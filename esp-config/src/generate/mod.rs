@@ -184,6 +184,17 @@ fn env_change_work_around(mut stdout: impl Write) {
     }
 }
 
+/// The stability of the configuration option.
+#[derive(Serialize, Clone, Copy)]
+pub enum Stability {
+    /// Unstable options need to be activated with the `unstable` feature
+    /// of the package that defines them.
+    Unstable,
+    /// Stable options contain the first version in which they were
+    /// stabilized.
+    Stable(&'static str),
+}
+
 /// A configuration option.
 #[derive(Serialize)]
 pub struct ConfigOption {
@@ -204,6 +215,9 @@ pub struct ConfigOption {
 
     /// An optional validator for the configuration option.
     pub constraint: Option<Validator>,
+
+    /// The stability of the configuration option.
+    pub stability: Stability,
 }
 
 impl ConfigOption {
@@ -350,42 +364,49 @@ mod test {
                             description: "NA",
                             default_value: Value::Integer(999),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "number_signed",
                             description: "NA",
                             default_value: Value::Integer(-777),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "string",
                             description: "NA",
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "bool",
                             description: "NA",
                             default_value: Value::Bool(false),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "number_default",
                             description: "NA",
                             default_value: Value::Integer(999),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "string_default",
                             description: "NA",
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "bool_default",
                             description: "NA",
                             default_value: Value::Bool(false),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                     ],
                     false,
@@ -435,24 +456,28 @@ mod test {
                             description: "NA",
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::PositiveInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "negative_number",
                             description: "NA",
                             default_value: Value::Integer(1),
                             constraint: Some(Validator::NegativeInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "non_negative_number",
                             description: "NA",
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::NonNegativeInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "range",
                             description: "NA",
                             default_value: Value::Integer(0),
                             constraint: Some(Validator::IntegerInRange(5..10)),
+                            stability: Stability::Stable("testing"),
                         },
                     ],
                     false,
@@ -478,6 +503,7 @@ mod test {
                             Ok(())
                         }
                     }))),
+                    stability: Stability::Stable("testing"),
                 }],
                 false,
             )
@@ -495,6 +521,7 @@ mod test {
                     description: "NA",
                     default_value: Value::Integer(-1),
                     constraint: Some(Validator::PositiveInteger),
+                    stability: Stability::Stable("testing"),
                 }],
                 false,
             )
@@ -519,6 +546,7 @@ mod test {
                             Ok(())
                         }
                     }))),
+                    stability: Stability::Stable("testing"),
                 }],
                 false,
             )
@@ -541,6 +569,7 @@ mod test {
                         description: "NA",
                         default_value: Value::Integer(999),
                         constraint: None,
+                        stability: Stability::Stable("testing"),
                     }],
                     false,
                 );
@@ -559,6 +588,7 @@ mod test {
                     description: "NA",
                     default_value: Value::Integer(999),
                     constraint: None,
+                    stability: Stability::Stable("testing"),
                 }],
                 false,
             );
@@ -577,6 +607,7 @@ mod test {
                         description: "NA",
                         default_value: Value::Integer(999),
                         constraint: None,
+                        stability: Stability::Stable("testing"),
                     }],
                     false,
                 );
@@ -599,6 +630,7 @@ mod test {
                         "variant-0".to_string(),
                         "variant-1".to_string(),
                     ])),
+                    stability: Stability::Stable("testing"),
                 }],
             );
         });
@@ -614,15 +646,25 @@ mod test {
     #[test]
     fn json_output() {
         let mut stdout = Vec::new();
-        let config = [ConfigOption {
-            name: "some-key",
-            description: "NA",
-            default_value: Value::String("variant-0".to_string()),
-            constraint: Some(Validator::Enumeration(vec![
-                "variant-0".to_string(),
-                "variant-1".to_string(),
-            ])),
-        }];
+        let config = [
+            ConfigOption {
+                name: "some-key",
+                description: "NA",
+                default_value: Value::String("variant-0".to_string()),
+                constraint: Some(Validator::Enumeration(vec![
+                    "variant-0".to_string(),
+                    "variant-1".to_string(),
+                ])),
+                stability: Stability::Stable("testing"),
+            },
+            ConfigOption {
+                name: "some-key2",
+                description: "NA",
+                default_value: Value::Bool(true),
+                constraint: None,
+                stability: Stability::Unstable,
+            },
+        ];
         let configs =
             temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
                 generate_config_internal(&mut stdout, "esp-test", &config)
@@ -643,8 +685,23 @@ mod test {
         "variant-1"
       ]
     },
+    "stability": {
+      "Stable": "testing"
+    },
     "actual_value": {
       "String": "variant-0"
+    }
+  },
+  {
+    "name": "some-key2",
+    "description": "NA",
+    "default_value": {
+      "Bool": true
+    },
+    "constraint": null,
+    "stability": "Unstable",
+    "actual_value": {
+      "Bool": true
     }
   }
 ]"#,

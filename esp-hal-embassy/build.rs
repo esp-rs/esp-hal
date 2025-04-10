@@ -1,7 +1,7 @@
 use std::{error::Error as StdError, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Error, Validator, Value};
+use esp_config::{generate_config, ConfigOption, Error, Stability, Validator, Value};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn StdError>> {
@@ -46,7 +46,8 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 name: "low-power-wait",
                 description: "Enables the lower-power wait if no tasks are ready to run on the thread-mode executor. This allows the MCU to use less power if the workload allows. Recommended for battery-powered systems. May impact analog performance.",
                 default_value: Value::Bool(true),
-                constraint: None
+                constraint: None,
+                stability: Stability::Unstable,
             },
             ConfigOption {
                 name: "timer-queue",
@@ -74,13 +75,15 @@ fn main() -> Result<(), Box<dyn StdError>> {
                         "generic" => Ok(()), // allows using embassy-time without the embassy executors
                         _ => Err(Error::Validation(format!("Expected 'single-integrated', 'multiple-integrated' or 'generic', found {string}")))
                     }
-                })))
+                }))),
+                stability: Stability::Unstable,
             },
             ConfigOption {
                 name: "generic-queue-size",
                 description: "The capacity of the queue when the `generic` timer queue flavour is selected.",
                 default_value: Value::Integer(64),
                 constraint: Some(Validator::PositiveInteger),
+                stability: Stability::Unstable,
             },
         ],
         true,

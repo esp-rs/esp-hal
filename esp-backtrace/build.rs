@@ -1,5 +1,5 @@
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Value};
+use esp_config::{generate_config, ConfigOption, Stability, Value};
 
 fn main() {
     // Ensure that only a single chip is specified:
@@ -22,6 +22,7 @@ fn main() {
             description: "The maximum number of frames that will be printed in a backtrace",
             default_value: Value::Integer(10),
             constraint: None,
+            stability: Stability::Unstable,
         }],
         true,
     );

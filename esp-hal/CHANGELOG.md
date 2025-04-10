@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2c::master::Operation` now implements `defmt::Format` (#3348)
 - ESP32-S2: Support for light-/deep-sleep (#3341) 
 - Add DMA memcpy support to the S2 (#3352)
+- ESP32-S2: Support for light-/deep-sleep (#3341)
 
 ### Changed
 
