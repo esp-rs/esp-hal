@@ -2805,15 +2805,16 @@ impl WifiController<'_> {
     ///
     /// This will set the mode accordingly.
     /// You need to use Wifi::connect() for connecting to an AP.
+    ///
+    /// Passing [Configuration::None] will disable both, AP and STA mode.
+    ///
+    /// If you don't intent to use WiFi anymore at all consider tearing down
+    /// WiFi completely.
     pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
         conf.validate()?;
 
         let mode = match conf {
-            Configuration::None => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ));
-            }
+            Configuration::None => wifi_mode_t_WIFI_MODE_NULL,
             Configuration::Client(_) => wifi_mode_t_WIFI_MODE_STA,
             Configuration::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
             Configuration::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
@@ -2823,11 +2824,7 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            Configuration::None => {
-                return Err(WifiError::InternalError(
-                    InternalWifiError::EspErrInvalidArg,
-                ));
-            }
+            Configuration::None => (),
             Configuration::Client(config) => {
                 apply_sta_config(config)?;
             }
