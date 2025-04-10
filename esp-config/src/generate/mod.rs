@@ -237,6 +237,12 @@ pub struct ConfigOption {
     pub constraint: Option<Validator>,
 }
 
+impl ConfigOption {
+    fn env_var(&self, prefix: &str) -> String {
+        format!("{}{}", prefix, screaming_snake_case(self.name))
+    }
+}
+
 fn create_config(
     mut stdout: impl Write,
     prefix: &str,
@@ -245,34 +251,15 @@ fn create_config(
 ) -> HashMap<String, Value> {
     let mut configs = HashMap::new();
 
-    for ConfigOption {
-        name,
-        description,
-        default_value,
-        constraint,
-    } in config
-    {
-        let name = format!("{prefix}{}", screaming_snake_case(name));
-        let allowed_values = if let Some(validator) = constraint {
-            validator.description()
-        } else {
-            None
-        }
-        .unwrap_or(String::from("-"));
-
+    for option in config {
         // Write documentation table line:
-        markdown::write_doc_table_line(
-            &mut *doc_table,
-            &name,
-            description,
-            &default_value,
-            &allowed_values,
-        );
+        markdown::write_doc_table_line(&mut *doc_table, prefix, &option);
 
+        let name = option.env_var(prefix);
         // Rebuild if config environment variable changed:
-        writeln!(stdout, "cargo:rerun-if-env-changed={name}").ok();
+        writeln!(stdout, "cargo:rerun-if-env-changed={}", name).ok();
 
-        configs.insert(name, default_value.clone());
+        configs.insert(name, option.default_value.clone());
     }
 
     configs
