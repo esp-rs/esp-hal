@@ -1,28 +1,12 @@
-use std::{
-    collections::HashMap,
-    env,
-    fmt::{self, Write as _},
-    fs,
-    io::Write,
-    path::PathBuf,
-};
+use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
 use serde::Serialize;
 
 use crate::generate::{validator::Validator, value::Value};
 
+mod markdown;
 pub(crate) mod validator;
 pub(crate) mod value;
-
-const DOC_TABLE_HEADER: &str = r#"
-| Name | Description | Default value | Allowed value |
-|------|-------------|---------------|---------------|
-"#;
-
-const SELECTED_TABLE_HEADER: &str = r#"
-| Name | Selected value |
-|------|----------------|
-"#;
 
 /// Configuration errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -84,11 +68,11 @@ pub fn generate_config(
     config: &[(&str, &str, Value, Option<Validator>)],
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
-    generate_config_internal(&mut std::io::stdout(), crate_name, config, emit_md_tables)
+    generate_config_internal(std::io::stdout(), crate_name, config, emit_md_tables)
 }
 
-pub fn generate_config_internal<W: Write>(
-    stdout: &mut W,
+pub fn generate_config_internal(
+    mut stdout: impl Write,
     crate_name: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
     emit_md_tables: bool,
@@ -98,10 +82,10 @@ pub fn generate_config_internal<W: Write>(
     writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
 
     #[cfg(not(test))]
-    env_change_work_around(stdout);
+    env_change_work_around(&mut stdout);
 
-    let mut doc_table = String::from(DOC_TABLE_HEADER);
-    let mut selected_config = String::from(SELECTED_TABLE_HEADER);
+    let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
+    let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
 
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
@@ -112,16 +96,14 @@ pub fn generate_config_internal<W: Write>(
     let config_validators = config
         .iter()
         .flat_map(|(name, _description, _default, validator)| {
-            if let Some(validator) = validator {
+            validator.as_ref().map(|validator| {
                 let name = format!("{prefix}{}", screaming_snake_case(name));
-                Some((name, validator))
-            } else {
-                None
-            }
+                (name, validator)
+            })
         })
         .collect::<HashMap<_, _>>();
 
-    let mut configs = create_config(stdout, &prefix, config, &mut doc_table);
+    let mut configs = create_config(&mut stdout, &prefix, config, &mut doc_table);
     capture_from_env(&prefix, &mut configs);
 
     for (name, value) in configs.iter() {
@@ -130,18 +112,22 @@ pub fn generate_config_internal<W: Write>(
         }
     }
 
-    let validators: HashMap<String, &Validator> = config
+    let validators = config
         .iter()
         .filter_map(|(name, _, _, validator)| {
-            if validator.is_some() {
-                Some((snake_case(name), validator.as_ref().unwrap()))
-            } else {
-                None
-            }
+            validator
+                .as_ref()
+                .map(|validator| (snake_case(name), validator))
         })
-        .collect();
+        .collect::<HashMap<_, _>>();
 
-    emit_configuration(stdout, &prefix, &configs, &validators, &mut selected_config);
+    emit_configuration(
+        &mut stdout,
+        &prefix,
+        &configs,
+        &validators,
+        &mut selected_config,
+    );
 
     write_config_json(snake_case(crate_name), config, &configs);
 
@@ -200,7 +186,7 @@ fn write_config_json(
 // This can be removed when https://github.com/rust-lang/cargo/pull/14058 is merged.
 // Unlikely to work on projects in workspaces
 #[cfg(not(test))]
-fn env_change_work_around<W: Write>(stdout: &mut W) {
+fn env_change_work_around(mut stdout: impl Write) {
     let mut out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
     // We clean out_dir by removing all trailing directories, until it ends with
@@ -233,8 +219,8 @@ fn env_change_work_around<W: Write>(stdout: &mut W) {
     }
 }
 
-fn create_config<W: Write>(
-    stdout: &mut W,
+fn create_config(
+    mut stdout: impl Write,
     prefix: &str,
     config: &[(&str, &str, Value, Option<Validator>)],
     doc_table: &mut String,
@@ -250,18 +236,19 @@ fn create_config<W: Write>(
         }
         .unwrap_or(String::from("-"));
 
-        configs.insert(name.clone(), default.clone());
-
         // Write documentation table line:
-        let default = default.to_string();
-        writeln!(
-            doc_table,
-            "|**{name}**|{description}|{default}|{allowed_values}"
-        )
-        .unwrap();
+        markdown::write_doc_table_line(
+            &mut *doc_table,
+            &name,
+            description,
+            &default,
+            &allowed_values,
+        );
 
         // Rebuild if config environment variable changed:
         writeln!(stdout, "cargo:rerun-if-env-changed={name}").ok();
+
+        configs.insert(name, default.clone());
     }
 
     configs
@@ -294,8 +281,8 @@ fn capture_from_env(prefix: &str, configs: &mut HashMap<String, Value>) {
     }
 }
 
-fn emit_configuration<W: Write>(
-    stdout: &mut W,
+fn emit_configuration(
+    mut stdout: impl Write,
     prefix: &str,
     configs: &HashMap<String, Value>,
     validators: &HashMap<String, &Validator>,
@@ -311,20 +298,17 @@ fn emit_configuration<W: Write>(
 
         if let Value::String(value) = value {
             if let Some(Validator::Enumeration(_)) = validators.get(&cfg_name) {
-                let value = format!("{}_{}", cfg_name, snake_case(value));
-                writeln!(stdout, "cargo:rustc-cfg={value}").ok();
+                writeln!(stdout, "cargo:rustc-cfg={}_{}", cfg_name, snake_case(value)).ok();
             }
         }
 
-        let value = value.to_string();
-
         // Values that haven't been seen will be output here with the default value:
         writeln!(stdout, "cargo:rustc-env={}={}", name, value).ok();
-        writeln!(selected_config, "|**{name}**|{value}|").unwrap();
+        markdown::write_summary_table_line(&mut *selected_config, &name, value);
     }
 
     for (name, validator) in validators {
-        validator.emit_cargo_extras(stdout, &name);
+        validator.emit_cargo_extras(&mut stdout, &name);
     }
 }
 
@@ -361,7 +345,7 @@ mod test {
         for input in INPUTS {
             v.parse_in_place(input).unwrap();
             // no matter the input format, the output format should be decimal
-            assert_eq!(format!("{v}"), "170");
+            assert_eq!(v.to_string(), "170");
         }
     }
 
@@ -370,10 +354,13 @@ mod test {
         let mut v = Value::Bool(false);
 
         v.parse_in_place("true").unwrap();
-        assert_eq!(format!("{v}"), "true");
+        assert_eq!(v.to_string(), "true");
 
         v.parse_in_place("false").unwrap();
-        assert_eq!(format!("{v}"), "false");
+        assert_eq!(v.to_string(), "false");
+
+        v.parse_in_place("else")
+            .expect_err("Only true or false are valid");
     }
 
     #[test]
@@ -391,13 +378,13 @@ mod test {
                     &[
                         ("number", "NA", Value::Integer(999), None),
                         ("number_signed", "NA", Value::Integer(-777), None),
-                        ("string", "NA", Value::String("Demo".to_owned()), None),
+                        ("string", "NA", Value::String("Demo".to_string()), None),
                         ("bool", "NA", Value::Bool(false), None),
                         ("number_default", "NA", Value::Integer(999), None),
                         (
                             "string_default",
                             "NA",
-                            Value::String("Demo".to_owned()),
+                            Value::String("Demo".to_string()),
                             None,
                         ),
                         ("bool_default", "NA", Value::Bool(false), None),
@@ -406,57 +393,27 @@ mod test {
                 );
 
                 // some values have changed
+                assert_eq!(configs["ESP_TEST_CONFIG_NUMBER"], Value::Integer(0xaa));
                 assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_NUMBER").unwrap() {
-                        Value::Integer(num) => *num,
-                        _ => unreachable!(),
-                    },
-                    0xaa
+                    configs["ESP_TEST_CONFIG_NUMBER_SIGNED"],
+                    Value::Integer(-999)
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_NUMBER_SIGNED").unwrap() {
-                        Value::Integer(num) => *num,
-                        _ => unreachable!(),
-                    },
-                    -999
+                    configs["ESP_TEST_CONFIG_STRING"],
+                    Value::String("Hello world!".to_string())
                 );
-                assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_STRING").unwrap() {
-                        Value::String(val) => val,
-                        _ => unreachable!(),
-                    },
-                    "Hello world!"
-                );
-                assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_BOOL").unwrap() {
-                        Value::Bool(val) => *val,
-                        _ => unreachable!(),
-                    },
-                    true
-                );
+                assert_eq!(configs["ESP_TEST_CONFIG_BOOL"], Value::Bool(true));
 
                 // the rest are the defaults
                 assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_NUMBER_DEFAULT").unwrap() {
-                        Value::Integer(num) => *num,
-                        _ => unreachable!(),
-                    },
-                    999
+                    configs["ESP_TEST_CONFIG_NUMBER_DEFAULT"],
+                    Value::Integer(999)
                 );
                 assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_STRING_DEFAULT").unwrap() {
-                        Value::String(val) => val,
-                        _ => unreachable!(),
-                    },
-                    "Demo"
+                    configs["ESP_TEST_CONFIG_STRING_DEFAULT"],
+                    Value::String("Demo".to_string())
                 );
-                assert_eq!(
-                    match configs.get("ESP_TEST_CONFIG_BOOL_DEFAULT").unwrap() {
-                        Value::Bool(val) => *val,
-                        _ => unreachable!(),
-                    },
-                    false
-                );
+                assert_eq!(configs["ESP_TEST_CONFIG_BOOL_DEFAULT"], Value::Bool(false));
             },
         )
     }
@@ -634,11 +591,34 @@ mod test {
         });
 
         let cargo_lines: Vec<&str> = std::str::from_utf8(&stdout).unwrap().lines().collect();
-        println!("{:#?}", cargo_lines);
         assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key)"));
         assert!(cargo_lines.contains(&"cargo:rustc-env=ESP_TEST_CONFIG_SOME_KEY=variant-0"));
         assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_0)"));
         assert!(cargo_lines.contains(&"cargo:rustc-check-cfg=cfg(some_key_variant_1)"));
         assert!(cargo_lines.contains(&"cargo:rustc-cfg=some_key_variant_0"));
+    }
+
+    #[test]
+    fn json_output() {
+        let mut stdout = Vec::new();
+        let config = [ConfigOption {
+            name: "some-key",
+            description: "NA",
+            default_value: Value::String("variant-0".to_string()),
+            constraint: Some(Validator::Enumeration(vec![
+                "variant-0".to_string(),
+                "variant-1".to_string(),
+            ])),
+        }];
+        let configs =
+            temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+                generate_config_internal(&mut stdout, "esp-test", &config, false)
+            });
+
+        let json_output = config_json(snake_case("esp-test"), &config, &configs);
+        assert_eq!(
+            r#"[{"name":"some-key","description":"NA","default_value":{"String":"variant-0"},"constraint":{"Enumeration":["variant-0","variant-1"]},"actual_value":{"String":"variant-0"}}]"#,
+            json_output
+        );
     }
 }
