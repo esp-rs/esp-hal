@@ -57,7 +57,14 @@ impl Validator {
             Validator::IntegerInRange(range) => {
                 Some(format!("Integer in range {}..{}", range.start, range.end))
             }
-            Validator::Enumeration(values) => Some(format!("Any of {:?}", values)),
+            Validator::Enumeration(values) => Some(format!(
+                "One of: <ul>{}</ul>",
+                values
+                    .iter()
+                    .map(|v| format!("<li>{}</li>", v))
+                    .collect::<Vec<_>>()
+                    .join("")
+            )),
             Validator::Custom(_) => None,
         }
     }
