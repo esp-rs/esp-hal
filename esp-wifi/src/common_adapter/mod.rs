@@ -2,7 +2,7 @@ use esp_wifi_sys::{
     c_types::c_char,
     include::{
         esp_phy_calibration_data_t,
-        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+        esp_phy_calibration_mode_t,
         get_phy_version_str,
         register_chipv7_phy,
         timeval,
@@ -361,10 +361,33 @@ pub(crate) fn phy_calibrate() {
     unsafe {
         chip_specific::bbpll_en_usb();
 
+        cfg_if::cfg_if! {
+            if #[cfg(phy_full_calibration)] {
+                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
+            } else {
+                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
+            }
+        };
+
+        cfg_if::cfg_if! {
+            if #[cfg(phy_skip_calibration_after_deep_sleep)] {
+                let calibration_mode = if crate::hal::system::reset_reason() == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep) {
+                    esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+                } else {
+                    CALIBRATION_MODE
+                };
+            } else {
+                let calibration_mode = CALIBRATION_MODE;
+            }
+        };
+
+        // TODO use debug
+        info!("Using calibration mode {}", calibration_mode);
+
         register_chipv7_phy(
             init_data,
             &mut cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
-            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+            calibration_mode,
         );
     }
 }

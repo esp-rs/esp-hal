@@ -275,6 +275,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 stability: Stability::Unstable,
                 active: true,
             },
+            ConfigOption {
+                name: "phy_skip_calibration_after_deep_sleep",
+                description: "Use PHY_RF_CAL_NONE after deep sleep.",
+                default_value: Value::Bool(false),
+                constraint: None
+            },
+            ConfigOption {
+                name: "phy_full_calibration",
+                description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL.",
+                default_value: Value::Bool(true),
+                constraint: None
+            },
         ],
         true,
         true,
