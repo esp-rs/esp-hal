@@ -17,7 +17,7 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
         .constraint
         .as_ref()
         .and_then(|validator| validator.description())
-        .unwrap_or(String::from("-"));
+        .unwrap_or_default();
 
     writeln!(
         table,
