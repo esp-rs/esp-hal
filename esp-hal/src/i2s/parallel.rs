@@ -488,6 +488,7 @@ fn calculate_clock(sample_rate: Rate, data_bits: u8) -> I2sClockDividers {
     }
 }
 #[doc(hidden)]
+#[allow(private_bounds)]
 pub trait PrivateInstance: DmaEligible {
     fn regs(&self) -> &RegisterBlock;
     fn peripheral(&self) -> crate::system::Peripheral;

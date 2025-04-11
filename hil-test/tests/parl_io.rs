@@ -9,7 +9,7 @@
 #[cfg(not(esp32h2))]
 use esp_hal::parl_io::{RxSixteenBits, TxSixteenBits};
 use esp_hal::{
-    dma::{DmaChannel0, DmaRxBuf, DmaTxBuf},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Pin},
     parl_io::{
@@ -32,14 +32,14 @@ use esp_hal::{
         TxPinConfigWithValidPin,
         TxTwoBits,
     },
-    peripherals::PARL_IO,
+    peripherals::{DMA_CH0, PARL_IO},
     time::Rate,
 };
 use hil_test as _;
 
 struct Context {
     parl_io: PARL_IO<'static>,
-    dma_channel: DmaChannel0<'static>,
+    dma_channel: DMA_CH0<'static>,
     clock_pin: AnyPin<'static>,
     valid_pin: AnyPin<'static>,
     data_pins: [AnyPin<'static>; 8],

@@ -220,30 +220,30 @@ impl TxRegisterAccess for AnyGdmaTxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         match self.channel {
-            0 => DmaChannel0::handler_out(),
+            0 => DMA_CH0::handler_out(),
             #[cfg(not(esp32c2))]
-            1 => DmaChannel1::handler_out(),
+            1 => DMA_CH1::handler_out(),
             #[cfg(not(esp32c2))]
-            2 => DmaChannel2::handler_out(),
+            2 => DMA_CH2::handler_out(),
             #[cfg(esp32s3)]
-            3 => DmaChannel3::handler_out(),
+            3 => DMA_CH3::handler_out(),
             #[cfg(esp32s3)]
-            4 => DmaChannel4::handler_out(),
+            4 => DMA_CH4::handler_out(),
             _ => unreachable!(),
         }
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         match self.channel {
-            0 => DmaChannel0::isr_out(),
+            0 => DMA_CH0::isr_out(),
             #[cfg(not(esp32c2))]
-            1 => DmaChannel1::isr_out(),
+            1 => DMA_CH1::isr_out(),
             #[cfg(not(esp32c2))]
-            2 => DmaChannel2::isr_out(),
+            2 => DMA_CH2::isr_out(),
             #[cfg(esp32s3)]
-            3 => DmaChannel3::isr_out(),
+            3 => DMA_CH3::isr_out(),
             #[cfg(esp32s3)]
-            4 => DmaChannel4::isr_out(),
+            4 => DMA_CH4::isr_out(),
             _ => unreachable!(),
         }
     }
@@ -450,30 +450,30 @@ impl RxRegisterAccess for AnyGdmaRxChannel<'_> {
 
     fn async_handler(&self) -> Option<InterruptHandler> {
         match self.channel {
-            0 => DmaChannel0::handler_in(),
+            0 => DMA_CH0::handler_in(),
             #[cfg(not(esp32c2))]
-            1 => DmaChannel1::handler_in(),
+            1 => DMA_CH1::handler_in(),
             #[cfg(not(esp32c2))]
-            2 => DmaChannel2::handler_in(),
+            2 => DMA_CH2::handler_in(),
             #[cfg(esp32s3)]
-            3 => DmaChannel3::handler_in(),
+            3 => DMA_CH3::handler_in(),
             #[cfg(esp32s3)]
-            4 => DmaChannel4::handler_in(),
+            4 => DMA_CH4::handler_in(),
             _ => unreachable!(),
         }
     }
 
     fn peripheral_interrupt(&self) -> Option<Interrupt> {
         match self.channel {
-            0 => DmaChannel0::isr_in(),
+            0 => DMA_CH0::isr_in(),
             #[cfg(not(esp32c2))]
-            1 => DmaChannel1::isr_in(),
+            1 => DMA_CH1::isr_in(),
             #[cfg(not(esp32c2))]
-            2 => DmaChannel2::isr_in(),
+            2 => DMA_CH2::isr_in(),
             #[cfg(esp32s3)]
-            3 => DmaChannel3::isr_in(),
+            3 => DMA_CH3::isr_in(),
             #[cfg(esp32s3)]
-            4 => DmaChannel4::isr_in(),
+            4 => DMA_CH4::isr_in(),
             _ => unreachable!(),
         }
     }
@@ -589,9 +589,8 @@ impl<CH: DmaChannel, Dm: DriverMode> Channel<Dm, CH> {
 macro_rules! impl_channel {
     ($num:literal, $interrupt_in:ident $(, $interrupt_out:ident)? ) => {
         paste::paste! {
-            $crate::create_peripheral!([<DmaChannel $num>] <= virtual);
-
-            impl [<DmaChannel $num>]<'_> {
+            use $crate::peripherals::[<DMA_CH $num>];
+            impl [<DMA_CH $num>]<'_> {
                 fn handler_in() -> Option<InterruptHandler> {
                     $crate::if_set! {
                         $({
@@ -599,15 +598,15 @@ macro_rules! impl_channel {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler_in() {
                                 $crate::ignore!($interrupt_out);
-                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]<'static>>();
+                                super::asynch::handle_in_interrupt::<[< DMA_CH $num >]<'static>>();
                             }
                             Some(interrupt_handler_in)
                         })?,
                         {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler() {
-                                super::asynch::handle_in_interrupt::<[< DmaChannel $num >]<'static>>();
-                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]<'static>>();
+                                super::asynch::handle_in_interrupt::<[< DMA_CH $num >]<'static>>();
+                                super::asynch::handle_out_interrupt::<[< DMA_CH $num >]<'static>>();
                             }
                             Some(interrupt_handler)
                         }
@@ -624,7 +623,7 @@ macro_rules! impl_channel {
                             #[handler(priority = Priority::max())]
                             fn interrupt_handler_out() {
                                 $crate::ignore!($interrupt_out);
-                                super::asynch::handle_out_interrupt::<[< DmaChannel $num >]<'static>>();
+                                super::asynch::handle_out_interrupt::<[< DMA_CH $num >]<'static>>();
                             }
                             Some(interrupt_handler_out)
                         })?,
@@ -637,7 +636,7 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl<'d> DmaChannel for [<DmaChannel $num>]<'d> {
+            impl<'d> DmaChannel for [<DMA_CH $num>]<'d> {
                 type Rx = AnyGdmaRxChannel<'d>;
                 type Tx = AnyGdmaTxChannel<'d>;
 
@@ -655,7 +654,7 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for [<DmaChannel $num>]<'d> {
+            impl<'d> DmaChannelConvert<AnyGdmaChannel<'d>> for [<DMA_CH $num>]<'d> {
                 fn degrade(self) -> AnyGdmaChannel<'d> {
                     AnyGdmaChannel {
                         channel: $num,
@@ -664,7 +663,7 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for [<DmaChannel $num>]<'d> {
+            impl<'d> DmaChannelConvert<AnyGdmaRxChannel<'d>> for [<DMA_CH $num>]<'d> {
                 fn degrade(self) -> AnyGdmaRxChannel<'d> {
                     AnyGdmaRxChannel {
                         channel: $num,
@@ -673,7 +672,7 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for [<DmaChannel $num>]<'d> {
+            impl<'d> DmaChannelConvert<AnyGdmaTxChannel<'d>> for [<DMA_CH $num>]<'d> {
                 fn degrade(self) -> AnyGdmaTxChannel<'d> {
                     AnyGdmaTxChannel {
                         channel: $num,
@@ -682,7 +681,7 @@ macro_rules! impl_channel {
                 }
             }
 
-            impl DmaChannelExt for [<DmaChannel $num>]<'_> {
+            impl DmaChannelExt for [<DMA_CH $num>]<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
                     AnyGdmaRxChannel {
                         channel: $num,
