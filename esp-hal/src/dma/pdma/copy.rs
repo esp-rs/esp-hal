@@ -4,7 +4,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::*,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{Interrupt, COPY_DMA},
+    peripherals::{Interrupt, DMA_COPY},
 };
 
 pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
@@ -12,7 +12,7 @@ pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;
 /// The RX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaRxChannel<'d>(pub(crate) CopyDmaChannel<'d>);
+pub struct CopyDmaRxChannel<'d>(pub(crate) DMA_COPY<'d>);
 
 impl CopyDmaRxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -26,7 +26,7 @@ impl DmaRxChannel for CopyDmaRxChannel<'_> {}
 /// The TX half of a Copy DMA channel.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaTxChannel<'d>(pub(crate) CopyDmaChannel<'d>);
+pub struct CopyDmaTxChannel<'d>(pub(crate) DMA_COPY<'d>);
 
 impl CopyDmaTxChannel<'_> {
     fn regs(&self) -> &CopyRegisterBlock {
@@ -359,29 +359,7 @@ impl InterruptAccess<DmaRxInterrupt> for CopyDmaRxChannel<'_> {
     }
 }
 
-#[doc = "DMA channel suitable for COPY"]
-#[non_exhaustive]
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct CopyDmaChannel<'d> {
-    _lifetime: core::marker::PhantomData<&'d mut ()>,
-}
-
-impl crate::private::Sealed for CopyDmaChannel<'_> {}
-
-impl CopyDmaChannel<'_> {
-    #[doc = r" Unsafely constructs a new DMA channel."]
-    #[doc = r""]
-    #[doc = r" # Safety"]
-    #[doc = r""]
-    #[doc = r" The caller must ensure that only a single instance is used."]
-    pub unsafe fn steal() -> Self {
-        Self {
-            _lifetime: core::marker::PhantomData,
-        }
-    }
-}
-impl<'d> DmaChannel for CopyDmaChannel<'d> {
+impl<'d> DmaChannel for DMA_COPY<'d> {
     type Rx = CopyDmaRxChannel<'d>;
     type Tx = CopyDmaTxChannel<'d>;
     unsafe fn split_internal(self, _: crate::private::Internal) -> (Self::Rx, Self::Tx) {
@@ -391,7 +369,7 @@ impl<'d> DmaChannel for CopyDmaChannel<'d> {
         )
     }
 }
-impl DmaChannelExt for CopyDmaChannel<'_> {
+impl DmaChannelExt for DMA_COPY<'_> {
     fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
         CopyDmaRxChannel(unsafe { Self::steal() })
     }
@@ -399,10 +377,10 @@ impl DmaChannelExt for CopyDmaChannel<'_> {
         CopyDmaTxChannel(unsafe { Self::steal() })
     }
 }
-impl PdmaChannel for CopyDmaChannel<'_> {
+impl PdmaChannel for DMA_COPY<'_> {
     type RegisterBlock = CopyRegisterBlock;
     fn register_block(&self) -> &Self::RegisterBlock {
-        COPY_DMA::regs()
+        DMA_COPY::regs()
     }
     fn tx_waker(&self) -> &'static AtomicWaker {
         static WAKER: AtomicWaker = AtomicWaker::new();
@@ -421,8 +399,8 @@ impl PdmaChannel for CopyDmaChannel<'_> {
     }
     fn async_handler(&self) -> InterruptHandler {
         pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {
-            super::asynch::handle_in_interrupt::<CopyDmaChannel<'static>>();
-            super::asynch::handle_out_interrupt::<CopyDmaChannel<'static>>();
+            super::asynch::handle_in_interrupt::<DMA_COPY<'static>>();
+            super::asynch::handle_out_interrupt::<DMA_COPY<'static>>();
         }
         #[allow(non_upper_case_globals)]
         pub(crate) static interrupt_handler: InterruptHandler =
@@ -438,12 +416,12 @@ impl PdmaChannel for CopyDmaChannel<'_> {
         &FLAG
     }
 }
-impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for CopyDmaChannel<'d> {
+impl<'d> DmaChannelConvert<CopyDmaRxChannel<'d>> for DMA_COPY<'d> {
     fn degrade(self) -> CopyDmaRxChannel<'d> {
         CopyDmaRxChannel(self)
     }
 }
-impl<'d> DmaChannelConvert<CopyDmaTxChannel<'d>> for CopyDmaChannel<'d> {
+impl<'d> DmaChannelConvert<CopyDmaTxChannel<'d>> for DMA_COPY<'d> {
     fn degrade(self) -> CopyDmaTxChannel<'d> {
         CopyDmaTxChannel(self)
     }

@@ -23,9 +23,9 @@ use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0<'d> = esp_hal::dma::I2s0DmaChannel<'d>;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
     } else {
-        type DmaChannel0<'d> = esp_hal::dma::DmaChannel0<'d>;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
     }
 }
 

@@ -206,9 +206,9 @@ mod test {
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
-                type DmaChannel<'a> = esp_hal::dma::Spi2DmaChannel<'a>;
+                type DmaChannel<'a> = esp_hal::peripherals::DMA_SPI2<'a>;
             } else {
-                type DmaChannel<'a> = esp_hal::dma::DmaChannel0<'a>;
+                type DmaChannel<'a> = esp_hal::peripherals::DMA_CH0<'a>;
             }
         }
 

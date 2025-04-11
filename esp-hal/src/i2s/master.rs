@@ -559,6 +559,7 @@ where
     }
 }
 
+#[instability::unstable]
 impl<'d, Dm> DmaSupportRx for I2sRx<'d, Dm>
 where
     Dm: DriverMode,
@@ -789,6 +790,7 @@ mod private {
         }
     }
 
+    #[allow(private_bounds)]
     pub trait RegBlock: DmaEligible {
         fn regs(&self) -> &RegisterBlock;
         fn peripheral(&self) -> crate::system::Peripheral;

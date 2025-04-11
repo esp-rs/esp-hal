@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{DmaChannel0, DmaTxBuf},
+    dma::DmaTxBuf,
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
@@ -19,6 +19,7 @@ use esp_hal::{
         channel::{CtrlMode, EdgeMode},
         Pcnt,
     },
+    peripherals::DMA_CH0,
     time::Rate,
     Blocking,
 };
@@ -39,7 +40,7 @@ struct Context<'d> {
     lcd_cam: LcdCam<'d, Blocking>,
     pcnt: Pcnt<'d>,
     pins: Pins,
-    dma: DmaChannel0<'d>,
+    dma: DMA_CH0<'d>,
     dma_buf: DmaTxBuf,
 }
 

@@ -579,6 +579,7 @@ pub trait Instance: crate::private::Sealed + super::IntoAnySpi {
 
 /// A marker for DMA-capable SPI peripheral instances.
 #[doc(hidden)]
+#[allow(private_bounds)]
 pub trait InstanceDma: Instance + DmaEligible {}
 
 impl InstanceDma for crate::peripherals::SPI2<'_> {}

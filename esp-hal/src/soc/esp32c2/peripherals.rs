@@ -61,6 +61,8 @@ crate::peripherals! {
         MEM2MEM5 <= virtual,
         MEM2MEM6 <= virtual,
         MEM2MEM8 <= virtual,
+
+        DMA_CH0 <= virtual,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo])
@@ -77,8 +79,5 @@ crate::peripherals! {
         (18, [Input, Output])
         (19, [Input, Output])
         (20, [Input, Output] (0 => U0RXD) ())
-    ],
-    dma_channels: [
-        DMA_CH0: DmaChannel0,
     ]
 }

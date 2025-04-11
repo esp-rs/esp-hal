@@ -2674,6 +2674,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[doc(hidden)]
+#[allow(private_bounds)]
 pub trait PeripheralInstance: private::Sealed + DmaEligible {
     /// Returns the peripheral data describing this SPI instance.
     fn info(&self) -> &'static Info;

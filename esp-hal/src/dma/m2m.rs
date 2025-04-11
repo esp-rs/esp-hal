@@ -11,8 +11,6 @@ use crate::dma::{
     DmaChannelConvert,
     DmaEligible,
 };
-#[cfg(esp32s2)]
-use crate::dma::{CopyDmaChannel, CopyDmaRxChannel, CopyDmaTxChannel};
 use crate::{
     dma::{
         BurstConfig,
@@ -32,6 +30,11 @@ use crate::{
     Async,
     Blocking,
     DriverMode,
+};
+#[cfg(esp32s2)]
+use crate::{
+    dma::{CopyDmaRxChannel, CopyDmaTxChannel},
+    peripherals::DMA_COPY,
 };
 
 /// DMA Memory to Memory pseudo-Peripheral
@@ -88,7 +91,7 @@ impl<'d> Mem2Mem<'d, Blocking> {
 
     /// Create a new Mem2Mem instance.
     #[cfg(esp32s2)]
-    pub fn new(channel: CopyDmaChannel<'d>) -> Self {
+    pub fn new(channel: DMA_COPY<'d>) -> Self {
         let channel = Channel::new(channel);
 
         // The S2's COPY DMA channel doesn't care about this. Once support for other

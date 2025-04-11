@@ -7,13 +7,14 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{DmaChannel0, DmaTxBuf},
+    dma::DmaTxBuf,
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
         lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
     },
+    peripherals::DMA_CH0,
     time::Rate,
     Async,
 };
@@ -23,7 +24,7 @@ const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Async>,
-    dma: DmaChannel0<'d>,
+    dma: DMA_CH0<'d>,
     dma_buf: DmaTxBuf,
 }
 

@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migrate SPI slave driver to newer DMA API (#3326)
 - Migrate DMA memcpy driver to newer DMA API (#3327)
 - Moved numbered GPIO pin types from `esp_hal::gpio::GpioPin<N>` to `esp_hal::peripherals::GPION<'_>` (#3349)
+- Moved DMA channel types from `esp_hal::dma::DmaChannelN`/`esp_hal::dma::XYDmaChannel` to `esp_hal::peripherals::DMA_XY` (#3372)
 - `ParlIoFullDuplex`, `ParlIoTxOnly` and `ParlIoRxOnly` have been merged into `ParlIo` (#3366)
 
 ### Fixed

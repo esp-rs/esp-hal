@@ -949,6 +949,7 @@ impl From<u32> for Owner {
 }
 
 #[doc(hidden)]
+#[instability::unstable]
 pub trait DmaEligible {
     /// The most specific DMA channel type usable by this peripheral.
     type Dma: DmaChannel;
@@ -1600,10 +1601,10 @@ pub type PeripheralRxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Rx;
 /// Helper type to get the DMA Tx channel for a peripheral.
 pub type PeripheralTxChannel<T> = <PeripheralDmaChannel<T> as DmaChannel>::Tx;
 
-#[doc(hidden)]
+#[instability::unstable]
 pub trait DmaRxChannel: RxRegisterAccess + InterruptAccess<DmaRxInterrupt> {}
 
-#[doc(hidden)]
+#[instability::unstable]
 pub trait DmaTxChannel: TxRegisterAccess + InterruptAccess<DmaTxInterrupt> {}
 
 /// A description of a DMA Channel.
@@ -1695,6 +1696,7 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// # Ok(())
 /// # }
 /// ```
+#[allow(private_bounds)]
 pub trait DmaChannelFor<P: DmaEligible>:
     DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
 {
@@ -1713,6 +1715,7 @@ where
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaRxChannel` implementation.
+#[allow(private_bounds)]
 pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
 impl<P, RX> RxChannelFor<P> for RX
 where
@@ -1728,6 +1731,7 @@ where
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaTxChannel` implementation.
+#[allow(private_bounds)]
 pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
 impl<P, TX> TxChannelFor<P> for TX
 where
@@ -2516,6 +2520,7 @@ pub(crate) mod dma_private {
         fn peripheral_dma_stop(&mut self);
     }
 
+    #[instability::unstable]
     pub trait DmaSupportTx: DmaSupport {
         type Channel: DmaTxChannel;
 
@@ -2524,6 +2529,7 @@ pub(crate) mod dma_private {
         fn chain(&mut self) -> &mut DescriptorChain;
     }
 
+    #[instability::unstable]
     pub trait DmaSupportRx: DmaSupport {
         type Channel: DmaRxChannel;
 
