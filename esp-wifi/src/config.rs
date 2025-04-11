@@ -28,8 +28,8 @@ pub(crate) struct EspWifiConfig {
 #[non_exhaustive]
 #[derive(Default)]
 pub enum PowerSaveMode {
-    None,
     #[default]
+    None,
     Minimum,
     Maximum,
 }
