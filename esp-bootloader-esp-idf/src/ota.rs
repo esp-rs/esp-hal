@@ -28,14 +28,6 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
 
-// We run tests on the host which happens to be MacOS machines and mach-o
-// doesn't like `link-sections`this way
-#[cfg(not(target_os = "macos"))]
-#[link_section = ".espressif.metadata"]
-#[used]
-#[export_name = "bootloader.FEATURE_OTA"]
-static OTA_FEATURE: [u8; 11] = *b"FEATURE=OTA";
-
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
 
