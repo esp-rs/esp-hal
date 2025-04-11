@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
 use serde::Serialize;
@@ -51,6 +52,10 @@ impl fmt::Display for Error {
 /// that match the given prefix. It will then attempt to parse the [`Value`] and
 /// run any validators which have been specified.
 ///
+/// [`Stability::Unstable`] features will only be enabled if the `unstable`
+/// feature is enabled in the dependant crate. If the `unstable` feature is not
+/// enabled, setting these options will result in a build error.
+///
 /// Once the config has been parsed, this function will emit `snake_case` cfg's
 /// _without_ the prefix which can be used in the dependant crate. After that,
 /// it will create a markdown table in the `OUT_DIR` under the name
@@ -66,18 +71,22 @@ impl fmt::Display for Error {
 pub fn generate_config(
     crate_name: &str,
     config: &[ConfigOption],
+    enable_unstable: bool,
     emit_md_tables: bool,
 ) -> HashMap<String, Value> {
-    let configs = generate_config_internal(std::io::stdout(), crate_name, config);
+    let configs = generate_config_internal(std::io::stdout(), crate_name, config, enable_unstable);
 
     if emit_md_tables {
         let file_name = snake_case(crate_name);
 
-        let mut doc_table = String::from(markdown::DOC_TABLE_HEADER);
+        let mut doc_table = markdown::DOC_TABLE_HEADER.replace(
+            "{prefix}",
+            format!("{}_CONFIG_*", screaming_snake_case(crate_name)).as_str(),
+        );
         let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
 
         for (name, option, value) in configs.iter() {
-            markdown::write_doc_table_line(&mut doc_table, &name, option);
+            markdown::write_doc_table_line(&mut doc_table, name, option);
             markdown::write_summary_table_line(&mut selected_config, &name, value);
         }
 
@@ -93,6 +102,7 @@ pub fn generate_config_internal<'a>(
     mut stdout: impl Write,
     crate_name: &str,
     config: &'a [ConfigOption],
+    enable_unstable: bool,
 ) -> Vec<(String, &'a ConfigOption, Value)> {
     // Only rebuild if `build.rs` changed. Otherwise, Cargo will rebuild if any
     // other file changed.
@@ -105,7 +115,7 @@ pub fn generate_config_internal<'a>(
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
     let mut configs = create_config(&prefix, config);
-    capture_from_env(&prefix, &mut configs);
+    capture_from_env(crate_name, &prefix, &mut configs, enable_unstable);
 
     for (_, option, value) in configs.iter() {
         if let Some(ref validator) = option.constraint {
@@ -184,6 +194,26 @@ fn env_change_work_around(mut stdout: impl Write) {
     }
 }
 
+/// The stability of the configuration option.
+#[derive(Serialize, Clone, Copy)]
+pub enum Stability {
+    /// Unstable options need to be activated with the `unstable` feature
+    /// of the package that defines them.
+    Unstable,
+    /// Stable options contain the first version in which they were
+    /// stabilized.
+    Stable(&'static str),
+}
+
+impl Display for Stability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Stability::Unstable => write!(f, "⚠️ Unstable"),
+            Stability::Stable(version) => write!(f, "Stable since {version}"),
+        }
+    }
+}
+
 /// A configuration option.
 #[derive(Serialize)]
 pub struct ConfigOption {
@@ -204,6 +234,9 @@ pub struct ConfigOption {
 
     /// An optional validator for the configuration option.
     pub constraint: Option<Validator>,
+
+    /// The stability of the configuration option.
+    pub stability: Stability,
 }
 
 impl ConfigOption {
@@ -213,6 +246,10 @@ impl ConfigOption {
 
     fn cfg_name(&self) -> String {
         snake_case(self.name)
+    }
+
+    fn is_stable(&self) -> bool {
+        matches!(self.stability, Stability::Stable(_))
     }
 }
 
@@ -229,17 +266,28 @@ fn create_config<'a>(
     configs
 }
 
-fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Value)>) {
+fn capture_from_env(
+    crate_name: &str,
+    prefix: &str,
+    configs: &mut Vec<(String, &ConfigOption, Value)>,
+    enable_unstable: bool,
+) {
     let mut unknown = Vec::new();
     let mut failed = Vec::new();
+    let mut unstable = Vec::new();
 
     // Try and capture input from the environment:
     for (var, value) in env::vars() {
         if var.starts_with(prefix) {
-            let Some((_, _, cfg)) = configs.iter_mut().find(|(k, _, _)| k == &var) else {
+            let Some((_, option, cfg)) = configs.iter_mut().find(|(k, _, _)| k == &var) else {
                 unknown.push(var);
                 continue;
             };
+
+            if !enable_unstable && !option.is_stable() {
+                unstable.push(var);
+                continue;
+            }
 
             if let Err(e) = cfg.parse_in_place(&value) {
                 failed.push(format!("{var}: {e}"));
@@ -249,6 +297,13 @@ fn capture_from_env(prefix: &str, configs: &mut Vec<(String, &ConfigOption, Valu
 
     if !failed.is_empty() {
         panic!("Invalid configuration options detected: {:?}", failed);
+    }
+
+    if !unstable.is_empty() {
+        panic!(
+            "The following configuration options are unstable: {unstable:?}. You can enable it by \
+            activating the 'unstable' feature in {crate_name}."
+        );
     }
 
     if !unknown.is_empty() {
@@ -350,44 +405,52 @@ mod test {
                             description: "NA",
                             default_value: Value::Integer(999),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "number_signed",
                             description: "NA",
                             default_value: Value::Integer(-777),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "string",
                             description: "NA",
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "bool",
                             description: "NA",
                             default_value: Value::Bool(false),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "number_default",
                             description: "NA",
                             default_value: Value::Integer(999),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "string_default",
                             description: "NA",
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "bool_default",
                             description: "NA",
                             default_value: Value::Bool(false),
                             constraint: None,
+                            stability: Stability::Stable("testing"),
                         },
                     ],
+                    false,
                     false,
                 );
 
@@ -435,26 +498,31 @@ mod test {
                             description: "NA",
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::PositiveInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "negative_number",
                             description: "NA",
                             default_value: Value::Integer(1),
                             constraint: Some(Validator::NegativeInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "non_negative_number",
                             description: "NA",
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::NonNegativeInteger),
+                            stability: Stability::Stable("testing"),
                         },
                         ConfigOption {
                             name: "range",
                             description: "NA",
                             default_value: Value::Integer(0),
                             constraint: Some(Validator::IntegerInRange(5..10)),
+                            stability: Stability::Stable("testing"),
                         },
                     ],
+                    false,
                     false,
                 )
             },
@@ -478,7 +546,9 @@ mod test {
                             Ok(())
                         }
                     }))),
+                    stability: Stability::Stable("testing"),
                 }],
+                false,
                 false,
             )
         });
@@ -495,7 +565,9 @@ mod test {
                     description: "NA",
                     default_value: Value::Integer(-1),
                     constraint: Some(Validator::PositiveInteger),
+                    stability: Stability::Stable("testing"),
                 }],
+                false,
                 false,
             )
         });
@@ -519,7 +591,9 @@ mod test {
                             Ok(())
                         }
                     }))),
+                    stability: Stability::Stable("testing"),
                 }],
+                false,
                 false,
             )
         });
@@ -541,7 +615,9 @@ mod test {
                         description: "NA",
                         default_value: Value::Integer(999),
                         constraint: None,
+                        stability: Stability::Stable("testing"),
                     }],
+                    false,
                     false,
                 );
             },
@@ -559,7 +635,9 @@ mod test {
                     description: "NA",
                     default_value: Value::Integer(999),
                     constraint: None,
+                    stability: Stability::Stable("testing"),
                 }],
+                false,
                 false,
             );
         });
@@ -577,7 +655,9 @@ mod test {
                         description: "NA",
                         default_value: Value::Integer(999),
                         constraint: None,
+                        stability: Stability::Stable("testing"),
                     }],
+                    false,
                     false,
                 );
             },
@@ -599,7 +679,9 @@ mod test {
                         "variant-0".to_string(),
                         "variant-1".to_string(),
                     ])),
+                    stability: Stability::Stable("testing"),
                 }],
+                false,
             );
         });
 
@@ -614,18 +696,28 @@ mod test {
     #[test]
     fn json_output() {
         let mut stdout = Vec::new();
-        let config = [ConfigOption {
-            name: "some-key",
-            description: "NA",
-            default_value: Value::String("variant-0".to_string()),
-            constraint: Some(Validator::Enumeration(vec![
-                "variant-0".to_string(),
-                "variant-1".to_string(),
-            ])),
-        }];
+        let config = [
+            ConfigOption {
+                name: "some-key",
+                description: "NA",
+                default_value: Value::String("variant-0".to_string()),
+                constraint: Some(Validator::Enumeration(vec![
+                    "variant-0".to_string(),
+                    "variant-1".to_string(),
+                ])),
+                stability: Stability::Stable("testing"),
+            },
+            ConfigOption {
+                name: "some-key2",
+                description: "NA",
+                default_value: Value::Bool(true),
+                constraint: None,
+                stability: Stability::Unstable,
+            },
+        ];
         let configs =
             temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
-                generate_config_internal(&mut stdout, "esp-test", &config)
+                generate_config_internal(&mut stdout, "esp-test", &config, false)
             });
 
         let json_output = config_json(&configs, true);
@@ -643,12 +735,50 @@ mod test {
         "variant-1"
       ]
     },
+    "stability": {
+      "Stable": "testing"
+    },
     "actual_value": {
       "String": "variant-0"
+    }
+  },
+  {
+    "name": "some-key2",
+    "description": "NA",
+    "default_value": {
+      "Bool": true
+    },
+    "constraint": null,
+    "stability": "Unstable",
+    "actual_value": {
+      "Bool": true
     }
   }
 ]"#,
             json_output
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn unstable_option_panics_unless_enabled() {
+        let mut stdout = Vec::new();
+        temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+            generate_config_internal(
+                &mut stdout,
+                "esp-test",
+                &[ConfigOption {
+                    name: "some-key",
+                    description: "NA",
+                    default_value: Value::String("variant-0".to_string()),
+                    constraint: Some(Validator::Enumeration(vec![
+                        "variant-0".to_string(),
+                        "variant-1".to_string(),
+                    ])),
+                    stability: Stability::Unstable,
+                }],
+                false,
+            );
+        });
     }
 }

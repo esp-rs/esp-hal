@@ -146,8 +146,9 @@
 //!
 //! We've exposed some configuration options that don't fit into cargo
 //! features. These can be set via environment variables, or via cargo's `[env]`
-//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
-//! for this crate:
+//! section inside `.cargo/config.toml`. Note that unstable options can only be
+//! enabled when the `unstable` feature is enabled for the crate. Below is a
+//! table of tunable parameters for this crate:
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_hal_config_table.md"))]
 #![doc = ""]

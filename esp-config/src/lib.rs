@@ -8,7 +8,14 @@
 #[cfg(feature = "build")]
 mod generate;
 #[cfg(feature = "build")]
-pub use generate::{generate_config, validator::Validator, value::Value, ConfigOption, Error};
+pub use generate::{
+    generate_config,
+    validator::Validator,
+    value::Value,
+    ConfigOption,
+    Error,
+    Stability,
+};
 
 /// Parse the value of an environment variable as a [bool] at compile time.
 #[macro_export]
