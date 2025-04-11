@@ -16,7 +16,7 @@ use esp_hal::{
         BitPackOrder,
         ClkOutPin,
         EnableMode,
-        ParlIoFullDuplex,
+        ParlIo,
         RxClkInPin,
         RxConfig,
         RxEightBits,
@@ -115,7 +115,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel).unwrap();
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
         let pio_tx = pio
             .tx
@@ -178,7 +178,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel).unwrap();
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
         let pio_tx = pio
             .tx
@@ -242,7 +242,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel).unwrap();
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
         let pio_tx = pio
             .tx
@@ -311,7 +311,7 @@ mod tests {
         let clock_out_pin = ClkOutPin::new(clock_tx);
         let clock_in_pin = RxClkInPin::new(clock_rx, SampleEdge::Normal);
 
-        let pio = ParlIoFullDuplex::new(ctx.parl_io, ctx.dma_channel).unwrap();
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
         let pio_tx = pio
             .tx
