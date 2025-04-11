@@ -21,7 +21,7 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
 
     writeln!(
         table,
-        "| {key} | <p>{description}</p><p>{stability}</p> | <center>{default}</center> | <center>{allowed}</center>",
+        "| <p>{key}</p><p>{stability}</p> | <p>{description}</p> | <center>{default}</center> | <center>{allowed}</center>",
         description = option.description,
         key = name,
         stability = option.stability,
