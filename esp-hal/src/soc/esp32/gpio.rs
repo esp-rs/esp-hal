@@ -582,9 +582,6 @@ macro_rules! rtcio_analog {
                     use $crate::gpio::RtcPin;
                     let rtcio = $crate::peripherals::RTC_IO::regs();
 
-                    // disable input
-                    rtcio.$pin_reg.modify(|_,w| w.[<$prefix fun_ie>]().bit(false));
-
                     // disable output
                     rtcio.enable_w1tc().write(|w| unsafe { w.enable_w1tc().bits(1 << self.rtc_number()) });
 
@@ -736,24 +733,24 @@ macro_rules! touch {
 }
 
 rtcio_analog! {
-    (36, 0,  sensor_pads(),    sense1_, sense1_hold_force          )
-    (37, 1,  sensor_pads(),    sense2_, sense2_hold_force          )
-    (38, 2,  sensor_pads(),    sense3_, sense3_hold_force          )
-    (39, 3,  sensor_pads(),    sense4_, sense4_hold_force          )
-    (34, 4,  adc_pad(),        adc1_,   adc1_hold_force            )
-    (35, 5,  adc_pad(),        adc2_,   adc2_hold_force            )
-    (25, 6,  pad_dac1(),       "",      pdac1_hold_force,      true)
-    (26, 7,  pad_dac2(),       "",      pdac2_hold_force,      true)
-    (33, 8,  xtal_32k_pad(),   x32n_,   x32n_hold_force,       true)
-    (32, 9,  xtal_32k_pad(),   x32p_,   x32p_hold_force,       true)
-    (4,  10, touch_pad0(),     "",      touch_pad0_hold_force, true)
-    (0,  11, touch_pad1(),     "",      touch_pad1_hold_force, true)
-    (2,  12, touch_pad2(),     "",      touch_pad2_hold_force, true)
-    (15, 13, touch_pad3(),     "",      touch_pad3_hold_force, true)
-    (13, 14, touch_pad4(),     "",      touch_pad4_hold_force, true)
-    (12, 15, touch_pad5(),     "",      touch_pad5_hold_force, true)
-    (14, 16, touch_pad6(),     "",      touch_pad6_hold_force, true)
-    (27, 17, touch_pad7(),     "",      touch_pad7_hold_force, true)
+    (36, 0,  sensor_pads(),    sense1_, sense1          )
+    (37, 1,  sensor_pads(),    sense2_, sense2          )
+    (38, 2,  sensor_pads(),    sense3_, sense3          )
+    (39, 3,  sensor_pads(),    sense4_, sense4          )
+    (34, 4,  adc_pad(),        adc1_,   adc1            )
+    (35, 5,  adc_pad(),        adc2_,   adc2            )
+    (25, 6,  pad_dac1(),       "",      pdac1,      true)
+    (26, 7,  pad_dac2(),       "",      pdac2,      true)
+    (33, 8,  xtal_32k_pad(),   x32n_,   x32n,       true)
+    (32, 9,  xtal_32k_pad(),   x32p_,   x32p,       true)
+    (4,  10, touch_pad0(),     "",      touch_pad0, true)
+    (0,  11, touch_pad1(),     "",      touch_pad1, true)
+    (2,  12, touch_pad2(),     "",      touch_pad2, true)
+    (15, 13, touch_pad3(),     "",      touch_pad3, true)
+    (13, 14, touch_pad4(),     "",      touch_pad4, true)
+    (12, 15, touch_pad5(),     "",      touch_pad5, true)
+    (14, 16, touch_pad6(),     "",      touch_pad6, true)
+    (27, 17, touch_pad7(),     "",      touch_pad7, true)
 }
 
 touch! {
