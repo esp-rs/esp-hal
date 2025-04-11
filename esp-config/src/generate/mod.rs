@@ -115,7 +115,7 @@ pub fn generate_config_internal<'a>(
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
     let mut configs = create_config(&prefix, config);
-    capture_from_env(&prefix, &mut configs, enable_unstable);
+    capture_from_env(crate_name, &prefix, &mut configs, enable_unstable);
 
     for (_, option, value) in configs.iter() {
         if let Some(ref validator) = option.constraint {
@@ -267,6 +267,7 @@ fn create_config<'a>(
 }
 
 fn capture_from_env(
+    crate_name: &str,
     prefix: &str,
     configs: &mut Vec<(String, &ConfigOption, Value)>,
     enable_unstable: bool,
@@ -300,8 +301,8 @@ fn capture_from_env(
 
     if !unstable.is_empty() {
         panic!(
-            "The following configuration options are unstable: {:?}",
-            unstable
+            "The following configuration options are unstable: {unstable:?}. You can enable it by \
+            activating the 'unstable' feature in {crate_name}."
         );
     }
 
