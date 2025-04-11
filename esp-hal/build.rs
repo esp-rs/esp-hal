@@ -102,8 +102,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Ideally, we should be able to set any clock frequency for any chip. However,
             // currently only the 32 and C2 implements any sort of configurability, and
             // the rest have a fixed clock frequeny.
-            // TODO: only show this configuration for chips that have multiple valid
-            // options.
             ConfigOption {
                 name: "xtal-frequency",
                 description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
@@ -117,17 +115,17 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "esp32h2" => String::from("32"),
                     _ => unreachable!(),
                 }),
-                constraint: Some(Validator::Enumeration(match device_name {
-                    "esp32" | "esp32c2" => {
-                        vec![String::from("auto"), String::from("26"), String::from("40")]
-                    }
+                constraint: match device_name {
+                    "esp32" | "esp32c2" => Some(Validator::Enumeration(vec![
+                        String::from("auto"),
+                        String::from("26"),
+                        String::from("40"),
+                    ])),
                     // The rest has only one option
-                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
-                    "esp32h2" => vec![String::from("32")],
-                    _ => unreachable!(),
-                })),
+                    _ => None,
+                },
                 stability: Stability::Unstable,
-                active: true,
+                active: ["esp32", "esp32s2"].contains(&device_name),
             },
             ConfigOption {
                 name: "spi-address-workaround",
