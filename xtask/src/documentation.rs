@@ -58,7 +58,7 @@ pub fn build_documentation(
                 _ => vec![Chip::Esp32c6],
             }
         } else {
-            log::warn!("Package '{package}' does not have chip features, ignoring argument");
+            log::debug!("Package '{package}' does not have chip features, ignoring argument");
             vec![]
         };
 
@@ -97,7 +97,7 @@ fn build_documentation_for_package(
 
     // Ensure that the package/chip combination provided are valid:
     if let Some(chip) = chip {
-        if let Err(err) = crate::validate_package_chip(package, &chip) {
+        if let Err(err) = package.validate_package_chip(&chip) {
             log::warn!("{err}");
             return Ok(());
         }
@@ -192,15 +192,17 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     // Determine the appropriate build target for the given package and chip,
     // if we're able to:
     let target = if let Some(ref chip) = chip {
-        Some(crate::target_triple(package, chip)?)
+        Some(package.target_triple(chip)?)
     } else {
         None
     };
 
     let mut features = vec![];
-    if let Some(chip) = chip {
+    if let Some(chip) = &chip {
         features.push(chip.to_string());
-        features.extend(apply_feature_rules(&package, Config::for_chip(&chip)));
+        features.extend(package.feature_rules(Config::for_chip(&chip)));
+    } else {
+        features.extend(package.feature_rules(&Config::empty()));
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -247,48 +249,6 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     docs_path = docs_path.join("doc");
 
     Ok(crate::windows_safe_path(&docs_path))
-}
-
-fn apply_feature_rules(package: &Package, config: &Config) -> Vec<String> {
-    let chip_name = &config.name();
-
-    let mut features = vec![];
-    match package {
-        Package::EspBacktrace => features.push("defmt".to_owned()),
-        Package::EspConfig => features.push("build".to_owned()),
-        Package::EspHal => {
-            features.push("unstable".to_owned());
-            features.push("ci".to_owned());
-            match chip_name.as_str() {
-                "esp32" => features.push("psram".to_owned()),
-                "esp32s2" => features.push("psram".to_owned()),
-                "esp32s3" => features.push("psram".to_owned()),
-                _ => {}
-            };
-        }
-        Package::EspWifi => {
-            features.push("esp-hal/unstable".to_owned());
-            if config.contains("wifi") {
-                features.push("wifi".to_owned());
-                features.push("esp-now".to_owned());
-                features.push("sniffer".to_owned());
-                features.push("smoltcp/proto-ipv4".to_owned());
-                features.push("smoltcp/proto-ipv6".to_owned());
-            }
-            if config.contains("ble") {
-                features.push("ble".to_owned());
-            }
-            if config.contains("wifi") && config.contains("ble") {
-                features.push("coex".to_owned());
-            }
-        }
-        Package::EspHalEmbassy | Package::EspIeee802154 => {
-            features.push("esp-hal/unstable".to_owned());
-        },
-        _ => {}
-    }
-
-    features
 }
 
 fn patch_documentation_index_for_package(
@@ -454,7 +414,7 @@ fn generate_documentation_meta_for_package(
 
     for chip in chips {
         // Ensure that the package/chip combination provided are valid:
-        crate::validate_package_chip(&package, chip)?;
+        package.validate_package_chip(chip)?;
 
         // Build the context object required for rendering this particular build's
         // information on the documentation index:
