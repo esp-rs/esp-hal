@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Update bt-hci version to fix serialization/deserialization of byte slices
+- Update bt-hci version to fix serialization/deserialization of byte slices (#3340)
+
+- Allow `Configuration::None`, set country early, changed default power-save-mode to None (#3364)
 
 ### Removed
 
