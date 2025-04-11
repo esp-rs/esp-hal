@@ -133,7 +133,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 data buffer is empty.",
                 default_value: Value::Bool(true),
                 constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
             },
             // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system
             // doesn't support per target configs, yet
@@ -143,7 +143,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 zero-cost stack overflow protection.",
                 default_value: Value::Bool(false),
                 constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
             },
             // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3
             // but the config system doesn't support per target configs, yet
@@ -156,7 +156,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     String::from("quad"),
                     String::from("octal"),
                 ])),
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
             },
             // Rust's stack smashing protection configuration
             ConfigOption {
@@ -181,7 +181,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 using `restore-state-u32`.",
                 default_value: Value::Bool(true),
                 constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
             },
         ],
         cfg!(feature = "unstable"),
