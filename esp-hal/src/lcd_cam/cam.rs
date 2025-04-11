@@ -135,8 +135,7 @@ impl<'d> Camera<'d> {
         cam: Cam<'d>,
         channel: impl RxChannelFor<LCD_CAM<'d>>,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    {
+    ) -> Result<Self, ConfigError> {
         let rx_channel = ChannelRx::new(channel.degrade());
 
         let mut this = Self {
