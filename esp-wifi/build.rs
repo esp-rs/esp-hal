@@ -105,6 +105,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(5),
                 constraint: Some(Validator::PositiveInteger),
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "tx_queue_size",
@@ -112,6 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(3),
                 constraint: Some(Validator::PositiveInteger),
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "static_rx_buf_num",
@@ -119,6 +121,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(10),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "dynamic_rx_buf_num",
@@ -126,6 +129,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(32),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "static_tx_buf_num",
@@ -133,6 +137,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(0),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "dynamic_tx_buf_num",
@@ -140,6 +145,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(32),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "ampdu_rx_enable",
@@ -147,6 +153,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "ampdu_tx_enable",
@@ -154,6 +161,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "amsdu_tx_enable",
@@ -161,6 +169,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(false),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "rx_ba_win",
@@ -168,6 +177,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(6),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "max_burst_size",
@@ -175,6 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(1),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "country_code",
@@ -182,6 +193,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::String("CN".to_owned()),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "country_code_operating_class",
@@ -189,6 +201,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(0),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "mtu",
@@ -196,6 +209,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(1492),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "tick_rate_hz",
@@ -203,6 +217,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(100),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "listen_interval",
@@ -210,6 +225,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(3),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "beacon_timeout",
@@ -217,6 +233,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(6),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "ap_beacon_timeout",
@@ -224,6 +241,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(300),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "failure_retry_cnt",
@@ -231,6 +249,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(1),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "scan_method",
@@ -238,6 +257,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(0),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "dump_packets",
@@ -245,6 +265,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(false),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "phy_enable_usb",
@@ -252,6 +273,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
         ],
         true,

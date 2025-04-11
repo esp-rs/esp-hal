@@ -31,6 +31,7 @@ fn main() {
                     String::from("64k"),
                 ])),
                 stability: Stability::Unstable,
+                active: true, // TODO we need to know the device here
             },
             ConfigOption {
                 name: "esp_idf_version",
@@ -39,6 +40,7 @@ fn main() {
                 default_value: Value::String(String::from("0.0.0")),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "partition-table-offset",
@@ -49,6 +51,7 @@ fn main() {
                 default_value: Value::Integer(0x8000),
                 constraint: Some(Validator::PositiveInteger),
                 stability: Stability::Unstable,
+                active: true,
             },
         ],
         true,

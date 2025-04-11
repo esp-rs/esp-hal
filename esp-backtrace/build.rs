@@ -23,6 +23,7 @@ fn main() {
             default_value: Value::Integer(10),
             constraint: None,
             stability: Stability::Unstable,
+            active: true,
         }],
         true,
         true,
