@@ -1,4 +1,13 @@
-use esp_wifi_sys::{c_types::c_char, include::timeval};
+use esp_wifi_sys::{
+    c_types::c_char,
+    include::{
+        esp_phy_calibration_data_t,
+        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+        get_phy_version_str,
+        register_chipv7_phy,
+        timeval,
+    },
+};
 use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
@@ -337,5 +346,25 @@ pub(crate) unsafe fn phy_disable_clock() {
         let radio_clocks = unsafe { RADIO_CLK::steal() };
         RadioClockController::new(radio_clocks).enable_phy(false);
         trace!("phy_disable_clock done!");
+    }
+}
+
+pub(crate) fn phy_calibrate() {
+    let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
+        [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
+
+    let phy_version = unsafe { get_phy_version_str() };
+    trace!("phy_version {}", unsafe { str_from_c(phy_version) });
+
+    let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
+
+    unsafe {
+        chip_specific::bbpll_en_usb();
+
+        register_chipv7_phy(
+            init_data,
+            &mut cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
+            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+        );
     }
 }
