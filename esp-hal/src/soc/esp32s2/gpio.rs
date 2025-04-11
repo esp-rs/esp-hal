@@ -330,7 +330,8 @@ macro_rules! rtcio_analog {
                 fn rtc_set_config(&self, input_enable: bool, mux: bool, func: $crate::gpio::RtcFunction) {
                     enable_iomux_clk_gate();
 
-                    // disable input
+                    // We need `paste` to rewrite something in each function, so that rustc
+                    // doesn't trip over trying to substitute a partial expression as `$pin_reg`
                     $crate::peripherals::[<RTC _IO>]::regs()
                         .$pin_reg.modify(|_,w| unsafe {
                             w.fun_ie().bit(input_enable);
