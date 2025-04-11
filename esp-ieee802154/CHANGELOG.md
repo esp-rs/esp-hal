@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed compatibility with `defmt` (#3374)
+
 ### Removed
 
 ## [0.6.0] - 2025-02-24
