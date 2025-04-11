@@ -1,4 +1,4 @@
-use core::{cell::RefCell, ptr::addr_of};
+use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{clock::RadioClockController, handler, interrupt::Priority, peripherals::RADIO_CLK};
@@ -380,7 +380,10 @@ fn ZB_MAC() {
     if events & Event::RxDone != 0 {
         trace!("rx done");
         unsafe {
-            trace!("Received raw {:x?}", &*addr_of!(RX_BUFFER));
+            trace!(
+                "Received raw {:?}",
+                crate::fmt::Bytes(&*core::ptr::addr_of!(RX_BUFFER))
+            );
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
                 if !queue.is_full() {
@@ -394,7 +397,7 @@ fn ZB_MAC() {
                 }
 
                 let frm = if RX_BUFFER[0] >= FRAME_SIZE as u8 {
-                    warn!("RX_BUFFER[0] {:} is larger than frame size", RX_BUFFER[0]);
+                    warn!("RX_BUFFER[0] {} is larger than frame size", RX_BUFFER[0]);
                     &RX_BUFFER[1..][..FRAME_SIZE - 1]
                 } else {
                     &RX_BUFFER[1..][..RX_BUFFER[0] as usize]
