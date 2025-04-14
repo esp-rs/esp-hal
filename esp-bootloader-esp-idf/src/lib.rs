@@ -41,7 +41,7 @@ pub mod partitions;
 pub mod ota;
 
 // We run tests on the host which happens to be MacOS machines and mach-o
-// doesn't like `link-sections`this way
+// doesn't like `link-sections` this way
 #[cfg(not(target_os = "macos"))]
 #[link_section = ".espressif.metadata"]
 #[used]

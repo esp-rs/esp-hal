@@ -1,6 +1,6 @@
 use crc::{Algorithm, Crc};
 
-static ALGO: Algorithm<u32> = Algorithm {
+static ALGO_CRC32_NORMAL: Algorithm<u32> = Algorithm {
     width: 32,
     poly: 0x04c11db7,
     init: 0,
@@ -18,7 +18,7 @@ pub struct Crc32 {
 impl Crc32 {
     pub fn new() -> Self {
         Self {
-            algo: Crc::<u32>::new(&ALGO),
+            algo: Crc::<u32>::new(&ALGO_CRC32_NORMAL),
         }
     }
 

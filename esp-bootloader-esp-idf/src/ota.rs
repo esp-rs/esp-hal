@@ -15,7 +15,7 @@
 //! should be used for the next boot.
 //!
 //! Note: The prebuilt bootloaders provided by `espflash` _might not_ include
-//! OTA support. In that case you need to built the bootloader yourself.
+//! OTA support. In that case you need to build the bootloader yourself.
 //!
 //! The general procedure to change the active slot
 //! - read the partition table [crate::partitions::read_partition_table]
