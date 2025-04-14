@@ -280,18 +280,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                 description: "Which power save mode to use when initializing.",
                 default_value: Value::String(String::from("none")),
                 constraint: Some(Validator::Enumeration(vec![String::from("none"), String::from("min"), String::from("max")])),
+                stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "phy_skip_calibration_after_deep_sleep",
                 description: "Use PHY_RF_CAL_NONE after deep sleep.",
                 default_value: Value::Bool(false),
-                constraint: None
+                constraint: None,
+                stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "phy_full_calibration",
                 description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL.",
                 default_value: Value::Bool(true),
-                constraint: None
+                constraint: None,
+                stability: Stability::Unstable,
+                active: true,
             },
         ],
         true,
