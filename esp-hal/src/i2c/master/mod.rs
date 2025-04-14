@@ -165,54 +165,29 @@ impl BusTimeout {
     }
 }
 
-#[cfg(not(esp32))]
-cfg_if::cfg_if! {
-    if #[cfg(esp32s2)] {
-        type FsmTimeoutType = u32;
-    } else {
-        type FsmTimeoutType = u8;
-    }
-}
-
-/// When the FSM remains unchanged for more than
-#[cfg_attr(esp32s2, doc = "the given amount of bus clock cycles")]
-#[cfg_attr(not(esp32s2), doc = "the 2^ the given amount of bus clock cycles")]
-/// a timeout will be triggered.
+/// When the FSM remains unchanged for more than the 2^ the given amount of bus
+/// clock cycles a timeout will be triggered.
 ///
-/// The default value is
-#[cfg_attr(esp32s2, doc = "0x100")]
-#[cfg_attr(not(esp32s2), doc = "0x10")]
+/// The default value is 0x10
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, esp32s2)))]
 pub struct FsmTimeout {
-    value: FsmTimeoutType,
+    value: u8,
 }
 
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, esp32s2)))]
 impl FsmTimeout {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            const FSM_TIMEOUT_MAX: FsmTimeoutType = 0xff_ffff;
-        } else {
-            const FSM_TIMEOUT_MAX: FsmTimeoutType = 23;
-        }
-    }
+    const FSM_TIMEOUT_MAX: u8 = 23;
 
-    cfg_if::cfg_if! {
-        if #[cfg(esp32s2)] {
-            const FSM_TIMEOUT_DEFAULT: FsmTimeoutType = 0x100;
-        } else {
-            const FSM_TIMEOUT_DEFAULT: FsmTimeoutType = 0x10;
-        }
-    }
+    const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
 
     /// Creates a new timeout.
     ///
     /// The meaning of the value and the allowed range of values is different
     /// for different chips.
-    pub const fn new_const<const VALUE: FsmTimeoutType>() -> Self {
+    pub const fn new_const<const VALUE: u8>() -> Self {
         const {
             core::assert!(VALUE <= Self::FSM_TIMEOUT_MAX, "Invalid timeout value");
         }
@@ -223,7 +198,7 @@ impl FsmTimeout {
     ///
     /// The meaning of the value and the allowed range of values is different
     /// for different chips.
-    pub fn new(value: FsmTimeoutType) -> Result<Self, ConfigError> {
+    pub fn new(value: u8) -> Result<Self, ConfigError> {
         if value > Self::FSM_TIMEOUT_MAX {
             return Err(ConfigError::TimeoutInvalid);
         }
@@ -231,12 +206,12 @@ impl FsmTimeout {
         Ok(Self { value })
     }
 
-    fn value(&self) -> FsmTimeoutType {
+    fn value(&self) -> u8 {
         self.value
     }
 }
 
-#[cfg(not(esp32))]
+#[cfg(not(any(esp32, esp32s2)))]
 impl Default for FsmTimeout {
     fn default() -> Self {
         Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
@@ -505,12 +480,12 @@ pub struct Config {
     timeout: BusTimeout,
 
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
-    #[cfg(not(esp32))]
+    #[cfg(not(any(esp32, esp32s2)))]
     #[builder_lite(unstable)]
     scl_st_timeout: FsmTimeout,
 
     /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM.
-    #[cfg(not(esp32))]
+    #[cfg(not(any(esp32, esp32s2)))]
     #[builder_lite(unstable)]
     scl_main_st_timeout: FsmTimeout,
 }
@@ -520,9 +495,9 @@ impl Default for Config {
         Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
-            #[cfg(not(esp32))]
+            #[cfg(not(any(esp32, esp32s2)))]
             scl_st_timeout: Default::default(),
-            #[cfg(not(esp32))]
+            #[cfg(not(any(esp32, esp32s2)))]
             scl_main_st_timeout: Default::default(),
         }
     }
@@ -726,9 +701,9 @@ impl<'a> I2cFuture<'a> {
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
             w.nack().set_bit();
-            #[cfg(not(esp32))]
+            #[cfg(not(any(esp32, esp32s2)))]
             w.scl_main_st_to().set_bit();
-            #[cfg(not(esp32))]
+            #[cfg(not(any(esp32, esp32s2)))]
             w.scl_st_to().set_bit();
 
             w
@@ -765,12 +740,12 @@ impl<'a> I2cFuture<'a> {
             )));
         }
 
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32s2)))]
         if r.scl_st_to().bit_is_set() {
             return Err(Error::Timeout);
         }
 
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32s2)))]
         if r.scl_main_st_to().bit_is_set() {
             return Err(Error::Timeout);
         }
@@ -1539,11 +1514,11 @@ impl Driver<'_> {
         self.set_frequency(config, config.timeout)?;
 
         // Configure additional timeouts
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.regs()
             .scl_st_time_out()
             .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
-        #[cfg(not(esp32))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.regs()
             .scl_main_st_time_out()
             .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
