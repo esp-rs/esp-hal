@@ -87,6 +87,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          components: rust-src
       - name: Prepare
         run: mkdir docs && mkdir docs/esp-hal && mkdir docs/esp-wifi && mkdir docs/esp-lp-hal
       - name: Download all docs
