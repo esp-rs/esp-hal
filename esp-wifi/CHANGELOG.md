@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- It's possible to configure the initial power-save mode
+
+- It's possible to use partial RF calibration, it's possible to use the None-calibration-schema after deep-sleep
+
 ### Changed
 
 - The scheduler now runs at interrupt priority 1 on Xtensa chips, too. (#3164)
