@@ -77,7 +77,7 @@ pub unsafe extern "C" fn env_is_chip() -> bool {
 ///     None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn set_intr(cpu_no: i32, intr_source: u32, intr_num: u32, intr_prio: i32) {
+pub unsafe extern "C" fn set_intr(cpu_no: i32, intr_source: u32, intr_num: u32, intr_prio: i32) { unsafe {
     trace!(
         "set_intr {} {} {} {}",
         cpu_no,
@@ -91,7 +91,7 @@ pub unsafe extern "C" fn set_intr(cpu_no: i32, intr_source: u32, intr_num: u32, 
         intr_num,
         intr_prio,
     );
-}
+}}
 
 /// **************************************************************************
 /// Name: wifi_clear_intr
@@ -462,11 +462,11 @@ pub unsafe extern "C" fn queue_send_from_isr(
     queue: *mut crate::binary::c_types::c_void,
     item: *mut crate::binary::c_types::c_void,
     _hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
+) -> i32 { unsafe {
     trace!("queue_send_from_isr");
     *(_hptw as *mut u32) = 1;
     queue_send(queue, item, 1000)
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_queue_send_to_back
@@ -650,7 +650,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
     prio: u32,
     task_handle: *mut crate::binary::c_types::c_void,
     core_id: u32,
-) -> i32 {
+) -> i32 { unsafe {
     trace!("task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
         task_func,
         str_from_c(name as _),
@@ -670,7 +670,7 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
     *(task_handle as *mut usize) = task as usize;
 
     1
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_task_create
@@ -698,9 +698,9 @@ pub unsafe extern "C" fn task_create(
     param: *mut crate::binary::c_types::c_void,
     prio: u32,
     task_handle: *mut crate::binary::c_types::c_void,
-) -> i32 {
+) -> i32 { unsafe {
     task_create_pinned_to_core(task_func, name, stack_depth, param, prio, task_handle, 0)
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_task_delete
@@ -817,9 +817,9 @@ pub unsafe extern "C" fn task_get_max_priority() -> i32 {
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     crate::compat::malloc::malloc(size).cast()
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_free
@@ -834,9 +834,9 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_v
 ///   No
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn free(p: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn free(p: *mut crate::binary::c_types::c_void) { unsafe {
     crate::compat::malloc::free(p.cast());
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_event_post
@@ -861,7 +861,7 @@ pub unsafe extern "C" fn event_post(
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
     ticks_to_wait: u32,
-) -> i32 {
+) -> i32 { unsafe {
     trace!(
         "event_post {:?} {} {:?} {} {:?}",
         event_base,
@@ -897,7 +897,7 @@ pub unsafe extern "C" fn event_post(
     memory_fence();
 
     0
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_get_free_heap_size
@@ -912,13 +912,13 @@ pub unsafe extern "C" fn event_post(
 ///   Free heap size
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn get_free_heap_size() -> u32 {
-    extern "C" {
+pub unsafe extern "C" fn get_free_heap_size() -> u32 { unsafe {
+    unsafe extern "C" {
         fn esp_wifi_free_internal_heap() -> usize;
     }
 
     esp_wifi_free_internal_heap() as u32
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_rand
@@ -933,9 +933,9 @@ pub unsafe extern "C" fn get_free_heap_size() -> u32 {
 ///   Random data
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn rand() -> u32 {
+pub unsafe extern "C" fn rand() -> u32 { unsafe {
     crate::common_adapter::random()
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_dport_access_stall_other_cpu_start
@@ -992,11 +992,11 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn phy_disable() {
+pub unsafe extern "C" fn phy_disable() { unsafe {
     trace!("phy_disable");
 
     crate::common_adapter::chip_specific::phy_disable();
-}
+}}
 
 /// **************************************************************************
 /// Name: esp32c3_phy_enable
@@ -1011,12 +1011,12 @@ pub unsafe extern "C" fn phy_disable() {
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn phy_enable() {
+pub unsafe extern "C" fn phy_enable() { unsafe {
     // quite some code needed here
     trace!("phy_enable");
 
     crate::common_adapter::chip_specific::phy_enable();
-}
+}}
 
 /// **************************************************************************
 /// Name: wifi_phy_update_country_info
@@ -1028,11 +1028,11 @@ pub unsafe extern "C" fn phy_enable() {
 #[allow(clippy::unnecessary_cast)]
 pub unsafe extern "C" fn phy_update_country_info(
     country: *const crate::binary::c_types::c_char,
-) -> crate::binary::c_types::c_int {
+) -> crate::binary::c_types::c_int { unsafe {
     // not implemented in original code
     trace!("phy_update_country_info {}", str_from_c(country.cast()));
     -1
-}
+}}
 
 /// **************************************************************************
 /// Name: wifi_reset_mac
@@ -1129,7 +1129,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 ///   System time in micros
 ///
 /// *************************************************************************
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
     crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
@@ -1410,11 +1410,11 @@ pub unsafe extern "C" fn nvs_erase_key(
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int { unsafe {
     trace!("get_random");
     crate::common_adapter::esp_fill_random(buf, len as u32);
     0
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_get_time
@@ -1523,9 +1523,9 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     crate::compat::malloc::malloc(size).cast()
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_realloc_internal
@@ -1565,9 +1565,9 @@ pub unsafe extern "C" fn realloc_internal(
 pub unsafe extern "C" fn calloc_internal(
     n: usize,
     size: usize,
-) -> *mut crate::binary::c_types::c_void {
+) -> *mut crate::binary::c_types::c_void { unsafe {
     calloc(n as u32, size) as *mut crate::binary::c_types::c_void
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_zalloc_internal
@@ -1582,9 +1582,9 @@ pub unsafe extern "C" fn calloc_internal(
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     calloc(size as u32, 1usize) as *mut crate::binary::c_types::c_void
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_wifi_malloc
@@ -1599,9 +1599,9 @@ pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_t
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     malloc(size)
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_wifi_realloc
@@ -1638,10 +1638,10 @@ pub unsafe extern "C" fn wifi_realloc(
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     trace!("wifi_calloc {} {}", n, size);
     calloc(n as u32, size) as *mut crate::binary::c_types::c_void
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_wifi_zalloc
@@ -1656,9 +1656,9 @@ pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binar
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types::c_void { unsafe {
     wifi_calloc(size, 1)
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_wifi_create_queue
@@ -1677,12 +1677,12 @@ pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types
 pub unsafe extern "C" fn wifi_create_queue(
     queue_len: crate::binary::c_types::c_int,
     item_size: crate::binary::c_types::c_int,
-) -> *mut crate::binary::c_types::c_void {
+) -> *mut crate::binary::c_types::c_void { unsafe {
     let queue = create_queue(queue_len, item_size);
     QUEUE_HANDLE = queue;
 
     addr_of_mut!(QUEUE_HANDLE).cast()
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_wifi_delete_queue
@@ -1697,14 +1697,14 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) { unsafe {
     trace!("wifi_delete_queue {:?}", queue);
     if core::ptr::eq(queue, addr_of_mut!(QUEUE_HANDLE).cast()) {
         delete_queue(QUEUE_HANDLE);
     } else {
         warn!("unknown queue when trying to delete WIFI queue");
     }
-}
+}}
 
 /// **************************************************************************
 /// Name: wifi_coex_deinit

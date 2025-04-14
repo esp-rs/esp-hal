@@ -17,7 +17,7 @@ pub(crate) fn shutdown_radio_isr() {
 }
 
 #[cfg(feature = "ble")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn LP_BLE_TIMER() {
     unsafe {
         trace!("LP_TIMER interrupt");
@@ -39,7 +39,7 @@ extern "C" fn LP_BLE_TIMER() {
 }
 
 #[cfg(feature = "ble")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn BT_MAC() {
     unsafe {
         trace!("BT_MAC interrupt");

@@ -227,7 +227,7 @@ impl EmbassyTimer {
     ///
     /// When using a single timer queue, the `priority` parameter is always the
     /// highest value possible.
-    pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> {
+    pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> { unsafe {
         for (i, alarm) in self.alarms.iter().enumerate() {
             let handle = alarm.inner.with(|alarm| {
                 let AlarmState::Created(interrupt_handler) = alarm.state else {
@@ -262,7 +262,7 @@ impl EmbassyTimer {
         }
 
         None
-    }
+    }}
 
     /// Set an alarm to fire at a certain timestamp.
     ///

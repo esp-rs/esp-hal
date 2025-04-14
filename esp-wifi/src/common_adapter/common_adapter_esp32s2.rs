@@ -55,7 +55,7 @@ pub(crate) fn phy_mem_init() {
     }
 }
 
-pub(crate) unsafe fn phy_enable() {
+pub(crate) unsafe fn phy_enable() { unsafe {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
@@ -89,10 +89,10 @@ pub(crate) unsafe fn phy_enable() {
             }
         });
     }
-}
+}}
 
 #[allow(unused)]
-pub(crate) unsafe fn phy_disable() {
+pub(crate) unsafe fn phy_disable() { unsafe {
     let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
@@ -108,7 +108,7 @@ pub(crate) unsafe fn phy_disable() {
             super::phy_disable_clock();
         });
     }
-}
+}}
 
 fn phy_digital_regs_load() {
     unsafe {
@@ -141,12 +141,12 @@ fn phy_digital_regs_store() {
 ///
 /// *************************************************************************
 #[ram]
-#[no_mangle]
-unsafe extern "C" fn phy_enter_critical() -> u32 {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn phy_enter_critical() -> u32 { unsafe {
     trace!("phy_enter_critical");
 
     core::mem::transmute(critical_section::acquire())
-}
+}}
 
 /// **************************************************************************
 /// Name: phy_exit_critical
@@ -162,43 +162,43 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
 ///
 /// *************************************************************************
 #[ram]
-#[no_mangle]
-unsafe extern "C" fn phy_exit_critical(level: u32) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn phy_exit_critical(level: u32) { unsafe {
     trace!("phy_exit_critical {}", level);
 
     critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
         level,
     ));
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn abort() {
     trace!("misc_nvs_deinit")
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn misc_nvs_deinit() {
     trace!("misc_nvs_deinit")
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn misc_nvs_init() -> i32 {
     trace!("misc_nvs_init");
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut g_log_mod: i32 = 0;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut g_log_level: i32 = 0;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static mut g_misc_nvs: &u32 = unsafe { &*core::ptr::addr_of!(NVS) };
 
 pub static mut NVS: u32 = 0;

@@ -67,7 +67,7 @@ unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _version: ESP_WIFI_OS_ADAPTER_VERSION as i32,
     _env_is_chip: Some(env_is_chip),
@@ -222,7 +222,7 @@ const WIFI_ENABLE_ENTERPRISE: u64 = 1 << 7;
 
 const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(super) static mut g_wifi_feature_caps: u64 = WIFI_FEATURE_CAPS;
 
 pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {

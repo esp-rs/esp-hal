@@ -45,7 +45,7 @@ pub mod ll;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
     return critical_section::with(|_| f());
@@ -62,11 +62,11 @@ fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rom_fn {
-    ($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr) => {
+    ($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr_2021) => {
         $(#[$attrs])*
         #[allow(unused)]
         #[inline(always)]
-        #[link_section = ".rwtext"]
+        #[unsafe(link_section = ".rwtext")]
         fn $name($($arg:$ty),*) $(-> $retval)? {
             unsafe {
                 let rom_fn: unsafe extern "C" fn($($arg: $ty),*) $(-> $retval)? =
@@ -76,7 +76,7 @@ macro_rules! rom_fn {
         }
     };
 
-    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr;)+) => {
+    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr_2021;)+) => {
         $(
             $crate::rom_fn!(fn $name($($arg: $ty),*) $(-> $retval)? = $addr);
         )+

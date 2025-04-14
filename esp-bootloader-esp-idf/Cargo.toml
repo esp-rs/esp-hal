@@ -1,8 +1,8 @@
 [package]
 name = "esp-bootloader-esp-idf"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.84.0"
+edition = "2024"
+rust-version = "1.85.0"
 description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords = ["esp32", "espressif", "no-std"]
@@ -12,6 +12,10 @@ license = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 defmt = { version = "0.3.10", optional = true }

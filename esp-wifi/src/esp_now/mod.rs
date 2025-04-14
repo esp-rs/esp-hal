@@ -745,7 +745,7 @@ unsafe extern "C" fn rcv_cb(
     esp_now_info: *const esp_now_recv_info_t,
     data: *const u8,
     data_len: i32,
-) {
+) { unsafe {
     let src = [
         (*esp_now_info).src_addr.offset(0).read(),
         (*esp_now_info).src_addr.offset(1).read(),
@@ -785,7 +785,7 @@ unsafe extern "C" fn rcv_cb(
 
         asynch::ESP_NOW_RX_WAKER.wake();
     });
-}
+}}
 
 pub use asynch::SendFuture;
 

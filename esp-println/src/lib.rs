@@ -9,10 +9,10 @@ pub mod defmt;
 pub mod logger;
 
 macro_rules! log_format {
-    ($value:expr) => {
-        #[link_section = concat!(".espressif.metadata")]
+    ($value:expr_2021) => {
+        #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
-        #[export_name = concat!("espflash.LOG_FORMAT")]
+        #[unsafe(export_name = concat!("espflash.LOG_FORMAT"))]
         static LOG_FORMAT: [u8; $value.len()] = const {
             let val_bytes = $value.as_bytes();
             let mut val_bytes_array = [0; $value.len()];
@@ -82,7 +82,7 @@ macro_rules! dbg {
     () => {
         $crate::println!("[{}:{}]", ::core::file!(), ::core::line!())
     };
-    ($val:expr $(,)?) => {
+    ($val:expr_2021 $(,)?) => {
         // Use of `match` here is intentional because it affects the lifetimes
         // of temporaries - https://stackoverflow.com/a/48732525/1063961
         match $val {
@@ -93,7 +93,7 @@ macro_rules! dbg {
             }
         }
     };
-    ($($val:expr),+ $(,)?) => {
+    ($($val:expr_2021),+ $(,)?) => {
         ($($crate::dbg!($val)),+,)
     };
 }
@@ -507,14 +507,14 @@ struct LockToken<'a>(LockInner<'a>);
 
 impl LockToken<'_> {
     #[allow(unused)]
-    unsafe fn conjure() -> Self {
+    unsafe fn conjure() -> Self { unsafe {
         #[cfg(feature = "critical-section")]
         let inner = critical_section::CriticalSection::new();
         #[cfg(not(feature = "critical-section"))]
         let inner = PhantomData;
 
         LockToken(inner)
-    }
+    }}
 }
 
 /// Runs the callback in a critical section, if enabled.

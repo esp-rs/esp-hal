@@ -109,7 +109,7 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 /// *************************************************************************
 #[allow(unused)]
 #[ram]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
@@ -132,7 +132,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int { unsafe {
     trace!("read_mac {:?} {}", mac, type_);
 
     let base_mac = hal::efuse::Efuse::mac_address();
@@ -173,43 +173,43 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
     }
 
     0
-}
+}}
 
 #[allow(unused)]
 #[ram]
-pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *const ()) -> i32 {
+pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *const ()) -> i32 { unsafe {
     trace!("sem take from isr");
     (hptw as *mut u32).write_volatile(0);
     crate::common_adapter::semphr_take(sem as *mut crate::binary::c_types::c_void, 0)
-}
+}}
 
 #[allow(unused)]
 #[ram]
-pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *const ()) -> i32 {
+pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *const ()) -> i32 { unsafe {
     trace!("sem give from isr");
     (hptw as *mut u32).write_volatile(0);
     crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void)
-}
+}}
 
 // other functions
-#[no_mangle]
-pub unsafe extern "C" fn puts(s: *const c_char) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn puts(s: *const c_char) { unsafe {
     let cstr = str_from_c(s);
     info!("{}", cstr);
-}
+}}
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
-#[no_mangle]
+#[unsafe(no_mangle)]
 static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 // stuff needed by wpa-supplicant
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn __assert_func(
     file: *const c_char,
     line: u32,
     func: *const c_char,
     failed_expr: *const c_char,
-) {
+) { unsafe {
     let file = str_from_c(file);
     let (func_pre, func) = if func.is_null() {
         ("", "")
@@ -222,24 +222,24 @@ pub unsafe extern "C" fn __assert_func(
         "assertion \"{}\" failed: file \"{}\", line {}{}{}",
         expr, file, line, func_pre, func
     );
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
     compat_timer_disarm(timer.cast());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
     compat_timer_done(timer.cast());
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_setfn(
     ptimer: *mut crate::binary::c_types::c_void,
     pfunction: *mut crate::binary::c_types::c_void,
     parg: *mut crate::binary::c_types::c_void,
-) {
+) { unsafe {
     compat_timer_setfn(
         ptimer.cast(),
         core::mem::transmute::<
@@ -248,9 +248,9 @@ pub unsafe extern "C" fn ets_timer_setfn(
         >(pfunction),
         parg,
     );
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_arm(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn ets_timer_arm(
     compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_arm_us(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn ets_timer_arm_us(
     compat_timer_arm_us(timer.cast(), tmout, repeat);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
@@ -281,8 +281,8 @@ pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     0
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) { unsafe {
     trace!("esp_fill_random");
     let dst = core::slice::from_raw_parts_mut(dst, len as usize);
 
@@ -292,9 +292,9 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
         let bytes = rng.random().to_le_bytes();
         chunk.copy_from_slice(&bytes[..chunk.len()]);
     }
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
 }

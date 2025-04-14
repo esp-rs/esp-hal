@@ -23,7 +23,7 @@ pub(crate) fn phy_mem_init() {
     }
 }
 
-pub(crate) unsafe fn phy_enable() {
+pub(crate) unsafe fn phy_enable() { unsafe {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
@@ -63,7 +63,7 @@ pub(crate) unsafe fn phy_enable() {
 
             #[cfg(feature = "ble")]
             {
-                extern "C" {
+                unsafe extern "C" {
                     fn coex_pti_v2();
                 }
                 coex_pti_v2();
@@ -72,10 +72,10 @@ pub(crate) unsafe fn phy_enable() {
             trace!("PHY ENABLE");
         });
     }
-}
+}}
 
 #[allow(unused)]
-pub(crate) unsafe fn phy_disable() {
+pub(crate) unsafe fn phy_disable() { unsafe {
     let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
     if count == 1 {
         critical_section::with(|_| {
@@ -97,7 +97,7 @@ pub(crate) unsafe fn phy_disable() {
             trace!("PHY DISABLE");
         });
     }
-}
+}}
 
 fn phy_digital_regs_load() {
     unsafe {

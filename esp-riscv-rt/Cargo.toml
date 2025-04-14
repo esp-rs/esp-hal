@@ -1,14 +1,18 @@
 [package]
 name          = "esp-riscv-rt"
 version       = "0.10.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 documentation = "https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/"
 keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 document-features = "0.2.11"

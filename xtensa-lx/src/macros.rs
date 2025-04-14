@@ -26,7 +26,7 @@
 /// ```
 #[macro_export]
 macro_rules! singleton {
-    ($(#[$meta:meta])* $name:ident: $ty:ty = $expr:expr) => {
+    ($(#[$meta:meta])* $name:ident: $ty:ty = $expr:expr_2021) => {
         $crate::_export::critical_section::with(|_| {
             // this is a tuple of a MaybeUninit and a bool because using an Option here is
             // problematic:  Due to niche-optimization, an Option could end up producing a non-zero
@@ -50,7 +50,7 @@ macro_rules! singleton {
             }
         })
     };
-    ($(#[$meta:meta])* : $ty:ty = $expr:expr) => {
+    ($(#[$meta:meta])* : $ty:ty = $expr:expr_2021) => {
         $crate::singleton!($(#[$meta])* VAR: $ty = $expr)
     };
 }

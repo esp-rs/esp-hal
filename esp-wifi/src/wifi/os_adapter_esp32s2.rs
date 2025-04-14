@@ -13,21 +13,21 @@ pub(crate) unsafe extern "C" fn set_intr(
     intr_source: u32,
     intr_num: u32,
     _intr_prio: i32,
-) {
-    extern "C" {
+) { unsafe {
+    unsafe extern "C" {
         fn intr_matrix_set(cpu_no: u32, model_num: u32, intr_num: u32);
     }
     // Force to bind WiFi interrupt to CPU0
     intr_matrix_set(0, intr_source, intr_num);
-}
+}}
 
-pub(crate) unsafe extern "C" fn phy_common_clock_disable() {
+pub(crate) unsafe extern "C" fn phy_common_clock_disable() { unsafe {
     crate::common_adapter::phy_disable_clock();
-}
+}}
 
-pub(crate) unsafe extern "C" fn phy_common_clock_enable() {
+pub(crate) unsafe extern "C" fn phy_common_clock_enable() { unsafe {
     crate::common_adapter::phy_enable_clock();
-}
+}}
 
 /// **************************************************************************
 /// Name: esp_set_isr
@@ -48,7 +48,7 @@ pub unsafe extern "C" fn set_isr(
     n: i32,
     f: *mut crate::binary::c_types::c_void,
     arg: *mut crate::binary::c_types::c_void,
-) {
+) { unsafe {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 
     match n {
@@ -72,4 +72,4 @@ pub unsafe extern "C" fn set_isr(
             interrupt::Priority::Priority1,
         ));
     }
-}
+}}

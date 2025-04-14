@@ -189,7 +189,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
 extern "C" fn patch_apply() {
     trace!("patch apply");
 
-    extern "C" {
+    unsafe extern "C" {
         fn config_ble_funcs_reset();
         fn config_btdm_funcs_reset();
     }
@@ -313,7 +313,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
 }
 
 pub(crate) fn btdm_controller_mem_init() {
-    extern "C" {
+    unsafe extern "C" {
         static mut _data_start_btdm: u32;
         static mut _data_end_btdm: u32;
         static _data_start_btdm_rom: u32;
@@ -367,7 +367,7 @@ pub(crate) fn bt_periph_module_enable() {
 }
 
 pub(crate) fn disable_sleep_mode() {
-    extern "C" {
+    unsafe extern "C" {
         fn btdm_controller_set_sleep_mode(mode: u8);
     }
 
@@ -397,7 +397,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32 {
     trace!("coex_bt_request");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_bt_request(event: u32, latency: u32, duration: u32) -> i32;
     }
@@ -412,7 +412,7 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
     trace!("coex_bt_release");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_bt_release(event: u32) -> i32;
     }
@@ -428,7 +428,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
     warn!("coex_register_bt_cb {:?}", callback);
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_register_bt_cb(callback: unsafe extern "C" fn()) -> i32;
     }
@@ -442,7 +442,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
 
 pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
     trace!("coex_bb_reset_lock");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_lock() -> u32;
     }
@@ -457,7 +457,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
     trace!("coex_bb_reset_unlock");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_bb_reset_unlock(event: u32);
     }
@@ -470,7 +470,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
     warn!("coex_schm_register_btdm_callback {:?}", callback);
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_schm_register_callback(kind: u32, callback: unsafe extern "C" fn()) -> i32;
     }
@@ -515,7 +515,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32 {
     warn!("coex_wifi_channel_get");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32;
     }
@@ -532,7 +532,7 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
     warn!("coex_register_wifi_channel_change_callback");
-    extern "C" {
+    unsafe extern "C" {
         #[cfg(coex)]
         fn coex_register_wifi_channel_change_callback(callback: unsafe extern "C" fn()) -> i32;
     }
@@ -544,7 +544,7 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     0
 }
 
-pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 {
+pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 { unsafe {
     trace!("set_isr called {} {:?} {:?}", n, f, arg);
 
     match n {
@@ -569,12 +569,12 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
     }
 
     0
-}
+}}
 
-pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
+pub(crate) unsafe extern "C" fn ints_on(mask: u32) { unsafe {
     trace!("chip_ints_on esp32 {:b}", mask);
     crate::hal::xtensa_lx::interrupt::enable_mask(mask);
-}
+}}
 
 #[cfg(coex)]
 const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;

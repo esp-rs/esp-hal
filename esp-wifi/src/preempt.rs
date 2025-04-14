@@ -56,7 +56,7 @@ pub trait Scheduler: Send + Sync + 'static {
     fn current_task_thread_semaphore(&self) -> *mut c_void;
 }
 
-extern "Rust" {
+unsafe extern "Rust" {
     fn esp_wifi_preempt_enable();
     fn esp_wifi_preempt_disable();
     fn esp_wifi_preempt_yield_task();
@@ -107,26 +107,26 @@ pub(crate) fn current_task_thread_semaphore() -> *mut c_void {
 /// See the module documentation for an example.
 #[macro_export]
 macro_rules! scheduler_impl {
-    (static $name:ident: $t: ty = $val:expr) => {
+    (static $name:ident: $t: ty = $val:expr_2021) => {
         static $name: $t = $val;
 
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_enable() {
             <$t as $crate::preempt::Scheduler>::enable(&$name)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_disable() {
             <$t as $crate::preempt::Scheduler>::disable(&$name)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_yield_task() {
             <$t as $crate::preempt::Scheduler>::yield_task(&$name)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_current_task() -> *mut c_void {
             <$t as $crate::preempt::Scheduler>::current_task(&$name)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_task_create(
             task: extern "C" fn(*mut c_void),
             param: *mut c_void,
@@ -134,11 +134,11 @@ macro_rules! scheduler_impl {
         ) -> *mut c_void {
             <$t as $crate::preempt::Scheduler>::task_create(&$name, task, param, task_stack_size)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_schedule_task_deletion(task_handle: *mut c_void) {
             <$t as $crate::preempt::Scheduler>::schedule_task_deletion(&$name, task_handle)
         }
-        #[no_mangle]
+        #[unsafe(no_mangle)]
         fn esp_wifi_preempt_current_task_thread_semaphore() -> *mut c_void {
             <$t as $crate::preempt::Scheduler>::current_task_thread_semaphore(&$name)
         }

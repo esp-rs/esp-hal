@@ -766,7 +766,7 @@ impl Configuration {
         &mut self,
     ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
         match self {
-            Self::Mixed(client_conf, ref mut ap_conf) => (client_conf, ap_conf),
+            Self::Mixed(client_conf, ap_conf) => (client_conf, ap_conf),
             Self::AccessPoint(_) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
@@ -922,10 +922,10 @@ impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
-) {
+) { unsafe {
     let csi_callback = unsafe { &mut *(ctx as *mut C) };
     csi_callback(*data);
-}
+}}
 
 #[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
@@ -1414,20 +1414,20 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if let Ok(()) = DATA_QUEUE_RX_STA.with(|queue| {
+    match DATA_QUEUE_RX_STA.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             Ok(())
         } else {
             Err(packet)
         }
-    }) {
+    }) { Ok(()) => {
         embassy::STA_RECEIVE_WAKER.wake();
         include::ESP_OK as esp_err_t
-    } else {
+    } _ => {
         debug!("RX QUEUE FULL");
         include::ESP_ERR_NO_MEM as esp_err_t
-    }
+    }}
 }
 
 unsafe extern "C" fn recv_cb_ap(
@@ -1442,20 +1442,20 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if let Ok(()) = DATA_QUEUE_RX_AP.with(|queue| {
+    match DATA_QUEUE_RX_AP.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             Ok(())
         } else {
             Err(packet)
         }
-    }) {
+    }) { Ok(()) => {
         embassy::AP_RECEIVE_WAKER.wake();
         include::ESP_OK as esp_err_t
-    } else {
+    } _ => {
         debug!("RX QUEUE FULL");
         include::ESP_ERR_NO_MEM as esp_err_t
-    }
+    }}
 }
 
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -1955,7 +1955,7 @@ impl RxControlInfo {
     /// # Safety
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
-    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self { unsafe {
         #[cfg(not(esp32c6))]
         let rx_control_info = RxControlInfo {
             rssi: (*rx_cntl).rssi(),
@@ -2001,7 +2001,7 @@ impl RxControlInfo {
             rxmatch0: (*rx_cntl).rxmatch0(),
         };
         rx_control_info
-    }
+    }}
 }
 /// Represents a Wi-Fi packet in promiscuous mode.
 #[cfg(feature = "sniffer")]
@@ -2023,7 +2023,7 @@ impl PromiscuousPkt<'_> {
     pub(crate) unsafe fn from_raw(
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
-    ) -> Self {
+    ) -> Self { unsafe {
         let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
         let len = rx_cntl.sig_len as usize;
         PromiscuousPkt {
@@ -2035,19 +2035,19 @@ impl PromiscuousPkt<'_> {
                 len,
             ),
         }
-    }
+    }}
 }
 
 #[cfg(feature = "sniffer")]
 static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
-unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
+unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) { unsafe {
     if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
         let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
         sniffer_callback(promiscuous_pkt);
     }
-}
+}}
 
 #[cfg(feature = "sniffer")]
 /// A wifi sniffer.
@@ -2460,7 +2460,7 @@ fn dump_packet_info(_buffer: &mut [u8]) {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! esp_wifi_result {
-    ($value:expr) => {{
+    ($value:expr_2021) => {{
         use num_traits::FromPrimitive;
         let result = $value;
         if result != esp_wifi_sys::include::ESP_OK as i32 {

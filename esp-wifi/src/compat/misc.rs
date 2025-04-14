@@ -1,28 +1,28 @@
 use crate::compat::malloc::malloc;
 
 // these are not called but needed for linking
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fwrite(ptr: *const (), size: usize, count: usize, stream: *const ()) -> usize {
     todo!("fwrite {:?} {} {} {:?}", ptr, size, count, stream)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fopen(filename: *const u8, mode: *const u8) -> *const () {
     todo!("fopen {:?} {:?}", filename, mode)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fgets(str: *const u8, count: u32, file: *const ()) -> *const u8 {
     todo!("fgets {:?} {} {:?}", str, count, file)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fclose(stream: *const ()) -> i32 {
     todo!("fclose {:?}", stream);
 }
 
 // We cannot just use the ROM function since it needs to allocate memory
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::c_char {
     trace!("strdup {:?}", str);
 
@@ -42,8 +42,8 @@ unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::
 // From docs: The __getreent() function returns a per-task pointer to struct
 // _reent in newlib libc. This structure is allocated on the TCB of each task.
 // i.e. it assumes a FreeRTOS task calling it.
-#[no_mangle]
-unsafe extern "C" fn atoi(str: *const i8) -> i32 {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn atoi(str: *const i8) -> i32 { unsafe {
     trace!("atoi {:?}", str);
 
     let mut sign: i32 = 1;
@@ -81,7 +81,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
         idx += 1;
     }
     res * sign
-}
+}}
 
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
@@ -97,8 +97,8 @@ struct Tm {
     tm_isdst: u32, // daylight savings time flag
 }
 
-#[no_mangle]
-unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn mktime(time: *const Tm) -> i64 { unsafe {
     trace!("mktime {:?}", time);
     let time = *time;
 
@@ -126,4 +126,4 @@ unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
     let seconds = days * 24 * 60 * 60 + time.tm_hour * 60 * 60 + time.tm_min * 60 + time.tm_sec;
 
     seconds as i64
-}
+}}

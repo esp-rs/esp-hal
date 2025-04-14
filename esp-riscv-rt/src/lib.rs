@@ -25,11 +25,11 @@ pub use riscv_rt_macros::{entry, pre_init};
 
 pub use self::Interrupt as interrupt;
 
-#[export_name = "error: esp-riscv-rt appears more than once in the dependency graph"]
+#[unsafe(export_name = "error: esp-riscv-rt appears more than once in the dependency graph")]
 #[doc(hidden)]
 pub static __ONCE__: () = ();
 
-extern "C" {
+unsafe extern "C" {
     // Boundaries of the .bss section
     static mut _bss_end: u32;
     static mut _bss_start: u32;
@@ -51,10 +51,10 @@ extern "C" {
 ///
 /// This function should not be called directly by the user, and should instead
 /// be invoked by the runtime implicitly.
-#[link_section = ".init.rust"]
-#[export_name = "_start_rust"]
-pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
-    extern "Rust" {
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(export_name = "_start_rust")]
+pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! { unsafe {
+    unsafe extern "Rust" {
         fn hal_main(a0: usize, a1: usize, a2: usize) -> !;
 
         fn __post_init();
@@ -68,7 +68,7 @@ pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
     _setup_interrupts();
 
     hal_main(a0, a1, a2);
-}
+}}
 
 /// Registers saved in trap handler
 #[derive(Debug, Default, Clone, Copy)]
@@ -170,10 +170,10 @@ pub struct TrapFrame {
 ///
 /// This function should not be called directly by the user, and should instead
 /// be invoked by the runtime implicitly.
-#[link_section = ".trap.rust"]
-#[export_name = "_start_trap_rust"]
+#[unsafe(link_section = ".trap.rust")]
+#[unsafe(export_name = "_start_trap_rust")]
 pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
-    extern "C" {
+    unsafe extern "C" {
         fn ExceptionHandler(trap_frame: &TrapFrame);
         fn DefaultHandler();
     }
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(unused_variables, non_snake_case)]
 pub fn DefaultExceptionHandler(trap_frame: &TrapFrame) -> ! {
     loop {
@@ -208,7 +208,7 @@ pub fn DefaultExceptionHandler(trap_frame: &TrapFrame) -> ! {
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[allow(unused_variables, non_snake_case)]
 pub fn DefaultInterruptHandler() {
     loop {
@@ -232,7 +232,7 @@ pub enum Interrupt {
     MachineExternal,
 }
 
-extern "C" {
+unsafe extern "C" {
     fn UserSoft();
     fn SupervisorSoft();
     fn MachineSoft();
@@ -251,7 +251,7 @@ pub union Vector {
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static __INTERRUPTS: [Vector; 12] = [
     Vector { handler: UserSoft },
     Vector {
@@ -282,22 +282,22 @@ pub static __INTERRUPTS: [Vector; 12] = [
 ];
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub unsafe extern "Rust" fn default_post_init() {}
 
 /// Default implementation of `_setup_interrupts` that sets `mtvec`/`stvec` to a
 /// trap handler address.
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
-pub unsafe extern "Rust" fn default_setup_interrupts() {
-    extern "C" {
+pub unsafe extern "Rust" fn default_setup_interrupts() { unsafe {
+    unsafe extern "C" {
         fn _start_trap();
     }
 
     mtvec::write(_start_trap as usize, TrapMode::Direct);
-}
+}}
 
 /// Parse cfg attributes inside a global_asm call.
 macro_rules! cfg_global_asm {

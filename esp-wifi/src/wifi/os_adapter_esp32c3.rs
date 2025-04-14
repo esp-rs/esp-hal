@@ -50,7 +50,7 @@ pub unsafe extern "C" fn set_isr(
     n: i32,
     f: *mut crate::binary::c_types::c_void,
     arg: *mut crate::binary::c_types::c_void,
-) {
+) { unsafe {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 
     match n {
@@ -74,4 +74,4 @@ pub unsafe extern "C" fn set_isr(
             interrupt::Priority::Priority1
         ));
     }
-}
+}}

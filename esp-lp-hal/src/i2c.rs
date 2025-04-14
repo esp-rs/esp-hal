@@ -15,11 +15,11 @@ const I2C_LL_INTR_MASK: u32 = (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S)
 const LP_I2C_FIFO_LEN: u32 = 16;
 
 #[doc(hidden)]
-pub unsafe fn conjure() -> LpI2c {
+pub unsafe fn conjure() -> LpI2c { unsafe {
     LpI2c {
         i2c: LP_I2C0::steal(),
     }
-}
+}}
 
 // TODO: Document enum variants
 /// I2C-specific transmission errors

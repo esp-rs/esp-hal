@@ -20,7 +20,7 @@ pub use generate::{
 /// Parse the value of an environment variable as a [bool] at compile time.
 #[macro_export]
 macro_rules! esp_config_bool {
-    ( $var:expr ) => {
+    ( $var:expr_2021 ) => {
         match env!($var).as_bytes() {
             b"true" => true,
             b"false" => false,
@@ -32,7 +32,7 @@ macro_rules! esp_config_bool {
 /// Parse the value of an environment variable as an integer at compile time.
 #[macro_export]
 macro_rules! esp_config_int {
-    ( $ty:ty, $var:expr ) => {
+    ( $ty:ty, $var:expr_2021 ) => {
         const { $crate::esp_config_int_parse!($ty, env!($var)) }
     };
 }
@@ -40,7 +40,7 @@ macro_rules! esp_config_int {
 /// Get the string value of an environment variable at compile time.
 #[macro_export]
 macro_rules! esp_config_str {
-    ( $var:expr ) => {
+    ( $var:expr_2021 ) => {
         env!($var)
     };
 }
@@ -52,7 +52,7 @@ macro_rules! esp_config_str {
 #[doc(hidden)] // To avoid confusion with `esp_config_int`, hide this in the docs
 #[macro_export]
 macro_rules! esp_config_int_parse {
-    ( $ty:ty, $s:expr ) => {{
+    ( $ty:ty, $s:expr_2021 ) => {{
         let val: $ty = match <$ty>::from_str_radix($s, 10) {
             Ok(val) => val as $ty,
             Err(_) => {

@@ -14,7 +14,7 @@ pub use generate_cfg::*;
 /// ```
 #[macro_export]
 macro_rules! memory_region_start {
-    ( $var:expr ) => {
+    ( $var:expr_2021 ) => {
         const {
             match usize::from_str_radix(env!(concat!("ESP_METADATA_REGION_", $var, "_START")), 10) {
                 Ok(val) => val,
@@ -34,7 +34,7 @@ macro_rules! memory_region_start {
 /// ```
 #[macro_export]
 macro_rules! memory_region_end {
-    ( $var:expr ) => {
+    ( $var:expr_2021 ) => {
         const {
             match usize::from_str_radix(env!(concat!("ESP_METADATA_REGION_", $var, "_END")), 10) {
                 Ok(val) => val,

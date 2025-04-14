@@ -25,14 +25,14 @@ pub mod exception;
 pub mod interrupt;
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn DefaultPreInit() {}
 
 #[doc(hidden)]
-#[no_mangle]
-pub unsafe extern "C" fn Reset() -> ! {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn Reset() -> ! { unsafe {
     // These symbols come from `link.x`
-    extern "C" {
+    unsafe extern "C" {
         static mut _bss_start: u32;
         static mut _bss_end: u32;
 
@@ -44,7 +44,7 @@ pub unsafe extern "C" fn Reset() -> ! {
 
     }
 
-    extern "Rust" {
+    unsafe extern "Rust" {
         // This symbol will be provided by the user via `#[entry]`
         fn main() -> !;
 
@@ -80,10 +80,10 @@ pub unsafe extern "C" fn Reset() -> ! {
     __post_init();
 
     main();
-}
+}}
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub unsafe extern "Rust" fn default_post_init() {}
 
@@ -91,7 +91,7 @@ pub unsafe extern "Rust" fn default_post_init() {}
 
 #[doc(hidden)]
 #[inline]
-unsafe fn reset_internal_timers() {
+unsafe fn reset_internal_timers() { unsafe {
     #[cfg(any(
         XCHAL_HAVE_TIMER0,
         XCHAL_HAVE_TIMER1,
@@ -113,10 +113,10 @@ unsafe fn reset_internal_timers() {
             "isync",
         }, in(reg) value, options(nostack));
     }
-}
+}}
 
 // CPU Interrupts
-extern "C" {
+unsafe extern "C" {
     #[cfg(XCHAL_HAVE_TIMER0)]
     pub fn Timer0(save_frame: &mut crate::exception::Context);
     #[cfg(XCHAL_HAVE_TIMER1)]
@@ -140,12 +140,12 @@ extern "C" {
 
 #[doc(hidden)]
 #[inline]
-unsafe fn set_vecbase(base: *const u32) {
+unsafe fn set_vecbase(base: *const u32) { unsafe {
     asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
-}
+}}
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub extern "Rust" fn default_mem_hook() -> bool {
     true // default to zeroing bss & initializing data

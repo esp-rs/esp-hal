@@ -130,7 +130,7 @@ impl RawQueue {
         }
     }
 
-    unsafe fn remove(&mut self, item: *mut c_void) {
+    unsafe fn remove(&mut self, item: *mut c_void) { unsafe {
         // do what the ESP-IDF implementations does ...
         // just remove all elements and add them back except the one we need to remove -
         // good enough for now
@@ -153,7 +153,7 @@ impl RawQueue {
                 self.enqueue(tmp_item.as_mut_ptr().cast());
             }
         }
-    }
+    }}
 
     fn count(&self) -> usize {
         if self.current_write >= self.current_read {
@@ -164,13 +164,13 @@ impl RawQueue {
     }
 }
 
-pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
+pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str { unsafe {
     let c_str = core::ffi::CStr::from_ptr(s.cast());
     core::str::from_utf8_unchecked(c_str.to_bytes())
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize { unsafe {
     let mut len = 0;
     loop {
         if chars.offset(len).read_volatile() == 0 {
@@ -180,7 +180,7 @@ unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
     }
 
     len as usize
-}
+}}
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
     unsafe {
@@ -401,29 +401,29 @@ pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 
 
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
-) -> crate::binary::c_types::c_uint {
+) -> crate::binary::c_types::c_uint { unsafe {
     trace!("sleep");
 
     usleep(seconds * 1_000);
     0
-}
+}}
 
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
-#[no_mangle]
-unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int { unsafe {
     trace!("usleep");
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_delay_us(us: u32);
     }
     esp_rom_delay_us(us);
     0
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn putchar(c: i32) -> crate::binary::c_types::c_int {
     trace!("putchar {}", c as u8 as char);
     c

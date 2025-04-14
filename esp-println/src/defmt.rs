@@ -47,7 +47,7 @@ unsafe impl defmt::Logger for Logger {
         unsafe { ENCODER.start_frame(do_write) }
     }
 
-    unsafe fn release() {
+    unsafe fn release() { unsafe {
         // safety: accessing the `static mut` is OK because we have acquired a critical
         // section.
         ENCODER.end_frame(do_write);
@@ -71,7 +71,7 @@ unsafe impl defmt::Logger for Logger {
             // safety: Must be paired with corresponding call to acquire(), see above
             critical_section::release(restore);
         }
-    }
+    }}
 
     unsafe fn flush() {
         let token = unsafe {
@@ -82,11 +82,11 @@ unsafe impl defmt::Logger for Logger {
         PrinterImpl::flush(token);
     }
 
-    unsafe fn write(bytes: &[u8]) {
+    unsafe fn write(bytes: &[u8]) { unsafe {
         // safety: accessing the `static mut` is OK because we have acquired a critical
         // section.
         ENCODER.write(bytes, do_write);
-    }
+    }}
 }
 
 fn do_write(bytes: &[u8]) {

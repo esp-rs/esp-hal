@@ -86,7 +86,7 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     handler: *mut crate::binary::c_types::c_void,
     arg: *mut crate::binary::c_types::c_void,
     ret_handle: *mut *mut crate::binary::c_types::c_void,
-) -> i32 {
+) -> i32 { unsafe {
     trace!(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",
         source,
@@ -115,7 +115,7 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     }
 
     0
-}
+}}
 
 pub(super) fn ble_rtc_clk_init() {
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by

@@ -32,7 +32,7 @@ static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, { crate::CONFIG.rx_queue_size 
     Mutex::new(RefCell::new(Queue::new()));
 static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
 
-extern "C" {
+unsafe extern "C" {
     fn bt_bb_v2_init_cmplx(print_version: u32); // from libbtbb.a
 
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
@@ -108,7 +108,7 @@ fn esp_btbb_enable() {
 fn ieee802154_mac_init() {
     #[cfg(feature = "esp32c6")]
     unsafe {
-        extern "C" {
+        unsafe extern "C" {
             static mut coex_pti_tab_ptr: u32;
             static coex_pti_tab: u8;
         }

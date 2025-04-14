@@ -125,10 +125,10 @@ loop:
 "#
 );
 
-#[link_section = ".init.rust"]
-#[export_name = "rust_main"]
-unsafe extern "C" fn lp_core_startup() -> ! {
-    extern "Rust" {
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(export_name = "rust_main")]
+unsafe extern "C" fn lp_core_startup() -> ! { unsafe {
+    unsafe extern "Rust" {
         fn main() -> !;
     }
 
@@ -143,7 +143,7 @@ unsafe extern "C" fn lp_core_startup() -> ! {
     }
 
     main();
-}
+}}
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 #[link_section = ".init.rust"]

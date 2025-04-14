@@ -30,9 +30,9 @@ const XDM_OCD_DCR_SET: u32 = 0x10200C;
 /// *This is highly unsafe!*
 /// It should be used with care, `base` MUST be a valid pointer
 #[inline(always)]
-pub unsafe fn set_vecbase(base: *const u32) {
+pub unsafe fn set_vecbase(base: *const u32) { unsafe {
     asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
-}
+}}
 
 /// Get the core stack pointer
 #[inline(always)]
@@ -53,7 +53,7 @@ pub fn get_stack_pointer() -> *const u32 {
 /// It should be used with care at e.g. program start or when building a task
 /// scheduler
 #[inline(always)]
-pub unsafe fn set_stack_pointer(stack: *mut u32) {
+pub unsafe fn set_stack_pointer(stack: *mut u32) { unsafe {
     // FIXME: this function relies on it getting inlined - if it doesn't inline it
     // will try and return from this function using the adress in `a0` which has
     // just been trashed... According to https://nnethercote.github.io/perf-book/inlining.html:
@@ -70,7 +70,7 @@ pub unsafe fn set_stack_pointer(stack: *mut u32) {
         "mov sp, {0}", // move stack pointer
         in(reg) stack, options(nostack)
     );
-}
+}}
 
 /// Get the core current program counter
 #[inline(always)]

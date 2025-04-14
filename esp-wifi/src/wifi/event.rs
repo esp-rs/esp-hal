@@ -197,7 +197,7 @@ pub(crate) unsafe fn dispatch_event_handler(
     event: WifiEvent,
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
-) -> bool {
+) -> bool { unsafe {
     match event {
         WifiEvent::WifiReady => {
             handle_raw::<WifiReady>(event_data, event_data_size)
@@ -335,4 +335,4 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<StaNeighborRep>(event_data, event_data_size)
         }
     }
-}
+}}

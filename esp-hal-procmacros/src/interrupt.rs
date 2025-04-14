@@ -48,11 +48,11 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let priority = if let Some(priority) = args.priority {
+    let priority = match args.priority { Some(priority) => {
         quote::quote!( #priority )
-    } else {
+    } _ => {
         quote::quote! { #root::interrupt::Priority::min() }
-    };
+    }};
 
     // XXX should we blacklist other attributes?
 

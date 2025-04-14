@@ -1,8 +1,8 @@
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     trace!("alloc {}", size);
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8;
     }
 
@@ -15,8 +15,8 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
     ptr
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn free(ptr: *mut u8) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn free(ptr: *mut u8) { unsafe {
     trace!("free {:?}", ptr);
 
     if ptr.is_null() {
@@ -24,15 +24,15 @@ pub unsafe extern "C" fn free(ptr: *mut u8) {
         return;
     }
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
     }
 
     esp_wifi_deallocate_internal_ram(ptr);
-}
+}}
 
-#[no_mangle]
-pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 { unsafe {
     trace!("calloc {} {}", number, size);
 
     let total_size = number as usize * size;
@@ -45,13 +45,13 @@ pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
     }
 
     ptr
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
     trace!("realloc {:?} {}", ptr, new_size);
 
-    extern "C" {
+    unsafe extern "C" {
         fn memcpy(d: *mut u8, s: *const u8, l: usize);
     }
 
@@ -71,14 +71,14 @@ unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
 
 #[cfg(feature = "esp-alloc")]
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn esp_wifi_free_internal_heap() -> usize {
     esp_alloc::HEAP.free_caps(esp_alloc::MemoryCapability::Internal.into())
 }
 
 #[cfg(feature = "esp-alloc")]
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
     let total_size = size + 4;
     unsafe {
@@ -98,7 +98,7 @@ pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8 {
 
 #[cfg(feature = "esp-alloc")]
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8) {
     use core::alloc::GlobalAlloc;
 
@@ -125,7 +125,7 @@ mod esp_alloc {
 
     unsafe impl Allocator for InternalMemory {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-            extern "C" {
+            unsafe extern "C" {
                 fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8;
             }
             let raw_ptr = unsafe { esp_wifi_allocate_from_internal_ram(layout.size()) };
@@ -133,12 +133,12 @@ mod esp_alloc {
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
-        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
-            extern "C" {
+        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) { unsafe {
+            unsafe extern "C" {
                 fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
             }
             esp_wifi_deallocate_internal_ram(ptr.as_ptr());
-        }
+        }}
     }
 }
 
