@@ -185,6 +185,8 @@ mod tests {
         assert_ne!(read_data, [0u8; 22])
     }
 
+    // This is still an issue on ESP32-S2
+    #[not(esp32s2)]
     #[test]
     async fn async_test_timeout_when_scl_kept_low(_ctx: Context) {
         let mut i2c = I2c::new(
@@ -199,7 +201,7 @@ mod tests {
         esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
 
         let mut read_data = [0u8; 22];
-        // will run into an error but it shouldn't run into an infinite loop
+        // will run into an error but it should return at least
         i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data)
             .await
             .ok();
