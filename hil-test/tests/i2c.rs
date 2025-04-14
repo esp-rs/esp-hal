@@ -184,4 +184,24 @@ mod tests {
 
         assert_ne!(read_data, [0u8; 22])
     }
+
+    #[test]
+    async fn async_test_timeout_when_scl_kept_low(_ctx: Context) {
+        let mut i2c = I2c::new(
+            unsafe { esp_hal::peripherals::I2C0::steal() },
+            Config::default(),
+        )
+        .unwrap()
+        .with_sda(unsafe { esp_hal::peripherals::GPIO4::steal() })
+        .with_scl(unsafe { esp_hal::peripherals::GPIO5::steal() })
+        .into_async();
+
+        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+
+        let mut read_data = [0u8; 22];
+        // will run into an error but it shouldn't run into an infinite loop
+        i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data)
+            .await
+            .ok();
+    }
 }
