@@ -1407,7 +1407,7 @@ mod dma {
 
                 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                     if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
-                        #[cfg(esp32)]
+                        #[cfg(any(esp32, esp32s2))]
                         // Need to poll for done-ness even after interrupt fires.
                         if self.0.busy() {
                             cx.waker().wake_by_ref();
