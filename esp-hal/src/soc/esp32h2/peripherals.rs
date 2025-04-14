@@ -93,6 +93,10 @@ crate::peripherals! {
         MEM2MEM13 <= virtual,
         MEM2MEM14 <= virtual,
         MEM2MEM15 <= virtual,
+
+        DMA_CH0 <= virtual,
+        DMA_CH1 <= virtual,
+        DMA_CH2 <= virtual,
     ],
     pins: [
         (0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
@@ -123,10 +127,5 @@ crate::peripherals! {
         (25, [Input, Output] () (2 => FSPICS3))
         (26, [Input, Output] () (2 => FSPICS4))
         (27, [Input, Output] () (2 => FSPICS5))
-    ],
-    dma_channels: [
-        DMA_CH0: DmaChannel0,
-        DMA_CH1: DmaChannel1,
-        DMA_CH2: DmaChannel2,
     ]
 }

@@ -56,6 +56,24 @@ If a driver works with multiple peripheral instances, e.g. `SPI`:
 +fn new(spi: impl Instance + Into<AnySpi<'d>>)
 ```
 
+## DMA changes
+
+### DMA channel types are now consistent with other peripheral singletons
+
+For compatibility with third party libraries, as well as for consistency with other peripherals,
+the DMA channel types (e.g. `DmaChannel0`/`Spi2DmaChannel`) have been replaced by
+`esp_hal::peripherals::DMA_channel<'d>` types.
+
+```diff
+-use esp_hal::gpio::DmaChannel0;
++use esp_hal::peripherals::DMA_CH0;
+```
+
+```diff
+-use esp_hal::gpio::Spi2DmaChannel;
++use esp_hal::peripherals::DMA_SPI2;
+```
+
 ## GPIO changes
 
 ### GPIO pins are now consistent with other peripheral singletons

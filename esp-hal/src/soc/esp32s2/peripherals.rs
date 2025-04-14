@@ -33,8 +33,6 @@ crate::peripherals! {
         APB_SARADC <= APB_SARADC,
         DAC1 <= virtual,
         DAC2 <= virtual,
-        COPY_DMA <= COPY_DMA,
-        CRYPTO_DMA <= CRYPTO_DMA,
         DEDICATED_GPIO <= DEDICATED_GPIO,
         DS <= DS,
         EFUSE <= EFUSE,
@@ -77,6 +75,12 @@ crate::peripherals! {
         NRX <= NRX,
         FE <= FE,
         FE2 <= FE2,
+
+        DMA_SPI2 <= SPI2,
+        DMA_SPI3 <= SPI3,
+        DMA_I2S0 <= I2S0,
+        DMA_CRYPTO <= CRYPTO_DMA,
+        DMA_COPY <= COPY_DMA,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo])
@@ -123,12 +127,5 @@ crate::peripherals! {
         (44, [Input, Output])
         (45, [Input, Output])
         (46, [Input, Output])
-    ],
-    dma_channels: [
-        DMA_SPI2: Spi2DmaChannel,
-        DMA_SPI3: Spi3DmaChannel,
-        DMA_I2S0: I2s0DmaChannel,
-        DMA_CRYPTO: CryptoDmaChannel,
-        DMA_COPY: CopyDmaChannel,
     ]
 }

@@ -385,9 +385,9 @@ impl InterruptAccess<DmaRxInterrupt> for AnyI2sDmaRxChannel<'_> {
 crate::any_peripheral! {
     /// An I2S-compatible type-erased DMA channel.
     pub peripheral AnyI2sDmaChannel<'d> {
-        I2s0(I2s0DmaChannel<'d>),
+        I2s0(super::DMA_I2S0<'d>),
         #[cfg(i2s1)]
-        I2s1(I2s1DmaChannel<'d>),
+        I2s1(super::DMA_I2S1<'d>),
     }
 }
 
