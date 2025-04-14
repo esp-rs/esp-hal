@@ -10,7 +10,8 @@
 //! does not directly equal to the time it takes to process the interrupt.
 //!
 //! Outputs used: GPIO2, GPIO4. These are toggled one after the other, so the
-//! generated square waves are 90 degrees out of phase.
+//! generated square waves are 90 degrees out of phase. DO NOT CONNECT GPIO2 and
+//! GPIO4 - they read back themselves.
 
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
@@ -35,14 +36,14 @@ async fn main(spawner: Spawner) {
 
     let mut enc_a = Flex::new(unsafe { p.GPIO2.clone_unchecked() });
     let enc_a_clone = Flex::new(p.GPIO2);
-    enc_a.set_as_output();
     enc_a.apply_output_config(&OutputConfig::default());
+    enc_a.enable_output(true);
     enc_a.enable_input(true);
 
     let mut enc_b = Flex::new(unsafe { p.GPIO4.clone_unchecked() });
     let enc_b_clone = Flex::new(p.GPIO4);
-    enc_b.set_as_output();
     enc_b.apply_output_config(&OutputConfig::default());
+    enc_b.enable_output(true);
     enc_b.enable_input(true);
 
     let timg0 = TimerGroup::new(p.TIMG0);

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add DMA memcpy support to the S2 (#3352)
 - Some config options can now only be set when the `unstable` feature in enabled (#3365)
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Added `Flex::enable_output` (#3387)
 
 ### Changed
 
@@ -59,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32/ESP32-S2: Avoid running into timeouts with reads/writes larger than the FIFO (#3199)
 - ESP32: Enforce required pointer alignments in DMA buffers (#3296)
 - ESP32-C6: Keep ADC enabled to improve radio signal strength (#3249)
-- Flex: Revert removal of `Flex::set_as_input` (#3250)
 - Fix off-by-one in the allowed range of the spi clock calculations (#3266)
 - Fix PCNT counter not keeping the peripheral enabled (#3334)
 - Fixed an issue where inverting a pin via the interconnect matrix was ineffective (#3312)
@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Peripheral` trait and `PeripheralRef` struct have been removed (#3302, #3305)
 - Removed the inherent `degrade` method from peripheral singletons. (#3305)
 - Removed the `FullDuplex` trait from the PARL_IO driver. (#3339)
+- Removed `Flex::{set_as_input, set_as_output, set_drive_strength, set_as_open_drain, pull_direction}` functions (#3387)
 
 ## v1.0.0-beta.0
 
