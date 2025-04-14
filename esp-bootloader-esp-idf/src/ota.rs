@@ -332,6 +332,31 @@ mod tests {
         0, 0, 0, 0, // FLAGS
     ];
 
+    const SLOT_INITIAL: &[u8] = &[
+        255u8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    ];
+
+    const SLOT_COUNT_1_UNDEFINED: &[u8] = &[
+        1u8, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 154, 152, 67, 71,
+    ];
+
+    const SLOT_COUNT_1_VALID: &[u8] = &[
+        1u8, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 255, 2, 0, 0, 0, 154, 152, 67, 71,
+    ];
+
+    const SLOT_COUNT_2_NEW: &[u8] = &[
+        2, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 0, 0, 0, 0, 116, 55, 246, 85,
+    ];
+
+    const SLOT_COUNT_3_PENDING: &[u8] = &[
+        3, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+        255, 255, 255, 255, 1, 0, 0, 0, 17, 80, 74, 237,
+    ];
+
     #[test]
     fn test_initial_state_and_next_slot() {
         let mut binary = PARTITION_RAW;
@@ -368,21 +393,8 @@ mod tests {
         assert_eq!(sut.current_slot().unwrap(), Slot::Slot0);
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::Undefined));
 
-        assert_eq!(
-            &[
-                1u8, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 154, 152, 67, 71
-            ],
-            &mock_flash.data[0x0000..][..0x20],
-        );
-
-        assert_eq!(
-            &[
-                255u8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255
-            ],
-            &mock_flash.data[0x1000..][..0x20],
-        );
+        assert_eq!(SLOT_COUNT_1_UNDEFINED, &mock_flash.data[0x0000..][..0x20],);
+        assert_eq!(SLOT_INITIAL, &mock_flash.data[0x1000..][..0x20],);
     }
 
     #[test]
@@ -397,15 +409,8 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(&[
-            1u8, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-            255, 255, 255, 255, 255, 255, 2, 0, 0, 0, 154, 152, 67, 71,
-        ]);
-
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(&[
-            255u8, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-        ]);
+        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
+        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_INITIAL);
 
         let mut mock_region = FlashRegion {
             raw: &mock_entry,
@@ -421,21 +426,8 @@ mod tests {
         assert_eq!(sut.current_slot().unwrap(), Slot::Slot1);
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::New));
 
-        assert_eq!(
-            &[
-                1, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 2, 0, 0, 0, 154, 152, 67, 71
-            ],
-            &mock_flash.data[0x0000..][..0x20],
-        );
-
-        assert_eq!(
-            &[
-                2, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 116, 55, 246, 85
-            ],
-            &mock_flash.data[0x1000..][..0x20],
-        );
+        assert_eq!(SLOT_COUNT_1_VALID, &mock_flash.data[0x0000..][..0x20],);
+        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
     }
 
     #[test]
@@ -450,15 +442,8 @@ mod tests {
             data: [0xff; 0x2000],
         };
 
-        mock_flash.data[0x0000..][..0x20].copy_from_slice(&[
-            1, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-            255, 255, 255, 255, 255, 2, 0, 0, 0, 154, 152, 67, 71,
-        ]);
-
-        mock_flash.data[0x1000..][..0x20].copy_from_slice(&[
-            2, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-            255, 255, 255, 255, 255, 0, 0, 0, 0, 116, 55, 246, 85,
-        ]);
+        mock_flash.data[0x0000..][..0x20].copy_from_slice(SLOT_COUNT_1_VALID);
+        mock_flash.data[0x1000..][..0x20].copy_from_slice(SLOT_COUNT_2_NEW);
 
         let mut mock_region = FlashRegion {
             raw: &mock_entry,
@@ -475,21 +460,8 @@ mod tests {
         assert_eq!(sut.current_slot().unwrap(), Slot::Slot0);
         assert_eq!(sut.current_ota_state(), Ok(OtaImageState::PendingVerify));
 
-        assert_eq!(
-            &[
-                3, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 1, 0, 0, 0, 17, 80, 74, 237
-            ],
-            &mock_flash.data[0x0000..][..0x20],
-        );
-
-        assert_eq!(
-            &[
-                2, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-                255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 116, 55, 246, 85
-            ],
-            &mock_flash.data[0x1000..][..0x20],
-        );
+        assert_eq!(SLOT_COUNT_3_PENDING, &mock_flash.data[0x0000..][..0x20],);
+        assert_eq!(SLOT_COUNT_2_NEW, &mock_flash.data[0x1000..][..0x20],);
     }
 
     #[test]
