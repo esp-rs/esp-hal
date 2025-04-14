@@ -1,8 +1,7 @@
 #![macro_use]
 #![allow(unused_macros)]
 
-#[cfg(all(feature = "defmt", feature = "log"))]
-compile_error!("You may not enable both `defmt` and `log` features.");
+use core::fmt::{Debug, Display, LowerHex};
 
 #[collapse_debuginfo(yes)]
 macro_rules! assert {
@@ -238,5 +237,33 @@ impl<T, E> Try for Result<T, E> {
     #[inline]
     fn into_result(self) -> Self {
         self
+    }
+}
+
+/// A way to `{:x?}` format a byte slice which is compatible with `defmt`
+pub struct Bytes<'a>(pub &'a [u8]);
+
+impl Debug for Bytes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#02x?}", self.0)
+    }
+}
+
+impl Display for Bytes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#02x?}", self.0)
+    }
+}
+
+impl LowerHex for Bytes<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#02x?}", self.0)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Bytes<'_> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{:02x}", self.0)
     }
 }

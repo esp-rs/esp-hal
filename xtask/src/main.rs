@@ -704,7 +704,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                             chip,
                             &path,
                             &[&format!("--target={}", chip.target())],
-                            &[&format!("{chip},esp-hal/unstable")],
+                            &[&format!("{chip},defmt,esp-hal/unstable")],
                             args.fix,
                             package.build_on_host(),
                         )?;
