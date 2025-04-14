@@ -381,8 +381,7 @@ pub(crate) fn phy_calibrate() {
             }
         };
 
-        // TODO use debug
-        info!("Using calibration mode {}", calibration_mode);
+        debug!("Using calibration mode {}", calibration_mode);
 
         register_chipv7_phy(
             init_data,
