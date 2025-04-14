@@ -2638,14 +2638,7 @@ pub fn new<'d>(
             esp_wifi_result!(esp_wifi_set_country(&country))?;
         }
 
-        #[cfg(initial_power_save_mode_none)]
-        const INITIAL_POWER_SAVE_MODE: PowerSaveMode = PowerSaveMode::None;
-        #[cfg(initial_power_save_mode_min)]
-        const INITIAL_POWER_SAVE_MODE: PowerSaveMode = PowerSaveMode::Minimum;
-        #[cfg(initial_power_save_mode_max)]
-        const INITIAL_POWER_SAVE_MODE: PowerSaveMode = PowerSaveMode::Maximum;
-
-        controller.set_power_saving(INITIAL_POWER_SAVE_MODE)?;
+        controller.set_power_saving(PowerSaveMode::default())?;
     }
 
     Ok((
