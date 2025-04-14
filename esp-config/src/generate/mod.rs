@@ -87,7 +87,7 @@ pub fn generate_config(
 
         for (name, option, value) in configs.iter() {
             markdown::write_doc_table_line(&mut doc_table, name, option);
-            markdown::write_summary_table_line(&mut selected_config, &name, value);
+            markdown::write_summary_table_line(&mut selected_config, name, value);
         }
 
         write_out_file(format!("{file_name}_config_table.md"), doc_table);

@@ -133,6 +133,11 @@ jobs:
           components: rust-src
       - uses: Swatinem/rust-cache@v2
 
+      - name: Stable toolchain checks
+        run: rustc +stable --version --verbose
+      - name: esp toolchain checks
+        run: rustc +esp --version --verbose
+
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
         run: |
