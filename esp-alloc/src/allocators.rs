@@ -23,9 +23,9 @@ unsafe impl Allocator for EspHeap {
         Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         crate::HEAP.dealloc(ptr.as_ptr(), layout);
-    }
+    }}
 }
 
 /// An allocator that uses all configured, available memory.
@@ -36,9 +36,9 @@ unsafe impl Allocator for AnyMemory {
         allocate_caps(EnumSet::empty(), layout)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         crate::HEAP.dealloc(ptr.as_ptr(), layout);
-    }
+    }}
 }
 
 /// An allocator that uses internal memory only.
@@ -49,9 +49,9 @@ unsafe impl Allocator for InternalMemory {
         allocate_caps(EnumSet::from(MemoryCapability::Internal), layout)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         crate::HEAP.dealloc(ptr.as_ptr(), layout);
-    }
+    }}
 }
 
 /// An allocator that uses external (PSRAM) memory only.
@@ -62,7 +62,7 @@ unsafe impl Allocator for ExternalMemory {
         allocate_caps(EnumSet::from(MemoryCapability::External), layout)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) { unsafe {
         crate::HEAP.dealloc(ptr.as_ptr(), layout);
-    }
+    }}
 }

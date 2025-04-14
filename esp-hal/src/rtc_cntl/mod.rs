@@ -1272,7 +1272,7 @@ pub fn wakeup_cause() -> SleepSource {
 
 // libphy.a can pull this in on some chips, we provide it here in the hal
 // so that either ieee or esp-wifi gets it for free without duplicating in both
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
     let xtal = RtcClock::xtal_freq();
     xtal.mhz() as i32

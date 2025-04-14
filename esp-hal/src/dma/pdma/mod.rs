@@ -53,12 +53,12 @@ macro_rules! impl_pdma_channel {
                 type Rx = [<$peri DmaRxChannel>]<'d>;
                 type Tx = [<$peri DmaTxChannel>]<'d>;
 
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) { unsafe {
                     (
                         [<$peri DmaRxChannel>](Self::steal().into()),
                         [<$peri DmaTxChannel>](Self::steal().into()),
                     )
-                }
+                }}
             }
 
             impl DmaChannelExt for $instance<'_> {

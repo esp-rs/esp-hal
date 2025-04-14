@@ -456,10 +456,10 @@ pub const CHUNK_SIZE: usize = 4092;
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
-    ($rx_size:expr, $tx_size:expr) => {
+    ($rx_size:expr_2021, $tx_size:expr_2021) => {
         $crate::dma_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
-    ($size:expr) => {
+    ($size:expr_2021) => {
         $crate::dma_buffers_chunk_size!($size, $crate::dma::CHUNK_SIZE)
     };
 }
@@ -480,11 +480,11 @@ macro_rules! dma_buffers {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers {
-    ($rx_size:expr, $tx_size:expr) => {
+    ($rx_size:expr_2021, $tx_size:expr_2021) => {
         $crate::dma_circular_buffers_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
-    ($size:expr) => {
+    ($size:expr_2021) => {
         $crate::dma_circular_buffers_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
@@ -504,11 +504,11 @@ macro_rules! dma_circular_buffers {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
-    ($rx_size:expr, $tx_size:expr) => {
+    ($rx_size:expr_2021, $tx_size:expr_2021) => {
         $crate::dma_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
-    ($size:expr) => {
+    ($size:expr_2021) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
@@ -529,11 +529,11 @@ macro_rules! dma_descriptors {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
-    ($rx_size:expr, $tx_size:expr) => {
+    ($rx_size:expr_2021, $tx_size:expr_2021) => {
         $crate::dma_circular_descriptors_chunk_size!($rx_size, $tx_size, $crate::dma::CHUNK_SIZE)
     };
 
-    ($size:expr) => {
+    ($size:expr_2021) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $crate::dma::CHUNK_SIZE)
     };
 }
@@ -542,7 +542,7 @@ macro_rules! dma_circular_descriptors {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! declare_aligned_dma_buffer {
-    ($name:ident, $size:expr) => {
+    ($name:ident, $size:expr_2021) => {
         // ESP32 requires word alignment for DMA buffers.
         // ESP32-S2 technically supports byte-aligned DMA buffers, but the
         // transfer ends up writing out of bounds.
@@ -556,7 +556,7 @@ macro_rules! declare_aligned_dma_buffer {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! as_mut_byte_array {
-    ($name:expr, $size:expr) => {
+    ($name:expr_2021, $size:expr_2021) => {
         unsafe { &mut *($name.as_mut_ptr() as *mut [u8; $size]) }
     };
 }
@@ -579,11 +579,11 @@ pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021) => {{
         $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
     }};
 
-    ($size:expr, $chunk_size:expr) => {
+    ($size:expr_2021, $chunk_size:expr_2021) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
     };
 }
@@ -605,11 +605,11 @@ macro_rules! dma_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021) => {{
         $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
     }};
 
-    ($size:expr, $chunk_size:expr) => {{
+    ($size:expr_2021, $chunk_size:expr_2021) => {{
         $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size)
     }};
 }
@@ -630,11 +630,11 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021) => {{
         $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
     }};
 
-    ($size:expr, $chunk_size:expr) => {
+    ($size:expr_2021, $chunk_size:expr_2021) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
     };
 }
@@ -656,11 +656,11 @@ macro_rules! dma_descriptors_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021) => {{
         $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
     }};
 
-    ($size:expr, $chunk_size:expr) => {
+    ($size:expr_2021, $chunk_size:expr_2021) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
     };
 }
@@ -668,13 +668,13 @@ macro_rules! dma_circular_descriptors_chunk_size {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_buffers_impl {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021, is_circular = $circular:tt) => {{
         let rx = $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = $circular);
         let tx = $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = $circular);
         (rx.0, rx.1, tx.0, tx.1)
     }};
 
-    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($size:expr_2021, $chunk_size:expr_2021, is_circular = $circular:tt) => {{
         $crate::declare_aligned_dma_buffer!(BUFFER, $size);
 
         unsafe {
@@ -685,7 +685,7 @@ macro_rules! dma_buffers_impl {
         }
     }};
 
-    ($size:expr, is_circular = $circular:tt) => {
+    ($size:expr_2021, is_circular = $circular:tt) => {
         $crate::dma_buffers_impl!(
             $size,
             $crate::dma::BurstConfig::DEFAULT.max_compatible_chunk_size(),
@@ -697,13 +697,13 @@ macro_rules! dma_buffers_impl {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_descriptors_impl {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($rx_size:expr_2021, $tx_size:expr_2021, $chunk_size:expr_2021, is_circular = $circular:tt) => {{
         let rx = $crate::dma_descriptors_impl!($rx_size, $chunk_size, is_circular = $circular);
         let tx = $crate::dma_descriptors_impl!($tx_size, $chunk_size, is_circular = $circular);
         (rx, tx)
     }};
 
-    ($size:expr, $chunk_size:expr, is_circular = $circular:tt) => {{
+    ($size:expr_2021, $chunk_size:expr_2021, is_circular = $circular:tt) => {{
         const COUNT: usize =
             $crate::dma_descriptor_count!($size, $chunk_size, is_circular = $circular);
 
@@ -717,7 +717,7 @@ macro_rules! dma_descriptors_impl {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! dma_descriptor_count {
-    ($size:expr, $chunk_size:expr, is_circular = $is_circular:tt) => {{
+    ($size:expr_2021, $chunk_size:expr_2021, is_circular = $is_circular:tt) => {{
         const {
             ::core::assert!($chunk_size <= 4095, "chunk size must be <= 4095");
             ::core::assert!($chunk_size > 0, "chunk size must be > 0");
@@ -746,7 +746,7 @@ macro_rules! dma_descriptor_count {
 /// ```
 #[macro_export]
 macro_rules! dma_tx_buffer {
-    ($tx_size:expr) => {{
+    ($tx_size:expr_2021) => {{
         let (tx_buffer, tx_descriptors) = $crate::dma_buffers_impl!($tx_size, is_circular = false);
 
         $crate::dma::DmaTxBuf::new(tx_descriptors, tx_buffer)
@@ -772,10 +772,10 @@ macro_rules! dma_tx_buffer {
 /// ```
 #[macro_export]
 macro_rules! dma_rx_stream_buffer {
-    ($rx_size:expr) => {
+    ($rx_size:expr_2021) => {
         $crate::dma_rx_stream_buffer!($rx_size, 4095)
     };
-    ($rx_size:expr, $chunk_size:expr) => {{
+    ($rx_size:expr_2021, $chunk_size:expr_2021) => {{
         let (buffer, descriptors) =
             $crate::dma_buffers_impl!($rx_size, $chunk_size, is_circular = false);
 
@@ -796,7 +796,7 @@ macro_rules! dma_rx_stream_buffer {
 /// ```
 #[macro_export]
 macro_rules! dma_loop_buffer {
-    ($size:expr) => {{
+    ($size:expr_2021) => {{
         const {
             ::core::assert!($size <= 4095, "size must be <= 4095");
             ::core::assert!($size > 0, "size must be > 0");
@@ -1137,7 +1137,7 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
+    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> + use<'_> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -1903,7 +1903,7 @@ where
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
-    ) -> Result<(), DmaError> {
+    ) -> Result<(), DmaError> { unsafe {
         // We check each descriptor buffer that points to PSRAM for
         // alignment and invalidate the cache for that buffer.
         // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
@@ -1942,7 +1942,7 @@ where
             auto_write_back: true,
         };
         self.do_prepare(preparation, peri)
-    }
+    }}
 
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
         &mut self,
@@ -2168,7 +2168,7 @@ where
         &mut self,
         peri: DmaPeripheral,
         chain: &DescriptorChain,
-    ) -> Result<(), DmaError> {
+    ) -> Result<(), DmaError> { unsafe {
         // Based on the ESP32-S3 TRM the alignment check is not needed for TX
 
         // We check each descriptor buffer that points to PSRAM for
@@ -2211,7 +2211,7 @@ where
         self.do_prepare(preparation, peri)?;
 
         Ok(())
-    }
+    }}
 
     pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(
         &mut self,

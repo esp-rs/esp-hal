@@ -24,29 +24,29 @@ use crate::{
     time::Rate,
 };
 
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
+unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock { unsafe {
     &*esp32c6::PMU::ptr()
-}
+}}
 
-unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
+unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock { unsafe {
     &*esp32c6::MODEM_LPCON::ptr()
-}
+}}
 
-unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
+unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock { unsafe {
     &*esp32c6::MODEM_SYSCON::ptr()
-}
+}}
 
-unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock {
+unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock { unsafe {
     &*esp32c6::LP_CLKRST::ptr()
-}
+}}
 
-unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
+unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock { unsafe {
     &*esp32c6::PCR::ptr()
-}
+}}
 
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
+unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock { unsafe {
     &*esp32c6::LP_AON::ptr()
-}
+}}
 
 fn pmu_power_domain_force_default() {
     unsafe {

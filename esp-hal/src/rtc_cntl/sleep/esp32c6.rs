@@ -782,13 +782,13 @@ impl Default for RtcSleepConfig {
     }
 }
 
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
+unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock { unsafe {
     &*esp32c6::PMU::ptr()
-}
+}}
 
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
+unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock { unsafe {
     &*esp32c6::LP_AON::ptr()
-}
+}}
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]

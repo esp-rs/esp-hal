@@ -33,7 +33,7 @@ pub(crate) mod regi2c;
 
 #[inline(always)]
 pub(crate) fn ets_delay_us(us: u32) {
-    extern "C" {
+    unsafe extern "C" {
         fn ets_delay_us(us: u32);
     }
 
@@ -43,7 +43,7 @@ pub(crate) fn ets_delay_us(us: u32) {
 #[allow(unused)]
 #[inline(always)]
 pub(crate) fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
-    extern "C" {
+    unsafe extern "C" {
         fn ets_update_cpu_frequency(ticks_per_us: u32);
     }
 
@@ -52,7 +52,7 @@ pub(crate) fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
 
 #[inline(always)]
 pub(crate) fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
-    extern "C" {
+    unsafe extern "C" {
         fn rtc_get_reset_reason(cpu_num: u32) -> u32;
     }
 
@@ -61,7 +61,7 @@ pub(crate) fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
 
 #[inline(always)]
 pub(crate) fn software_reset_cpu(cpu_num: u32) {
-    extern "C" {
+    unsafe extern "C" {
         fn software_reset_cpu(cpu_num: u32);
     }
 
@@ -70,7 +70,7 @@ pub(crate) fn software_reset_cpu(cpu_num: u32) {
 
 #[inline(always)]
 pub(crate) fn software_reset() -> ! {
-    extern "C" {
+    unsafe extern "C" {
         fn software_reset() -> !;
     }
 
@@ -80,7 +80,7 @@ pub(crate) fn software_reset() -> ! {
 #[cfg(esp32s3)]
 #[inline(always)]
 pub(crate) fn ets_set_appcpu_boot_addr(boot_addr: u32) {
-    extern "C" {
+    unsafe extern "C" {
         fn ets_set_appcpu_boot_addr(boot_addr: u32);
     }
 

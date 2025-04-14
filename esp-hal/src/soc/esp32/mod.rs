@@ -59,10 +59,10 @@ pub(crate) mod constants {
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
 #[doc(hidden)]
-#[no_mangle]
-pub unsafe extern "C" fn ESP32Reset() -> ! {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ESP32Reset() -> ! { unsafe {
     // These symbols come from `memory.x`
-    extern "C" {
+    unsafe extern "C" {
         static mut _rtc_fast_bss_start: u32;
         static mut _rtc_fast_bss_end: u32;
         static mut _rtc_fast_persistent_start: u32;
@@ -121,12 +121,12 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 
     // continue with default reset handler
     xtensa_lx_rt::Reset()
-}
+}}
 
 /// The ESP32 has a first stage bootloader that handles loading program data
 /// into the right place therefore we skip loading it again.
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false

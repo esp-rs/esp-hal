@@ -63,10 +63,10 @@ pub(crate) mod constants {
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
 #[doc(hidden)]
-#[no_mangle]
-pub unsafe extern "C" fn ESP32Reset() -> ! {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ESP32Reset() -> ! { unsafe {
     // These symbols come from `memory.x`
-    extern "C" {
+    unsafe extern "C" {
         static mut _rtc_fast_bss_start: u32;
         static mut _rtc_fast_bss_end: u32;
         static mut _rtc_fast_persistent_start: u32;
@@ -125,12 +125,12 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 
     // continue with default reset handler
     xtensa_lx_rt::Reset()
-}
+}}
 
 /// The ESP32 has a first stage bootloader that handles loading program data
 /// into the right place therefore we skip loading it again.
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
@@ -138,32 +138,32 @@ pub extern "Rust" fn __init_data() -> bool {
 
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) { unsafe {
+    unsafe extern "C" {
         fn Cache_WriteBack_Addr(addr: u32, size: u32);
     }
     Cache_WriteBack_Addr(addr, size);
-}
+}}
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) { unsafe {
+    unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);
     }
     Cache_Invalidate_Addr(addr, size);
-}
+}}
 
 /// Get the size of a cache line in the DCache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_get_dcache_line_size() -> u32 {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_get_dcache_line_size() -> u32 { unsafe {
+    unsafe extern "C" {
         fn Cache_Get_DCache_Line_Size() -> u32;
     }
     Cache_Get_DCache_Line_Size()
-}
+}}
 
 pub(crate) fn pre_init() {}

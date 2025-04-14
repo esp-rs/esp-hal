@@ -274,12 +274,12 @@ impl HeapRegion {
         heap_bottom: *mut u8,
         size: usize,
         capabilities: EnumSet<MemoryCapability>,
-    ) -> Self {
+    ) -> Self { unsafe {
         let mut heap = Heap::empty();
         heap.init(heap_bottom, size);
 
         Self { heap, capabilities }
-    }
+    }}
 
     /// Return stats for the current memory region
     pub fn stats(&self) -> RegionStats {
@@ -598,11 +598,11 @@ impl EspHeap {
 }
 
 unsafe impl GlobalAlloc for EspHeap {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { unsafe {
         self.alloc_caps(EnumSet::empty(), layout)
-    }
+    }}
 
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe {
         if ptr.is_null() {
             return;
         }
@@ -629,5 +629,5 @@ unsafe impl GlobalAlloc for EspHeap {
                 internal_heap_stats.total_freed += before - self.used();
             }
         })
-    }
+    }}
 }

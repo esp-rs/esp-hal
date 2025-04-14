@@ -128,7 +128,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 
-    extern "C" {
+    unsafe extern "C" {
         fn rom_config_instruction_cache_mode(
             cfg_cache_size: u32,
             cfg_cache_ways: u8,
@@ -325,7 +325,7 @@ pub(crate) mod utils {
     const SPI_MEM_CLKCNT_L_S: u32 = 0;
     const SPI_MEM_SCLKCNT_L_S: u32 = 0;
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
         fn esp_rom_efuse_get_flash_wp_gpio() -> u8;
@@ -587,7 +587,7 @@ pub(crate) mod utils {
         cs_mask: u8,
         is_write_erase_operation: bool,
     ) {
-        extern "C" {
+        unsafe extern "C" {
             ///  Start a spi user command sequence
             ///  [`spi_num`] spi port
             ///  [`rx_buf`] buffer pointer to receive data
@@ -663,7 +663,7 @@ pub(crate) mod utils {
             dummy_bit_len: u32,
         }
 
-        extern "C" {
+        unsafe extern "C" {
             /// Config the spi user command
             /// [`spi_num`] spi port
             /// [`pcmd`] pointer to accept the spi command struct
@@ -689,7 +689,7 @@ pub(crate) mod utils {
 
     #[ram]
     fn psram_set_op_mode(mode: CommandMode) {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_spi_set_op_mode(spi: u32, mode: u32);
         }
 

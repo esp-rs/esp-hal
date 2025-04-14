@@ -71,13 +71,13 @@ mod single_core {
 
         /// Prevents interrupts above `level` from firing and returns the
         /// current run level.
-        unsafe fn change_current_level(level: Priority) -> Priority {
+        unsafe fn change_current_level(level: Priority) -> Priority { unsafe {
             crate::interrupt::change_current_runlevel(level)
-        }
+        }}
     }
 
     impl RawLock for PriorityLock {
-        unsafe fn enter(&self) -> RestoreState {
+        unsafe fn enter(&self) -> RestoreState { unsafe {
             #[cfg(riscv)]
             if self.0 == Priority::max() {
                 return InterruptLock.enter();
@@ -91,9 +91,9 @@ mod single_core {
             compiler_fence(Ordering::SeqCst);
 
             RestoreState::from(prev_interrupt_priority)
-        }
+        }}
 
-        unsafe fn exit(&self, token: RestoreState) {
+        unsafe fn exit(&self, token: RestoreState) { unsafe {
             #[cfg(riscv)]
             if self.0 == Priority::max() {
                 return InterruptLock.exit(token);
@@ -105,14 +105,14 @@ mod single_core {
 
             let priority = unwrap!(Priority::try_from(token));
             unsafe { Self::change_current_level(priority) };
-        }
+        }}
     }
 
     /// A lock that disables interrupts.
     pub struct InterruptLock;
 
     impl RawLock for InterruptLock {
-        unsafe fn enter(&self) -> RestoreState {
+        unsafe fn enter(&self) -> RestoreState { unsafe {
             cfg_if::cfg_if! {
                 if #[cfg(riscv)] {
                     let mut mstatus = 0u32;
@@ -131,9 +131,9 @@ mod single_core {
             compiler_fence(Ordering::SeqCst);
 
             RestoreState(token)
-        }
+        }}
 
-        unsafe fn exit(&self, token: RestoreState) {
+        unsafe fn exit(&self, token: RestoreState) { unsafe {
             // Ensure no preceeding memory accesses are reordered to after interrupts are
             // enabled.
             compiler_fence(Ordering::SeqCst);
@@ -156,7 +156,7 @@ mod single_core {
                     compile_error!("Unsupported architecture")
                 }
             }
-        }
+        }}
     }
 }
 
@@ -300,7 +300,7 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
     /// - Each release call must be paired with an acquire call.
-    unsafe fn release(&self, token: RestoreState) {
+    unsafe fn release(&self, token: RestoreState) { unsafe {
         if !token.is_reentry() {
             #[cfg(multi_core)]
             self.inner.unlock();
@@ -310,7 +310,7 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
 
             self.lock.exit(token)
         }
-    }
+    }}
 
     /// Runs the callback with this lock locked.
     ///
@@ -356,9 +356,9 @@ impl RawMutex {
     /// - The returned token must be passed to the corresponding `release` call.
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
-    pub unsafe fn acquire(&self) -> RestoreState {
+    pub unsafe fn acquire(&self) -> RestoreState { unsafe {
         self.inner.acquire()
-    }
+    }}
 
     /// Releases the lock.
     ///
@@ -369,9 +369,9 @@ impl RawMutex {
     /// - The caller must ensure to release the locks in the reverse order they
     ///   were acquired.
     /// - Each release call must be paired with an acquire call.
-    pub unsafe fn release(&self, token: RestoreState) {
+    pub unsafe fn release(&self, token: RestoreState) { unsafe {
         self.inner.release(token);
-    }
+    }}
 
     /// Runs the callback with this lock locked.
     ///
@@ -503,12 +503,12 @@ mod critical_section {
     static CRITICAL_SECTION: super::RawMutex = super::RawMutex::new();
 
     unsafe impl critical_section::Impl for CriticalSection {
-        unsafe fn acquire() -> critical_section::RawRestoreState {
+        unsafe fn acquire() -> critical_section::RawRestoreState { unsafe {
             CRITICAL_SECTION.acquire().0
-        }
+        }}
 
-        unsafe fn release(token: critical_section::RawRestoreState) {
+        unsafe fn release(token: critical_section::RawRestoreState) { unsafe {
             CRITICAL_SECTION.release(super::RestoreState(token));
-        }
+        }}
     }
 }

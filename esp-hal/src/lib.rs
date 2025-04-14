@@ -500,14 +500,14 @@ pub mod __macro_implementation {
 }
 
 #[cfg(riscv)]
-#[export_name = "hal_main"]
+#[unsafe(export_name = "hal_main")]
 fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
-    extern "Rust" {
+    unsafe extern "Rust" {
         // This symbol will be provided by the user via `#[entry]`
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    extern "C" {
+    unsafe extern "C" {
         static mut __stack_chk_guard: u32;
     }
 
@@ -524,7 +524,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
     }
 }
 
-#[export_name = "__stack_chk_fail"]
+#[unsafe(export_name = "__stack_chk_fail")]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }

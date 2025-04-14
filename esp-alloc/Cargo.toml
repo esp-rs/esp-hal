@@ -1,8 +1,8 @@
 [package]
 name          = "esp-alloc"
 version       = "0.7.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "A heap allocator for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-alloc/latest/"
 keywords      = ["allocator", "embedded", "esp32", "espressif", "memory"]

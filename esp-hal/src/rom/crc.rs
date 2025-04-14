@@ -100,7 +100,7 @@
 #[cfg(rom_crc_be)]
 #[inline(always)]
 pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc32_be(crc: u32, buf: *const u8, len: u32) -> u32;
     }
     unsafe { esp_rom_crc32_be(crc, buf.as_ptr(), buf.len() as u32) }
@@ -110,7 +110,7 @@ pub fn crc32_be(crc: u32, buf: &[u8]) -> u32 {
 #[cfg(rom_crc_be)]
 #[inline(always)]
 pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc16_be(crc: u16, buf: *const u8, len: u32) -> u16;
     }
     unsafe { esp_rom_crc16_be(crc, buf.as_ptr(), buf.len() as u32) }
@@ -120,7 +120,7 @@ pub fn crc16_be(crc: u16, buf: &[u8]) -> u16 {
 #[cfg(rom_crc_be)]
 #[inline(always)]
 pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc8_be(crc: u8, buf: *const u8, len: u32) -> u8;
     }
     unsafe { esp_rom_crc8_be(crc, buf.as_ptr(), buf.len() as u32) }
@@ -130,7 +130,7 @@ pub fn crc8_be(crc: u8, buf: &[u8]) -> u8 {
 #[cfg(rom_crc_le)]
 #[inline(always)]
 pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc32_le(crc: u32, buf: *const u8, len: u32) -> u32;
     }
     unsafe { esp_rom_crc32_le(crc, buf.as_ptr(), buf.len() as u32) }
@@ -140,7 +140,7 @@ pub fn crc32_le(crc: u32, buf: &[u8]) -> u32 {
 #[cfg(rom_crc_le)]
 #[inline(always)]
 pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc16_le(crc: u16, buf: *const u8, len: u32) -> u16;
     }
     unsafe { esp_rom_crc16_le(crc, buf.as_ptr(), buf.len() as u32) }
@@ -150,7 +150,7 @@ pub fn crc16_le(crc: u16, buf: &[u8]) -> u16 {
 #[inline(always)]
 #[cfg(rom_crc_le)]
 pub fn crc8_le(crc: u8, buf: &[u8]) -> u8 {
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_crc8_le(crc: u8, buf: *const u8, len: u32) -> u8;
     }
     unsafe { esp_rom_crc8_le(crc, buf.as_ptr(), buf.len() as u32) }

@@ -172,7 +172,7 @@ pub enum ErrorKind {
 }
 
 macro_rules! impl_display {
-    ($($kind:ident => $msg:expr),* $(,)?) => {
+    ($($kind:ident => $msg:expr_2021),* $(,)?) => {
         impl core::fmt::Display for ErrorKind {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {
@@ -475,7 +475,7 @@ impl EspTwaiFrame {
         id: impl Into<Id>,
         registers: *const u32,
         dlc: usize,
-    ) -> Self {
+    ) -> Self { unsafe {
         let mut data: [u8; 8] = [0; 8];
 
         // Copy the data from the memory mapped peripheral into actual memory.
@@ -488,7 +488,7 @@ impl EspTwaiFrame {
             is_remote: false,
             self_reception: false,
         }
-    }
+    }}
 }
 
 #[instability::unstable]
@@ -1235,12 +1235,12 @@ impl embedded_can::Error for EspTwaiError {
 /// TWAI_DATA_x_REG registers which has different results based on the mode of
 /// the peripheral.
 #[inline(always)]
-unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
+unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) { unsafe {
     for (i, dest) in dest.iter_mut().enumerate() {
         // Perform a volatile read to avoid compiler optimizations.
         *dest = src.add(i).read_volatile() as u8;
     }
-}
+}}
 
 /// Copy data to multiple TWAI_DATA_x_REG registers, unpacking the source into
 /// the destination.
@@ -1251,12 +1251,12 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
 /// TWAI_DATA_x_REG registers which has different results based on the mode of
 /// the peripheral.
 #[inline(always)]
-unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
+unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) { unsafe {
     for (i, src) in src.iter().enumerate() {
         // Perform a volatile write to avoid compiler optimizations.
         dest.add(i).write_volatile(*src as u32);
     }
-}
+}}
 
 #[instability::unstable]
 impl<Dm> embedded_can::nb::Can for Twai<'_, Dm>

@@ -968,7 +968,7 @@ macro_rules! gpio {
 
             #[doc(hidden)]
             macro_rules! handle_gpio_output {
-                ($this:expr, $inner:ident, $code:tt) => {
+                ($this:expr_2021, $inner:ident, $code:tt) => {
                     match $this.number() {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* {{
@@ -986,7 +986,7 @@ macro_rules! gpio {
 
             #[doc(hidden)]
             macro_rules! handle_gpio_input {
-                ($this:expr, $inner:ident, $code:tt) => {
+                ($this:expr_2021, $inner:ident, $code:tt) => {
                     match $this.number() {
                         $(
                             $gpionum => {{
@@ -1007,7 +1007,7 @@ macro_rules! gpio {
                 if #[cfg(any(lp_io, rtc_cntl))] {
                     #[doc(hidden)]
                     macro_rules! handle_rtcio {
-                        ($this:expr, $inner:ident, $code:tt) => {
+                        ($this:expr_2021, $inner:ident, $code:tt) => {
                             match $this.number() {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
@@ -1025,7 +1025,7 @@ macro_rules! gpio {
 
                     #[doc(hidden)]
                     macro_rules! handle_rtcio_with_resistors {
-                        ($this:expr, $inner:ident, $code:tt) => {
+                        ($this:expr_2021, $inner:ident, $code:tt) => {
                             match $this.number() {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {
@@ -2131,11 +2131,11 @@ impl RtcPin for AnyPin<'_> {
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
-    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) { unsafe {
         handle_rtcio!(self, target, {
             RtcPin::apply_wakeup(&target, wakeup, level)
         })
-    }
+    }}
 }
 
 #[cfg(any(lp_io, rtc_cntl))]

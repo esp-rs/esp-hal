@@ -1729,9 +1729,9 @@ mod dma {
             &mut self,
             bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer)
-        }
+        }}
 
         /// Configures the DMA buffers for the SPI instance.
         ///
@@ -1775,9 +1775,9 @@ mod dma {
             &mut self,
             bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf)
-        }
+        }}
 
         /// Perform a DMA read.
         ///
@@ -1813,9 +1813,9 @@ mod dma {
             bytes_to_write: usize,
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
-        }
+        }}
 
         /// Perform a DMA transfer
         ///
@@ -1862,7 +1862,7 @@ mod dma {
             dummy: u8,
             bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             self.driver().setup_half_duplex(
                 false,
                 cmd,
@@ -1874,7 +1874,7 @@ mod dma {
             )?;
 
             self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
-        }
+        }}
 
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
@@ -1919,7 +1919,7 @@ mod dma {
             dummy: u8,
             bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             #[cfg(all(esp32, spi_address_workaround))]
             {
                 // On the ESP32, if we don't have data, the address is always sent
@@ -1940,7 +1940,7 @@ mod dma {
             )?;
 
             self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
-        }
+        }}
 
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
@@ -2787,7 +2787,7 @@ impl DmaDriver {
         rx_buffer: &mut impl DmaRxBuffer,
         tx_buffer: &mut impl DmaTxBuffer,
         channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error> { unsafe {
         #[cfg(esp32s2)]
         {
             // without this a transfer after a write will fail
@@ -2837,7 +2837,7 @@ impl DmaDriver {
         self.driver.start_operation();
 
         Ok(())
-    }
+    }}
 
     fn enable_dma(&self) {
         #[cfg(gdma)]

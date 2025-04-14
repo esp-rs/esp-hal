@@ -153,7 +153,7 @@ pub struct CpuControl<'d> {
     _cpu_control: CPU_CTRL<'d>,
 }
 
-unsafe fn internal_park_core(core: Cpu, park: bool) {
+unsafe fn internal_park_core(core: Cpu, park: bool) { unsafe {
     let c1_value = if park { 0x21 } else { 0 };
     let c0_value = if park { 0x02 } else { 0 };
     match core {
@@ -174,7 +174,7 @@ unsafe fn internal_park_core(core: Cpu, park: bool) {
                 .modify(|_, w| w.sw_stall_appcpu_c0().bits(c0_value));
         }
     }
-}
+}}
 
 impl<'d> CpuControl<'d> {
     /// Creates a new instance of `CpuControl`.
@@ -192,9 +192,9 @@ impl<'d> CpuControl<'d> {
     /// The user must ensure that the core being parked is not the core which is
     /// currently executing their code.
     #[instability::unstable]
-    pub unsafe fn park_core(&mut self, core: Cpu) {
+    pub unsafe fn park_core(&mut self, core: Cpu) { unsafe {
         internal_park_core(core, true);
-    }
+    }}
 
     /// Unpark the given core
     #[instability::unstable]
@@ -210,7 +210,7 @@ impl<'d> CpuControl<'d> {
     unsafe fn start_core1_init<F>() -> !
     where
         F: FnOnce(),
-    {
+    { unsafe {
         // disables interrupts
         xtensa_lx::interrupt::set_mask(0);
 
@@ -219,7 +219,7 @@ impl<'d> CpuControl<'d> {
         xtensa_lx::timer::set_ccompare1(0);
         xtensa_lx::timer::set_ccompare2(0);
 
-        extern "C" {
+        unsafe extern "C" {
             static mut _init_start: u32;
         }
 
@@ -237,14 +237,14 @@ impl<'d> CpuControl<'d> {
         // as we rely on the function call to use
         // the new stack.
         Self::start_core1_run::<F>()
-    }
+    }}
 
     /// Run the core1 closure.
     #[inline(never)]
     unsafe fn start_core1_run<F>() -> !
     where
         F: FnOnce(),
-    {
+    { unsafe {
         #[allow(static_mut_refs)] // FIXME
         match START_CORE1_FUNCTION.take() {
             Some(entry) => {
@@ -256,7 +256,7 @@ impl<'d> CpuControl<'d> {
             }
             None => panic!("No start function set"),
         }
-    }
+    }}
 
     /// Start the APP (second) core.
     ///

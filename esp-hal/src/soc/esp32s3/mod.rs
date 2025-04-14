@@ -64,13 +64,13 @@ pub(crate) mod constants {
 }
 
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn configure_cpu_caches() {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn configure_cpu_caches() { unsafe {
     // this is just the bare minimum we need to run code from flash
     // consider implementing more advanced configurations
     // see https://github.com/apache/incubator-nuttx/blob/master/arch/xtensa/src/esp32s3/esp32s3_start.c
 
-    extern "C" {
+    unsafe extern "C" {
         fn rom_config_instruction_cache_mode(
             cfg_cache_size: u32,
             cfg_cache_ways: u8,
@@ -89,7 +89,7 @@ pub unsafe fn configure_cpu_caches() {
         CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
         CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
     );
-}
+}}
 
 /// Function initializes ESP32S3 specific memories (RTC slow and fast) and
 /// then calls original Reset function
@@ -98,13 +98,13 @@ pub unsafe fn configure_cpu_caches() {
 /// *Note: the pre_init function is called in the original reset handler
 /// after the initializations done in this function*
 #[doc(hidden)]
-#[no_mangle]
-#[link_section = ".rwtext"]
-pub unsafe extern "C" fn ESP32Reset() -> ! {
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".rwtext")]
+pub unsafe extern "C" fn ESP32Reset() -> ! { unsafe {
     configure_cpu_caches();
 
     // These symbols come from `memory.x`
-    extern "C" {
+    unsafe extern "C" {
         static mut _rtc_fast_bss_start: u32;
         static mut _rtc_fast_bss_end: u32;
         static mut _rtc_fast_persistent_start: u32;
@@ -163,12 +163,12 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
 
     // continue with default reset handler
     xtensa_lx_rt::Reset()
-}
+}}
 
 /// The ESP32 has a first stage bootloader that handles loading program data
 /// into the right place therefore we skip loading it again.
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub extern "Rust" fn __init_data() -> bool {
     false
@@ -176,9 +176,9 @@ pub extern "Rust" fn __init_data() -> bool {
 
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) { unsafe {
+    unsafe extern "C" {
         fn rom_Cache_WriteBack_Addr(addr: u32, size: u32);
         fn Cache_Suspend_DCache_Autoload() -> u32;
         fn Cache_Resume_DCache_Autoload(value: u32);
@@ -187,26 +187,26 @@ pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
     let autoload = Cache_Suspend_DCache_Autoload();
     rom_Cache_WriteBack_Addr(addr, size);
     Cache_Resume_DCache_Autoload(autoload);
-}
+}}
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) { unsafe {
+    unsafe extern "C" {
         fn Cache_Invalidate_Addr(addr: u32, size: u32);
     }
     Cache_Invalidate_Addr(addr, size);
-}
+}}
 
 /// Get the size of a cache line in the DCache.
 #[doc(hidden)]
-#[link_section = ".rwtext"]
-pub unsafe fn cache_get_dcache_line_size() -> u32 {
-    extern "C" {
+#[unsafe(link_section = ".rwtext")]
+pub unsafe fn cache_get_dcache_line_size() -> u32 { unsafe {
+    unsafe extern "C" {
         fn Cache_Get_DCache_Line_Size() -> u32;
     }
     Cache_Get_DCache_Line_Size()
-}
+}}
 
 pub(crate) fn pre_init() {}

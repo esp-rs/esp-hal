@@ -16,6 +16,10 @@ default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
+[lib]
+bench = false
+test  = false
+
 [dependencies]
 bitflags                 = "2.8.0"
 bytemuck                 = "1.21.0"

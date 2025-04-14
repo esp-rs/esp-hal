@@ -311,7 +311,7 @@ pub(crate) mod utils {
         pub status_mask: u32,
     }
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
         fn esp_rom_gpio_connect_out_signal(
@@ -1075,7 +1075,7 @@ pub(crate) mod utils {
             }
 
             macro_rules! apply_to_field {
-                ($w:ident, $field:expr, $bits:expr) => {
+                ($w:ident, $field:expr_2021, $bits:expr_2021) => {
                     match $field {
                         Field::McuSel => $w.mcu_sel().bits($bits),
                         Field::FunDrv => $w.fun_drv().bits($bits),

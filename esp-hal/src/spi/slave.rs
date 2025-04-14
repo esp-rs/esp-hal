@@ -464,7 +464,7 @@ pub mod dma {
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
             channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
-        ) -> Result<(), Error> {
+        ) -> Result<(), Error> { unsafe {
             self.enable_dma();
 
             self.info.reset_spi();
@@ -505,7 +505,7 @@ pub mod dma {
             }
 
             Ok(())
-        }
+        }}
 
         fn reset_dma_before_usr_cmd(&self) {
             #[cfg(gdma)]
