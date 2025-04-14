@@ -50,6 +50,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "timer-queue",
@@ -74,6 +75,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     Validator::Enumeration(vec![String::from("generic")])
                 }),
                 stability: Stability::Unstable,
+                active: cfg!(feature = "executors"),
             },
             ConfigOption {
                 name: "generic-queue-size",
@@ -82,6 +84,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 default_value: Value::Integer(64),
                 constraint: Some(Validator::PositiveInteger),
                 stability: Stability::Unstable,
+                active: true,
             },
         ],
         true,

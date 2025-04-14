@@ -15,6 +15,7 @@ fn main() {
             default_value: Value::Integer(50),
             constraint: Some(Validator::PositiveInteger),
             stability: Stability::Unstable,
+            active: true,
         }],
         true,
         true,
