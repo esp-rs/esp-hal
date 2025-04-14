@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use super::{snake_case, value::Value, Error};
 
+type CustomValidatorFn = Box<dyn Fn(&Value) -> Result<(), Error>>;
+
 /// Configuration value validation functions.
 #[derive(Serialize)]
 pub enum Validator {
@@ -22,13 +24,10 @@ pub enum Validator {
     /// type.
     #[serde(serialize_with = "serialize_custom")]
     #[serde(untagged)]
-    Custom(Box<dyn Fn(&Value) -> Result<(), Error>>),
+    Custom(CustomValidatorFn),
 }
 
-pub(crate) fn serialize_custom<S>(
-    _: &Box<dyn Fn(&Value) -> Result<(), Error>>,
-    serializer: S,
-) -> Result<S::Ok, S::Error>
+pub(crate) fn serialize_custom<S>(_: &CustomValidatorFn, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
@@ -75,25 +74,22 @@ impl Validator {
         config_key: &str,
         actual_value: &Value,
     ) {
-        match self {
-            Validator::Enumeration(values) => {
-                for possible_value in values {
-                    writeln!(
-                        stdout,
-                        "cargo:rustc-check-cfg=cfg({config_key}_{})",
-                        snake_case(possible_value)
-                    )
-                    .ok();
-                }
-
+        if let Validator::Enumeration(values) = self {
+            for possible_value in values {
                 writeln!(
                     stdout,
-                    "cargo:rustc-cfg={config_key}_{}",
-                    snake_case(&actual_value.to_string())
+                    "cargo:rustc-check-cfg=cfg({config_key}_{})",
+                    snake_case(possible_value)
                 )
                 .ok();
             }
-            _ => (),
+
+            writeln!(
+                stdout,
+                "cargo:rustc-cfg={config_key}_{}",
+                snake_case(&actual_value.to_string())
+            )
+            .ok();
         }
     }
 }
@@ -109,9 +105,9 @@ pub(crate) fn enumeration(values: &Vec<String>, value: &Value) -> Result<(), Err
 
         Ok(())
     } else {
-        return Err(Error::parse(
+        Err(Error::parse(
             "Validator::Enumeration can only be used with string values",
-        ));
+        ))
     }
 }
 

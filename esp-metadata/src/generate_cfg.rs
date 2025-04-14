@@ -100,7 +100,7 @@ pub enum Chip {
 }
 
 impl Chip {
-    pub fn target(&self) -> &str {
+    pub fn target(&self) -> &'static str {
         use Chip::*;
 
         match self {
@@ -118,7 +118,7 @@ impl Chip {
         matches!(self, Esp32c6 | Esp32s2 | Esp32s3)
     }
 
-    pub fn lp_target(&self) -> Result<&str> {
+    pub fn lp_target(&self) -> Result<&'static str> {
         use Chip::*;
 
         match self {
@@ -183,6 +183,20 @@ impl Config {
             Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
             Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
             Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
+        }
+    }
+
+    /// Create an empty configuration
+    pub fn empty() -> Self {
+        Self {
+            device: Device {
+                name: "".to_owned(),
+                arch: Arch::RiscV,
+                cores: Cores::Single,
+                peripherals: Vec::new(),
+                symbols: Vec::new(),
+                memory: Vec::new(),
+            },
         }
     }
 

@@ -7,12 +7,11 @@ use std::{
 
 use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Parser};
-use esp_metadata::{Arch, Chip, Config};
+use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
-    target_triple,
     Package,
     Version,
 };
@@ -165,7 +164,7 @@ struct LintPackagesArgs {
     packages: Vec<Package>,
 
     /// Lint for a specific chip
-    #[arg(long, value_enum, default_values_t = Chip::iter())]
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
     chips: Vec<Chip>,
 
     /// Automatically apply fixes
@@ -253,7 +252,7 @@ fn main() -> Result<()> {
 
 fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
-    xtask::validate_package_chip(&args.package, &args.chip)?;
+    args.package.validate_package_chip(&args.chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -305,7 +304,7 @@ fn build_examples(
     out_path: PathBuf,
 ) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     if examples
         .iter()
@@ -346,7 +345,7 @@ fn build_examples(
 
 fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     // Filter the examples down to only the binary we're interested in, assuming it
     // actually supports the specified chip:
@@ -375,7 +374,7 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
 
 fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(args.package, &args.chip)?;
+    let target = args.package.target_triple(&args.chip)?;
 
     // Filter the examples down to only the binaries we're interested in
     let mut examples: Vec<Metadata> = examples
@@ -451,7 +450,7 @@ fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
     let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
     // Determine the appropriate build target for the given package and chip:
-    let target = target_triple(Package::HilTest, &args.chip)?;
+    let target = Package::HilTest.target_triple(&args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
     let mut tests = xtask::firmware::load(&package_path.join("tests"))?
@@ -636,188 +635,36 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    for package in packages {
-        let path = workspace.join(package.to_string());
-
+    for package in packages.iter().filter(|p| p.is_published()) {
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
-
         for chip in &args.chips {
             let device = Config::for_chip(chip);
 
-            match package {
-                Package::EspBacktrace => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[
-                            "--no-default-features",
-                            &format!("--target={}", chip.target()),
-                        ],
-                        &[&format!("{chip},defmt")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
+            if let Err(_) = package.validate_package_chip(chip) {
+                continue;
+            }
+
+            let feature_sets = [
+                vec![package.feature_rules(device)], // initially test all features
+                package.lint_feature_rules(device), // add separate test cases
+            ]
+            .concat();
+
+            for mut features in feature_sets {
+                if package.has_chip_features() {
+                    features.push(device.name())
                 }
 
-                Package::EspHal => {
-                    let mut features = format!("{chip},ci,unstable");
-
-                    // Cover all esp-hal features where a device is supported
-                    if device.contains("usb0") {
-                        features.push_str(",usb-otg")
-                    }
-                    if device.contains("bt") {
-                        features.push_str(",bluetooth")
-                    }
-                    if device.contains("psram") {
-                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                        // defaults to `quad`) as it would require a separate build
-                        features.push_str(",psram")
-                    }
-
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&features],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspHalEmbassy => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},executors,defmt,esp-hal/unstable")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspIeee802154 => {
-                    if device.contains("ieee802154") {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[&format!("{chip},defmt,esp-hal/unstable")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-                Package::EspLpHal => {
-                    if device.contains("lp_core") {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.lp_target().unwrap())],
-                            &[&format!("{chip},embedded-io")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-
-                Package::EspPrintln => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},defmt-espflash")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspRiscvRt => {
-                    if matches!(device.arch(), Arch::RiscV) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[""],
-                            args.fix,
-                            package.build_on_host(),
-                        )?;
-                    }
-                }
-
-                Package::EspStorage => {
-                    lint_package(
-                        chip,
-                        &path,
-                        &[&format!("--target={}", chip.target())],
-                        &[&format!("{chip},storage,nor-flash,low-level")],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::EspWifi => {
-                    let minimal_features = format!("{chip},esp-hal/unstable,builtin-scheduler");
-                    let mut all_features = minimal_features.clone();
-
-                    all_features.push_str(",defmt");
-
-                    if device.contains("wifi") {
-                        all_features.push_str(",esp-now,sniffer")
-                    }
-                    if device.contains("bt") {
-                        all_features.push_str(",ble")
-                    }
-                    if device.contains("coex") {
-                        all_features.push_str(",coex")
-                    }
-                    lint_package(
-                        chip,
-                        &path,
-                        &[
-                            &format!("--target={}", chip.target()),
-                            "--no-default-features",
-                        ],
-                        &[&minimal_features, &all_features],
-                        args.fix,
-                        package.build_on_host(),
-                    )?;
-                }
-
-                Package::XtensaLx => {
-                    if matches!(device.arch(), Arch::Xtensa) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[""],
-                            args.fix,
-                            package.build_on_host(),
-                        )?
-                    }
-                }
-
-                Package::XtensaLxRt => {
-                    if matches!(device.arch(), Arch::Xtensa) {
-                        lint_package(
-                            chip,
-                            &path,
-                            &[&format!("--target={}", chip.target())],
-                            &[&format!("{chip}")],
-                            args.fix,
-                            package.build_on_host(),
-                        )?
-                    }
-                }
-
-                // We will *not* check the following packages with `clippy`; this
-                // may or may not change in the future:
-                Package::Examples | Package::HilTest | Package::QaTest => {}
-
-                // By default, no `clippy` arguments are required:
-                _ => lint_package(chip, &path, &[], &[], args.fix, package.build_on_host())?,
+                lint_package(
+                    workspace,
+                    *package,
+                    chip,
+                    &["--no-default-features"],
+                    &features,
+                    args.fix,
+                )?;
             }
         }
     }
@@ -826,53 +673,52 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 }
 
 fn lint_package(
+    workspace: &Path,
+    package: Package,
     chip: &Chip,
-    path: &Path,
     args: &[&str],
-    feature_sets: &[&str],
+    features: &[String],
     fix: bool,
-    build_on_host: bool,
 ) -> Result<()> {
-    for features in feature_sets {
-        log::info!(
-            "Linting package: {} ({}, features: {})",
-            path.display(),
-            chip,
-            features
-        );
+    log::info!(
+        "Linting package: {} ({}, features: {:?})",
+        package,
+        chip,
+        features
+    );
 
-        let builder = CargoArgsBuilder::default().subcommand("clippy");
+    let path = workspace.join(package.to_string());
 
-        let mut builder = if chip.is_xtensa() {
-            let builder = if build_on_host {
-                builder
-            } else {
-                builder.arg("-Zbuild-std=core,alloc")
-            };
+    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
+    let mut builder = if !package.build_on_host() {
+        if chip.is_xtensa() {
             // We only overwrite Xtensas so that externally set nightly/stable toolchains
             // are not overwritten.
-            builder.toolchain("esp")
-        } else {
-            builder
-        };
-
-        for arg in args {
-            builder = builder.arg(arg.to_string());
+            builder = builder.arg("-Zbuild-std=core,alloc");
+            builder = builder.toolchain("esp");
         }
 
-        builder = builder.arg(format!("--features={features}"));
+        builder.target(package.target_triple(chip)?)
+    } else {
+        builder
+    };
 
-        let builder = if fix {
-            builder.arg("--fix").arg("--lib").arg("--allow-dirty")
-        } else {
-            builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
-        };
-
-        let cargo_args = builder.build();
-
-        xtask::cargo::run_with_env(&cargo_args, path, [("CI", "1")], false)?;
+    for arg in args {
+        builder = builder.arg(arg.to_string());
     }
+
+    builder = builder.arg(format!("--features={}", features.join(",")));
+
+    let builder = if fix {
+        builder.arg("--fix").arg("--lib").arg("--allow-dirty")
+    } else {
+        builder.arg("--").arg("-D").arg("warnings").arg("--no-deps")
+    };
+
+    let cargo_args = builder.build();
+
+    xtask::cargo::run_with_env(&cargo_args, &path, [("CI", "1")], false)?;
 
     Ok(())
 }
@@ -964,7 +810,7 @@ fn run_doc_tests(workspace: &Path, args: ExampleArgs) -> Result<()> {
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
-    let target = target_triple(args.package, &chip)?;
+    let target = args.package.target_triple(&chip)?;
     let features = vec![chip.to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
