@@ -61,6 +61,14 @@ impl Slot {
             Slot::Slot1 => Slot::Slot0,
         }
     }
+
+    fn offset(&self) -> u32 {
+        match self {
+            Slot::None => SLOT0_DATA_OFFSET,
+            Slot::Slot0 => SLOT0_DATA_OFFSET,
+            Slot::Slot1 => SLOT1_DATA_OFFSET,
+        }
+    }
 }
 
 /// OTA image states for checking operability of the app.
@@ -226,19 +234,11 @@ where
         let crc = crate::crypto::Crc32::new();
         let checksum = crc.crc(&new_seq.to_le_bytes());
 
-        if slot == Slot::Slot0 {
-            let mut buffer = OtaSelectEntry::default();
-            self.flash.read(SLOT0_DATA_OFFSET, buffer.as_bytes_mut())?;
-            buffer.ota_seq = new_seq;
-            buffer.crc = checksum;
-            self.flash.write(SLOT0_DATA_OFFSET, buffer.as_bytes_mut())?;
-        } else {
-            let mut buffer = OtaSelectEntry::default();
-            self.flash.read(SLOT1_DATA_OFFSET, buffer.as_bytes_mut())?;
-            buffer.ota_seq = new_seq;
-            buffer.crc = checksum;
-            self.flash.write(SLOT1_DATA_OFFSET, buffer.as_bytes_mut())?;
-        }
+        let mut buffer = OtaSelectEntry::default();
+        self.flash.read(slot.offset(), buffer.as_bytes_mut())?;
+        buffer.ota_seq = new_seq;
+        buffer.crc = checksum;
+        self.flash.write(slot.offset(), buffer.as_bytes_mut())?;
 
         Ok(())
     }
@@ -254,18 +254,12 @@ where
     ) -> Result<(), crate::partitions::Error> {
         match self.current_slot()? {
             Slot::None => Err(crate::partitions::Error::InvalidState),
-            Slot::Slot0 => {
+            _ => {
+                let offset = self.current_slot()?.offset();
                 let mut buffer = OtaSelectEntry::default();
-                self.flash.read(SLOT0_DATA_OFFSET, buffer.as_bytes_mut())?;
+                self.flash.read(offset, buffer.as_bytes_mut())?;
                 buffer.ota_state = state;
-                self.flash.write(SLOT0_DATA_OFFSET, buffer.as_bytes_mut())?;
-                Ok(())
-            }
-            Slot::Slot1 => {
-                let mut buffer = OtaSelectEntry::default();
-                self.flash.read(SLOT1_DATA_OFFSET, buffer.as_bytes_mut())?;
-                buffer.ota_state = state;
-                self.flash.write(SLOT1_DATA_OFFSET, buffer.as_bytes_mut())?;
+                self.flash.write(offset, buffer.as_bytes_mut())?;
                 Ok(())
             }
         }
@@ -279,14 +273,10 @@ where
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, crate::partitions::Error> {
         match self.current_slot()? {
             Slot::None => Err(crate::partitions::Error::InvalidState),
-            Slot::Slot0 => {
+            _ => {
+                let offset = self.current_slot()?.offset();
                 let mut buffer = OtaSelectEntry::default();
-                self.flash.read(SLOT0_DATA_OFFSET, buffer.as_bytes_mut())?;
-                Ok(buffer.ota_state)
-            }
-            Slot::Slot1 => {
-                let mut buffer = OtaSelectEntry::default();
-                self.flash.read(SLOT1_DATA_OFFSET, buffer.as_bytes_mut())?;
+                self.flash.read(offset, buffer.as_bytes_mut())?;
                 Ok(buffer.ota_state)
             }
         }
