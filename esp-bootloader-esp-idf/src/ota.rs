@@ -76,31 +76,34 @@ impl Slot {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u32)]
 pub enum OtaImageState {
-    /// Monitor the first boot. In bootloader this state is changed to
-    /// `PendingVerify`.
+    /// Monitor the first boot. The bootloader will change this to
+    /// `PendingVerify` if auto-rollback is enabled.
     ///
     /// You want to set this state after activating a newly installed update.
     New           = 0x0,
 
-    /// First boot for this app was. This state is usually only set by the
-    /// bootloader.
+    /// Bootloader changes [OtaImageState::New] to
+    /// [OtaImageState::PendingVerify] to indicate the app should confirm the
+    /// image as working.
     PendingVerify = 0x1,
 
-    /// App was confirmed as workable. App can boot and work without limits.
+    /// Set by the firmware once it's found to be working. The bootloader will
+    /// consider this Slot as working and continue to use it.
     Valid         = 0x2,
 
-    /// App was confirmed as non-workable.
+    /// Set by the firmware once it's found to be non-working.
     ///
-    /// This app will not be selected to boot at all.
+    /// The bootloader will consider this Slot as non-working and not try to
+    /// boot it further.
     Invalid       = 0x3,
 
-    /// App could not confirm the workable or non-workable.
-    ///
-    /// In bootloader `PendingVerify` state will be changed to `Aborted` by the
-    /// bootloader. This app will not selected to boot at all.
+    /// The bootloader will change the state to [OtaImageState::Aborted] if the
+    /// application didn't change [OtaImageState::PendingVerify]
+    /// to either [OtaImageState::Valid] or [OtaImageState::Invalid].
     Aborted       = 0x4,
 
-    /// Undefined. App can boot and work without limits.
+    /// Undefined. The bootloader won't make any assumptions about the working
+    /// state of this slot.
     #[default]
     Undefined     = 0xFFFFFFFF,
 }

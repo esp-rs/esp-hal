@@ -41,4 +41,4 @@ log = ["dep:log"]
 defmt = ["dep:defmt"]
 
 # Replace ROM functions with pure Rust implementations, needed for tests.
-pure-rust = ["dep:crc"]
+std = ["dep:crc"]

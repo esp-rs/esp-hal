@@ -182,4 +182,4 @@ jobs:
       - run: cd esp-config && cargo test --features build
 
       # Run tests in esp-bootloader-esp-idf
-      - run: cd esp-bootloader-esp-idf && cargo test --features=pure-rust
+      - run: cd esp-bootloader-esp-idf && cargo test --features=std

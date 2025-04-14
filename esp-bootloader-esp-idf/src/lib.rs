@@ -26,14 +26,14 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "pure-rust"))]
+#[cfg(not(feature = "std"))]
 mod rom;
-#[cfg(not(feature = "pure-rust"))]
+#[cfg(not(feature = "std"))]
 pub(crate) use rom as crypto;
 
-#[cfg(feature = "pure-rust")]
+#[cfg(feature = "std")]
 mod non_rom;
-#[cfg(feature = "pure-rust")]
+#[cfg(feature = "std")]
 pub(crate) use non_rom as crypto;
 
 pub mod partitions;
