@@ -1,7 +1,7 @@
 //! I2C test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -29,7 +29,7 @@ const DUT_ADDRESS: u8 = 0x77;
 const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -119,6 +119,68 @@ mod tests {
                 &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
             )
             .ok();
+
+        assert_ne!(read_data, [0u8; 22])
+    }
+
+    #[test]
+    async fn async_empty_write_returns_ack_error_for_unknown_address(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+
+        // on some chips we can determine the ack-check-failed reason but not on all
+        // chips
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32,esp32s2,esp32c2,esp32c3))] {
+                assert_eq!(
+                    i2c.write_async(NON_EXISTENT_ADDRESS, &[]).await,
+                    Err(Error::AcknowledgeCheckFailed(
+                        AcknowledgeCheckFailedReason::Unknown
+                    ))
+                );
+            } else {
+                assert_eq!(
+                    i2c.write_async(NON_EXISTENT_ADDRESS, &[]).await,
+                    Err(Error::AcknowledgeCheckFailed(
+                        AcknowledgeCheckFailedReason::Address
+                    ))
+                );
+            }
+        }
+
+        assert_eq!(i2c.write_async(DUT_ADDRESS, &[]).await, Ok(()));
+    }
+
+    #[test]
+    async fn async_test_read_cali(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+        let mut read_data = [0u8; 22];
+
+        // have a failing read which might could leave the peripheral in an undesirable
+        // state
+        i2c.write_read_async(NON_EXISTENT_ADDRESS, &[0xaa], &mut read_data)
+            .await
+            .ok();
+
+        // do the real read which should succeed
+        i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data)
+            .await
+            .ok();
+
+        assert_ne!(read_data, [0u8; 22])
+    }
+
+    #[test]
+    async fn async_test_read_cali_with_transactions(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+        let mut read_data = [0u8; 22];
+
+        // do the real read which should succeed
+        i2c.transaction_async(
+            DUT_ADDRESS,
+            &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
+        )
+        .await
+        .ok();
 
         assert_ne!(read_data, [0u8; 22])
     }
