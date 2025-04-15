@@ -558,6 +558,10 @@ pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: 
                 Interrupt::RWBT,
                 interrupt::Priority::Priority1
             ));
+            unwrap!(interrupt::enable(
+                Interrupt::RWBLE,
+                interrupt::Priority::Priority1
+            ));
         }
         7 => unsafe {
             ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
