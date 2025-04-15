@@ -649,7 +649,7 @@ mod vectored {
             let configured_interrupts = configured_interrupts(core, status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+                let interrupt: Interrupt = core::mem::transmute(interrupt_nr as u16);
 
                 unsafe extern "C" {
                     // defined in each hal

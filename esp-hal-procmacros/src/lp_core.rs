@@ -181,9 +181,9 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     quote!(
         #[allow(non_snake_case)]
-        #[export_name = "main"]
+        #[unsafe(export_name = "main")]
         pub fn __risc_v_rt__main() -> ! {
-            #[export_name = #magic_symbol_name]
+            #[unsafe(export_name = #magic_symbol_name)]
             static ULP_MAGIC: [u32; 0] = [0u32; 0];
 
             unsafe { ULP_MAGIC.as_ptr().read_volatile(); }
@@ -349,7 +349,7 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 
             static LP_CODE: &[u8] = &[#(#binary),*];
 
-            extern "C" {
+            unsafe extern "C" {
                 static #rtc_code_start: u32;
             }
 

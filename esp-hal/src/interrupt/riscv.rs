@@ -465,12 +465,12 @@ mod vectored {
         clear(core, cpu_intr);
 
         let priority = INTERRUPT_TO_PRIORITY[cpu_intr as usize];
-        let prio: Priority = unsafe { core::mem::transmute(priority) };
+        let prio: Priority = core::mem::transmute(priority);
         let configured_interrupts = configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
             // Don't use `Interrupt::try_from`. It's slower and placed in flash
-            let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
+            let interrupt: Interrupt = core::mem::transmute(interrupt_nr as u16);
             handle_interrupt(interrupt, context);
         }
     }}
@@ -676,9 +676,7 @@ mod classic {
             // leave interrupts disabled if interrupt is of max priority.
             intr.cpu_int_thresh()
                 .write(|w| w.bits(interrupt_priority + 1)); // set the prio threshold to 1 more than current interrupt prio
-            unsafe {
-                riscv::interrupt::enable();
-            }
+            riscv::interrupt::enable();
         }
         prev_interrupt_priority
     }}
@@ -842,9 +840,8 @@ mod plic {
             PLIC_MX::regs()
                 .mxint_thresh()
                 .write(|w| w.cpu_mxint_thresh().bits(interrupt_priority + 1));
-            unsafe {
-                riscv::interrupt::enable();
-            }
+            
+            riscv::interrupt::enable();
         }
         prev_interrupt_priority as u32
     }}

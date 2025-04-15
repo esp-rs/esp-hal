@@ -2817,7 +2817,7 @@ impl DmaDriver {
                 if _full_duplex {
                     self.regs()
                         .dma_in_link()
-                        .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
+                        .modify(|_, w| w.inlink_addr().bits(0));
                     self.regs()
                         .dma_in_link()
                         .modify(|_, w| w.inlink_start().set_bit());

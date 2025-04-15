@@ -186,7 +186,8 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
         "wrong size event data"
     );
 
-    handle::<Event>(unsafe { &Event::from_raw_event_data(event_data) })
+    let event = unsafe { Event::from_raw_event_data(event_data) };
+    handle::<Event>(&event)
 }
 
 /// Handle event regardless of its type.

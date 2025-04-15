@@ -151,6 +151,7 @@ impl Package {
                 if config.contains("lp_core") {
                     features.push("embedded-io".to_owned());
                 }
+                features.push("embedded-hal".to_owned());
             }
             Package::EspPrintln => {
                 features.push("auto".to_owned());

@@ -107,15 +107,13 @@ pub unsafe extern "C" fn ESP32Reset() -> ! { unsafe {
         );
     }
 
-    unsafe {
-        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
-        // we _should_ use a random value but we don't have a good source for random
-        // numbers here
-        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-            u32,
-            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        ));
-    }
+    let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
+    // we _should_ use a random value but we don't have a good source for random
+    // numbers here
+    stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+        u32,
+        "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+    ));
 
     crate::interrupt::setup_interrupts();
 

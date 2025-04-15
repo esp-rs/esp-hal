@@ -39,11 +39,12 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
+    // Otherwise, this error occurs:
+    // error[E0716]: temporary value dropped while borrowed
     let root = Ident::new(
-        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-            name
-        } else {
-            "crate"
+        match crate_name("esp-hal") {
+            Ok(FoundCrate::Name(ref name)) => name,
+            _ => "crate"
         },
         Span::call_site().into(),
     );

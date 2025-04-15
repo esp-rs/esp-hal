@@ -146,8 +146,8 @@ unsafe extern "C" fn lp_core_startup() -> ! { unsafe {
 }}
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // Rescue RISC-V core from monitor state.
     unsafe { &*pac::RTC_CNTL::PTR }
@@ -156,8 +156,8 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_halt() {
     unsafe { &*pac::RTC_CNTL::PTR }
         .cocpu_ctrl()

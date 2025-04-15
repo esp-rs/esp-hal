@@ -284,11 +284,9 @@ impl<'d> CpuControl<'d> {
             static mut _init_start: u32;
         }
 
-        unsafe {
-            // move vec table
-            let base = core::ptr::addr_of!(_init_start);
-            core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
-        }
+        // move vec table
+        let base = core::ptr::addr_of!(_init_start);
+        core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
 
         // switch to new stack
         xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
@@ -309,10 +307,10 @@ impl<'d> CpuControl<'d> {
         #[allow(static_mut_refs)] // FIXME
         match START_CORE1_FUNCTION.take() {
             Some(entry) => {
-                let entry = unsafe { ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>()) };
+                let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
                 entry();
                 loop {
-                    unsafe { internal_park_core(Cpu::current(), true) };
+                    internal_park_core(Cpu::current(), true);
                 }
             }
             None => panic!("No start function set"),

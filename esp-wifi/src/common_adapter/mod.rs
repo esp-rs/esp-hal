@@ -287,7 +287,7 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) { unsafe {
     let dst = core::slice::from_raw_parts_mut(dst, len as usize);
 
     // stealing RNG is safe since we own it (passed into `init`)
-    let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+    let mut rng = esp_hal::rng::Rng::new(esp_hal::peripherals::RNG::steal());
     for chunk in dst.chunks_mut(4) {
         let bytes = rng.random().to_le_bytes();
         chunk.copy_from_slice(&bytes[..chunk.len()]);

@@ -1012,6 +1012,7 @@ macro_rules! gpio {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
                                         #[allow(unused_mut)]
+                                        #[allow(unused_unsafe)]
                                         let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                         $code
                                     }} else {{

@@ -190,7 +190,7 @@ macro_rules! unwrap {
 #[cfg(not(feature = "defmt"))]
 #[collapse_debuginfo(yes)]
 macro_rules! unwrap {
-    ($arg:expr) => {
+    ($arg:expr_2021) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
             ::core::result::Result::Err(e) => {
@@ -198,7 +198,7 @@ macro_rules! unwrap {
             }
         }
     };
-    ($arg:expr, $($msg:expr),+ $(,)? ) => {
+    ($arg:expr_2021, $($msg:expr_2021),+ $(,)? ) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
             ::core::result::Result::Err(e) => {

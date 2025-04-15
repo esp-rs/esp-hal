@@ -83,7 +83,7 @@ mod single_core {
                 return InterruptLock.enter();
             }
 
-            let prev_interrupt_priority = unsafe { Self::change_current_level(self.0) };
+            let prev_interrupt_priority = Self::change_current_level(self.0);
             assert!(prev_interrupt_priority <= self.0);
 
             // Ensure no subsequent memory accesses are reordered to before interrupts are
@@ -104,7 +104,7 @@ mod single_core {
             compiler_fence(Ordering::SeqCst);
 
             let priority = unwrap!(Priority::try_from(token));
-            unsafe { Self::change_current_level(priority) };
+            Self::change_current_level(priority);
         }}
     }
 
