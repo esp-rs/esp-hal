@@ -8,10 +8,7 @@
 
 use esp_hal::{
     Blocking,
-    gpio::{
-        AnyPin,
-        interconnect::{InputSignal, OutputSignal},
-    },
+    gpio::AnyPin,
     uart::{self, ClockSource, Uart},
 };
 use hil_test as _;
@@ -161,8 +158,8 @@ mod tests {
     fn test_send_receive_inverted(ctx: Context) {
         let mut uart = ctx
             .uart1
-            .with_tx(OutputSignal::from(ctx.tx).inverted())
-            .with_rx(InputSignal::from(ctx.rx).inverted());
+            .with_tx(ctx.tx.into_output_signal().with_inverted_output(true))
+            .with_rx(unsafe { ctx.rx.into_input_signal() }.with_inverted_input(true));
 
         uart.write(&[0x42]).unwrap();
         let mut byte = [0u8; 1];

@@ -117,6 +117,7 @@ use crate::{
         asynch::DmaTxFuture,
     },
     gpio::{
+        OutputConfig,
         OutputSignal,
         interconnect::{OutputConnection, PeripheralOutput},
     },
@@ -191,7 +192,8 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
     fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -239,7 +241,8 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
     fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -275,7 +278,10 @@ impl<'d> I2sParallel<'d, Blocking> {
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
         let clock_pin = clock_pin.into();
-        clock_pin.set_to_push_pull_output();
+
+        clock_pin.apply_output_config(&OutputConfig::default());
+        clock_pin.set_output_enable(true);
+
         i2s.ws_signal().connect_to(&clock_pin);
 
         pins.configure(&i2s);

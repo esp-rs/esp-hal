@@ -12,6 +12,8 @@
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
     gpio::{
+        DriveMode,
+        OutputConfig,
         OutputSignal,
         interconnect::{OutputConnection, PeripheralOutput},
     },
@@ -558,10 +560,15 @@ where
                 return Err(Error::Timer);
             }
 
-            match cfg {
-                config::PinConfig::PushPull => self.output_pin.set_to_push_pull_output(),
-                config::PinConfig::OpenDrain => self.output_pin.set_to_open_drain_output(),
+            // TODO this is unnecessary
+            let drive_mode = match cfg {
+                config::PinConfig::PushPull => DriveMode::PushPull,
+                config::PinConfig::OpenDrain => DriveMode::OpenDrain,
             };
+
+            self.output_pin
+                .apply_output_config(&OutputConfig::default().with_drive_mode(drive_mode));
+            self.output_pin.set_output_enable(true);
 
             let timer_number = timer.number() as u8;
 

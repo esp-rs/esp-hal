@@ -74,6 +74,7 @@ mod tests {
         // A bit ugly but the peripheral interconnect APIs aren't yet stable.
         let mosi = unsafe { miso.clone_unchecked() };
         let miso_input = unsafe { miso.clone_unchecked() };
+
         // Will be used later to detect edges directly or through PCNT.
         let miso_input = Input::new(miso_input, Default::default());
 

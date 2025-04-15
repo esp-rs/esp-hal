@@ -144,7 +144,7 @@ mod tests {
         )
         .into_async();
 
-        let (din, dout) = ctx.dout.split();
+        let (din, dout) = unsafe { ctx.dout.split() };
 
         let i2s_tx = i2s
             .i2s_tx
@@ -194,7 +194,7 @@ mod tests {
             ctx.dma_channel,
         );
 
-        let (din, dout) = ctx.dout.split();
+        let (din, dout) = unsafe { ctx.dout.split() };
 
         let mut i2s_tx = i2s
             .i2s_tx

@@ -94,7 +94,7 @@ use crate::{
         WriteBuffer,
         dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
     },
-    gpio::interconnect::PeripheralOutput,
+    gpio::{OutputConfig, interconnect::PeripheralOutput},
     i2s::AnyI2s,
     interrupt::{InterruptConfigurable, InterruptHandler},
     system::PeripheralGuard,
@@ -387,7 +387,10 @@ where
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
     pub fn with_mclk(self, mclk: impl PeripheralOutput<'d>) -> Self {
         let mclk = mclk.into();
-        mclk.set_to_push_pull_output();
+
+        mclk.apply_output_config(&OutputConfig::default());
+        mclk.set_output_enable(true);
+
         self.i2s_tx.i2s.mclk_signal().connect_to(&mclk);
 
         self
@@ -681,7 +684,9 @@ mod private {
         DriverMode,
         dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
         gpio::{
+            InputConfig,
             InputSignal,
+            OutputConfig,
             OutputSignal,
             interconnect::{PeripheralInput, PeripheralOutput},
         },
@@ -719,7 +724,10 @@ mod private {
 
         pub fn with_bclk(self, bclk: impl PeripheralOutput<'d>) -> Self {
             let bclk = bclk.into();
-            bclk.set_to_push_pull_output();
+
+            bclk.apply_output_config(&OutputConfig::default());
+            bclk.set_output_enable(true);
+
             self.i2s.bclk_signal().connect_to(&bclk);
 
             self
@@ -727,7 +735,10 @@ mod private {
 
         pub fn with_ws(self, ws: impl PeripheralOutput<'d>) -> Self {
             let ws = ws.into();
-            ws.set_to_push_pull_output();
+
+            ws.apply_output_config(&OutputConfig::default());
+            ws.set_output_enable(true);
+
             self.i2s.ws_signal().connect_to(&ws);
 
             self
@@ -735,7 +746,10 @@ mod private {
 
         pub fn with_dout(self, dout: impl PeripheralOutput<'d>) -> Self {
             let dout = dout.into();
-            dout.set_to_push_pull_output();
+
+            dout.apply_output_config(&OutputConfig::default());
+            dout.set_output_enable(true);
+
             self.i2s.dout_signal().connect_to(&dout);
 
             self
@@ -767,7 +781,10 @@ mod private {
 
         pub fn with_bclk(self, bclk: impl PeripheralOutput<'d>) -> Self {
             let bclk = bclk.into();
-            bclk.set_to_push_pull_output();
+
+            bclk.apply_output_config(&OutputConfig::default());
+            bclk.set_output_enable(true);
+
             self.i2s.bclk_rx_signal().connect_to(&bclk);
 
             self
@@ -775,7 +792,10 @@ mod private {
 
         pub fn with_ws(self, ws: impl PeripheralOutput<'d>) -> Self {
             let ws = ws.into();
-            ws.set_to_push_pull_output();
+
+            ws.apply_output_config(&OutputConfig::default());
+            ws.set_output_enable(true);
+
             self.i2s.ws_rx_signal().connect_to(&ws);
 
             self
@@ -783,7 +803,10 @@ mod private {
 
         pub fn with_din(self, din: impl PeripheralInput<'d>) -> Self {
             let din = din.into();
-            din.init_input(crate::gpio::Pull::None);
+
+            din.apply_input_config(&InputConfig::default());
+            din.set_input_enable(true);
+
             self.i2s.din_signal().connect_to(&din);
 
             self

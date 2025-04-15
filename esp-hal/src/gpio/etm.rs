@@ -127,6 +127,7 @@ impl<'d> Channels<'d> {
 }
 
 /// Configuration for an ETM controlled GPIO input pin
+// TODO: remove this
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InputConfig {
@@ -179,7 +180,8 @@ impl<const C: u8> EventChannel<C> {
     ) -> Event<'d> {
         let pin = pin.into();
 
-        pin.init_input(pin_config.pull);
+        pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
+        pin.set_input_enable(true);
 
         enable_event_channel(C, pin.number());
         Event {
@@ -279,13 +281,17 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         let pin = pin.into();
 
-        pin.set_output_high(pin_config.initial_state.into());
-        if pin_config.open_drain {
-            pin.pull_direction(pin_config.pull);
-            pin.set_to_open_drain_output();
+        let config = if pin_config.open_drain {
+            super::OutputConfig::default()
+                .with_drive_mode(super::DriveMode::OpenDrain)
+                .with_pull(pin_config.pull)
         } else {
-            pin.set_to_push_pull_output();
-        }
+            super::OutputConfig::default()
+        };
+
+        pin.set_output_high(pin_config.initial_state.into());
+        pin.apply_output_config(&config);
+        pin.set_output_enable(true);
 
         enable_task_channel(C, pin.number());
         Task {

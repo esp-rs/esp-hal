@@ -95,11 +95,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.pins.GPIO8.split();
-        let (unit0_input, unit0_signal) = ctx.pins.GPIO11.split();
-        let (unit1_input, unit1_signal) = ctx.pins.GPIO12.split();
-        let (unit2_input, unit2_signal) = ctx.pins.GPIO16.split();
-        let (unit3_input, unit3_signal) = ctx.pins.GPIO17.split();
+        let (unit_ctrl, cs_signal) = unsafe { ctx.pins.GPIO8.split() };
+        let (unit0_input, unit0_signal) = unsafe { ctx.pins.GPIO11.split() };
+        let (unit1_input, unit1_signal) = unsafe { ctx.pins.GPIO12.split() };
+        let (unit2_input, unit2_signal) = unsafe { ctx.pins.GPIO16.split() };
+        let (unit3_input, unit3_signal) = unsafe { ctx.pins.GPIO17.split() };
 
         let pcnt = ctx.pcnt;
 
@@ -209,11 +209,11 @@ mod tests {
         // issue with configuring pins as outputs after inputs have been sorted
         // out. See https://github.com/esp-rs/esp-hal/pull/2173#issue-2529323702
 
-        let (unit_ctrl, cs_signal) = ctx.pins.GPIO8.split();
-        let (unit0_input, unit0_signal) = ctx.pins.GPIO11.split();
-        let (unit1_input, unit1_signal) = ctx.pins.GPIO12.split();
-        let (unit2_input, unit2_signal) = ctx.pins.GPIO16.split();
-        let (unit3_input, unit3_signal) = ctx.pins.GPIO17.split();
+        let (unit_ctrl, cs_signal) = unsafe { ctx.pins.GPIO8.split() };
+        let (unit0_input, unit0_signal) = unsafe { ctx.pins.GPIO11.split() };
+        let (unit1_input, unit1_signal) = unsafe { ctx.pins.GPIO12.split() };
+        let (unit2_input, unit2_signal) = unsafe { ctx.pins.GPIO16.split() };
+        let (unit3_input, unit3_signal) = unsafe { ctx.pins.GPIO17.split() };
 
         let pcnt = ctx.pcnt;
 

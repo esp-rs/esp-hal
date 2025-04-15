@@ -63,6 +63,7 @@ use crate::{
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
     gpio::{
+        OutputConfig,
         OutputSignal,
         interconnect::{OutputConnection, PeripheralOutput},
     },
@@ -270,7 +271,10 @@ where
     /// Associates a CS pin with the I8080 interface.
     pub fn with_cs(self, cs: impl PeripheralOutput<'d>) -> Self {
         let cs = cs.into();
-        cs.set_to_push_pull_output();
+
+        cs.apply_output_config(&OutputConfig::default());
+        cs.set_output_enable(true);
+
         OutputSignal::LCD_CS.connect_to(&cs);
 
         self
@@ -285,10 +289,12 @@ where
         let dc = dc.into();
         let wrx = wrx.into();
 
-        dc.set_to_push_pull_output();
+        dc.apply_output_config(&OutputConfig::default());
+        dc.set_output_enable(true);
         OutputSignal::LCD_DC.connect_to(&dc);
 
-        wrx.set_to_push_pull_output();
+        wrx.apply_output_config(&OutputConfig::default());
+        wrx.set_output_enable(true);
         OutputSignal::LCD_PCLK.connect_to(&wrx);
 
         self
@@ -661,7 +667,8 @@ impl TxPins for TxEightBits<'_> {
         ];
 
         for (pin, signal) in self.pins.iter().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             signal.connect_to(pin);
         }
     }
@@ -739,7 +746,8 @@ impl TxPins for TxSixteenBits<'_> {
         ];
 
         for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             signal.connect_to(pin);
         }
     }
