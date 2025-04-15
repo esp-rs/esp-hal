@@ -923,9 +923,7 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) { unsaf
     assert!((*queue).dummy != 0);
 
     let real_queue = (*queue).dummy as *mut ConcurrentQueue;
-    unsafe {
-        core::ptr::drop_in_place(real_queue);
-    }
+    core::ptr::drop_in_place(real_queue);
     (*queue).dummy = 0;
 }}
 
@@ -978,11 +976,8 @@ unsafe extern "C" fn ble_npl_eventq_init(queue: *const ble_npl_eventq) { unsafe 
     let queue = queue as *mut ble_npl_eventq;
 
     let raw_queue = ConcurrentQueue::new(EVENT_QUEUE_SIZE, 4);
-    let ptr =
-        unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue };
-    unsafe {
-        ptr.write(raw_queue);
-    }
+    let ptr = crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue;
+    ptr.write(raw_queue);
 
     (*queue).dummy = ptr as i32;
 }}

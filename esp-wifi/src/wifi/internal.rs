@@ -49,17 +49,17 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
 unsafe extern "C" fn semphr_take_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
+) -> i32 { unsafe {
     crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ())
-}
+}}
 
 #[cfg(coex)]
 unsafe extern "C" fn semphr_give_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
+) -> i32 { unsafe {
     crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ())
-}
+}}
 
 #[cfg(coex)]
 unsafe extern "C" fn is_in_isr_wrapper() -> i32 {

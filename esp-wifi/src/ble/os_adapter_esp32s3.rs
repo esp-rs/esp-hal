@@ -408,7 +408,7 @@ pub(crate) unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(
     trace!("coex_core_ble_conn_dyn_prio_get");
 
     #[cfg(coex)]
-    return coex_core_ble_conn_dyn_prio_get(low, high);
+    return unsafe { coex_core_ble_conn_dyn_prio_get(low, high) };
 
     #[cfg(not(coex))]
     0

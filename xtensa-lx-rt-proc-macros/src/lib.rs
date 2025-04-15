@@ -118,7 +118,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
-        #[export_name = "main"]
+        #[unsafe(export_name = "main")]
         pub unsafe extern "C" fn #tramp_ident() {
             #ident(
                 #(#resource_args),*

@@ -28,7 +28,7 @@ fn main() -> ! {
         if #[cfg(not(feature = "esp32s3"))] {
             use core::ptr::addr_of_mut;
 
-            extern "C" {
+            unsafe extern "C" {
                 // top of stack
                 static mut _stack_start: u32;
                 // bottom of stack

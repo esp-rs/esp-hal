@@ -923,7 +923,7 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) { unsafe {
-    let csi_callback = unsafe { &mut *(ctx as *mut C) };
+    let csi_callback = &mut *(ctx as *mut C);
     csi_callback(*data);
 }}
 
@@ -1388,7 +1388,7 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     {
         debug!("coex-init");
         #[allow(clippy::needless_return)]
-        return crate::binary::include::coex_init();
+        return unsafe { crate::binary::include::coex_init() };
     }
 
     #[cfg(not(coex))]

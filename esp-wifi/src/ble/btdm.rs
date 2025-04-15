@@ -252,7 +252,7 @@ unsafe extern "C" fn is_in_isr() -> i32 {
 }
 
 #[ram]
-unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 { unsafe {
+unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
     #[cfg(any(esp32c3, esp32s3))]
     todo!("cause_sw_intr_to_core is not implemented for this target");
 
@@ -260,10 +260,10 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 { u
     {
         trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
         let intr = 1 << _intr_no;
-        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
+        unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
         0
     }
-}}
+}
 
 #[allow(unused)]
 #[ram]
@@ -324,13 +324,13 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
+    unsafe { crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32) };
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
+    unsafe { crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32) };
 }
 
 #[ram]

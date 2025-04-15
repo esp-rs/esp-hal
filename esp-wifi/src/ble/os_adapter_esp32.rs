@@ -403,7 +403,7 @@ pub(crate) unsafe extern "C" fn coex_bt_request(event: u32, latency: u32, durati
     }
 
     #[cfg(coex)]
-    return coex_bt_request(event, latency, duration);
+    return unsafe { coex_bt_request(event, latency, duration) };
 
     #[cfg(not(coex))]
     0
@@ -418,7 +418,7 @@ pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
     }
 
     #[cfg(coex)]
-    return coex_bt_release(event);
+    return unsafe { coex_bt_release(event) };
 
     #[cfg(not(coex))]
     0
@@ -434,7 +434,7 @@ pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
     }
 
     #[cfg(coex)]
-    return coex_register_bt_cb(callback);
+    return unsafe { coex_register_bt_cb(callback) };
 
     #[cfg(not(coex))]
     0
@@ -448,7 +448,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_lock() -> u32 {
     }
 
     #[cfg(coex)]
-    return coex_bb_reset_lock();
+    return unsafe { coex_bb_reset_lock() };
 
     #[cfg(not(coex))]
     0
@@ -463,7 +463,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
     }
 
     #[cfg(coex)]
-    coex_bb_reset_unlock(event);
+    unsafe { coex_bb_reset_unlock(event) };
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
@@ -476,7 +476,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     }
 
     #[cfg(coex)]
-    return coex_schm_register_callback(1, callback); // COEX_SCHM_CALLBACK_TYPE_BT = 1
+    return unsafe {coex_schm_register_callback(1, callback)}; // COEX_SCHM_CALLBACK_TYPE_BT = 1
 
     #[cfg(not(coex))]
     0
@@ -486,7 +486,7 @@ pub(crate) unsafe extern "C" fn coex_schm_interval_get() -> u32 {
     trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_interval_get();
+    return unsafe { crate::binary::include::coex_schm_interval_get() };
 
     #[cfg(not(coex))]
     0
@@ -496,7 +496,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
     trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_period_get();
+    return unsafe { crate::binary::include::coex_schm_curr_period_get() };
 
     #[cfg(not(coex))]
     0
@@ -506,7 +506,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_phase_get() as *const ();
+    return unsafe{crate::binary::include::coex_schm_curr_phase_get()} as *const ();
 
     #[cfg(not(coex))]
     return core::ptr::null::<()>();
@@ -521,7 +521,7 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondar
     }
 
     #[cfg(coex)]
-    return coex_wifi_channel_get(primary, secondary);
+    return unsafe { coex_wifi_channel_get(primary, secondary)};
 
     #[cfg(not(coex))]
     -1
@@ -538,7 +538,7 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     }
 
     #[cfg(coex)]
-    return coex_register_wifi_channel_change_callback(callback);
+    return unsafe {coex_register_wifi_channel_change_callback(callback)};
 
     #[cfg(not(coex))]
     0
@@ -607,7 +607,7 @@ fn async_wakeup_request(event: i32) -> bool {
         _ => return false,
     };
 
-    extern "C" {
+    unsafe extern "C" {
         fn btdm_power_state_active() -> bool;
         fn btdm_wakeup_request(request_lock: bool);
     }
@@ -641,7 +641,7 @@ fn async_wakeup_request_end(event: i32) {
         _ => return,
     };
 
-    extern "C" {
+    unsafe extern "C" {
         // this isn't found anywhere ... not a ROM function
         // not in any of the libs - but the code will never call this anyway
 

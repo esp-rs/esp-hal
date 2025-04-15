@@ -1713,11 +1713,11 @@ pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn coex_deinit() {
+pub unsafe extern "C" fn coex_deinit() { 
     trace!("coex_deinit");
 
     #[cfg(coex)]
-    crate::binary::include::coex_deinit();
+    unsafe {crate::binary::include::coex_deinit()};
 }
 
 /// **************************************************************************
@@ -1727,11 +1727,11 @@ pub unsafe extern "C" fn coex_deinit() {
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int { 
     trace!("coex_enable");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_enable();
+    return unsafe { crate::binary::include::coex_enable() };
 
     #[cfg(not(coex))]
     0
@@ -1744,11 +1744,11 @@ pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int {
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn coex_disable() {
+pub unsafe extern "C" fn coex_disable() { 
     trace!("coex_disable");
 
     #[cfg(coex)]
-    crate::binary::include::coex_disable();
+    unsafe { crate::binary::include::coex_disable() };
 }
 
 /// **************************************************************************
@@ -1758,11 +1758,11 @@ pub unsafe extern "C" fn coex_disable() {
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn coex_status_get() -> u32 {
+pub unsafe extern "C" fn coex_status_get() -> u32 { 
     trace!("coex_status_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_status_get();
+    return unsafe { crate::binary::include::coex_status_get() };
 
     #[cfg(not(coex))]
     0
@@ -1780,11 +1780,11 @@ pub unsafe extern "C" fn coex_wifi_request(
     event: u32,
     latency: u32,
     duration: u32,
-) -> crate::binary::c_types::c_int {
+) -> crate::binary::c_types::c_int { 
     trace!("coex_wifi_request");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_wifi_request(event, latency, duration);
+    return unsafe { crate::binary::include::coex_wifi_request(event, latency, duration) };
 
     #[cfg(not(coex))]
     0
@@ -1798,11 +1798,11 @@ pub unsafe extern "C" fn coex_wifi_request(
 ///
 /// *************************************************************************
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types::c_int { 
     trace!("coex_wifi_release");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_wifi_release(event);
+    return unsafe { crate::binary::include::coex_wifi_release(event) };
 
     #[cfg(not(coex))]
     0
@@ -1819,11 +1819,11 @@ pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types
 pub unsafe extern "C" fn coex_wifi_channel_set(
     primary: u8,
     secondary: u8,
-) -> crate::binary::c_types::c_int {
+) -> crate::binary::c_types::c_int { 
     trace!("coex_wifi_channel_set");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_wifi_channel_set(primary, secondary);
+    return unsafe { crate::binary::include::coex_wifi_channel_set(primary, secondary) };
 
     #[cfg(not(coex))]
     0
@@ -1840,11 +1840,11 @@ pub unsafe extern "C" fn coex_wifi_channel_set(
 pub unsafe extern "C" fn coex_event_duration_get(
     event: u32,
     duration: *mut u32,
-) -> crate::binary::c_types::c_int {
+) -> crate::binary::c_types::c_int { 
     trace!("coex_event_duration_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_event_duration_get(event, duration);
+    return unsafe { crate::binary::include::coex_event_duration_get(event, duration) };
 
     #[cfg(not(coex))]
     0
@@ -1859,11 +1859,11 @@ pub unsafe extern "C" fn coex_event_duration_get(
 /// *************************************************************************
 #[cfg(any(esp32c3, esp32c2, esp32c6, esp32s3))]
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int { 
     trace!("coex_pti_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_pti_get(event, pti);
+    return unsafe { crate::binary::include::coex_pti_get(event, pti) };
 
     #[cfg(not(coex))]
     0
@@ -1883,11 +1883,11 @@ pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) {
+pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) { 
     trace!("coex_schm_status_bit_clear");
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_clear(type_, status);
+    unsafe { crate::binary::include::coex_schm_status_bit_clear(type_, status) };
 }
 
 /// **************************************************************************
@@ -1898,11 +1898,11 @@ pub unsafe extern "C" fn coex_schm_status_bit_clear(type_: u32, status: u32) {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
+pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) { 
     trace!("coex_schm_status_bit_set");
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_set(type_, status);
+    unsafe { crate::binary::include::coex_schm_status_bit_set(type_, status) };
 }
 
 /// **************************************************************************
@@ -1913,11 +1913,11 @@ pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary::c_types::c_int { 
     trace!("coex_schm_interval_set");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_interval_set(interval);
+    return unsafe { crate::binary::include::coex_schm_interval_set(interval) };
 
     #[cfg(not(coex))]
     0
@@ -1931,11 +1931,11 @@ pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary:
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_interval_get() -> u32 {
+pub unsafe extern "C" fn coex_schm_interval_get() -> u32 { 
     trace!("coex_schm_interval_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_interval_get();
+    return unsafe { crate::binary::include::coex_schm_interval_get() };
 
     #[cfg(not(coex))]
     0
@@ -1949,11 +1949,11 @@ pub unsafe extern "C" fn coex_schm_interval_get() -> u32 {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
+pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 { 
     trace!("coex_schm_curr_period_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_period_get();
+    return unsafe { crate::binary::include::coex_schm_curr_period_get() };
 
     #[cfg(not(coex))]
     0
@@ -1967,24 +1967,24 @@ pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_types::c_void { 
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
-    return crate::binary::include::coex_schm_curr_phase_get();
+    return unsafe { crate::binary::include::coex_schm_curr_phase_get() };
 
     #[cfg(not(coex))]
     return core::ptr::null_mut();
 }
 
-pub unsafe extern "C" fn coex_schm_process_restart_wrapper() -> esp_wifi_sys::c_types::c_int {
+pub unsafe extern "C" fn coex_schm_process_restart_wrapper() -> esp_wifi_sys::c_types::c_int { 
     trace!("coex_schm_process_restart_wrapper");
 
     #[cfg(not(coex))]
     return 0;
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_process_restart()
+    unsafe { crate::binary::include::coex_schm_process_restart() }
 }
 
 #[allow(unused_variables)]
@@ -1993,17 +1993,17 @@ pub unsafe extern "C" fn coex_schm_register_cb_wrapper(
     cb: ::core::option::Option<
         unsafe extern "C" fn(arg1: esp_wifi_sys::c_types::c_int) -> esp_wifi_sys::c_types::c_int,
     >,
-) -> esp_wifi_sys::c_types::c_int {
+) -> esp_wifi_sys::c_types::c_int { 
     trace!("coex_schm_register_cb_wrapper {} {:?}", arg1, cb);
 
     #[cfg(not(coex))]
     return 0;
 
     #[cfg(coex)]
-    crate::binary::include::coex_schm_register_callback(
+    unsafe { crate::binary::include::coex_schm_register_callback(
         arg1 as u32,
         unwrap!(cb) as *const esp_wifi_sys::c_types::c_void as *mut esp_wifi_sys::c_types::c_void,
-    )
+    ) }
 }
 
 pub unsafe extern "C" fn coex_schm_flexible_period_set(period: u8) -> i32 {
@@ -2011,7 +2011,7 @@ pub unsafe extern "C" fn coex_schm_flexible_period_set(period: u8) -> i32 {
 
     #[cfg(coex)]
     unsafe {
-        extern "C" {
+        unsafe extern "C" {
             fn coex_schm_flexible_period_set(period: u8) -> i32;
         }
 
@@ -2027,7 +2027,7 @@ pub unsafe extern "C" fn coex_schm_flexible_period_get() -> u8 {
 
     #[cfg(coex)]
     unsafe {
-        extern "C" {
+        unsafe extern "C" {
             fn coex_schm_flexible_period_get() -> u8;
         }
 
@@ -2040,9 +2040,9 @@ pub unsafe extern "C" fn coex_schm_flexible_period_get() -> u8 {
 
 pub unsafe extern "C" fn coex_register_start_cb(
     _cb: Option<unsafe extern "C" fn() -> esp_wifi_sys::c_types::c_int>,
-) -> esp_wifi_sys::c_types::c_int {
+) -> esp_wifi_sys::c_types::c_int { 
     #[cfg(coex)]
-    return esp_wifi_sys::include::coex_register_start_cb(_cb);
+    return unsafe { esp_wifi_sys::include::coex_register_start_cb(_cb) };
 
     #[cfg(not(coex))]
     0
