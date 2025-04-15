@@ -107,6 +107,22 @@ pub enum VsyncFilterThreshold {
     Eight,
 }
 
+/// Vsync/Hsync or Data Enable Mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum VhdeMode {
+    /// VSYNC + HSYNC mode is selected, in this mode,
+    /// the signals of VSYNC, HSYNC and DE are used to control the data.
+    /// For this case, users need to wire the three signal lines.
+    VsyncHsync,
+
+    /// DE mode is selected, the signals of VSYNC and
+    /// DE are used to control the data. For this case, wiring HSYNC signal
+    /// line is not a must. But in this case, the YUV-RGB conversion
+    /// function of camera module is not available.
+    De,
+}
+
 /// Vsync Filter Threshold
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -192,7 +208,8 @@ impl<'d> Camera<'d> {
         });
         self.regs().cam_ctrl1().write(|w| unsafe {
             w.cam_2byte_en().bit(config.enable_2byte_mode);
-            w.cam_vh_de_mode_en().bit(config.vh_de_mode_en);
+            w.cam_vh_de_mode_en()
+                .bit(matches!(config.vh_de_mode, VhdeMode::VsyncHsync));
             w.cam_rec_data_bytelen().bits(0);
             w.cam_line_int_num().bits(0);
             w.cam_vsync_filter_en()
@@ -607,15 +624,8 @@ pub struct Config {
     /// The bit order for the camera data.
     bit_order: BitOrder,
 
-    /// If this is set to true, VSYNC + HSYNC mode is selected, in this mode,
-    /// the signals of VSYNC, HSYNC and DE are used to control the data.
-    /// For this case, users need to wire the three signal lines.
-    ///
-    /// If this is set to false, DE mode is selected, the signals of VSYNC and
-    /// DE are used to control the data. For this case, wiring HSYNC signal
-    /// line is not a must. But in this case, the YUV-RGB conversion
-    /// function of camera module is not available.
-    vh_de_mode_en: bool,
+    /// Vsync/Hsync or Data Enable Mode
+    vh_de_mode: VhdeMode,
 
     /// The Vsync filter threshold.
     vsync_filter_threshold: Option<VsyncFilterThreshold>,
@@ -628,7 +638,7 @@ impl Default for Config {
             enable_2byte_mode: false,
             byte_order: Default::default(),
             bit_order: Default::default(),
-            vh_de_mode_en: false,
+            vh_de_mode: VhdeMode::De,
             vsync_filter_threshold: None,
         }
     }

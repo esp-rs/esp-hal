@@ -214,12 +214,13 @@ The data and ctrl pins of the camera have been split out into individual `with_*
 ```diff
 - camera.with_ctrl_pins(vsync_pin, href_pin);
 + camera.with_vsync(vsync_pin).with_h_enable(href_pin);
++ config.with_vh_de_mode(VhdeMode::VsyncHsync);
 ```
 
 ```diff
 - camera.with_ctrl_pins_and_de(vsync_pin, hsync_pin, href_pin);
 + camera.with_vsync(vsync_pin).with_hsync(hsync_pin).with_h_enable(href_pin);
-+ config.with_vh_de_mode_en(false); // Needed to enable HCYNC pin
++ config.with_vh_de_mode(VhdeMode::De); // Needed to enable HSYNC pin
 ```
 
 ```diff

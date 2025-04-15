@@ -11,7 +11,7 @@ use esp_hal::{
     dma_buffers,
     gpio::Level,
     lcd_cam::{
-        cam::{self, Camera},
+        cam::{self, Camera, VhdeMode},
         lcd::{
             dpi,
             dpi::{Dpi, Format, FrameTiming},
@@ -122,7 +122,7 @@ mod tests {
             rx_channel,
             cam::Config::default()
                 .with_frequency(Rate::from_mhz(1))
-                .with_vh_de_mode_en(true),
+                .with_vh_de_mode(VhdeMode::VsyncHsync),
         )
         .unwrap()
         .with_vsync(vsync_in)
