@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump MSRV to 1.84 (#2951)
 - Fix gpio `input_state` and `output_state` for the ESP32-S3 and ESP32-S2 (#3191)
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 
 ### Fixed
 

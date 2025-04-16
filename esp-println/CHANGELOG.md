@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+
 ### Fixed
 
 - Manually setting a log level now correctly ignores `ESP_LOG`. (#3240)

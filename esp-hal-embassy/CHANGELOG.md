@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Re-added the `multiple-integrated` timer queue flavour (#3166)
 
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+
 ### Changed
 
 ### Fixed
