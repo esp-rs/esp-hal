@@ -37,14 +37,14 @@ async fn main(spawner: Spawner) {
     let mut enc_a = Flex::new(unsafe { p.GPIO2.clone_unchecked() });
     let enc_a_clone = Flex::new(p.GPIO2);
     enc_a.apply_output_config(&OutputConfig::default());
-    enc_a.enable_output(true);
-    enc_a.enable_input(true);
+    enc_a.set_output_enable(true);
+    enc_a.set_input_enable(true);
 
     let mut enc_b = Flex::new(unsafe { p.GPIO4.clone_unchecked() });
     let enc_b_clone = Flex::new(p.GPIO4);
     enc_b.apply_output_config(&OutputConfig::default());
-    enc_b.enable_output(true);
-    enc_b.enable_input(true);
+    enc_b.set_output_enable(true);
+    enc_b.set_input_enable(true);
 
     let timg0 = TimerGroup::new(p.TIMG0);
     esp_hal_embassy::init(timg0.timer0);

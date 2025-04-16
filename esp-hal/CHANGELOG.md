@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some config options can now only be set when the `unstable` feature in enabled (#3365)
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Added `Flex::enable_output` (#3387)
+- Added `Flex::set_output_enable` (#3387)
 
 ### Changed
 
@@ -45,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All `Camera` pins are now configured using `with_*()` methods (#3237)
 - The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`. (#3402)
 - Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
+- Renamed `Flex::enable_input` to `set_input_enable` (#3387)
 
 ### Fixed
 

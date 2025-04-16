@@ -19,7 +19,7 @@ impl Level {
 
     pub(crate) fn init_input(&self, _pull: Pull) {}
 
-    pub(crate) fn enable_input(&self, _on: bool) {}
+    pub(crate) fn set_input_enable(&self, _on: bool) {}
 
     pub(crate) fn is_input_high(&self) -> bool {
         *self == Level::High
@@ -27,7 +27,7 @@ impl Level {
 
     pub(crate) fn set_to_open_drain_output(&self) {}
     pub(crate) fn set_to_push_pull_output(&self) {}
-    pub(crate) fn enable_output(&self, _on: bool) {}
+    pub(crate) fn set_output_enable(&self, _on: bool) {}
     pub(crate) fn set_output_high(&self, _on: bool) {}
     pub(crate) fn set_drive_strength(&self, _strength: DriveStrength) {}
     pub(crate) fn enable_open_drain(&self, _on: bool) {}

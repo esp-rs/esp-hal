@@ -884,7 +884,7 @@ where
     /// `with_sio0`.
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
         let mosi = mosi.into();
-        mosi.enable_output(false);
+        mosi.set_output_enable(false);
 
         self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
 
@@ -900,7 +900,7 @@ where
     /// [DataMode::SingleTwoDataLines]
     pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
         let miso = miso.into();
-        miso.enable_input(true);
+        miso.set_input_enable(true);
 
         self.driver().info.miso.connect_to(&miso);
 
@@ -923,8 +923,8 @@ where
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
         let mosi = mosi.into();
-        mosi.enable_output(true);
-        mosi.enable_input(true);
+        mosi.set_output_enable(true);
+        mosi.set_input_enable(true);
 
         self.driver().info.sio0_input.connect_to(&mosi);
         self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
@@ -947,8 +947,8 @@ where
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralOutput<'d>) -> Self {
         let sio1 = sio1.into();
-        sio1.enable_input(true);
-        sio1.enable_output(true);
+        sio1.set_input_enable(true);
+        sio1.set_output_enable(true);
 
         self.driver().info.miso.connect_to(&sio1);
         self.pins.sio1_pin = sio1.connect_with_guard(self.driver().info.sio1_output);
@@ -968,8 +968,8 @@ where
     pub fn with_sio2(mut self, sio2: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
         let sio2 = sio2.into();
-        sio2.enable_input(true);
-        sio2.enable_output(true);
+        sio2.set_input_enable(true);
+        sio2.set_output_enable(true);
 
         unwrap!(self.driver().info.sio2_input).connect_to(&sio2);
         self.pins.sio2_pin = self
@@ -993,8 +993,8 @@ where
     pub fn with_sio3(mut self, sio3: impl PeripheralOutput<'d>) -> Self {
         // TODO: panic if not QSPI?
         let sio3 = sio3.into();
-        sio3.enable_input(true);
-        sio3.enable_output(true);
+        sio3.set_input_enable(true);
+        sio3.set_output_enable(true);
 
         unwrap!(self.driver().info.sio3_input).connect_to(&sio3);
         self.pins.sio3_pin = self

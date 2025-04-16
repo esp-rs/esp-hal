@@ -122,7 +122,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             let source = source.into();
-            source.enable_input(true);
+            source.set_input_enable(true);
             signal.connect_to(&source);
         }
         self
@@ -180,7 +180,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
 
         if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
             let source = source.into();
-            source.enable_input(true);
+            source.set_input_enable(true);
             signal.connect_to(&source);
         }
         self
