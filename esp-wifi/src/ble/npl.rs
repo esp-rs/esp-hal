@@ -386,13 +386,13 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     unsafe {
         let name_str = str_from_c(name);
-        
+
         trace!(
             "task_create {:?} {} {} {:?} {} {:?} {}",
             task_func, name_str, stack_depth, param, prio, task_handle, core_id,
         );
     };
-        
+
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
     unsafe {
@@ -834,11 +834,11 @@ unsafe extern "C" fn ble_npl_event_init(
     if (*event).dummy == 0 {
         unsafe {
             let evt = crate::compat::malloc::calloc(1, core::mem::size_of::<Event>()) as *mut Event;
-            
+
             (*evt).event_fn_ptr = func;
             (*evt).ev_arg_ptr = arg;
             (*evt).queued = false;
-            
+
             let event = event.cast_mut();
             (*event).dummy = evt as i32;
         }

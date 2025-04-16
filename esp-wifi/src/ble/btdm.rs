@@ -233,7 +233,7 @@ unsafe extern "C" fn task_create(
             *mut crate::binary::c_types::c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
-        
+
         let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
         *(handle as *mut usize) = task as usize;
     }

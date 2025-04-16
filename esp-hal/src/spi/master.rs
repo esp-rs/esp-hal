@@ -1875,9 +1875,9 @@ mod dma {
                     bytes_to_read == 0,
                     data_mode,
                 )?;
-
-                self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
             }
+
+            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }
 
         /// Perform a half-duplex read operation using DMA.
@@ -1924,28 +1924,26 @@ mod dma {
             bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            unsafe {
-                #[cfg(all(esp32, spi_address_workaround))]
-                {
-                    // On the ESP32, if we don't have data, the address is always sent
-                    // on a single line, regardless of its data mode.
-                    if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
-                        return self.set_up_address_workaround(cmd, address, dummy);
-                    }
+            #[cfg(all(esp32, spi_address_workaround))]
+            {
+                // On the ESP32, if we don't have data, the address is always sent
+                // on a single line, regardless of its data mode.
+                if bytes_to_write == 0 && address.mode() != DataMode::SingleTwoDataLines {
+                    return self.set_up_address_workaround(cmd, address, dummy);
                 }
-
-                self.driver().setup_half_duplex(
-                    true,
-                    cmd,
-                    address,
-                    false,
-                    dummy,
-                    bytes_to_write == 0,
-                    data_mode,
-                )?;
-
-                self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
             }
+
+            self.driver().setup_half_duplex(
+                true,
+                cmd,
+                address,
+                false,
+                dummy,
+                bytes_to_write == 0,
+                data_mode,
+            )?;
+
+            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -2794,57 +2792,55 @@ impl DmaDriver {
         tx_buffer: &mut impl DmaTxBuffer,
         channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
     ) -> Result<(), Error> {
-        unsafe {
-            #[cfg(esp32s2)]
+        #[cfg(esp32s2)]
+        {
+            // without this a transfer after a write will fail
+            self.regs().dma_out_link().write(|w| w.bits(0));
+            self.regs().dma_in_link().write(|w| w.bits(0));
+        }
+
+        self.driver.configure_datalen(rx_len, tx_len);
+
+        // enable the MISO and MOSI if needed
+        self.regs()
+            .user()
+            .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
+
+        self.enable_dma();
+
+        if rx_len > 0 {
+            channel
+                .rx
+                .prepare_transfer(self.dma_peripheral, rx_buffer)
+                .and_then(|_| channel.rx.start_transfer())?;
+        } else {
+            #[cfg(esp32)]
             {
-                // without this a transfer after a write will fail
-                self.regs().dma_out_link().write(|w| w.bits(0));
-                self.regs().dma_in_link().write(|w| w.bits(0));
-            }
-
-            self.driver.configure_datalen(rx_len, tx_len);
-
-            // enable the MISO and MOSI if needed
-            self.regs()
-                .user()
-                .modify(|_, w| w.usr_miso().bit(rx_len > 0).usr_mosi().bit(tx_len > 0));
-
-            self.enable_dma();
-
-            if rx_len > 0 {
-                channel
-                    .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)
-                    .and_then(|_| channel.rx.start_transfer())?;
-            } else {
-                #[cfg(esp32)]
-                {
-                    // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
-                    // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
-                    if _full_duplex {
-                        self.regs()
-                            .dma_in_link()
-                            .modify(|_, w| w.inlink_addr().bits(0));
-                        self.regs()
-                            .dma_in_link()
-                            .modify(|_, w| w.inlink_start().set_bit());
-                    }
+                // see https://github.com/espressif/esp-idf/commit/366e4397e9dae9d93fe69ea9d389b5743295886f
+                // see https://github.com/espressif/esp-idf/commit/0c3653b1fd7151001143451d4aa95dbf15ee8506
+                if _full_duplex {
+                    self.regs()
+                        .dma_in_link()
+                        .modify(|_, w| w.inlink_addr().bits(0));
+                    self.regs()
+                        .dma_in_link()
+                        .modify(|_, w| w.inlink_start().set_bit());
                 }
             }
-            if tx_len > 0 {
-                channel
-                    .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)
-                    .and_then(|_| channel.tx.start_transfer())?;
-            }
-
-            #[cfg(gdma)]
-            self.reset_dma();
-
-            self.driver.start_operation();
-
-            Ok(())
         }
+        if tx_len > 0 {
+            channel
+                .tx
+                .prepare_transfer(self.dma_peripheral, tx_buffer)
+                .and_then(|_| channel.tx.start_transfer())?;
+        }
+
+        #[cfg(gdma)]
+        self.reset_dma();
+
+        self.driver.start_operation();
+
+        Ok(())
     }
 
     fn enable_dma(&self) {

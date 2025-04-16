@@ -78,37 +78,33 @@ mod single_core {
 
     impl RawLock for PriorityLock {
         unsafe fn enter(&self) -> RestoreState {
-            unsafe {
-                #[cfg(riscv)]
-                if self.0 == Priority::max() {
-                    return InterruptLock.enter();
-                }
-
-                let prev_interrupt_priority = Self::change_current_level(self.0);
-                assert!(prev_interrupt_priority <= self.0);
-
-                // Ensure no subsequent memory accesses are reordered to before interrupts are
-                // disabled.
-                compiler_fence(Ordering::SeqCst);
-
-                RestoreState::from(prev_interrupt_priority)
+            #[cfg(riscv)]
+            if self.0 == Priority::max() {
+                return InterruptLock.enter();
             }
+
+            let prev_interrupt_priority = Self::change_current_level(self.0);
+            assert!(prev_interrupt_priority <= self.0);
+
+            // Ensure no subsequent memory accesses are reordered to before interrupts are
+            // disabled.
+            compiler_fence(Ordering::SeqCst);
+
+            RestoreState::from(prev_interrupt_priority)
         }
 
         unsafe fn exit(&self, token: RestoreState) {
-            unsafe {
-                #[cfg(riscv)]
-                if self.0 == Priority::max() {
-                    return InterruptLock.exit(token);
-                }
-                assert!(Self::current_priority() <= self.0);
-                // Ensure no preceeding memory accesses are reordered to after interrupts are
-                // enabled.
-                compiler_fence(Ordering::SeqCst);
-
-                let priority = unwrap!(Priority::try_from(token));
-                Self::change_current_level(priority);
+            #[cfg(riscv)]
+            if self.0 == Priority::max() {
+                return InterruptLock.exit(token);
             }
+            assert!(Self::current_priority() <= self.0);
+            // Ensure no preceeding memory accesses are reordered to after interrupts are
+            // enabled.
+            compiler_fence(Ordering::SeqCst);
+
+            let priority = unwrap!(Priority::try_from(token));
+            Self::change_current_level(priority);
         }
     }
 
@@ -117,51 +113,47 @@ mod single_core {
 
     impl RawLock for InterruptLock {
         unsafe fn enter(&self) -> RestoreState {
-            unsafe {
-                cfg_if::cfg_if! {
-                    if #[cfg(riscv)] {
-                        let mut mstatus = 0u32;
-                        core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
-                        let token = mstatus & 0b1000;
-                    } else if #[cfg(xtensa)] {
-                        let token: u32;
-                        core::arch::asm!("rsil {0}, 5", out(reg) token);
-                    } else {
-                        compile_error!("Unsupported architecture")
-                    }
-                };
+            cfg_if::cfg_if! {
+                if #[cfg(riscv)] {
+                    let mut mstatus = 0u32;
+                    core::arch::asm!("csrrci {0}, mstatus, 8", inout(reg) mstatus);
+                    let token = mstatus & 0b1000;
+                } else if #[cfg(xtensa)] {
+                    let token: u32;
+                    core::arch::asm!("rsil {0}, 5", out(reg) token);
+                } else {
+                    compile_error!("Unsupported architecture")
+                }
+            };
 
-                // Ensure no subsequent memory accesses are reordered to before interrupts are
-                // disabled.
-                compiler_fence(Ordering::SeqCst);
+            // Ensure no subsequent memory accesses are reordered to before interrupts are
+            // disabled.
+            compiler_fence(Ordering::SeqCst);
 
-                RestoreState(token)
-            }
+            RestoreState(token)
         }
 
         unsafe fn exit(&self, token: RestoreState) {
-            unsafe {
-                // Ensure no preceeding memory accesses are reordered to after interrupts are
-                // enabled.
-                compiler_fence(Ordering::SeqCst);
+            // Ensure no preceeding memory accesses are reordered to after interrupts are
+            // enabled.
+            compiler_fence(Ordering::SeqCst);
 
-                let RestoreState(token) = token;
+            let RestoreState(token) = token;
 
-                cfg_if::cfg_if! {
-                    if #[cfg(riscv)] {
-                        if token != 0 {
-                            esp_riscv_rt::riscv::interrupt::enable();
-                        }
-                    } else if #[cfg(xtensa)] {
-                        // Reserved bits in the PS register, these must be written as 0.
-                        const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
-                        debug_assert!(token & RESERVED_MASK == 0);
-                        core::arch::asm!(
-                            "wsr.ps {0}",
-                            "rsync", in(reg) token)
-                    } else {
-                        compile_error!("Unsupported architecture")
+            cfg_if::cfg_if! {
+                if #[cfg(riscv)] {
+                    if token != 0 {
+                        esp_riscv_rt::riscv::interrupt::enable();
                     }
+                } else if #[cfg(xtensa)] {
+                    // Reserved bits in the PS register, these must be written as 0.
+                    const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
+                    debug_assert!(token & RESERVED_MASK == 0);
+                    core::arch::asm!(
+                        "wsr.ps {0}",
+                        "rsync", in(reg) token)
+                } else {
+                    compile_error!("Unsupported architecture")
                 }
             }
         }
@@ -309,16 +301,14 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
     ///   were acquired.
     /// - Each release call must be paired with an acquire call.
     unsafe fn release(&self, token: RestoreState) {
-        unsafe {
-            if !token.is_reentry() {
-                #[cfg(multi_core)]
-                self.inner.unlock();
+        if !token.is_reentry() {
+            #[cfg(multi_core)]
+            self.inner.unlock();
 
-                #[cfg(single_core)]
-                self.is_locked.set(false);
+            #[cfg(single_core)]
+            self.is_locked.set(false);
 
-                self.lock.exit(token)
-            }
+            self.lock.exit(token)
         }
     }
 
