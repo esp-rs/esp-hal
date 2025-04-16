@@ -175,7 +175,7 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtc_pins {
-    ( $( $pin_num:expr_2021 )+ ) => {
+    ( $( $pin_num:expr )+ ) => {
         $(
             impl $crate::gpio::RtcPin for paste::paste!($crate::peripherals::[<GPIO $pin_num>]<'_>) {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) { unsafe {

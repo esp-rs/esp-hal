@@ -533,7 +533,7 @@ pub enum OutputSignal {
 
 macro_rules! rtcio_analog {
     (
-        $pin_num:expr_2021, $rtc_pin:expr_2021, $pin_reg:expr_2021, $prefix:pat, $hold:ident $(, $rue:literal)?
+        $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
         paste::paste! {
             impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
@@ -613,7 +613,7 @@ macro_rules! rtcio_analog {
     };
 
     (
-        $( ( $pin_num:expr_2021, $rtc_pin:expr_2021, $pin_reg:expr_2021, $prefix:pat, $hold:ident $(, $rue:literal )? ) )+
+        $( ( $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal )? ) )+
     ) => {
         $(
             rtcio_analog!($pin_num, $rtc_pin, $pin_reg, $prefix, $hold $(, $rue )?);
@@ -639,7 +639,7 @@ macro_rules! rtcio_analog {
 
 /// Common functionality for all touch pads
 macro_rules! touch {
-    (@pin_specific $touch_num:expr_2021, true) => {
+    (@pin_specific $touch_num:expr, true) => {
         paste::paste! {
             RTC_IO::regs().[< touch_pad $touch_num >]().write(|w| unsafe {
                 w.xpd().set_bit();
@@ -657,7 +657,7 @@ macro_rules! touch {
         }
     };
 
-    (@pin_specific $touch_num:expr_2021, false) => {
+    (@pin_specific $touch_num:expr, false) => {
         paste::paste! {
             RTC_IO::regs().[< touch_pad $touch_num >]().write(|w| {
                 w.xpd().set_bit();
@@ -669,7 +669,7 @@ macro_rules! touch {
     (
         $(
             (
-                $touch_num:literal, $pin_num:literal, $touch_out_reg:expr_2021, $touch_thres_reg:expr_2021, $normal_pin:literal
+                $touch_num:literal, $pin_num:literal, $touch_out_reg:expr, $touch_thres_reg:expr, $normal_pin:literal
             )
         )+
     ) => {

@@ -107,7 +107,7 @@ pub(crate) fn current_task_thread_semaphore() -> *mut c_void {
 /// See the module documentation for an example.
 #[macro_export]
 macro_rules! scheduler_impl {
-    (static $name:ident: $t: ty = $val:expr_2021) => {
+    (static $name:ident: $t: ty = $val:expr) => {
         static $name: $t = $val;
 
         #[unsafe(no_mangle)]

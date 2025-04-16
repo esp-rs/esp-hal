@@ -9,7 +9,7 @@ pub mod defmt;
 pub mod logger;
 
 macro_rules! log_format {
-    ($value:expr_2021) => {
+    ($value:expr) => {
         #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
         #[unsafe(export_name = concat!("espflash.LOG_FORMAT"))]
@@ -82,7 +82,7 @@ macro_rules! dbg {
     () => {
         $crate::println!("[{}:{}]", ::core::file!(), ::core::line!())
     };
-    ($val:expr_2021 $(,)?) => {
+    ($val:expr $(,)?) => {
         // Use of `match` here is intentional because it affects the lifetimes
         // of temporaries - https://stackoverflow.com/a/48732525/1063961
         match $val {
@@ -93,7 +93,7 @@ macro_rules! dbg {
             }
         }
     };
-    ($($val:expr_2021),+ $(,)?) => {
+    ($($val:expr),+ $(,)?) => {
         ($($crate::dbg!($val)),+,)
     };
 }

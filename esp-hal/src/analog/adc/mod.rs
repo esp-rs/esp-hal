@@ -239,7 +239,7 @@ trait AdcCalEfuse {
 
 macro_rules! impl_adc_interface {
     ($adc:ident [
-        $( ($pin:ident<'_>, $channel:expr_2021) ,)+
+        $( ($pin:ident<'_>, $channel:expr) ,)+
     ]) => {
         $(
             impl $crate::analog::adc::AdcChannel for $crate::peripherals::$pin<'_> {

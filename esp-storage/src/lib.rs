@@ -62,7 +62,7 @@ fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! rom_fn {
-    ($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr_2021) => {
+    ($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr) => {
         $(#[$attrs])*
         #[allow(unused)]
         #[inline(always)]
@@ -76,7 +76,7 @@ macro_rules! rom_fn {
         }
     };
 
-    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr_2021;)+) => {
+    ($($(#[$attrs:meta])* fn $name:ident($($arg:tt: $ty:ty),*) $(-> $retval:ty)? = $addr:expr;)+) => {
         $(
             $crate::rom_fn!(fn $name($($arg: $ty),*) $(-> $retval)? = $addr);
         )+

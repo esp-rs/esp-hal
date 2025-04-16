@@ -203,7 +203,7 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtc_pins {
-    ( $( $pin_num:expr_2021 )+ ) => {
+    ( $( $pin_num:expr )+ ) => {
         $(
             paste::paste! {
                 impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {

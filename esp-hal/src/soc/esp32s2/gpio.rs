@@ -318,7 +318,7 @@ pub enum OutputSignal {
 }
 
 macro_rules! rtcio_analog {
-    ($pin_num:expr_2021, $pin_reg:expr_2021, $hold:ident) => {
+    ($pin_num:expr, $pin_reg:expr, $hold:ident) => {
         paste::paste!{
             impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                 fn rtc_number(&self) -> u8 {
@@ -394,7 +394,7 @@ macro_rules! rtcio_analog {
     };
 
     (
-        $( ( $pin_num:expr_2021, $pin_reg:expr_2021, $hold:ident ) )+
+        $( ( $pin_num:expr, $pin_reg:expr, $hold:ident ) )+
     ) => {
         $(
             rtcio_analog!($pin_num, $pin_reg, $hold);

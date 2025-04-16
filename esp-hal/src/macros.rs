@@ -215,10 +215,10 @@ macro_rules! any_peripheral {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! if_set {
-    (, $not_set:expr_2021) => {
+    (, $not_set:expr) => {
         $not_set
     };
-    ($set:expr_2021, $not_set:expr_2021) => {
+    ($set:expr, $not_set:expr) => {
         $set
     };
 }
@@ -243,7 +243,7 @@ macro_rules! ignore {
 #[macro_export]
 #[doc(hidden)]
 macro_rules! metadata {
-    ($category:literal, $key:ident, $value:expr_2021) => {
+    ($category:literal, $key:ident, $value:expr) => {
         #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
         #[unsafe(export_name = concat!($category, ".", stringify!($key)))]

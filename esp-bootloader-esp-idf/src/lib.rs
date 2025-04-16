@@ -296,14 +296,14 @@ macro_rules! esp_app_desc {
     };
 
     (
-     $version: expr_2021,
-     $project_name: expr_2021,
-     $build_time: expr_2021,
-     $build_date: expr_2021,
-     $idf_ver: expr_2021,
-     $mmu_page_size: expr_2021,
-     $min_efuse_blk_rev_full: expr_2021,
-     $max_efuse_blk_rev_full: expr_2021
+     $version: expr,
+     $project_name: expr,
+     $build_time: expr,
+     $build_date: expr,
+     $idf_ver: expr,
+     $mmu_page_size: expr,
+     $min_efuse_blk_rev_full: expr,
+     $max_efuse_blk_rev_full: expr
     ) => {
         #[unsafe(export_name = "esp_app_desc")]
         #[unsafe(link_section = ".rodata_desc.appdesc")]

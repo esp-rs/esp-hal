@@ -113,7 +113,7 @@ macro_rules! panic {
 
 #[collapse_debuginfo(yes)]
 macro_rules! trace {
-    ($s:literal $(, $x:expr_2021)* $(,)?) => {
+    ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
             ::log::trace!($s $(, $x)*);
@@ -127,7 +127,7 @@ macro_rules! trace {
 
 #[collapse_debuginfo(yes)]
 macro_rules! debug {
-    ($s:literal $(, $x:expr_2021)* $(,)?) => {
+    ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
             ::log::debug!($s $(, $x)*);
@@ -141,7 +141,7 @@ macro_rules! debug {
 
 #[collapse_debuginfo(yes)]
 macro_rules! info {
-    ($s:literal $(, $x:expr_2021)* $(,)?) => {
+    ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
             ::log::info!($s $(, $x)*);
@@ -155,7 +155,7 @@ macro_rules! info {
 
 #[collapse_debuginfo(yes)]
 macro_rules! warn {
-    ($s:literal $(, $x:expr_2021)* $(,)?) => {
+    ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
             ::log::warn!($s $(, $x)*);
@@ -169,7 +169,7 @@ macro_rules! warn {
 
 #[collapse_debuginfo(yes)]
 macro_rules! error {
-    ($s:literal $(, $x:expr_2021)* $(,)?) => {
+    ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
             ::log::error!($s $(, $x)*);
@@ -192,7 +192,7 @@ macro_rules! unwrap {
 #[cfg(not(feature = "defmt"))]
 #[collapse_debuginfo(yes)]
 macro_rules! unwrap {
-    ($arg:expr_2021) => {
+    ($arg:expr) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
             ::core::result::Result::Err(e) => {
@@ -200,7 +200,7 @@ macro_rules! unwrap {
             }
         }
     };
-    ($arg:expr_2021, $($msg:expr_2021),+ $(,)? ) => {
+    ($arg:expr, $($msg:expr),+ $(,)? ) => {
         match $crate::fmt::Try::into_result($arg) {
             ::core::result::Result::Ok(t) => t,
             ::core::result::Result::Err(e) => {

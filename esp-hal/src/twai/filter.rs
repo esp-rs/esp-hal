@@ -55,7 +55,7 @@ pub type BitFilter<const N: usize> = [u8; N];
 
 // Convert a byte from a bytestring into a bit inside a given code and mask.
 macro_rules! set_bit_from_byte {
-    ($code:expr_2021, $mask:expr_2021, $byte:expr_2021, $shift:expr_2021) => {
+    ($code:expr, $mask:expr, $byte:expr, $shift:expr) => {
         match $byte {
             b'0' => {
                 // Code bit is already zero, no need to set it.

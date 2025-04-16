@@ -12,7 +12,7 @@
 /// ```
 #[macro_export]
 macro_rules! heap_allocator {
-    ($(#[$m:meta])* size: $size:expr_2021) => {{
+    ($(#[$m:meta])* size: $size:expr) => {{
         $(#[$m])*
         static mut HEAP: core::mem::MaybeUninit<[u8; $size]> = core::mem::MaybeUninit::uninit();
 
@@ -45,7 +45,7 @@ macro_rules! heap_allocator {
 /// or indirectly. Be very careful when using PSRAM in your global allocator.
 #[macro_export]
 macro_rules! psram_allocator {
-    ($peripheral:expr_2021, $psram_module:path) => {{
+    ($peripheral:expr, $psram_module:path) => {{
         use $psram_module as _psram;
         let (start, size) = _psram::psram_raw_parts(&$peripheral);
         unsafe {

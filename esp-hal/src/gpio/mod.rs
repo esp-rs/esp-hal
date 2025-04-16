@@ -968,7 +968,7 @@ macro_rules! gpio {
 
             #[doc(hidden)]
             macro_rules! handle_gpio_output {
-                ($this:expr_2021, $inner:ident, $code:tt) => {
+                ($this:expr, $inner:ident, $code:tt) => {
                     match $this.number() {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* {{
@@ -986,7 +986,7 @@ macro_rules! gpio {
 
             #[doc(hidden)]
             macro_rules! handle_gpio_input {
-                ($this:expr_2021, $inner:ident, $code:tt) => {
+                ($this:expr, $inner:ident, $code:tt) => {
                     match $this.number() {
                         $(
                             $gpionum => {{
@@ -1007,7 +1007,7 @@ macro_rules! gpio {
                 if #[cfg(any(lp_io, rtc_cntl))] {
                     #[doc(hidden)]
                     macro_rules! handle_rtcio {
-                        ($this:expr_2021, $inner:ident, $code:tt) => {
+                        ($this:expr, $inner:ident, $code:tt) => {
                             match $this.number() {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
@@ -1026,7 +1026,7 @@ macro_rules! gpio {
 
                     #[doc(hidden)]
                     macro_rules! handle_rtcio_with_resistors {
-                        ($this:expr_2021, $inner:ident, $code:tt) => {
+                        ($this:expr, $inner:ident, $code:tt) => {
                             match $this.number() {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {

@@ -1075,7 +1075,7 @@ pub(crate) mod utils {
             }
 
             macro_rules! apply_to_field {
-                ($w:ident, $field:expr_2021, $bits:expr_2021) => {
+                ($w:ident, $field:expr, $bits:expr) => {
                     match $field {
                         Field::McuSel => $w.mcu_sel().bits($bits),
                         Field::FunDrv => $w.fun_drv().bits($bits),

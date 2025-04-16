@@ -172,7 +172,7 @@ pub enum ErrorKind {
 }
 
 macro_rules! impl_display {
-    ($($kind:ident => $msg:expr_2021),* $(,)?) => {
+    ($($kind:ident => $msg:expr),* $(,)?) => {
         impl core::fmt::Display for ErrorKind {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 match self {

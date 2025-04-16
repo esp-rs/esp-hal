@@ -2472,7 +2472,7 @@ fn dump_packet_info(_buffer: &mut [u8]) {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! esp_wifi_result {
-    ($value:expr_2021) => {{
+    ($value:expr) => {{
         use num_traits::FromPrimitive;
         let result = $value;
         if result != esp_wifi_sys::include::ESP_OK as i32 {

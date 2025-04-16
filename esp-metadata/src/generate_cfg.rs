@@ -4,7 +4,7 @@ use anyhow::{Result, bail};
 use strum::IntoEnumIterator;
 
 macro_rules! include_toml {
-    ($type:ty, $file:expr_2021) => {{
+    ($type:ty, $file:expr) => {{
         static LOADED_TOML: OnceLock<$type> = OnceLock::new();
         LOADED_TOML.get_or_init(|| basic_toml::from_str(include_str!($file)).unwrap())
     }};
