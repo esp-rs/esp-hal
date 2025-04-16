@@ -34,7 +34,7 @@ use esp_hal::{
         master::{Config, I2c},
     },
     lcd_cam::{
-        cam::{self, Camera, RxEightBits},
+        cam::{self, Camera},
         LcdCam,
     },
     main,
@@ -55,25 +55,24 @@ fn main() -> ! {
     let cam_vsync = peripherals.GPIO6;
     let cam_href = peripherals.GPIO7;
     let cam_pclk = peripherals.GPIO13;
-    let cam_data_pins = RxEightBits::new(
-        peripherals.GPIO11,
-        peripherals.GPIO9,
-        peripherals.GPIO8,
-        peripherals.GPIO10,
-        peripherals.GPIO12,
-        peripherals.GPIO18,
-        peripherals.GPIO17,
-        peripherals.GPIO16,
-    );
 
     let cam_config = cam::Config::default().with_frequency(Rate::from_mhz(20));
 
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-    let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_data_pins, cam_config)
+    let camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, cam_config)
         .unwrap()
         .with_master_clock(cam_xclk)
         .with_pixel_clock(cam_pclk)
-        .with_ctrl_pins(cam_vsync, cam_href);
+        .with_vsync(cam_vsync)
+        .with_h_enable(cam_href)
+        .with_data0(peripherals.GPIO11)
+        .with_data1(peripherals.GPIO9)
+        .with_data2(peripherals.GPIO8)
+        .with_data3(peripherals.GPIO10)
+        .with_data4(peripherals.GPIO12)
+        .with_data5(peripherals.GPIO18)
+        .with_data6(peripherals.GPIO17)
+        .with_data7(peripherals.GPIO16);
 
     let delay = Delay::new();
 

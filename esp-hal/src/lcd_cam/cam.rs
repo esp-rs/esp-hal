@@ -16,7 +16,7 @@
 //! master mode.
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
-//! # use esp_hal::lcd_cam::{cam::{Camera, Config, RxEightBits}, LcdCam};
+//! # use esp_hal::lcd_cam::{cam::{Camera, Config}, LcdCam};
 //! # use esp_hal::dma_rx_stream_buffer;
 //!
 //! # let dma_buf = dma_rx_stream_buffer!(20 * 1000, 1000);
@@ -25,16 +25,6 @@
 //! let vsync_pin = peripherals.GPIO6;
 //! let href_pin = peripherals.GPIO7;
 //! let pclk_pin = peripherals.GPIO13;
-//! let data_pins = RxEightBits::new(
-//!     peripherals.GPIO11,
-//!     peripherals.GPIO9,
-//!     peripherals.GPIO8,
-//!     peripherals.GPIO10,
-//!     peripherals.GPIO12,
-//!     peripherals.GPIO18,
-//!     peripherals.GPIO17,
-//!     peripherals.GPIO16,
-//! );
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
@@ -42,12 +32,20 @@
 //! let mut camera = Camera::new(
 //!     lcd_cam.cam,
 //!     peripherals.DMA_CH0,
-//!     data_pins,
 //!     config,
 //! )?
 //! .with_master_clock(mclk_pin) // Remove this for slave mode
 //! .with_pixel_clock(pclk_pin)
-//! .with_ctrl_pins(vsync_pin, href_pin);
+//! .with_vsync(vsync_pin)
+//! .with_h_enable(href_pin)
+//! .with_data0(peripherals.GPIO11)
+//! .with_data1(peripherals.GPIO9)
+//! .with_data2(peripherals.GPIO8)
+//! .with_data3(peripherals.GPIO10)
+//! .with_data4(peripherals.GPIO12)
+//! .with_data5(peripherals.GPIO18)
+//! .with_data6(peripherals.GPIO17)
+//! .with_data7(peripherals.GPIO16);
 //!
 //! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
@@ -109,6 +107,22 @@ pub enum VsyncFilterThreshold {
     Eight,
 }
 
+/// Vsync/Hsync or Data Enable Mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum VhdeMode {
+    /// VSYNC + HSYNC mode is selected, in this mode,
+    /// the signals of VSYNC, HSYNC and DE are used to control the data.
+    /// For this case, users need to wire the three signal lines.
+    VsyncHsync,
+
+    /// DE mode is selected, the signals of VSYNC and
+    /// DE are used to control the data. For this case, wiring HSYNC signal
+    /// line is not a must. But in this case, the YUV-RGB conversion
+    /// function of camera module is not available.
+    De,
+}
+
 /// Vsync Filter Threshold
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -133,15 +147,11 @@ pub struct Camera<'d> {
 
 impl<'d> Camera<'d> {
     /// Creates a new `Camera` instance with DMA support.
-    pub fn new<P>(
+    pub fn new(
         cam: Cam<'d>,
         channel: impl RxChannelFor<LCD_CAM<'d>>,
-        _pins: P,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    where
-        P: RxPins + 'd,
-    {
+    ) -> Result<Self, ConfigError> {
         let rx_channel = ChannelRx::new(channel.degrade());
 
         let mut this = Self {
@@ -149,10 +159,6 @@ impl<'d> Camera<'d> {
             rx_channel,
             _guard: cam._guard,
         };
-
-        this.regs()
-            .cam_ctrl1()
-            .modify(|_, w| w.cam_2byte_en().bit(P::BUS_WIDTH == 2));
 
         this.apply_config(&config)?;
 
@@ -200,8 +206,10 @@ impl<'d> Camera<'d> {
                 w.cam_stop_en().clear_bit()
             }
         });
-        self.regs().cam_ctrl1().modify(|_, w| unsafe {
-            w.cam_vh_de_mode_en().set_bit();
+        self.regs().cam_ctrl1().write(|w| unsafe {
+            w.cam_2byte_en().bit(config.enable_2byte_mode);
+            w.cam_vh_de_mode_en()
+                .bit(matches!(config.vh_de_mode, VhdeMode::VsyncHsync));
             w.cam_rec_data_bytelen().bits(0);
             w.cam_line_int_num().bits(0);
             w.cam_vsync_filter_en()
@@ -244,50 +252,194 @@ impl<'d> Camera<'d> {
         self
     }
 
-    /// Configures the control pins for the camera interface (VSYNC and
-    /// HENABLE).
-    pub fn with_ctrl_pins(
-        self,
-        vsync: impl PeripheralInput<'d>,
-        h_enable: impl PeripheralInput<'d>,
-    ) -> Self {
-        let vsync = vsync.into();
-        let h_enable = h_enable.into();
+    /// Configures the Vertical Sync (VSYNC) pin for the camera interface.
+    pub fn with_vsync(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
 
-        vsync.init_input(Pull::None);
-        InputSignal::CAM_V_SYNC.connect_to(&vsync);
-        h_enable.init_input(Pull::None);
-        InputSignal::CAM_H_ENABLE.connect_to(&h_enable);
-
-        self.regs()
-            .cam_ctrl1()
-            .modify(|_, w| w.cam_vh_de_mode_en().clear_bit());
+        pin.init_input(Pull::None);
+        InputSignal::CAM_V_SYNC.connect_to(&pin);
 
         self
     }
 
-    /// Configures the control pins for the camera interface (VSYNC, HSYNC, and
-    /// HENABLE) with DE (data enable).
-    pub fn with_ctrl_pins_and_de(
-        self,
-        vsync: impl PeripheralInput<'d>,
-        hsync: impl PeripheralInput<'d>,
-        h_enable: impl PeripheralInput<'d>,
-    ) -> Self {
-        let vsync = vsync.into();
-        let hsync = hsync.into();
-        let h_enable = h_enable.into();
+    /// Configures the Horizontal Sync (HSYNC) pin for the camera interface.
+    pub fn with_hsync(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
 
-        vsync.init_input(Pull::None);
-        InputSignal::CAM_V_SYNC.connect_to(&vsync);
-        hsync.init_input(Pull::None);
-        InputSignal::CAM_H_SYNC.connect_to(&hsync);
-        h_enable.init_input(Pull::None);
-        InputSignal::CAM_H_ENABLE.connect_to(&h_enable);
+        pin.init_input(Pull::None);
+        InputSignal::CAM_H_SYNC.connect_to(&pin);
 
-        self.regs()
-            .cam_ctrl1()
-            .modify(|_, w| w.cam_vh_de_mode_en().set_bit());
+        self
+    }
+
+    /// Configures the Horizontal Enable (HENABLE) pin for the camera interface.
+    ///
+    /// Also known as "Data Enable".
+    pub fn with_h_enable(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_H_ENABLE.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 0 pin for the camera interface.
+    pub fn with_data0(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_0.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 1 pin for the camera interface.
+    pub fn with_data1(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_1.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 2 pin for the camera interface.
+    pub fn with_data2(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_2.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 3 pin for the camera interface.
+    pub fn with_data3(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_3.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 4 pin for the camera interface.
+    pub fn with_data4(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_4.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 5 pin for the camera interface.
+    pub fn with_data5(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_5.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 6 pin for the camera interface.
+    pub fn with_data6(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_6.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 7 pin for the camera interface.
+    pub fn with_data7(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_7.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 8 pin for the camera interface.
+    pub fn with_data8(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_8.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 9 pin for the camera interface.
+    pub fn with_data9(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_9.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 10 pin for the camera interface.
+    pub fn with_data10(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_10.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 11 pin for the camera interface.
+    pub fn with_data11(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_11.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 12 pin for the camera interface.
+    pub fn with_data12(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_12.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 13 pin for the camera interface.
+    pub fn with_data13(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_13.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 14 pin for the camera interface.
+    pub fn with_data14(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_14.connect_to(&pin);
+
+        self
+    }
+
+    /// Configures the DATA 15 pin for the camera interface.
+    pub fn with_data15(self, pin: impl PeripheralInput<'d>) -> Self {
+        let pin = pin.into();
+
+        pin.init_input(Pull::None);
+        InputSignal::CAM_DATA_15.connect_to(&pin);
 
         self
     }
@@ -456,115 +608,6 @@ impl<BUF: DmaRxBuffer> Drop for CameraTransfer<'_, BUF> {
     }
 }
 
-/// Represents an 8-bit wide camera data bus.
-/// Is used to configure the camera interface to receive 8-bit data.
-pub struct RxEightBits {
-    _pins: (),
-}
-
-impl RxEightBits {
-    #[allow(clippy::too_many_arguments)]
-    /// Creates a new instance of `RxEightBits`, configuring the specified pins
-    /// as the 8-bit data bus.
-    pub fn new<'d>(
-        pin_0: impl PeripheralInput<'d>,
-        pin_1: impl PeripheralInput<'d>,
-        pin_2: impl PeripheralInput<'d>,
-        pin_3: impl PeripheralInput<'d>,
-        pin_4: impl PeripheralInput<'d>,
-        pin_5: impl PeripheralInput<'d>,
-        pin_6: impl PeripheralInput<'d>,
-        pin_7: impl PeripheralInput<'d>,
-    ) -> Self {
-        let pairs = [
-            (pin_0.into(), InputSignal::CAM_DATA_0),
-            (pin_1.into(), InputSignal::CAM_DATA_1),
-            (pin_2.into(), InputSignal::CAM_DATA_2),
-            (pin_3.into(), InputSignal::CAM_DATA_3),
-            (pin_4.into(), InputSignal::CAM_DATA_4),
-            (pin_5.into(), InputSignal::CAM_DATA_5),
-            (pin_6.into(), InputSignal::CAM_DATA_6),
-            (pin_7.into(), InputSignal::CAM_DATA_7),
-        ];
-
-        for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None);
-            signal.connect_to(&pin);
-        }
-
-        Self { _pins: () }
-    }
-}
-
-impl RxPins for RxEightBits {
-    const BUS_WIDTH: usize = 1;
-}
-
-/// Represents a 16-bit wide camera data bus.
-/// Is used to configure the camera interface to receive 16-bit data.
-pub struct RxSixteenBits {
-    _pins: (),
-}
-
-impl RxSixteenBits {
-    #[allow(clippy::too_many_arguments)]
-    /// Creates a new instance of `RxSixteenBits`, configuring the specified
-    /// pins as the 16-bit data bus.
-    pub fn new<'d>(
-        pin_0: impl PeripheralInput<'d>,
-        pin_1: impl PeripheralInput<'d>,
-        pin_2: impl PeripheralInput<'d>,
-        pin_3: impl PeripheralInput<'d>,
-        pin_4: impl PeripheralInput<'d>,
-        pin_5: impl PeripheralInput<'d>,
-        pin_6: impl PeripheralInput<'d>,
-        pin_7: impl PeripheralInput<'d>,
-        pin_8: impl PeripheralInput<'d>,
-        pin_9: impl PeripheralInput<'d>,
-        pin_10: impl PeripheralInput<'d>,
-        pin_11: impl PeripheralInput<'d>,
-        pin_12: impl PeripheralInput<'d>,
-        pin_13: impl PeripheralInput<'d>,
-        pin_14: impl PeripheralInput<'d>,
-        pin_15: impl PeripheralInput<'d>,
-    ) -> Self {
-        let pairs = [
-            (pin_0.into(), InputSignal::CAM_DATA_0),
-            (pin_1.into(), InputSignal::CAM_DATA_1),
-            (pin_2.into(), InputSignal::CAM_DATA_2),
-            (pin_3.into(), InputSignal::CAM_DATA_3),
-            (pin_4.into(), InputSignal::CAM_DATA_4),
-            (pin_5.into(), InputSignal::CAM_DATA_5),
-            (pin_6.into(), InputSignal::CAM_DATA_6),
-            (pin_7.into(), InputSignal::CAM_DATA_7),
-            (pin_8.into(), InputSignal::CAM_DATA_8),
-            (pin_9.into(), InputSignal::CAM_DATA_9),
-            (pin_10.into(), InputSignal::CAM_DATA_10),
-            (pin_11.into(), InputSignal::CAM_DATA_11),
-            (pin_12.into(), InputSignal::CAM_DATA_12),
-            (pin_13.into(), InputSignal::CAM_DATA_13),
-            (pin_14.into(), InputSignal::CAM_DATA_14),
-            (pin_15.into(), InputSignal::CAM_DATA_15),
-        ];
-
-        for (pin, signal) in pairs.into_iter() {
-            pin.init_input(Pull::None);
-            signal.connect_to(&pin);
-        }
-
-        Self { _pins: () }
-    }
-}
-
-impl RxPins for RxSixteenBits {
-    const BUS_WIDTH: usize = 2;
-}
-
-#[doc(hidden)]
-pub trait RxPins {
-    const BUS_WIDTH: usize;
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Configuration settings for the Camera interface.
@@ -572,11 +615,17 @@ pub struct Config {
     /// The pixel clock frequency for the camera interface.
     frequency: Rate,
 
+    /// Enable 16 bit mode (instead of 8 bit).
+    enable_2byte_mode: bool,
+
     /// The byte order for the camera data.
     byte_order: ByteOrder,
 
     /// The bit order for the camera data.
     bit_order: BitOrder,
+
+    /// Vsync/Hsync or Data Enable Mode
+    vh_de_mode: VhdeMode,
 
     /// The Vsync filter threshold.
     vsync_filter_threshold: Option<VsyncFilterThreshold>,
@@ -586,8 +635,10 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             frequency: Rate::from_mhz(20),
+            enable_2byte_mode: false,
             byte_order: Default::default(),
             bit_order: Default::default(),
+            vh_de_mode: VhdeMode::De,
             vsync_filter_threshold: None,
         }
     }

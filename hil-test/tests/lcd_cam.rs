@@ -11,7 +11,7 @@ use esp_hal::{
     dma_buffers,
     gpio::Level,
     lcd_cam::{
-        cam::{self, Camera, RxEightBits},
+        cam::{self, Camera, VhdeMode},
         lcd::{
             dpi,
             dpi::{Dpi, Format, FrameTiming},
@@ -120,12 +120,23 @@ mod tests {
         let camera = Camera::new(
             lcd_cam.cam,
             rx_channel,
-            RxEightBits::new(d0_in, d1_in, d2_in, d3_in, d4_in, d5_in, d6_in, d7_in),
-            cam::Config::default().with_frequency(Rate::from_mhz(1)),
+            cam::Config::default()
+                .with_frequency(Rate::from_mhz(1))
+                .with_vh_de_mode(VhdeMode::VsyncHsync),
         )
         .unwrap()
-        .with_ctrl_pins_and_de(vsync_in, hsync_in, de_in)
-        .with_pixel_clock(pclk_in);
+        .with_vsync(vsync_in)
+        .with_hsync(hsync_in)
+        .with_h_enable(de_in)
+        .with_pixel_clock(pclk_in)
+        .with_data0(d0_in)
+        .with_data1(d1_in)
+        .with_data2(d2_in)
+        .with_data3(d3_in)
+        .with_data4(d4_in)
+        .with_data5(d5_in)
+        .with_data6(d6_in)
+        .with_data7(d7_in);
 
         let mut dma_tx_buf = ctx.dma_tx_buf;
         let mut dma_rx_buf = ctx.dma_rx_buf;
