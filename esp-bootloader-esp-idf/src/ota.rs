@@ -28,6 +28,11 @@ use embedded_storage::{ReadStorage, Storage};
 
 use crate::partitions::FlashRegion;
 
+// IN THEORY the partition table format allows up to 16 OTA-app partitions but
+// in reality the ESP-IDF bootloader only supports exactly two.
+//
+// See https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/ota.html
+// See https://github.com/espressif/esp-idf/blob/1c468f68259065ef51afd114605d9122f13d9d72/components/bootloader_support/src/bootloader_utility.c#L91-L116
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
 
@@ -189,9 +194,7 @@ where
             Slot::None
         } else if seq0 == 0xffffffff {
             Slot::Slot1
-        } else if seq1 == 0xffffffff {
-            Slot::Slot0
-        } else if seq0 > seq1 {
+        } else if seq1 == 0xffffffff || seq0 > seq1 {
             Slot::Slot0
         } else {
             Slot::Slot1
