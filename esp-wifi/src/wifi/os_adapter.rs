@@ -78,11 +78,11 @@ pub unsafe extern "C" fn env_is_chip() -> bool {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn set_intr(cpu_no: i32, intr_source: u32, intr_num: u32, intr_prio: i32) {
+    trace!(
+        "set_intr {} {} {} {}",
+        cpu_no, intr_source, intr_num, intr_prio
+    );
     unsafe {
-        trace!(
-            "set_intr {} {} {} {}",
-            cpu_no, intr_source, intr_num, intr_prio
-        );
         crate::wifi::os_adapter::os_adapter_chip_specific::set_intr(
             cpu_no,
             intr_source,
@@ -462,8 +462,8 @@ pub unsafe extern "C" fn queue_send_from_isr(
     item: *mut crate::binary::c_types::c_void,
     _hptw: *mut crate::binary::c_types::c_void,
 ) -> i32 {
+    trace!("queue_send_from_isr");
     unsafe {
-        trace!("queue_send_from_isr");
         *(_hptw as *mut u32) = 1;
         queue_send(queue, item, 1000)
     }
@@ -652,18 +652,18 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
     task_handle: *mut crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
+    trace!(
+        "task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
+        task_func,
+        unsafe {str_from_c(name as _)},
+        stack_depth,
+        param,
+        prio,
+        task_handle,
+        core_id
+    );
+    
     unsafe {
-        trace!(
-            "task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
-            task_func,
-            str_from_c(name as _),
-            stack_depth,
-            param,
-            prio,
-            task_handle,
-            core_id
-        );
-
         let task_func = core::mem::transmute::<
             *mut crate::binary::c_types::c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
@@ -868,39 +868,37 @@ pub unsafe extern "C" fn event_post(
     event_data_size: usize,
     ticks_to_wait: u32,
 ) -> i32 {
-    unsafe {
-        trace!(
-            "event_post {:?} {} {:?} {} {:?}",
-            event_base, event_id, event_data, event_data_size, ticks_to_wait
-        );
-        use num_traits::FromPrimitive;
+    trace!(
+        "event_post {:?} {} {:?} {} {:?}",
+        event_base, event_id, event_data, event_data_size, ticks_to_wait
+    );
+    use num_traits::FromPrimitive;
 
-        let event = unwrap!(WifiEvent::from_i32(event_id));
-        trace!("EVENT: {:?}", event);
+    let event = unwrap!(WifiEvent::from_i32(event_id));
+    trace!("EVENT: {:?}", event);
 
-        WIFI_EVENTS.with(|events| events.borrow_mut().insert(event));
-        let handled = super::event::dispatch_event_handler(event, event_data, event_data_size);
+    WIFI_EVENTS.with(|events| events.borrow_mut().insert(event));
+    let handled = super::event::dispatch_event_handler(event, event_data, event_data_size);
 
-        super::state::update_state(event, handled);
+    super::state::update_state(event, handled);
 
-        event.waker().wake();
+    event.waker().wake();
 
-        match event {
-            WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
-                crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
-            }
-
-            WifiEvent::ApStart | WifiEvent::ApStop => {
-                crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
-            }
-
-            _ => {}
+    match event {
+        WifiEvent::StaConnected | WifiEvent::StaDisconnected => {
+            crate::wifi::embassy::STA_LINK_STATE_WAKER.wake();
         }
 
-        memory_fence();
+        WifiEvent::ApStart | WifiEvent::ApStop => {
+            crate::wifi::embassy::AP_LINK_STATE_WAKER.wake();
+        }
 
-        0
+        _ => {}
     }
+
+    memory_fence();
+
+    0
 }
 
 /// **************************************************************************
@@ -917,11 +915,11 @@ pub unsafe extern "C" fn event_post(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn get_free_heap_size() -> u32 {
+    unsafe extern "C" {
+        fn esp_wifi_free_internal_heap() -> usize;
+    }
+    
     unsafe {
-        unsafe extern "C" {
-            fn esp_wifi_free_internal_heap() -> usize;
-        }
-
         esp_wifi_free_internal_heap() as u32
     }
 }
@@ -999,9 +997,9 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
+    trace!("phy_disable");
+    
     unsafe {
-        trace!("phy_disable");
-
         crate::common_adapter::chip_specific::phy_disable();
     }
 }
@@ -1020,10 +1018,10 @@ pub unsafe extern "C" fn phy_disable() {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn phy_enable() {
+    // quite some code needed here
+    trace!("phy_enable");
+    
     unsafe {
-        // quite some code needed here
-        trace!("phy_enable");
-
         crate::common_adapter::chip_specific::phy_enable();
     }
 }
@@ -1423,11 +1421,11 @@ pub unsafe extern "C" fn nvs_erase_key(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
+    trace!("get_random");
     unsafe {
-        trace!("get_random");
         crate::common_adapter::esp_fill_random(buf, len as u32);
-        0
     }
+        0
 }
 
 /// **************************************************************************
@@ -1653,8 +1651,8 @@ pub unsafe extern "C" fn wifi_realloc(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void {
+    trace!("wifi_calloc {} {}", n, size);
     unsafe {
-        trace!("wifi_calloc {} {}", n, size);
         calloc(n as u32, size) as *mut crate::binary::c_types::c_void
     }
 }
@@ -1716,8 +1714,8 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
+    trace!("wifi_delete_queue {:?}", queue);
     unsafe {
-        trace!("wifi_delete_queue {:?}", queue);
         if core::ptr::eq(queue, addr_of_mut!(QUEUE_HANDLE).cast()) {
             delete_queue(QUEUE_HANDLE);
         } else {

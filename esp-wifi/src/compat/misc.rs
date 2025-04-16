@@ -44,45 +44,43 @@ unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::
 // i.e. it assumes a FreeRTOS task calling it.
 #[unsafe(no_mangle)]
 unsafe extern "C" fn atoi(str: *const i8) -> i32 {
-    unsafe {
-        trace!("atoi {:?}", str);
+    trace!("atoi {:?}", str);
 
-        let mut sign: i32 = 1;
-        let mut res: i32 = 0;
-        let mut idx = 0;
+    let mut sign: i32 = 1;
+    let mut res: i32 = 0;
+    let mut idx = 0;
 
-        // skip leading spaces
-        while str.add(idx).read() as u8 == b' ' {
-            idx += 1;
-        }
-
-        // check sign
-        let c = str.add(idx).read() as u8;
-        if c == b'-' || c == b'+' {
-            if c == b'-' {
-                sign = -1;
-            }
-            idx += 1;
-        }
-
-        // parse number digit by digit
-        loop {
-            let c = str.add(idx).read() as u8;
-
-            if !c.is_ascii_digit() {
-                break;
-            }
-
-            // if the result would exceed the bounds - return max-value
-            if res > i32::MAX / 10 || (res == i32::MAX / 10 && c - b'0' > 7) {
-                return if sign == 1 { i32::MAX } else { i32::MIN };
-            }
-
-            res = 10 * res + (c - b'0') as i32;
-            idx += 1;
-        }
-        res * sign
+    // skip leading spaces
+    while str.add(idx).read() as u8 == b' ' {
+        idx += 1;
     }
+
+    // check sign
+    let c = str.add(idx).read() as u8;
+    if c == b'-' || c == b'+' {
+        if c == b'-' {
+            sign = -1;
+        }
+        idx += 1;
+    }
+
+    // parse number digit by digit
+    loop {
+        let c = str.add(idx).read() as u8;
+
+        if !c.is_ascii_digit() {
+            break;
+        }
+
+        // if the result would exceed the bounds - return max-value
+        if res > i32::MAX / 10 || (res == i32::MAX / 10 && c - b'0' > 7) {
+            return if sign == 1 { i32::MAX } else { i32::MIN };
+        }
+
+        res = 10 * res + (c - b'0') as i32;
+        idx += 1;
+    }
+    res * sign
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -101,33 +99,31 @@ struct Tm {
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
-    unsafe {
-        trace!("mktime {:?}", time);
-        let time = *time;
+    trace!("mktime {:?}", time);
+    let time = *time;
 
-        // Simplified implementation, ignoring time zones, leap seconds, and other
-        // complexities
-        let mut days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    // Simplified implementation, ignoring time zones, leap seconds, and other
+    // complexities
+    let mut days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-        let is_leap_year = |year: u32| year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let is_leap_year = |year: u32| year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
 
-        let mut days = 0;
-        let year = time.tm_year + 1900;
-        for y in 1970..year {
-            days += if is_leap_year(y) { 366 } else { 365 };
-        }
-
-        if is_leap_year(year) {
-            days_in_month[1] = 29;
-        }
-
-        for m in 0..time.tm_mon {
-            days += days_in_month[m as usize];
-        }
-        days += time.tm_mday - 1;
-
-        let seconds = days * 24 * 60 * 60 + time.tm_hour * 60 * 60 + time.tm_min * 60 + time.tm_sec;
-
-        seconds as i64
+    let mut days = 0;
+    let year = time.tm_year + 1900;
+    for y in 1970..year {
+        days += if is_leap_year(y) { 366 } else { 365 };
     }
+
+    if is_leap_year(year) {
+        days_in_month[1] = 29;
+    }
+
+    for m in 0..time.tm_mon {
+        days += days_in_month[m as usize];
+    }
+    days += time.tm_mday - 1;
+
+    let seconds = days * 24 * 60 * 60 + time.tm_hour * 60 * 60 + time.tm_min * 60 + time.tm_sec;
+
+    seconds as i64
 }

@@ -547,37 +547,35 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
 }
 
 pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    unsafe {
-        trace!("set_isr called {} {:?} {:?}", n, f, arg);
+    trace!("set_isr called {} {:?} {:?}", n, f, arg);
 
-        match n {
-            5 => {
-                ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-                unwrap!(interrupt::enable(
-                    Interrupt::RWBT,
-                    interrupt::Priority::Priority1
-                ));
-            }
-            7 => {
-                ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-            }
-            8 => {
-                ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-                unwrap!(interrupt::enable(
-                    Interrupt::BT_BB,
-                    interrupt::Priority::Priority1,
-                ));
-            }
-            _ => panic!("set_isr - unsupported interrupt number {}", n),
+    match n {
+        5 => {
+            ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            unwrap!(interrupt::enable(
+                Interrupt::RWBT,
+                interrupt::Priority::Priority1
+            ));
         }
-
-        0
+        7 => {
+            ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+        }
+        8 => {
+            ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            unwrap!(interrupt::enable(
+                Interrupt::BT_BB,
+                interrupt::Priority::Priority1,
+            ));
+        }
+        _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
+
+    0
 }
 
 pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
+    trace!("chip_ints_on esp32 {:b}", mask);
     unsafe {
-        trace!("chip_ints_on esp32 {:b}", mask);
         crate::hal::xtensa_lx::interrupt::enable_mask(mask);
     }
 }

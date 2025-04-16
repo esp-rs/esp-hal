@@ -131,28 +131,26 @@ impl RawQueue {
     }
 
     unsafe fn remove(&mut self, item: *mut c_void) {
-        unsafe {
-            // do what the ESP-IDF implementations does ...
-            // just remove all elements and add them back except the one we need to remove -
-            // good enough for now
-            let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
-            let count = self.count();
+        // do what the ESP-IDF implementations does ...
+        // just remove all elements and add them back except the one we need to remove -
+        // good enough for now
+        let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
+        let count = self.count();
 
-            if count == 0 {
-                return;
+        if count == 0 {
+            return;
+        }
+
+        let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
+        tmp_item.reserve_exact(self.item_size);
+        tmp_item.resize(self.item_size, 0);
+
+        for _ in 0..count {
+            if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
+                break;
             }
-
-            let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
-            tmp_item.reserve_exact(self.item_size);
-            tmp_item.resize(self.item_size, 0);
-
-            for _ in 0..count {
-                if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
-                    break;
-                }
-                if &tmp_item[..] != item_slice {
-                    self.enqueue(tmp_item.as_mut_ptr().cast());
-                }
+            if &tmp_item[..] != item_slice {
+                self.enqueue(tmp_item.as_mut_ptr().cast());
             }
         }
     }
@@ -175,17 +173,17 @@ pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
-    unsafe {
-        let mut len = 0;
-        loop {
+    let mut len = 0;
+    loop {
+        unsafe {
             if chars.offset(len).read_volatile() == 0 {
                 break;
             }
-            len += 1;
+        len += 1;
         }
-
-        len as usize
     }
+
+    len as usize
 }
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
@@ -407,26 +405,27 @@ pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 
 pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
 ) -> crate::binary::c_types::c_uint {
+    trace!("sleep");
+    
     unsafe {
-        trace!("sleep");
-
         usleep(seconds * 1_000);
-        0
     }
+    0
 }
 
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
 unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
-    unsafe {
-        trace!("usleep");
-        unsafe extern "C" {
-            fn esp_rom_delay_us(us: u32);
-        }
-        esp_rom_delay_us(us);
-        0
+    trace!("usleep");
+    unsafe extern "C" {
+        fn esp_rom_delay_us(us: u32);
     }
+    
+    unsafe {
+        esp_rom_delay_us(us);
+    }
+    0
 }
 
 #[unsafe(no_mangle)]

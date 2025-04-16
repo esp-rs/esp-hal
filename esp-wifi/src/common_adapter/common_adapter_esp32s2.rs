@@ -56,61 +56,57 @@ pub(crate) fn phy_mem_init() {
 }
 
 pub(crate) unsafe fn phy_enable() {
-    unsafe {
-        let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
-        if count == 0 {
-            critical_section::with(|_| {
-                super::phy_enable_clock();
+    let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
+    if count == 0 {
+        critical_section::with(|_| {
+            super::phy_enable_clock();
 
-                if !G_IS_PHY_CALIBRATED {
-                    let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
-                        [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
+            if !G_IS_PHY_CALIBRATED {
+                let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
+                    [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
-                    let init_data = &PHY_INIT_DATA_DEFAULT;
+                let init_data = &PHY_INIT_DATA_DEFAULT;
 
-                    register_chipv7_phy(
-                        init_data,
-                        &mut cal_data as *mut _
-                            as *mut crate::binary::include::esp_phy_calibration_data_t,
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-                    );
+                register_chipv7_phy(
+                    init_data,
+                    &mut cal_data as *mut _
+                        as *mut crate::binary::include::esp_phy_calibration_data_t,
+                    esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+                );
 
-                    G_IS_PHY_CALIBRATED = true;
-                } else {
-                    phy_wakeup_init();
-                    phy_digital_regs_load();
+                G_IS_PHY_CALIBRATED = true;
+            } else {
+                phy_wakeup_init();
+                phy_digital_regs_load();
+            }
+
+            #[cfg(feature = "ble")]
+            {
+                extern "C" {
+                    fn coex_pti_v2();
                 }
-
-                #[cfg(feature = "ble")]
-                {
-                    extern "C" {
-                        fn coex_pti_v2();
-                    }
-                    coex_pti_v2();
-                }
-            });
-        }
+                coex_pti_v2();
+            }
+        });
     }
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable() {
-    unsafe {
-        let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
-        if count == 1 {
-            critical_section::with(|_| {
-                phy_digital_regs_store();
-                // Disable PHY and RF.
-                phy_close_rf();
+    let count = PHY_ACCESS_REF.fetch_sub(1, Ordering::SeqCst);
+    if count == 1 {
+        critical_section::with(|_| {
+            phy_digital_regs_store();
+            // Disable PHY and RF.
+            phy_close_rf();
 
-                // Disable PHY temperature sensor
-                phy_xpd_tsens();
+            // Disable PHY temperature sensor
+            phy_xpd_tsens();
 
-                // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
-                // RNG
-                super::phy_disable_clock();
-            });
-        }
+            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+            // RNG
+            super::phy_disable_clock();
+        });
     }
 }
 
@@ -147,9 +143,9 @@ fn phy_digital_regs_store() {
 #[ram]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn phy_enter_critical() -> u32 {
+    trace!("phy_enter_critical");
+    
     unsafe {
-        trace!("phy_enter_critical");
-
         core::mem::transmute(critical_section::acquire())
     }
 }
@@ -170,9 +166,9 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
 #[ram]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn phy_exit_critical(level: u32) {
+    trace!("phy_exit_critical {}", level);
+    
     unsafe {
-        trace!("phy_exit_critical {}", level);
-
         critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
             level,
         ));

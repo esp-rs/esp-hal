@@ -86,12 +86,12 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     arg: *mut crate::binary::c_types::c_void,
     ret_handle: *mut *mut crate::binary::c_types::c_void,
 ) -> i32 {
+    trace!(
+        "esp_intr_alloc {} {} {:?} {:?} {:?}",
+        source, flags, handler, arg, ret_handle
+    );
+    
     unsafe {
-        trace!(
-            "esp_intr_alloc {} {} {:?} {:?} {:?}",
-            source, flags, handler, arg, ret_handle
-        );
-
         match source {
             4 => {
                 ISR_INTERRUPT_4 = (handler, arg);
@@ -109,9 +109,9 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
             }
             _ => panic!("Unexpected interrupt source {}", source),
         }
-
-        0
     }
+
+    0
 }
 
 pub(super) fn ble_rtc_clk_init() {

@@ -327,16 +327,16 @@ pub(crate) unsafe extern "C" fn interrupt_set(
     arg: *const (),
     ret_handle: *mut *const (),
 ) -> i32 {
+    trace!(
+        "interrupt_set {} {} {} {} {}",
+        cpu_no, intr_source, handler as usize, arg as u32, ret_handle as usize,
+    );
+    
     unsafe {
-        trace!(
-            "interrupt_set {} {} {} {} {}",
-            cpu_no, intr_source, handler as usize, arg as u32, ret_handle as usize,
-        );
-
         interrupt_handler_set(intr_source, handler, arg);
-
-        0
     }
+
+    0
 }
 
 pub(crate) unsafe extern "C" fn interrupt_clear(_handler: *const ()) -> i32 {
@@ -348,11 +348,11 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
     func: extern "C" fn(*const ()),
     arg: *const (),
 ) {
+    trace!(
+        "interrupt_handler_set {} {:?} {:?}",
+        interrupt_no, func, arg
+    );
     unsafe {
-        trace!(
-            "interrupt_handler_set {} {:?} {:?}",
-            interrupt_no, func, arg
-        );
         match interrupt_no {
             5 => {
                 BT_INTERRUPT_FUNCTION5 = (

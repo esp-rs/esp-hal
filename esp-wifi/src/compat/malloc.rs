@@ -17,36 +17,36 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn free(ptr: *mut u8) {
+    trace!("free {:?}", ptr);
+    
+    if ptr.is_null() {
+        warn!("Attempt to free null pointer");
+        return;
+    }
+    
+    unsafe extern "C" {
+        fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+    }
+    
     unsafe {
-        trace!("free {:?}", ptr);
-
-        if ptr.is_null() {
-            warn!("Attempt to free null pointer");
-            return;
-        }
-
-        unsafe extern "C" {
-            fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
-        }
-
         esp_wifi_deallocate_internal_ram(ptr);
     }
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
+    trace!("calloc {} {}", number, size);
+    
+    let total_size = number as usize * size;
     unsafe {
-        trace!("calloc {} {}", number, size);
-
-        let total_size = number as usize * size;
         let ptr = malloc(total_size);
-
+        
         if !ptr.is_null() {
             for i in 0..total_size as isize {
                 ptr.offset(i).write_volatile(0);
             }
         }
-
+        
         ptr
     }
 }
@@ -138,10 +138,10 @@ mod esp_alloc {
         }
 
         unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
+            unsafe extern "C" {
+                fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+            }
             unsafe {
-                unsafe extern "C" {
-                    fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
-                }
                 esp_wifi_deallocate_internal_ram(ptr.as_ptr());
             }
         }

@@ -133,55 +133,53 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
-    unsafe {
-        trace!("read_mac {:?} {}", mac, type_);
+    trace!("read_mac {:?} {}", mac, type_);
 
-        let base_mac = hal::efuse::Efuse::mac_address();
+    let base_mac = hal::efuse::Efuse::mac_address();
 
-        for (i, &byte) in base_mac.iter().enumerate() {
-            mac.add(i).write_volatile(byte);
-        }
-
-        // ESP_MAC_WIFI_SOFTAP
-        if type_ == 1 {
-            let tmp = mac.offset(0).read_volatile();
-            for i in 0..64 {
-                mac.offset(0).write_volatile(tmp | 0x02);
-                mac.offset(0)
-                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-                if mac.offset(0).read_volatile() != tmp {
-                    break;
-                }
-            }
-        }
-
-        // ESP_MAC_BT
-        if type_ == 2 {
-            let tmp = mac.offset(0).read_volatile();
-            for i in 0..64 {
-                mac.offset(0).write_volatile(tmp | 0x02);
-                mac.offset(0)
-                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-                if mac.offset(0).read_volatile() != tmp {
-                    break;
-                }
-            }
-
-            mac.offset(5)
-                .write_volatile(mac.offset(5).read_volatile() + 1);
-        }
-
-        0
+    for (i, &byte) in base_mac.iter().enumerate() {
+        mac.add(i).write_volatile(byte);
     }
+
+    // ESP_MAC_WIFI_SOFTAP
+    if type_ == 1 {
+        let tmp = mac.offset(0).read_volatile();
+        for i in 0..64 {
+            mac.offset(0).write_volatile(tmp | 0x02);
+            mac.offset(0)
+                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
+
+            if mac.offset(0).read_volatile() != tmp {
+                break;
+            }
+        }
+    }
+
+    // ESP_MAC_BT
+    if type_ == 2 {
+        let tmp = mac.offset(0).read_volatile();
+        for i in 0..64 {
+            mac.offset(0).write_volatile(tmp | 0x02);
+            mac.offset(0)
+                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
+
+            if mac.offset(0).read_volatile() != tmp {
+                break;
+            }
+        }
+
+        mac.offset(5)
+            .write_volatile(mac.offset(5).read_volatile() + 1);
+    }
+
+    0
 }
 
 #[allow(unused)]
 #[ram]
 pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *const ()) -> i32 {
+    trace!("sem take from isr");
     unsafe {
-        trace!("sem take from isr");
         (hptw as *mut u32).write_volatile(0);
         crate::common_adapter::semphr_take(sem as *mut crate::binary::c_types::c_void, 0)
     }
@@ -190,8 +188,8 @@ pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *cons
 #[allow(unused)]
 #[ram]
 pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *const ()) -> i32 {
+    trace!("sem give from isr");
     unsafe {
-        trace!("sem give from isr");
         (hptw as *mut u32).write_volatile(0);
         crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void)
     }
@@ -226,7 +224,7 @@ pub unsafe extern "C" fn __assert_func(
             (", function: ", str_from_c(func))
         };
         let expr = str_from_c(failed_expr);
-
+        
         panic!(
             "assertion \"{}\" failed: file \"{}\", line {}{}{}",
             expr, file, line, func_pre, func
@@ -295,10 +293,10 @@ pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
+    trace!("esp_fill_random");
     unsafe {
-        trace!("esp_fill_random");
         let dst = core::slice::from_raw_parts_mut(dst, len as usize);
-
+        
         // stealing RNG is safe since we own it (passed into `init`)
         let mut rng = esp_hal::rng::Rng::new(esp_hal::peripherals::RNG::steal());
         for chunk in dst.chunks_mut(4) {

@@ -94,28 +94,26 @@ static mut INTERRUPT_DISABLE_CNT: usize = 0;
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
-    unsafe {
-        INTERRUPT_DISABLE_CNT -= 1;
-        let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
-        trace!("interrupt_enable {}", flags);
-        critical_section::release(core::mem::transmute::<
-            InterruptsFlagType,
-            critical_section::RestoreState,
-        >(flags));
-    }
+    INTERRUPT_DISABLE_CNT -= 1;
+    let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
+    trace!("interrupt_enable {}", flags);
+    critical_section::release(core::mem::transmute::<
+        InterruptsFlagType,
+        critical_section::RestoreState,
+    >(flags));
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
-    unsafe {
-        trace!("interrupt_disable");
+    trace!("interrupt_disable");
+    unsafe { 
         let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
             critical_section::acquire(),
         );
-        G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
-        INTERRUPT_DISABLE_CNT += 1;
-        trace!("interrupt_disable {}", flags);
     }
+    G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
+    INTERRUPT_DISABLE_CNT += 1;
+    trace!("interrupt_disable {}", flags);
 }
 
 #[ram]
@@ -190,10 +188,10 @@ unsafe extern "C" fn queue_send_from_isr(
     _item: *const (),
     _hptw: *const (),
 ) -> i32 {
+    trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
+    // Force to set the value to be false
+    *(_hptw as *mut bool) = false;
     unsafe {
-        trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
-        // Force to set the value to be false
-        *(_hptw as *mut bool) = false;
         queue_send(_queue, _item, 0)
     }
 }
@@ -226,21 +224,26 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     unsafe {
         let n = str_from_c(name);
-        trace!(
-            "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
-            func, name, n, stack_depth, param, prio, handle, core_id
-        );
+    }
+    trace!(
+        "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
+        func, name, n, stack_depth, param, prio, handle, core_id
+    );
 
+    unsafe {
         let task_func = core::mem::transmute::<
             *mut crate::binary::c_types::c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
-
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
-        *(handle as *mut usize) = task as usize;
-
-        1
     }
+
+    unsafe {
+        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+    }
+    
+    *(handle as *mut usize) = task as usize;
+
+    1
 }
 
 unsafe extern "C" fn task_delete(task: *const ()) {
@@ -282,8 +285,8 @@ unsafe extern "C" fn srand(seed: u32) {
 #[allow(unused)]
 #[ram]
 unsafe extern "C" fn rand() -> i32 {
+    trace!("rand");
     unsafe {
-        trace!("rand");
         crate::common_adapter::random() as i32
     }
 }
