@@ -26,7 +26,27 @@
 // MUST be the first module
 mod fmt;
 
+#[cfg(not(feature = "std"))]
+mod rom;
+#[cfg(not(feature = "std"))]
+pub(crate) use rom as crypto;
+
+#[cfg(feature = "std")]
+mod non_rom;
+#[cfg(feature = "std")]
+pub(crate) use non_rom as crypto;
+
 pub mod partitions;
+
+pub mod ota;
+
+// We run tests on the host which happens to be MacOS machines and mach-o
+// doesn't like `link-sections` this way
+#[cfg(not(target_os = "macos"))]
+#[link_section = ".espressif.metadata"]
+#[used]
+#[export_name = "bootloader.NAME"]
+static OTA_FEATURE: [u8; 7] = *b"ESP-IDF";
 
 /// ESP-IDF compatible application descriptor
 ///
