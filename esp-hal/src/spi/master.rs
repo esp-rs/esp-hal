@@ -1865,17 +1865,15 @@ mod dma {
             bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
-            unsafe {
-                self.driver().setup_half_duplex(
-                    false,
-                    cmd,
-                    address,
-                    false,
-                    dummy,
-                    bytes_to_read == 0,
-                    data_mode,
-                )?;
-            }
+            self.driver().setup_half_duplex(
+                false,
+                cmd,
+                address,
+                false,
+                dummy,
+                bytes_to_read == 0,
+                data_mode,
+            )?;
 
             self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
         }

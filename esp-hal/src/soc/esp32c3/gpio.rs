@@ -207,13 +207,13 @@ macro_rules! rtc_pins {
         $(
             paste::paste! {
                 impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
-                    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) { unsafe {
+                    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                         let rtc_cntl = $crate::peripherals::LPWR::regs();
                         let gpio_wakeup = rtc_cntl.gpio_wakeup();
 
                         gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
                         gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
-                    }}
+                    }
 
                     fn rtcio_pad_hold(&self, enable: bool) {
                         $crate::peripherals::LPWR::regs()

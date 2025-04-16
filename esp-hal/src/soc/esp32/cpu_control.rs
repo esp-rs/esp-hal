@@ -153,26 +153,24 @@ pub struct CpuControl<'d> {
 }
 
 unsafe fn internal_park_core(core: Cpu, park: bool) {
-    unsafe {
-        let c1_value = if park { 0x21 } else { 0 };
-        let c0_value = if park { 0x02 } else { 0 };
-        match core {
-            Cpu::ProCpu => {
-                LPWR::regs()
-                    .sw_cpu_stall()
-                    .modify(|_, w| w.sw_stall_procpu_c1().bits(c1_value));
-                LPWR::regs()
-                    .options0()
-                    .modify(|_, w| w.sw_stall_procpu_c0().bits(c0_value));
-            }
-            Cpu::AppCpu => {
-                LPWR::regs()
-                    .sw_cpu_stall()
-                    .modify(|_, w| w.sw_stall_appcpu_c1().bits(c1_value));
-                LPWR::regs()
-                    .options0()
-                    .modify(|_, w| w.sw_stall_appcpu_c0().bits(c0_value));
-            }
+    let c1_value = if park { 0x21 } else { 0 };
+    let c0_value = if park { 0x02 } else { 0 };
+    match core {
+        Cpu::ProCpu => {
+            LPWR::regs()
+                .sw_cpu_stall()
+                .modify(|_, w| w.sw_stall_procpu_c1().bits(c1_value));
+            LPWR::regs()
+                .options0()
+                .modify(|_, w| w.sw_stall_procpu_c0().bits(c0_value));
+        }
+        Cpu::AppCpu => {
+            LPWR::regs()
+                .sw_cpu_stall()
+                .modify(|_, w| w.sw_stall_appcpu_c1().bits(c1_value));
+            LPWR::regs()
+                .options0()
+                .modify(|_, w| w.sw_stall_appcpu_c0().bits(c0_value));
         }
     }
 }
@@ -276,32 +274,30 @@ impl<'d> CpuControl<'d> {
     where
         F: FnOnce(),
     {
-        unsafe {
-            // disables interrupts
-            xtensa_lx::interrupt::set_mask(0);
+        // disables interrupts
+        xtensa_lx::interrupt::set_mask(0);
 
-            // reset cycle compare registers
-            xtensa_lx::timer::set_ccompare0(0);
-            xtensa_lx::timer::set_ccompare1(0);
-            xtensa_lx::timer::set_ccompare2(0);
+        // reset cycle compare registers
+        xtensa_lx::timer::set_ccompare0(0);
+        xtensa_lx::timer::set_ccompare1(0);
+        xtensa_lx::timer::set_ccompare2(0);
 
-            unsafe extern "C" {
-                static mut _init_start: u32;
-            }
-
-            // move vec table
-            let base = core::ptr::addr_of!(_init_start);
-            core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
-
-            // switch to new stack
-            xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
-
-            // Trampoline to run from the new stack.
-            // start_core1_run should _NEVER_ be inlined
-            // as we rely on the function call to use
-            // the new stack.
-            Self::start_core1_run::<F>()
+        unsafe extern "C" {
+            static mut _init_start: u32;
         }
+
+        // move vec table
+        let base = core::ptr::addr_of!(_init_start);
+        core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+
+        // switch to new stack
+        xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
+
+        // Trampoline to run from the new stack.
+        // start_core1_run should _NEVER_ be inlined
+        // as we rely on the function call to use
+        // the new stack.
+        Self::start_core1_run::<F>()
     }
 
     /// Run the core1 closure.
@@ -310,18 +306,16 @@ impl<'d> CpuControl<'d> {
     where
         F: FnOnce(),
     {
-        unsafe {
-            #[allow(static_mut_refs)] // FIXME
-            match START_CORE1_FUNCTION.take() {
-                Some(entry) => {
-                    let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
-                    entry();
-                    loop {
-                        internal_park_core(Cpu::current(), true);
-                    }
+        #[allow(static_mut_refs)] // FIXME
+        match START_CORE1_FUNCTION.take() {
+            Some(entry) => {
+                let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
+                entry();
+                loop {
+                    internal_park_core(Cpu::current(), true);
                 }
-                None => panic!("No start function set"),
             }
+            None => panic!("No start function set"),
         }
     }
 

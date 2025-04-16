@@ -1894,46 +1894,44 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        unsafe {
-            // We check each descriptor buffer that points to PSRAM for
-            // alignment and invalidate the cache for that buffer.
-            // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
-            // not. TRM section 3.4.9
-            // Note that DmaBuffer implementations are required to do this for us.
-            cfg_if::cfg_if! {
-                if #[cfg(psram_dma)] {
-                    let mut uses_psram = false;
-                    let psram_range = crate::soc::psram_range();
-                    for des in chain.descriptors.iter() {
-                        // we are forcing the DMA alignment to the cache line size
-                        // required when we are using dcache
-                        let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-                        if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
-                            uses_psram = true;
-                            // both the size and address of the buffer must be aligned
-                            if des.buffer as usize % alignment != 0 {
-                                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
-                            }
-                            if des.size() % alignment != 0 {
-                                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
-                            }
-                            crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+        // We check each descriptor buffer that points to PSRAM for
+        // alignment and invalidate the cache for that buffer.
+        // NOTE: for RX the `buffer` and `size` need to be aligned but the `len` does
+        // not. TRM section 3.4.9
+        // Note that DmaBuffer implementations are required to do this for us.
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                let mut uses_psram = false;
+                let psram_range = crate::soc::psram_range();
+                for des in chain.descriptors.iter() {
+                    // we are forcing the DMA alignment to the cache line size
+                    // required when we are using dcache
+                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
+                        uses_psram = true;
+                        // both the size and address of the buffer must be aligned
+                        if des.buffer as usize % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
                         }
+                        if des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
+                        }
+                        crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
                     }
                 }
             }
-
-            let preparation = Preparation {
-                start: chain.first().cast_mut(),
-                direction: TransferDirection::In,
-                #[cfg(psram_dma)]
-                accesses_psram: uses_psram,
-                burst_transfer: BurstConfig::default(),
-                check_owner: Some(false),
-                auto_write_back: true,
-            };
-            self.do_prepare(preparation, peri)
         }
+
+        let preparation = Preparation {
+            start: chain.first().cast_mut(),
+            direction: TransferDirection::In,
+            #[cfg(psram_dma)]
+            accesses_psram: uses_psram,
+            burst_transfer: BurstConfig::default(),
+            check_owner: Some(false),
+            auto_write_back: true,
+        };
+        self.do_prepare(preparation, peri)
     }
 
     pub(crate) unsafe fn prepare_transfer<BUF: DmaRxBuffer>(
@@ -2161,50 +2159,48 @@ where
         peri: DmaPeripheral,
         chain: &DescriptorChain,
     ) -> Result<(), DmaError> {
-        unsafe {
-            // Based on the ESP32-S3 TRM the alignment check is not needed for TX
+        // Based on the ESP32-S3 TRM the alignment check is not needed for TX
 
-            // We check each descriptor buffer that points to PSRAM for
-            // alignment and writeback the cache for that buffer.
-            // Note that DmaBuffer implementations are required to do this for us.
-            #[cfg(psram_dma)]
-            cfg_if::cfg_if! {
-                if #[cfg(psram_dma)] {
-                    let mut uses_psram = false;
-                    let psram_range = crate::soc::psram_range();
-                    for des in chain.descriptors.iter() {
-                        // we are forcing the DMA alignment to the cache line size
-                        // required when we are using dcache
-                        let alignment = crate::soc::cache_get_dcache_line_size() as usize;
-                        if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
-                            uses_psram = true;
-                            // both the size and address of the buffer must be aligned
-                            if des.buffer as usize % alignment != 0 {
-                                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
-                            }
-                            if des.size() % alignment != 0 {
-                                return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
-                            }
-                            crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+        // We check each descriptor buffer that points to PSRAM for
+        // alignment and writeback the cache for that buffer.
+        // Note that DmaBuffer implementations are required to do this for us.
+        #[cfg(psram_dma)]
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)] {
+                let mut uses_psram = false;
+                let psram_range = crate::soc::psram_range();
+                for des in chain.descriptors.iter() {
+                    // we are forcing the DMA alignment to the cache line size
+                    // required when we are using dcache
+                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
+                        uses_psram = true;
+                        // both the size and address of the buffer must be aligned
+                        if des.buffer as usize % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
                         }
+                        if des.size() % alignment != 0 {
+                            return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
+                        }
+                        crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
                     }
                 }
             }
-
-            let preparation = Preparation {
-                start: chain.first().cast_mut(),
-                direction: TransferDirection::Out,
-                #[cfg(psram_dma)]
-                accesses_psram: uses_psram,
-                burst_transfer: BurstConfig::default(),
-                check_owner: Some(false),
-                // enable descriptor write back in circular mode
-                auto_write_back: !(*chain.last()).next.is_null(),
-            };
-            self.do_prepare(preparation, peri)?;
-
-            Ok(())
         }
+
+        let preparation = Preparation {
+            start: chain.first().cast_mut(),
+            direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: uses_psram,
+            burst_transfer: BurstConfig::default(),
+            check_owner: Some(false),
+            // enable descriptor write back in circular mode
+            auto_write_back: !(*chain.last()).next.is_null(),
+        };
+        self.do_prepare(preparation, peri)?;
+
+        Ok(())
     }
 
     pub(crate) unsafe fn prepare_transfer<BUF: DmaTxBuffer>(

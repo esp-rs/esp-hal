@@ -465,48 +465,46 @@ pub mod dma {
             tx_buffer: &mut impl DmaTxBuffer,
             channel: &mut Channel<Dm, PeripheralDmaChannel<AnySpi<'_>>>,
         ) -> Result<(), Error> {
-            unsafe {
-                self.enable_dma();
+            self.enable_dma();
 
-                self.info.reset_spi();
+            self.info.reset_spi();
 
-                if read_buffer_len > 0 {
-                    channel
-                        .rx
-                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
-                }
-
-                if write_buffer_len > 0 {
-                    channel
-                        .tx
-                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
-                }
-
-                #[cfg(esp32)]
-                self.info
-                    .prepare_length_and_lines(read_buffer_len, write_buffer_len);
-
-                self.reset_dma_before_usr_cmd();
-
-                #[cfg(not(esp32))]
-                self.regs()
-                    .dma_conf()
-                    .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
-
-                self.clear_dma_interrupts();
-                self.info.setup_for_flush();
-                self.regs().cmd().modify(|_, w| w.usr().set_bit());
-
-                if read_buffer_len > 0 {
-                    channel.rx.start_transfer()?;
-                }
-
-                if write_buffer_len > 0 {
-                    channel.tx.start_transfer()?;
-                }
-
-                Ok(())
+            if read_buffer_len > 0 {
+                channel
+                    .rx
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)?;
             }
+
+            if write_buffer_len > 0 {
+                channel
+                    .tx
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+            }
+
+            #[cfg(esp32)]
+            self.info
+                .prepare_length_and_lines(read_buffer_len, write_buffer_len);
+
+            self.reset_dma_before_usr_cmd();
+
+            #[cfg(not(esp32))]
+            self.regs()
+                .dma_conf()
+                .modify(|_, w| w.dma_slv_seg_trans_en().clear_bit());
+
+            self.clear_dma_interrupts();
+            self.info.setup_for_flush();
+            self.regs().cmd().modify(|_, w| w.usr().set_bit());
+
+            if read_buffer_len > 0 {
+                channel.rx.start_transfer()?;
+            }
+
+            if write_buffer_len > 0 {
+                channel.tx.start_transfer()?;
+            }
+
+            Ok(())
         }
 
         fn reset_dma_before_usr_cmd(&self) {

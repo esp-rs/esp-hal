@@ -198,12 +198,12 @@ macro_rules! lp_gpio {
     ) => {
         $(
             impl $crate::gpio::RtcPin for paste::paste!($crate::peripherals::[<GPIO $gpionum>]<'_>) {
-                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) { unsafe {
+                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.pin($gpionum).modify(|_, w| {
                         w.wakeup_enable().bit(wakeup).int_type().bits(level)
                     });
-                }}
+                }
 
                 fn rtcio_pad_hold(&self, enable: bool) {
                     let mask = 1 << $gpionum;
