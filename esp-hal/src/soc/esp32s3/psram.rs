@@ -828,7 +828,7 @@ pub(crate) mod utils {
     const SPI_MEM_SCLKCNT_L_S: u32 = 0;
     const ESP_ROM_SPIFLASH_OPI_DTR_MODE: u8 = 7;
 
-    extern "C" {
+    unsafe extern "C" {
         // @brief To execute a flash operation command
         // @param spi_num spi port
         // @param mode Flash Read Mode
