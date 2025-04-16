@@ -655,14 +655,14 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
     trace!(
         "task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
         task_func,
-        unsafe {str_from_c(name as _)},
+        unsafe { str_from_c(name as _) },
         stack_depth,
         param,
         prio,
         task_handle,
         core_id
     );
-    
+
     unsafe {
         let task_func = core::mem::transmute::<
             *mut crate::binary::c_types::c_void,
@@ -918,10 +918,8 @@ pub unsafe extern "C" fn get_free_heap_size() -> u32 {
     unsafe extern "C" {
         fn esp_wifi_free_internal_heap() -> usize;
     }
-    
-    unsafe {
-        esp_wifi_free_internal_heap() as u32
-    }
+
+    unsafe { esp_wifi_free_internal_heap() as u32 }
 }
 
 /// **************************************************************************
@@ -998,7 +996,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-    
+
     unsafe {
         crate::common_adapter::chip_specific::phy_disable();
     }
@@ -1020,7 +1018,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    
+
     unsafe {
         crate::common_adapter::chip_specific::phy_enable();
     }
@@ -1425,7 +1423,7 @@ pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::
     unsafe {
         crate::common_adapter::esp_fill_random(buf, len as u32);
     }
-        0
+    0
 }
 
 /// **************************************************************************
@@ -1652,9 +1650,7 @@ pub unsafe extern "C" fn wifi_realloc(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void {
     trace!("wifi_calloc {} {}", n, size);
-    unsafe {
-        calloc(n as u32, size) as *mut crate::binary::c_types::c_void
-    }
+    unsafe { calloc(n as u32, size) as *mut crate::binary::c_types::c_void }
 }
 
 /// **************************************************************************

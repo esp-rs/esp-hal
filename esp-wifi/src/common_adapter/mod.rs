@@ -224,7 +224,7 @@ pub unsafe extern "C" fn __assert_func(
             (", function: ", str_from_c(func))
         };
         let expr = str_from_c(failed_expr);
-        
+
         panic!(
             "assertion \"{}\" failed: file \"{}\", line {}{}{}",
             expr, file, line, func_pre, func
@@ -296,7 +296,7 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");
     unsafe {
         let dst = core::slice::from_raw_parts_mut(dst, len as usize);
-        
+
         // stealing RNG is safe since we own it (passed into `init`)
         let mut rng = esp_hal::rng::Rng::new(esp_hal::peripherals::RNG::steal());
         for chunk in dst.chunks_mut(4) {

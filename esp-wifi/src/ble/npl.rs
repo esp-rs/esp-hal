@@ -372,9 +372,7 @@ unsafe extern "C" fn ecc_gen_key_pair(_: *const u8, _: *const u8) -> i32 {
 
 unsafe extern "C" fn os_random() -> u32 {
     trace!("os_random");
-    unsafe {
-        (crate::common_adapter::random() & u32::MAX) as u32
-    }
+    unsafe { (crate::common_adapter::random() & u32::MAX) as u32 }
 }
 
 unsafe extern "C" fn task_create(
@@ -387,7 +385,7 @@ unsafe extern "C" fn task_create(
     core_id: u32,
 ) -> i32 {
     unsafe {
-        let name_str = str_from_c(name)
+        let name_str = str_from_c(name);
     };
 
     trace!(
@@ -712,9 +710,9 @@ unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
 
 unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     trace!("ble_npl_callout_stop {:?}", callout);
-    
+
     assert!((*callout).dummy != 0);
-    
+
     let co = (*callout).dummy as *mut Callout;
     unsafe {
         // stop timer
@@ -733,7 +731,7 @@ unsafe extern "C" fn ble_npl_callout_reset(
         // start timer
         compat::timer_compat::compat_timer_arm(addr_of_mut!((*co).timer_handle), time, false);
     }
-        0
+    0
 }
 
 unsafe extern "C" fn ble_npl_sem_get_count(_sem: *const ble_npl_sem) -> u16 {
@@ -816,11 +814,11 @@ unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
 
 unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
     trace!("ble_npl_event_deinit {:?}", event);
-    
+
     let event = event as *mut ble_npl_event;
     let evt = (*event).dummy as *mut Event;
     assert!(!evt.is_null());
-    
+
     unsafe {
         crate::compat::malloc::free(evt.cast());
     }
@@ -834,7 +832,7 @@ unsafe extern "C" fn ble_npl_event_init(
     arg: *const c_void,
 ) {
     trace!("ble_npl_event_init {:?} {:?} {:?}", event, func, arg);
-    
+
     if (*event).dummy == 0 {
         unsafe {
             let evt = crate::compat::malloc::calloc(1, core::mem::size_of::<Event>()) as *mut Event;
@@ -859,10 +857,10 @@ unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bo
 
 unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
     trace!("ble_npl_event_run {:?}", event);
-    
+
     let evt = (*event).dummy as *mut Event;
     assert!(!evt.is_null());
-    
+
     trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
     unsafe {
         let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
@@ -937,10 +935,10 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
 unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     trace!("ble_npl_eventq_deinit {:?}", queue);
-    
+
     let queue = queue.cast_mut();
     assert!((*queue).dummy != 0);
-    
+
     let real_queue = (*queue).dummy as *mut ConcurrentQueue;
     unsafe {
         core::ptr::drop_in_place(real_queue);
@@ -980,7 +978,7 @@ unsafe extern "C" fn ble_npl_callout_init(
 unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
     trace!("callout_timer_callback_wrapper {:?}", arg);
     let co = (*(arg as *mut ble_npl_callout)).dummy as *mut Callout;
-    
+
     unsafe {
         if !(*co).eventq.is_null() {
             ble_npl_eventq_put(addr_of!((*co).eventq).cast(), addr_of!((*co).events));

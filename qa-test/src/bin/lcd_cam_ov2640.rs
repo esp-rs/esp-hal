@@ -35,7 +35,6 @@ use esp_hal::{
         master::{Config, I2c},
     },
     lcd_cam::{
-        cam::{self, Camera},
         LcdCam,
         cam::{self, Camera, RxEightBits},
     },

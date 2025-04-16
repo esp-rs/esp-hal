@@ -90,7 +90,7 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",
         source, flags, handler, arg, ret_handle
     );
-    
+
     unsafe {
         match source {
             3 => {
@@ -110,7 +110,7 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
             _ => panic!("Unexpected interrupt source {}", source),
         }
     }
-    
+
     0
 }
 

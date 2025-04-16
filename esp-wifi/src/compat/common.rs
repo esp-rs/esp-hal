@@ -179,7 +179,7 @@ unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
             if chars.offset(len).read_volatile() == 0 {
                 break;
             }
-        len += 1;
+            len += 1;
         }
     }
 
@@ -406,7 +406,7 @@ pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
 ) -> crate::binary::c_types::c_uint {
     trace!("sleep");
-    
+
     unsafe {
         usleep(seconds * 1_000);
     }
@@ -421,7 +421,7 @@ unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
     unsafe extern "C" {
         fn esp_rom_delay_us(us: u32);
     }
-    
+
     unsafe {
         esp_rom_delay_us(us);
     }

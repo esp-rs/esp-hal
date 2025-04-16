@@ -30,7 +30,7 @@ pub(crate) unsafe extern "C" fn set_intr(
         fn intr_matrix_set(cpu_no: u32, model_num: u32, intr_num: u32);
     }
     unsafe {
-    // Force to bind WiFi interrupt to CPU0
+        // Force to bind WiFi interrupt to CPU0
         intr_matrix_set(0, intr_source, intr_num);
     }
 }

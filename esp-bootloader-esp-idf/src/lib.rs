@@ -43,9 +43,9 @@ pub mod ota;
 // We run tests on the host which happens to be MacOS machines and mach-o
 // doesn't like `link-sections` this way
 #[cfg(not(target_os = "macos"))]
-#[link_section = ".espressif.metadata"]
+#[unsafe(link_section = ".espressif.metadata")]
 #[used]
-#[export_name = "bootloader.NAME"]
+#[unsafe(export_name = "bootloader.NAME")]
 static OTA_FEATURE: [u8; 7] = *b"ESP-IDF";
 
 /// ESP-IDF compatible application descriptor

@@ -106,7 +106,7 @@ unsafe extern "C" fn interrupt_enable() {
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    unsafe { 
+    unsafe {
         let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
             critical_section::acquire(),
         );
@@ -191,9 +191,7 @@ unsafe extern "C" fn queue_send_from_isr(
     trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
     // Force to set the value to be false
     *(_hptw as *mut bool) = false;
-    unsafe {
-        queue_send(_queue, _item, 0)
-    }
+    unsafe { queue_send(_queue, _item, 0) }
 }
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
@@ -240,7 +238,7 @@ unsafe extern "C" fn task_create(
     unsafe {
         let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
     }
-    
+
     *(handle as *mut usize) = task as usize;
 
     1
@@ -286,9 +284,7 @@ unsafe extern "C" fn srand(seed: u32) {
 #[ram]
 unsafe extern "C" fn rand() -> i32 {
     trace!("rand");
-    unsafe {
-        crate::common_adapter::random() as i32
-    }
+    unsafe { crate::common_adapter::random() as i32 }
 }
 
 #[ram]

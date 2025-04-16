@@ -7,7 +7,7 @@ pub mod timer_compat;
 unsafe extern "C" fn _putchar(c: u8) {
     static mut BUFFER: [u8; 256] = [0u8; 256];
     static mut IDX: usize = 0;
-    
+
     unsafe {
         let buffer = core::ptr::addr_of_mut!(BUFFER);
         if c == 0 || c == b'\n' || IDX == (*buffer).len() - 1 {

@@ -6,7 +6,7 @@ impl Crc32 {
     }
 
     pub fn crc(&self, data: &[u8]) -> u32 {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_crc32_le(crc: u32, buf: *const u8, len: u32) -> u32;
         }
 

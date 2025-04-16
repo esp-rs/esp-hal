@@ -144,10 +144,8 @@ fn phy_digital_regs_store() {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn phy_enter_critical() -> u32 {
     trace!("phy_enter_critical");
-    
-    unsafe {
-        core::mem::transmute(critical_section::acquire())
-    }
+
+    unsafe { core::mem::transmute(critical_section::acquire()) }
 }
 
 /// **************************************************************************
@@ -167,7 +165,7 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn phy_exit_critical(level: u32) {
     trace!("phy_exit_critical {}", level);
-    
+
     unsafe {
         critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
             level,
