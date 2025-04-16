@@ -284,164 +284,93 @@ impl<'d> Camera<'d> {
         self
     }
 
-    /// Configures the DATA 0 pin for the camera interface.
-    pub fn with_data0(self, pin: impl PeripheralInput<'d>) -> Self {
+    fn with_data_pin(self, signal: InputSignal, pin: impl PeripheralInput<'d>) -> Self {
         let pin = pin.into();
 
         pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_0.connect_to(&pin);
+        signal.connect_to(&pin);
 
         self
+    }
+
+    /// Configures the DATA 0 pin for the camera interface.
+    pub fn with_data0(self, pin: impl PeripheralInput<'d>) -> Self {
+        self.with_data_pin(InputSignal::CAM_DATA_0, pin)
     }
 
     /// Configures the DATA 1 pin for the camera interface.
     pub fn with_data1(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_1.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_1, pin)
     }
 
     /// Configures the DATA 2 pin for the camera interface.
     pub fn with_data2(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_2.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_2, pin)
     }
 
     /// Configures the DATA 3 pin for the camera interface.
     pub fn with_data3(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_3.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_3, pin)
     }
 
     /// Configures the DATA 4 pin for the camera interface.
     pub fn with_data4(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_4.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_4, pin)
     }
 
     /// Configures the DATA 5 pin for the camera interface.
     pub fn with_data5(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_5.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_5, pin)
     }
 
     /// Configures the DATA 6 pin for the camera interface.
     pub fn with_data6(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_6.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_6, pin)
     }
 
     /// Configures the DATA 7 pin for the camera interface.
     pub fn with_data7(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_7.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_7, pin)
     }
 
     /// Configures the DATA 8 pin for the camera interface.
     pub fn with_data8(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_8.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_8, pin)
     }
 
     /// Configures the DATA 9 pin for the camera interface.
     pub fn with_data9(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_9.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_9, pin)
     }
 
     /// Configures the DATA 10 pin for the camera interface.
     pub fn with_data10(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_10.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_10, pin)
     }
 
     /// Configures the DATA 11 pin for the camera interface.
     pub fn with_data11(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_11.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_11, pin)
     }
 
     /// Configures the DATA 12 pin for the camera interface.
     pub fn with_data12(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_12.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_12, pin)
     }
 
     /// Configures the DATA 13 pin for the camera interface.
     pub fn with_data13(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_13.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_13, pin)
     }
 
     /// Configures the DATA 14 pin for the camera interface.
     pub fn with_data14(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_14.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_14, pin)
     }
 
     /// Configures the DATA 15 pin for the camera interface.
     pub fn with_data15(self, pin: impl PeripheralInput<'d>) -> Self {
-        let pin = pin.into();
-
-        pin.init_input(Pull::None);
-        InputSignal::CAM_DATA_15.connect_to(&pin);
-
-        self
+        self.with_data_pin(InputSignal::CAM_DATA_15, pin)
     }
 
     /// Starts a DMA transfer to receive data from the camera peripheral.
