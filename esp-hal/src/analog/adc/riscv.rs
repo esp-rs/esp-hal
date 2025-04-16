@@ -14,13 +14,13 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 #[cfg(any(esp32c2, esp32c3, esp32c6))]
 use crate::efuse::Efuse;
 use crate::{
-    analog::adc::asynch::AdcFuture,
-    interrupt::{InterruptConfigurable, InterruptHandler},
-    peripherals::{Interrupt, APB_SARADC},
-    soc::regi2c,
-    system::{GenericPeripheralGuard, Peripheral},
     Async,
     Blocking,
+    analog::adc::asynch::AdcFuture,
+    interrupt::{InterruptConfigurable, InterruptHandler},
+    peripherals::{APB_SARADC, Interrupt},
+    soc::regi2c,
+    system::{GenericPeripheralGuard, Peripheral},
 };
 
 mod calibration;
@@ -573,7 +573,7 @@ pub(crate) mod asynch {
     use portable_atomic::{AtomicU32, Ordering};
     use procmacros::handler;
 
-    use crate::{asynch::AtomicWaker, peripherals::APB_SARADC, Async};
+    use crate::{Async, asynch::AtomicWaker, peripherals::APB_SARADC};
 
     #[cfg(all(adc1, adc2))]
     static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);

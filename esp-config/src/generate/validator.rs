@@ -2,7 +2,7 @@ use std::{io::Write, ops::Range};
 
 use serde::Serialize;
 
-use super::{snake_case, value::Value, Error};
+use super::{Error, snake_case, value::Value};
 
 type CustomValidatorFn = Box<dyn Fn(&Value) -> Result<(), Error>>;
 

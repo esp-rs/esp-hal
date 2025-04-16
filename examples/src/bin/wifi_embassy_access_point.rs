@@ -16,13 +16,13 @@ use core::{net::Ipv4Addr, str::FromStr};
 
 use embassy_executor::Spawner;
 use embassy_net::{
-    tcp::TcpSocket,
     IpListenEndpoint,
     Ipv4Cidr,
     Runner,
     Stack,
     StackResources,
     StaticConfigV4,
+    tcp::TcpSocket,
 };
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
@@ -30,6 +30,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
+    EspWifiController,
     init,
     wifi::{
         AccessPointConfiguration,
@@ -39,7 +40,6 @@ use esp_wifi::{
         WifiEvent,
         WifiState,
     },
-    EspWifiController,
 };
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html

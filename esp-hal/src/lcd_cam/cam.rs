@@ -59,20 +59,20 @@ use core::{
 };
 
 use crate::{
+    Blocking,
     clock::Clocks,
     dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, RxChannelFor},
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         Pull,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
-    lcd_cam::{calculate_clkm, BitOrder, ByteOrder, ClockError},
+    lcd_cam::{BitOrder, ByteOrder, ClockError, calculate_clkm},
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Blocking,
 };
 
 /// Generation of GDMA SUC EOF

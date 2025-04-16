@@ -47,31 +47,33 @@ unsafe impl defmt::Logger for Logger {
         unsafe { ENCODER.start_frame(do_write) }
     }
 
-    unsafe fn release() { unsafe {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.end_frame(do_write);
-
-        Self::flush();
-
-        #[cfg(feature = "critical-section")]
-        {
-            // We don't need to write a custom end-of-frame sequence because:
-            //  - using `defmt`, the rzcobs encoding already includes a terminating zero
-            //  - using `defmt-raw`, we don't add any additional framing data
-
+    unsafe fn release() {
+        unsafe {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            TAKEN = false;
+            ENCODER.end_frame(do_write);
 
-            // safety: accessing the `static mut` is OK because we have acquired a critical
-            // section.
-            let restore = CS_RESTORE;
+            Self::flush();
 
-            // safety: Must be paired with corresponding call to acquire(), see above
-            critical_section::release(restore);
+            #[cfg(feature = "critical-section")]
+            {
+                // We don't need to write a custom end-of-frame sequence because:
+                //  - using `defmt`, the rzcobs encoding already includes a terminating zero
+                //  - using `defmt-raw`, we don't add any additional framing data
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                TAKEN = false;
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                let restore = CS_RESTORE;
+
+                // safety: Must be paired with corresponding call to acquire(), see above
+                critical_section::release(restore);
+            }
         }
-    }}
+    }
 
     unsafe fn flush() {
         let token = unsafe {
@@ -82,11 +84,13 @@ unsafe impl defmt::Logger for Logger {
         PrinterImpl::flush(token);
     }
 
-    unsafe fn write(bytes: &[u8]) { unsafe {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.write(bytes, do_write);
-    }}
+    unsafe fn write(bytes: &[u8]) {
+        unsafe {
+            // safety: accessing the `static mut` is OK because we have acquired a critical
+            // section.
+            ENCODER.write(bytes, do_write);
+        }
+    }
 }
 
 fn do_write(bytes: &[u8]) {

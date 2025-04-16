@@ -1,4 +1,4 @@
-use crate::rom::regi2c::{define_regi2c, RawRegI2cField, RegI2cMaster, RegI2cRegister};
+use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
     master: REGI2C_SAR_I2C(0x69, 1) {

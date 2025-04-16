@@ -22,7 +22,7 @@ use crate::{
     dma::*,
     handler,
     interrupt::Priority,
-    peripherals::{pac, Interrupt, DMA},
+    peripherals::{DMA, Interrupt, pac},
 };
 
 /// An arbitrary GDMA channel

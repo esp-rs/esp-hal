@@ -13,9 +13,6 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse,
-    parse_macro_input,
-    spanned::Spanned,
     AttrStyle,
     Attribute,
     FnArg,
@@ -28,6 +25,9 @@ use syn::{
     Stmt,
     Type,
     Visibility,
+    parse,
+    parse_macro_input,
+    spanned::Spanned,
 };
 
 /// Marks a function as the main function to be called on program start
@@ -239,7 +239,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                         "This attribute accepts an integer attribute",
                     )
                     .to_compile_error()
-                    .into()
+                    .into();
                 }
             },
             _ => {
@@ -248,7 +248,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                     "This attribute accepts an integer attribute",
                 )
                 .to_compile_error()
-                .into()
+                .into();
             }
         }
     }

@@ -1,4 +1,4 @@
-use crate::rom::regi2c::{define_regi2c, RegI2cMaster, RegI2cRegister};
+use crate::rom::regi2c::{RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
     master: REGI2C_BBPLL(0x66, 4) {

@@ -6,7 +6,7 @@ use std::io::Write as _;
 
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{parse_macro_input, punctuated::Punctuated, LitStr, Token};
+use syn::{LitStr, Token, parse_macro_input, punctuated::Punctuated};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// Print a build error and terminate the process.

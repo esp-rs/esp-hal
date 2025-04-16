@@ -1,7 +1,7 @@
 use std::{error::Error as StdError, str::FromStr};
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Stability, Validator, Value};
+use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn StdError>> {

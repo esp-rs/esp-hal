@@ -64,27 +64,29 @@ pub unsafe extern "C" fn set_isr(
     n: i32,
     f: *mut crate::binary::c_types::c_void,
     arg: *mut crate::binary::c_types::c_void,
-) { unsafe {
-    trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
+) {
+    unsafe {
+        trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 
-    match n {
-        0 => {
-            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        match n {
+            0 => {
+                crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+            }
+            1 => {
+                crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+            }
+            _ => panic!("set_isr - unsupported interrupt number {}", n),
         }
-        1 => {
-            crate::wifi::ISR_INTERRUPT_1 = (f, arg);
+        #[cfg(feature = "wifi")]
+        {
+            unwrap!(interrupt::enable(
+                peripherals::Interrupt::WIFI_MAC,
+                interrupt::Priority::Priority1
+            ));
+            unwrap!(interrupt::enable(
+                peripherals::Interrupt::WIFI_PWR,
+                interrupt::Priority::Priority1
+            ));
         }
-        _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
-    #[cfg(feature = "wifi")]
-    {
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::WIFI_MAC,
-            interrupt::Priority::Priority1
-        ));
-        unwrap!(interrupt::enable(
-            peripherals::Interrupt::WIFI_PWR,
-            interrupt::Priority::Priority1
-        ));
-    }
-}}
+}

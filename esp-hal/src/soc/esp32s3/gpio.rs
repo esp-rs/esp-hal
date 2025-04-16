@@ -233,7 +233,7 @@ pub enum InputSignal {
 #[derive(Debug, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[doc(hidden)] // TODO connection operations are now public on these, we might want to publish
-               // them
+// them
 pub enum OutputSignal {
     SPIQ                       = 0,
     SPID                       = 1,

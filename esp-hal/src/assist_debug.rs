@@ -26,7 +26,7 @@
 use crate::{
     interrupt::InterruptHandler,
     pac,
-    peripherals::{Interrupt, ASSIST_DEBUG},
+    peripherals::{ASSIST_DEBUG, Interrupt},
 };
 
 /// The debug assist driver instance.

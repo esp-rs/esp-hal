@@ -5,6 +5,7 @@ use peripherals::INTPRI as SystemPeripheral;
 use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{
+    TimeBase,
     hal::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
@@ -12,7 +13,6 @@ use crate::{
         time::Rate,
     },
     preempt_builtin::task_switch,
-    TimeBase,
 };
 
 /// The timer responsible for time slicing.

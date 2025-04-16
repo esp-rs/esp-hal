@@ -81,11 +81,7 @@ impl Efuse {
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L14>
     pub fn rtc_calib_version() -> u8 {
         let (major, _minor) = Self::block_version();
-        if major == 0 {
-            1
-        } else {
-            0
-        }
+        if major == 0 { 1 } else { 0 }
     }
 
     /// Get ADC initial code for specified attenuation from efuse

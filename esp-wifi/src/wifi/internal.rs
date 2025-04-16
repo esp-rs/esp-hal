@@ -1,10 +1,10 @@
 use esp_wifi_sys::include::{
-    wifi_init_config_t,
-    wifi_osi_funcs_t,
-    wpa_crypto_funcs_t,
     ESP_WIFI_OS_ADAPTER_MAGIC,
     ESP_WIFI_OS_ADAPTER_VERSION,
     WIFI_INIT_CONFIG_MAGIC,
+    wifi_init_config_t,
+    wifi_osi_funcs_t,
+    wpa_crypto_funcs_t,
 };
 
 use super::os_adapter::*;
@@ -49,17 +49,17 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
 unsafe extern "C" fn semphr_take_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
-) -> i32 { unsafe {
-    crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ())
-}}
+) -> i32 {
+    unsafe { crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ()) }
+}
 
 #[cfg(coex)]
 unsafe extern "C" fn semphr_give_from_isr_wrapper(
     semphr: *mut crate::binary::c_types::c_void,
     hptw: *mut crate::binary::c_types::c_void,
-) -> i32 { unsafe {
-    crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ())
-}}
+) -> i32 {
+    unsafe { crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ()) }
+}
 
 #[cfg(coex)]
 unsafe extern "C" fn is_in_isr_wrapper() -> i32 {

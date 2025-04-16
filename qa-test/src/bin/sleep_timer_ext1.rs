@@ -16,11 +16,11 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull, RtcPin},
     main,
     rtc_cntl::{
+        Rtc,
+        SocResetReason,
         reset_reason,
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
-        Rtc,
-        SocResetReason,
     },
     system::Cpu,
 };

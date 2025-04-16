@@ -127,23 +127,25 @@ loop:
 
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "rust_main")]
-unsafe extern "C" fn lp_core_startup() -> ! { unsafe {
-    unsafe extern "Rust" {
-        fn main() -> !;
-    }
+unsafe extern "C" fn lp_core_startup() -> ! {
+    unsafe {
+        unsafe extern "Rust" {
+            fn main() -> !;
+        }
 
-    #[cfg(feature = "esp32c6")]
-    if (*pac::LP_CLKRST::PTR)
-        .lp_clk_conf()
-        .read()
-        .fast_clk_sel()
-        .bit_is_set()
-    {
-        CPU_CLOCK = XTAL_D2_CLK_HZ;
-    }
+        #[cfg(feature = "esp32c6")]
+        if (*pac::LP_CLKRST::PTR)
+            .lp_clk_conf()
+            .read()
+            .fast_clk_sel()
+            .bit_is_set()
+        {
+            CPU_CLOCK = XTAL_D2_CLK_HZ;
+        }
 
-    main();
-}}
+        main();
+    }
+}
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 #[unsafe(link_section = ".init.rust")]

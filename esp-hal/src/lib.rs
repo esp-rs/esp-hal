@@ -478,7 +478,9 @@ macro_rules! impl_persistable {
     )+};
 }
 
-impl_persistable!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+impl_persistable!(
+    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64
+);
 impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, AtomicI32, AtomicUsize, AtomicIsize);
 
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}

@@ -24,12 +24,12 @@
 use core::{marker::PhantomData, ptr::copy_nonoverlapping};
 
 use crate::{
+    Async,
+    Blocking,
     interrupt::InterruptHandler,
     pac,
     peripherals::{Interrupt, RSA},
     system::{Cpu, GenericPeripheralGuard, Peripheral as PeripheralEnable},
-    Async,
-    Blocking,
 };
 
 #[cfg_attr(esp32s2, path = "esp32sX.rs")]
@@ -386,6 +386,7 @@ pub(crate) mod asynch {
     use procmacros::handler;
 
     use crate::{
+        Async,
         asynch::AtomicWaker,
         peripherals::RSA,
         rsa::{
@@ -396,7 +397,6 @@ pub(crate) mod asynch {
             RsaModularMultiplication,
             RsaMultiplication,
         },
-        Async,
     };
 
     static WAKER: AtomicWaker = AtomicWaker::new();

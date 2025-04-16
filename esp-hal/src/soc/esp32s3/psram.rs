@@ -1114,7 +1114,10 @@ pub(crate) mod utils {
         print_psram_info(&mode_reg);
 
         if mode_reg.vendor_id() != OCT_PSRAM_VENDOR_ID {
-            warn!("PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode", mode_reg.vendor_id());
+            warn!(
+                "PSRAM ID read error: {:x}, PSRAM chip not found or not supported, or wrong PSRAM line mode",
+                mode_reg.vendor_id()
+            );
             return;
         }
 
@@ -1296,7 +1299,7 @@ pub(crate) mod utils {
 
         // Set SPI01 core clock
         spi0_timing_config_set_core_clock(core_clock); // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
-                                                       // Set FLASH module clock
+        // Set FLASH module clock
         spi0_timing_config_set_flash_clock(flash_div);
         if control_spi1 {
             spi1_timing_config_set_flash_clock(flash_div);

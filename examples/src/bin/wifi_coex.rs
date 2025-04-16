@@ -17,15 +17,15 @@
 use core::net::Ipv4Addr;
 
 use bleps::{
+    Ble,
+    HciConnector,
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     att::Uuid,
-    Ble,
-    HciConnector,
 };
 use blocking_network_stack::Stack;
 use embedded_io::*;

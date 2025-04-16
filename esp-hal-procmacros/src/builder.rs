@@ -1,9 +1,6 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    parse::Error as ParseError,
-    punctuated::Punctuated,
-    spanned::Spanned,
     Attribute,
     Data,
     DataStruct,
@@ -14,6 +11,9 @@ use syn::{
     PathSegment,
     Token,
     Type,
+    parse::Error as ParseError,
+    punctuated::Punctuated,
+    spanned::Spanned,
 };
 
 const KNOWN_HELPERS: &[&str] = &[

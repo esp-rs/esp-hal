@@ -1,8 +1,8 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
-    peripherals::{LPWR, LP_AON, PCR, PMU, TIMG0},
+    clock::{Clock, XtalClock, clocks_ll::regi2c_write_mask},
+    peripherals::{LP_AON, LPWR, PCR, PMU, TIMG0},
     rtc_cntl::RtcClock,
     time::Rate,
 };

@@ -5,8 +5,9 @@ use crate::{
     efuse::Efuse,
     gpio::RtcFunction,
     rtc_cntl::{
+        Rtc,
+        RtcClock,
         rtc::{
-            rtc_clk_cpu_freq_set_xtal,
             HpAnalog,
             HpSysCntlReg,
             HpSysPower,
@@ -14,6 +15,7 @@ use crate::{
             LpSysPower,
             RtcCalSel,
             SavedClockConfig,
+            rtc_clk_cpu_freq_set_xtal,
         },
         sleep::{
             Ext1WakeupSource,
@@ -23,8 +25,6 @@ use crate::{
             WakeTriggers,
             WakeupLevel,
         },
-        Rtc,
-        RtcClock,
     },
 };
 
@@ -782,13 +782,13 @@ impl Default for RtcSleepConfig {
     }
 }
 
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock { unsafe {
-    &*esp32c6::PMU::ptr()
-}}
+unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
+    unsafe { &*esp32c6::PMU::ptr() }
+}
 
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock { unsafe {
-    &*esp32c6::LP_AON::ptr()
-}}
+unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
+    unsafe { &*esp32c6::LP_AON::ptr() }
+}
 
 bitfield::bitfield! {
     #[derive(Clone, Copy)]

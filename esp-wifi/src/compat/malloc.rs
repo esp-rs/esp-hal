@@ -16,36 +16,40 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut u8 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn free(ptr: *mut u8) { unsafe {
-    trace!("free {:?}", ptr);
+pub unsafe extern "C" fn free(ptr: *mut u8) {
+    unsafe {
+        trace!("free {:?}", ptr);
 
-    if ptr.is_null() {
-        warn!("Attempt to free null pointer");
-        return;
+        if ptr.is_null() {
+            warn!("Attempt to free null pointer");
+            return;
+        }
+
+        unsafe extern "C" {
+            fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+        }
+
+        esp_wifi_deallocate_internal_ram(ptr);
     }
-
-    unsafe extern "C" {
-        fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
-    }
-
-    esp_wifi_deallocate_internal_ram(ptr);
-}}
+}
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 { unsafe {
-    trace!("calloc {} {}", number, size);
+pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
+    unsafe {
+        trace!("calloc {} {}", number, size);
 
-    let total_size = number as usize * size;
-    let ptr = malloc(total_size);
+        let total_size = number as usize * size;
+        let ptr = malloc(total_size);
 
-    if !ptr.is_null() {
-        for i in 0..total_size as isize {
-            ptr.offset(i).write_volatile(0);
+        if !ptr.is_null() {
+            for i in 0..total_size as isize {
+                ptr.offset(i).write_volatile(0);
+            }
         }
-    }
 
-    ptr
-}}
+        ptr
+    }
+}
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 {
@@ -133,12 +137,14 @@ mod esp_alloc {
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
-        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) { unsafe {
-            unsafe extern "C" {
-                fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+        unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
+            unsafe {
+                unsafe extern "C" {
+                    fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+                }
+                esp_wifi_deallocate_internal_ram(ptr.as_ptr());
             }
-            esp_wifi_deallocate_internal_ram(ptr.as_ptr());
-        }}
+        }
     }
 }
 

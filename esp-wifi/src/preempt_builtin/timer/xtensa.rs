@@ -1,9 +1,9 @@
 use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
+    TimeBase,
     hal::{interrupt, time::Rate, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
     preempt_builtin::task_switch,
-    TimeBase,
 };
 
 /// The timer responsible for time slicing.

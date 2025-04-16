@@ -1,15 +1,15 @@
-use darling::{ast::NestedMeta, FromMeta};
+use darling::{FromMeta, ast::NestedMeta};
 use proc_macro::{Span, TokenStream};
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Ident;
-use proc_macro_crate::{crate_name, FoundCrate};
 use syn::{
-    parse::Error as SynError,
-    spanned::Spanned,
     AttrStyle,
     Attribute,
     ItemFn,
     ReturnType,
     Type,
+    parse::Error as SynError,
+    spanned::Spanned,
 };
 
 pub enum WhiteListCaller {
@@ -44,16 +44,19 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     let root = Ident::new(
         match crate_name("esp-hal") {
             Ok(FoundCrate::Name(ref name)) => name,
-            _ => "crate"
+            _ => "crate",
         },
         Span::call_site().into(),
     );
 
-    let priority = match args.priority { Some(priority) => {
-        quote::quote!( #priority )
-    } _ => {
-        quote::quote! { #root::interrupt::Priority::min() }
-    }};
+    let priority = match args.priority {
+        Some(priority) => {
+            quote::quote!( #priority )
+        }
+        _ => {
+            quote::quote! { #root::interrupt::Priority::min() }
+        }
+    };
 
     // XXX should we blacklist other attributes?
 

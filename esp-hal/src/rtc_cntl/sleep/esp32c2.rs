@@ -2,7 +2,7 @@ use super::{TimerWakeupSource, WakeSource, WakeTriggers, WakeupLevel};
 use crate::{
     gpio::{RtcFunction, RtcPinWithResistors},
     peripherals::{APB_CTRL, BB, EXTMEM, GPIO, IO_MUX, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
+    rtc_cntl::{Clock, Rtc, RtcClock, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 

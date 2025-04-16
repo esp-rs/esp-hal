@@ -202,11 +202,11 @@ extern "C" fn patch_apply() {
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
-        let coex_version = unwrap!(core::ffi::CStr::from_ptr(
-            crate::binary::include::coex_version_get()
-        )
-        .to_str()
-        .ok());
+        let coex_version = unwrap!(
+            core::ffi::CStr::from_ptr(crate::binary::include::coex_version_get())
+                .to_str()
+                .ok()
+        );
         info!("COEX Version {}", coex_version);
         // we should parse it ... for now just hardcoded
         major.write_volatile(1);
@@ -239,7 +239,7 @@ const SOC_MEM_BT_MISC_START: u32 = 0x3ffbdb28;
 const SOC_MEM_BT_MISC_END: u32 = 0x3ffbdb5c;
 
 const SOC_MEM_BT_EM_BREDR_REAL_END: u32 = 0x3ffb6388; //  (SOC_MEM_BT_EM_BREDR_NO_SYNC_END + CONFIG_BTDM_CTRL_BR_EDR_MAX_SYNC_CONN_EFF
-                                                      // * SOC_MEM_BT_EM_PER_SYNC_SIZE);
+// * SOC_MEM_BT_EM_PER_SYNC_SIZE);
 
 static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
     // following is .data
@@ -463,7 +463,9 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
     }
 
     #[cfg(coex)]
-    unsafe { coex_bb_reset_unlock(event) };
+    unsafe {
+        coex_bb_reset_unlock(event)
+    };
 }
 
 pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
@@ -476,7 +478,7 @@ pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     }
 
     #[cfg(coex)]
-    return unsafe {coex_schm_register_callback(1, callback)}; // COEX_SCHM_CALLBACK_TYPE_BT = 1
+    return unsafe { coex_schm_register_callback(1, callback) }; // COEX_SCHM_CALLBACK_TYPE_BT = 1
 
     #[cfg(not(coex))]
     0
@@ -506,7 +508,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
-    return unsafe{crate::binary::include::coex_schm_curr_phase_get()} as *const ();
+    return unsafe { crate::binary::include::coex_schm_curr_phase_get() } as *const ();
 
     #[cfg(not(coex))]
     return core::ptr::null::<()>();
@@ -521,7 +523,7 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondar
     }
 
     #[cfg(coex)]
-    return unsafe { coex_wifi_channel_get(primary, secondary)};
+    return unsafe { coex_wifi_channel_get(primary, secondary) };
 
     #[cfg(not(coex))]
     -1
@@ -538,43 +540,47 @@ pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     }
 
     #[cfg(coex)]
-    return unsafe {coex_register_wifi_channel_change_callback(callback)};
+    return unsafe { coex_register_wifi_channel_change_callback(callback) };
 
     #[cfg(not(coex))]
     0
 }
 
-pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 { unsafe {
-    trace!("set_isr called {} {:?} {:?}", n, f, arg);
+pub(crate) unsafe extern "C" fn set_isr(n: i32, f: unsafe extern "C" fn(), arg: *const ()) -> i32 {
+    unsafe {
+        trace!("set_isr called {} {:?} {:?}", n, f, arg);
 
-    match n {
-        5 => {
-            ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-            unwrap!(interrupt::enable(
-                Interrupt::RWBT,
-                interrupt::Priority::Priority1
-            ));
+        match n {
+            5 => {
+                ISR_INTERRUPT_5 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+                unwrap!(interrupt::enable(
+                    Interrupt::RWBT,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            7 => {
+                ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+            }
+            8 => {
+                ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
+                unwrap!(interrupt::enable(
+                    Interrupt::BT_BB,
+                    interrupt::Priority::Priority1,
+                ));
+            }
+            _ => panic!("set_isr - unsupported interrupt number {}", n),
         }
-        7 => {
-            ISR_INTERRUPT_7 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-        }
-        8 => {
-            ISR_INTERRUPT_8 = (f as *mut c_types::c_void, arg as *mut c_types::c_void);
-            unwrap!(interrupt::enable(
-                Interrupt::BT_BB,
-                interrupt::Priority::Priority1,
-            ));
-        }
-        _ => panic!("set_isr - unsupported interrupt number {}", n),
+
+        0
     }
+}
 
-    0
-}}
-
-pub(crate) unsafe extern "C" fn ints_on(mask: u32) { unsafe {
-    trace!("chip_ints_on esp32 {:b}", mask);
-    crate::hal::xtensa_lx::interrupt::enable_mask(mask);
-}}
+pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
+    unsafe {
+        trace!("chip_ints_on esp32 {:b}", mask);
+        crate::hal::xtensa_lx::interrupt::enable_mask(mask);
+    }
+}
 
 #[cfg(coex)]
 const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;

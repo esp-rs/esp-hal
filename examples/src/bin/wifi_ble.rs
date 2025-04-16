@@ -11,16 +11,16 @@
 #![no_main]
 
 use bleps::{
+    Ble,
+    HciConnector,
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     attribute_server::{AttributeServer, NotificationData, WorkResult},
     gatt,
-    Ble,
-    HciConnector,
 };
 use esp_alloc as _;
 use esp_backtrace as _;

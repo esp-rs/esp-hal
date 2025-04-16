@@ -130,9 +130,9 @@ unsafe extern "Rust" {
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".rwtext")]
-unsafe extern "C" fn __default_exception(cause: ExceptionCause, save_frame: &mut Context) { unsafe {
-    __user_exception(cause, save_frame)
-}}
+unsafe extern "C" fn __default_exception(cause: ExceptionCause, save_frame: &mut Context) {
+    unsafe { __user_exception(cause, save_frame) }
+}
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".rwtext")]

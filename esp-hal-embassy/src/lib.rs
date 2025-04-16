@@ -54,7 +54,7 @@ mod fmt;
 
 #[cfg(not(feature = "esp32"))]
 use esp_hal::timer::systimer::Alarm;
-use esp_hal::timer::{timg::Timer as TimgTimer, AnyTimer};
+use esp_hal::timer::{AnyTimer, timg::Timer as TimgTimer};
 pub use macros::embassy_main as main;
 
 #[cfg(feature = "executors")]

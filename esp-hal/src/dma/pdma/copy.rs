@@ -4,7 +4,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::*,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{Interrupt, DMA_COPY},
+    peripherals::{DMA_COPY, Interrupt},
 };
 
 pub(super) type CopyRegisterBlock = crate::pac::copy_dma::RegisterBlock;

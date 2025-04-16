@@ -53,22 +53,24 @@ unsafe extern "C" {
 /// be invoked by the runtime implicitly.
 #[unsafe(link_section = ".init.rust")]
 #[unsafe(export_name = "_start_rust")]
-pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! { unsafe {
-    unsafe extern "Rust" {
-        fn hal_main(a0: usize, a1: usize, a2: usize) -> !;
+pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
+    unsafe {
+        unsafe extern "Rust" {
+            fn hal_main(a0: usize, a1: usize, a2: usize) -> !;
 
-        fn __post_init();
+            fn __post_init();
 
-        fn _setup_interrupts();
+            fn _setup_interrupts();
 
+        }
+
+        __post_init();
+
+        _setup_interrupts();
+
+        hal_main(a0, a1, a2);
     }
-
-    __post_init();
-
-    _setup_interrupts();
-
-    hal_main(a0, a1, a2);
-}}
+}
 
 /// Registers saved in trap handler
 #[derive(Debug, Default, Clone, Copy)]

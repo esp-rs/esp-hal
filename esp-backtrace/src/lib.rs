@@ -90,7 +90,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     let backtrace = Backtrace::capture();
     #[cfg(target_arch = "riscv32")]
     if backtrace.frames().is_empty() {
-        println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
+        println!(
+            "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
+        );
     }
     for frame in backtrace.frames() {
         println!("0x{:x}", frame.program_counter());
@@ -163,7 +165,9 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
         let backtrace = Backtrace::from_sp(context.s0 as u32);
         let frames = backtrace.frames();
         if frames.is_empty() {
-            println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
+            println!(
+                "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
+            );
         }
         for frame in backtrace.frames() {
             println!("0x{:x}", frame.program_counter());

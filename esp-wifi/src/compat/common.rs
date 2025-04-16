@@ -130,30 +130,32 @@ impl RawQueue {
         }
     }
 
-    unsafe fn remove(&mut self, item: *mut c_void) { unsafe {
-        // do what the ESP-IDF implementations does ...
-        // just remove all elements and add them back except the one we need to remove -
-        // good enough for now
-        let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
-        let count = self.count();
+    unsafe fn remove(&mut self, item: *mut c_void) {
+        unsafe {
+            // do what the ESP-IDF implementations does ...
+            // just remove all elements and add them back except the one we need to remove -
+            // good enough for now
+            let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
+            let count = self.count();
 
-        if count == 0 {
-            return;
-        }
-
-        let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
-        tmp_item.reserve_exact(self.item_size);
-        tmp_item.resize(self.item_size, 0);
-
-        for _ in 0..count {
-            if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
-                break;
+            if count == 0 {
+                return;
             }
-            if &tmp_item[..] != item_slice {
-                self.enqueue(tmp_item.as_mut_ptr().cast());
+
+            let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
+            tmp_item.reserve_exact(self.item_size);
+            tmp_item.resize(self.item_size, 0);
+
+            for _ in 0..count {
+                if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
+                    break;
+                }
+                if &tmp_item[..] != item_slice {
+                    self.enqueue(tmp_item.as_mut_ptr().cast());
+                }
             }
         }
-    }}
+    }
 
     fn count(&self) -> usize {
         if self.current_write >= self.current_read {
@@ -164,23 +166,27 @@ impl RawQueue {
     }
 }
 
-pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str { unsafe {
-    let c_str = core::ffi::CStr::from_ptr(s.cast());
-    core::str::from_utf8_unchecked(c_str.to_bytes())
-}}
+pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
+    unsafe {
+        let c_str = core::ffi::CStr::from_ptr(s.cast());
+        core::str::from_utf8_unchecked(c_str.to_bytes())
+    }
+}
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize { unsafe {
-    let mut len = 0;
-    loop {
-        if chars.offset(len).read_volatile() == 0 {
-            break;
+unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
+    unsafe {
+        let mut len = 0;
+        loop {
+            if chars.offset(len).read_volatile() == 0 {
+                break;
+            }
+            len += 1;
         }
-        len += 1;
-    }
 
-    len as usize
-}}
+        len as usize
+    }
+}
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
     unsafe {
@@ -352,9 +358,7 @@ pub(crate) fn send_queued(
 ) -> i32 {
     trace!(
         "queue_send queue {:?} item {:x} block_time_tick {}",
-        queue,
-        item as usize,
-        block_time_tick
+        queue, item as usize, block_time_tick
     );
 
     let queue: *mut ConcurrentQueue = queue.cast();
@@ -368,9 +372,7 @@ pub(crate) fn receive_queued(
 ) -> i32 {
     trace!(
         "queue_recv {:?} item {:?} block_time_tick {}",
-        queue,
-        item,
-        block_time_tick
+        queue, item, block_time_tick
     );
 
     let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
@@ -404,24 +406,28 @@ pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
-) -> crate::binary::c_types::c_uint { unsafe {
-    trace!("sleep");
+) -> crate::binary::c_types::c_uint {
+    unsafe {
+        trace!("sleep");
 
-    usleep(seconds * 1_000);
-    0
-}}
+        usleep(seconds * 1_000);
+        0
+    }
+}
 
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int { unsafe {
-    trace!("usleep");
-    unsafe extern "C" {
-        fn esp_rom_delay_us(us: u32);
+unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
+    unsafe {
+        trace!("usleep");
+        unsafe extern "C" {
+            fn esp_rom_delay_us(us: u32);
+        }
+        esp_rom_delay_us(us);
+        0
     }
-    esp_rom_delay_us(us);
-    0
-}}
+}
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn putchar(c: i32) -> crate::binary::c_types::c_int {

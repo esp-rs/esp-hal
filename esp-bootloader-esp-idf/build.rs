@@ -1,7 +1,7 @@
 use std::env;
 
 use chrono::{TimeZone, Utc};
-use esp_config::{generate_config, ConfigOption, Stability, Validator, Value};
+use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 
 fn main() {
     let build_time = match env::var("SOURCE_DATE_EPOCH") {

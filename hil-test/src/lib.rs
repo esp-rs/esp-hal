@@ -89,7 +89,7 @@ macro_rules! unconnected_pin {
 mod executor {
     use core::marker::PhantomData;
 
-    use embassy_executor::{raw, Spawner};
+    use embassy_executor::{Spawner, raw};
 
     #[export_name = "__pender"]
     fn __pender(_: *mut ()) {}

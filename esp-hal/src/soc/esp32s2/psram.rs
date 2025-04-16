@@ -515,7 +515,9 @@ pub(crate) mod utils {
                 // rom.
             } else {
                 // this case is currently not yet supported
-                panic!("Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported.");
+                panic!(
+                    "Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported."
+                );
 
                 // FLASH pins are all configured via GPIO matrix in ROM.
                 // psram_io.flash_clk_io =

@@ -102,22 +102,22 @@ use core::{
 };
 
 use crate::{
+    Blocking,
+    DriverMode,
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
-    gpio::{interconnect::PeripheralOutput, Level, OutputSignal},
+    gpio::{Level, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
         BitOrder,
         ByteOrder,
         ClockError,
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Lcd, Phase, Polarity},
     },
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Blocking,
-    DriverMode,
 };
 
 /// Errors that can occur when configuring the DPI peripheral.

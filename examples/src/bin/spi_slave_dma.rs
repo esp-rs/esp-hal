@@ -37,7 +37,7 @@ use esp_hal::{
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     main,
-    spi::{slave::Spi, Mode},
+    spi::{Mode, slave::Spi},
 };
 use esp_println::println;
 

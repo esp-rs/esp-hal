@@ -235,6 +235,7 @@ pub mod dma {
     use core::mem::ManuallyDrop;
 
     use crate::{
+        Blocking,
         aes::{Key, Mode},
         dma::{
             Channel,
@@ -245,7 +246,6 @@ pub mod dma {
             PeripheralDmaChannel,
         },
         peripherals::AES,
-        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();

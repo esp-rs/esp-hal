@@ -103,8 +103,10 @@ use core::{
 };
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        asynch::DmaTxFuture,
         Channel,
         ChannelTx,
         DmaChannelFor,
@@ -112,19 +114,17 @@ use crate::{
         DmaError,
         DmaTxBuffer,
         PeripheralTxChannel,
+        asynch::DmaTxFuture,
     },
     gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
+        interconnect::{OutputConnection, PeripheralOutput},
     },
     i2s::{AnyI2s, AnyI2sInner},
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 #[doc(hidden)]

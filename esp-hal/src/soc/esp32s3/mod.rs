@@ -65,31 +65,33 @@ pub(crate) mod constants {
 
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
-pub unsafe fn configure_cpu_caches() { unsafe {
-    // this is just the bare minimum we need to run code from flash
-    // consider implementing more advanced configurations
-    // see https://github.com/apache/incubator-nuttx/blob/master/arch/xtensa/src/esp32s3/esp32s3_start.c
+pub unsafe fn configure_cpu_caches() {
+    unsafe {
+        // this is just the bare minimum we need to run code from flash
+        // consider implementing more advanced configurations
+        // see https://github.com/apache/incubator-nuttx/blob/master/arch/xtensa/src/esp32s3/esp32s3_start.c
 
-    unsafe extern "C" {
-        fn rom_config_instruction_cache_mode(
-            cfg_cache_size: u32,
-            cfg_cache_ways: u8,
-            cfg_cache_line_size: u8,
+        unsafe extern "C" {
+            fn rom_config_instruction_cache_mode(
+                cfg_cache_size: u32,
+                cfg_cache_ways: u8,
+                cfg_cache_line_size: u8,
+            );
+        }
+
+        // ideally these should be configurable
+        const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000; // ESP32S3_INSTRUCTION_CACHE_32KB
+        const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8; // ESP32S3_INSTRUCTION_CACHE_8WAYS
+        const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32; // ESP32S3_INSTRUCTION_CACHE_LINE_32B
+
+        // Configure the mode of instruction cache: cache size, cache line size.
+        rom_config_instruction_cache_mode(
+            CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
+            CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
+            CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
         );
     }
-
-    // ideally these should be configurable
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000; // ESP32S3_INSTRUCTION_CACHE_32KB
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8; // ESP32S3_INSTRUCTION_CACHE_8WAYS
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32; // ESP32S3_INSTRUCTION_CACHE_LINE_32B
-
-    // Configure the mode of instruction cache: cache size, cache line size.
-    rom_config_instruction_cache_mode(
-        CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
-        CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
-        CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
-    );
-}}
+}
 
 /// Function initializes ESP32S3 specific memories (RTC slow and fast) and
 /// then calls original Reset function
@@ -100,68 +102,70 @@ pub unsafe fn configure_cpu_caches() { unsafe {
 #[doc(hidden)]
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".rwtext")]
-pub unsafe extern "C" fn ESP32Reset() -> ! { unsafe {
-    configure_cpu_caches();
+pub unsafe extern "C" fn ESP32Reset() -> ! {
+    unsafe {
+        configure_cpu_caches();
 
-    // These symbols come from `memory.x`
-    unsafe extern "C" {
-        static mut _rtc_fast_bss_start: u32;
-        static mut _rtc_fast_bss_end: u32;
-        static mut _rtc_fast_persistent_start: u32;
-        static mut _rtc_fast_persistent_end: u32;
+        // These symbols come from `memory.x`
+        unsafe extern "C" {
+            static mut _rtc_fast_bss_start: u32;
+            static mut _rtc_fast_bss_end: u32;
+            static mut _rtc_fast_persistent_start: u32;
+            static mut _rtc_fast_persistent_end: u32;
 
-        static mut _rtc_slow_bss_start: u32;
-        static mut _rtc_slow_bss_end: u32;
-        static mut _rtc_slow_persistent_start: u32;
-        static mut _rtc_slow_persistent_end: u32;
+            static mut _rtc_slow_bss_start: u32;
+            static mut _rtc_slow_bss_end: u32;
+            static mut _rtc_slow_persistent_start: u32;
+            static mut _rtc_slow_persistent_end: u32;
 
-        static mut _stack_start_cpu0: u32;
+            static mut _stack_start_cpu0: u32;
 
-        static mut __stack_chk_guard: u32;
-    }
+            static mut __stack_chk_guard: u32;
+        }
 
-    // set stack pointer to end of memory: no need to retain stack up to this point
-    xtensa_lx::set_stack_pointer(addr_of_mut!(_stack_start_cpu0));
+        // set stack pointer to end of memory: no need to retain stack up to this point
+        xtensa_lx::set_stack_pointer(addr_of_mut!(_stack_start_cpu0));
 
-    // copying data from flash to various data segments is done by the bootloader
-    // initialization to zero needs to be done by the application
+        // copying data from flash to various data segments is done by the bootloader
+        // initialization to zero needs to be done by the application
 
-    // Initialize RTC RAM
-    xtensa_lx_rt::zero_bss(
-        addr_of_mut!(_rtc_fast_bss_start),
-        addr_of_mut!(_rtc_fast_bss_end),
-    );
-    xtensa_lx_rt::zero_bss(
-        addr_of_mut!(_rtc_slow_bss_start),
-        addr_of_mut!(_rtc_slow_bss_end),
-    );
-    if matches!(
-        crate::system::reset_reason(),
-        None | Some(SocResetReason::ChipPowerOn)
-    ) {
+        // Initialize RTC RAM
         xtensa_lx_rt::zero_bss(
-            addr_of_mut!(_rtc_fast_persistent_start),
-            addr_of_mut!(_rtc_fast_persistent_end),
+            addr_of_mut!(_rtc_fast_bss_start),
+            addr_of_mut!(_rtc_fast_bss_end),
         );
         xtensa_lx_rt::zero_bss(
-            addr_of_mut!(_rtc_slow_persistent_start),
-            addr_of_mut!(_rtc_slow_persistent_end),
+            addr_of_mut!(_rtc_slow_bss_start),
+            addr_of_mut!(_rtc_slow_bss_end),
         );
+        if matches!(
+            crate::system::reset_reason(),
+            None | Some(SocResetReason::ChipPowerOn)
+        ) {
+            xtensa_lx_rt::zero_bss(
+                addr_of_mut!(_rtc_fast_persistent_start),
+                addr_of_mut!(_rtc_fast_persistent_end),
+            );
+            xtensa_lx_rt::zero_bss(
+                addr_of_mut!(_rtc_slow_persistent_start),
+                addr_of_mut!(_rtc_slow_persistent_end),
+            );
+        }
+
+        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
+        // we _should_ use a random value but we don't have a good source for random
+        // numbers here
+        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+
+        crate::interrupt::setup_interrupts();
+
+        // continue with default reset handler
+        xtensa_lx_rt::Reset()
     }
-
-    let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
-    // we _should_ use a random value but we don't have a good source for random
-    // numbers here
-    stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-        u32,
-        "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-    ));
-
-    crate::interrupt::setup_interrupts();
-
-    // continue with default reset handler
-    xtensa_lx_rt::Reset()
-}}
+}
 
 /// The ESP32 has a first stage bootloader that handles loading program data
 /// into the right place therefore we skip loading it again.
@@ -175,36 +179,42 @@ pub extern "Rust" fn __init_data() -> bool {
 /// Write back a specific range of data in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
-pub unsafe fn cache_writeback_addr(addr: u32, size: u32) { unsafe {
-    unsafe extern "C" {
-        fn rom_Cache_WriteBack_Addr(addr: u32, size: u32);
-        fn Cache_Suspend_DCache_Autoload() -> u32;
-        fn Cache_Resume_DCache_Autoload(value: u32);
+pub unsafe fn cache_writeback_addr(addr: u32, size: u32) {
+    unsafe {
+        unsafe extern "C" {
+            fn rom_Cache_WriteBack_Addr(addr: u32, size: u32);
+            fn Cache_Suspend_DCache_Autoload() -> u32;
+            fn Cache_Resume_DCache_Autoload(value: u32);
+        }
+        // suspend autoload, avoid load cachelines being written back
+        let autoload = Cache_Suspend_DCache_Autoload();
+        rom_Cache_WriteBack_Addr(addr, size);
+        Cache_Resume_DCache_Autoload(autoload);
     }
-    // suspend autoload, avoid load cachelines being written back
-    let autoload = Cache_Suspend_DCache_Autoload();
-    rom_Cache_WriteBack_Addr(addr, size);
-    Cache_Resume_DCache_Autoload(autoload);
-}}
+}
 
 /// Invalidate a specific range of addresses in the cache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
-pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) { unsafe {
-    unsafe extern "C" {
-        fn Cache_Invalidate_Addr(addr: u32, size: u32);
+pub unsafe fn cache_invalidate_addr(addr: u32, size: u32) {
+    unsafe {
+        unsafe extern "C" {
+            fn Cache_Invalidate_Addr(addr: u32, size: u32);
+        }
+        Cache_Invalidate_Addr(addr, size);
     }
-    Cache_Invalidate_Addr(addr, size);
-}}
+}
 
 /// Get the size of a cache line in the DCache.
 #[doc(hidden)]
 #[unsafe(link_section = ".rwtext")]
-pub unsafe fn cache_get_dcache_line_size() -> u32 { unsafe {
-    unsafe extern "C" {
-        fn Cache_Get_DCache_Line_Size() -> u32;
+pub unsafe fn cache_get_dcache_line_size() -> u32 {
+    unsafe {
+        unsafe extern "C" {
+            fn Cache_Get_DCache_Line_Size() -> u32;
+        }
+        Cache_Get_DCache_Line_Size()
     }
-    Cache_Get_DCache_Line_Size()
-}}
+}
 
 pub(crate) fn pre_init() {}

@@ -39,11 +39,13 @@ use crate::pac::LP_UART;
 const UART_FIFO_SIZE: u16 = 128;
 
 #[doc(hidden)]
-pub unsafe fn conjure() -> LpUart { unsafe {
-    LpUart {
-        uart: LP_UART::steal(),
+pub unsafe fn conjure() -> LpUart {
+    unsafe {
+        LpUart {
+            uart: LP_UART::steal(),
+        }
     }
-}}
+}
 
 /// UART Error
 #[derive(Debug)]

@@ -326,20 +326,18 @@ pub(crate) unsafe extern "C" fn interrupt_set(
     handler: extern "C" fn(*const ()),
     arg: *const (),
     ret_handle: *mut *const (),
-) -> i32 { unsafe {
-    trace!(
-        "interrupt_set {} {} {} {} {}",
-        cpu_no,
-        intr_source,
-        handler as usize,
-        arg as u32,
-        ret_handle as usize,
-    );
+) -> i32 {
+    unsafe {
+        trace!(
+            "interrupt_set {} {} {} {} {}",
+            cpu_no, intr_source, handler as usize, arg as u32, ret_handle as usize,
+        );
 
-    interrupt_handler_set(intr_source, handler, arg);
+        interrupt_handler_set(intr_source, handler, arg);
 
-    0
-}}
+        0
+    }
+}
 
 pub(crate) unsafe extern "C" fn interrupt_clear(_handler: *const ()) -> i32 {
     todo!();
@@ -349,41 +347,41 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
     interrupt_no: i32,
     func: extern "C" fn(*const ()),
     arg: *const (),
-) { unsafe {
-    trace!(
-        "interrupt_handler_set {} {:?} {:?}",
-        interrupt_no,
-        func,
-        arg
-    );
-    match interrupt_no {
-        5 => {
-            BT_INTERRUPT_FUNCTION5 = (
-                func as *mut crate::binary::c_types::c_void,
-                arg as *mut crate::binary::c_types::c_void,
-            );
-            unwrap!(interrupt::enable(
-                Interrupt::RWBT,
-                interrupt::Priority::Priority1
-            ));
-            unwrap!(interrupt::enable(
-                Interrupt::BT_BB,
-                interrupt::Priority::Priority1
-            ));
+) {
+    unsafe {
+        trace!(
+            "interrupt_handler_set {} {:?} {:?}",
+            interrupt_no, func, arg
+        );
+        match interrupt_no {
+            5 => {
+                BT_INTERRUPT_FUNCTION5 = (
+                    func as *mut crate::binary::c_types::c_void,
+                    arg as *mut crate::binary::c_types::c_void,
+                );
+                unwrap!(interrupt::enable(
+                    Interrupt::RWBT,
+                    interrupt::Priority::Priority1
+                ));
+                unwrap!(interrupt::enable(
+                    Interrupt::BT_BB,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            8 => {
+                BT_INTERRUPT_FUNCTION8 = (
+                    func as *mut crate::binary::c_types::c_void,
+                    arg as *mut crate::binary::c_types::c_void,
+                );
+                unwrap!(interrupt::enable(
+                    Interrupt::RWBLE,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            _ => panic!("Unsupported interrupt number {}", interrupt_no),
         }
-        8 => {
-            BT_INTERRUPT_FUNCTION8 = (
-                func as *mut crate::binary::c_types::c_void,
-                arg as *mut crate::binary::c_types::c_void,
-            );
-            unwrap!(interrupt::enable(
-                Interrupt::RWBLE,
-                interrupt::Priority::Priority1
-            ));
-        }
-        _ => panic!("Unsupported interrupt number {}", interrupt_no),
     }
-}}
+}
 
 pub(crate) unsafe extern "C" fn coex_wifi_sleep_set(sleep: i32) {
     trace!(

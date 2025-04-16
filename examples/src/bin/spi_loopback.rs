@@ -21,8 +21,8 @@ use esp_hal::{
     delay::Delay,
     main,
     spi::{
-        master::{Config, Spi},
         Mode,
+        master::{Config, Spi},
     },
     time::Rate,
 };

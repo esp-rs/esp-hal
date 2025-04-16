@@ -1,6 +1,6 @@
 use crate::{
     peripherals::{I2C_ANA_MST, MODEM_LPCON},
-    rom::regi2c::{define_regi2c, RawRegI2cField, RegI2cMaster, RegI2cRegister},
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
 };
 
 define_regi2c! {
@@ -110,11 +110,7 @@ fn regi2c_enable_block(block: u8) -> usize {
         }
     });
 
-    if i2c_sel {
-        0
-    } else {
-        1
-    }
+    if i2c_sel { 0 } else { 1 }
 }
 
 pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {

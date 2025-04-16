@@ -73,8 +73,10 @@ use enumset::{EnumSet, EnumSetType};
 use private::*;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
         Channel,
         ChannelRx,
         ChannelTx,
@@ -90,15 +92,13 @@ use crate::{
         PeripheralTxChannel,
         ReadBuffer,
         WriteBuffer,
+        dma_private::{DmaSupport, DmaSupportRx, DmaSupportTx},
     },
     gpio::interconnect::PeripheralOutput,
     i2s::AnyI2s,
     interrupt::{InterruptConfigurable, InterruptHandler},
     system::PeripheralGuard,
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 #[derive(Debug, EnumSetType)]
@@ -678,16 +678,16 @@ mod private {
     #[cfg(not(i2s1))]
     use crate::pac::i2s0::RegisterBlock;
     use crate::{
+        DriverMode,
         dma::{ChannelRx, ChannelTx, DescriptorChain, DmaDescriptor, DmaEligible},
         gpio::{
-            interconnect::{PeripheralInput, PeripheralOutput},
             InputSignal,
             OutputSignal,
+            interconnect::{PeripheralInput, PeripheralOutput},
         },
         i2s::AnyI2sInner,
         interrupt::InterruptHandler,
-        peripherals::{Interrupt, I2S0},
-        DriverMode,
+        peripherals::{I2S0, Interrupt},
     };
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
@@ -1784,15 +1784,15 @@ mod private {
 pub mod asynch {
     use super::{Error, I2sRx, I2sTx, RegisterAccessPrivate};
     use crate::{
+        Async,
         dma::{
-            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
             DmaEligible,
             ReadBuffer,
             RxCircularState,
             TxCircularState,
             WriteBuffer,
+            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
         },
-        Async,
     };
 
     impl<'d> I2sTx<'d, Async> {

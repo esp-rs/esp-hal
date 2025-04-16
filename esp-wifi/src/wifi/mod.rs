@@ -17,6 +17,11 @@ use core::{
 use enumset::{EnumSet, EnumSetType};
 use esp_hal::{asynch::AtomicWaker, sync::Locked};
 use esp_wifi_sys::include::{
+    WIFI_PROTOCOL_11AX,
+    WIFI_PROTOCOL_11B,
+    WIFI_PROTOCOL_11G,
+    WIFI_PROTOCOL_11N,
+    WIFI_PROTOCOL_LR,
     esp_eap_client_clear_ca_cert,
     esp_eap_client_clear_certificate_and_key,
     esp_eap_client_clear_identity,
@@ -37,11 +42,6 @@ use esp_wifi_sys::include::{
     esp_wifi_sta_enterprise_enable,
     wifi_pkt_rx_ctrl_t,
     wifi_scan_channel_bitmap_t,
-    WIFI_PROTOCOL_11AX,
-    WIFI_PROTOCOL_11B,
-    WIFI_PROTOCOL_11G,
-    WIFI_PROTOCOL_11N,
-    WIFI_PROTOCOL_LR,
 };
 #[cfg(feature = "sniffer")]
 use esp_wifi_sys::include::{
@@ -62,12 +62,12 @@ use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
 use crate::{
+    EspWifiController,
     common_adapter::*,
     config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
     wifi::private::EspWifiPacketBuffer,
-    EspWifiController,
 };
 
 const MTU: usize = crate::CONFIG.mtu;
@@ -922,10 +922,12 @@ impl<T> CsiCallback for T where T: FnMut(crate::binary::include::wifi_csi_info_t
 unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
-) { unsafe {
-    let csi_callback = &mut *(ctx as *mut C);
-    csi_callback(*data);
-}}
+) {
+    unsafe {
+        let csi_callback = &mut *(ctx as *mut C);
+        csi_callback(*data);
+    }
+}
 
 #[derive(Clone, PartialEq, Eq)]
 // https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
@@ -1421,13 +1423,16 @@ unsafe extern "C" fn recv_cb_sta(
         } else {
             Err(packet)
         }
-    }) { Ok(()) => {
-        embassy::STA_RECEIVE_WAKER.wake();
-        include::ESP_OK as esp_err_t
-    } _ => {
-        debug!("RX QUEUE FULL");
-        include::ESP_ERR_NO_MEM as esp_err_t
-    }}
+    }) {
+        Ok(()) => {
+            embassy::STA_RECEIVE_WAKER.wake();
+            include::ESP_OK as esp_err_t
+        }
+        _ => {
+            debug!("RX QUEUE FULL");
+            include::ESP_ERR_NO_MEM as esp_err_t
+        }
+    }
 }
 
 unsafe extern "C" fn recv_cb_ap(
@@ -1449,13 +1454,16 @@ unsafe extern "C" fn recv_cb_ap(
         } else {
             Err(packet)
         }
-    }) { Ok(()) => {
-        embassy::AP_RECEIVE_WAKER.wake();
-        include::ESP_OK as esp_err_t
-    } _ => {
-        debug!("RX QUEUE FULL");
-        include::ESP_ERR_NO_MEM as esp_err_t
-    }}
+    }) {
+        Ok(()) => {
+            embassy::AP_RECEIVE_WAKER.wake();
+            include::ESP_OK as esp_err_t
+        }
+        _ => {
+            debug!("RX QUEUE FULL");
+            include::ESP_ERR_NO_MEM as esp_err_t
+        }
+    }
 }
 
 pub(crate) static WIFI_TX_INFLIGHT: AtomicUsize = AtomicUsize::new(0);
@@ -1556,7 +1564,9 @@ impl Default for ScanTypeConfig {
 impl ScanTypeConfig {
     fn validate(&self) {
         if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
-            warn!("Passive scan duration longer than 1500ms may cause a station to disconnect from the AP");
+            warn!(
+                "Passive scan duration longer than 1500ms may cause a station to disconnect from the AP"
+            );
         }
     }
 }
@@ -1955,53 +1965,55 @@ impl RxControlInfo {
     /// # Safety
     /// When calling this, you must ensure, that `rx_cntl` points to a valid
     /// instance of [wifi_pkt_rx_ctrl_t].
-    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self { unsafe {
-        #[cfg(not(esp32c6))]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_mode: (*rx_cntl).sig_mode(),
-            mcs: (*rx_cntl).mcs(),
-            cwb: (*rx_cntl).cwb(),
-            smoothing: (*rx_cntl).smoothing(),
-            not_sounding: (*rx_cntl).not_sounding(),
-            aggregation: (*rx_cntl).aggregation(),
-            stbc: (*rx_cntl).stbc(),
-            fec_coding: (*rx_cntl).fec_coding(),
-            sgi: (*rx_cntl).sgi(),
-            ampdu_cnt: (*rx_cntl).ampdu_cnt(),
-            channel: (*rx_cntl).channel(),
-            secondary_channel: (*rx_cntl).secondary_channel(),
-            timestamp: (*rx_cntl).timestamp(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            ant: (*rx_cntl).ant(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
-        };
-        #[cfg(esp32c6)]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
-            dump_len: (*rx_cntl).dump_len(),
-            he_sigb_len: (*rx_cntl).he_sigb_len(),
-            cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
-            cur_bb_format: (*rx_cntl).cur_bb_format(),
-            rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
-            rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-            second: (*rx_cntl).second(),
-            channel: (*rx_cntl).channel(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            is_group: (*rx_cntl).is_group(),
-            rxend_state: (*rx_cntl).rxend_state(),
-            rxmatch3: (*rx_cntl).rxmatch3(),
-            rxmatch2: (*rx_cntl).rxmatch2(),
-            rxmatch1: (*rx_cntl).rxmatch1(),
-            rxmatch0: (*rx_cntl).rxmatch0(),
-        };
-        rx_control_info
-    }}
+    pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
+        unsafe {
+            #[cfg(not(esp32c6))]
+            let rx_control_info = RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_mode: (*rx_cntl).sig_mode(),
+                mcs: (*rx_cntl).mcs(),
+                cwb: (*rx_cntl).cwb(),
+                smoothing: (*rx_cntl).smoothing(),
+                not_sounding: (*rx_cntl).not_sounding(),
+                aggregation: (*rx_cntl).aggregation(),
+                stbc: (*rx_cntl).stbc(),
+                fec_coding: (*rx_cntl).fec_coding(),
+                sgi: (*rx_cntl).sgi(),
+                ampdu_cnt: (*rx_cntl).ampdu_cnt(),
+                channel: (*rx_cntl).channel(),
+                secondary_channel: (*rx_cntl).secondary_channel(),
+                timestamp: (*rx_cntl).timestamp(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                ant: (*rx_cntl).ant(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+            };
+            #[cfg(esp32c6)]
+            let rx_control_info = RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+                dump_len: (*rx_cntl).dump_len(),
+                he_sigb_len: (*rx_cntl).he_sigb_len(),
+                cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+                cur_bb_format: (*rx_cntl).cur_bb_format(),
+                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+                second: (*rx_cntl).second(),
+                channel: (*rx_cntl).channel(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                is_group: (*rx_cntl).is_group(),
+                rxend_state: (*rx_cntl).rxend_state(),
+                rxmatch3: (*rx_cntl).rxmatch3(),
+                rxmatch2: (*rx_cntl).rxmatch2(),
+                rxmatch1: (*rx_cntl).rxmatch1(),
+                rxmatch0: (*rx_cntl).rxmatch0(),
+            };
+            rx_control_info
+        }
+    }
 }
 /// Represents a Wi-Fi packet in promiscuous mode.
 #[cfg(feature = "sniffer")]
@@ -2023,31 +2035,35 @@ impl PromiscuousPkt<'_> {
     pub(crate) unsafe fn from_raw(
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
-    ) -> Self { unsafe {
-        let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
-        let len = rx_cntl.sig_len as usize;
-        PromiscuousPkt {
-            rx_cntl,
-            frame_type,
-            len,
-            data: core::slice::from_raw_parts(
-                (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
+    ) -> Self {
+        unsafe {
+            let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
+            let len = rx_cntl.sig_len as usize;
+            PromiscuousPkt {
+                rx_cntl,
+                frame_type,
                 len,
-            ),
+                data: core::slice::from_raw_parts(
+                    (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
+                    len,
+                ),
+            }
         }
-    }}
+    }
 }
 
 #[cfg(feature = "sniffer")]
 static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
-unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) { unsafe {
-    if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
-        let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
-        sniffer_callback(promiscuous_pkt);
+unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
+    unsafe {
+        if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
+            let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
+            sniffer_callback(promiscuous_pkt);
+        }
     }
-}}
+}
 
 #[cfg(feature = "sniffer")]
 /// A wifi sniffer.

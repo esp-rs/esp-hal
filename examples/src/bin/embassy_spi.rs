@@ -25,8 +25,8 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     spi::{
-        master::{Config, Spi},
         Mode,
+        master::{Config, Spi},
     },
     time::Rate,
     timer::timg::TimerGroup,

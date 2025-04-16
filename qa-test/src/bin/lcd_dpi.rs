@@ -33,23 +33,23 @@ use core::iter::{empty, once};
 
 use esp_backtrace as _;
 use esp_hal::{
+    Blocking,
     delay::Delay,
     dma_loop_buffer,
     gpio::{Level, Output, OutputConfig},
     i2c::{self, master::I2c},
     lcd_cam::{
+        LcdCam,
         lcd::{
-            dpi::{Config, Dpi, Format, FrameTiming},
             ClockMode,
             Phase,
             Polarity,
+            dpi::{Config, Dpi, Format, FrameTiming},
         },
-        LcdCam,
     },
     main,
     peripherals::Peripherals,
     time::Rate,
-    Blocking,
 };
 use esp_println::println;
 

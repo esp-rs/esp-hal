@@ -19,7 +19,7 @@
 //!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
 
-use crate::peripherals::{LPWR, LP_AON, LP_CORE, LP_PERI, PMU};
+use crate::peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU};
 
 /// Represents the possible wakeup sources for the LP (Low Power) core.
 #[derive(Debug, Clone, Copy)]

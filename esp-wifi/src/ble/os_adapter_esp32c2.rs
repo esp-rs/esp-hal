@@ -86,36 +86,34 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
     handler: *mut crate::binary::c_types::c_void,
     arg: *mut crate::binary::c_types::c_void,
     ret_handle: *mut *mut crate::binary::c_types::c_void,
-) -> i32 { unsafe {
-    trace!(
-        "esp_intr_alloc {} {} {:?} {:?} {:?}",
-        source,
-        flags,
-        handler,
-        arg,
-        ret_handle
-    );
+) -> i32 {
+    unsafe {
+        trace!(
+            "esp_intr_alloc {} {} {:?} {:?} {:?}",
+            source, flags, handler, arg, ret_handle
+        );
 
-    match source {
-        4 => {
-            ISR_INTERRUPT_4 = (handler, arg);
-            unwrap!(interrupt::enable(
-                Interrupt::BT_MAC,
-                interrupt::Priority::Priority1
-            ));
+        match source {
+            4 => {
+                ISR_INTERRUPT_4 = (handler, arg);
+                unwrap!(interrupt::enable(
+                    Interrupt::BT_MAC,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            7 => {
+                ISR_INTERRUPT_7 = (handler, arg);
+                unwrap!(interrupt::enable(
+                    Interrupt::LP_TIMER,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            _ => panic!("Unexpected interrupt source {}", source),
         }
-        7 => {
-            ISR_INTERRUPT_7 = (handler, arg);
-            unwrap!(interrupt::enable(
-                Interrupt::LP_TIMER,
-                interrupt::Priority::Priority1
-            ));
-        }
-        _ => panic!("Unexpected interrupt source {}", source),
+
+        0
     }
-
-    0
-}}
+}
 
 pub(super) fn ble_rtc_clk_init() {
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by

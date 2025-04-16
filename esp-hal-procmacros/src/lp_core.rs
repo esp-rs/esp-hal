@@ -4,19 +4,19 @@ use quote::quote;
 
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
+    use proc_macro_crate::{FoundCrate, crate_name};
     use proc_macro2::{Ident, Span};
-    use proc_macro_crate::{crate_name, FoundCrate};
     use quote::format_ident;
     use syn::{
-        parse::Error,
-        parse_macro_input,
-        spanned::Spanned,
         FnArg,
         GenericArgument,
         ItemFn,
         PatType,
         PathArguments,
         Type,
+        parse::Error,
+        parse_macro_input,
+        spanned::Spanned,
     };
 
     pub(crate) fn make_magic_symbol_name(args: &Vec<&PatType>) -> String {
@@ -209,8 +209,8 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
     use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
     use parse::Error;
     use proc_macro::Span;
-    use proc_macro_crate::{crate_name, FoundCrate};
-    use syn::{parse, Ident};
+    use proc_macro_crate::{FoundCrate, crate_name};
+    use syn::{Ident, parse};
 
     let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
         crate_name("esp-lp-hal")

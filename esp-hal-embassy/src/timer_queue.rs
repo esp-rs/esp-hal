@@ -12,7 +12,7 @@ use embassy_sync::blocking_mutex::Mutex;
 use esp_hal::{interrupt::Priority, sync::RawPriorityLimitedMutex};
 use queue_impl::RawQueue;
 
-use crate::time_driver::{set_up_alarm, AlarmHandle};
+use crate::time_driver::{AlarmHandle, set_up_alarm};
 
 struct TimerQueueInner {
     queue: RawQueue,

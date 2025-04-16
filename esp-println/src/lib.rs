@@ -139,9 +139,9 @@ type PrinterImpl = auto_printer::Printer;
 ))]
 mod auto_printer {
     use crate::{
+        LockToken,
         serial_jtag_printer::Printer as PrinterSerialJtag,
         uart_printer::Printer as PrinterUart,
-        LockToken,
     };
 
     pub struct Printer;
@@ -507,14 +507,16 @@ struct LockToken<'a>(LockInner<'a>);
 
 impl LockToken<'_> {
     #[allow(unused)]
-    unsafe fn conjure() -> Self { unsafe {
-        #[cfg(feature = "critical-section")]
-        let inner = critical_section::CriticalSection::new();
-        #[cfg(not(feature = "critical-section"))]
-        let inner = PhantomData;
+    unsafe fn conjure() -> Self {
+        unsafe {
+            #[cfg(feature = "critical-section")]
+            let inner = critical_section::CriticalSection::new();
+            #[cfg(not(feature = "critical-section"))]
+            let inner = PhantomData;
 
-        LockToken(inner)
-    }}
+            LockToken(inner)
+        }
+    }
 }
 
 /// Runs the callback in a critical section, if enabled.

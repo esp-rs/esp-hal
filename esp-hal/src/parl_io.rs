@@ -132,6 +132,9 @@ use enumset::{EnumSet, EnumSetType};
 use private::*;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
         Channel,
         ChannelRx,
@@ -145,17 +148,14 @@ use crate::{
         PeripheralTxChannel,
     },
     gpio::{
-        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
+        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 const MAX_DMA_SIZE: usize = 65535;
@@ -1546,10 +1546,10 @@ pub mod asynch {
 
     use procmacros::handler;
 
-    use super::{private::Instance, ParlIoRxTransfer, ParlIoTxTransfer};
+    use super::{ParlIoRxTransfer, ParlIoTxTransfer, private::Instance};
     use crate::{
         asynch::AtomicWaker,
-        dma::{asynch::DmaRxFuture, DmaRxBuffer, DmaTxBuffer},
+        dma::{DmaRxBuffer, DmaTxBuffer, asynch::DmaRxFuture},
     };
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
