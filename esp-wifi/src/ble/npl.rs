@@ -386,13 +386,13 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     unsafe {
         let name_str = str_from_c(name);
+        
+        trace!(
+            "task_create {:?} {} {} {:?} {} {:?} {}",
+            task_func, name_str, stack_depth, param, prio, task_handle, core_id,
+        );
     };
-
-    trace!(
-        "task_create {:?} {} {} {:?} {} {:?} {}",
-        task_func, name_str, stack_depth, param, prio, task_handle, core_id,
-    );
-
+        
     *(task_handle as *mut usize) = 0; // we will run it in task 0
 
     unsafe {
@@ -400,12 +400,10 @@ unsafe extern "C" fn task_create(
             *mut crate::binary::c_types::c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(task_func);
-    }
 
-    unsafe {
         let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        *(task_handle as *mut usize) = task as usize;
     }
-    *(task_handle as *mut usize) = task as usize;
 
     1
 }
@@ -424,8 +422,8 @@ unsafe extern "C" fn task_delete(task: *const c_void) {
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {
     unsafe {
         let name_str = str_from_c(fn_name as _);
+        panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
     }
-    panic!("ASSERT {}:{} {} {}", name_str, ln, param1, param2);
 }
 
 unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut c_void) -> i32 {
@@ -836,14 +834,14 @@ unsafe extern "C" fn ble_npl_event_init(
     if (*event).dummy == 0 {
         unsafe {
             let evt = crate::compat::malloc::calloc(1, core::mem::size_of::<Event>()) as *mut Event;
+            
+            (*evt).event_fn_ptr = func;
+            (*evt).ev_arg_ptr = arg;
+            (*evt).queued = false;
+            
+            let event = event.cast_mut();
+            (*event).dummy = evt as i32;
         }
-
-        (*evt).event_fn_ptr = func;
-        (*evt).ev_arg_ptr = arg;
-        (*evt).queued = false;
-
-        let event = event.cast_mut();
-        (*event).dummy = evt as i32;
     }
 }
 

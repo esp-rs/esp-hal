@@ -110,10 +110,10 @@ unsafe extern "C" fn interrupt_disable() {
         let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
             critical_section::acquire(),
         );
+        G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
+        INTERRUPT_DISABLE_CNT += 1;
+        trace!("interrupt_disable {}", flags);
     }
-    G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
-    INTERRUPT_DISABLE_CNT += 1;
-    trace!("interrupt_disable {}", flags);
 }
 
 #[ram]
@@ -222,24 +222,21 @@ unsafe extern "C" fn task_create(
 ) -> i32 {
     unsafe {
         let n = str_from_c(name);
+        trace!(
+            "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
+            func, name, n, stack_depth, param, prio, handle, core_id
+        );
     }
-    trace!(
-        "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
-        func, name, n, stack_depth, param, prio, handle, core_id
-    );
 
     unsafe {
         let task_func = core::mem::transmute::<
             *mut crate::binary::c_types::c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
-    }
-
-    unsafe {
+        
         let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        *(handle as *mut usize) = task as usize;
     }
-
-    *(handle as *mut usize) = task as usize;
 
     1
 }
