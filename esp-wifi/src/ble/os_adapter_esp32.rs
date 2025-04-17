@@ -589,10 +589,10 @@ pub(crate) unsafe extern "C" fn ints_on(mask: u32) {
 }
 
 #[cfg(coex)]
-const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;
+pub(crate) const BTDM_ASYNC_WAKEUP_REQ_HCI: i32 = 0;
 
 #[cfg(coex)]
-const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
+pub(crate) const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 
 // const BTDM_ASYNC_WAKEUP_REQMAX: i32 = 2;
 
@@ -610,26 +610,41 @@ const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 ///
 /// *************************************************************************
 #[cfg(coex)]
-fn async_wakeup_request(event: i32) -> bool {
-    let mut do_wakeup_request = false;
-
-    let request_lock = match event {
-        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,
-        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => false,
-        _ => return false,
-    };
+pub(crate) fn async_wakeup_request(event: i32) -> bool {
+    trace!("async_wakeup_request {event}");
 
     unsafe extern "C" {
+        fn btdm_in_wakeup_requesting_set(set: bool);
+
         fn btdm_power_state_active() -> bool;
-        fn btdm_wakeup_request(request_lock: bool);
+
+        fn btdm_wakeup_request();
     }
 
-    if !unsafe { btdm_power_state_active() } {
-        do_wakeup_request = true;
-        unsafe { btdm_wakeup_request(request_lock) };
-    }
+    let request_lock = match event {
+        e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => {
+            unsafe {
+                btdm_in_wakeup_requesting_set(true);
+            }
+            false
+        }
+        e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => {
+            unsafe {
+                btdm_in_wakeup_requesting_set(true);
+            }
 
-    do_wakeup_request
+            if !unsafe { btdm_power_state_active() } {
+                unsafe {
+                    btdm_wakeup_request();
+                }
+                true
+            } else {
+                false
+            }
+        }
+        _ => return false,
+    };
+    request_lock
 }
 
 /// **************************************************************************
@@ -646,7 +661,9 @@ fn async_wakeup_request(event: i32) -> bool {
 ///
 /// *************************************************************************
 #[cfg(coex)]
-fn async_wakeup_request_end(event: i32) {
+pub(crate) fn async_wakeup_request_end(event: i32) {
+    trace!("async_wakeup_request_end {event}");
+
     let request_lock = match event {
         e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,
         e if e == BTDM_ASYNC_WAKEUP_REQ_COEX => false,
@@ -654,12 +671,10 @@ fn async_wakeup_request_end(event: i32) {
     };
 
     unsafe extern "C" {
-        // this isn't found anywhere ... not a ROM function
-        // not in any of the libs - but the code will never call this anyway
-
-        // fn btdm_wakeup_request_end();
+        fn btdm_in_wakeup_requesting_set(set: bool);
     }
+
     if request_lock {
-        // unsafe { btdm_wakeup_request_end() };
+        unsafe { btdm_in_wakeup_requesting_set(false) };
     }
 }

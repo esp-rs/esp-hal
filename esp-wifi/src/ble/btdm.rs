@@ -485,7 +485,19 @@ pub fn send_hci(data: &[u8]) {
                 }
 
                 PACKET_SENT.store(false, Ordering::Relaxed);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request_end(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 trace!("sent vhci host packet");
 
                 super::dump_packet_info(packet);
