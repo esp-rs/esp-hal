@@ -45,7 +45,7 @@
 //! ensure that only a single driver configures the split pin, by selectively
 //! [freezing](`InputSignal::freeze`) the signals.
 //!
-//! For example, if you want to route GPIO3 to both a [Pulse Counter]
+//! For example, if you want to route GPIO3 to both a Pulse Counter
 //! input and a [UART][crate::uart::Uart] RX line, you will need to make sure
 //! one of the signals is frozen, otherwise the driver that is configured later
 //! will overwrite the other driver's configuration. Configuring the signals on
@@ -87,7 +87,6 @@
 //! - A GPIO output can be driven by only one peripheral output.
 //!
 //! [`GPIO0`]: crate::peripherals::GPIO0
-//! [Pulse Counter]: crate::pcnt::Pcnt
 //! [`Spi::with_mosi`]: crate::spi::master::Spi::with_mosi
 
 #[cfg(feature = "unstable")]
