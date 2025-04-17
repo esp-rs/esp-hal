@@ -476,19 +476,17 @@ impl EspTwaiFrame {
         registers: *const u32,
         dlc: usize,
     ) -> Self {
-        unsafe {
-            let mut data: [u8; 8] = [0; 8];
+        let mut data: [u8; 8] = [0; 8];
 
-            // Copy the data from the memory mapped peripheral into actual memory.
-            copy_from_data_register(&mut data[..dlc], registers);
+        // Copy the data from the memory mapped peripheral into actual memory.
+        copy_from_data_register(&mut data[..dlc], registers);
 
-            Self {
-                id: id.into(),
-                data,
-                dlc,
-                is_remote: false,
-                self_reception: false,
-            }
+        Self {
+            id: id.into(),
+            data,
+            dlc,
+            is_remote: false,
+            self_reception: false,
         }
     }
 }
@@ -1238,9 +1236,9 @@ impl embedded_can::Error for EspTwaiError {
 /// the peripheral.
 #[inline(always)]
 unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
-    unsafe {
-        for (i, dest) in dest.iter_mut().enumerate() {
-            // Perform a volatile read to avoid compiler optimizations.
+    for (i, dest) in dest.iter_mut().enumerate() {
+        // Perform a volatile read to avoid compiler optimizations.
+        unsafe {
             *dest = src.add(i).read_volatile() as u8;
         }
     }
@@ -1256,9 +1254,9 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
 /// the peripheral.
 #[inline(always)]
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
-    unsafe {
-        for (i, src) in src.iter().enumerate() {
-            // Perform a volatile write to avoid compiler optimizations.
+    for (i, src) in src.iter().enumerate() {
+        // Perform a volatile write to avoid compiler optimizations.
+        unsafe {
             dest.add(i).write_volatile(*src as u32);
         }
     }

@@ -518,12 +518,13 @@ mod vectored {
 
     /// Returns the currently bound interrupt handler.
     pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
-        let addr = pac::__INTERRUPTS[interrupt as usize]._handler;
-        if addr as usize == 0 {
-            return None;
+        unsafe {
+            let addr = pac::__INTERRUPTS[interrupt as usize]._handler;
+            if addr as usize == 0 {
+                return None;
+            }
+            Some(addr)
         }
-
-        Some(addr)
     }
 
     fn interrupt_level_to_cpu_interrupt(
