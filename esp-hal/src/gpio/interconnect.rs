@@ -12,17 +12,6 @@
 //!
 //! ## Signals
 //!
-//! Each GPIO pin driver such as [`Input`], can be converted
-//! into input or output signals. [`Flex`], which can be either input or output,
-//! can be [`split`][Flex::split] into both signals at once. These signals can
-//! then be individually connected to a peripheral input or output signal. This
-//! allows for flexible routing of signals between peripherals and GPIO pins.
-//!
-//! Note that only configured GPIO drivers can be safely turned into signals,
-//! and this conversion freezes the pin configuration, otherwise it would be
-//! possible for multiple peripheral drivers to configure the same GPIO pin at
-//! the same time, which is undefined behavior.
-//!
 //! GPIO signals are represented by the [`InputSignal`] and [`OutputSignal`]
 //! structs. Sometimes, however, you want to connect a fixed signal level
 //! to your peripheral's input, or don't want to route the output to any pin. To
@@ -33,10 +22,39 @@
 //! [`OutputConnection`] types to represent a signal that can either
 //! be a GPIO pin or a fixed signal level.
 //!
+//! ### Splitting drivers into signals
+//!
+//! Each GPIO pin driver such as [`Input`], can be converted
+//! into input or output signals. [`Flex`], which can be either input or output,
+//! can be [`split`][Flex::split] into both signals at once. These signals can
+//! then be individually connected to a peripheral input or output signal. This
+//! allows for flexible routing of signals between peripherals and GPIO pins.
+//!
+//! Note that only configured GPIO drivers can be safely turned into signals.
+//! This conversion freezes the pin configuration, otherwise it would be
+//! possible for multiple peripheral drivers to configure the same GPIO pin at
+//! the same time, which is undefined behavior.
+//!
+//! ### Splitting pins into signals
+//!
+//! GPIO pin types such as [`GPIO0`] or [`AnyPin`] can be **unsafely**
+//! [split](AnyPin::split) into signals. In this case you need to carefully
+//! ensure that only a single driver configures the split pin, by selectively
+//! [freezing](`InputSignal::freeze`) the signals.
+//!
+//! For example, if you want to route GPIO3 to both a [Pulse Counter]
+//! input and a [UART][crate::uart::Uart] RX line, you will need to make sure
+//! one of the signals is frozen, otherwise the driver that is configured later
+//! will overwrite the other driver's configuration. Configuring the signals on
+//! multiple cores is undefined behaviour unless you ensure the configuration
+//! does not happen at the same time.
+//!
+//! ### Using pins and signals
+//!
 //! A GPIO pin can be configured either with a GPIO driver such as
 //! [`Input`][crate::gpio::Input], or by a peripheral driver using a pin
 //! assignment method such as
-//! [`Spi::with_mosi`](crate::spi::master::Spi::with_mosi). The peripheral
+//! [`Spi::with_mosi`]. The peripheral
 //! drivers' preferences can be overridden by passing a pin driver to the
 //! peripheral driver. When converting a driver to signals, the underlying
 //! signals will be initially [frozen](InputSignal::freeze) to support this
@@ -64,6 +82,10 @@
 //!   output signal.
 //! - A GPIO input signal can be connected to any number of peripheral inputs.
 //! - A GPIO output can be driven by only one peripheral output.
+//!
+//! [`GPIO0`]: crate::peripherals::GPIO0
+//! [Pulse Counter]: crate::pcnt::Pcnt
+//! [`Spi::with_mosi`]: crate::spi::master::Spi::with_mosi
 
 #[cfg(feature = "unstable")]
 use crate::gpio::{Input, Output};
@@ -90,7 +112,10 @@ use crate::{
     private::{self, Sealed},
 };
 
-/// The base of all peripheral signal.
+/// The base of all peripheral signals.
+///
+/// This trait represents a signal in the GPIO matrix. Signals are converted or
+/// split from GPIO pins and can be connected to peripheral inputs and outputs.
 ///
 /// All signals can be peripheral inputs, but not all output-like types should
 /// be allowed to be passed as inputs. This trait bridges this gap by defining
