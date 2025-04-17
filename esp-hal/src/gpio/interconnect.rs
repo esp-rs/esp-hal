@@ -66,9 +66,9 @@
 //! ## Inverting inputs and outputs
 //!
 //! The GPIO matrix allows for inverting the input and output signals. This can
-//! be configured by setting the [`InputSignal::invert_input`] and
-//! [`OutputSignal::invert_output`]. The hardware is configured accordingly when
-//! the signal is connected to a peripheral input or output.
+//! be configured via [`InputSignal::with_inverted_input`] and
+//! [`OutputSignal::with_inverted_input`]. The hardware is configured
+//! accordingly when the signal is connected to a peripheral input or output.
 //!
 //! ## Connection rules
 //!
@@ -278,24 +278,30 @@ impl<'d> PeripheralSignal<'d> for InputSignal<'d> {
         // Since there can only be one input signal connected to a peripheral
         // at a time, this function will disconnect any previously
         // connected input signals.
-        self.pin
-            .connect_to_peripheral_input(signal, self.invert_input, self.force_gpio_matrix);
+        self.pin.connect_to_peripheral_input(
+            signal,
+            self.is_input_inverted(),
+            self.is_gpio_matrix_forced(),
+        );
     }
 }
 impl<'d> PeripheralInput<'d> for InputSignal<'d> {}
 
 impl<'d> PeripheralSignal<'d> for OutputSignal<'d> {
     fn connect_input_to_peripheral(&self, signal: gpio::InputSignal) {
-        self.pin
-            .connect_to_peripheral_input(signal, self.invert_input, self.force_gpio_matrix);
+        self.pin.connect_to_peripheral_input(
+            signal,
+            self.is_input_inverted(),
+            self.is_gpio_matrix_forced(),
+        );
     }
 }
 impl<'d> PeripheralOutput<'d> for OutputSignal<'d> {
     fn connect_peripheral_to_output(&self, signal: gpio::OutputSignal) {
         self.pin.connect_peripheral_to_output(
             signal,
-            self.invert_output,
-            self.force_gpio_matrix,
+            self.is_output_inverted(),
+            self.is_gpio_matrix_forced(),
             true,
             false,
         );
@@ -493,6 +499,15 @@ impl Signal<'_> {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Clone, Copy)]
+    struct InputFlags: u8 {
+        const ForceGpioMatrix = 1 << 0;
+        const Frozen          = 1 << 1;
+        const InvertInput     = 1 << 2;
+    }
+}
+
 /// An input signal between a peripheral and a GPIO pin.
 ///
 /// If the `InputSignal` was obtained from a pin driver such as
@@ -504,12 +519,7 @@ impl Signal<'_> {
 #[instability::unstable]
 pub struct InputSignal<'d> {
     pin: Signal<'d>,
-    /// If `true`, forces the GPIO matrix to be used for this signal.
-    pub(crate) force_gpio_matrix: bool,
-    /// Inverts the peripheral's input signal.
-    pub(crate) invert_input: bool,
-    /// If `true`, prevents peripheral drivers from modifying the pin settings.
-    pub(crate) frozen: bool,
+    flags: InputFlags,
 }
 
 impl From<Level> for InputSignal<'_> {
@@ -552,9 +562,7 @@ impl Clone for InputSignal<'_> {
     fn clone(&self) -> Self {
         Self {
             pin: unsafe { self.pin.clone_unchecked() },
-            force_gpio_matrix: self.force_gpio_matrix,
-            invert_input: self.invert_input,
-            frozen: self.frozen,
+            flags: self.flags,
         }
     }
 }
@@ -563,9 +571,7 @@ impl<'d> InputSignal<'d> {
     fn new_inner(inner: Signal<'d>) -> Self {
         Self {
             pin: inner,
-            force_gpio_matrix: false,
-            invert_input: false,
-            frozen: false,
+            flags: InputFlags::empty(),
         }
     }
 
@@ -582,7 +588,7 @@ impl<'d> InputSignal<'d> {
     /// This will prevent the associated peripheral from modifying the pin
     /// settings.
     pub fn freeze(mut self) -> Self {
-        self.frozen = true;
+        self.flags.insert(InputFlags::Frozen);
         self
     }
 
@@ -599,7 +605,7 @@ impl<'d> InputSignal<'d> {
     /// also lead to surprising behavior if the pin is passed to multiple
     /// peripherals that expect conflicting settings.
     pub unsafe fn unfreeze(&mut self) {
-        self.frozen = false;
+        self.flags.remove(InputFlags::Frozen);
     }
 
     /// Returns the GPIO number of the underlying pin.
@@ -610,13 +616,15 @@ impl<'d> InputSignal<'d> {
     }
 
     /// Returns `true` if the input signal is high.
+    ///
+    /// Note that this does not take [`Self::with_inverted_input`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns the current signal level.
     ///
-    /// Note that this does not take [`Self::invert_input`] into account.
+    /// Note that this does not take [`Self::with_inverted_input`] into account.
     pub fn level(&self) -> Level {
         self.is_input_high().into()
     }
@@ -626,14 +634,27 @@ impl<'d> InputSignal<'d> {
     /// Note that the hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_input_inverted(&self) -> bool {
-        self.invert_input
+        self.flags.contains(InputFlags::InvertInput)
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     pub fn with_inverted_input(mut self, invert: bool) -> Self {
-        self.invert_input = invert;
+        self.flags.set(InputFlags::InvertInput, invert);
         self
+    }
+
+    /// Consumes the signal and returns a new one that forces the GPIO matrix
+    /// to be used.
+    pub fn with_gpio_matrix_forced(mut self, force: bool) -> Self {
+        self.flags.set(InputFlags::ForceGpioMatrix, force);
+        self
+    }
+
+    /// Returns `true` if the input signal must be routed through the GPIO
+    /// matrix.
+    pub fn is_gpio_matrix_forced(&self) -> bool {
+        self.flags.contains(InputFlags::ForceGpioMatrix)
     }
 
     delegate::delegate! {
@@ -651,13 +672,23 @@ impl<'d> InputSignal<'d> {
         #[instability::unstable]
         #[doc(hidden)]
         to match &self.pin {
-            Signal::Pin(_) if self.frozen => NoOp,
+            Signal::Pin(_) if self.flags.contains(InputFlags::Frozen) => NoOp,
             Signal::Pin(signal) => signal,
             Signal::Level(_) => NoOp,
         } {
             pub fn apply_input_config(&self, _config: &gpio::InputConfig);
             pub fn set_input_enable(&self, on: bool);
         }
+    }
+}
+
+bitflags::bitflags! {
+    #[derive(Clone, Copy)]
+    struct OutputFlags: u8 {
+        const ForceGpioMatrix = 1 << 0;
+        const Frozen          = 1 << 1;
+        const InvertInput     = 1 << 2;
+        const InvertOutput    = 1 << 3;
     }
 }
 
@@ -675,18 +706,7 @@ impl<'d> InputSignal<'d> {
 #[instability::unstable]
 pub struct OutputSignal<'d> {
     pin: Signal<'d>,
-
-    /// If `true`, forces the GPIO matrix to be used for this signal.
-    pub(crate) force_gpio_matrix: bool,
-
-    /// Inverts the peripheral's output signal.
-    pub(crate) invert_output: bool,
-
-    /// Inverts the peripheral's input signal.
-    pub(crate) invert_input: bool,
-
-    /// If `true`, prevents peripheral drivers from modifying the pin settings.
-    pub(crate) frozen: bool,
+    flags: OutputFlags,
 }
 
 impl Sealed for OutputSignal<'_> {}
@@ -729,10 +749,7 @@ impl<'d> OutputSignal<'d> {
     fn new_inner(inner: Signal<'d>) -> Self {
         Self {
             pin: inner,
-            force_gpio_matrix: false,
-            invert_output: false,
-            invert_input: false,
-            frozen: false,
+            flags: OutputFlags::empty(),
         }
     }
 
@@ -742,6 +759,15 @@ impl<'d> OutputSignal<'d> {
 
     pub(crate) fn new_level(level: Level) -> Self {
         Self::new_inner(Signal::Level(level))
+    }
+
+    /// Freezes the pin configuration.
+    ///
+    /// This will prevent the associated peripheral from modifying the pin
+    /// settings.
+    pub fn freeze(mut self) -> Self {
+        self.flags.insert(OutputFlags::Frozen);
+        self
     }
 
     /// Unfreezes the pin configuration.
@@ -757,7 +783,7 @@ impl<'d> OutputSignal<'d> {
     /// It can also lead to surprising behavior if the pin is passed to multiple
     /// peripherals that expect conflicting settings.
     pub unsafe fn unfreeze(&mut self) {
-        self.frozen = false;
+        self.flags.remove(OutputFlags::Frozen);
     }
 
     /// Returns the GPIO number of the underlying pin.
@@ -772,7 +798,7 @@ impl<'d> OutputSignal<'d> {
     /// Note that the hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_input_inverted(&self) -> bool {
-        self.invert_input
+        self.flags.contains(OutputFlags::InvertInput)
     }
 
     /// Returns `true` if the output signal is configured to be inverted.
@@ -780,29 +806,47 @@ impl<'d> OutputSignal<'d> {
     /// Note that the hardware is not configured until the signal is actually
     /// connected to a peripheral.
     pub fn is_output_inverted(&self) -> bool {
-        self.invert_output
+        self.flags.contains(OutputFlags::InvertOutput)
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// output signal.
     pub fn with_inverted_output(mut self, invert: bool) -> Self {
-        self.invert_output = invert;
+        self.flags.set(OutputFlags::InvertOutput, invert);
         self
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     pub fn with_inverted_input(mut self, invert: bool) -> Self {
-        self.invert_input = invert;
+        self.flags.set(OutputFlags::InvertInput, invert);
         self
     }
 
+    /// Consumes the signal and returns a new one that forces the GPIO matrix
+    /// to be used.
+    pub fn with_gpio_matrix_forced(mut self, force: bool) -> Self {
+        self.flags.set(OutputFlags::ForceGpioMatrix, force);
+        self
+    }
+
+    /// Returns `true` if the input signal must be routed through the GPIO
+    /// matrix.
+    pub fn is_gpio_matrix_forced(&self) -> bool {
+        self.flags.contains(OutputFlags::ForceGpioMatrix)
+    }
+
     /// Returns `true` if the input signal is high.
+    ///
+    /// Note that this does not take [`Self::with_inverted_input`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns `true` if the output signal is set high.
+    ///
+    /// Note that this does not take [`Self::with_inverted_output`] into
+    /// account.
     pub fn is_set_high(&self) -> bool {
         self.pin.is_set_high()
     }
@@ -830,7 +874,7 @@ impl<'d> OutputSignal<'d> {
         #[instability::unstable]
         #[doc(hidden)]
         to match &self.pin {
-            Signal::Pin(_) if self.frozen => NoOp,
+            Signal::Pin(_) if self.flags.contains(OutputFlags::Frozen) => NoOp,
             Signal::Pin(pin) => pin,
             Signal::Level(_) => NoOp,
         } {

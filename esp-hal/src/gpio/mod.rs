@@ -1768,12 +1768,10 @@ impl<'d> Flex<'d> {
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
         self.pin.set_input_enable(true);
-        let mut input = unsafe {
+        unsafe {
             // Safety: the signal is frozen by this function.
-            self.pin.clone_unchecked().split_no_init().0
-        };
-        input.frozen = true;
-        input
+            self.pin.clone_unchecked().split_no_init().0.freeze()
+        }
     }
 
     /// Split the pin into an input and output signal pair.
@@ -1861,12 +1859,10 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
-        let mut output = unsafe {
+        unsafe {
             // Safety: the signals are frozen by this function.
-            self.pin.split_no_init().1
-        };
-        output.frozen = true;
-        output
+            self.pin.split_no_init().1.freeze()
+        }
     }
 }
 
@@ -1945,12 +1941,12 @@ impl<'lt> AnyPin<'lt> {
         self.init_gpio();
         self.set_input_enable(true);
 
-        let (input, mut output) = unsafe { self.split_no_init() };
+        let (input, output) = unsafe { self.split_no_init() };
 
         // We don't know if the input signal(s) will support bypassing the GPIO matrix.
         // Since the bypass option is common between input and output halves of
         // a single GPIO, we can't assume anything about the output, either.
-        output.force_gpio_matrix = true;
+        let output = output.with_gpio_matrix_forced(true);
 
         (input, output)
     }
@@ -2007,7 +2003,7 @@ impl<'lt> AnyPin<'lt> {
         interconnect::InputSignal<'lt>,
         interconnect::OutputSignal<'lt>,
     ) {
-        let mut input = interconnect::InputSignal::new(unsafe { self.clone_unchecked() });
+        let input = interconnect::InputSignal::new(unsafe { self.clone_unchecked() });
         let output = interconnect::OutputSignal::new(self);
 
         // Since InputSignal can be cloned, we have no way of knowing how many signals
@@ -2015,7 +2011,7 @@ impl<'lt> AnyPin<'lt> {
         // passed to peripherals, and one of them would allow GPIO alternate
         // function configurations, it would mean that the GPIO MCU_SEL bit's
         // final value would depend on the order of operations.
-        input.force_gpio_matrix = true;
+        let input = input.with_gpio_matrix_forced(true);
 
         (input, output)
     }

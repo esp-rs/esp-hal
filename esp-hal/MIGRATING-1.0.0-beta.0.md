@@ -104,6 +104,7 @@ been made:
   - `InputSignal::invert` and `OutputSignal::invert` have been removed.
   - `OutputSignal` now has an `inverted_input` property, which can be changed by using `with_inverted_output`.
   - The signals have `is_{input, output}_inverted` methods to read the state that will be used when configuring the hardware.
+- Users can now force a signal through the GPIO matrix.
 - The `enable_input` and `enable_output` methods have been renamed to `set_input_enable` and `set_output_enable`.
 - A new `PeripheralSignal` trait has been added, which allows us to no longer imply `PeripheralInput` for `PeripheralOutput` types.
 - Functions that accept `PeripheralInput` **no longer accept** `PeripheralOutput` implementations.
