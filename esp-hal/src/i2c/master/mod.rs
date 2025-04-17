@@ -43,7 +43,7 @@ use crate::{
         OutputSignal,
         PinGuard,
         Pull,
-        interconnect::{OutputConnection, PeripheralOutput},
+        interconnect::{self, PeripheralOutput},
     },
     i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
@@ -954,7 +954,7 @@ where
 
         input.connect_to(&pin);
 
-        *guard = OutputConnection::connect_with_guard(pin, output);
+        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
     }
 
     /// Writes bytes to slave with given `address`

@@ -148,8 +148,11 @@ use crate::{
         PeripheralTxChannel,
     },
     gpio::{
+        self,
+        InputSignal,
         NoPin,
-        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
+        OutputSignal,
+        interconnect::{self, PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
@@ -430,18 +433,18 @@ impl core::fmt::Display for ConfigError {
 /// Used to configure no pin as clock output
 impl TxClkPin for NoPin {
     fn configure(&mut self) {
-        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(self);
+        OutputSignal::PARL_TX_CLK.connect_to(self);
     }
 }
 impl RxClkPin for NoPin {
     fn configure(&mut self) {
-        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(self);
+        InputSignal::PARL_RX_CLK.connect_to(self);
     }
 }
 
 /// Wraps a GPIO pin which will be used as the clock output signal
 pub struct ClkOutPin<'d> {
-    pin: OutputConnection<'d>,
+    pin: interconnect::OutputSignal<'d>,
 }
 impl<'d> ClkOutPin<'d> {
     /// Create a ClkOutPin
@@ -451,17 +454,16 @@ impl<'d> ClkOutPin<'d> {
 }
 impl TxClkPin for ClkOutPin<'_> {
     fn configure(&mut self) {
-        self.pin
-            .apply_output_config(&crate::gpio::OutputConfig::default());
+        self.pin.apply_output_config(&gpio::OutputConfig::default());
         self.pin.set_output_enable(true);
 
-        crate::gpio::OutputSignal::PARL_TX_CLK.connect_to(&self.pin);
+        OutputSignal::PARL_TX_CLK.connect_to(&self.pin);
     }
 }
 
 /// Wraps a GPIO pin which will be used as the TX clock input signal
 pub struct ClkInPin<'d> {
-    pin: InputConnection<'d>,
+    pin: interconnect::InputSignal<'d>,
 }
 impl<'d> ClkInPin<'d> {
     /// Create a new ClkInPin
@@ -475,16 +477,15 @@ impl TxClkPin for ClkInPin<'_> {
         pcr.parl_clk_tx_conf()
             .modify(|_, w| unsafe { w.parl_clk_tx_sel().bits(3).parl_clk_tx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .apply_input_config(&crate::gpio::InputConfig::default());
+        self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
-        crate::gpio::InputSignal::PARL_TX_CLK.connect_to(&self.pin);
+        InputSignal::PARL_TX_CLK.connect_to(&self.pin);
     }
 }
 
 /// Wraps a GPIO pin which will be used as the RX clock input signal
 pub struct RxClkInPin<'d> {
-    pin: InputConnection<'d>,
+    pin: interconnect::InputSignal<'d>,
     sample_edge: SampleEdge,
 }
 impl<'d> RxClkInPin<'d> {
@@ -502,11 +503,10 @@ impl RxClkPin for RxClkInPin<'_> {
         pcr.parl_clk_rx_conf()
             .modify(|_, w| unsafe { w.parl_clk_rx_sel().bits(3).parl_clk_rx_div_num().bits(0) }); // PAD_CLK_TX, no divider
 
-        self.pin
-            .apply_input_config(&crate::gpio::InputConfig::default());
+        self.pin.apply_input_config(&gpio::InputConfig::default());
         self.pin.set_input_enable(true);
 
-        crate::gpio::InputSignal::PARL_RX_CLK.connect_to(&self.pin);
+        InputSignal::PARL_RX_CLK.connect_to(&self.pin);
 
         Instance::set_rx_clk_edge_sel(self.sample_edge);
     }
@@ -518,7 +518,7 @@ where
     P: NotContainsValidSignalPin + TxPins + ConfigurePins + 'd,
 {
     tx_pins: P,
-    valid_pin: OutputConnection<'d>,
+    valid_pin: interconnect::OutputSignal<'d>,
 }
 
 impl<'d, P> TxPinConfigWithValidPin<'d, P>
@@ -547,7 +547,7 @@ where
         self.tx_pins.configure();
 
         self.valid_pin
-            .apply_output_config(&crate::gpio::OutputConfig::default());
+            .apply_output_config(&gpio::OutputConfig::default());
         self.valid_pin.set_output_enable(true);
 
         Instance::tx_valid_pin_signal().connect_to(&self.valid_pin);
@@ -596,7 +596,7 @@ macro_rules! tx_pins {
             #[doc = "bit output mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : OutputConnection<'d >,
+                    [< pin_ $pin:lower >] : interconnect::OutputSignal<'d>,
                 )+
             }
 
@@ -617,10 +617,10 @@ macro_rules! tx_pins {
             {
                 fn configure(&mut self) {
                     $(
-                        self.[< pin_ $pin:lower >].apply_output_config(&$crate::gpio::OutputConfig::default());
+                        self.[< pin_ $pin:lower >].apply_output_config(&gpio::OutputConfig::default());
                         self.[< pin_ $pin:lower >].set_output_enable(true);
 
-                        crate::gpio::OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
+                        OutputSignal::$signal.connect_to(&mut self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_tx_bit_width( private::WidSel::[< Bits $width >]);
@@ -695,7 +695,7 @@ where
     P: NotContainsValidSignalPin + RxPins + ConfigurePins,
 {
     rx_pins: P,
-    valid_pin: InputConnection<'d>,
+    valid_pin: interconnect::InputSignal<'d>,
     enable_mode: EnableMode,
 }
 
@@ -726,7 +726,7 @@ where
         self.rx_pins.configure();
 
         self.valid_pin
-            .apply_input_config(&crate::gpio::InputConfig::default());
+            .apply_input_config(&gpio::InputConfig::default());
         self.valid_pin.set_input_enable(true);
 
         Instance::rx_valid_pin_signal().connect_to(&self.valid_pin);
@@ -797,7 +797,7 @@ macro_rules! rx_pins {
             #[doc = "bit input mode"]
             pub struct $name<'d> {
                 $(
-                    [< pin_ $pin:lower >] : InputConnection<'d>,
+                    [< pin_ $pin:lower >] : interconnect::InputSignal<'d>,
                 )+
             }
 
@@ -818,9 +818,9 @@ macro_rules! rx_pins {
             {
                 fn configure(&mut self) {
                     $(
-                        self.[< pin_ $pin:lower >].apply_input_config(&$crate::gpio::InputConfig::default());
+                        self.[< pin_ $pin:lower >].apply_input_config(&gpio::InputConfig::default());
                         self.[< pin_ $pin:lower >].set_input_enable(true);
-                        crate::gpio::InputSignal::$signal.connect_to(&self.[< pin_ $pin:lower >]);
+                        InputSignal::$signal.connect_to(&self.[< pin_ $pin:lower >]);
                     )+
 
                     private::Instance::set_rx_bit_width( private::WidSel::[< Bits $width >]);
@@ -1635,7 +1635,10 @@ pub mod asynch {
 
 mod private {
     use super::{BitPackOrder, SampleEdge};
-    use crate::peripherals::PARL_IO;
+    use crate::{
+        gpio::{InputSignal, OutputSignal},
+        peripherals::PARL_IO,
+    };
 
     pub trait NotContainsValidSignalPin {}
 
@@ -1750,8 +1753,8 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit_is_set()
         }
 
-        pub fn tx_valid_pin_signal() -> crate::gpio::OutputSignal {
-            crate::gpio::OutputSignal::PARL_TX_DATA15
+        pub fn tx_valid_pin_signal() -> OutputSignal {
+            OutputSignal::PARL_TX_DATA15
         }
 
         pub fn set_tx_hw_valid_en(value: bool) {
@@ -1770,8 +1773,8 @@ mod private {
                 .modify(|_, w| unsafe { w.rx_bus_wid_sel().bits(width as u8) });
         }
 
-        pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
-            crate::gpio::InputSignal::PARL_RX_DATA15
+        pub fn rx_valid_pin_signal() -> InputSignal {
+            InputSignal::PARL_RX_DATA15
         }
 
         pub fn set_rx_sw_en(value: bool) {
@@ -1966,8 +1969,8 @@ mod private {
             reg_block.int_raw().read().tx_eof().bit_is_set()
         }
 
-        pub fn tx_valid_pin_signal() -> crate::gpio::OutputSignal {
-            crate::gpio::OutputSignal::PARL_TX_DATA7
+        pub fn tx_valid_pin_signal() -> OutputSignal {
+            OutputSignal::PARL_TX_DATA7
         }
 
         pub fn set_tx_hw_valid_en(value: bool) {
@@ -1986,8 +1989,8 @@ mod private {
                 .modify(|_, w| unsafe { w.rx_bus_wid_sel().bits(width as u8) });
         }
 
-        pub fn rx_valid_pin_signal() -> crate::gpio::InputSignal {
-            crate::gpio::InputSignal::PARL_RX_DATA7
+        pub fn rx_valid_pin_signal() -> InputSignal {
+            InputSignal::PARL_RX_DATA7
         }
 
         pub fn set_rx_sw_en(value: bool) {

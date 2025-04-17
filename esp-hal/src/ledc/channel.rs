@@ -15,7 +15,7 @@ use crate::{
         DriveMode,
         OutputConfig,
         OutputSignal,
-        interconnect::{OutputConnection, PeripheralOutput},
+        interconnect::{self, PeripheralOutput},
     },
     pac::ledc::RegisterBlock,
     peripherals::LEDC,
@@ -153,7 +153,7 @@ pub struct Channel<'a, S: TimerSpeed> {
     ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
-    output_pin: OutputConnection<'a>,
+    output_pin: interconnect::OutputSignal<'a>,
 }
 
 impl<'a, S: TimerSpeed> Channel<'a, S> {

@@ -179,11 +179,12 @@ impl<const C: u8> EventChannel<C> {
         kind: EventKind,
     ) -> Event<'d> {
         let pin = pin.into();
+        if let Some(number) = pin.number() {
+            pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
+            pin.set_input_enable(true);
 
-        pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
-        pin.set_input_enable(true);
-
-        enable_event_channel(C, pin.number());
+            enable_event_channel(C, number);
+        }
         Event {
             id: kind.id() + C,
             _pin: PhantomData,
@@ -281,19 +282,22 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         let pin = pin.into();
 
-        let config = if pin_config.open_drain {
-            super::OutputConfig::default()
-                .with_drive_mode(super::DriveMode::OpenDrain)
-                .with_pull(pin_config.pull)
-        } else {
-            super::OutputConfig::default()
-        };
+        if let Some(number) = pin.number() {
+            let config = if pin_config.open_drain {
+                super::OutputConfig::default()
+                    .with_drive_mode(super::DriveMode::OpenDrain)
+                    .with_pull(pin_config.pull)
+            } else {
+                super::OutputConfig::default()
+            };
 
-        pin.set_output_high(pin_config.initial_state.into());
-        pin.apply_output_config(&config);
-        pin.set_output_enable(true);
+            pin.set_output_high(pin_config.initial_state.into());
+            pin.apply_output_config(&config);
+            pin.set_output_enable(true);
 
-        enable_task_channel(C, pin.number());
+            // TODO: what should we do if the user passes a Level/NoPin?
+            enable_task_channel(C, number);
+        }
         Task {
             id: kind.id() + C,
             _pin: PhantomData,

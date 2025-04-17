@@ -119,7 +119,7 @@ use crate::{
     gpio::{
         OutputConfig,
         OutputSignal,
-        interconnect::{OutputConnection, PeripheralOutput},
+        interconnect::{self, PeripheralOutput},
     },
     i2s::{AnyI2s, AnyI2sInner},
     pac::i2s0::RegisterBlock,
@@ -137,7 +137,7 @@ pub trait TxPins<'d> {
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pins: [OutputConnection<'d>; 16],
+    pins: [interconnect::OutputSignal<'d>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
@@ -202,7 +202,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pins: [OutputConnection<'d>; 8],
+    pins: [interconnect::OutputSignal<'d>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
