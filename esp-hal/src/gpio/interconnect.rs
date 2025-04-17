@@ -572,7 +572,6 @@ impl<'d> InputSignal<'d> {
             p if self.frozen => Frozen(p),
             p => p
         } {
-            pub fn init_gpio(&self);
             pub fn apply_input_config(&self, _config: &gpio::InputConfig);
             pub fn set_input_enable(&self, _on: bool);
         }
@@ -691,7 +690,6 @@ impl<'d> OutputSignal<'d> {
             p if self.frozen => Frozen(p),
             p => p
         } {
-            pub fn init_gpio(&self);
             pub fn apply_output_config(&self, _config: &gpio::OutputConfig);
             pub fn apply_input_config(&self, _config: &gpio::InputConfig);
             pub fn set_input_enable(&self, _on: bool);
@@ -772,7 +770,6 @@ impl InputConnection<'_> {
             InputConnectionInner::Signal(signal) => signal,
             InputConnectionInner::Constant(_) => NoOp,
         } {
-            pub fn init_gpio(&self);
             pub fn apply_input_config(&self, _config: &gpio::InputConfig);
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             pub fn set_input_enable(&self, on: bool);
@@ -853,7 +850,6 @@ impl OutputConnection<'_> {
             OutputConnectionInner::Signal(signal) => signal,
             OutputConnectionInner::Constant(_) => NoOp,
         } {
-            pub fn init_gpio(&self);
             pub fn input_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::InputSignal)];
             pub fn output_signals(&self, _internal: private::Internal) -> &'static [(AlternateFunction, gpio::OutputSignal)];
             pub fn apply_input_config(&self, _config: &gpio::InputConfig);
@@ -896,7 +892,6 @@ impl OutputConnection<'_> {
 struct Frozen<'a>(&'a AnyPin<'a>);
 
 impl Frozen<'_> {
-    fn init_gpio(&self) {}
     // Even though settings are frozen, the user probably wants the input stage to
     // be enabled. It's cheap and safe to do. The user can still disconnect the
     // peripheral from the outside world if they want with some creative
@@ -913,7 +908,6 @@ impl Frozen<'_> {
 struct NoOp;
 
 impl NoOp {
-    fn init_gpio(&self) {}
     fn set_input_enable(&self, _on: bool) {}
     fn set_output_enable(&self, _on: bool) {}
     fn set_output_high(&self, _on: bool) {}
@@ -947,6 +941,8 @@ impl NoOp {
 /// // 33 | |     Level::Low,
 /// // 34 | |     Default::default()),
 /// //    | |_______________________^ the trait `InputPin` is not implemented for `Output<'_>`
+/// // FIXME: due to <https://github.com/rust-lang/rust/issues/139924> this test may be ineffective.
+/// //        It can be manually verified by changing it to `no_run` for a `run-doc-tests` run.
 #[doc = crate::before_snippet!()]
 /// use esp_hal::gpio::{Output, Level, interconnect::PeripheralInput};
 ///

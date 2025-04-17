@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDmaBus` no longer adjusts the DMA buffer length for each transfer (#3263)
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
-- `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- The `gpio::interconnect` module has been rewritten. For details, refer to the Migration guide (#3302, #3395)
 - Make `ParlIo` driver construction more consistent (#3345)
 - `ParlIo` driver now uses a config struct (#3359)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)

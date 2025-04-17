@@ -876,9 +876,12 @@ macro_rules! gpio {
                     #[instability::unstable]
                     pub unsafe fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
                         use $crate::gpio::Pin;
+
                         // FIXME: we should implement this in the gpio macro for output pins, but we
                         // should also have an input-only alternative for pins that can't be used as
                         // outputs.
+
+                        // This goes through AnyPin which calls `init_gpio` as needed.
                         unsafe { self.degrade().split() }
                     }
                 }
@@ -1532,6 +1535,7 @@ impl<'d> Flex<'d> {
     pub fn new(pin: impl Pin + 'd) -> Self {
         let pin = pin.degrade();
 
+        // Before each use, reset the GPIO to a known state.
         pin.init_gpio();
 
         Self { pin }
@@ -1877,6 +1881,11 @@ impl<'lt> AnyPin<'lt> {
     }
 
     #[inline]
+    /// Resets the GPIO to a known state.
+    ///
+    /// This function needs to be called before using the GPIO pin:
+    /// - Before converting it into signals
+    /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
         #[cfg(usb_device)]
         disable_usb_pads(self.number());
@@ -1926,18 +1935,12 @@ impl<'lt> AnyPin<'lt> {
         interconnect::InputSignal<'lt>,
         interconnect::OutputSignal<'lt>,
     ) {
-        self.init_gpio();
-        unsafe { self.split_no_init() }
-    }
+        assert!(self.is_output());
 
-    unsafe fn split_no_init(
-        self,
-    ) -> (
-        interconnect::InputSignal<'lt>,
-        interconnect::OutputSignal<'lt>,
-    ) {
-        let input = unsafe { self.clone_unchecked().into_input_signal() };
-        let mut output = self.into_output_signal();
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+
+        let (input, mut output) = unsafe { self.split_no_init() };
 
         // We don't know if the input signal(s) will support bypassing the GPIO matrix.
         // Since the bypass option is common between input and output halves of
@@ -1960,17 +1963,10 @@ impl<'lt> AnyPin<'lt> {
     #[inline]
     #[instability::unstable]
     pub unsafe fn into_input_signal(self) -> interconnect::InputSignal<'lt> {
-        let mut input = interconnect::InputSignal::new(Self {
-            pin: self.pin,
-            _lifetime: self._lifetime,
-        });
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
 
-        // Since InputSignal can be cloned, we have no way of knowing how many signals
-        // end up being configured, and in what order. If multiple signals are
-        // passed to peripherals, and one of them would allow GPIO alternate
-        // function configurations, it would mean that the GPIO MCU_SEL bit's
-        // final value would depend on the order of operations.
-        input.force_gpio_matrix = true;
+        let (input, _) = unsafe { self.split_no_init() };
 
         input
     }
@@ -1988,11 +1984,32 @@ impl<'lt> AnyPin<'lt> {
     pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
         assert!(self.is_output());
 
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+
         // AnyPin is used as output only, we can allow bypassing the GPIO matrix.
-        interconnect::OutputSignal::new(Self {
-            pin: self.pin,
-            _lifetime: self._lifetime,
-        })
+        let (_, output) = unsafe { self.split_no_init() };
+
+        output
+    }
+
+    unsafe fn split_no_init(
+        self,
+    ) -> (
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
+    ) {
+        let mut input = interconnect::InputSignal::new(unsafe { self.clone_unchecked() });
+        let output = interconnect::OutputSignal::new(self);
+
+        // Since InputSignal can be cloned, we have no way of knowing how many signals
+        // end up being configured, and in what order. If multiple signals are
+        // passed to peripherals, and one of them would allow GPIO alternate
+        // function configurations, it would mean that the GPIO MCU_SEL bit's
+        // final value would depend on the order of operations.
+        input.force_gpio_matrix = true;
+
+        (input, output)
     }
 
     #[inline]
