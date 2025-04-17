@@ -63,8 +63,7 @@ unsafe extern "C" fn semphr_give_from_isr_wrapper(
 
 #[cfg(coex)]
 unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
-    // like original implementation
-    0
+    crate::interrupts_disabled() as i32
 }
 
 #[unsafe(no_mangle)]
