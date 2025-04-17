@@ -1967,48 +1967,52 @@ impl RxControlInfo {
     /// instance of [wifi_pkt_rx_ctrl_t].
     pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
         #[cfg(not(esp32c6))]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_mode: (*rx_cntl).sig_mode(),
-            mcs: (*rx_cntl).mcs(),
-            cwb: (*rx_cntl).cwb(),
-            smoothing: (*rx_cntl).smoothing(),
-            not_sounding: (*rx_cntl).not_sounding(),
-            aggregation: (*rx_cntl).aggregation(),
-            stbc: (*rx_cntl).stbc(),
-            fec_coding: (*rx_cntl).fec_coding(),
-            sgi: (*rx_cntl).sgi(),
-            ampdu_cnt: (*rx_cntl).ampdu_cnt(),
-            channel: (*rx_cntl).channel(),
-            secondary_channel: (*rx_cntl).secondary_channel(),
-            timestamp: (*rx_cntl).timestamp(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            ant: (*rx_cntl).ant(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
+        let rx_control_info = unsafe {
+            RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_mode: (*rx_cntl).sig_mode(),
+                mcs: (*rx_cntl).mcs(),
+                cwb: (*rx_cntl).cwb(),
+                smoothing: (*rx_cntl).smoothing(),
+                not_sounding: (*rx_cntl).not_sounding(),
+                aggregation: (*rx_cntl).aggregation(),
+                stbc: (*rx_cntl).stbc(),
+                fec_coding: (*rx_cntl).fec_coding(),
+                sgi: (*rx_cntl).sgi(),
+                ampdu_cnt: (*rx_cntl).ampdu_cnt(),
+                channel: (*rx_cntl).channel(),
+                secondary_channel: (*rx_cntl).secondary_channel(),
+                timestamp: (*rx_cntl).timestamp(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                ant: (*rx_cntl).ant(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+            }
         };
         #[cfg(esp32c6)]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
-            dump_len: (*rx_cntl).dump_len(),
-            he_sigb_len: (*rx_cntl).he_sigb_len(),
-            cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
-            cur_bb_format: (*rx_cntl).cur_bb_format(),
-            rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
-            rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-            second: (*rx_cntl).second(),
-            channel: (*rx_cntl).channel(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            is_group: (*rx_cntl).is_group(),
-            rxend_state: (*rx_cntl).rxend_state(),
-            rxmatch3: (*rx_cntl).rxmatch3(),
-            rxmatch2: (*rx_cntl).rxmatch2(),
-            rxmatch1: (*rx_cntl).rxmatch1(),
-            rxmatch0: (*rx_cntl).rxmatch0(),
+        let rx_control_info = unsafe {
+            RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+                dump_len: (*rx_cntl).dump_len(),
+                he_sigb_len: (*rx_cntl).he_sigb_len(),
+                cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+                cur_bb_format: (*rx_cntl).cur_bb_format(),
+                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+                second: (*rx_cntl).second(),
+                channel: (*rx_cntl).channel(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                is_group: (*rx_cntl).is_group(),
+                rxend_state: (*rx_cntl).rxend_state(),
+                rxmatch3: (*rx_cntl).rxmatch3(),
+                rxmatch2: (*rx_cntl).rxmatch2(),
+                rxmatch1: (*rx_cntl).rxmatch1(),
+                rxmatch0: (*rx_cntl).rxmatch0(),
+            }
         };
         rx_control_info
     }
@@ -2034,16 +2038,18 @@ impl PromiscuousPkt<'_> {
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
     ) -> Self {
-        let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
+        let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
         let len = rx_cntl.sig_len as usize;
         PromiscuousPkt {
             rx_cntl,
             frame_type,
             len,
-            data: core::slice::from_raw_parts(
-                (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
-                len,
-            ),
+            data: unsafe {
+                core::slice::from_raw_parts(
+                    (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
+                    len,
+                )
+            },
         }
     }
 }

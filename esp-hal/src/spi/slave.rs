@@ -470,15 +470,19 @@ pub mod dma {
             self.info.reset_spi();
 
             if read_buffer_len > 0 {
-                channel
-                    .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                unsafe {
+                    channel
+                        .rx
+                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                }
             }
 
             if write_buffer_len > 0 {
-                channel
-                    .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                unsafe {
+                    channel
+                        .tx
+                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                }
             }
 
             #[cfg(esp32)]

@@ -94,7 +94,6 @@
 // toolchain doesn't know about that lint, yet)
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
-#![allow(unsafe_op_in_unsafe_fn)]
 #![cfg_attr(
     not(any(feature = "wifi", feature = "ble")),
     allow(

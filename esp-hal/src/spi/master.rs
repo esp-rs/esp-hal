@@ -1875,7 +1875,7 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
+            unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf) }
         }
 
         /// Perform a half-duplex read operation using DMA.
@@ -1941,7 +1941,7 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
+            unsafe { self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer) }
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -2793,8 +2793,8 @@ impl DmaDriver {
         #[cfg(esp32s2)]
         {
             // without this a transfer after a write will fail
-            self.regs().dma_out_link().write(|w| w.bits(0));
-            self.regs().dma_in_link().write(|w| w.bits(0));
+            self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
+            self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
 
         self.driver.configure_datalen(rx_len, tx_len);
@@ -2807,10 +2807,12 @@ impl DmaDriver {
         self.enable_dma();
 
         if rx_len > 0 {
-            channel
-                .rx
-                .prepare_transfer(self.dma_peripheral, rx_buffer)
-                .and_then(|_| channel.rx.start_transfer())?;
+            unsafe {
+                channel
+                    .rx
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .and_then(|_| channel.rx.start_transfer())?;
+            }
         } else {
             #[cfg(esp32)]
             {
@@ -2819,7 +2821,7 @@ impl DmaDriver {
                 if _full_duplex {
                     self.regs()
                         .dma_in_link()
-                        .modify(|_, w| w.inlink_addr().bits(0));
+                        .modify(|_, w| unsafe { w.inlink_addr().bits(0) });
                     self.regs()
                         .dma_in_link()
                         .modify(|_, w| w.inlink_start().set_bit());
@@ -2827,10 +2829,12 @@ impl DmaDriver {
             }
         }
         if tx_len > 0 {
-            channel
-                .tx
-                .prepare_transfer(self.dma_peripheral, tx_buffer)
-                .and_then(|_| channel.tx.start_transfer())?;
+            unsafe {
+                channel
+                    .tx
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .and_then(|_| channel.tx.start_transfer())?;
+            }
         }
 
         #[cfg(gdma)]

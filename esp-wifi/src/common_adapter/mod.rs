@@ -138,38 +138,42 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
     let base_mac = hal::efuse::Efuse::mac_address();
 
     for (i, &byte) in base_mac.iter().enumerate() {
-        mac.add(i).write_volatile(byte);
-    }
-
-    // ESP_MAC_WIFI_SOFTAP
-    if type_ == 1 {
-        let tmp = mac.offset(0).read_volatile();
-        for i in 0..64 {
-            mac.offset(0).write_volatile(tmp | 0x02);
-            mac.offset(0)
-                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
-
-            if mac.offset(0).read_volatile() != tmp {
-                break;
-            }
+        unsafe {
+            mac.add(i).write_volatile(byte);
         }
     }
 
-    // ESP_MAC_BT
-    if type_ == 2 {
-        let tmp = mac.offset(0).read_volatile();
-        for i in 0..64 {
-            mac.offset(0).write_volatile(tmp | 0x02);
-            mac.offset(0)
-                .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
+    unsafe {
+        // ESP_MAC_WIFI_SOFTAP
+        if type_ == 1 {
+            let tmp = mac.offset(0).read_volatile();
+            for i in 0..64 {
+                mac.offset(0).write_volatile(tmp | 0x02);
+                mac.offset(0)
+                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
 
-            if mac.offset(0).read_volatile() != tmp {
-                break;
+                if mac.offset(0).read_volatile() != tmp {
+                    break;
+                }
             }
         }
 
-        mac.offset(5)
-            .write_volatile(mac.offset(5).read_volatile() + 1);
+        // ESP_MAC_BT
+        if type_ == 2 {
+            let tmp = mac.offset(0).read_volatile();
+            for i in 0..64 {
+                mac.offset(0).write_volatile(tmp | 0x02);
+                mac.offset(0)
+                    .write_volatile(mac.offset(0).read_volatile() ^ (i << 2));
+
+                if mac.offset(0).read_volatile() != tmp {
+                    break;
+                }
+            }
+
+            mac.offset(5)
+                .write_volatile(mac.offset(5).read_volatile() + 1);
+        }
     }
 
     0

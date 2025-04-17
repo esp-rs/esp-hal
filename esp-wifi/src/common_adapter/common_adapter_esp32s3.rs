@@ -61,9 +61,11 @@ pub(crate) unsafe fn phy_enable() {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
         critical_section::with(|_| {
-            super::phy_enable_clock();
+            unsafe {
+                super::phy_enable_clock();
+            }
 
-            if !G_IS_PHY_CALIBRATED {
+            if !unsafe { G_IS_PHY_CALIBRATED } {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
@@ -75,19 +77,25 @@ pub(crate) unsafe fn phy_enable() {
                         fn phy_bbpll_en_usb(param: bool);
                     }
 
-                    phy_bbpll_en_usb(true);
+                    unsafe {
+                        phy_bbpll_en_usb(true);
+                    }
                 }
 
-                register_chipv7_phy(
-                    init_data,
-                    &mut cal_data as *mut _
-                        as *mut crate::binary::include::esp_phy_calibration_data_t,
-                    esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-                );
+                unsafe {
+                    register_chipv7_phy(
+                        init_data,
+                        &mut cal_data as *mut _
+                            as *mut crate::binary::include::esp_phy_calibration_data_t,
+                        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+                    );
 
-                G_IS_PHY_CALIBRATED = true;
+                    G_IS_PHY_CALIBRATED = true;
+                }
             } else {
-                phy_wakeup_init();
+                unsafe {
+                    phy_wakeup_init();
+                }
                 phy_digital_regs_load();
             }
 
@@ -96,7 +104,9 @@ pub(crate) unsafe fn phy_enable() {
                 unsafe extern "C" {
                     fn coex_pti_v2();
                 }
-                coex_pti_v2();
+                unsafe {
+                    coex_pti_v2();
+                }
             }
 
             trace!("PHY ENABLE");
@@ -110,15 +120,17 @@ pub(crate) unsafe fn phy_disable() {
     if count == 1 {
         critical_section::with(|_| {
             phy_digital_regs_store();
-            // Disable PHY and RF.
-            phy_close_rf();
+            unsafe {
+                // Disable PHY and RF.
+                phy_close_rf();
 
-            // Disable PHY temperature sensor
-            phy_xpd_tsens();
+                // Disable PHY temperature sensor
+                phy_xpd_tsens();
 
-            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
-            // RNG
-            super::phy_disable_clock();
+                // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+                // RNG
+                super::phy_disable_clock();
+            }
 
             trace!("PHY DISABLE");
         });

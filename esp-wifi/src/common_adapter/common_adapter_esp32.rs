@@ -41,29 +41,37 @@ pub(crate) unsafe fn phy_enable() {
             //     phy_update_wifi_mac_time(false, s_phy_rf_en_ts);
             // #endif
 
-            super::phy_enable_clock();
+            unsafe {
+                super::phy_enable_clock();
+            }
 
-            if !G_IS_PHY_CALIBRATED {
+            if !unsafe { G_IS_PHY_CALIBRATED } {
                 let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
                     [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
 
                 let init_data = &PHY_INIT_DATA_DEFAULT;
 
-                register_chipv7_phy(
-                    init_data,
-                    &mut cal_data as *mut _
-                        as *mut crate::binary::include::esp_phy_calibration_data_t,
-                    esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-                );
+                unsafe {
+                    register_chipv7_phy(
+                        init_data,
+                        &mut cal_data as *mut _
+                            as *mut crate::binary::include::esp_phy_calibration_data_t,
+                        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
+                    );
 
-                G_IS_PHY_CALIBRATED = true;
+                    G_IS_PHY_CALIBRATED = true;
+                }
             } else {
-                phy_wakeup_init();
+                unsafe {
+                    phy_wakeup_init();
+                }
                 phy_digital_regs_load();
             }
 
             #[cfg(coex)]
-            coex_bt_high_prio();
+            unsafe {
+                coex_bt_high_prio();
+            }
 
             trace!("PHY ENABLE");
         });
@@ -76,17 +84,19 @@ pub(crate) unsafe fn phy_disable() {
     if count == 1 {
         critical_section::with(|_| {
             phy_digital_regs_store();
-            // Disable PHY and RF.
-            phy_close_rf();
+            unsafe {
+                // Disable PHY and RF.
+                phy_close_rf();
 
-            // #if CONFIG_IDF_TARGET_ESP32
-            //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral
-            // clock         phy_update_wifi_mac_time(true,
-            // esp_timer_get_time()); #endif
+                // #if CONFIG_IDF_TARGET_ESP32
+                //         // Update WiFi MAC time before disalbe WiFi/BT common peripheral
+                // clock         phy_update_wifi_mac_time(true,
+                // esp_timer_get_time()); #endif
 
-            // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
-            // RNG
-            super::phy_disable_clock();
+                // Disable WiFi/BT common peripheral clock. Do not disable clock for hardware
+                // RNG
+                super::phy_disable_clock();
+            }
             trace!("PHY DISABLE");
         });
     }

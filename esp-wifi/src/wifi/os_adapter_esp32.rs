@@ -57,12 +57,12 @@ pub unsafe extern "C" fn set_isr(
 ) {
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
     match n {
-        0 => {
+        0 => unsafe {
             crate::wifi::ISR_INTERRUPT_1 = (f, arg);
-        }
-        1 => {
+        },
+        1 => unsafe {
             crate::wifi::ISR_INTERRUPT_1 = (f, arg);
-        }
+        },
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
     #[cfg(feature = "wifi")]

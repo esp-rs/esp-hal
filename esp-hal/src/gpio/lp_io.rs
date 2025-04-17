@@ -201,7 +201,9 @@ macro_rules! lp_gpio {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.pin($gpionum).modify(|_, w| {
-                        w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                        unsafe {
+                            w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                        }
                     });
                 }
 

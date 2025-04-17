@@ -479,7 +479,9 @@ impl EspTwaiFrame {
         let mut data: [u8; 8] = [0; 8];
 
         // Copy the data from the memory mapped peripheral into actual memory.
-        copy_from_data_register(&mut data[..dlc], registers);
+        unsafe {
+            copy_from_data_register(&mut data[..dlc], registers);
+        }
 
         Self {
             id: id.into(),

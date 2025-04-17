@@ -83,46 +83,54 @@ pub unsafe extern "C" fn ESP32Reset() -> ! {
     }
 
     // set stack pointer to end of memory: no need to retain stack up to this point
-    xtensa_lx::set_stack_pointer(addr_of_mut!(_stack_start_cpu0));
+    unsafe {
+        xtensa_lx::set_stack_pointer(addr_of_mut!(_stack_start_cpu0));
+    }
 
     // copying data from flash to various data segments is done by the bootloader
     // initialization to zero needs to be done by the application
 
     // Initialize RTC RAM
-    xtensa_lx_rt::zero_bss(
-        addr_of_mut!(_rtc_fast_bss_start),
-        addr_of_mut!(_rtc_fast_bss_end),
-    );
-    xtensa_lx_rt::zero_bss(
-        addr_of_mut!(_rtc_slow_bss_start),
-        addr_of_mut!(_rtc_slow_bss_end),
-    );
+    unsafe {
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_fast_bss_start),
+            addr_of_mut!(_rtc_fast_bss_end),
+        );
+        xtensa_lx_rt::zero_bss(
+            addr_of_mut!(_rtc_slow_bss_start),
+            addr_of_mut!(_rtc_slow_bss_end),
+        );
+    }
     if matches!(
         crate::system::reset_reason(),
         None | Some(SocResetReason::ChipPowerOn)
     ) {
-        xtensa_lx_rt::zero_bss(
-            addr_of_mut!(_rtc_fast_persistent_start),
-            addr_of_mut!(_rtc_fast_persistent_end),
-        );
-        xtensa_lx_rt::zero_bss(
-            addr_of_mut!(_rtc_slow_persistent_start),
-            addr_of_mut!(_rtc_slow_persistent_end),
-        );
+        unsafe {
+            xtensa_lx_rt::zero_bss(
+                addr_of_mut!(_rtc_fast_persistent_start),
+                addr_of_mut!(_rtc_fast_persistent_end),
+            );
+            xtensa_lx_rt::zero_bss(
+                addr_of_mut!(_rtc_slow_persistent_start),
+                addr_of_mut!(_rtc_slow_persistent_end),
+            );
+        }
     }
 
     let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
     // we _should_ use a random value but we don't have a good source for random
     // numbers here
-    stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-        u32,
-        "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-    ));
+    unsafe {
+        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+    }
 
     crate::interrupt::setup_interrupts();
 
     // continue with default reset handler
-    xtensa_lx_rt::Reset()
+    unsafe { xtensa_lx_rt::Reset() }
 }
 
 /// The ESP32 has a first stage bootloader that handles loading program data

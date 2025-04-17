@@ -393,7 +393,9 @@ unsafe extern "C" fn task_create(
         );
     };
 
-    *(task_handle as *mut usize) = 0; // we will run it in task 0
+    unsafe {
+        *(task_handle as *mut usize) = 0;
+    } // we will run it in task 0
 
     unsafe {
         let task_func = core::mem::transmute::<
@@ -709,10 +711,10 @@ unsafe extern "C" fn ble_npl_callout_deinit(callout: *const ble_npl_callout) {
 unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     trace!("ble_npl_callout_stop {:?}", callout);
 
-    assert!((*callout).dummy != 0);
+    assert!(unsafe { (*callout).dummy != 0 });
 
-    let co = (*callout).dummy as *mut Callout;
     unsafe {
+        let co = (*callout).dummy as *mut Callout;
         // stop timer
         compat::timer_compat::compat_timer_disarm(addr_of_mut!((*co).timer_handle));
     }
@@ -724,7 +726,7 @@ unsafe extern "C" fn ble_npl_callout_reset(
 ) -> ble_npl_error_t {
     trace!("ble_npl_callout_reset {:?} {}", callout, time);
 
-    let co = (*callout).dummy as *mut Callout;
+    let co = unsafe { (*callout).dummy } as *mut Callout;
     unsafe {
         // start timer
         compat::timer_compat::compat_timer_arm(addr_of_mut!((*co).timer_handle), time, false);
@@ -773,55 +775,61 @@ unsafe extern "C" fn ble_npl_mutex_deinit(_mutex: *const ble_npl_mutex) -> ble_n
 unsafe extern "C" fn ble_npl_event_set_arg(event: *const ble_npl_event, arg: *const c_void) {
     trace!("ble_npl_event_set_arg {:?} {:?}", event, arg);
 
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
-    (*evt).ev_arg_ptr = arg;
+    unsafe {
+        (*evt).ev_arg_ptr = arg;
+    }
 }
 
 unsafe extern "C" fn ble_npl_event_get_arg(event: *const ble_npl_event) -> *const c_void {
     trace!("ble_npl_event_get_arg {:?}", event);
 
-    let evt = (*event).dummy as *mut Event;
-    assert!(!evt.is_null());
+    unsafe {
+        let evt = (*event).dummy as *mut Event;
+        assert!(!evt.is_null());
 
-    let arg_ptr = (*evt).ev_arg_ptr;
+        let arg_ptr = (*evt).ev_arg_ptr;
 
-    trace!("returning arg {:x}", arg_ptr as usize);
+        trace!("returning arg {:x}", arg_ptr as usize);
 
-    arg_ptr
+        arg_ptr
+    }
 }
 
 unsafe extern "C" fn ble_npl_event_is_queued(event: *const ble_npl_event) -> bool {
     trace!("ble_npl_event_is_queued {:?}", event);
 
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
-    (*evt).queued
+    unsafe { (*evt).queued }
 }
 
 unsafe extern "C" fn ble_npl_event_reset(event: *const ble_npl_event) {
     trace!("ble_npl_event_reset {:?}", event);
 
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
-    (*evt).queued = false
+    unsafe { (*evt).queued = false }
 }
 
 unsafe extern "C" fn ble_npl_event_deinit(event: *const ble_npl_event) {
     trace!("ble_npl_event_deinit {:?}", event);
 
     let event = event as *mut ble_npl_event;
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
     unsafe {
         crate::compat::malloc::free(evt.cast());
     }
 
-    (*event).dummy = 0;
+    unsafe {
+        (*event).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_event_init(
@@ -831,7 +839,7 @@ unsafe extern "C" fn ble_npl_event_init(
 ) {
     trace!("ble_npl_event_init {:?} {:?} {:?}", event, func, arg);
 
-    if (*event).dummy == 0 {
+    if unsafe { (*event).dummy } == 0 {
         unsafe {
             let evt = crate::compat::malloc::calloc(1, core::mem::size_of::<Event>()) as *mut Event;
 
@@ -848,18 +856,22 @@ unsafe extern "C" fn ble_npl_event_init(
 unsafe extern "C" fn ble_npl_eventq_is_empty(queue: *const ble_npl_eventq) -> bool {
     trace!("ble_npl_eventq_is_empty {:?}", queue);
 
-    let queue = (*queue).dummy as *mut ConcurrentQueue;
+    let queue = unsafe { (*queue).dummy } as *mut ConcurrentQueue;
     assert!(!queue.is_null());
-    (*queue).count() == 0
+    unsafe { (*queue).count() == 0 }
 }
 
 unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
     trace!("ble_npl_event_run {:?}", event);
 
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
-    trace!("info {:?} with arg {:x}", (*evt).event_fn_ptr, event as u32);
+    trace!(
+        "info {:?} with arg {:x}",
+        unsafe { (*evt).event_fn_ptr },
+        event as u32
+    );
     unsafe {
         let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
         func(event as u32);
@@ -873,34 +885,38 @@ unsafe extern "C" fn ble_npl_eventq_remove(
     event: *const ble_npl_event,
 ) {
     trace!("ble_npl_eventq_remove {:?} {:?}", queue, event);
+    unsafe {
+        assert!((*queue).dummy != 0);
+        let evt = (*event).dummy as *mut Event;
+        assert!(!evt.is_null());
 
-    assert!((*queue).dummy != 0);
-    let evt = (*event).dummy as *mut Event;
-    assert!(!evt.is_null());
+        if !(*evt).queued {
+            return;
+        }
 
-    if !(*evt).queued {
-        return;
+        let queue = (*queue).dummy as *mut ConcurrentQueue;
+        (*queue).remove(addr_of!(event) as *mut _);
+        (*evt).queued = false;
     }
-
-    let queue = (*queue).dummy as *mut ConcurrentQueue;
-    (*queue).remove(addr_of!(event) as *mut _);
-
-    (*evt).queued = false;
 }
 
 unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *const ble_npl_event) {
     trace!("ble_npl_eventq_put {:?} {:?}", queue, event);
 
-    assert!((*queue).dummy != 0);
+    assert!(unsafe { (*queue).dummy } != 0);
 
-    let evt = (*event).dummy as *mut Event;
+    let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
-    (*evt).queued = true;
+    unsafe {
+        (*evt).queued = true;
+    }
 
-    let queue = (*queue).dummy as *mut ConcurrentQueue;
+    let queue = unsafe { (*queue).dummy } as *mut ConcurrentQueue;
     let mut event = event as usize;
-    (*queue).enqueue(addr_of_mut!(event).cast());
+    unsafe {
+        (*queue).enqueue(addr_of_mut!(event).cast());
+    }
 }
 
 unsafe extern "C" fn ble_npl_eventq_get(
@@ -909,17 +925,19 @@ unsafe extern "C" fn ble_npl_eventq_get(
 ) -> *const ble_npl_event {
     trace!("ble_npl_eventq_get {:?} {}", queue, time);
 
-    let queue = (*queue).dummy as *mut ConcurrentQueue;
+    let queue = unsafe { (*queue).dummy } as *mut ConcurrentQueue;
 
     let mut event: usize = 0;
     if time == TIME_FOREVER {
         loop {
-            if (*queue).try_dequeue(addr_of_mut!(event).cast()) {
+            if unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
                 let event = event as *mut ble_npl_event;
-                let evt = (*event).dummy as *mut Event;
-                if (*evt).queued {
+                let evt = unsafe { (*event).dummy } as *mut Event;
+                if unsafe { (*evt).queued } {
                     trace!("got {:x}", evt as usize);
-                    (*evt).queued = false;
+                    unsafe {
+                        (*evt).queued = false;
+                    }
                     return event as *const ble_npl_event;
                 }
             }
@@ -935,13 +953,15 @@ unsafe extern "C" fn ble_npl_eventq_deinit(queue: *const ble_npl_eventq) {
     trace!("ble_npl_eventq_deinit {:?}", queue);
 
     let queue = queue.cast_mut();
-    assert!((*queue).dummy != 0);
+    assert!(unsafe { (*queue).dummy } != 0);
 
-    let real_queue = (*queue).dummy as *mut ConcurrentQueue;
+    let real_queue = unsafe { (*queue).dummy } as *mut ConcurrentQueue;
     unsafe {
         core::ptr::drop_in_place(real_queue);
     }
-    (*queue).dummy = 0;
+    unsafe {
+        (*queue).dummy = 0;
+    }
 }
 
 unsafe extern "C" fn ble_npl_callout_init(
@@ -955,19 +975,21 @@ unsafe extern "C" fn ble_npl_callout_init(
         callout, eventq, func, args
     );
 
-    if (*callout).dummy == 0 {
+    if unsafe { (*callout).dummy } == 0 {
         let callout = callout.cast_mut();
 
-        let new_callout =
-            crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
-        ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
-        (*callout).dummy = new_callout as i32;
+        unsafe {
+            let new_callout =
+                crate::compat::malloc::calloc(1, core::mem::size_of::<Callout>()) as *mut Callout;
+            ble_npl_event_init(addr_of_mut!((*new_callout).events), func, args);
+            (*callout).dummy = new_callout as i32;
 
-        crate::compat::timer_compat::compat_timer_setfn(
-            addr_of_mut!((*new_callout).timer_handle),
-            callout_timer_callback_wrapper,
-            callout as *mut c_void,
-        );
+            crate::compat::timer_compat::compat_timer_setfn(
+                addr_of_mut!((*new_callout).timer_handle),
+                callout_timer_callback_wrapper,
+                callout as *mut c_void,
+            );
+        }
     }
 
     0
@@ -975,7 +997,7 @@ unsafe extern "C" fn ble_npl_callout_init(
 
 unsafe extern "C" fn callout_timer_callback_wrapper(arg: *mut c_void) {
     trace!("callout_timer_callback_wrapper {:?}", arg);
-    let co = (*(arg as *mut ble_npl_callout)).dummy as *mut Callout;
+    let co = unsafe { (*(arg as *mut ble_npl_callout)).dummy } as *mut Callout;
 
     unsafe {
         if !(*co).eventq.is_null() {
@@ -992,10 +1014,15 @@ unsafe extern "C" fn ble_npl_eventq_init(queue: *const ble_npl_eventq) {
     let queue = queue as *mut ble_npl_eventq;
 
     let raw_queue = ConcurrentQueue::new(EVENT_QUEUE_SIZE, 4);
-    let ptr = crate::compat::malloc::malloc(size_of_val(&raw_queue)) as *mut ConcurrentQueue;
-    ptr.write(raw_queue);
+    let ptr =
+        unsafe { crate::compat::malloc::malloc(size_of_val(&raw_queue)) } as *mut ConcurrentQueue;
+    unsafe {
+        ptr.write(raw_queue);
+    }
 
-    (*queue).dummy = ptr as i32;
+    unsafe {
+        (*queue).dummy = ptr as i32;
+    }
 }
 
 unsafe extern "C" fn ble_npl_mutex_init(_mutex: *const ble_npl_mutex) -> u32 {
@@ -1286,12 +1313,12 @@ fn os_msys_init() {
 
 unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i32 {
     trace!("ble_hs_hci_rx_evt {:?} {:?}", cmd, arg);
-    trace!("$ cmd = {:x}", *cmd);
-    trace!("$ len = {:x}", *(cmd.offset(1)));
+    trace!("$ cmd = {:x}", unsafe { *cmd });
+    trace!("$ len = {:x}", unsafe { *(cmd.offset(1)) });
 
-    let event = *cmd;
-    let len = *(cmd.offset(1)) as usize;
-    let payload = core::slice::from_raw_parts(cmd.offset(2), len);
+    let event = unsafe { *cmd };
+    let len = unsafe { *(cmd.offset(1)) } as usize;
+    let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
     critical_section::with(|cs| {
@@ -1310,7 +1337,9 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         dump_packet_info(&data[..(len + 3)]);
     });
 
-    r_ble_hci_trans_buf_free(cmd);
+    unsafe {
+        r_ble_hci_trans_buf_free(cmd);
+    }
 
     crate::ble::controller::asynch::hci_read_data_available();
 
@@ -1320,9 +1349,9 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
 unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i32 {
     trace!("ble_hs_rx_data {:?} {:?}", om, arg);
 
-    let data_ptr = (*om).om_data;
-    let len = (*om).om_len;
-    let data_slice = core::slice::from_raw_parts(data_ptr, len as usize);
+    let data_ptr = unsafe { (*om).om_data };
+    let len = unsafe { (*om).om_len };
+    let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
 
     critical_section::with(|cs| {
         let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -1338,7 +1367,9 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
         super::dump_packet_info(&data[..(len + 1) as usize]);
     });
 
-    r_os_mbuf_free_chain(om as *mut _);
+    unsafe {
+        r_os_mbuf_free_chain(om as *mut _);
+    }
 
     crate::ble::controller::asynch::hci_read_data_available();
 

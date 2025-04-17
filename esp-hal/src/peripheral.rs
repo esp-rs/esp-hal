@@ -93,17 +93,19 @@ macro_rules! peripherals {
                 /// You must ensure that you're only using one instance of this type at a time.
                 #[inline]
                 pub unsafe fn steal() -> Self {
-                    Self {
-                        $(
-                            $name: $name::steal(),
-                        )*
-                        $(
-                            $unstable_name: $unstable_name::steal(),
-                        )*
+                    unsafe {
+                        Self {
+                            $(
+                                $name: $name::steal(),
+                            )*
+                            $(
+                                $unstable_name: $unstable_name::steal(),
+                            )*
 
-                        $(
-                            [<GPIO $pin>]: [<GPIO $pin>]::steal(),
-                        )*
+                            $(
+                                [<GPIO $pin>]: [<GPIO $pin>]::steal(),
+                            )*
+                        }
                     }
                 }
             }

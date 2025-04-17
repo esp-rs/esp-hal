@@ -174,14 +174,16 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
 pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
-    let intr_map_base = match core {
-        Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
-    };
-    intr_map_base
-        .offset(interrupt_number)
-        .write_volatile(cpu_interrupt_number as u32);
+    unsafe {
+        let intr_map_base = match core {
+            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
+            #[cfg(multi_core)]
+            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
+        };
+        intr_map_base
+            .offset(interrupt_number)
+            .write_volatile(cpu_interrupt_number as u32);
+    }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
@@ -350,12 +352,14 @@ pub(crate) fn current_runlevel() -> Priority {
 /// runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
     let token: u32;
-    match level {
-        Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
-        Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
-        Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
-        Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
-    };
+    unsafe {
+        match level {
+            Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
+            Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
+            Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
+            Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
+        };
+    }
 
     let prev_interrupt_priority = token as u8 & 0x0F;
 
@@ -511,9 +515,13 @@ mod vectored {
     ///
     /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
-            as *mut unsafe extern "C" fn();
-        ptr.write_volatile(handler);
+        let ptr = unsafe {
+            &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
+                as *mut unsafe extern "C" fn()
+        };
+        unsafe {
+            ptr.write_volatile(handler);
+        }
     }
 
     /// Returns the currently bound interrupt handler.
@@ -627,11 +635,13 @@ mod vectored {
             // If the interrupt is edge triggered, we need to clear the request on the CPU's
             // side.
             if ((1 << cpu_interrupt_nr) & CPU_INTERRUPT_EDGE) != 0 {
-                interrupt::clear(1 << cpu_interrupt_nr);
+                unsafe {
+                    interrupt::clear(1 << cpu_interrupt_nr);
+                }
             }
 
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
-                handler(save_frame);
+                unsafe { handler(save_frame) };
             }
         } else {
             let status = if !cfg!(esp32s3) && (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
@@ -640,7 +650,7 @@ mod vectored {
 
                 // If the interrupt is edge triggered, we need to clear the
                 // request on the CPU's side
-                interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE);
+                unsafe { interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE) };
 
                 // For edge interrupts we cannot rely on the peripherals' interrupt status
                 // registers, therefore call all registered handlers for current level.
@@ -654,22 +664,23 @@ mod vectored {
             let configured_interrupts = configured_interrupts(core, status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt: Interrupt = core::mem::transmute(interrupt_nr as u16);
+                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
 
                 unsafe extern "C" {
                     // defined in each hal
                     fn EspDefaultHandler(interrupt: Interrupt);
                 }
 
-                let handler = pac::__INTERRUPTS[interrupt as usize]._handler;
+                let handler = unsafe { pac::__INTERRUPTS[interrupt as usize]._handler };
                 if core::ptr::eq(
                     handler as *const _,
                     EspDefaultHandler as *const unsafe extern "C" fn(),
                 ) {
-                    EspDefaultHandler(interrupt);
+                    unsafe { EspDefaultHandler(interrupt) };
                 } else {
-                    let handler: fn(&mut Context) =
-                        core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
+                    let handler: fn(&mut Context) = unsafe {
+                        core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
+                    };
                     handler(save_frame);
                 }
             }

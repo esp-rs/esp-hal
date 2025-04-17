@@ -134,7 +134,7 @@ impl RawQueue {
         // do what the ESP-IDF implementations does ...
         // just remove all elements and add them back except the one we need to remove -
         // good enough for now
-        let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
+        let item_slice = unsafe { core::slice::from_raw_parts(item as *const u8, self.item_size) };
         let count = self.count();
 
         if count == 0 {
@@ -146,11 +146,11 @@ impl RawQueue {
         tmp_item.resize(self.item_size, 0);
 
         for _ in 0..count {
-            if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
+            if !unsafe { self.try_dequeue(tmp_item.as_mut_ptr().cast()) } {
                 break;
             }
             if &tmp_item[..] != item_slice {
-                self.enqueue(tmp_item.as_mut_ptr().cast());
+                unsafe { self.enqueue(tmp_item.as_mut_ptr().cast()) };
             }
         }
     }
