@@ -643,7 +643,7 @@ impl<'d> InputSignal<'d> {
         #[instability::unstable]
         #[doc(hidden)]
         to match &self.pin {
-            Signal::Pin(pin) if self.frozen => Frozen(pin),
+            Signal::Pin(_) if self.frozen => NoOp,
             Signal::Pin(signal) => signal,
             Signal::Level(_) => NoOp,
         } {
@@ -806,7 +806,7 @@ impl<'d> OutputSignal<'d> {
         #[instability::unstable]
         #[doc(hidden)]
         to match &self.pin {
-            Signal::Pin(pin) if self.frozen => Frozen(pin),
+            Signal::Pin(_) if self.frozen => NoOp,
             Signal::Pin(pin) => pin,
             Signal::Level(_) => NoOp,
         } {
@@ -817,22 +817,6 @@ impl<'d> OutputSignal<'d> {
             pub fn set_output_high(&self, on: bool);
         }
     }
-}
-
-struct Frozen<'a>(&'a AnyPin<'a>);
-
-impl Frozen<'_> {
-    // Even though settings are frozen, the user probably wants the input stage to
-    // be enabled. It's cheap and safe to do. The user can still disconnect the
-    // peripheral from the outside world if they want with some creative
-    // applicaiton of `Flex`.
-    fn set_input_enable(&self, _on: bool) {
-        self.0.set_input_enable(true);
-    }
-    fn set_output_enable(&self, _on: bool) {}
-    fn set_output_high(&self, _on: bool) {}
-    fn apply_input_config(&self, _config: &gpio::InputConfig) {}
-    fn apply_output_config(&self, _config: &gpio::OutputConfig) {}
 }
 
 struct NoOp;
