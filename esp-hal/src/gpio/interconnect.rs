@@ -507,7 +507,7 @@ pub struct InputSignal<'d> {
     /// If `true`, forces the GPIO matrix to be used for this signal.
     pub(crate) force_gpio_matrix: bool,
     /// Inverts the peripheral's input signal.
-    pub invert_input: bool,
+    pub(crate) invert_input: bool,
     /// If `true`, prevents peripheral drivers from modifying the pin settings.
     pub(crate) frozen: bool,
 }
@@ -621,6 +621,14 @@ impl<'d> InputSignal<'d> {
         self.is_input_high().into()
     }
 
+    /// Returns `true` if the input signal is configured to be inverted.
+    ///
+    /// Note that the hardware is not configured until the signal is actually
+    /// connected to a peripheral.
+    pub fn is_input_inverted(&self) -> bool {
+        self.invert_input
+    }
+
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
     pub fn with_inverted_input(mut self, invert: bool) -> Self {
@@ -672,10 +680,10 @@ pub struct OutputSignal<'d> {
     pub(crate) force_gpio_matrix: bool,
 
     /// Inverts the peripheral's output signal.
-    pub invert_output: bool,
+    pub(crate) invert_output: bool,
 
     /// Inverts the peripheral's input signal.
-    pub invert_input: bool,
+    pub(crate) invert_input: bool,
 
     /// If `true`, prevents peripheral drivers from modifying the pin settings.
     pub(crate) frozen: bool,
@@ -757,6 +765,22 @@ impl<'d> OutputSignal<'d> {
     /// Returns `None` if the signal is a constant level.
     pub fn number(&self) -> Option<u8> {
         self.pin.number()
+    }
+
+    /// Returns `true` if the input signal is configured to be inverted.
+    ///
+    /// Note that the hardware is not configured until the signal is actually
+    /// connected to a peripheral.
+    pub fn is_input_inverted(&self) -> bool {
+        self.invert_input
+    }
+
+    /// Returns `true` if the output signal is configured to be inverted.
+    ///
+    /// Note that the hardware is not configured until the signal is actually
+    /// connected to a peripheral.
+    pub fn is_output_inverted(&self) -> bool {
+        self.invert_output
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
