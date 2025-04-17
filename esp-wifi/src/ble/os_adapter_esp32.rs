@@ -388,7 +388,7 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
-    warn!("coex_bt_wakeup_request_end");
+    trace!("coex_bt_wakeup_request_end");
 
     #[cfg(coex)]
     async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
@@ -427,7 +427,7 @@ pub(crate) unsafe extern "C" fn coex_bt_release(event: u32) -> i32 {
 pub(crate) unsafe extern "C" fn coex_register_bt_cb_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    warn!("coex_register_bt_cb {:?}", callback);
+    trace!("coex_register_bt_cb {:?}", callback);
     unsafe extern "C" {
         #[cfg(coex)]
         fn coex_register_bt_cb(callback: unsafe extern "C" fn()) -> i32;
@@ -471,7 +471,7 @@ pub(crate) unsafe extern "C" fn coex_bb_reset_unlock(event: u32) {
 pub(crate) unsafe extern "C" fn coex_schm_register_btdm_callback_wrapper(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    warn!("coex_schm_register_btdm_callback {:?}", callback);
+    trace!("coex_schm_register_btdm_callback {:?}", callback);
     unsafe extern "C" {
         #[cfg(coex)]
         fn coex_schm_register_callback(kind: u32, callback: unsafe extern "C" fn()) -> i32;
@@ -516,7 +516,7 @@ pub(crate) unsafe extern "C" fn coex_schm_curr_phase_get() -> *const () {
 
 #[allow(unused_variables)]
 pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32 {
-    warn!("coex_wifi_channel_get");
+    trace!("coex_wifi_channel_get");
     unsafe extern "C" {
         #[cfg(coex)]
         fn coex_wifi_channel_get(primary: *mut u8, secondary: *mut u8) -> i32;
@@ -533,7 +533,7 @@ pub(crate) unsafe extern "C" fn coex_wifi_channel_get(primary: *mut u8, secondar
 pub(crate) unsafe extern "C" fn coex_register_wifi_channel_change_callback(
     callback: unsafe extern "C" fn(),
 ) -> i32 {
-    warn!("coex_register_wifi_channel_change_callback");
+    trace!("coex_register_wifi_channel_change_callback");
     unsafe extern "C" {
         #[cfg(coex)]
         fn coex_register_wifi_channel_change_callback(callback: unsafe extern "C" fn()) -> i32;
