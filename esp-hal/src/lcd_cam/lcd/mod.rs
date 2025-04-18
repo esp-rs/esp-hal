@@ -6,9 +6,6 @@
 //!
 //! For more information on these modes, please refer to the documentation in
 //! their respective modules.
-//!
-//! ## Implementation State
-//! - RGB is not supported yet
 
 use super::GenericPeripheralGuard;
 use crate::{peripherals::LCD_CAM, system};
