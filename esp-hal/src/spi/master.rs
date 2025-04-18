@@ -2730,35 +2730,35 @@ pub struct Info {
     pub sio3_input: Option<InputSignal>,
 
     /// SIO4 output signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio4_output: Option<OutputSignal>,
 
     /// SIO4 input signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio4_input: Option<InputSignal>,
 
     /// SIO5 output signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio5_output: Option<OutputSignal>,
 
     /// SIO5 input signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio5_input: Option<InputSignal>,
 
     /// SIO6 output signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio6_output: Option<OutputSignal>,
 
     /// SIO6 input signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio6_input: Option<InputSignal>,
 
     /// SIO7 output signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio7_output: Option<OutputSignal>,
 
     /// SIO7 input signal for OPI mode.
-    #[cfg(any(esp32s2, esp32s3))]
+    #[cfg(spi_octal)]
     pub sio7_input: Option<InputSignal>,
 }
 
@@ -3726,21 +3726,21 @@ macro_rules! spi_instance {
                         sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
                         sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
                         sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
-                        #[cfg(any(esp32s2, esp32s3))]
+                        #[cfg(spi_octal)]
                         sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
                     };
 
