@@ -1528,8 +1528,9 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
-// These three traits need to be public to allow the user to create functions that
-// can take either 8 or 16 bit pins and call parl_io.tx.with_config() or parl_io.rx.with_config().
+// These three traits need to be public to allow the user to create functions
+// that can take either 8 or 16 bit pins and call parl_io.tx.with_config() or
+// parl_io.rx.with_config().
 #[doc(hidden)]
 pub trait TxPins {}
 #[doc(hidden)]
