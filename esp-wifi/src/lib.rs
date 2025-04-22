@@ -476,7 +476,8 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
 /// Returns true if at least some interrupt levels are disabled.
 fn interrupts_disabled() -> bool {
     #[cfg(target_arch = "xtensa")]
-    return hal::xtensa_lx::interrupt::get_level() != 0;
+    return hal::xtensa_lx::interrupt::get_level() != 0
+        || hal::xtensa_lx::interrupt::get_mask() == 0;
 
     #[cfg(target_arch = "riscv32")]
     return !hal::riscv::register::mstatus::read().mie()
