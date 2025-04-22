@@ -48,7 +48,7 @@
 //! ```
 
 pub use self::fields::*;
-use crate::{peripherals::EFUSE, time::Rate};
+use crate::{peripherals::EFUSE, soc::efuse_field::EfuseField, time::Rate};
 
 mod fields;
 
@@ -77,7 +77,7 @@ pub enum ChipType {
 impl Efuse {
     /// Reads the base MAC address from the eFuse memory.
     pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC)
+        Self::read_field_be(MAC0)
     }
 
     /// Returns the number of CPUs available on the chip.
@@ -135,8 +135,8 @@ impl Efuse {
     }
 }
 
-#[allow(unused)]
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy, strum::FromRepr)]
+#[repr(u32)]
 pub(crate) enum EfuseBlock {
     Block0,
     Block1,

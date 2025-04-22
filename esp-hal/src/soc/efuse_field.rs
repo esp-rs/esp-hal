@@ -3,19 +3,22 @@ use bytemuck::AnyBitPattern;
 use crate::soc::efuse::{Efuse, EfuseBlock};
 
 /// The bit field for get access to efuse data
-#[derive(Clone, Copy)]
+#[allow(unused)]
+#[derive(Debug, Clone, Copy)]
 pub struct EfuseField {
-    blk: EfuseBlock,
-    bit_off: u16,
-    bit_len: u16,
+    pub(crate) block: EfuseBlock,
+    pub(crate) word: u32,
+    pub(crate) bit_start: u32,
+    pub(crate) bit_count: u32,
 }
 
 impl EfuseField {
-    pub(crate) const fn new(blk: EfuseBlock, bit_off: u16, bit_len: u16) -> Self {
+    pub(crate) const fn new(block: u32, word: u32, bit_start: u32, bit_count: u32) -> Self {
         Self {
-            blk,
-            bit_off,
-            bit_len,
+            block: EfuseBlock::from_repr(block).unwrap(),
+            word,
+            bit_start,
+            bit_count,
         }
     }
 }
@@ -33,10 +36,10 @@ impl Efuse {
             )
         };
         // get block address
-        let block_address = field.blk.address();
+        let block_address = field.block.address();
 
-        let bit_off = field.bit_off as usize;
-        let bit_end = (field.bit_len as usize).min(bytes.len() * 8) + bit_off;
+        let bit_off = field.bit_start as usize;
+        let bit_end = (field.bit_count as usize).min(bytes.len() * 8) + bit_off;
 
         let mut last_word_off = bit_off / 32;
         let mut last_word = unsafe { block_address.add(last_word_off).read_volatile() };
@@ -112,7 +115,7 @@ impl Efuse {
     #[inline(always)]
     #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub fn read_bit(field: EfuseField) -> bool {
-        assert_eq!(field.bit_len, 1);
+        assert_eq!(field.bit_count, 1);
         Self::read_field_le::<u8>(field) != 0
     }
 }
