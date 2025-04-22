@@ -83,6 +83,32 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     res * sign
 }
 
+// We cannot just use the ROM function since it calls `__getreent`
+//
+// From docs: The __getreent() function returns a per-task pointer to struct
+// _reent in newlib libc. This structure is allocated on the TCB of each task.
+// i.e. it assumes a FreeRTOS task calling it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn strcasecmp(
+    s1: *const core::ffi::c_char,
+    s2: *const core::ffi::c_char,
+) -> u8 {
+    let mut i = 0;
+    loop {
+        unsafe {
+            let s1_i = s1.add(i);
+            let s2_i = s2.add(i);
+
+            let val = (*s1_i).to_ascii_lowercase() as u8 - (*s2_i).to_ascii_lowercase() as u8;
+            if val != 0 || *s1_i == 0 {
+                return val;
+            }
+
+            i += 1;
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 #[repr(C)]
 struct Tm {
