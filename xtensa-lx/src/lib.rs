@@ -31,7 +31,9 @@ const XDM_OCD_DCR_SET: u32 = 0x10200C;
 /// It should be used with care, `base` MUST be a valid pointer
 #[inline(always)]
 pub unsafe fn set_vecbase(base: *const u32) {
-    asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+    unsafe {
+        asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+    }
 }
 
 /// Get the core stack pointer
@@ -54,22 +56,24 @@ pub fn get_stack_pointer() -> *const u32 {
 /// scheduler
 #[inline(always)]
 pub unsafe fn set_stack_pointer(stack: *mut u32) {
-    // FIXME: this function relies on it getting inlined - if it doesn't inline it
-    // will try and return from this function using the adress in `a0` which has
-    // just been trashed... According to https://nnethercote.github.io/perf-book/inlining.html:
-    // "Inline attributes do not guarantee that a function is inlined or not
-    // inlined, but in practice, #[inline(always)] will cause inlining in all but
-    // the most exceptional cases." Is this good enough? Should we rewrite these
-    // as a macro to guarentee inlining?
+    unsafe {
+        // FIXME: this function relies on it getting inlined - if it doesn't inline it
+        // will try and return from this function using the adress in `a0` which has
+        // just been trashed... According to https://nnethercote.github.io/perf-book/inlining.html:
+        // "Inline attributes do not guarantee that a function is inlined or not
+        // inlined, but in practice, #[inline(always)] will cause inlining in all but
+        // the most exceptional cases." Is this good enough? Should we rewrite these
+        // as a macro to guarentee inlining?
 
-    // NOTE: modification of the `sp` & `a0` is not typically allowed inside inline
-    // asm!, but because we *need* to modify it we can do so by ommiting it from
-    // the clobber
-    asm!(
-        "movi a0, 0", // trash return register
-        "mov sp, {0}", // move stack pointer
-        in(reg) stack, options(nostack)
-    );
+        // NOTE: modification of the `sp` & `a0` is not typically allowed inside inline
+        // asm!, but because we *need* to modify it we can do so by ommiting it from
+        // the clobber
+        asm!(
+            "movi a0, 0", // trash return register
+            "mov sp, {0}", // move stack pointer
+            in(reg) stack, options(nostack)
+        );
+    }
 }
 
 /// Get the core current program counter

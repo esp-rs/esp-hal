@@ -34,7 +34,7 @@ pub(crate) fn shutdown_radio_isr() {
 
 #[cfg(feature = "ble")]
 #[allow(non_snake_case)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn Software0() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_7;
@@ -48,7 +48,7 @@ fn Software0() {
 }
 
 #[cfg(feature = "wifi")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn WIFI_MAC() {
     unsafe {
         let (fnc, arg) = crate::wifi::os_adapter::ISR_INTERRUPT_1;
@@ -62,7 +62,7 @@ extern "C" fn WIFI_MAC() {
 }
 
 #[cfg(feature = "ble")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn RWBT() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
@@ -76,7 +76,7 @@ extern "C" fn RWBT() {
 }
 
 #[cfg(feature = "ble")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn RWBLE() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
@@ -90,7 +90,7 @@ extern "C" fn RWBLE() {
 }
 
 #[cfg(feature = "ble")]
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn BT_BB() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;

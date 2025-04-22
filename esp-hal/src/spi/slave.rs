@@ -69,18 +69,18 @@ use core::marker::PhantomData;
 
 use super::{Error, Mode};
 use crate::{
+    Blocking,
+    DriverMode,
     dma::DmaEligible,
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     pac::spi2::RegisterBlock,
     spi::AnySpi,
     system::PeripheralGuard,
-    Blocking,
-    DriverMode,
 };
 
 const MAX_DMA_SIZE: usize = 32768 - 32;
@@ -164,6 +164,7 @@ pub mod dma {
 
     use super::*;
     use crate::{
+        DriverMode,
         dma::{
             Channel,
             DmaChannelFor,
@@ -173,7 +174,6 @@ pub mod dma {
             EmptyBuf,
             PeripheralDmaChannel,
         },
-        DriverMode,
     };
 
     impl<'d> Spi<'d, Blocking> {
@@ -470,15 +470,19 @@ pub mod dma {
             self.info.reset_spi();
 
             if read_buffer_len > 0 {
-                channel
-                    .rx
-                    .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                unsafe {
+                    channel
+                        .rx
+                        .prepare_transfer(self.dma_peripheral, rx_buffer)?;
+                }
             }
 
             if write_buffer_len > 0 {
-                channel
-                    .tx
-                    .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                unsafe {
+                    channel
+                        .tx
+                        .prepare_transfer(self.dma_peripheral, tx_buffer)?;
+                }
             }
 
             #[cfg(esp32)]

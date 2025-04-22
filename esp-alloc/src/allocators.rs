@@ -24,7 +24,9 @@ unsafe impl Allocator for EspHeap {
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        }
     }
 }
 
@@ -37,7 +39,9 @@ unsafe impl Allocator for AnyMemory {
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        }
     }
 }
 
@@ -50,7 +54,9 @@ unsafe impl Allocator for InternalMemory {
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        }
     }
 }
 
@@ -63,6 +69,8 @@ unsafe impl Allocator for ExternalMemory {
     }
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        unsafe {
+            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+        }
     }
 }

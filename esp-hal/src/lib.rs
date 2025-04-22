@@ -478,7 +478,9 @@ macro_rules! impl_persistable {
     )+};
 }
 
-impl_persistable!(u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64);
+impl_persistable!(
+    u8, i8, u16, i16, u32, i32, u64, i64, u128, i128, usize, isize, f32, f64
+);
 impl_persistable!(atomic AtomicU8, AtomicI8, AtomicU16, AtomicI16, AtomicU32, AtomicI32, AtomicUsize, AtomicIsize);
 
 unsafe impl<T: Persistable, const N: usize> Persistable for [T; N] {}
@@ -500,14 +502,14 @@ pub mod __macro_implementation {
 }
 
 #[cfg(riscv)]
-#[export_name = "hal_main"]
+#[unsafe(export_name = "hal_main")]
 fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
-    extern "Rust" {
+    unsafe extern "Rust" {
         // This symbol will be provided by the user via `#[entry]`
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    extern "C" {
+    unsafe extern "C" {
         static mut __stack_chk_guard: u32;
     }
 
@@ -524,7 +526,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
     }
 }
 
-#[export_name = "__stack_chk_fail"]
+#[unsafe(export_name = "__stack_chk_fail")]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }

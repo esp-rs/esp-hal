@@ -11,14 +11,14 @@ pub mod lcd;
 use core::marker::PhantomData;
 
 use crate::{
+    Async,
+    Blocking,
     asynch::AtomicWaker,
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
     peripherals::{Interrupt, LCD_CAM},
     system::{Cpu, GenericPeripheralGuard},
-    Async,
-    Blocking,
 };
 
 /// Represents a combined LCD and Camera interface.
@@ -291,11 +291,7 @@ fn calculate_closest_divider(
 
 // https://en.wikipedia.org/wiki/Euclidean_algorithm
 const fn hcf(a: usize, b: usize) -> usize {
-    if b != 0 {
-        hcf(b, a % b)
-    } else {
-        a
-    }
+    if b != 0 { hcf(b, a % b) } else { a }
 }
 
 struct Fraction {

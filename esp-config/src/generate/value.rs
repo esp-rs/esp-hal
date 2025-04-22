@@ -25,7 +25,7 @@ impl Value {
                 _ => {
                     return Err(Error::parse(format!(
                         "Expected 'true' or 'false', found: '{s}'"
-                    )))
+                    )));
                 }
             },
             Value::Integer(_) => {

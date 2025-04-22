@@ -746,33 +746,37 @@ unsafe extern "C" fn rcv_cb(
     data: *const u8,
     data_len: i32,
 ) {
-    let src = [
-        (*esp_now_info).src_addr.offset(0).read(),
-        (*esp_now_info).src_addr.offset(1).read(),
-        (*esp_now_info).src_addr.offset(2).read(),
-        (*esp_now_info).src_addr.offset(3).read(),
-        (*esp_now_info).src_addr.offset(4).read(),
-        (*esp_now_info).src_addr.offset(5).read(),
-    ];
+    let src = unsafe {
+        [
+            (*esp_now_info).src_addr.offset(0).read(),
+            (*esp_now_info).src_addr.offset(1).read(),
+            (*esp_now_info).src_addr.offset(2).read(),
+            (*esp_now_info).src_addr.offset(3).read(),
+            (*esp_now_info).src_addr.offset(4).read(),
+            (*esp_now_info).src_addr.offset(5).read(),
+        ]
+    };
 
-    let dst = [
-        (*esp_now_info).des_addr.offset(0).read(),
-        (*esp_now_info).des_addr.offset(1).read(),
-        (*esp_now_info).des_addr.offset(2).read(),
-        (*esp_now_info).des_addr.offset(3).read(),
-        (*esp_now_info).des_addr.offset(4).read(),
-        (*esp_now_info).des_addr.offset(5).read(),
-    ];
+    let dst = unsafe {
+        [
+            (*esp_now_info).des_addr.offset(0).read(),
+            (*esp_now_info).des_addr.offset(1).read(),
+            (*esp_now_info).des_addr.offset(2).read(),
+            (*esp_now_info).des_addr.offset(3).read(),
+            (*esp_now_info).des_addr.offset(4).read(),
+            (*esp_now_info).des_addr.offset(5).read(),
+        ]
+    };
 
-    let rx_cntl = (*esp_now_info).rx_ctrl;
-    let rx_control = RxControlInfo::from_raw(rx_cntl);
+    let rx_cntl = unsafe { (*esp_now_info).rx_ctrl };
+    let rx_control = unsafe { RxControlInfo::from_raw(rx_cntl) };
 
     let info = ReceiveInfo {
         src_address: src,
         dst_address: dst,
         rx_control,
     };
-    let slice = core::slice::from_raw_parts(data, data_len as usize);
+    let slice = unsafe { core::slice::from_raw_parts(data, data_len as usize) };
     critical_section::with(|cs| {
         let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
         let data = Box::from(slice);

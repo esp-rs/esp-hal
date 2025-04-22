@@ -1,6 +1,6 @@
 use std::sync::OnceLock;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use strum::IntoEnumIterator;
 
 macro_rules! include_toml {

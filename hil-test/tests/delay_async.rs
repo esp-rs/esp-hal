@@ -17,7 +17,7 @@ use embedded_hal_async::delay::DelayNs;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::{
     peripherals::Peripherals,
-    timer::{timg::TimerGroup, OneShotTimer},
+    timer::{OneShotTimer, timg::TimerGroup},
 };
 use hil_test as _;
 

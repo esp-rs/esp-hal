@@ -2,7 +2,7 @@
 
 use crate::{
     gpio::lp_io::LowPowerOutputOpenDrain,
-    peripherals::{LPWR, LP_AON, LP_I2C0, LP_IO, LP_PERI},
+    peripherals::{LP_AON, LP_I2C0, LP_IO, LP_PERI, LPWR},
     time::Rate,
 };
 

@@ -1,8 +1,8 @@
 [package]
 name          = "esp-ieee802154"
 version       = "0.6.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Low-level IEEE 802.15.4 driver for the ESP32-C6 and ESP32-H2"
 documentation = "https://docs.espressif.com/projects/rust/esp-ieee802154/latest/"
 keywords      = ["embedded", "esp32", "espressif", "ieee802154", "wpan"]

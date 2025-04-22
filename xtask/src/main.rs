@@ -648,7 +648,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
 
             let feature_sets = [
                 vec![package.feature_rules(device)], // initially test all features
-                package.lint_feature_rules(device), // add separate test cases
+                package.lint_feature_rules(device),  // add separate test cases
             ]
             .concat();
 

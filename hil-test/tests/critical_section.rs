@@ -11,9 +11,9 @@
 use esp_hal::{
     delay::Delay,
     interrupt::{
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
         InterruptHandler,
         Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     peripherals::Peripherals,
     sync::{Locked, RawPriorityLimitedMutex},

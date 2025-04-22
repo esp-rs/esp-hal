@@ -11,15 +11,15 @@ use esp_hal::{
     dma_buffers,
     gpio::Level,
     lcd_cam::{
+        LcdCam,
         cam::{self, Camera, VhdeMode},
         lcd::{
-            dpi,
-            dpi::{Dpi, Format, FrameTiming},
             ClockMode,
             Phase,
             Polarity,
+            dpi,
+            dpi::{Dpi, Format, FrameTiming},
         },
-        LcdCam,
     },
     peripherals::Peripherals,
     time::Rate,

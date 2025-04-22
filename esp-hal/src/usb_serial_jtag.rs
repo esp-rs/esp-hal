@@ -128,13 +128,13 @@ use core::{convert::Infallible, marker::PhantomData};
 use procmacros::handler;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     pac::usb_device::RegisterBlock,
     peripherals::{Interrupt, USB_DEVICE},
     system::{Cpu, PeripheralClockControl},
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 /// Custom USB serial error type

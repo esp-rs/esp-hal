@@ -1,13 +1,13 @@
 use core::convert::Infallible;
 
 use crate::rsa::{
-    implement_op,
     Multi,
     Rsa,
     RsaMode,
     RsaModularExponentiation,
     RsaModularMultiplication,
     RsaMultiplication,
+    implement_op,
 };
 
 impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
@@ -115,7 +115,7 @@ pub mod operand_sizes {
     //! Marker types for the operand sizes
     use paste::paste;
 
-    use super::{implement_op, Multi, RsaMode};
+    use super::{Multi, RsaMode, implement_op};
 
     implement_op!(
         (32, multi),

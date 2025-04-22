@@ -18,8 +18,8 @@ use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal}
 use esp_hal::system::{CpuControl, Stack};
 use esp_hal::{
     interrupt::{
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
         Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     timer::AnyTimer,
 };

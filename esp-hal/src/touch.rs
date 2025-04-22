@@ -29,13 +29,13 @@
 use core::marker::PhantomData;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     gpio::TouchPin,
     peripherals::{LPWR, SENS, TOUCH},
     private::{Internal, Sealed},
     rtc_cntl::Rtc,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 /// A marker trait describing the mode the touch pad is set to.
@@ -517,7 +517,7 @@ mod asynch {
     };
 
     use super::*;
-    use crate::{asynch::AtomicWaker, handler, ram, Async};
+    use crate::{Async, asynch::AtomicWaker, handler, ram};
 
     const NUM_TOUCH_PINS: usize = 10;
 

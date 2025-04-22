@@ -49,23 +49,23 @@ use enumset::{EnumSet, EnumSetType};
 use portable_atomic::AtomicBool;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         PinGuard,
         Pull,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
     peripherals::Interrupt,
     private::OnDrop,
     system::{PeripheralClockControl, PeripheralGuard},
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 /// UART RX Error
@@ -2145,7 +2145,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 pub mod lp_uart {
     use crate::{
         gpio::lp_io::{LowPowerInput, LowPowerOutput},
-        peripherals::{LPWR, LP_AON, LP_IO, LP_UART},
+        peripherals::{LP_AON, LP_IO, LP_UART, LPWR},
         uart::{Config, DataBits, Parity, StopBits},
     };
     /// LP-UART driver

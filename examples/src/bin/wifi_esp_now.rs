@@ -19,7 +19,7 @@ use esp_hal::{
 };
 use esp_println::println;
 use esp_wifi::{
-    esp_now::{PeerInfo, BROADCAST_ADDRESS},
+    esp_now::{BROADCAST_ADDRESS, PeerInfo},
     init,
 };
 

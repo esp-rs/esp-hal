@@ -102,7 +102,10 @@ pub enum ExceptionCause {
 impl Display for ExceptionCause {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if *self == Self::Cp0Disabled {
-            write!(f, "Cp0Disabled (Access to the floating point coprocessor is not allowed. You may want to enable the `float-save-restore` feature of the `xtensa-lx-rt` crate.)")
+            write!(
+                f,
+                "Cp0Disabled (Access to the floating point coprocessor is not allowed. You may want to enable the `float-save-restore` feature of the `xtensa-lx-rt` crate.)"
+            )
         } else {
             write!(f, "{:?}", self)
         }

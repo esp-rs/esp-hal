@@ -14,10 +14,10 @@ use core::cell::RefCell;
 
 use bleps::{
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     async_attribute_server::AttributeServer,
     asynch::Ble,
@@ -35,7 +35,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, init, EspWifiController};
+use esp_wifi::{EspWifiController, ble::controller::BleConnector, init};
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {

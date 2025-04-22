@@ -10,9 +10,9 @@ pub mod logger;
 
 macro_rules! log_format {
     ($value:expr) => {
-        #[link_section = concat!(".espressif.metadata")]
+        #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
-        #[export_name = concat!("espflash.LOG_FORMAT")]
+        #[unsafe(export_name = concat!("espflash.LOG_FORMAT"))]
         static LOG_FORMAT: [u8; $value.len()] = const {
             let val_bytes = $value.as_bytes();
             let mut val_bytes_array = [0; $value.len()];
@@ -139,9 +139,9 @@ type PrinterImpl = auto_printer::Printer;
 ))]
 mod auto_printer {
     use crate::{
+        LockToken,
         serial_jtag_printer::Printer as PrinterSerialJtag,
         uart_printer::Printer as PrinterUart,
-        LockToken,
     };
 
     pub struct Printer;
@@ -508,12 +508,14 @@ struct LockToken<'a>(LockInner<'a>);
 impl LockToken<'_> {
     #[allow(unused)]
     unsafe fn conjure() -> Self {
-        #[cfg(feature = "critical-section")]
-        let inner = critical_section::CriticalSection::new();
-        #[cfg(not(feature = "critical-section"))]
-        let inner = PhantomData;
+        unsafe {
+            #[cfg(feature = "critical-section")]
+            let inner = critical_section::CriticalSection::new();
+            #[cfg(not(feature = "critical-section"))]
+            let inner = PhantomData;
 
-        LockToken(inner)
+            LockToken(inner)
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 [package]
 name          = "esp-build"
 version       = "0.2.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Build utilities for esp-hal"
 documentation = "https://docs.espressif.com/projects/rust/esp-build/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"

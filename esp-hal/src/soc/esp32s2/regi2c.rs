@@ -1,6 +1,6 @@
 use crate::{
     peripherals::{I2C_ANA_MST, SYSCON},
-    rom::regi2c::{define_regi2c, RawRegI2cField, RegI2cMaster, RegI2cRegister},
+    rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c},
 };
 
 define_regi2c! {

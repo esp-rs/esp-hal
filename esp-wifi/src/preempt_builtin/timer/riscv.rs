@@ -5,6 +5,7 @@ use peripherals::INTPRI as SystemPeripheral;
 use peripherals::SYSTEM as SystemPeripheral;
 
 use crate::{
+    TimeBase,
     hal::{
         interrupt::{self, TrapFrame},
         peripherals::{self, Interrupt},
@@ -12,7 +13,6 @@ use crate::{
         time::Rate,
     },
     preempt_builtin::task_switch,
-    TimeBase,
 };
 
 /// The timer responsible for time slicing.
@@ -65,7 +65,7 @@ extern "C" fn handler(trap_frame: &mut TrapFrame) {
     task_switch(trap_frame);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn FROM_CPU_INTR3(trap_frame: &mut TrapFrame) {
     // clear FROM_CPU_INTR3
     SystemPeripheral::regs()

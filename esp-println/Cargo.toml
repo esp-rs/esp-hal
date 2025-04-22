@@ -1,8 +1,8 @@
 [package]
 name          = "esp-println"
 version       = "0.13.1"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Provides `print!` and `println!` implementations various Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-println/latest/"
 keywords      = ["defmt", "embedded", "esp32", "espressif", "logging"]
@@ -15,6 +15,10 @@ links         = "esp-println"
 cargo-args     = ["-Z", "build-std=core"]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3"]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 critical-section = { version = "1.2.0", optional = true }

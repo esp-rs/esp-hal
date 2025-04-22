@@ -7,10 +7,10 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     dma::{DmaError, Mem2Mem},
     dma_buffers,
     dma_descriptors,
-    Blocking,
 };
 use hil_test as _;
 

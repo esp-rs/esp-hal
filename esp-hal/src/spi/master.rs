@@ -46,15 +46,18 @@ use procmacros::ram;
 
 use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer},
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
         PinGuard,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
@@ -62,9 +65,6 @@ use crate::{
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 /// Enumeration of possible SPI interrupt events.
@@ -1198,12 +1198,12 @@ mod dma {
     use core::{
         cmp::min,
         mem::ManuallyDrop,
-        sync::atomic::{fence, Ordering},
+        sync::atomic::{Ordering, fence},
     };
 
     use super::*;
     use crate::{
-        dma::{asynch::DmaRxFuture, Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel},
+        dma::{Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel, asynch::DmaRxFuture},
         spi::master::dma::asynch::DropGuard,
     };
 
@@ -1730,7 +1730,7 @@ mod dma {
             bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer)
+            unsafe { self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer) }
         }
 
         /// Configures the DMA buffers for the SPI instance.
@@ -1776,7 +1776,7 @@ mod dma {
             bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
-            self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf)
+            unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf) }
         }
 
         /// Perform a DMA read.
@@ -1814,7 +1814,9 @@ mod dma {
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
+            unsafe {
+                self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
+            }
         }
 
         /// Perform a DMA transfer
@@ -1873,7 +1875,7 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
+            unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf) }
         }
 
         /// Perform a half-duplex read operation using DMA.
@@ -1939,7 +1941,7 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
+            unsafe { self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer) }
         }
 
         /// Perform a half-duplex write operation using DMA.
@@ -2791,8 +2793,8 @@ impl DmaDriver {
         #[cfg(esp32s2)]
         {
             // without this a transfer after a write will fail
-            self.regs().dma_out_link().write(|w| w.bits(0));
-            self.regs().dma_in_link().write(|w| w.bits(0));
+            self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
+            self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
 
         self.driver.configure_datalen(rx_len, tx_len);
@@ -2805,10 +2807,12 @@ impl DmaDriver {
         self.enable_dma();
 
         if rx_len > 0 {
-            channel
-                .rx
-                .prepare_transfer(self.dma_peripheral, rx_buffer)
-                .and_then(|_| channel.rx.start_transfer())?;
+            unsafe {
+                channel
+                    .rx
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .and_then(|_| channel.rx.start_transfer())?;
+            }
         } else {
             #[cfg(esp32)]
             {
@@ -2825,10 +2829,12 @@ impl DmaDriver {
             }
         }
         if tx_len > 0 {
-            channel
-                .tx
-                .prepare_transfer(self.dma_peripheral, tx_buffer)
-                .and_then(|_| channel.tx.start_transfer())?;
+            unsafe {
+                channel
+                    .tx
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .and_then(|_| channel.tx.start_transfer())?;
+            }
         }
 
         #[cfg(gdma)]

@@ -311,7 +311,7 @@ pub(crate) mod utils {
         pub status_mask: u32,
     }
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
         fn esp_rom_gpio_connect_out_signal(
@@ -616,7 +616,7 @@ pub(crate) mod utils {
                     if clk_mode == PsramClkMode::PsramClkModeDclk {
                         spi.sram_drd_cmd()
                             .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(15)); // read command length, 2 bytes(1byte for delay),sending in qio mode in
-                                                                                       // cache
+                        // cache
                         spi.sram_drd_cmd().modify(|_, w| {
                             w.cache_sram_usr_rd_cmd_value()
                                 .bits((PSRAM_FAST_READ_QUAD << 8) as u16)

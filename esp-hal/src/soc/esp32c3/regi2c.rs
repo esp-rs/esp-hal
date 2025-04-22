@@ -1,4 +1,4 @@
-use crate::rom::regi2c::{define_regi2c, RawRegI2cField, RegI2cMaster, RegI2cRegister};
+use crate::rom::regi2c::{RawRegI2cField, RegI2cMaster, RegI2cRegister, define_regi2c};
 
 define_regi2c! {
     master: REGI2C_BBPLL(0x66, 0) {
@@ -144,14 +144,14 @@ define_regi2c! {
 }
 
 pub(crate) fn regi2c_read(block: u8, host_id: u8, reg_add: u8) -> u8 {
-    extern "C" {
+    unsafe extern "C" {
         pub(crate) fn esp_rom_regi2c_read(block: u8, block_hostid: u8, reg_add: u8) -> u8;
     }
     unsafe { esp_rom_regi2c_read(block, host_id, reg_add) }
 }
 
 pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
-    extern "C" {
+    unsafe extern "C" {
         pub(crate) fn rom_i2c_writeReg(block: u8, block_hostid: u8, reg_add: u8, indata: u8);
     }
     unsafe { rom_i2c_writeReg(block, host_id, reg_add, data) };

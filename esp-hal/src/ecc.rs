@@ -28,13 +28,13 @@
 use core::marker::PhantomData;
 
 use crate::{
-    interrupt::InterruptHandler,
-    pac,
-    peripherals::{Interrupt, ECC},
-    reg_access::{AlignmentHelper, SocDependentEndianess},
-    system::{self, GenericPeripheralGuard},
     Blocking,
     DriverMode,
+    interrupt::InterruptHandler,
+    pac,
+    peripherals::{ECC, Interrupt},
+    reg_access::{AlignmentHelper, SocDependentEndianess},
+    system::{self, GenericPeripheralGuard},
 };
 
 /// The ECC Accelerator driver instance

@@ -411,7 +411,7 @@ mod tests {
     #[test]
     #[cfg(feature = "unstable")]
     fn interrupt_executor_is_not_frozen(ctx: Context) {
-        use esp_hal::interrupt::{software::SoftwareInterrupt, Priority};
+        use esp_hal::interrupt::{Priority, software::SoftwareInterrupt};
         use esp_hal_embassy::InterruptExecutor;
         use static_cell::StaticCell;
 

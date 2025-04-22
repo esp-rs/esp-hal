@@ -9,7 +9,7 @@ use super::{
 use crate::{
     gpio::{RtcFunction, RtcPin},
     peripherals::{EXTMEM, LPWR, RTC_IO, SENS, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{sleep::RtcioWakeupSource, Clock, Rtc, RtcClock},
+    rtc_cntl::{Clock, Rtc, RtcClock, sleep::RtcioWakeupSource},
     soc::regi2c,
 };
 

@@ -154,10 +154,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 
     trace!(
         "timer_arm_us {:x} current: {} ticks: {} repeat: {}",
-        ets_timer as usize,
-        systick,
-        ticks,
-        repeat
+        ets_timer as usize, systick, ticks, repeat
     );
 
     TIMERS.with(|timers| {
@@ -210,9 +207,7 @@ pub(crate) fn compat_timer_setfn(
 ) {
     trace!(
         "timer_setfn {:x} {:?} {:?}",
-        ets_timer as usize,
-        pfunction,
-        parg
+        ets_timer as usize, pfunction, parg
     );
     let set = TIMERS.with(|timers| unsafe {
         if let Some(timer) = timers.find(ets_timer) {

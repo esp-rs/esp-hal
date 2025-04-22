@@ -6,6 +6,8 @@ use strum::FromRepr;
 
 use crate::{
     clock::{
+        Clock,
+        XtalClock,
         clocks_ll::{
             esp32c6_bbpll_get_freq_mhz,
             esp32c6_cpu_get_hs_divider,
@@ -15,8 +17,6 @@ use crate::{
             esp32c6_rtc_update_to_8m,
             esp32c6_rtc_update_to_xtal_raw,
         },
-        Clock,
-        XtalClock,
     },
     peripherals::TIMG0,
     rtc_cntl::RtcClock,
@@ -25,27 +25,27 @@ use crate::{
 };
 
 unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    &*esp32c6::PMU::ptr()
+    unsafe { &*esp32c6::PMU::ptr() }
 }
 
 unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
-    &*esp32c6::MODEM_LPCON::ptr()
+    unsafe { &*esp32c6::MODEM_LPCON::ptr() }
 }
 
 unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
-    &*esp32c6::MODEM_SYSCON::ptr()
+    unsafe { &*esp32c6::MODEM_SYSCON::ptr() }
 }
 
 unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock {
-    &*esp32c6::LP_CLKRST::ptr()
+    unsafe { &*esp32c6::LP_CLKRST::ptr() }
 }
 
 unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
-    &*esp32c6::PCR::ptr()
+    unsafe { &*esp32c6::PCR::ptr() }
 }
 
 unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    &*esp32c6::LP_AON::ptr()
+    unsafe { &*esp32c6::LP_AON::ptr() }
 }
 
 fn pmu_power_domain_force_default() {

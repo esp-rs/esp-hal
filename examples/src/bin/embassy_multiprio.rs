@@ -24,8 +24,8 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::{software::SoftwareInterruptControl, Priority},
-    timer::{timg::TimerGroup, AnyTimer},
+    interrupt::{Priority, software::SoftwareInterruptControl},
+    timer::{AnyTimer, timg::TimerGroup},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
@@ -58,7 +58,9 @@ async fn low_prio_blocking() {
 /// A well-behaved, but starved async task.
 #[embassy_executor::task]
 async fn low_prio_async() {
-    println!("Starting low-priority task that will not be able to run while the blocking task is running");
+    println!(
+        "Starting low-priority task that will not be able to run while the blocking task is running"
+    );
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         println!("Low priority ticks");

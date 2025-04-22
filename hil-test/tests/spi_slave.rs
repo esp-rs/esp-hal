@@ -10,11 +10,11 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
-    spi::{slave::Spi, Mode},
-    Blocking,
+    spi::{Mode, slave::Spi},
 };
 use hil_test as _;
 

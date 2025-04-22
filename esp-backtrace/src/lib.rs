@@ -90,7 +90,9 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     let backtrace = Backtrace::capture();
     #[cfg(target_arch = "riscv32")]
     if backtrace.frames().is_empty() {
-        println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
+        println!(
+            "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
+        );
     }
     for frame in backtrace.frames() {
         println!("0x{:x}", frame.program_counter());
@@ -100,8 +102,8 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 }
 
 #[cfg(all(feature = "exception-handler", target_arch = "xtensa"))]
-#[no_mangle]
-#[link_section = ".rwtext"]
+#[unsafe(no_mangle)]
+#[unsafe(link_section = ".rwtext")]
 unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
     pre_backtrace();
 
@@ -117,7 +119,7 @@ unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) 
 }
 
 #[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
-#[export_name = "ExceptionHandler"]
+#[unsafe(export_name = "ExceptionHandler")]
 fn exception_handler(context: &arch::TrapFrame) -> ! {
     pre_backtrace();
 
@@ -163,7 +165,9 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
         let backtrace = Backtrace::from_sp(context.s0 as u32);
         let frames = backtrace.frames();
         if frames.is_empty() {
-            println!("No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)");
+            println!(
+                "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
+            );
         }
         for frame in backtrace.frames() {
             println!("0x{:x}", frame.program_counter());
@@ -233,7 +237,7 @@ fn halt() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(feature = "custom-halt")] {
             // call custom code
-            extern "Rust" {
+            unsafe extern "Rust" {
                 fn custom_halt() -> !;
             }
             unsafe { custom_halt() }
@@ -285,7 +289,7 @@ fn halt() -> ! {
 fn pre_backtrace() {
     #[cfg(feature = "custom-pre-backtrace")]
     {
-        extern "Rust" {
+        unsafe extern "Rust" {
             fn custom_pre_backtrace();
         }
         unsafe { custom_pre_backtrace() }

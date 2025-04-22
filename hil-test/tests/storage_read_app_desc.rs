@@ -51,9 +51,9 @@ const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] 
     ret
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[used]
-#[link_section = ".rodata_desc"]
+#[unsafe(link_section = ".rodata_desc")]
 #[allow(non_upper_case_globals)]
 pub static esp_app_desc: EspAppDesc = EspAppDesc {
     magic_word: ESP_APP_DESC_MAGIC_WORD,

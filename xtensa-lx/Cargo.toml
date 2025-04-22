@@ -1,8 +1,8 @@
 [package]
 name          = "xtensa-lx"
 version       = "0.10.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Low-level access to Xtensa LX processors and peripherals"
 documentation = "https://docs.espressif.com/projects/rust/xtensa-lx/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
@@ -10,6 +10,10 @@ license       = "MIT OR Apache-2.0"
 categories    = ["embedded", "hardware-support", "no-std"]
 keywords      = ["lx", "peripheral", "register", "xtensa"]
 links         = "xtensa-lx"
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 critical-section  = "1.2.0"

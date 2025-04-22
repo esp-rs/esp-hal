@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use esp_config::{generate_config, ConfigOption, Stability, Validator, Value};
+use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());

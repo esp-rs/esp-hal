@@ -9,12 +9,12 @@
 mod generate;
 #[cfg(feature = "build")]
 pub use generate::{
-    generate_config,
-    validator::Validator,
-    value::Value,
     ConfigOption,
     Error,
     Stability,
+    generate_config,
+    validator::Validator,
+    value::Value,
 };
 
 /// Parse the value of an environment variable as a [bool] at compile time.

@@ -102,7 +102,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     const CACHE_4WAYS_ASSOC: u32 = 0;
     const CACHE_LINE_SIZE_16B: u32 = 0;
 
-    extern "C" {
+    unsafe extern "C" {
         /// Allocate memory to used by ICache and DCache.
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
@@ -338,7 +338,7 @@ pub(crate) mod utils {
         cs_mask: u8,
         is_write_erase_operation: bool,
     ) {
-        extern "C" {
+        unsafe extern "C" {
             ///  Start a spi user command sequence
             ///  [`spi_num`] spi port
             ///  [`rx_buf`] buffer pointer to receive data
@@ -415,7 +415,7 @@ pub(crate) mod utils {
             dummy_bit_len: u32,
         }
 
-        extern "C" {
+        unsafe extern "C" {
             /// Config the spi user command
             /// [`spi_num`] spi port
             /// [`pcmd`] pointer to accept the spi command struct
@@ -440,7 +440,7 @@ pub(crate) mod utils {
     }
 
     fn psram_set_op_mode(mode: CommandMode) {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_spi_set_op_mode(spi: u32, mode: u32);
         }
 
@@ -473,7 +473,7 @@ pub(crate) mod utils {
     }
 
     fn psram_gpio_config() {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
             /// Enable Quad I/O pin functions
@@ -515,7 +515,9 @@ pub(crate) mod utils {
                 // rom.
             } else {
                 // this case is currently not yet supported
-                panic!("Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported.");
+                panic!(
+                    "Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported."
+                );
 
                 // FLASH pins are all configured via GPIO matrix in ROM.
                 // psram_io.flash_clk_io =

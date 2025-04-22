@@ -20,11 +20,11 @@ use esp_hal::{
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn GPIO() {
     // Prevents binding the default handler, but we need to clear the GPIO
     // interrupts by hand.
-    let peripherals = esp_hal::peripherals::Peripherals::steal();
+    let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
 
     let (gpio1, _) = hil_test::common_test_pins!(peripherals);
 

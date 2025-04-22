@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Support for light-/deep-sleep (#3341)
 - Add DMA memcpy support to the S2 (#3352)
 - Some config options can now only be set when the `unstable` feature in enabled (#3365)
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 
 ### Changed
 

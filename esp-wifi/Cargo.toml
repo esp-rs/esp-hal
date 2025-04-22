@@ -1,14 +1,18 @@
 [package]
 name = "esp-wifi"
 version = "0.13.0"
-edition = "2021"
-rust-version  = "1.84.0"
+edition = "2024"
+rust-version  = "1.85.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
 documentation = "https://docs.espressif.com/projects/rust/esp-wifi/latest/"
 keywords = ["wifi", "bluetooth", "esp-now", "esp32", "no-std"]
 categories = ["embedded", "hardware-support", "no-std"]
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 allocator-api2 = { version = "0.2.0", default-features = false, features = ["alloc"] }

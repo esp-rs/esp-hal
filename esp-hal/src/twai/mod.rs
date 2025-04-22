@@ -122,19 +122,19 @@ use core::marker::PhantomData;
 
 use self::filter::{Filter, FilterType};
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         OutputSignal,
         Pull,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     pac::twai0::RegisterBlock,
     system::{Cpu, PeripheralGuard},
     twai::filter::SingleStandardFilter,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 pub mod filter;
@@ -479,7 +479,9 @@ impl EspTwaiFrame {
         let mut data: [u8; 8] = [0; 8];
 
         // Copy the data from the memory mapped peripheral into actual memory.
-        copy_from_data_register(&mut data[..dlc], registers);
+        unsafe {
+            copy_from_data_register(&mut data[..dlc], registers);
+        }
 
         Self {
             id: id.into(),
@@ -1238,7 +1240,9 @@ impl embedded_can::Error for EspTwaiError {
 unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
     for (i, dest) in dest.iter_mut().enumerate() {
         // Perform a volatile read to avoid compiler optimizations.
-        *dest = src.add(i).read_volatile() as u8;
+        unsafe {
+            *dest = src.add(i).read_volatile() as u8;
+        }
     }
 }
 
@@ -1254,7 +1258,9 @@ unsafe fn copy_from_data_register(dest: &mut [u8], src: *const u32) {
 unsafe fn copy_to_data_register(dest: *mut u32, src: &[u8]) {
     for (i, src) in src.iter().enumerate() {
         // Perform a volatile write to avoid compiler optimizations.
-        dest.add(i).write_volatile(*src as u32);
+        unsafe {
+            dest.add(i).write_volatile(*src as u32);
+        }
     }
 }
 

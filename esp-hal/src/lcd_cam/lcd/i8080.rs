@@ -53,33 +53,33 @@
 use core::{
     fmt::Formatter,
     marker::PhantomData,
-    mem::{size_of, ManuallyDrop},
+    mem::{ManuallyDrop, size_of},
     ops::{Deref, DerefMut},
 };
 
 use crate::{
+    Blocking,
+    DriverMode,
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
     gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
         OutputSignal,
+        interconnect::{OutputConnection, PeripheralOutput},
     },
     lcd_cam::{
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Phase, Polarity},
         BitOrder,
         ByteOrder,
         ClockError,
         Instance,
-        Lcd,
         LCD_DONE_WAKER,
+        Lcd,
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Phase, Polarity},
     },
     pac,
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Blocking,
-    DriverMode,
 };
 
 /// A configuration error.

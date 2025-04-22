@@ -2,7 +2,7 @@
 
 #![allow(unused)] // TODO: Remove me when `embedded_hal::i2c::I2c` is implemented
 
-use crate::pac::{lp_i2c0::COMD, LP_I2C0};
+use crate::pac::{LP_I2C0, lp_i2c0::COMD};
 
 const LP_I2C_TRANS_COMPLETE_INT_ST_S: u32 = 7;
 const LP_I2C_END_DETECT_INT_ST_S: u32 = 3;
@@ -16,8 +16,10 @@ const LP_I2C_FIFO_LEN: u32 = 16;
 
 #[doc(hidden)]
 pub unsafe fn conjure() -> LpI2c {
-    LpI2c {
-        i2c: LP_I2C0::steal(),
+    unsafe {
+        LpI2c {
+            i2c: LP_I2C0::steal(),
+        }
     }
 }
 
