@@ -1,7 +1,7 @@
 //! Test we get an error when attempting to initialize esp-wifi with interrupts
 //! disabled in common ways
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
+//% CHIPS: esp32 esp32s2 esp32c2 esp32c3 esp32c6 esp32s3
 //% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi
 
 #![no_std]
@@ -9,6 +9,12 @@
 
 use esp_hal::clock::CpuClock;
 use hil_test as _;
+
+#[cfg(target_arch = "riscv32")]
+use esp_hal::riscv::interrupt::free as interrupt_free;
+
+#[cfg(target_arch = "xtensa")]
+use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
@@ -58,20 +64,4 @@ mod tests {
             Err(esp_wifi::InitializationError::InterruptsDisabled),
         ));
     }
-}
-
-#[cfg(target_arch = "riscv32")]
-fn interrupt_free<F, R>(f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    esp_hal::riscv::interrupt::free(f)
-}
-
-#[cfg(target_arch = "xtensa")]
-fn interrupt_free<F, R>(f: F) -> R
-where
-    F: FnOnce() -> R,
-{
-    esp_hal::xtensa_lx::interrupt::free(f)
 }
