@@ -17,6 +17,8 @@ pub(crate) static mut ISR_INTERRUPT_7: (
     *mut crate::binary::c_types::c_void,
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
+// keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
+// ideally _some_ of these values should be configurable
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
     config_version: 0x20240422,
     ble_ll_resolv_list_size: 4,

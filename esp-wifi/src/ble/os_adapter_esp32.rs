@@ -290,6 +290,8 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
 ];
 
 pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
+    // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
+    // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         controller_task_stack_size: 4096,
         controller_task_prio: 23,
