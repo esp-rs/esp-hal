@@ -1528,6 +1528,18 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
+// These three traits need to be public to allow the user to create functions
+// that can take either 8 or 16 bit pins and call parl_io.tx.with_config() or
+// parl_io.rx.with_config().
+#[doc(hidden)]
+pub trait TxPins {}
+#[doc(hidden)]
+pub trait RxPins {}
+#[doc(hidden)]
+pub trait ConfigurePins {
+    fn configure(&mut self);
+}
+
 #[doc(hidden)]
 pub mod asynch {
     use core::task::Poll;
@@ -1610,19 +1622,11 @@ mod private {
 
     pub trait ContainsValidSignalPin {}
 
-    pub trait TxPins {}
-
-    pub trait RxPins {}
-
     pub trait TxClkPin {
         fn configure(&mut self);
     }
 
     pub trait RxClkPin {
-        fn configure(&mut self);
-    }
-
-    pub trait ConfigurePins {
         fn configure(&mut self);
     }
 
