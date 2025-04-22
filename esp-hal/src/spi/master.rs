@@ -680,7 +680,7 @@ impl<'d> Spi<'d, Blocking> {
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
         let sclk_pin = PinGuard::new_unconnected(spi.info().sclk);
-        let cs_pin = PinGuard::new_unconnected(spi.info().cs);
+        let cs_pin = PinGuard::new_unconnected(spi.info().cs[0]);
         let sio1_pin = PinGuard::new_unconnected(spi.info().sio1_output);
         let sio2_pin = spi.info().sio2_output.map(PinGuard::new_unconnected);
         let sio3_pin = spi.info().sio3_output.map(PinGuard::new_unconnected);
@@ -1021,7 +1021,7 @@ where
     pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
         let cs = cs.into();
         cs.set_to_push_pull_output();
-        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs);
+        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs[0]);
 
         self
     }
@@ -2708,8 +2708,8 @@ pub struct Info {
     /// MISO signal.
     pub miso: InputSignal,
 
-    /// Chip select signal.
-    pub cs: OutputSignal,
+    /// Chip select signals.
+    pub cs: &'static [OutputSignal],
 
     /// SIO0 (MOSI) input signal for half-duplex mode.
     pub sio0_input: InputSignal,
@@ -2728,6 +2728,38 @@ pub struct Info {
 
     /// SIO3 input signal for QSPI mode.
     pub sio3_input: Option<InputSignal>,
+
+    /// SIO4 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio4_output: Option<OutputSignal>,
+
+    /// SIO4 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio4_input: Option<InputSignal>,
+
+    /// SIO5 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio5_output: Option<OutputSignal>,
+
+    /// SIO5 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio5_input: Option<InputSignal>,
+
+    /// SIO6 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio6_output: Option<OutputSignal>,
+
+    /// SIO6 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio6_input: Option<InputSignal>,
+
+    /// SIO7 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio7_output: Option<OutputSignal>,
+
+    /// SIO7 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio7_input: Option<InputSignal>,
 }
 
 struct DmaDriver {
@@ -3678,7 +3710,7 @@ unsafe impl Sync for Info {}
 // hardware fully. The master module should extend it with the master specific
 // details.
 macro_rules! spi_instance {
-    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
+    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, [$($cs:ident),+] $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
         paste::paste! {
             impl PeripheralInstance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
@@ -3690,13 +3722,29 @@ macro_rules! spi_instance {
                         sclk: OutputSignal::$sclk,
                         mosi: OutputSignal::$mosi,
                         miso: InputSignal::$miso,
-                        cs: OutputSignal::$cs,
+                        cs: &[$(OutputSignal::$cs),+],
                         sio0_input: InputSignal::$mosi,
                         sio1_output: OutputSignal::$miso,
                         sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
                         sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
                         sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
                         sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
+                        #[cfg(spi_octal)]
+                        sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
                     };
 
                     &INFO
@@ -3715,22 +3763,22 @@ macro_rules! spi_instance {
 #[cfg(spi2)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0, HSPIWP, HSPIHD);
+        spi_instance!(2, HSPICLK, HSPID, HSPIQ, [HSPICS0, HSPICS1, HSPICS2], HSPIWP, HSPIHD);
     } else if #[cfg(any(esp32s2, esp32s3))] {
-        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0, FSPIWP, FSPIHD);
+        spi_instance!(2, FSPICLK, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7);
     } else {
-        spi_instance!(2, FSPICLK_MUX, FSPID, FSPIQ, FSPICS0, FSPIWP, FSPIHD);
+        spi_instance!(2, FSPICLK_MUX, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD);
     }
 }
 
 #[cfg(spi3)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0, VSPIWP, VSPIHD);
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, [VSPICS0, VSPICS1, VSPICS2], VSPIWP, VSPIHD);
     } else if #[cfg(esp32s3)] {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0, SPI3_WP, SPI3_HD);
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2], SPI3_WP, SPI3_HD);
     } else {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2]);
     }
 }
 
