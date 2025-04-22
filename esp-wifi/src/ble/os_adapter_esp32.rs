@@ -202,16 +202,23 @@ extern "C" fn patch_apply() {
 
 extern "C" fn coex_version_get_wrapper(major: *mut u32, minor: *mut u32, patch: *mut u32) -> i32 {
     unsafe {
-        let coex_version = unwrap!(
-            core::ffi::CStr::from_ptr(crate::binary::include::coex_version_get())
-                .to_str()
-                .ok()
-        );
-        info!("COEX Version {}", coex_version);
-        // we should parse it ... for now just hardcoded
-        major.write_volatile(1);
-        minor.write_volatile(2);
-        patch.write_volatile(0);
+        let mut version = crate::binary::include::coex_version_t {
+            major: 0,
+            minor: 0,
+            patch: 0,
+        };
+        if coex_version_get_value(&mut version) == 0 {
+            info!(
+                "COEX Version {}.{}.{}",
+                version.major, version.minor, version.patch
+            );
+
+            major.write_volatile(version.major as u32);
+            minor.write_volatile(version.minor as u32);
+            patch.write_volatile(version.patch as u32);
+        } else {
+            error!("Unable to get COEX version");
+        }
     }
 
     0
@@ -285,12 +292,12 @@ static BTDM_DRAM_AVAILABLE_REGION: [btdm_dram_available_region_t; 7] = [
 pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
     esp_bt_controller_config_t {
         controller_task_stack_size: 4096,
-        controller_task_prio: 110,
+        controller_task_prio: 23,
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
         scan_duplicate_mode: 0,
         scan_duplicate_type: 0,
-        normal_adv_size: 200,
+        normal_adv_size: 100,
         mesh_adv_size: 0,
         send_adv_reserved_size: 1000,
         controller_debug_flag: 0,
@@ -300,7 +307,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         bt_sco_datapath: 0,
         auto_latency: false,
         bt_legacy_auth_vs_evt: false,
-        bt_max_sync_conn: 1,
+        bt_max_sync_conn: 0,
         ble_sca: 1,
         pcm_role: 0,
         pcm_polar: 0,
@@ -380,18 +387,31 @@ pub(crate) fn disable_sleep_mode() {
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request() -> bool {
     trace!("coex_bt_wakeup_request");
-    #[cfg(coex)]
-    return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
 
-    #[cfg(not(coex))]
+    // This should really be
+    // ```rust,norun
+    // #[cfg(coex)]
+    // return async_wakeup_request(BTDM_ASYNC_WAKEUP_REQ_COEX);
+    // #[cfg(not(coex))]
+    // true
+    // ```
+    //
+    // But doing the right thing here keeps BT from working.
+    // In a similar scenario this function isn't called in ESP-IDF.
     true
 }
 
 pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
     trace!("coex_bt_wakeup_request_end");
 
-    #[cfg(coex)]
-    async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
+    // This should really be
+    // ```rust,norun
+    //#[cfg(coex)]
+    // async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
+    // ```
+    // 
+    // But doing the right thing here keeps BT from working.
+    // In a similar scenario this function isn't called in ESP-IDF.
 }
 
 #[allow(unused_variables)]

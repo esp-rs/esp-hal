@@ -302,7 +302,6 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
     trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-    // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
 }
