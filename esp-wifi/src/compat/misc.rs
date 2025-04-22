@@ -92,20 +92,20 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
 pub unsafe extern "C" fn strcasecmp(
     s1: *const core::ffi::c_char,
     s2: *const core::ffi::c_char,
-) -> u8 {
+) -> i32 {
     let mut i = 0;
     loop {
         unsafe {
             let s1_i = s1.add(i);
             let s2_i = s2.add(i);
 
-            let val = (*s1_i).to_ascii_lowercase() as u8 - (*s2_i).to_ascii_lowercase() as u8;
+            let val = (*s1_i).to_ascii_lowercase() as i32 - (*s2_i).to_ascii_lowercase() as i32;
             if val != 0 || *s1_i == 0 {
                 return val;
             }
-
-            i += 1;
         }
+
+        i += 1;
     }
 }
 
