@@ -380,7 +380,7 @@ pub fn init<'d>(
     _rng: impl EspWifiRngSource + 'd,
     _radio_clocks: RADIO_CLK<'d>,
 ) -> Result<EspWifiController<'d>, InitializationError> {
-    if crate::interrupts_disabled() {
+    if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }
 
@@ -474,7 +474,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
 }
 
 /// Returns true if at least some interrupt levels are disabled.
-fn interrupts_disabled() -> bool {
+fn is_interrupts_disabled() -> bool {
     #[cfg(target_arch = "xtensa")]
     return hal::xtensa_lx::interrupt::get_level() != 0
         || hal::xtensa_lx::interrupt::get_mask() == 0;

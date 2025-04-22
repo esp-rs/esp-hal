@@ -2614,7 +2614,7 @@ pub fn new<'d>(
     inited: &'d EspWifiController<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
-    if crate::interrupts_disabled() {
+    if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
     }
 

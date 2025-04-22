@@ -258,7 +258,7 @@ unsafe extern "C" fn task_delete(task: *const ()) {
 
 #[ram]
 unsafe extern "C" fn is_in_isr() -> i32 {
-    crate::interrupts_disabled() as i32
+    crate::is_interrupts_disabled() as i32
 }
 
 #[ram]
