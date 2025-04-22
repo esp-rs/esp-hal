@@ -258,5 +258,11 @@ The data and ctrl pins of the camera have been split out into individual `with_*
   )?;
 
 + camera.with_data0(peripherals.GPIO11).with_data1(peripherals.GPIO9).with_dataX();
-
 ```
+
+## Configuration changes
+
+Some configuration options are now unstable and they require the `unstable` feature to be
+enabled. You can learn about a particular option in the [esp-hal documentation](https://docs.espressif.com/projects/rust/esp-hal/latest/).
+
+The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`.

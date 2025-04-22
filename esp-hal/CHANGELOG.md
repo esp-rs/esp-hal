@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved DMA channel types from `esp_hal::dma::DmaChannelN`/`esp_hal::dma::XYDmaChannel` to `esp_hal::peripherals::DMA_XY` (#3372)
 - `ParlIoFullDuplex`, `ParlIoTxOnly` and `ParlIoRxOnly` have been merged into `ParlIo` (#3366)
 - All `Camera` pins are now configured using `with_*()` methods (#3237)
+- The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`. (#3402)
 
 ### Fixed
 
