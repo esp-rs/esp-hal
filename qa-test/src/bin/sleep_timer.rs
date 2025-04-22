@@ -11,7 +11,7 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     main,
-    rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason},
+    rtc_cntl::{Rtc, SocResetReason, reset_reason, sleep::TimerWakeupSource, wakeup_cause},
     system::Cpu,
 };
 use esp_println::println;

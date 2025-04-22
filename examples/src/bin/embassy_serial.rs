@@ -13,9 +13,9 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
+    Async,
     timer::timg::TimerGroup,
     uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx},
-    Async,
 };
 use static_cell::StaticCell;
 

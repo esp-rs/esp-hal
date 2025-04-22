@@ -25,7 +25,7 @@ impl Value {
                 _ => {
                     return Err(Error::parse(format!(
                         "Expected 'true' or 'false', found: '{s}'"
-                    )))
+                    )));
                 }
             },
             Value::Integer(_) => {
@@ -33,7 +33,7 @@ impl Value {
                     [b'0', b'x', ..] => i128::from_str_radix(&s[2..], 16),
                     [b'0', b'o', ..] => i128::from_str_radix(&s[2..], 8),
                     [b'0', b'b', ..] => i128::from_str_radix(&s[2..], 2),
-                    _ => i128::from_str_radix(&s, 10),
+                    _ => s.parse(),
                 }
                 .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
 

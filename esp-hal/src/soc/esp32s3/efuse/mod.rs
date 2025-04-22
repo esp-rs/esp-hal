@@ -83,11 +83,7 @@ impl Efuse {
     pub fn rtc_calib_version() -> u8 {
         let (major, _minor) = Self::block_version();
 
-        if major == 1 {
-            1
-        } else {
-            0
-        }
+        if major == 1 { 1 } else { 0 }
     }
 
     /// Get ADC initial code for specified attenuation from efuse

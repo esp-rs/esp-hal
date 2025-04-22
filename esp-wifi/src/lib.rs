@@ -118,11 +118,11 @@ use esp_config::*;
 use esp_hal::timer::systimer::Alarm;
 use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
 use hal::{
+    Blocking,
     clock::Clocks,
     rng::{Rng, Trng},
     time::Rate,
-    timer::{timg::Timer as TimgTimer, AnyTimer, PeriodicTimer},
-    Blocking,
+    timer::{AnyTimer, PeriodicTimer, timg::Timer as TimgTimer},
 };
 use portable_atomic::Ordering;
 
@@ -244,7 +244,10 @@ const _: () = {
         CONFIG.rx_ba_win < CONFIG.dynamic_rx_buf_num,
         "WiFi configuration check: rx_ba_win should not be larger than dynamic_rx_buf_num!"
     );
-    core::assert!(CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2), "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!");
+    core::assert!(
+        CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2),
+        "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!"
+    );
 };
 
 type TimeBase = PeriodicTimer<'static, Blocking>;

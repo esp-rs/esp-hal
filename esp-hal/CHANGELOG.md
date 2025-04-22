@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Support for light-/deep-sleep (#3341)
 - Add DMA memcpy support to the S2 (#3352)
 - Some config options can now only be set when the `unstable` feature in enabled (#3365)
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 
 ### Changed
 
@@ -40,6 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved DMA channel types from `esp_hal::dma::DmaChannelN`/`esp_hal::dma::XYDmaChannel` to `esp_hal::peripherals::DMA_XY` (#3372)
 - `ParlIoFullDuplex`, `ParlIoTxOnly` and `ParlIoRxOnly` have been merged into `ParlIo` (#3366)
 - I2C checks ST_TOUT / MAIN_ST_TOUT where available (#3333)
+- All `Camera` pins are now configured using `with_*()` methods (#3237)
+- The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`. (#3402)
+- Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
 
 ### Fixed
 

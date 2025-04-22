@@ -14,10 +14,10 @@ use embedded_hal_async::spi::SpiBus as SpiBusAsync;
 #[cfg(feature = "unstable")]
 use esp_hal::peripherals::SPI2;
 use esp_hal::{
+    Blocking,
     gpio::Input,
     spi::master::{Config, Spi},
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 

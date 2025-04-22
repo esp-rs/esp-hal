@@ -88,29 +88,27 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 ) -> i32 {
     trace!(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",
-        source,
-        flags,
-        handler,
-        arg,
-        ret_handle
+        source, flags, handler, arg, ret_handle
     );
 
-    match source {
-        3 => {
-            ISR_INTERRUPT_3 = (handler, arg);
-            unwrap!(interrupt::enable(
-                Interrupt::LP_BLE_TIMER,
-                interrupt::Priority::Priority1
-            ));
+    unsafe {
+        match source {
+            3 => {
+                ISR_INTERRUPT_3 = (handler, arg);
+                unwrap!(interrupt::enable(
+                    Interrupt::LP_BLE_TIMER,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            15 => {
+                ISR_INTERRUPT_15 = (handler, arg);
+                unwrap!(interrupt::enable(
+                    Interrupt::BT_MAC,
+                    interrupt::Priority::Priority1
+                ));
+            }
+            _ => panic!("Unexpected interrupt source {}", source),
         }
-        15 => {
-            ISR_INTERRUPT_15 = (handler, arg);
-            unwrap!(interrupt::enable(
-                Interrupt::BT_MAC,
-                interrupt::Priority::Priority1
-            ));
-        }
-        _ => panic!("Unexpected interrupt source {}", source),
     }
 
     0
@@ -132,7 +130,7 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
 }
 
 #[allow(improper_ctypes_definitions)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn jrand48(
     _xsubi: [crate::binary::c_types::c_ushort; 3],
 ) -> crate::binary::c_types::c_long {

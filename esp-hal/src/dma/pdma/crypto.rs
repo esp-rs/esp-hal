@@ -4,7 +4,7 @@ use crate::{
     asynch::AtomicWaker,
     dma::*,
     interrupt::Priority,
-    peripherals::{Interrupt, DMA_CRYPTO},
+    peripherals::{DMA_CRYPTO, Interrupt},
 };
 
 pub(super) type CryptoRegisterBlock = crate::pac::crypto_dma::RegisterBlock;

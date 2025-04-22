@@ -6,16 +6,16 @@
 #![no_std]
 #![no_main]
 
-use crypto_bigint::{Uint, U1024, U512};
+use crypto_bigint::{U512, U1024, Uint};
 use esp_hal::{
+    Blocking,
     rsa::{
-        operand_sizes::*,
         Rsa,
         RsaModularExponentiation,
         RsaModularMultiplication,
         RsaMultiplication,
+        operand_sizes::*,
     },
-    Blocking,
 };
 use hil_test as _;
 

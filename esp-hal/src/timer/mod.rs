@@ -48,14 +48,14 @@ use core::{
 };
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::Interrupt,
     system::Cpu,
     time::{Duration, Instant},
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 #[cfg(systimer)]

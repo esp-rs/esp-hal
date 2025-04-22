@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::Result;
 use enum_as_inner::EnumAsInner;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use serde::Deserialize;
 use strum::{Display, EnumIter, EnumString};
 

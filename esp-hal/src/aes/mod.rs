@@ -108,10 +108,10 @@ impl Key {
     /// Returns a slice representation of the AES key.
     fn as_slice(&self) -> &[u8] {
         match self {
-            Key::Key16(ref key) => key,
+            Key::Key16(key) => key,
             #[cfg(any(esp32, esp32s2))]
-            Key::Key24(ref key) => key,
-            Key::Key32(ref key) => key,
+            Key::Key24(key) => key,
+            Key::Key32(key) => key,
         }
     }
 }
@@ -235,6 +235,7 @@ pub mod dma {
     use core::mem::ManuallyDrop;
 
     use crate::{
+        Blocking,
         aes::{Key, Mode},
         dma::{
             Channel,
@@ -245,7 +246,6 @@ pub mod dma {
             PeripheralDmaChannel,
         },
         peripherals::AES,
-        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();

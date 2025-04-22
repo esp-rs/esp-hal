@@ -132,6 +132,9 @@ use enumset::{EnumSet, EnumSetType};
 use private::*;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
         Channel,
         ChannelRx,
@@ -145,17 +148,14 @@ use crate::{
         PeripheralTxChannel,
     },
     gpio::{
-        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
         NoPin,
+        interconnect::{InputConnection, OutputConnection, PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     parl_io::asynch::interrupt_handler,
     peripherals::{Interrupt, PARL_IO, PCR},
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 const MAX_DMA_SIZE: usize = 65535;
@@ -1528,16 +1528,28 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::ParlIo as u8 }>,
 }
 
+// These three traits need to be public to allow the user to create functions
+// that can take either 8 or 16 bit pins and call parl_io.tx.with_config() or
+// parl_io.rx.with_config().
+#[doc(hidden)]
+pub trait TxPins {}
+#[doc(hidden)]
+pub trait RxPins {}
+#[doc(hidden)]
+pub trait ConfigurePins {
+    fn configure(&mut self);
+}
+
 #[doc(hidden)]
 pub mod asynch {
     use core::task::Poll;
 
     use procmacros::handler;
 
-    use super::{private::Instance, ParlIoRxTransfer, ParlIoTxTransfer};
+    use super::{ParlIoRxTransfer, ParlIoTxTransfer, private::Instance};
     use crate::{
         asynch::AtomicWaker,
-        dma::{asynch::DmaRxFuture, DmaRxBuffer, DmaTxBuffer},
+        dma::{DmaRxBuffer, DmaTxBuffer, asynch::DmaRxFuture},
     };
 
     static TX_WAKER: AtomicWaker = AtomicWaker::new();
@@ -1610,19 +1622,11 @@ mod private {
 
     pub trait ContainsValidSignalPin {}
 
-    pub trait TxPins {}
-
-    pub trait RxPins {}
-
     pub trait TxClkPin {
         fn configure(&mut self);
     }
 
     pub trait RxClkPin {
-        fn configure(&mut self);
-    }
-
-    pub trait ConfigurePins {
         fn configure(&mut self);
     }
 

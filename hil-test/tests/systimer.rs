@@ -12,15 +12,15 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
+    Blocking,
     delay::Delay,
     handler,
     time::Duration,
     timer::{
-        systimer::{Alarm, SystemTimer},
         OneShotTimer,
         PeriodicTimer,
+        systimer::{Alarm, SystemTimer},
     },
-    Blocking,
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};

@@ -61,8 +61,8 @@ use strum::EnumCount;
 use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
-    interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
-    peripherals::{handle_gpio_input, handle_gpio_output, Interrupt, GPIO, IO_MUX},
+    interrupt::{self, DEFAULT_INTERRUPT_HANDLER, InterruptHandler, Priority},
+    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output},
     private::{self, Sealed},
 };
 
@@ -1012,6 +1012,7 @@ macro_rules! gpio {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
                                         #[allow(unused_mut)]
+                                        #[allow(unused_unsafe)]
                                         let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                         $code
                                     }} else {{
@@ -2132,9 +2133,11 @@ impl RtcPin for AnyPin<'_> {
 
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-        handle_rtcio!(self, target, {
-            RtcPin::apply_wakeup(&target, wakeup, level)
-        })
+        unsafe {
+            handle_rtcio!(self, target, {
+                RtcPin::apply_wakeup(&target, wakeup, level)
+            })
+        }
     }
 }
 

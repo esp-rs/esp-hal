@@ -26,7 +26,27 @@
 // MUST be the first module
 mod fmt;
 
+#[cfg(not(feature = "std"))]
+mod rom;
+#[cfg(not(feature = "std"))]
+pub(crate) use rom as crypto;
+
+#[cfg(feature = "std")]
+mod non_rom;
+#[cfg(feature = "std")]
+pub(crate) use non_rom as crypto;
+
 pub mod partitions;
+
+pub mod ota;
+
+// We run tests on the host which happens to be MacOS machines and mach-o
+// doesn't like `link-sections` this way
+#[cfg(not(target_os = "macos"))]
+#[unsafe(link_section = ".espressif.metadata")]
+#[used]
+#[unsafe(export_name = "bootloader.NAME")]
+static OTA_FEATURE: [u8; 7] = *b"ESP-IDF";
 
 /// ESP-IDF compatible application descriptor
 ///
@@ -285,8 +305,8 @@ macro_rules! esp_app_desc {
      $min_efuse_blk_rev_full: expr,
      $max_efuse_blk_rev_full: expr
     ) => {
-        #[export_name = "esp_app_desc"]
-        #[link_section = ".rodata_desc.appdesc"]
+        #[unsafe(export_name = "esp_app_desc")]
+        #[unsafe(link_section = ".rodata_desc.appdesc")]
         pub static ESP_APP_DESC: $crate::EspAppDesc = $crate::EspAppDesc::new_internal(
             $version,
             $project_name,

@@ -123,14 +123,14 @@ macro_rules! any_peripheral {
                 ///
                 /// You must ensure that you're only using one instance of this type at a time.
                 #[inline]
-                pub unsafe fn clone_unchecked(&self) -> Self {
+                pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
                     match &self.0 {
                         $(
                             $(#[cfg($variant_meta)])*
                             [< $name Inner >]::$variant(inner) => $name([<$name Inner>]::$variant(inner.clone_unchecked())),
                         )*
                     }
-                }
+                }}
 
                 /// Creates a new peripheral reference with a shorter lifetime.
                 ///
@@ -244,9 +244,9 @@ macro_rules! ignore {
 #[doc(hidden)]
 macro_rules! metadata {
     ($category:literal, $key:ident, $value:expr) => {
-        #[link_section = concat!(".espressif.metadata")]
+        #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
-        #[export_name = concat!($category, ".", stringify!($key))]
+        #[unsafe(export_name = concat!($category, ".", stringify!($key)))]
         static $key: [u8; $value.len()] = const {
             let val_bytes = $value.as_bytes();
             let mut val_bytes_array = [0; $value.len()];

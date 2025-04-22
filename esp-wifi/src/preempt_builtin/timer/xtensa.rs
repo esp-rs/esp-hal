@@ -1,9 +1,9 @@
 use esp_hal::interrupt::InterruptHandler;
 
 use crate::{
+    TimeBase,
     hal::{interrupt, time::Rate, trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
     preempt_builtin::task_switch,
-    TimeBase,
 };
 
 /// The timer responsible for time slicing.
@@ -75,8 +75,8 @@ extern "C" fn timer_tick_handler(_context: &mut TrapFrame) {
 }
 
 #[allow(non_snake_case)]
-#[cfg_attr(not(esp32), export_name = "Software0")]
-#[cfg_attr(esp32, export_name = "Software1")]
+#[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
+#[cfg_attr(esp32, unsafe(export_name = "Software1"))]
 fn task_switch_interrupt(context: &mut TrapFrame) {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };

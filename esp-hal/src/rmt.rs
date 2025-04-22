@@ -229,18 +229,18 @@ use core::{
 use enumset::{EnumSet, EnumSetType};
 
 use crate::{
+    Async,
+    Blocking,
     asynch::AtomicWaker,
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         Level,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     handler,
     peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
 };
 
 /// Errors

@@ -7,16 +7,16 @@
 #![no_main]
 
 use esp_hal::{
+    Async,
     dma::DmaTxBuf,
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
-        lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
+        lcd::i8080::{Command, Config, I8080, TxEightBits},
     },
     peripherals::DMA_CH0,
     time::Rate,
-    Async,
 };
 use hil_test as _;
 

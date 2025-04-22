@@ -41,20 +41,23 @@ use core::marker::PhantomData;
 #[instability::unstable]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
-#[cfg(place_spi_driver_in_ram)]
+#[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
 use super::{BitOrder, DataMode, DmaError, Error, Mode};
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     clock::Clocks,
     dma::{DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer},
     gpio::{
-        interconnect::{PeripheralInput, PeripheralOutput},
         InputSignal,
         NoPin,
         OutputSignal,
         PinGuard,
+        interconnect::{PeripheralInput, PeripheralOutput},
     },
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
@@ -62,9 +65,6 @@ use crate::{
     spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 /// Enumeration of possible SPI interrupt events.
@@ -680,7 +680,7 @@ impl<'d> Spi<'d, Blocking> {
 
         let mosi_pin = PinGuard::new_unconnected(spi.info().mosi);
         let sclk_pin = PinGuard::new_unconnected(spi.info().sclk);
-        let cs_pin = PinGuard::new_unconnected(spi.info().cs);
+        let cs_pin = PinGuard::new_unconnected(spi.info().cs[0]);
         let sio1_pin = PinGuard::new_unconnected(spi.info().sio1_output);
         let sio2_pin = spi.info().sio2_output.map(PinGuard::new_unconnected);
         let sio3_pin = spi.info().sio3_output.map(PinGuard::new_unconnected);
@@ -1021,7 +1021,7 @@ where
     pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
         let cs = cs.into();
         cs.set_to_push_pull_output();
-        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs);
+        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs[0]);
 
         self
     }
@@ -1198,12 +1198,12 @@ mod dma {
     use core::{
         cmp::min,
         mem::ManuallyDrop,
-        sync::atomic::{fence, Ordering},
+        sync::atomic::{Ordering, fence},
     };
 
     use super::*;
     use crate::{
-        dma::{asynch::DmaRxFuture, Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel},
+        dma::{Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel, asynch::DmaRxFuture},
         spi::master::dma::asynch::DropGuard,
     };
 
@@ -1407,7 +1407,7 @@ mod dma {
 
                 fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                     if self.0.interrupts().contains(SpiInterrupt::TransferDone) {
-                        #[cfg(esp32)]
+                        #[cfg(any(esp32, esp32s2))]
                         // Need to poll for done-ness even after interrupt fires.
                         if self.0.busy() {
                             cx.waker().wake_by_ref();
@@ -1523,7 +1523,7 @@ mod dma {
         ///
         /// The caller must ensure to not access the buffer contents while the
         /// transfer is in progress. Moving the buffer itself is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             &mut self,
             full_duplex: bool,
@@ -1724,13 +1724,13 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_write(
             &mut self,
             bytes_to_write: usize,
             buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer)
+            unsafe { self.start_dma_transfer(0, bytes_to_write, &mut EmptyBuf, buffer) }
         }
 
         /// Configures the DMA buffers for the SPI instance.
@@ -1749,7 +1749,7 @@ mod dma {
         /// SPI instance. The maximum amount of data to be sent is 32736
         /// bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
@@ -1770,13 +1770,13 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_read(
             &mut self,
             bytes_to_read: usize,
             buffer: &mut impl DmaRxBuffer,
         ) -> Result<(), Error> {
-            self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf)
+            unsafe { self.start_dma_transfer(bytes_to_read, 0, buffer, &mut EmptyBuf) }
         }
 
         /// Perform a DMA read.
@@ -1785,7 +1785,7 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
@@ -1806,7 +1806,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_transfer(
             &mut self,
             bytes_to_read: usize,
@@ -1814,7 +1814,9 @@ mod dma {
             rx_buffer: &mut impl DmaRxBuffer,
             tx_buffer: &mut impl DmaTxBuffer,
         ) -> Result<(), Error> {
-            self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
+            unsafe {
+                self.start_transfer_dma(true, bytes_to_read, bytes_to_write, rx_buffer, tx_buffer)
+            }
         }
 
         /// Perform a DMA transfer
@@ -1823,7 +1825,7 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
@@ -1853,7 +1855,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_half_duplex_read(
             &mut self,
             data_mode: DataMode,
@@ -1873,12 +1875,12 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf)
+            unsafe { self.start_transfer_dma(false, bytes_to_read, 0, buffer, &mut EmptyBuf) }
         }
 
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn half_duplex_read<RX: DmaRxBuffer>(
             mut self,
@@ -1910,7 +1912,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_half_duplex_write(
             &mut self,
             data_mode: DataMode,
@@ -1939,12 +1941,12 @@ mod dma {
                 data_mode,
             )?;
 
-            self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer)
+            unsafe { self.start_transfer_dma(false, 0, bytes_to_write, &mut EmptyBuf, buffer) }
         }
 
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn half_duplex_write<TX: DmaTxBuffer>(
             mut self,
@@ -2708,8 +2710,8 @@ pub struct Info {
     /// MISO signal.
     pub miso: InputSignal,
 
-    /// Chip select signal.
-    pub cs: OutputSignal,
+    /// Chip select signals.
+    pub cs: &'static [OutputSignal],
 
     /// SIO0 (MOSI) input signal for half-duplex mode.
     pub sio0_input: InputSignal,
@@ -2728,6 +2730,38 @@ pub struct Info {
 
     /// SIO3 input signal for QSPI mode.
     pub sio3_input: Option<InputSignal>,
+
+    /// SIO4 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio4_output: Option<OutputSignal>,
+
+    /// SIO4 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio4_input: Option<InputSignal>,
+
+    /// SIO5 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio5_output: Option<OutputSignal>,
+
+    /// SIO5 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio5_input: Option<InputSignal>,
+
+    /// SIO6 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio6_output: Option<OutputSignal>,
+
+    /// SIO6 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio6_input: Option<InputSignal>,
+
+    /// SIO7 output signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio7_output: Option<OutputSignal>,
+
+    /// SIO7 input signal for OPI mode.
+    #[cfg(spi_octal)]
+    pub sio7_input: Option<InputSignal>,
 }
 
 struct DmaDriver {
@@ -2746,7 +2780,7 @@ impl DmaDriver {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<Dm: DriverMode>(
         &self,
         _full_duplex: bool,
@@ -2759,8 +2793,8 @@ impl DmaDriver {
         #[cfg(esp32s2)]
         {
             // without this a transfer after a write will fail
-            self.regs().dma_out_link().write(|w| w.bits(0));
-            self.regs().dma_in_link().write(|w| w.bits(0));
+            self.regs().dma_out_link().write(|w| unsafe { w.bits(0) });
+            self.regs().dma_in_link().write(|w| unsafe { w.bits(0) });
         }
 
         self.driver.configure_datalen(rx_len, tx_len);
@@ -2773,10 +2807,12 @@ impl DmaDriver {
         self.enable_dma();
 
         if rx_len > 0 {
-            channel
-                .rx
-                .prepare_transfer(self.dma_peripheral, rx_buffer)
-                .and_then(|_| channel.rx.start_transfer())?;
+            unsafe {
+                channel
+                    .rx
+                    .prepare_transfer(self.dma_peripheral, rx_buffer)
+                    .and_then(|_| channel.rx.start_transfer())?;
+            }
         } else {
             #[cfg(esp32)]
             {
@@ -2793,10 +2829,12 @@ impl DmaDriver {
             }
         }
         if tx_len > 0 {
-            channel
-                .tx
-                .prepare_transfer(self.dma_peripheral, tx_buffer)
-                .and_then(|_| channel.tx.start_transfer())?;
+            unsafe {
+                channel
+                    .tx
+                    .prepare_transfer(self.dma_peripheral, tx_buffer)
+                    .and_then(|_| channel.tx.start_transfer())?;
+            }
         }
 
         #[cfg(gdma)]
@@ -3285,7 +3323,7 @@ impl Driver {
         });
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn fill_fifo(&self, chunk: &[u8]) {
         // TODO: replace with `array_chunks` and `from_le_bytes`
         let mut c_iter = chunk.chunks_exact(4);
@@ -3318,7 +3356,7 @@ impl Driver {
     /// This function will return before all bytes of the last chunk to transmit
     /// have been sent to the wire. If you must ensure that the whole
     /// messages was written correctly, use [`Self::flush`].
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn write(&self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -3345,7 +3383,7 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
@@ -3362,7 +3400,7 @@ impl Driver {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -3379,7 +3417,7 @@ impl Driver {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -3396,7 +3434,7 @@ impl Driver {
     /// doesn't perform flushing. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.regs();
 
@@ -3420,6 +3458,7 @@ impl Driver {
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn flush(&self) -> Result<(), Error> {
         while self.busy() {
             // wait for bus to be clear
@@ -3427,7 +3466,7 @@ impl Driver {
         Ok(())
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn transfer<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write(chunk)?;
@@ -3438,7 +3477,7 @@ impl Driver {
         Ok(words)
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             // Cut the transfer short if the future is dropped. We'll block for a short
@@ -3457,12 +3496,14 @@ impl Driver {
         Ok(())
     }
 
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn start_operation(&self) {
         self.update();
         self.regs().cmd().modify(|_, w| w.usr().set_bit());
     }
 
     /// Starts the operation and waits for it to complete.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn execute_operation_async(&self) {
         // On ESP32, the interrupt seems to not fire in specific circumstances, when
         // `listen` is called after `start_operation`. Let's call it before, to be sure.
@@ -3675,7 +3716,7 @@ unsafe impl Sync for Info {}
 // hardware fully. The master module should extend it with the master specific
 // details.
 macro_rules! spi_instance {
-    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident $(, $sio2:ident, $sio3:ident)?) => {
+    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, [$($cs:ident),+] $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
         paste::paste! {
             impl PeripheralInstance for crate::peripherals::[<SPI $num>]<'_> {
                 #[inline(always)]
@@ -3687,13 +3728,29 @@ macro_rules! spi_instance {
                         sclk: OutputSignal::$sclk,
                         mosi: OutputSignal::$mosi,
                         miso: InputSignal::$miso,
-                        cs: OutputSignal::$cs,
+                        cs: &[$(OutputSignal::$cs),+],
                         sio0_input: InputSignal::$mosi,
                         sio1_output: OutputSignal::$miso,
                         sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
                         sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
                         sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
                         sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
+                        #[cfg(spi_octal)]
+                        sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
+                        #[cfg(spi_octal)]
+                        sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
                     };
 
                     &INFO
@@ -3712,22 +3769,22 @@ macro_rules! spi_instance {
 #[cfg(spi2)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0, HSPIWP, HSPIHD);
+        spi_instance!(2, HSPICLK, HSPID, HSPIQ, [HSPICS0, HSPICS1, HSPICS2], HSPIWP, HSPIHD);
     } else if #[cfg(any(esp32s2, esp32s3))] {
-        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0, FSPIWP, FSPIHD);
+        spi_instance!(2, FSPICLK, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7);
     } else {
-        spi_instance!(2, FSPICLK_MUX, FSPID, FSPIQ, FSPICS0, FSPIWP, FSPIHD);
+        spi_instance!(2, FSPICLK_MUX, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD);
     }
 }
 
 #[cfg(spi3)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0, VSPIWP, VSPIHD);
+        spi_instance!(3, VSPICLK, VSPID, VSPIQ, [VSPICS0, VSPICS1, VSPICS2], VSPIWP, VSPIHD);
     } else if #[cfg(esp32s3)] {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0, SPI3_WP, SPI3_HD);
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2], SPI3_WP, SPI3_HD);
     } else {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
+        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2]);
     }
 }
 
@@ -3762,7 +3819,7 @@ struct Esp32Hack {
 #[cfg(esp32)]
 unsafe impl Sync for Esp32Hack {}
 
-#[cfg_attr(place_spi_driver_in_ram, ram)]
+#[cfg_attr(place_spi_master_driver_in_ram, ram)]
 fn handle_async(instance: impl Instance) {
     let state = instance.state();
     let info = instance.info();
@@ -3800,7 +3857,7 @@ macro_rules! master_instance {
 
             fn handler(&self) -> InterruptHandler {
                 #[$crate::handler]
-                #[cfg_attr(place_spi_driver_in_ram, ram)]
+                #[cfg_attr(place_spi_master_driver_in_ram, ram)]
                 fn handle() {
                     handle_async(unsafe { $crate::peripherals::$peri::steal() })
                 }
@@ -3833,6 +3890,7 @@ struct SpiFuture<'a> {
 }
 
 impl<'a> SpiFuture<'a> {
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
         // Make sure this is called before starting an async operation. On the ESP32,
         // calling after may cause the interrupt to not fire.

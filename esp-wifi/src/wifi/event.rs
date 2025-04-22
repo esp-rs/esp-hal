@@ -186,7 +186,8 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
         "wrong size event data"
     );
 
-    handle::<Event>(unsafe { &Event::from_raw_event_data(event_data) })
+    let event = unsafe { Event::from_raw_event_data(event_data) };
+    handle::<Event>(&event)
 }
 
 /// Handle event regardless of its type.
@@ -197,7 +198,7 @@ pub(crate) unsafe fn dispatch_event_handler(
     event: WifiEvent,
     event_data: *mut crate::binary::c_types::c_void,
     event_data_size: usize,
-) -> bool {
+) -> bool { unsafe {
     match event {
         WifiEvent::WifiReady => {
             handle_raw::<WifiReady>(event_data, event_data_size)
@@ -335,4 +336,4 @@ pub(crate) unsafe fn dispatch_event_handler(
             handle_raw::<StaNeighborRep>(event_data, event_data_size)
         }
     }
-}
+}}

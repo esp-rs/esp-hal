@@ -43,6 +43,10 @@ jobs:
           ldproxy: false
           version: 1.85.0.0
 
+      # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
+      - name: rust-src
+        run: rustup component add rust-src --toolchain nightly
+
       # TODO: we could build this once and download onto each runner
       # Build the `xtask` package using the latest commit, and copy the
       # resulting binary to the `~/.cargo/bin/` directory. We do this to

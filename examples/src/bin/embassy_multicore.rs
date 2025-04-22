@@ -21,7 +21,7 @@ use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
     system::{Cpu, CpuControl, Stack},
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::{AnyTimer, timg::TimerGroup},
 };
 use esp_hal_embassy::Executor;
 use esp_println::println;

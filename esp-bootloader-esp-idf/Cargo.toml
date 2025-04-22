@@ -1,8 +1,8 @@
 [package]
 name = "esp-bootloader-esp-idf"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.84.0"
+edition = "2024"
+rust-version = "1.85.0"
 description = "Functionality related to the esp-idf bootloader"
 documentation = "https://docs.espressif.com/projects/rust/esp-bootloader-esp-idf/latest/"
 keywords = ["esp32", "espressif", "no-std"]
@@ -13,14 +13,20 @@ license = "MIT OR Apache-2.0"
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 
+[lib]
+bench = false
+test  = false
+
 [dependencies]
 defmt = { version = "0.3.10", optional = true }
 document-features = "0.2.11"
 esp-config = { version = "0.3.0", path = "../esp-config" }
 embedded-storage = "0.3.1"
 log = { version = "0.4.26", optional = true }
-md-5 = { version = "0.10.6", default-features = false, optional = true }
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
+
+crc = { version = "3.0.0", optional = true }
+md-5 = { version = "0.10.6", default-features = false, optional = true }
 
 [build-dependencies]
 chrono = { version = "0.4.20", default-features = false, features = ["clock"] }
@@ -37,3 +43,6 @@ log = ["dep:log"]
 
 ## Enable support for `defmt`
 defmt = ["dep:defmt"]
+
+# Replace ROM functions with pure Rust implementations, needed for tests.
+std = ["dep:crc"]

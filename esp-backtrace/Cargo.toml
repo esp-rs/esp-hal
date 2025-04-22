@@ -1,8 +1,8 @@
 [package]
 name          = "esp-backtrace"
 version       = "0.15.1"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Bare-metal backtrace support for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-backtrace/latest/"
 keywords      = ["backtrace", "embedded", "esp32", "espressif"]
@@ -13,6 +13,10 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 cfg-if      = "1.0.0"

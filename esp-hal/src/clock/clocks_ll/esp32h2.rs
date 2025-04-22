@@ -221,11 +221,7 @@ fn regi2c_enable_block(block: u8) -> usize {
         }
     });
 
-    if i2c_sel {
-        0
-    } else {
-        1
-    }
+    if i2c_sel { 0 } else { 1 }
 }
 
 pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {

@@ -61,14 +61,14 @@ pub use self::m2m::*;
 #[cfg(pdma)]
 pub use self::pdma::*;
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     interrupt::InterruptHandler,
     peripherals::Interrupt,
     soc::{is_slice_in_dram, is_valid_memory_address, is_valid_ram_address},
     system,
     system::Cpu,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 trait Word: crate::private::Sealed {}
@@ -579,9 +579,7 @@ pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
-    }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_buffers_chunk_size!($size, $size, $chunk_size)
@@ -605,13 +603,9 @@ macro_rules! dma_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
-    }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_buffers_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
 
-    ($size:expr, $chunk_size:expr) => {{
-        $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size)
-    }};
+    ($size:expr, $chunk_size:expr) => {{ $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size) }};
 }
 
 /// Convenience macro to create DMA descriptors with specific chunk size
@@ -630,9 +624,7 @@ macro_rules! dma_circular_buffers_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false)
-    }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = false) }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_descriptors_chunk_size!($size, $size, $chunk_size)
@@ -656,9 +648,7 @@ macro_rules! dma_descriptors_chunk_size {
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
-    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{
-        $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true)
-    }};
+    ($rx_size:expr, $tx_size:expr, $chunk_size:expr) => {{ $crate::dma_descriptors_impl!($rx_size, $tx_size, $chunk_size, is_circular = true) }};
 
     ($size:expr, $chunk_size:expr) => {
         $crate::dma_circular_descriptors_chunk_size!($size, $size, $chunk_size)
@@ -1137,7 +1127,7 @@ impl<'a> DescriptorSet<'a> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> {
+    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor> + use<'_> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -1916,7 +1906,7 @@ where
                 for des in chain.descriptors.iter() {
                     // we are forcing the DMA alignment to the cache line size
                     // required when we are using dcache
-                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    let alignment = unsafe { crate::soc::cache_get_dcache_line_size() } as usize;
                     if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
                         uses_psram = true;
                         // both the size and address of the buffer must be aligned
@@ -1926,7 +1916,7 @@ where
                         if des.size() % alignment != 0 {
                             return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
                         }
-                        crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32);
+                        unsafe {crate::soc::cache_invalidate_addr(des.buffer as u32, des.size() as u32); }
                     }
                 }
             }
@@ -2182,7 +2172,7 @@ where
                 for des in chain.descriptors.iter() {
                     // we are forcing the DMA alignment to the cache line size
                     // required when we are using dcache
-                    let alignment = crate::soc::cache_get_dcache_line_size() as usize;
+                    let alignment = unsafe { crate::soc::cache_get_dcache_line_size()} as usize;
                     if crate::soc::addr_in_range(des.buffer as usize, psram_range.clone()) {
                         uses_psram = true;
                         // both the size and address of the buffer must be aligned
@@ -2192,7 +2182,7 @@ where
                         if des.size() % alignment != 0 {
                             return Err(DmaError::InvalidAlignment(DmaAlignmentError::Size));
                         }
-                        crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32);
+                        unsafe { crate::soc::cache_writeback_addr(des.buffer as u32, des.size() as u32); }
                     }
                 }
             }
@@ -2206,7 +2196,7 @@ where
             burst_transfer: BurstConfig::default(),
             check_owner: Some(false),
             // enable descriptor write back in circular mode
-            auto_write_back: !(*chain.last()).next.is_null(),
+            auto_write_back: !(unsafe { *chain.last() }).next.is_null(),
         };
         self.do_prepare(preparation, peri)?;
 

@@ -55,9 +55,9 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::{
-        interconnect::{InputSignal, OutputSignal},
         Level,
         Pull,
+        interconnect::{InputSignal, OutputSignal},
     },
     peripherals::GPIO_SD,
     private,

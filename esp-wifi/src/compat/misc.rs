@@ -1,28 +1,28 @@
 use crate::compat::malloc::malloc;
 
 // these are not called but needed for linking
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fwrite(ptr: *const (), size: usize, count: usize, stream: *const ()) -> usize {
     todo!("fwrite {:?} {} {} {:?}", ptr, size, count, stream)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fopen(filename: *const u8, mode: *const u8) -> *const () {
     todo!("fopen {:?} {:?}", filename, mode)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fgets(str: *const u8, count: u32, file: *const ()) -> *const u8 {
     todo!("fgets {:?} {} {:?}", str, count, file)
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn fclose(stream: *const ()) -> i32 {
     todo!("fclose {:?}", stream);
 }
 
 // We cannot just use the ROM function since it needs to allocate memory
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::c_char {
     trace!("strdup {:?}", str);
 
@@ -42,7 +42,7 @@ unsafe extern "C" fn strdup(str: *const core::ffi::c_char) -> *const core::ffi::
 // From docs: The __getreent() function returns a per-task pointer to struct
 // _reent in newlib libc. This structure is allocated on the TCB of each task.
 // i.e. it assumes a FreeRTOS task calling it.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     trace!("atoi {:?}", str);
 
@@ -51,12 +51,12 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
     let mut idx = 0;
 
     // skip leading spaces
-    while str.add(idx).read() as u8 == b' ' {
+    while unsafe { str.add(idx).read() } as u8 == b' ' {
         idx += 1;
     }
 
     // check sign
-    let c = str.add(idx).read() as u8;
+    let c = unsafe { str.add(idx).read() } as u8;
     if c == b'-' || c == b'+' {
         if c == b'-' {
             sign = -1;
@@ -66,7 +66,7 @@ unsafe extern "C" fn atoi(str: *const i8) -> i32 {
 
     // parse number digit by digit
     loop {
-        let c = str.add(idx).read() as u8;
+        let c = unsafe { str.add(idx).read() } as u8;
 
         if !c.is_ascii_digit() {
             break;
@@ -97,10 +97,10 @@ struct Tm {
     tm_isdst: u32, // daylight savings time flag
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
     trace!("mktime {:?}", time);
-    let time = *time;
+    let time = unsafe { *time };
 
     // Simplified implementation, ignoring time zones, leap seconds, and other
     // complexities

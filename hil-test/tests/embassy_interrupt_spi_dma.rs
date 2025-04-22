@@ -12,16 +12,16 @@
 
 use embassy_time::{Duration, Instant, Timer};
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    interrupt::{software::SoftwareInterruptControl, Priority},
+    interrupt::{Priority, software::SoftwareInterruptControl},
     spi::{
-        master::{Config, Spi},
         Mode,
+        master::{Config, Spi},
     },
     time::Rate,
     timer::AnyTimer,
-    Blocking,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test as _;

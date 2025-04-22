@@ -1,8 +1,8 @@
 [package]
 name          = "esp-storage"
 version       = "0.5.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
 documentation = "https://docs.espressif.com/projects/rust/esp-storage/latest/"
 keywords      = ["embedded-storage", "esp32", "espressif", "no-std"]
@@ -13,6 +13,10 @@ license       = "MIT OR Apache-2.0"
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 embedded-storage = "0.3.1"

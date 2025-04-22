@@ -86,8 +86,11 @@ pub fn generate_config(
         let mut selected_config = String::from(markdown::SELECTED_TABLE_HEADER);
 
         for (name, option, value) in configs.iter() {
+            if !option.active {
+                continue;
+            }
             markdown::write_doc_table_line(&mut doc_table, name, option);
-            markdown::write_summary_table_line(&mut selected_config, &name, value);
+            markdown::write_summary_table_line(&mut selected_config, name, value);
         }
 
         write_out_file(format!("{file_name}_config_table.md"), doc_table);
@@ -237,6 +240,12 @@ pub struct ConfigOption {
 
     /// The stability of the configuration option.
     pub stability: Stability,
+
+    /// Whether the config option should be offered to the user.
+    ///
+    /// Inactive options are not included in the documentation, and accessing
+    /// them provides the default value.
+    pub active: bool,
 }
 
 impl ConfigOption {
@@ -283,6 +292,11 @@ fn capture_from_env(
                 unknown.push(var);
                 continue;
             };
+
+            if !option.active {
+                unknown.push(var);
+                continue;
+            }
 
             if !enable_unstable && !option.is_stable() {
                 unstable.push(var);
@@ -406,6 +420,7 @@ mod test {
                             default_value: Value::Integer(999),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "number_signed",
@@ -413,6 +428,7 @@ mod test {
                             default_value: Value::Integer(-777),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "string",
@@ -420,6 +436,7 @@ mod test {
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "bool",
@@ -427,6 +444,7 @@ mod test {
                             default_value: Value::Bool(false),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "number_default",
@@ -434,6 +452,7 @@ mod test {
                             default_value: Value::Integer(999),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "string_default",
@@ -441,6 +460,7 @@ mod test {
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "bool_default",
@@ -448,6 +468,7 @@ mod test {
                             default_value: Value::Bool(false),
                             constraint: None,
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                     ],
                     false,
@@ -499,6 +520,7 @@ mod test {
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::PositiveInteger),
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "negative_number",
@@ -506,6 +528,7 @@ mod test {
                             default_value: Value::Integer(1),
                             constraint: Some(Validator::NegativeInteger),
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "non_negative_number",
@@ -513,6 +536,7 @@ mod test {
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::NonNegativeInteger),
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                         ConfigOption {
                             name: "range",
@@ -520,6 +544,7 @@ mod test {
                             default_value: Value::Integer(0),
                             constraint: Some(Validator::IntegerInRange(5..10)),
                             stability: Stability::Stable("testing"),
+                            active: true,
                         },
                     ],
                     false,
@@ -547,6 +572,7 @@ mod test {
                         }
                     }))),
                     stability: Stability::Stable("testing"),
+                    active: true,
                 }],
                 false,
                 false,
@@ -566,6 +592,7 @@ mod test {
                     default_value: Value::Integer(-1),
                     constraint: Some(Validator::PositiveInteger),
                     stability: Stability::Stable("testing"),
+                    active: true,
                 }],
                 false,
                 false,
@@ -592,6 +619,7 @@ mod test {
                         }
                     }))),
                     stability: Stability::Stable("testing"),
+                    active: true,
                 }],
                 false,
                 false,
@@ -616,6 +644,7 @@ mod test {
                         default_value: Value::Integer(999),
                         constraint: None,
                         stability: Stability::Stable("testing"),
+                        active: true,
                     }],
                     false,
                     false,
@@ -636,6 +665,7 @@ mod test {
                     default_value: Value::Integer(999),
                     constraint: None,
                     stability: Stability::Stable("testing"),
+                    active: true,
                 }],
                 false,
                 false,
@@ -656,6 +686,7 @@ mod test {
                         default_value: Value::Integer(999),
                         constraint: None,
                         stability: Stability::Stable("testing"),
+                        active: true,
                     }],
                     false,
                     false,
@@ -680,6 +711,7 @@ mod test {
                         "variant-1".to_string(),
                     ])),
                     stability: Stability::Stable("testing"),
+                    active: true,
                 }],
                 false,
             );
@@ -706,6 +738,7 @@ mod test {
                     "variant-1".to_string(),
                 ])),
                 stability: Stability::Stable("testing"),
+                active: true,
             },
             ConfigOption {
                 name: "some-key2",
@@ -713,6 +746,7 @@ mod test {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
         ];
         let configs =
@@ -738,6 +772,7 @@ mod test {
     "stability": {
       "Stable": "testing"
     },
+    "active": true,
     "actual_value": {
       "String": "variant-0"
     }
@@ -750,6 +785,7 @@ mod test {
     },
     "constraint": null,
     "stability": "Unstable",
+    "active": true,
     "actual_value": {
       "Bool": true
     }
@@ -776,6 +812,31 @@ mod test {
                         "variant-1".to_string(),
                     ])),
                     stability: Stability::Unstable,
+                    active: true,
+                }],
+                false,
+            );
+        });
+    }
+
+    #[test]
+    #[should_panic]
+    fn inactive_option_panics() {
+        let mut stdout = Vec::new();
+        temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
+            generate_config_internal(
+                &mut stdout,
+                "esp-test",
+                &[ConfigOption {
+                    name: "some-key",
+                    description: "NA",
+                    default_value: Value::String("variant-0".to_string()),
+                    constraint: Some(Validator::Enumeration(vec![
+                        "variant-0".to_string(),
+                        "variant-1".to_string(),
+                    ])),
+                    stability: Stability::Stable("testing"),
+                    active: false,
                 }],
                 false,
             );

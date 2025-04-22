@@ -131,8 +131,6 @@ pub mod asynch {
     };
     pub use embassy_usb_synopsys_otg::Config;
     use embassy_usb_synopsys_otg::{
-        on_interrupt,
-        otg_v1::Otg,
         Bus as OtgBus,
         ControlPipe,
         Driver as OtgDriver,
@@ -142,6 +140,8 @@ pub mod asynch {
         Out,
         PhyType,
         State,
+        on_interrupt,
+        otg_v1::Otg,
     };
     use procmacros::handler;
 

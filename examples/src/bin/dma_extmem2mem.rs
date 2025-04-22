@@ -8,7 +8,7 @@
 #![no_std]
 #![no_main]
 
-use aligned::{Aligned, A64};
+use aligned::{A64, Aligned};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
@@ -66,8 +66,8 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let mut extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
-    let mut intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
+    let extram_buffer: &mut [u8] = dma_alloc_buffer!(DATA_SIZE, 64);
+    let intram_buffer = dma_buffer_aligned!(DATA_SIZE, A64);
     let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(DATA_SIZE, CHUNK_SIZE);
 
     let dma_peripheral = peripherals.SPI2;

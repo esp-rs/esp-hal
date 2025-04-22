@@ -9,7 +9,7 @@ use std::{
 };
 
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Stability, Validator, Value};
+use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -72,11 +72,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp_hal",
         &[
             ConfigOption {
-                name: "place-spi-driver-in-ram",
-                description: "Places the SPI driver in RAM for better performance",
+                name: "place-spi-master-driver-in-ram",
+                description: "Places the SPI master driver in RAM for better performance",
                 default_value: Value::Bool(false),
                 constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
+                active: true,
             },
             ConfigOption {
                 name: "place-switch-tables-in-ram",
@@ -86,6 +87,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Stable("1.0.0-beta.0"),
+                active: true,
             },
             ConfigOption {
                 name: "place-anon-in-ram",
@@ -95,11 +97,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(false),
                 constraint: None,
                 stability: Stability::Stable("1.0.0-beta.0"),
+                active: true,
             },
             // Ideally, we should be able to set any clock frequency for any chip. However,
             // currently only the 32 and C2 implements any sort of configurability, and
             // the rest have a fixed clock frequeny.
-            // TODO: only show this configuration for chips that have multiple valid options.
             ConfigOption {
                 name: "xtal-frequency",
                 description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
@@ -113,50 +115,58 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "esp32h2" => String::from("32"),
                     _ => unreachable!(),
                 }),
-                constraint: Some(Validator::Enumeration(match device_name {
-                    "esp32" | "esp32c2" => {
-                        vec![String::from("auto"), String::from("26"), String::from("40")]
-                    }
+                constraint: match device_name {
+                    "esp32" | "esp32c2" => Some(Validator::Enumeration(vec![
+                        String::from("auto"),
+                        String::from("26"),
+                        String::from("40"),
+                    ])),
                     // The rest has only one option
-                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => vec![String::from("40")],
-                    "esp32h2" => vec![String::from("32")],
-                    _ => unreachable!(),
-                })),
+                    _ => None,
+                },
                 stability: Stability::Unstable,
+                active: ["esp32", "esp32s2"].contains(&device_name),
             },
-            // ideally we should only offer this for ESP32 but the config system doesn't
-            // support per target configs, yet
             ConfigOption {
                 name: "spi-address-workaround",
-                description: "(ESP32 only) Enables a workaround for the issue where SPI in \
+                description: "Enables a workaround for the issue where SPI in \
                 half-duplex mode incorrectly transmits the address on a single line if the \
                 data buffer is empty.",
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: device_name == "esp32",
             },
-            // ideally we should only offer this for ESP32-C6/ESP32-H2 but the config system
-            // doesn't support per target configs, yet
             ConfigOption {
                 name: "flip-link",
-                description: "(ESP32-C6/ESP32-H2 only): Move the stack to start of RAM to get \
-                zero-cost stack overflow protection.",
+                description: "Move the stack to start of RAM to get zero-cost stack overflow protection.",
                 default_value: Value::Bool(false),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: ["esp32c6", "esp32h2"].contains(&device_name),
             },
-            // ideally we should only offer this for ESP32, ESP32-S2 and `octal` only for ESP32-S3
-            // but the config system doesn't support per target configs, yet
+            // TODO: automate "enum of single choice" handling - they don't need
+            // to be presented to the user
             ConfigOption {
                 name: "psram-mode",
-                description: "(ESP32, ESP32-S2 and ESP32-S3 only, `octal` is only supported for \
-                ESP32-S3) SPIRAM chip mode",
+                description: "SPIRAM chip mode",
                 default_value: Value::String(String::from("quad")),
-                constraint: Some(Validator::Enumeration(vec![
-                    String::from("quad"),
-                    String::from("octal"),
-                ])),
+                constraint: Some(Validator::Enumeration(
+                    if config
+                        .symbols()
+                        .iter()
+                        .any(|s| s.eq_ignore_ascii_case("octal_psram"))
+                    {
+                        vec![String::from("quad"), String::from("octal")]
+                    } else {
+                        vec![String::from("quad")]
+                    },
+                )),
                 stability: Stability::Unstable,
+                active: config
+                    .symbols()
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case("psram")),
             },
             // Rust's stack smashing protection configuration
             ConfigOption {
@@ -166,6 +176,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(4096),
                 constraint: None,
                 stability: Stability::Stable("1.0.0-beta.0"),
+                active: true,
             },
             ConfigOption {
                 name: "stack-guard-value",
@@ -173,6 +184,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Integer(0xDEED_BAAD),
                 constraint: None,
                 stability: Stability::Stable("1.0.0-beta.0"),
+                active: true,
             },
             ConfigOption {
                 name: "impl-critical-section",
@@ -182,6 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
+                active: true,
             },
         ],
         cfg!(feature = "unstable"),

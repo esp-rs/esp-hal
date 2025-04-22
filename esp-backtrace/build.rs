@@ -1,5 +1,5 @@
 use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, ConfigOption, Stability, Value};
+use esp_config::{ConfigOption, Stability, Value, generate_config};
 
 fn main() {
     // Ensure that only a single chip is specified:
@@ -23,6 +23,7 @@ fn main() {
             default_value: Value::Integer(10),
             constraint: None,
             stability: Stability::Unstable,
+            active: true,
         }],
         true,
         true,

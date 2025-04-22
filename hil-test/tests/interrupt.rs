@@ -15,9 +15,9 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{
         self,
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
         CpuInterrupt,
         Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     peripherals::Interrupt,
 };
@@ -30,7 +30,7 @@ struct Context {
     sw0_trigger_addr: u32,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 fn interrupt20() {
     unsafe { asm!("csrrwi x0, 0x7e1, 0 #disable timer") }
     critical_section::with(|cs| {

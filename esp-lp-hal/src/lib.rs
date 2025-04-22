@@ -125,29 +125,31 @@ loop:
 "#
 );
 
-#[link_section = ".init.rust"]
-#[export_name = "rust_main"]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(export_name = "rust_main")]
 unsafe extern "C" fn lp_core_startup() -> ! {
-    extern "Rust" {
-        fn main() -> !;
-    }
+    unsafe {
+        unsafe extern "Rust" {
+            fn main() -> !;
+        }
 
-    #[cfg(feature = "esp32c6")]
-    if (*pac::LP_CLKRST::PTR)
-        .lp_clk_conf()
-        .read()
-        .fast_clk_sel()
-        .bit_is_set()
-    {
-        CPU_CLOCK = XTAL_D2_CLK_HZ;
-    }
+        #[cfg(feature = "esp32c6")]
+        if (*pac::LP_CLKRST::PTR)
+            .lp_clk_conf()
+            .read()
+            .fast_clk_sel()
+            .bit_is_set()
+        {
+            CPU_CLOCK = XTAL_D2_CLK_HZ;
+        }
 
-    main();
+        main();
+    }
 }
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
     // Rescue RISC-V core from monitor state.
     unsafe { &*pac::RTC_CNTL::PTR }
@@ -156,8 +158,8 @@ unsafe extern "C" fn ulp_riscv_rescue_from_monitor() {
 }
 
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
-#[link_section = ".init.rust"]
-#[no_mangle]
+#[unsafe(link_section = ".init.rust")]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn ulp_riscv_halt() {
     unsafe { &*pac::RTC_CNTL::PTR }
         .cocpu_ctrl()

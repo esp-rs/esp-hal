@@ -17,6 +17,11 @@ use core::{
 use enumset::{EnumSet, EnumSetType};
 use esp_hal::{asynch::AtomicWaker, sync::Locked};
 use esp_wifi_sys::include::{
+    WIFI_PROTOCOL_11AX,
+    WIFI_PROTOCOL_11B,
+    WIFI_PROTOCOL_11G,
+    WIFI_PROTOCOL_11N,
+    WIFI_PROTOCOL_LR,
     esp_eap_client_clear_ca_cert,
     esp_eap_client_clear_certificate_and_key,
     esp_eap_client_clear_identity,
@@ -37,11 +42,6 @@ use esp_wifi_sys::include::{
     esp_wifi_sta_enterprise_enable,
     wifi_pkt_rx_ctrl_t,
     wifi_scan_channel_bitmap_t,
-    WIFI_PROTOCOL_11AX,
-    WIFI_PROTOCOL_11B,
-    WIFI_PROTOCOL_11G,
-    WIFI_PROTOCOL_11N,
-    WIFI_PROTOCOL_LR,
 };
 #[cfg(feature = "sniffer")]
 use esp_wifi_sys::include::{
@@ -62,12 +62,12 @@ use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
 use crate::{
+    EspWifiController,
     common_adapter::*,
     config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
     wifi::private::EspWifiPacketBuffer,
-    EspWifiController,
 };
 
 const MTU: usize = crate::CONFIG.mtu;
@@ -766,7 +766,7 @@ impl Configuration {
         &mut self,
     ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
         match self {
-            Self::Mixed(client_conf, ref mut ap_conf) => (client_conf, ap_conf),
+            Self::Mixed(client_conf, ap_conf) => (client_conf, ap_conf),
             Self::AccessPoint(_) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
@@ -923,8 +923,10 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     ctx: *mut crate::wifi::c_types::c_void,
     data: *mut crate::binary::include::wifi_csi_info_t,
 ) {
-    let csi_callback = unsafe { &mut *(ctx as *mut C) };
-    csi_callback(*data);
+    unsafe {
+        let csi_callback = &mut *(ctx as *mut C);
+        csi_callback(*data);
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -1388,7 +1390,7 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     {
         debug!("coex-init");
         #[allow(clippy::needless_return)]
-        return crate::binary::include::coex_init();
+        return unsafe { crate::binary::include::coex_init() };
     }
 
     #[cfg(not(coex))]
@@ -1414,7 +1416,7 @@ unsafe extern "C" fn recv_cb_sta(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if let Ok(()) = DATA_QUEUE_RX_STA.with(|queue| {
+    match DATA_QUEUE_RX_STA.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             Ok(())
@@ -1422,11 +1424,14 @@ unsafe extern "C" fn recv_cb_sta(
             Err(packet)
         }
     }) {
-        embassy::STA_RECEIVE_WAKER.wake();
-        include::ESP_OK as esp_err_t
-    } else {
-        debug!("RX QUEUE FULL");
-        include::ESP_ERR_NO_MEM as esp_err_t
+        Ok(()) => {
+            embassy::STA_RECEIVE_WAKER.wake();
+            include::ESP_OK as esp_err_t
+        }
+        _ => {
+            debug!("RX QUEUE FULL");
+            include::ESP_ERR_NO_MEM as esp_err_t
+        }
     }
 }
 
@@ -1442,7 +1447,7 @@ unsafe extern "C" fn recv_cb_ap(
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
-    if let Ok(()) = DATA_QUEUE_RX_AP.with(|queue| {
+    match DATA_QUEUE_RX_AP.with(|queue| {
         if queue.len() < RX_QUEUE_SIZE {
             queue.push_back(packet);
             Ok(())
@@ -1450,11 +1455,14 @@ unsafe extern "C" fn recv_cb_ap(
             Err(packet)
         }
     }) {
-        embassy::AP_RECEIVE_WAKER.wake();
-        include::ESP_OK as esp_err_t
-    } else {
-        debug!("RX QUEUE FULL");
-        include::ESP_ERR_NO_MEM as esp_err_t
+        Ok(()) => {
+            embassy::AP_RECEIVE_WAKER.wake();
+            include::ESP_OK as esp_err_t
+        }
+        _ => {
+            debug!("RX QUEUE FULL");
+            include::ESP_ERR_NO_MEM as esp_err_t
+        }
     }
 }
 
@@ -1556,7 +1564,9 @@ impl Default for ScanTypeConfig {
 impl ScanTypeConfig {
     fn validate(&self) {
         if matches!(self, Self::Passive(dur) if *dur > Duration::from_millis(1500)) {
-            warn!("Passive scan duration longer than 1500ms may cause a station to disconnect from the AP");
+            warn!(
+                "Passive scan duration longer than 1500ms may cause a station to disconnect from the AP"
+            );
         }
     }
 }
@@ -1957,48 +1967,52 @@ impl RxControlInfo {
     /// instance of [wifi_pkt_rx_ctrl_t].
     pub unsafe fn from_raw(rx_cntl: *const wifi_pkt_rx_ctrl_t) -> Self {
         #[cfg(not(esp32c6))]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_mode: (*rx_cntl).sig_mode(),
-            mcs: (*rx_cntl).mcs(),
-            cwb: (*rx_cntl).cwb(),
-            smoothing: (*rx_cntl).smoothing(),
-            not_sounding: (*rx_cntl).not_sounding(),
-            aggregation: (*rx_cntl).aggregation(),
-            stbc: (*rx_cntl).stbc(),
-            fec_coding: (*rx_cntl).fec_coding(),
-            sgi: (*rx_cntl).sgi(),
-            ampdu_cnt: (*rx_cntl).ampdu_cnt(),
-            channel: (*rx_cntl).channel(),
-            secondary_channel: (*rx_cntl).secondary_channel(),
-            timestamp: (*rx_cntl).timestamp(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            ant: (*rx_cntl).ant(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
+        let rx_control_info = unsafe {
+            RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_mode: (*rx_cntl).sig_mode(),
+                mcs: (*rx_cntl).mcs(),
+                cwb: (*rx_cntl).cwb(),
+                smoothing: (*rx_cntl).smoothing(),
+                not_sounding: (*rx_cntl).not_sounding(),
+                aggregation: (*rx_cntl).aggregation(),
+                stbc: (*rx_cntl).stbc(),
+                fec_coding: (*rx_cntl).fec_coding(),
+                sgi: (*rx_cntl).sgi(),
+                ampdu_cnt: (*rx_cntl).ampdu_cnt(),
+                channel: (*rx_cntl).channel(),
+                secondary_channel: (*rx_cntl).secondary_channel(),
+                timestamp: (*rx_cntl).timestamp(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                ant: (*rx_cntl).ant(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+            }
         };
         #[cfg(esp32c6)]
-        let rx_control_info = RxControlInfo {
-            rssi: (*rx_cntl).rssi(),
-            rate: (*rx_cntl).rate(),
-            sig_len: (*rx_cntl).sig_len(),
-            rx_state: (*rx_cntl).rx_state(),
-            dump_len: (*rx_cntl).dump_len(),
-            he_sigb_len: (*rx_cntl).he_sigb_len(),
-            cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
-            cur_bb_format: (*rx_cntl).cur_bb_format(),
-            rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
-            rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
-            second: (*rx_cntl).second(),
-            channel: (*rx_cntl).channel(),
-            noise_floor: (*rx_cntl).noise_floor(),
-            is_group: (*rx_cntl).is_group(),
-            rxend_state: (*rx_cntl).rxend_state(),
-            rxmatch3: (*rx_cntl).rxmatch3(),
-            rxmatch2: (*rx_cntl).rxmatch2(),
-            rxmatch1: (*rx_cntl).rxmatch1(),
-            rxmatch0: (*rx_cntl).rxmatch0(),
+        let rx_control_info = unsafe {
+            RxControlInfo {
+                rssi: (*rx_cntl).rssi(),
+                rate: (*rx_cntl).rate(),
+                sig_len: (*rx_cntl).sig_len(),
+                rx_state: (*rx_cntl).rx_state(),
+                dump_len: (*rx_cntl).dump_len(),
+                he_sigb_len: (*rx_cntl).he_sigb_len(),
+                cur_single_mpdu: (*rx_cntl).cur_single_mpdu(),
+                cur_bb_format: (*rx_cntl).cur_bb_format(),
+                rx_channel_estimate_info_vld: (*rx_cntl).rx_channel_estimate_info_vld(),
+                rx_channel_estimate_len: (*rx_cntl).rx_channel_estimate_len(),
+                second: (*rx_cntl).second(),
+                channel: (*rx_cntl).channel(),
+                noise_floor: (*rx_cntl).noise_floor(),
+                is_group: (*rx_cntl).is_group(),
+                rxend_state: (*rx_cntl).rxend_state(),
+                rxmatch3: (*rx_cntl).rxmatch3(),
+                rxmatch2: (*rx_cntl).rxmatch2(),
+                rxmatch1: (*rx_cntl).rxmatch1(),
+                rxmatch0: (*rx_cntl).rxmatch0(),
+            }
         };
         rx_control_info
     }
@@ -2024,16 +2038,18 @@ impl PromiscuousPkt<'_> {
         buf: *const wifi_promiscuous_pkt_t,
         frame_type: wifi_promiscuous_pkt_type_t,
     ) -> Self {
-        let rx_cntl = RxControlInfo::from_raw(&(*buf).rx_ctrl);
+        let rx_cntl = unsafe { RxControlInfo::from_raw(&(*buf).rx_ctrl) };
         let len = rx_cntl.sig_len as usize;
         PromiscuousPkt {
             rx_cntl,
             frame_type,
             len,
-            data: core::slice::from_raw_parts(
-                (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
-                len,
-            ),
+            data: unsafe {
+                core::slice::from_raw_parts(
+                    (buf as *const u8).add(core::mem::size_of::<wifi_pkt_rx_ctrl_t>()),
+                    len,
+                )
+            },
         }
     }
 }
@@ -2043,9 +2059,11 @@ static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
 #[cfg(feature = "sniffer")]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
-    if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
-        let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
-        sniffer_callback(promiscuous_pkt);
+    unsafe {
+        if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
+            let promiscuous_pkt = PromiscuousPkt::from_raw(buf as *const _, frame_type);
+            sniffer_callback(promiscuous_pkt);
+        }
     }
 }
 

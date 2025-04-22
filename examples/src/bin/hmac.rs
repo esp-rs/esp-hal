@@ -110,7 +110,13 @@ fn main() -> ! {
         for (a, b) in output.iter().zip(soft_result) {
             assert_eq!(*a, b);
         }
-        println!("Testing for length: {:>4} | HW: {:>6} cycles, SW: {:>7} cycles (HW HMAC is {:>2}x faster)", i, hw_time, soft_time, soft_time / hw_time);
+        println!(
+            "Testing for length: {:>4} | HW: {:>6} cycles, SW: {:>7} cycles (HW HMAC is {:>2}x faster)",
+            i,
+            hw_time,
+            soft_time,
+            soft_time / hw_time
+        );
     }
     println!("Finished stress tests!");
 

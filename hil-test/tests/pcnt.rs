@@ -9,7 +9,7 @@
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull},
-    pcnt::{channel::EdgeMode, Pcnt},
+    pcnt::{Pcnt, channel::EdgeMode},
 };
 use hil_test as _;
 

@@ -74,7 +74,7 @@ macro_rules! peripherals {
                 /// Returns all the peripherals *once*
                 #[inline]
                 pub(crate) fn take() -> Self {
-                    #[no_mangle]
+                    #[unsafe(no_mangle)]
                     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
 
                     critical_section::with(|_| unsafe {
@@ -93,17 +93,19 @@ macro_rules! peripherals {
                 /// You must ensure that you're only using one instance of this type at a time.
                 #[inline]
                 pub unsafe fn steal() -> Self {
-                    Self {
-                        $(
-                            $name: $name::steal(),
-                        )*
-                        $(
-                            $unstable_name: $unstable_name::steal(),
-                        )*
+                    unsafe {
+                        Self {
+                            $(
+                                $name: $name::steal(),
+                            )*
+                            $(
+                                $unstable_name: $unstable_name::steal(),
+                            )*
 
-                        $(
-                            [<GPIO $pin>]: [<GPIO $pin>]::steal(),
-                        )*
+                            $(
+                                [<GPIO $pin>]: [<GPIO $pin>]::steal(),
+                            )*
+                        }
                     }
                 }
             }
@@ -182,9 +184,9 @@ macro_rules! create_peripheral {
             /// You must ensure that you're only using one instance of this type at a time.
             #[inline]
             #[allow(dead_code)]
-            pub unsafe fn clone_unchecked(&self) -> Self {
+            pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
                 Self::steal()
-            }
+            }}
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///

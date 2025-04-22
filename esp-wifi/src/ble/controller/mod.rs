@@ -79,11 +79,11 @@ pub(crate) mod asynch {
     use core::task::Poll;
 
     use bt_hci::{
-        transport::{Transport, WithIndicator},
         ControllerToHostPacket,
         FromHciBytes,
         HostToControllerPacket,
         WriteHci,
+        transport::{Transport, WithIndicator},
     };
     use esp_hal::asynch::AtomicWaker;
 
@@ -156,7 +156,7 @@ pub(crate) mod asynch {
             Ok(p) => Ok(Some(p)),
             Err(e) => {
                 if e == bt_hci::FromHciBytesError::InvalidSize {
-                    use bt_hci::{event::EventPacketHeader, PacketKind};
+                    use bt_hci::{PacketKind, event::EventPacketHeader};
 
                     // Some controllers emit a suprious command complete event at startup.
                     let (kind, data) =

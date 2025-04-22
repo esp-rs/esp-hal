@@ -45,7 +45,7 @@ pub mod ll;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
     return critical_section::with(|_| f());
@@ -66,7 +66,7 @@ macro_rules! rom_fn {
         $(#[$attrs])*
         #[allow(unused)]
         #[inline(always)]
-        #[link_section = ".rwtext"]
+        #[unsafe(link_section = ".rwtext")]
         fn $name($($arg:$ty),*) $(-> $retval)? {
             unsafe {
                 let rom_fn: unsafe extern "C" fn($($arg: $ty),*) $(-> $retval)? =

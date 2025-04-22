@@ -6,7 +6,7 @@ use std::io::Write as _;
 
 use proc_macro::TokenStream;
 use quote::ToTokens;
-use syn::{parse_macro_input, punctuated::Punctuated, LitStr, Token};
+use syn::{LitStr, Token, parse_macro_input, punctuated::Punctuated};
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 /// Print a build error and terminate the process.
@@ -113,7 +113,7 @@ pub fn assert_unique_used_features(input: TokenStream) -> TokenStream {
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-fn impl_unique_features(features: &[LitStr], expectation: &str) -> impl ToTokens {
+fn impl_unique_features(features: &[LitStr], expectation: &str) -> impl ToTokens + use<> {
     let pairs = unique_pairs(features);
     let unique_cfgs = pairs
         .iter()
@@ -133,7 +133,7 @@ ERROR: expected {expectation} enabled feature from feature group:
     }
 }
 
-fn impl_used_features(features: &[LitStr], expectation: &str) -> impl ToTokens {
+fn impl_used_features(features: &[LitStr], expectation: &str) -> impl ToTokens + use<> {
     let message = format!(
         r#"
 ERROR: expected {expectation} enabled feature from feature group:

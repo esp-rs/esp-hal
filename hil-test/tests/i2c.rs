@@ -7,9 +7,9 @@
 #![no_main]
 
 use esp_hal::{
-    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, I2cAddress, Operation},
     Async,
     Blocking,
+    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, I2cAddress, Operation},
 };
 use hil_test as _;
 

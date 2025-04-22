@@ -8,11 +8,11 @@ use core::cell::Cell;
 
 use embassy_time_driver::Driver;
 use esp_hal::{
+    Blocking,
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
     time::{Duration, Instant},
     timer::OneShotTimer,
-    Blocking,
 };
 
 pub type Timer = OneShotTimer<'static, Blocking>;
@@ -228,40 +228,42 @@ impl EmbassyTimer {
     /// When using a single timer queue, the `priority` parameter is always the
     /// highest value possible.
     pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> {
-        for (i, alarm) in self.alarms.iter().enumerate() {
-            let handle = alarm.inner.with(|alarm| {
-                let AlarmState::Created(interrupt_handler) = alarm.state else {
-                    return None;
-                };
+        unsafe {
+            for (i, alarm) in self.alarms.iter().enumerate() {
+                let handle = alarm.inner.with(|alarm| {
+                    let AlarmState::Created(interrupt_handler) = alarm.state else {
+                        return None;
+                    };
 
-                let timer = self.available_timers.with(|available_timers| {
-                    if let Some(timers) = available_timers.take() {
-                        // If the driver is initialized, we can allocate a timer.
-                        // If this fails, we can't do anything about it.
-                        let Some((timer, rest)) = timers.split_first_mut() else {
-                            not_enough_timers();
-                        };
-                        *available_timers = Some(rest);
-                        timer
-                    } else {
-                        panic!("schedule_wake called before esp_hal_embassy::init()")
-                    }
+                    let timer = self.available_timers.with(|available_timers| {
+                        if let Some(timers) = available_timers.take() {
+                            // If the driver is initialized, we can allocate a timer.
+                            // If this fails, we can't do anything about it.
+                            let Some((timer, rest)) = timers.split_first_mut() else {
+                                not_enough_timers();
+                            };
+                            *available_timers = Some(rest);
+                            timer
+                        } else {
+                            panic!("schedule_wake called before esp_hal_embassy::init()")
+                        }
+                    });
+
+                    alarm.state = AlarmState::initialize(
+                        timer,
+                        InterruptHandler::new(interrupt_handler, priority),
+                    );
+
+                    Some(AlarmHandle::new(i))
                 });
 
-                alarm.state = AlarmState::initialize(
-                    timer,
-                    InterruptHandler::new(interrupt_handler, priority),
-                );
-
-                Some(AlarmHandle::new(i))
-            });
-
-            if handle.is_some() {
-                return handle;
+                if handle.is_some() {
+                    return handle;
+                }
             }
-        }
 
-        None
+            None
+        }
     }
 
     /// Set an alarm to fire at a certain timestamp.
@@ -362,7 +364,9 @@ fn not_enough_timers() -> ! {
     // This is wrapped in a separate function because rustfmt does not like
     // extremely long strings. Also, if log is used, this avoids storing the string
     // twice.
-    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the `single-integrated` or the `generic` timer queue flavors.");
+    panic!(
+        "There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the `single-integrated` or the `generic` timer queue flavors."
+    );
 }
 
 pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {

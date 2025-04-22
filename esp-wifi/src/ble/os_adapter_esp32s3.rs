@@ -207,7 +207,7 @@ extern "C" fn coex_schm_curr_phase_get() -> *const () {
 extern "C" fn coex_bt_wakeup_request() {
     trace!("coex_bt_wakeup_request");
 
-    extern "C" {
+    unsafe extern "C" {
         fn btdm_wakeup_request();
     }
 
@@ -219,7 +219,7 @@ extern "C" fn coex_bt_wakeup_request() {
 extern "C" fn coex_bt_wakeup_request_end() {
     trace!("coex_bt_wakeup_request_end");
 
-    extern "C" {
+    unsafe extern "C" {
         fn btdm_in_wakeup_requesting_set(set: bool);
     }
 
@@ -229,7 +229,7 @@ extern "C" fn coex_bt_wakeup_request_end() {
 }
 
 extern "C" fn ets_delay_us_wrapper(us: u32) {
-    extern "C" {
+    unsafe extern "C" {
         fn ets_delay_us(us: u32);
     }
 
@@ -246,7 +246,7 @@ extern "C" fn btdm_rom_table_ready_wrapper() {
     // #endif
 }
 
-extern "C" {
+unsafe extern "C" {
     fn btdm_controller_rom_data_init() -> i32;
 }
 
@@ -338,14 +338,12 @@ pub(crate) unsafe extern "C" fn interrupt_set(
 ) -> i32 {
     trace!(
         "interrupt_set {} {} {} {} {}",
-        cpu_no,
-        intr_source,
-        handler as usize,
-        arg as u32,
-        ret_handle as usize,
+        cpu_no, intr_source, handler as usize, arg as u32, ret_handle as usize,
     );
 
-    interrupt_handler_set(intr_source, handler, arg);
+    unsafe {
+        interrupt_handler_set(intr_source, handler, arg);
+    }
 
     0
 }
@@ -361,32 +359,32 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
 ) {
     trace!(
         "interrupt_handler_set {} {:?} {:?}",
-        interrupt_no,
-        func,
-        arg
+        interrupt_no, func, arg
     );
-    match interrupt_no {
-        5 => {
-            ISR_INTERRUPT_5 = (
-                func as *mut crate::binary::c_types::c_void,
-                arg as *mut crate::binary::c_types::c_void,
-            );
-            unwrap!(interrupt::enable(
-                Interrupt::BT_BB,
-                interrupt::Priority::Priority1,
-            ));
+    unsafe {
+        match interrupt_no {
+            5 => {
+                ISR_INTERRUPT_5 = (
+                    func as *mut crate::binary::c_types::c_void,
+                    arg as *mut crate::binary::c_types::c_void,
+                );
+                unwrap!(interrupt::enable(
+                    Interrupt::BT_BB,
+                    interrupt::Priority::Priority1,
+                ));
+            }
+            8 => {
+                ISR_INTERRUPT_8 = (
+                    func as *mut crate::binary::c_types::c_void,
+                    arg as *mut crate::binary::c_types::c_void,
+                );
+                unwrap!(interrupt::enable(
+                    Interrupt::RWBLE,
+                    interrupt::Priority::Priority1,
+                ));
+            }
+            _ => panic!("Unsupported interrupt number {}", interrupt_no),
         }
-        8 => {
-            ISR_INTERRUPT_8 = (
-                func as *mut crate::binary::c_types::c_void,
-                arg as *mut crate::binary::c_types::c_void,
-            );
-            unwrap!(interrupt::enable(
-                Interrupt::RWBLE,
-                interrupt::Priority::Priority1,
-            ));
-        }
-        _ => panic!("Unsupported interrupt number {}", interrupt_no),
     }
 }
 
@@ -402,13 +400,13 @@ pub(crate) unsafe extern "C" fn coex_core_ble_conn_dyn_prio_get(
     low: *mut i32,
     high: *mut i32,
 ) -> i32 {
-    extern "C" {
+    unsafe extern "C" {
         fn coex_core_ble_conn_dyn_prio_get(low: *mut i32, high: *mut i32) -> i32;
     }
     trace!("coex_core_ble_conn_dyn_prio_get");
 
     #[cfg(coex)]
-    return coex_core_ble_conn_dyn_prio_get(low, high);
+    return unsafe { coex_core_ble_conn_dyn_prio_get(low, high) };
 
     #[cfg(not(coex))]
     0

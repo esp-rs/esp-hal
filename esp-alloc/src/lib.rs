@@ -275,10 +275,12 @@ impl HeapRegion {
         size: usize,
         capabilities: EnumSet<MemoryCapability>,
     ) -> Self {
-        let mut heap = Heap::empty();
-        heap.init(heap_bottom, size);
+        unsafe {
+            let mut heap = Heap::empty();
+            heap.init(heap_bottom, size);
 
-        Self { heap, capabilities }
+            Self { heap, capabilities }
+        }
     }
 
     /// Return stats for the current memory region
@@ -599,35 +601,37 @@ impl EspHeap {
 
 unsafe impl GlobalAlloc for EspHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.alloc_caps(EnumSet::empty(), layout)
+        unsafe { self.alloc_caps(EnumSet::empty(), layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
-            return;
-        }
+        unsafe {
+            if ptr.is_null() {
+                return;
+            }
 
-        critical_section::with(|cs| {
-            #[cfg(feature = "internal-heap-stats")]
-            let before = self.used();
-            let mut regions = self.heap.borrow_ref_mut(cs);
-            let mut iter = (*regions).iter_mut();
+            critical_section::with(|cs| {
+                #[cfg(feature = "internal-heap-stats")]
+                let before = self.used();
+                let mut regions = self.heap.borrow_ref_mut(cs);
+                let mut iter = (*regions).iter_mut();
 
-            while let Some(Some(region)) = iter.next() {
-                if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
-                    region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
+                while let Some(Some(region)) = iter.next() {
+                    if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
+                        region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
+                    }
                 }
-            }
 
-            #[cfg(feature = "internal-heap-stats")]
-            {
-                let mut internal_heap_stats = self.internal_heap_stats.borrow_ref_mut(cs);
-                drop(regions);
-                // We need to call `used()` because [linked_list_allocator::Heap] does internal
-                // size alignment so we cannot use the size provided by the
-                // layout.
-                internal_heap_stats.total_freed += before - self.used();
-            }
-        })
+                #[cfg(feature = "internal-heap-stats")]
+                {
+                    let mut internal_heap_stats = self.internal_heap_stats.borrow_ref_mut(cs);
+                    drop(regions);
+                    // We need to call `used()` because [linked_list_allocator::Heap] does internal
+                    // size alignment so we cannot use the size provided by the
+                    // layout.
+                    internal_heap_stats.total_freed += before - self.used();
+                }
+            })
+        }
     }
 }

@@ -124,7 +124,9 @@ fn main() -> ! {
         }
     }
 
-    println!("Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    println!(
+        "Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/"
+    );
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut rx_buffer = [0u8; 1536];

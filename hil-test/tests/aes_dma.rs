@@ -7,7 +7,7 @@
 #![no_main]
 
 use esp_hal::{
-    aes::{dma::CipherMode, Aes, Mode},
+    aes::{Aes, Mode, dma::CipherMode},
     dma_buffers,
     peripherals::Peripherals,
 };

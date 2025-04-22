@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove the `heapless` dependency (including from the public API) (#3317)
 
+- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+
 ### Fixed
 
 - Update bt-hci version to fix serialization/deserialization of byte slices (#3340)

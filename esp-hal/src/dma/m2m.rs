@@ -12,6 +12,9 @@ use crate::dma::{
     DmaEligible,
 };
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
         BurstConfig,
         Channel,
@@ -27,9 +30,6 @@ use crate::{
         DmaTxBuffer,
         DmaTxInterrupt,
     },
-    Async,
-    Blocking,
-    DriverMode,
 };
 #[cfg(esp32s2)]
 use crate::{

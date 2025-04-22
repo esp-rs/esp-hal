@@ -1,8 +1,8 @@
 [package]
 name          = "esp-hal"
 version       = "1.0.0-beta.0"
-edition       = "2021"
-rust-version  = "1.84.0"
+edition       = "2024"
+rust-version  = "1.85.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
@@ -15,6 +15,10 @@ links         = "esp-hal"
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
+
+[lib]
+bench = false
+test  = false
 
 [dependencies]
 bitflags                 = "2.8.0"
@@ -145,9 +149,6 @@ defmt = [
 #! ### PSRAM Feature Flags
 ## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
 psram = []
-
-# This feature is intended for testing; you probably don't want to enable it:
-ci = ["defmt", "bluetooth"]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

@@ -17,15 +17,15 @@
 use core::net::Ipv4Addr;
 
 use bleps::{
+    Ble,
+    HciConnector,
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     att::Uuid,
-    Ble,
-    HciConnector,
 };
 use blocking_network_stack::Stack;
 use embedded_io::*;
@@ -60,7 +60,7 @@ fn main() -> ! {
 
     esp_alloc::heap_allocator!(size: 72 * 1024);
     // COEX needs more RAM - add some more
-    esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 

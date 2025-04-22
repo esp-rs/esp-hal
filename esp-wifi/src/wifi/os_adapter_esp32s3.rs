@@ -14,11 +14,13 @@ pub(crate) unsafe extern "C" fn set_intr(
     intr_num: u32,
     _intr_prio: i32,
 ) {
-    extern "C" {
+    unsafe extern "C" {
         fn intr_matrix_set(cpu_no: u32, model_num: u32, intr_num: u32);
     }
-    // Force to bind WiFi interrupt to CPU0
-    intr_matrix_set(0, intr_source, intr_num);
+    unsafe {
+        // Force to bind WiFi interrupt to CPU0
+        intr_matrix_set(0, intr_source, intr_num);
+    }
 }
 
 /// **************************************************************************
@@ -44,12 +46,12 @@ pub unsafe extern "C" fn set_isr(
     trace!("set_isr - interrupt {} function {:?} arg {:?}", n, f, arg);
 
     match n {
-        0 => {
+        0 => unsafe {
             crate::wifi::ISR_INTERRUPT_1 = (f, arg);
-        }
-        1 => {
+        },
+        1 => unsafe {
             crate::wifi::ISR_INTERRUPT_1 = (f, arg);
-        }
+        },
         _ => panic!("set_isr - unsupported interrupt number {}", n),
     }
     #[cfg(feature = "wifi")]

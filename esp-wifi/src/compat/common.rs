@@ -134,7 +134,7 @@ impl RawQueue {
         // do what the ESP-IDF implementations does ...
         // just remove all elements and add them back except the one we need to remove -
         // good enough for now
-        let item_slice = core::slice::from_raw_parts(item as *const u8, self.item_size);
+        let item_slice = unsafe { core::slice::from_raw_parts(item as *const u8, self.item_size) };
         let count = self.count();
 
         if count == 0 {
@@ -146,11 +146,11 @@ impl RawQueue {
         tmp_item.resize(self.item_size, 0);
 
         for _ in 0..count {
-            if !self.try_dequeue(tmp_item.as_mut_ptr().cast()) {
+            if !unsafe { self.try_dequeue(tmp_item.as_mut_ptr().cast()) } {
                 break;
             }
             if &tmp_item[..] != item_slice {
-                self.enqueue(tmp_item.as_mut_ptr().cast());
+                unsafe { self.enqueue(tmp_item.as_mut_ptr().cast()) };
             }
         }
     }
@@ -165,18 +165,22 @@ impl RawQueue {
 }
 
 pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
-    let c_str = core::ffi::CStr::from_ptr(s.cast());
-    core::str::from_utf8_unchecked(c_str.to_bytes())
+    unsafe {
+        let c_str = core::ffi::CStr::from_ptr(s.cast());
+        core::str::from_utf8_unchecked(c_str.to_bytes())
+    }
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
     let mut len = 0;
     loop {
-        if chars.offset(len).read_volatile() == 0 {
-            break;
+        unsafe {
+            if chars.offset(len).read_volatile() == 0 {
+                break;
+            }
+            len += 1;
         }
-        len += 1;
     }
 
     len as usize
@@ -352,9 +356,7 @@ pub(crate) fn send_queued(
 ) -> i32 {
     trace!(
         "queue_send queue {:?} item {:x} block_time_tick {}",
-        queue,
-        item as usize,
-        block_time_tick
+        queue, item as usize, block_time_tick
     );
 
     let queue: *mut ConcurrentQueue = queue.cast();
@@ -368,9 +370,7 @@ pub(crate) fn receive_queued(
 ) -> i32 {
     trace!(
         "queue_recv {:?} item {:?} block_time_tick {}",
-        queue,
-        item,
-        block_time_tick
+        queue, item, block_time_tick
     );
 
     let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
@@ -401,29 +401,34 @@ pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 
 
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn sleep(
     seconds: crate::binary::c_types::c_uint,
 ) -> crate::binary::c_types::c_uint {
     trace!("sleep");
 
-    usleep(seconds * 1_000);
+    unsafe {
+        usleep(seconds * 1_000);
+    }
     0
 }
 
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
     trace!("usleep");
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_delay_us(us: u32);
     }
-    esp_rom_delay_us(us);
+
+    unsafe {
+        esp_rom_delay_us(us);
+    }
     0
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn putchar(c: i32) -> crate::binary::c_types::c_int {
     trace!("putchar {}", c as u8 as char);
     c

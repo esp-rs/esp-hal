@@ -9,14 +9,14 @@
 use embassy_time::{Duration, Ticker, Timer};
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
+    interrupt::software::SoftwareInterruptControl,
     timer::systimer::SystemTimer,
 };
 use esp_hal::{
     peripherals::Peripherals,
     time,
-    timer::{timg::TimerGroup, AnyTimer, OneShotTimer, PeriodicTimer},
+    timer::{AnyTimer, OneShotTimer, PeriodicTimer, timg::TimerGroup},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;

@@ -31,25 +31,25 @@ use embedded_hal::i2c::Operation as EhalOperation;
 use enumset::{EnumSet, EnumSetType};
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
         InputSignal,
         OutputSignal,
         PinGuard,
         Pull,
+        interconnect::{OutputConnection, PeripheralOutput},
     },
     i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
-    pac::i2c0::{RegisterBlock, COMD},
+    pac::i2c0::{COMD, RegisterBlock},
     peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
     time::Rate,
-    Async,
-    Blocking,
-    DriverMode,
 };
 
 cfg_if::cfg_if! {

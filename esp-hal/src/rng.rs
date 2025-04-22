@@ -198,10 +198,10 @@ impl<'d> Trng<'d> {
     ///
     /// Returns a new `Trng` instance.
     pub fn new(rng: RNG<'_>, adc: ADC1<'d>) -> Self {
-        let gen = Rng::new(rng);
+        let r#gen = Rng::new(rng);
         crate::soc::trng::ensure_randomness();
         Self {
-            rng: gen,
+            rng: r#gen,
             _adc: adc,
         }
     }
