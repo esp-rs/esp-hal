@@ -165,6 +165,59 @@ impl BusTimeout {
     }
 }
 
+/// When the FSM remains unchanged for more than the 2^ the given amount of bus
+/// clock cycles a timeout will be triggered.
+///
+/// The default value is 0x10
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(any(esp32, esp32s2)))]
+pub struct FsmTimeout {
+    value: u8,
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+impl FsmTimeout {
+    const FSM_TIMEOUT_MAX: u8 = 23;
+
+    const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
+
+    /// Creates a new timeout.
+    ///
+    /// The meaning of the value and the allowed range of values is different
+    /// for different chips.
+    pub const fn new_const<const VALUE: u8>() -> Self {
+        const {
+            core::assert!(VALUE <= Self::FSM_TIMEOUT_MAX, "Invalid timeout value");
+        }
+        Self { value: VALUE }
+    }
+
+    /// Creates a new timeout.
+    ///
+    /// The meaning of the value and the allowed range of values is different
+    /// for different chips.
+    pub fn new(value: u8) -> Result<Self, ConfigError> {
+        if value > Self::FSM_TIMEOUT_MAX {
+            return Err(ConfigError::TimeoutInvalid);
+        }
+
+        Ok(Self { value })
+    }
+
+    fn value(&self) -> u8 {
+        self.value
+    }
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+impl Default for FsmTimeout {
+    fn default() -> Self {
+        Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
+    }
+}
+
 /// I2C-specific transmission errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -425,6 +478,16 @@ pub struct Config {
 
     /// I2C SCL timeout period.
     timeout: BusTimeout,
+
+    /// Sets the threshold value for the unchanged period of the SCL_FSM.
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[builder_lite(unstable)]
+    scl_st_timeout: FsmTimeout,
+
+    /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM.
+    #[cfg(not(any(esp32, esp32s2)))]
+    #[builder_lite(unstable)]
+    scl_main_st_timeout: FsmTimeout,
 }
 
 impl Default for Config {
@@ -432,6 +495,10 @@ impl Default for Config {
         Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
+            #[cfg(not(any(esp32, esp32s2)))]
+            scl_st_timeout: Default::default(),
+            #[cfg(not(any(esp32, esp32s2)))]
+            scl_main_st_timeout: Default::default(),
         }
     }
 }
@@ -634,6 +701,10 @@ impl<'a> I2cFuture<'a> {
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
             w.nack().set_bit();
+            #[cfg(not(any(esp32, esp32s2)))]
+            w.scl_main_st_to().set_bit();
+            #[cfg(not(any(esp32, esp32s2)))]
+            w.scl_st_to().set_bit();
 
             w
         });
@@ -667,6 +738,16 @@ impl<'a> I2cFuture<'a> {
             return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
                 self.info.regs(),
             )));
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        if r.scl_st_to().bit_is_set() {
+            return Err(Error::Timeout);
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        if r.scl_main_st_to().bit_is_set() {
+            return Err(Error::Timeout);
         }
 
         #[cfg(not(esp32))]
@@ -1147,6 +1228,10 @@ fn async_handler(info: &Info, state: &State) {
         w.trans_complete().clear_bit();
         w.arbitration_lost().clear_bit();
         w.time_out().clear_bit();
+        #[cfg(not(esp32))]
+        w.scl_main_st_to().clear_bit();
+        #[cfg(not(esp32))]
+        w.scl_st_to().clear_bit();
 
         #[cfg(not(any(esp32, esp32s2)))]
         w.txfifo_wm().clear_bit();
@@ -1427,6 +1512,16 @@ impl Driver<'_> {
 
         // Configure frequency
         self.set_frequency(config, config.timeout)?;
+
+        // Configure additional timeouts
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.regs()
+            .scl_st_time_out()
+            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
+        #[cfg(not(any(esp32, esp32s2)))]
+        self.regs()
+            .scl_main_st_time_out()
+            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
 
         self.update_config();
 
