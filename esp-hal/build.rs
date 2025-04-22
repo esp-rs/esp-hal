@@ -72,11 +72,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "esp_hal",
         &[
             ConfigOption {
-                name: "place-spi-driver-in-ram",
-                description: "Places the SPI driver in RAM for better performance",
+                name: "place-spi-master-driver-in-ram",
+                description: "Places the SPI master driver in RAM for better performance",
                 default_value: Value::Bool(false),
                 constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
+                stability: Stability::Unstable,
                 active: true,
             },
             ConfigOption {

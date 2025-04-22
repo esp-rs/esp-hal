@@ -41,7 +41,7 @@ use core::marker::PhantomData;
 #[instability::unstable]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
-#[cfg(place_spi_driver_in_ram)]
+#[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
 use super::{BitOrder, DataMode, DmaError, Error, Mode};
@@ -1523,7 +1523,7 @@ mod dma {
         ///
         /// The caller must ensure to not access the buffer contents while the
         /// transfer is in progress. Moving the buffer itself is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_transfer_dma<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             &mut self,
             full_duplex: bool,
@@ -1724,7 +1724,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_write(
             &mut self,
             bytes_to_write: usize,
@@ -1749,7 +1749,7 @@ mod dma {
         /// SPI instance. The maximum amount of data to be sent is 32736
         /// bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn write<TX: DmaTxBuffer>(
             mut self,
@@ -1770,7 +1770,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_read(
             &mut self,
             bytes_to_read: usize,
@@ -1785,7 +1785,7 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn read<RX: DmaRxBuffer>(
             mut self,
@@ -1806,7 +1806,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_dma_transfer(
             &mut self,
             bytes_to_read: usize,
@@ -1823,7 +1823,7 @@ mod dma {
         /// the SPI instance. The maximum amount of data to be
         /// sent/received is 32736 bytes.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn transfer<RX: DmaRxBuffer, TX: DmaTxBuffer>(
             mut self,
@@ -1853,7 +1853,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_half_duplex_read(
             &mut self,
             data_mode: DataMode,
@@ -1878,7 +1878,7 @@ mod dma {
 
         /// Perform a half-duplex read operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn half_duplex_read<RX: DmaRxBuffer>(
             mut self,
@@ -1910,7 +1910,7 @@ mod dma {
         ///
         /// The caller must ensure that the buffers are not accessed while the
         /// transfer is in progress. Moving the buffers is allowed.
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         unsafe fn start_half_duplex_write(
             &mut self,
             data_mode: DataMode,
@@ -1944,7 +1944,7 @@ mod dma {
 
         /// Perform a half-duplex write operation using DMA.
         #[allow(clippy::type_complexity)]
-        #[cfg_attr(place_spi_driver_in_ram, ram)]
+        #[cfg_attr(place_spi_master_driver_in_ram, ram)]
         #[instability::unstable]
         pub fn half_duplex_write<TX: DmaTxBuffer>(
             mut self,
@@ -2778,7 +2778,7 @@ impl DmaDriver {
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<Dm: DriverMode>(
         &self,
         _full_duplex: bool,
@@ -3317,7 +3317,7 @@ impl Driver {
         });
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn fill_fifo(&self, chunk: &[u8]) {
         // TODO: replace with `array_chunks` and `from_le_bytes`
         let mut c_iter = chunk.chunks_exact(4);
@@ -3350,7 +3350,7 @@ impl Driver {
     /// This function will return before all bytes of the last chunk to transmit
     /// have been sent to the wire. If you must ensure that the whole
     /// messages was written correctly, use [`Self::flush`].
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn write(&self, words: &[u8]) -> Result<(), Error> {
         let num_chunks = words.len() / FIFO_SIZE;
 
@@ -3377,7 +3377,7 @@ impl Driver {
     }
 
     /// Write bytes to SPI.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn write_async(&self, words: &[u8]) -> Result<(), Error> {
         // The fifo has a limited fixed size, so the data must be chunked and then
         // transmitted
@@ -3394,7 +3394,7 @@ impl Driver {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -3411,7 +3411,7 @@ impl Driver {
     /// Sends out a stuffing byte for every byte to read. This function doesn't
     /// perform flushing. If you want to read the response to something you
     /// have written before, consider using [`Self::transfer`] instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn read_async(&self, words: &mut [u8]) -> Result<(), Error> {
         let empty_array = [EMPTY_WRITE_PAD; FIFO_SIZE];
 
@@ -3428,7 +3428,7 @@ impl Driver {
     /// doesn't perform flushing. If you want to read the response to
     /// something you have written before, consider using [`Self::transfer`]
     /// instead.
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn read_from_fifo(&self, words: &mut [u8]) -> Result<(), Error> {
         let reg_block = self.regs();
 
@@ -3452,6 +3452,7 @@ impl Driver {
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn flush(&self) -> Result<(), Error> {
         while self.busy() {
             // wait for bus to be clear
@@ -3459,7 +3460,7 @@ impl Driver {
         Ok(())
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn transfer<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write(chunk)?;
@@ -3470,7 +3471,7 @@ impl Driver {
         Ok(words)
     }
 
-    #[cfg_attr(place_spi_driver_in_ram, ram)]
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn transfer_in_place_async(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             // Cut the transfer short if the future is dropped. We'll block for a short
@@ -3489,12 +3490,14 @@ impl Driver {
         Ok(())
     }
 
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn start_operation(&self) {
         self.update();
         self.regs().cmd().modify(|_, w| w.usr().set_bit());
     }
 
     /// Starts the operation and waits for it to complete.
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn execute_operation_async(&self) {
         // On ESP32, the interrupt seems to not fire in specific circumstances, when
         // `listen` is called after `start_operation`. Let's call it before, to be sure.
@@ -3810,7 +3813,7 @@ struct Esp32Hack {
 #[cfg(esp32)]
 unsafe impl Sync for Esp32Hack {}
 
-#[cfg_attr(place_spi_driver_in_ram, ram)]
+#[cfg_attr(place_spi_master_driver_in_ram, ram)]
 fn handle_async(instance: impl Instance) {
     let state = instance.state();
     let info = instance.info();
@@ -3848,7 +3851,7 @@ macro_rules! master_instance {
 
             fn handler(&self) -> InterruptHandler {
                 #[$crate::handler]
-                #[cfg_attr(place_spi_driver_in_ram, ram)]
+                #[cfg_attr(place_spi_master_driver_in_ram, ram)]
                 fn handle() {
                     handle_async(unsafe { $crate::peripherals::$peri::steal() })
                 }
@@ -3881,6 +3884,7 @@ struct SpiFuture<'a> {
 }
 
 impl<'a> SpiFuture<'a> {
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn setup(driver: &'a Driver) -> impl Future<Output = Self> {
         // Make sure this is called before starting an async operation. On the ESP32,
         // calling after may cause the interrupt to not fire.
