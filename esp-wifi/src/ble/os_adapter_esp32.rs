@@ -406,10 +406,10 @@ pub(crate) unsafe extern "C" fn coex_bt_wakeup_request_end() {
 
     // This should really be
     // ```rust,norun
-    //#[cfg(coex)]
+    // #[cfg(coex)]
     // async_wakeup_request_end(BTDM_ASYNC_WAKEUP_REQ_COEX);
     // ```
-    // 
+    //
     // But doing the right thing here keeps BT from working.
     // In a similar scenario this function isn't called in ESP-IDF.
 }
