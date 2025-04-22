@@ -58,9 +58,17 @@ fn main() -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
-    esp_alloc::heap_allocator!(size: 72 * 1024);
     // COEX needs more RAM - add some more
-    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+    #[cfg(feature = "esp32")]
+    {
+        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 96 * 1024);
+        esp_alloc::heap_allocator!(size: 24 * 1024);
+    }
+    #[cfg(not(feature = "esp32"))]
+    {
+        esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
+        esp_alloc::heap_allocator!(size: 64 * 1024);
+    }
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
@@ -68,7 +76,29 @@ fn main() -> ! {
 
     let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
 
-    let bluetooth = peripherals.BT;
+    let now = || time::Instant::now().duration_since_epoch().as_millis();
+
+    // initializing Bluetooth first results in a more stable WiFi connection on ESP32
+    let connector = BleConnector::new(&esp_wifi_ctrl, peripherals.BT);
+    let hci = HciConnector::new(connector, now);
+    let mut ble = Ble::new(&hci);
+
+    println!("{:?}", ble.init());
+    println!("{:?}", ble.cmd_set_le_advertising_parameters());
+    println!(
+        "{:?}",
+        ble.cmd_set_le_advertising_data(
+            create_advertising_data(&[
+                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
+                AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
+                AdStructure::CompleteLocalName(esp_hal::chip!()),
+            ])
+            .unwrap()
+        )
+    );
+    println!("{:?}", ble.cmd_set_le_advertise_enable(true));
+
+    println!("started advertising");
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
@@ -90,7 +120,6 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
-    let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -130,27 +159,6 @@ fn main() -> ! {
             break;
         }
     }
-
-    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth);
-    let hci = HciConnector::new(connector, now);
-    let mut ble = Ble::new(&hci);
-
-    println!("{:?}", ble.init());
-    println!("{:?}", ble.cmd_set_le_advertising_parameters());
-    println!(
-        "{:?}",
-        ble.cmd_set_le_advertising_data(
-            create_advertising_data(&[
-                AdStructure::Flags(LE_GENERAL_DISCOVERABLE | BR_EDR_NOT_SUPPORTED),
-                AdStructure::ServiceUuids16(&[Uuid::Uuid16(0x1809)]),
-                AdStructure::CompleteLocalName(esp_hal::chip!()),
-            ])
-            .unwrap()
-        )
-    );
-    println!("{:?}", ble.cmd_set_le_advertise_enable(true));
-
-    println!("started advertising");
 
     println!("Start busy loop on main");
 
