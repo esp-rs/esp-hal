@@ -8,13 +8,11 @@
 #![no_main]
 
 use esp_hal::clock::CpuClock;
-use hil_test as _;
-
 #[cfg(target_arch = "riscv32")]
 use esp_hal::riscv::interrupt::free as interrupt_free;
-
 #[cfg(target_arch = "xtensa")]
 use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
+use hil_test as _;
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
