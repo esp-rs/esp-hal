@@ -122,7 +122,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_sck(self, sclk: impl PeripheralInput<'d>) -> Self {
         let sclk = sclk.into();
-        sclk.enable_input(true);
+        sclk.set_input_enable(true);
         self.spi.info().sclk.connect_to(&sclk);
         self
     }
@@ -131,7 +131,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_mosi(self, mosi: impl PeripheralInput<'d>) -> Self {
         let mosi = mosi.into();
-        mosi.enable_input(true);
+        mosi.set_input_enable(true);
         self.spi.info().mosi.connect_to(&mosi);
         self
     }
@@ -149,7 +149,7 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_cs(self, cs: impl PeripheralInput<'d>) -> Self {
         let cs = cs.into();
-        cs.enable_input(true);
+        cs.set_input_enable(true);
         self.spi.info().cs.connect_to(&cs);
         self
     }

@@ -102,6 +102,38 @@ The affected types in the `gpio::interconnect` module are:
 - `InputConnection`
 - `OutputConnection`
 
+### Flex API surface has been simplified
+
+The `enable_input` method has been renamed to `set_input_enable`.
+
+The `Flex` driver no longer provides the following functions:
+
+- set_as_input
+- set_as_output
+- set_drive_strength
+- set_as_open_drain
+- pull_direction
+
+The individual configurations can be set via `apply_input_config` and `apply_output_config`.
+The input buffer and output driver can be separately enabled via `set_input_enable` and
+`set_output_enable`.
+
+Normally you only need to configure your pin once, after which changing modes can be done by calling
+`set_input_enable` and/or `set_output_enable`.
+
+```diff
+- flex.set_as_input(pull_direction);
++ flex.apply_input_config(&InputConfig::default().with_pull(pull_direction)); // only if needed
++ flex.set_output_enable(false);
++ flex.set_input_enable(true);
+
+- flex.set_as_output(); // or set_as_open_drain(pull_direction)
++ flex.apply_output_config(&OutputConfig::default().with_drive_mode(open_drain_or_push_pull)); // only if needed
++ flex.set_input_enable(false); // optional
++ flex.set_level(initial_level); // optional
++ flex.set_output_enable(true);
+```
+
 ## I2S driver now takes `DmaDescriptor`s later in construction
 
 ```diff

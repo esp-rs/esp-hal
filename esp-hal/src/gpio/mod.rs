@@ -1072,7 +1072,7 @@ pub enum DriveMode {
     /// resistors.
     #[cfg_attr(
         feature = "unstable",
-        doc = "\n\nEnable the input related functionality by using [Output::into_flex] and enabling input via [Flex::enable_input]"
+        doc = "\n\nEnable the input related functionality by using [Output::into_flex] and enabling input via [Flex::set_input_enable]"
     )]
     OpenDrain,
 }
@@ -1160,7 +1160,7 @@ impl<'d> Output<'d> {
         };
         this.set_level(initial_level);
         this.apply_config(&config);
-        this.pin.pin.enable_output(true);
+        this.pin.pin.set_output_enable(true);
 
         this
     }
@@ -1366,8 +1366,8 @@ impl<'d> Input<'d> {
     pub fn new(pin: impl InputPin + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
 
-        pin.pin.enable_output(false);
-        pin.enable_input(true);
+        pin.pin.set_output_enable(false);
+        pin.set_input_enable(true);
         pin.apply_input_config(&config);
 
         Self { pin }
@@ -1582,7 +1582,14 @@ impl<'d> Input<'d> {
 
 /// Flexible pin driver.
 ///
-/// This driver allows changing the pin mode between input and output.
+/// This pin driver can act as either input, or output, or both at the same
+/// time. The input and output are (not counting the shared pull direction)
+/// separately configurable, and they have independent enable states.
+///
+/// Enabling the input stage does not change the output stage, and vice versa.
+/// Disabling the input or output stages don't forget their configuration.
+/// Disabling the output stage will not change the output level, but it will
+/// disable the driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Flex<'d> {
@@ -1602,6 +1609,8 @@ impl<'d> Flex<'d> {
         #[cfg(usb_device)]
         disable_usb_pads(pin.number());
 
+        pin.set_output_enable(false);
+
         GPIO::regs()
             .func_out_sel_cfg(pin.number() as usize)
             .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
@@ -1620,23 +1629,24 @@ impl<'d> Flex<'d> {
         self.pin.number()
     }
 
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
+    // Input functions
+
+    /// Applies the given input configuration to the pin.
     ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Flex;
-    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
-    /// // Can be passed as an input.
-    /// let pin1 = pin1_gpio.peripheral_input();
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// This function does not set the pin as input (i.e. it does not enable the
+    /// input buffer). Note that the pull direction is common between the
+    /// input and output configuration.
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
-        unsafe { AnyPin::steal(self.number()) }.split().0
+    pub fn apply_input_config(&mut self, config: &InputConfig) {
+        self.pin.pull_direction(config.pull);
+    }
+
+    /// Enable or disable the GPIO pin input buffer.
+    #[inline]
+    #[instability::unstable]
+    pub fn set_input_enable(&mut self, enable_input: bool) {
+        self.pin.set_input_enable(enable_input);
     }
 
     /// Get whether the pin input level is high.
@@ -1741,19 +1751,46 @@ impl<'d> Flex<'d> {
         self.listen_with_options(event.into(), false, false, enable)
     }
 
-    /// Set the GPIO to output mode.
+    // Output functions
+
+    /// Applies the given output configuration to the pin.
+    ///
+    /// This function does not set the pin to output (i.e. it does not enable
+    /// the output driver). Note that the pull direction is common between
+    /// the input and output configuration.
     #[inline]
     #[instability::unstable]
-    pub fn set_as_output(&mut self) {
-        self.pin.set_to_push_pull_output();
+    pub fn apply_output_config(&mut self, config: &OutputConfig) {
+        let pull_up = config.pull == Pull::Up;
+        let pull_down = config.pull == Pull::Down;
+
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(unsafe { self.pin.clone_unchecked() }, pull_up, pull_down);
+
+        io_mux_reg(self.number()).modify(|_, w| {
+            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
+            w.fun_wpu().bit(pull_up);
+            w.fun_wpd().bit(pull_down);
+            w
+        });
+
+        GPIO::regs().pin(self.number() as usize).modify(|_, w| {
+            w.pad_driver()
+                .bit(config.drive_mode == DriveMode::OpenDrain)
+        });
     }
 
-    /// Set the GPIO to input mode.
+    /// Enable or disable the GPIO pin output driver.
+    ///
+    /// The output level will be set to the last value. Use [`Self::set_high`],
+    /// [`Self::set_low`] or [`Self::set_level`] to set the output level before
+    /// enabling the output.
+    ///
+    /// This function does not disable the input buffer.
     #[inline]
     #[instability::unstable]
-    pub fn set_as_input(&mut self, pull: Pull) {
-        self.pin.init_input(pull);
-        self.pin.enable_output(false);
+    pub fn set_output_enable(&mut self, enable_output: bool) {
+        self.pin.set_output_enable(enable_output);
     }
 
     /// Set the output as high.
@@ -1806,63 +1843,25 @@ impl<'d> Flex<'d> {
         self.set_level(!level);
     }
 
-    /// Configure the [DriveStrength] of the pin
+    // Other/common functions
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::Flex;
+    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// # Ok(())
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
-    pub fn set_drive_strength(&mut self, strength: DriveStrength) {
-        self.pin.set_drive_strength(strength);
-    }
-
-    /// Set the GPIO to open-drain mode.
-    #[inline]
-    #[instability::unstable]
-    pub fn set_as_open_drain(&mut self, pull: Pull) {
-        self.pin.set_to_open_drain_output();
-        self.pin.pull_direction(pull);
-    }
-
-    /// Configure pullup/pulldown resistors.
-    #[inline]
-    #[instability::unstable]
-    pub fn pull_direction(&mut self, pull: Pull) {
-        self.pin.pull_direction(pull);
-    }
-
-    /// Enable or disable the GPIO pin input buffer.
-    #[inline]
-    #[instability::unstable]
-    pub fn enable_input(&mut self, enable_input: bool) {
-        self.pin.enable_input(enable_input);
-    }
-
-    /// Applies the given output configuration to the pin.
-    #[inline]
-    #[instability::unstable]
-    pub fn apply_output_config(&mut self, config: &OutputConfig) {
-        let pull_up = config.pull == Pull::Up;
-        let pull_down = config.pull == Pull::Down;
-
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(unsafe { self.pin.clone_unchecked() }, pull_up, pull_down);
-
-        io_mux_reg(self.number()).modify(|_, w| {
-            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
-            w.fun_wpu().bit(pull_up);
-            w.fun_wpd().bit(pull_down);
-            w
-        });
-
-        GPIO::regs().pin(self.number() as usize).modify(|_, w| {
-            w.pad_driver()
-                .bit(config.drive_mode == DriveMode::OpenDrain)
-        });
-    }
-
-    /// Applies the given input configuration to the pin.
-    #[inline]
-    #[instability::unstable]
-    pub fn apply_input_config(&mut self, config: &InputConfig) {
-        self.pin.pull_direction(config.pull);
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
+        unsafe { AnyPin::steal(self.number()) }.split().0
     }
 
     /// Split the pin into an input and output signal.
@@ -1983,14 +1982,14 @@ impl<'lt> AnyPin<'lt> {
 
     /// Enable or disable the GPIO pin output buffer.
     #[inline]
-    pub(crate) fn enable_output(&self, enable: bool) {
+    pub(crate) fn set_output_enable(&self, enable: bool) {
         assert!(self.is_output() || !enable);
         self.bank().write_out_en(self.mask(), enable);
     }
 
     /// Enable input for the pin
     #[inline]
-    pub(crate) fn enable_input(&self, on: bool) {
+    pub(crate) fn set_input_enable(&self, on: bool) {
         io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
     }
 
@@ -2027,7 +2026,7 @@ impl<'lt> AnyPin<'lt> {
         open_drain: bool,
         input_enable: Option<bool>,
     ) {
-        self.enable_output(true);
+        self.set_output_enable(true);
 
         let gpio = GPIO::regs();
 

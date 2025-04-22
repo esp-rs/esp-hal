@@ -338,8 +338,8 @@ mod tests {
         let mut test_gpio2 = Flex::new(ctx.test_gpio2);
 
         test_gpio1.set_high();
-        test_gpio1.set_as_output();
-        test_gpio2.enable_input(true);
+        test_gpio1.set_output_enable(true);
+        test_gpio2.set_input_enable(true);
 
         ctx.delay.delay_millis(1);
 
@@ -352,8 +352,8 @@ mod tests {
         assert_eq!(test_gpio1.is_set_high(), false);
         assert_eq!(test_gpio2.is_high(), false);
 
-        test_gpio1.enable_input(true);
-        test_gpio2.set_as_output();
+        test_gpio1.set_input_enable(true);
+        test_gpio2.set_output_enable(true);
         ctx.delay.delay_millis(1);
 
         assert_eq!(test_gpio1.is_high(), false);

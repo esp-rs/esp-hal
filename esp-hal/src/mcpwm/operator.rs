@@ -306,7 +306,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
         pin.set_update_method(config.update_method);
 
         PWM::output_signal::<OP, IS_A>().connect_to(&pin.pin);
-        pin.pin.enable_output(true);
+        pin.pin.set_output_enable(true);
 
         pin
     }

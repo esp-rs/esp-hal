@@ -1050,7 +1050,7 @@ where
         pin.set_output_high(true);
 
         pin.set_to_open_drain_output();
-        pin.enable_input(true);
+        pin.set_input_enable(true);
         pin.pull_direction(Pull::Up);
 
         input.connect_to(&pin);
