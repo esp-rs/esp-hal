@@ -7,12 +7,12 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     gpio::{
-        interconnect::{InputSignal, OutputSignal},
         AnyPin,
+        interconnect::{InputSignal, OutputSignal},
     },
     uart::{self, ClockSource, Uart},
-    Blocking,
 };
 use hil_test as _;
 

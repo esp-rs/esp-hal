@@ -11,13 +11,13 @@
 #![no_main]
 
 use esp_hal::{
+    Async,
     delay::Delay,
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     time::Rate,
-    Async,
 };
 use hil_test as _;
 

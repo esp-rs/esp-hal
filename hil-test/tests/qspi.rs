@@ -7,18 +7,18 @@
 #![no_main]
 
 #[cfg(pcnt)]
-use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
+use esp_hal::pcnt::{Pcnt, channel::EdgeMode, unit::Unit};
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
+        master::{Address, Command, Config, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 

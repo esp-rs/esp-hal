@@ -7,13 +7,13 @@
 #![no_main]
 
 use esp_hal::{
+    Config,
     clock::CpuClock,
     config::{WatchdogConfig, WatchdogStatus},
     delay::Delay,
     rtc_cntl::Rtc,
     time::Duration,
     timer::timg::TimerGroup,
-    Config,
 };
 use hil_test as _;
 

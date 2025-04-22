@@ -12,8 +12,8 @@ use esp_hal::{
     dma::DmaTxBuf,
     dma_tx_buffer,
     gpio::{
-        interconnect::{InputSignal, OutputSignal},
         NoPin,
+        interconnect::{InputSignal, OutputSignal},
     },
     parl_io::{
         BitPackOrder,
@@ -25,9 +25,9 @@ use esp_hal::{
         TxPinConfigIncludingValidPin,
     },
     pcnt::{
+        Pcnt,
         channel::{CtrlMode, EdgeMode},
         unit::Unit,
-        Pcnt,
     },
     peripherals::{DMA_CH0, PARL_IO},
     time::Rate,

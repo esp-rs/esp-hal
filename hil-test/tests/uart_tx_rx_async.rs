@@ -7,8 +7,8 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{self, UartRx, UartTx},
     Async,
+    uart::{self, UartRx, UartTx},
 };
 use hil_test as _;
 
@@ -22,7 +22,7 @@ struct Context {
 mod tests {
     use embassy_futures::{
         join::join,
-        select::{select, Either},
+        select::{Either, select},
     };
     use embassy_time::{Duration, Timer};
     use embedded_io_async::Write;

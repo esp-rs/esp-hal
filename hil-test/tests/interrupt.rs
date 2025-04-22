@@ -15,9 +15,9 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{
         self,
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
         CpuInterrupt,
         Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     peripherals::Interrupt,
 };

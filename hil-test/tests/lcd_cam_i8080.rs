@@ -7,21 +7,21 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     dma::DmaTxBuf,
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
-        lcd::i8080::{Command, Config, TxEightBits, TxSixteenBits, I8080},
         BitOrder,
         LcdCam,
+        lcd::i8080::{Command, Config, I8080, TxEightBits, TxSixteenBits},
     },
     pcnt::{
-        channel::{CtrlMode, EdgeMode},
         Pcnt,
+        channel::{CtrlMode, EdgeMode},
     },
     peripherals::DMA_CH0,
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 

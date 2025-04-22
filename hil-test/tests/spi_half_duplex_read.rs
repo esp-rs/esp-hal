@@ -7,16 +7,16 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{Level, Output, OutputConfig},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
+        master::{Address, Command, Config, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 

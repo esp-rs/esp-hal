@@ -7,8 +7,8 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{self, Uart},
     Async,
+    uart::{self, Uart},
 };
 use hil_test as _;
 

@@ -8,8 +8,8 @@
 
 use embedded_can::Frame;
 use esp_hal::{
-    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
+    twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
 use hil_test as _;
 use nb::block;

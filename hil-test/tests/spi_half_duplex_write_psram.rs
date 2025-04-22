@@ -10,18 +10,18 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
-    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
+    pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
         DataMode,
         Mode,
+        master::{Address, Command, Config, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 extern crate alloc;
