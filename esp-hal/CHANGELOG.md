@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`. (#3402)
 - Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
 - Renamed `Flex::enable_input` to `set_input_enable` (#3387)
+- Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
 
 ### Fixed
 
