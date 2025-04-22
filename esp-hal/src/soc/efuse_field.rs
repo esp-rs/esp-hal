@@ -26,6 +26,23 @@ impl EfuseField {
 }
 
 impl Efuse {
+    /// Reads chip's MAC address from the eFuse storage.
+    pub fn read_base_mac_address() -> [u8; 6] {
+        let mut mac_addr = [0u8; 6];
+
+        let mac0 = Self::read_field_be::<[u8; 4]>(crate::soc::efuse::MAC0);
+        let mac1 = Self::read_field_be::<[u8; 2]>(crate::soc::efuse::MAC1);
+
+        mac_addr[0] = mac1[0];
+        mac_addr[1] = mac1[1];
+        mac_addr[2] = mac0[0];
+        mac_addr[3] = mac0[1];
+        mac_addr[4] = mac0[2];
+        mac_addr[5] = mac0[3];
+
+        mac_addr
+    }
+
     /// Read field value in a little-endian order
     #[inline(always)]
     pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {

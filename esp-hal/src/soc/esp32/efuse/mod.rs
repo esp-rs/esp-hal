@@ -75,11 +75,6 @@ pub enum ChipType {
 }
 
 impl Efuse {
-    /// Reads the base MAC address from the eFuse memory.
-    pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC0)
-    }
-
     /// Returns the number of CPUs available on the chip.
     ///
     /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol
