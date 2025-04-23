@@ -187,6 +187,7 @@ impl FsmTimeout {
     ///
     /// The meaning of the value and the allowed range of values is different
     /// for different chips.
+    #[instability::unstable]
     pub const fn new_const<const VALUE: u8>() -> Self {
         const {
             core::assert!(VALUE <= Self::FSM_TIMEOUT_MAX, "Invalid timeout value");
@@ -198,6 +199,7 @@ impl FsmTimeout {
     ///
     /// The meaning of the value and the allowed range of values is different
     /// for different chips.
+    #[instability::unstable]
     pub fn new(value: u8) -> Result<Self, ConfigError> {
         if value > Self::FSM_TIMEOUT_MAX {
             return Err(ConfigError::TimeoutInvalid);

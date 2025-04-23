@@ -40,7 +40,7 @@ macro_rules! i2c_pins {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
             } else if #[cfg(esp32c2)] {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
-            } else {
+            } else { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
             }
         }
