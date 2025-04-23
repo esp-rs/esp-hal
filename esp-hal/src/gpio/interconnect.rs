@@ -594,8 +594,8 @@ impl<'d> InputSignal<'d> {
 
     /// Freezes the pin configuration.
     ///
-    /// This will prevent the associated peripheral from modifying the pin
-    /// settings.
+    /// This will prevent peripheral drivers using this signal from modifying
+    /// the pin settings.
     pub fn freeze(mut self) -> Self {
         self.flags.insert(InputFlags::Frozen);
         self
@@ -603,7 +603,7 @@ impl<'d> InputSignal<'d> {
 
     /// Unfreezes the pin configuration.
     ///
-    /// This will enable the associated peripheral to modify the pin settings
+    /// This will enable peripheral drivers to modify the pin settings
     /// again.
     ///
     /// # Safety
@@ -772,8 +772,8 @@ impl<'d> OutputSignal<'d> {
 
     /// Freezes the pin configuration.
     ///
-    /// This will prevent the associated peripheral from modifying the pin
-    /// settings.
+    /// This will prevent peripheral drivers using this signal from
+    /// modifying the pin settings.
     pub fn freeze(mut self) -> Self {
         self.flags.insert(OutputFlags::Frozen);
         self
@@ -781,7 +781,7 @@ impl<'d> OutputSignal<'d> {
 
     /// Unfreezes the pin configuration.
     ///
-    /// This will enable the associated peripheral to modify the pin settings
+    /// This will enable peripheral drivers to modify the pin settings
     /// again.
     ///
     /// # Safety
