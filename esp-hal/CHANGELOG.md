@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
 - Update `defmt` to 1.0 (#3416)
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
+- esp-hal no longer clears the GPIO interrupt status bits by default. (#3408)
 
 ### Fixed
 
@@ -78,6 +79,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Passing an invalid seven bit I2C address is now rejected (#3343)
 - PARL_IO: Use correct max transfer size (#3346)
 - `OneShot` timer now returns an InvalidTimeout from `schedule` instead of panicking (#3433)
+- GPIO interrupt handling no longer causes infinite looping if a task at higher priority is awaiting on a pin event (#3408)
+- `esp_hal::gpio::Input::is_interrupt_set` can now return true (#3408)
 
 ### Removed
 
