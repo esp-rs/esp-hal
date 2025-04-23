@@ -37,6 +37,8 @@ struct Context {
     test_gpio2: AnyPin<'static>,
     #[cfg(feature = "unstable")]
     delay: Delay,
+    #[cfg(feature = "unstable")]
+    io: Io<'static>,
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -46,7 +48,7 @@ pub fn interrupt_handler() {
         *COUNTER.borrow_ref_mut(cs) += 1;
         INPUT_PIN
             .borrow_ref_mut(cs)
-            .as_mut() // we can't unwrap as the handler may get called for async operations
+            .as_mut()
             .map(|pin| pin.clear_interrupt());
     });
 }
@@ -92,12 +94,12 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
+        // Interrupts are unstable
+        #[cfg(feature = "unstable")]
+        let io = Io::new(peripherals.IO_MUX);
+
         #[cfg(feature = "unstable")]
         {
-            // Interrupts are unstable
-            let mut io = Io::new(peripherals.IO_MUX);
-            io.set_interrupt_handler(interrupt_handler);
-
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_hal_embassy::init(timg0.timer0);
@@ -108,6 +110,8 @@ mod tests {
             test_gpio2: gpio2.degrade(),
             #[cfg(feature = "unstable")]
             delay,
+            #[cfg(feature = "unstable")]
+            io,
         }
     }
 
@@ -144,6 +148,22 @@ mod tests {
 
     #[test]
     async fn a_pin_can_wait(ctx: Context) {
+        let mut first = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        embassy_futures::select::select(
+            first.wait_for_rising_edge(),
+            // Other futures won't return, this one will, make sure its last so all other futures
+            // are polled first
+            embassy_futures::yield_now(),
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")] // Interrupts are unstable
+    async fn a_pin_can_wait_with_custom_handler(mut ctx: Context) {
+        ctx.io.set_interrupt_handler(interrupt_handler);
+
         let mut first = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
 
         embassy_futures::select::select(
@@ -241,7 +261,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "unstable")] // Interrupts are unstable
-    fn gpio_interrupt(ctx: Context) {
+    fn gpio_interrupt(mut ctx: Context) {
+        ctx.io.set_interrupt_handler(interrupt_handler);
+
         let mut test_gpio1 =
             Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
