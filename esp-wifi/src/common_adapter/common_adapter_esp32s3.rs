@@ -59,11 +59,13 @@ pub(crate) fn enable_wifi_power_domain() {
 pub(crate) unsafe fn bbpll_en_usb() {
     #[cfg(phy_enable_usb)]
     {
-        extern "C" {
+        unsafe extern "C" {
             fn phy_bbpll_en_usb(param: bool);
         }
 
-        phy_bbpll_en_usb(true);
+        unsafe {
+            phy_bbpll_en_usb(true);
+        }
     }
 }
 
@@ -75,9 +77,9 @@ pub(crate) unsafe fn phy_enable() {
                 super::phy_enable_clock();
             }
 
-            if !G_IS_PHY_CALIBRATED {
+            if unsafe { !G_IS_PHY_CALIBRATED } {
                 super::phy_calibrate();
-                G_IS_PHY_CALIBRATED = true;
+                unsafe { G_IS_PHY_CALIBRATED = true };
             } else {
                 unsafe {
                     phy_wakeup_init();

@@ -33,9 +33,9 @@ pub(crate) unsafe fn phy_enable() {
                 super::phy_enable_clock();
             }
 
-            if !G_IS_PHY_CALIBRATED {
+            if unsafe { !G_IS_PHY_CALIBRATED } {
                 super::phy_calibrate();
-                G_IS_PHY_CALIBRATED = true;
+                unsafe { G_IS_PHY_CALIBRATED = true };
             } else {
                 unsafe {
                     phy_wakeup_init();
