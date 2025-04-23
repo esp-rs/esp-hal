@@ -179,7 +179,7 @@ impl<const C: u8> EventChannel<C> {
         kind: EventKind,
     ) -> Event<'d> {
         let pin = pin.into();
-        if let Some(number) = pin.number() {
+        if let Some(number) = pin.gpio_number() {
             pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
             pin.set_input_enable(true);
 
@@ -282,7 +282,7 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         let pin = pin.into();
 
-        if let Some(number) = pin.number() {
+        if let Some(number) = pin.gpio_number() {
             let config = if pin_config.open_drain {
                 super::OutputConfig::default()
                     .with_drive_mode(super::DriveMode::OpenDrain)

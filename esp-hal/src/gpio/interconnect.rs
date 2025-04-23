@@ -374,7 +374,7 @@ enum Signal<'d> {
     Level(Level),
 }
 impl Signal<'_> {
-    fn number(&self) -> Option<u8> {
+    fn gpio_number(&self) -> Option<u8> {
         match &self {
             Signal::Pin(pin) => Some(pin.number()),
             Signal::Level(_) => None,
@@ -499,7 +499,7 @@ impl Signal<'_> {
     }
 
     fn disconnect_from_peripheral_output(&self) {
-        let Some(number) = self.number() else {
+        let Some(number) = self.gpio_number() else {
             return;
         };
         GPIO::regs()
@@ -620,8 +620,8 @@ impl<'d> InputSignal<'d> {
     /// Returns the GPIO number of the underlying pin.
     ///
     /// Returns `None` if the signal is a constant level.
-    pub fn number(&self) -> Option<u8> {
-        self.pin.number()
+    pub fn gpio_number(&self) -> Option<u8> {
+        self.pin.gpio_number()
     }
 
     /// Returns `true` if the input signal is high.
@@ -798,8 +798,8 @@ impl<'d> OutputSignal<'d> {
     /// Returns the GPIO number of the underlying pin.
     ///
     /// Returns `None` if the signal is a constant level.
-    pub fn number(&self) -> Option<u8> {
-        self.pin.number()
+    pub fn gpio_number(&self) -> Option<u8> {
+        self.pin.gpio_number()
     }
 
     /// Returns `true` if the input signal is configured to be inverted.
