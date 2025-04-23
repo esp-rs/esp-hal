@@ -2,8 +2,17 @@
 //!
 //! The GPIO matrix offers flexible connection options between GPIO pins and
 //! peripherals. This module offers capabilities not covered by GPIO pin types
-//! and drivers.
-#![doc = concat!("## Relation to the", crate::trm_markdown_link!())]
+//! and drivers, like routing fixed logic levels to peripheral inputs, or
+//! inverting input and output signals.
+//!
+//! > Note that routing a signal through the GPIO matrix adds some latency to
+//! > the signal. This is not a problem for most peripherals, but it can be an
+//! > issue for high-speed peripherals like SPI or I2S. `esp-hal` tries to
+//! > bypass the GPIO matrix when possible (e.g. when the pin can be configured
+//! > as a suitable Alternate Function for the peripheral signal, and other
+//! > settings are compatible), but silently falls back to the GPIO matrix for
+//! > flexibility.
+#![doc = concat!("## Relation to the ", crate::trm_markdown_link!("iomuxgpio"))]
 //! The GPIO drivers implement IO MUX and pin functionality (input/output
 //! buffers, pull resistors, etc.). The GPIO matrix is represented by signals
 //! and the [`PeripheralInput`] and [`PeripheralOutput`] traits. There is some
