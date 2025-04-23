@@ -99,10 +99,10 @@ been made:
 - The `InputSignal` and `OutputSignal` types now have a lifetime. This lifetime prevents them to be live for longer than the GPIO that was used to create them.
 - Because `InputSignal` and `OutputSignal` can now represent constant levels, the `number` method now returns `Option<u8>`.
 - The way to invert inputs and outputs has been changed:
-  - `InputSignal::inverted` has been renamed to `InputSignal::with_inverted_input`.
-  - `OutputSignal::inverted` has been renamed to `OutputSignal::with_inverted_output`.
+  - `InputSignal::inverted` has been renamed to `InputSignal::with_input_inverter`.
+  - `OutputSignal::inverted` has been renamed to `OutputSignal::with_output_inverter`.
   - `InputSignal::invert` and `OutputSignal::invert` have been removed.
-  - `OutputSignal` now has an `inverted_input` property, which can be changed by using `with_inverted_output`.
+  - `OutputSignal` now has an `inverted_input` property, which can be changed by using `with_output_inverter`.
   - The signals have `is_{input, output}_inverted` methods to read the state that will be used when configuring the hardware.
 - Users can now force a signal through the GPIO matrix.
 - The `enable_input` and `enable_output` methods have been renamed to `set_input_enable` and `set_output_enable`.

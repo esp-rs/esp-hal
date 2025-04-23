@@ -75,8 +75,8 @@
 //! ## Inverting inputs and outputs
 //!
 //! The GPIO matrix allows for inverting the input and output signals. This can
-//! be configured via [`InputSignal::with_inverted_input`] and
-//! [`OutputSignal::with_inverted_input`]. The hardware is configured
+//! be configured via [`InputSignal::with_input_inverter`] and
+//! [`OutputSignal::with_input_inverter`]. The hardware is configured
 //! accordingly when the signal is connected to a peripheral input or output.
 //!
 //! ## Connection rules
@@ -626,14 +626,14 @@ impl<'d> InputSignal<'d> {
 
     /// Returns `true` if the input signal is high.
     ///
-    /// Note that this does not take [`Self::with_inverted_input`] into account.
+    /// Note that this does not take [`Self::with_input_inverter`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns the current signal level.
     ///
-    /// Note that this does not take [`Self::with_inverted_input`] into account.
+    /// Note that this does not take [`Self::with_input_inverter`] into account.
     pub fn level(&self) -> Level {
         self.is_input_high().into()
     }
@@ -648,7 +648,7 @@ impl<'d> InputSignal<'d> {
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
-    pub fn with_inverted_input(mut self, invert: bool) -> Self {
+    pub fn with_input_inverter(mut self, invert: bool) -> Self {
         self.flags.set(InputFlags::InvertInput, invert);
         self
     }
@@ -820,14 +820,14 @@ impl<'d> OutputSignal<'d> {
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// output signal.
-    pub fn with_inverted_output(mut self, invert: bool) -> Self {
+    pub fn with_output_inverter(mut self, invert: bool) -> Self {
         self.flags.set(OutputFlags::InvertOutput, invert);
         self
     }
 
     /// Consumes the signal and returns a new one that inverts the peripheral's
     /// input signal.
-    pub fn with_inverted_input(mut self, invert: bool) -> Self {
+    pub fn with_input_inverter(mut self, invert: bool) -> Self {
         self.flags.set(OutputFlags::InvertInput, invert);
         self
     }
@@ -847,14 +847,14 @@ impl<'d> OutputSignal<'d> {
 
     /// Returns `true` if the input signal is high.
     ///
-    /// Note that this does not take [`Self::with_inverted_input`] into account.
+    /// Note that this does not take [`Self::with_input_inverter`] into account.
     pub fn is_input_high(&self) -> bool {
         self.pin.is_input_high()
     }
 
     /// Returns `true` if the output signal is set high.
     ///
-    /// Note that this does not take [`Self::with_inverted_output`] into
+    /// Note that this does not take [`Self::with_output_inverter`] into
     /// account.
     pub fn is_set_high(&self) -> bool {
         self.pin.is_set_high()
