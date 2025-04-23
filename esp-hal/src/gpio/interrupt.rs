@@ -1,14 +1,18 @@
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
+use strum::EnumCount;
 
 use crate::{
     gpio::{GpioBank, InterruptStatusRegisterAccess, asynch, set_int_enable},
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
     peripherals::Interrupt,
+    sync::RawMutex,
 };
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+
+pub(super) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 pub(super) struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
@@ -26,11 +30,6 @@ impl CFnPtr {
             unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
         }
     }
-}
-
-#[ram]
-pub(super) extern "C" fn user_gpio_interrupt_handler() {
-    handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
 }
 
 pub(crate) fn bind_default_interrupt_handler() {
@@ -59,44 +58,97 @@ pub(crate) fn bind_default_interrupt_handler() {
     unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
 }
 
+/// The default GPIO interrupt handler, when the user has not set one.
+///
+/// This handler will disable all pending interrupts and leave the interrupt
+/// status bits unchanged. This enables functions like `is_interrupt_set` to
+/// work correctly.
 #[ram]
 extern "C" fn default_gpio_interrupt_handler() {
-    handle_pin_interrupts(|| ());
+    GPIO_LOCK.lock(|| {
+        let banks = interrupt_status();
+
+        // Handle the async interrupts
+        for (bank, intrs) in banks {
+            // Get the mask of active async pins and clear the relevant bits to signal
+            // completion. This way the user may clear the interrupt status
+            // without worrying about the async bit being cleared.
+            let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+
+            // Wake up the tasks
+            handle_async_pins(bank, intrs & async_pins);
+
+            // Disable the remaining interrupts.
+            let mut intrs = intrs & !async_pins;
+            while intrs != 0 {
+                let pin_pos = intrs.trailing_zeros();
+                intrs -= 1 << pin_pos;
+
+                let pin_nr = pin_pos as u8 + bank.offset();
+
+                // Disable the interrupt for this pin. This must be done as the last operation
+                // on the pin, so that `async fn wait_for` will not
+                // race with the interrupt handler.
+                set_int_enable(pin_nr, Some(0), 0, false);
+            }
+        }
+    });
 }
 
+/// The user GPIO interrupt handler, when the user has set one.
+///
+/// This handler only disables interrupts associated with async pins. The user
+/// handler is responsible for clearing the interrupt status bits or disabling
+/// the interrupts.
 #[ram]
-fn handle_pin_interrupts(user_handler: fn()) {
+pub(super) extern "C" fn user_gpio_interrupt_handler() {
+    GPIO_LOCK.lock(|| {
+        let banks = interrupt_status();
+
+        // Call the user handler before clearing interrupts. The user can use the enable
+        // bits to determine which interrupts they are interested in. Clearing the
+        // interupt status or enable bits have no effect on the rest of the
+        // interrupt handler.
+        USER_INTERRUPT_HANDLER.call();
+
+        // Handle the async interrupts
+        for (bank, intrs) in banks {
+            // Get the mask of active async pins and clear the relevant bits to signal
+            // completion. This way the user may clear the interrupt status
+            // without worrying about the async bit being cleared.
+            let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+
+            // Wake up the tasks
+            handle_async_pins(bank, intrs & async_pins);
+        }
+    });
+}
+
+fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
     let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
 
     #[cfg(gpio_bank_1)]
     let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
 
-    user_handler();
-
-    let banks = [
+    [
         (GpioBank::_0, intrs_bank0),
         #[cfg(gpio_bank_1)]
         (GpioBank::_1, intrs_bank1),
-    ];
+    ]
+}
 
-    for (bank, intrs) in banks {
-        // Get the mask of active async pins and also unmark them in the same go.
-        let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+fn handle_async_pins(bank: GpioBank, mut async_intrs: u32) {
+    while async_intrs != 0 {
+        let pin_pos = async_intrs.trailing_zeros();
+        async_intrs -= 1 << pin_pos;
 
-        // Wake up the tasks
-        let mut intr_bits = intrs & async_pins;
-        while intr_bits != 0 {
-            let pin_pos = intr_bits.trailing_zeros();
-            intr_bits -= 1 << pin_pos;
+        let pin_nr = pin_pos as u8 + bank.offset();
+        // The pin is async, we need to wake up the task.
+        asynch::PIN_WAKERS[pin_nr as usize].wake();
 
-            let pin_nr = pin_pos as u8 + bank.offset();
-
-            crate::interrupt::free(|| {
-                asynch::PIN_WAKERS[pin_nr as usize].wake();
-                set_int_enable(pin_nr, Some(0), 0, false);
-            });
-        }
-
-        bank.write_interrupt_status_clear(intrs);
+        // Disable the interrupt for this pin. This must be done as the last operation
+        // on the pin, so that `async fn wait_for` will not
+        // race with the interrupt handler.
+        set_int_enable(pin_nr, Some(0), 0, false);
     }
 }

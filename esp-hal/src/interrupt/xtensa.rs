@@ -1,6 +1,7 @@
 //! Interrupt handling
 
 use xtensa_lx::interrupt;
+#[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
 use xtensa_lx_rt::exception::Context;
 

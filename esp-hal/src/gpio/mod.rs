@@ -643,10 +643,23 @@ impl<'d> Io<'d> {
         doc = "Registers an interrupt handler for all GPIO pins on the current core."
     )]
     #[doc = ""]
-    /// Note that when using interrupt handlers registered by this function,
-    /// we clear the interrupt status register for you. This is NOT the case
-    /// if you register the interrupt handler directly, by defining a
-    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
+    /// Note that when using interrupt handlers registered by this function, or
+    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
+    /// **not** clear the interrupt status register or the interrupt enable
+    /// setting for you. Based on your use case, you need to do one of this
+    /// yourself:
+    ///
+    /// - Disabling the interrupt enable setting for the GPIO pin allows you to
+    ///   handle an event once per call to [`listen()`]. Using this method, the
+    ///   [`is_interrupt_set()`] method will return `true` if the interrupt is
+    ///   set even after your handler has finished running.
+    /// - Clearing the interrupt status register allows you to handle an event
+    ///   repeatedly after [`listen()`] is called. Using this method,
+    ///   [`is_interrupt_set()`] will return `false` after your handler has
+    ///   finished running.
+    ///
+    /// [`listen()`]: Input::listen
+    /// [`is_interrupt_set()`]: Input::is_interrupt_set
     ///
     /// # Panics
     ///
@@ -1487,32 +1500,6 @@ impl<'d> Flex<'d> {
         self.pin.is_input_high().into()
     }
 
-    fn listen_with_options(
-        &self,
-        event: Event,
-        int_enable: bool,
-        nmi_enable: bool,
-        wake_up_from_light_sleep: bool,
-    ) -> Result<(), WakeConfigError> {
-        if wake_up_from_light_sleep {
-            match event {
-                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
-                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
-                }
-                _ => {}
-            }
-        }
-
-        set_int_enable(
-            self.pin.number(),
-            Some(gpio_intr_enable(int_enable, nmi_enable)),
-            event as u8,
-            wake_up_from_light_sleep,
-        );
-
-        Ok(())
-    }
-
     /// Listen for interrupts.
     ///
     /// See [`Input::listen`] for more information and an example.
@@ -1521,14 +1508,16 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
-        unwrap!(self.listen_with_options(event, true, false, false));
+        unwrap!(self.pin.listen_with_options(event, true, false, false));
     }
 
     /// Stop listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
-        set_int_enable(self.pin.number(), Some(0), 0, false);
+        GPIO_LOCK.lock(|| {
+            set_int_enable(self.pin.number(), Some(0), 0, false);
+        });
     }
 
     /// Check if the pin is listening for interrupts.
@@ -1565,7 +1554,8 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.listen_with_options(event.into(), false, false, enable)
+        self.pin
+            .listen_with_options(event.into(), false, false, enable)
     }
 
     // Output functions
@@ -1955,6 +1945,55 @@ impl<'lt> AnyPin<'lt> {
         });
     }
 
+    fn clear_interrupt(&self) {
+        self.bank().write_interrupt_status_clear(self.mask());
+    }
+
+    fn with_gpio_lock<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        // If the pin is listening, we need to take a critical section to prevent racing
+        // with the interrupt handler.
+        if is_int_enabled(self.number()) {
+            GPIO_LOCK.lock(f)
+        } else {
+            f()
+        }
+    }
+
+    fn listen_with_options(
+        &self,
+        event: Event,
+        int_enable: bool,
+        nmi_enable: bool,
+        wake_up_from_light_sleep: bool,
+    ) -> Result<(), WakeConfigError> {
+        if wake_up_from_light_sleep {
+            match event {
+                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
+                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
+                }
+                _ => {}
+            }
+        }
+
+        self.with_gpio_lock(|| {
+            // Clear the interrupt status bit for this Pin, just in case the user forgot.
+            // Since we disabled the interrupt in the handler, it's not possible to
+            // trigger a new interrupt before we re-enable it here.
+            self.clear_interrupt();
+
+            set_int_enable(
+                self.number(),
+                Some(gpio_intr_enable(int_enable, nmi_enable)),
+                event as u8,
+                wake_up_from_light_sleep,
+            );
+        });
+        Ok(())
+    }
+
     #[inline]
     fn apply_output_config(&self, config: &OutputConfig) {
         let pull_up = config.pull == Pull::Up;
@@ -1970,11 +2009,11 @@ impl<'lt> AnyPin<'lt> {
             w
         });
 
-        let gpio = GPIO::regs();
-
-        gpio.pin(self.number() as usize).modify(|_, w| {
-            w.pad_driver()
-                .bit(config.drive_mode == DriveMode::OpenDrain)
+        self.with_gpio_lock(|| {
+            GPIO::regs().pin(self.number() as usize).modify(|_, w| {
+                w.pad_driver()
+                    .bit(config.drive_mode == DriveMode::OpenDrain)
+            });
         });
     }
 

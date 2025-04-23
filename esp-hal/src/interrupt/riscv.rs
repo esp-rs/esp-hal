@@ -13,7 +13,6 @@
 //! ```
 
 pub use esp_riscv_rt::TrapFrame;
-pub(crate) use esp_riscv_rt::riscv::interrupt::free;
 use riscv::register::{mcause, mtvec};
 
 #[cfg(not(plic))]

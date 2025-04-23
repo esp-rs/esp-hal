@@ -127,14 +127,6 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_hal_embassy::init(timg0.timer0);
 
-        // We need to enable the GPIO interrupt, otherwise the async Future's
-        // setup or Drop implementation hangs.
-        esp_hal::interrupt::enable(
-            esp_hal::peripherals::Interrupt::GPIO,
-            esp_hal::interrupt::Priority::Priority1,
-        )
-        .unwrap();
-
         let counter = drive_pins(gpio1, gpio2).await;
 
         // GPIO is bound to something else, so we don't expect the async API to work.
