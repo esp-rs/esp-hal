@@ -853,6 +853,33 @@ impl<'d, Dm> Spi<'d, Dm>
 where
     Dm: DriverMode,
 {
+    fn connect_sio_pin(
+        &self,
+        pin: impl PeripheralOutput<'d>,
+        in_signal: InputSignal,
+        out_signal: OutputSignal,
+    ) -> PinGuard {
+        let pin = pin.into();
+
+        pin.apply_input_config(&InputConfig::default());
+        pin.apply_output_config(&OutputConfig::default());
+
+        pin.set_input_enable(true);
+        pin.set_output_enable(false);
+
+        in_signal.connect_to(&pin);
+        pin.connect_with_guard(out_signal)
+    }
+
+    fn connect_output_pin(&self, pin: impl PeripheralOutput<'d>, signal: OutputSignal) -> PinGuard {
+        let pin = pin.into();
+
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true); // TODO turn this bool into a Yes/No/PeripheralControl trio
+
+        pin.connect_with_guard(signal)
+    }
+
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
@@ -860,12 +887,7 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
     pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
-        let sclk = sclk.into();
-
-        sclk.apply_output_config(&OutputConfig::default());
-        sclk.set_output_enable(true);
-
-        self.pins.sclk_pin = sclk.connect_with_guard(self.driver().info.sclk);
+        self.pins.sclk_pin = self.connect_output_pin(sclk, self.driver().info.sclk);
 
         self
     }
@@ -879,12 +901,7 @@ where
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
-        let mosi = mosi.into();
-
-        mosi.apply_output_config(&OutputConfig::default());
-        mosi.set_output_enable(true); // TODO turn this bool into a Yes/No/PeripheralControl trio
-
-        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
+        self.pins.mosi_pin = self.connect_output_pin(mosi, self.driver().info.mosi);
 
         self
     }
@@ -922,16 +939,8 @@ where
     /// Note: You do not need to call [Self::with_mosi] when this is used.
     #[instability::unstable]
     pub fn with_sio0(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
-        let mosi = mosi.into();
-
-        mosi.apply_input_config(&InputConfig::default());
-        mosi.apply_output_config(&OutputConfig::default());
-
-        mosi.set_input_enable(true);
-        mosi.set_output_enable(false);
-
-        self.driver().info.sio0_input.connect_to(&mosi);
-        self.pins.mosi_pin = mosi.connect_with_guard(self.driver().info.mosi);
+        self.pins.mosi_pin =
+            self.connect_sio_pin(mosi, self.driver().info.sio0_input, self.driver().info.mosi);
 
         self
     }
@@ -950,16 +959,11 @@ where
     /// Note: You do not need to call [Self::with_miso] when this is used.
     #[instability::unstable]
     pub fn with_sio1(mut self, sio1: impl PeripheralOutput<'d>) -> Self {
-        let sio1 = sio1.into();
-
-        sio1.apply_input_config(&InputConfig::default());
-        sio1.apply_output_config(&OutputConfig::default());
-
-        sio1.set_input_enable(true);
-        sio1.set_output_enable(false);
-
-        self.driver().info.miso.connect_to(&sio1);
-        self.pins.sio1_pin = sio1.connect_with_guard(self.driver().info.sio1_output);
+        self.pins.sio1_pin = self.connect_sio_pin(
+            sio1,
+            self.driver().info.miso,
+            self.driver().info.sio1_output,
+        );
 
         self
     }
@@ -968,27 +972,13 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO2 output and input signals.
-    ///
-    /// # Current Stability Limitations
-    /// QSPI operations are unstable, associated pins configuration is
-    /// inefficient.
     #[instability::unstable]
     pub fn with_sio2(mut self, sio2: impl PeripheralOutput<'d>) -> Self {
-        // TODO: panic if not QSPI?
-        let sio2 = sio2.into();
-
-        sio2.apply_input_config(&InputConfig::default());
-        sio2.apply_output_config(&OutputConfig::default());
-
-        sio2.set_input_enable(true);
-        sio2.set_output_enable(false);
-
-        unwrap!(self.driver().info.sio2_input).connect_to(&sio2);
-        self.pins.sio2_pin = self
-            .driver()
-            .info
-            .sio2_output
-            .map(|signal| sio2.connect_with_guard(signal));
+        self.pins.sio2_pin = Some(self.connect_sio_pin(
+            sio2,
+            unwrap!(self.driver().info.sio2_input),
+            unwrap!(self.driver().info.sio2_output),
+        ));
 
         self
     }
@@ -997,27 +987,13 @@ where
     ///
     /// Enables both input and output functionality for the pin, and connects it
     /// to the SIO3 output and input signals.
-    ///
-    /// # Current Stability Limitations
-    /// QSPI operations are unstable, associated pins configuration is
-    /// inefficient.
     #[instability::unstable]
     pub fn with_sio3(mut self, sio3: impl PeripheralOutput<'d>) -> Self {
-        // TODO: panic if not QSPI?
-        let sio3 = sio3.into();
-
-        sio3.apply_input_config(&InputConfig::default());
-        sio3.apply_output_config(&OutputConfig::default());
-
-        sio3.set_input_enable(true);
-        sio3.set_output_enable(false);
-
-        unwrap!(self.driver().info.sio3_input).connect_to(&sio3);
-        self.pins.sio3_pin = self
-            .driver()
-            .info
-            .sio3_output
-            .map(|signal| sio3.connect_with_guard(signal));
+        self.pins.sio3_pin = Some(self.connect_sio_pin(
+            sio3,
+            unwrap!(self.driver().info.sio3_input),
+            unwrap!(self.driver().info.sio3_output),
+        ));
 
         self
     }
@@ -1035,13 +1011,7 @@ where
     /// mechanism to select which CS line to use.
     #[instability::unstable]
     pub fn with_cs(mut self, cs: impl PeripheralOutput<'d>) -> Self {
-        let cs = cs.into();
-
-        cs.apply_output_config(&OutputConfig::default());
-        cs.set_output_enable(true);
-
-        self.pins.cs_pin = cs.connect_with_guard(self.driver().info.cs[0]);
-
+        self.pins.cs_pin = self.connect_output_pin(cs, self.driver().info.cs[0]);
         self
     }
 
