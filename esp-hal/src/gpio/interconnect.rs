@@ -90,7 +90,8 @@
 //!   GPIOs can be configured differently. The peripheral drivers will only
 //!   support a single connection (that is, they disconnect previously
 //!   configured signals on repeat calls to the same function), but you can use
-//!   [`gpio::OutputSignal::connect_to`] to connect multiple GPIOs to the same
+//!   `esp_hal::gpio::OutputSignal::connect_to` (note that the type is currently
+//!   hidden from the documentation) to connect multiple GPIOs to the same
 //!   output signal.
 //! - A GPIO input signal can be connected to any number of peripheral inputs.
 //! - A GPIO output can be driven by only one peripheral output.
