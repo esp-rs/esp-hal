@@ -129,6 +129,19 @@ mod tests {
             .start_app_core(
                 unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) },
                 move || {
+                    // app core starts with interrupts disabled
+                    unsafe {
+                        esp_hal::xtensa_lx::interrupt::enable_mask(
+                            esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level1.mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2
+                                    .mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level3
+                                    .mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6
+                                    .mask(),
+                        );
+                    }
+
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
                     let _init = esp_wifi::init(
                         timg0.timer1,

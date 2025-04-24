@@ -214,6 +214,11 @@ name              = "esp_wifi_ble_controller"
 harness           = false
 required-features = ["esp-wifi", "esp-alloc"]
 
+[[test]]
+name              = "esp_wifi_init"
+harness           = false
+required-features = ["esp-wifi", "esp-alloc"]
+
 [dependencies]
 allocator-api2    = { version = "0.2.0", default-features = false, features = ["alloc"] }
 cfg-if             = "1.0.0"

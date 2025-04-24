@@ -704,7 +704,7 @@ mod classic {
     }
 
     /// Get the current run level (the level below which interrupts are masked).
-    pub(crate) fn current_runlevel() -> Priority {
+    pub fn current_runlevel() -> Priority {
         let intr = INTERRUPT_CORE0::regs();
         let prev_interrupt_priority = intr.cpu_int_thresh().read().bits().saturating_sub(1) as u8;
 
@@ -872,7 +872,7 @@ mod plic {
     }
 
     /// Get the current run level (the level below which interrupts are masked).
-    pub(crate) fn current_runlevel() -> Priority {
+    pub fn current_runlevel() -> Priority {
         let prev_interrupt_priority = PLIC_MX::regs()
             .mxint_thresh()
             .read()

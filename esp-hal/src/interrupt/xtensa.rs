@@ -333,7 +333,7 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 }
 
 /// Get the current run level (the level below which interrupts are masked).
-pub(crate) fn current_runlevel() -> Priority {
+pub fn current_runlevel() -> Priority {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
