@@ -13,7 +13,8 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 use crate::efuse::Efuse;
 use crate::{
-    Async, Blocking,
+    Async,
+    Blocking,
     analog::adc::asynch::AdcFuture,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt},

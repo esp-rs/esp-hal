@@ -42,8 +42,7 @@
 //! ```
 
 pub use self::fields::*;
-use crate::soc::efuse_field::EfuseField;
-use crate::{analog::adc::Attenuation, peripherals::EFUSE};
+use crate::{analog::adc::Attenuation, peripherals::EFUSE, soc::efuse_field::EfuseField};
 
 mod fields;
 
@@ -82,11 +81,7 @@ impl Efuse {
     /// //esp_efuse_rtc_calib_get_ver
     pub fn rtc_calib_version() -> u8 {
         let (_major, minor) = Self::block_version();
-        if minor >= 2 {
-            1
-        } else {
-            0
-        }
+        if minor >= 2 { 1 } else { 0 }
     }
 
     /// Get ADC initial code for specified attenuation from efuse
