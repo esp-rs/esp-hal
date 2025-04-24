@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
 - Renamed `Flex::enable_input` to `set_input_enable` (#3387)
 - Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
+- Update `defmt` to 1.0 (#3416)
 
 ### Fixed
 

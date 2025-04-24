@@ -19,7 +19,7 @@ esp-hal            = { path = "../esp-hal", features = ["unstable", "log"] }
 esp-hal-embassy    = { path = "../esp-hal-embassy" }
 esp-println        = { path = "../esp-println", features = ["log"] }
 lis3dh-async       = "0.9.3"
-ssd1306            = "0.9.0"
+ssd1306            = "0.10.0"
 
 [features]
 unstable = []

@@ -17,6 +17,6 @@ test  = false
 
 [dependencies]
 critical-section  = "1.2.0"
-document-features = "0.2.10"
+document-features = "0.2.11"
 
 [features]
