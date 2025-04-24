@@ -7,6 +7,7 @@
 #![no_std]
 #![no_main]
 
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(target_arch = "riscv32")]
 use esp_hal::riscv::interrupt::free as interrupt_free;
 #[cfg(target_arch = "xtensa")]
@@ -19,28 +20,42 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
+use esp_wifi::InitializationError;
 use hil_test as _;
-use portable_atomic::AtomicUsize;
 use static_cell::StaticCell;
 
-static ASYNC_TEST_STATE: AtomicUsize = AtomicUsize::new(0);
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
 
 #[embassy_executor::task]
-async fn try_init(timer: TIMG0<'static>, rng: RNG<'static>, radio_clk: RADIO_CLK<'static>) {
+async fn try_init(
+    signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
+    timer: TIMG0<'static>,
+    rng: RNG<'static>,
+    radio_clk: RADIO_CLK<'static>,
+) {
     let timg0 = TimerGroup::new(timer);
 
-    defmt::info!("before");
     let init = esp_wifi::init(timg0.timer0, Rng::new(rng), radio_clk);
-    defmt::info!("after {}", init.is_ok());
 
     match init {
-        Ok(_) => ASYNC_TEST_STATE.store(1, core::sync::atomic::Ordering::Relaxed),
-        Err(_) => ASYNC_TEST_STATE.store(2, core::sync::atomic::Ordering::Relaxed),
+        Ok(_) => {
+            signal.signal(None);
+        }
+        Err(err) => {
+            signal.signal(Some(err));
+        }
     }
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
     use super::*;
 
@@ -87,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn test_init_fails_in_interrupt_executor_task(peripherals: Peripherals) {
+    async fn test_init_fails_in_interrupt_executor_task(peripherals: Peripherals) {
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
         static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<1>> = StaticCell::new();
@@ -95,20 +110,24 @@ mod tests {
         let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
         let spawner = executor_core0.start(Priority::Priority1);
+
+        let signal =
+            mk_static!(Signal<CriticalSectionRawMutex, Option<InitializationError>>, Signal::new());
+
         spawner
             .spawn(try_init(
+                signal,
                 peripherals.TIMG0,
                 peripherals.RNG,
                 peripherals.RADIO_CLK,
             ))
             .ok();
 
-        loop {
-            if ASYNC_TEST_STATE.load(core::sync::atomic::Ordering::Relaxed) != 0 {
-                break;
-            }
-        }
+        let res = signal.wait().await;
 
-        assert!(ASYNC_TEST_STATE.load(core::sync::atomic::Ordering::Relaxed) == 2);
+        assert!(matches!(
+            res,
+            Some(esp_wifi::InitializationError::InterruptsDisabled),
+        ));
     }
 }
