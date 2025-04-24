@@ -294,12 +294,12 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         controller_task_stack_size: 4096,
-        controller_task_prio: 23,
+        controller_task_prio: 110,
         hci_uart_no: 1,
         hci_uart_baudrate: 921600,
         scan_duplicate_mode: 0,
         scan_duplicate_type: 0,
-        normal_adv_size: 100,
+        normal_adv_size: 200,
         mesh_adv_size: 0,
         send_adv_reserved_size: 1000,
         controller_debug_flag: 0,
@@ -309,7 +309,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         bt_sco_datapath: 0,
         auto_latency: false,
         bt_legacy_auth_vs_evt: false,
-        bt_max_sync_conn: 0,
+        bt_max_sync_conn: 1,
         ble_sca: 1,
         pcm_role: 0,
         pcm_polar: 0,
