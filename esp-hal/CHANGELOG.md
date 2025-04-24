@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data transfer functions in the following modules now accept `AsRef<[u8]>` and `AsMut<[u8]>` in place of slices (#3415)
   - `spi::master::{Spi, SpiDmaBus}`
   - `uart::{Uart, UartTx, UartRx}`
+  - `i2c::master::I2c`
 
 ### Fixed
 

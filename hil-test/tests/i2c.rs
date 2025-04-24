@@ -60,7 +60,9 @@ mod tests {
             Err(Error::AddressInvalid(I2cAddress::SevenBit(0x80)))
         );
         assert_eq!(
-            ctx.i2c.write_read(0x80, &[0x77], &mut [0; 1]),
+            // We can even pass arrays, not just slices! That isn't meaningful for the read buffer,
+            // but it's possible.
+            ctx.i2c.write_read(0x80, [0x77], [0; 1]),
             Err(Error::AddressInvalid(I2cAddress::SevenBit(0x80)))
         );
     }
