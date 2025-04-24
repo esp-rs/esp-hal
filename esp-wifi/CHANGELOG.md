@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Allow `Configuration::None`, set country early, changed default power-save-mode to None (#3364)
 
+- Enterprise WPA fixed for ESP32-S2 (#3406)
+
 ### Removed
 
 ## [0.13.0] - 2025-02-24
