@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#3415)
 - Data transfer functions in the following modules now accept `AsRef<[u8]>` and `AsMut<[u8]>` in place of slices (#3415)
   - `spi::master::{Spi, SpiDmaBus}`
+  - `uart::{Uart, UartTx, UartRx}`
 
 ### Fixed
 
