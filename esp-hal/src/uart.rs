@@ -623,7 +623,8 @@ impl<'d> UartTx<'d, Async> {
         // We need to loop in case the TX empty interrupt was fired but not cleared
         // before, but the FIFO itself was filled up by a previous write.
         let space = loop {
-            let space = Info::UART_FIFO_SIZE - self.tx_fifo_count();
+            let tx_fifo_count = self.uart.info().tx_fifo_count();
+            let space = Info::UART_FIFO_SIZE - tx_fifo_count;
             if space != 0 {
                 break space;
             }
@@ -633,7 +634,9 @@ impl<'d> UartTx<'d, Async> {
         let free = (space as usize).min(bytes.len());
 
         for &byte in &bytes[..free] {
-            self.regs()
+            self.uart
+                .info()
+                .regs()
                 .fifo()
                 .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
         }
@@ -654,7 +657,7 @@ impl<'d> UartTx<'d, Async> {
         // Nothing is guaranteed to clear the Done status, so let's loop here in case Tx
         // was Done before the last write operation that pushed data into the
         // FIFO.
-        while self.tx_fifo_count() > 0 {
+        while self.uart.info().tx_fifo_count() > 0 {
             UartTxFuture::new(self.uart.reborrow(), TxEvent::Done).await;
         }
 
@@ -725,33 +728,7 @@ where
     /// write operation.
     #[instability::unstable]
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
-        if data.is_empty() {
-            return Ok(0);
-        }
-
-        while self.tx_fifo_count() >= Info::UART_FIFO_SIZE {}
-
-        let space = ((Info::UART_FIFO_SIZE - self.tx_fifo_count()) as usize).min(data.len());
-        for &byte in &data[..space] {
-            self.write_byte(byte)?;
-        }
-
-        Ok(space)
-    }
-
-    fn write_byte(&mut self, word: u8) -> Result<(), TxError> {
-        self.regs()
-            .fifo()
-            .write(|w| unsafe { w.rxfifo_rd_byte().bits(word) });
-
-        Ok(())
-    }
-
-    #[allow(clippy::useless_conversion)]
-    /// Returns the number of bytes currently in the TX FIFO for this UART
-    /// instance.
-    fn tx_fifo_count(&self) -> u16 {
-        self.regs().status().read().txfifo_cnt().bits().into()
+        self.uart.info().write(data)
     }
 
     /// Flush the transmit buffer.
@@ -760,7 +737,7 @@ where
     /// transmitted.
     #[instability::unstable]
     pub fn flush(&mut self) -> Result<(), TxError> {
-        while self.tx_fifo_count() > 0 {}
+        while self.uart.info().tx_fifo_count() > 0 {}
         self.flush_last_byte();
         Ok(())
     }
@@ -902,7 +879,7 @@ impl<'d> UartRx<'d, Async> {
         preferred: usize,
         listen_for_timeout: bool,
     ) -> Result<(), RxError> {
-        while self.rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
+        while self.uart.info().rx_fifo_count() < (minimum as u16).min(Info::RX_FIFO_MAX_THRHD) {
             let amount = u16::try_from(preferred)
                 .unwrap_or(Info::RX_FIFO_MAX_THRHD)
                 .min(Info::RX_FIFO_MAX_THRHD);
@@ -1007,7 +984,7 @@ impl<'d> UartRx<'d, Async> {
             self.wait_for_buffered_data(buf.len(), buf.len(), false)
                 .await?;
 
-            let read = self.read_buffered(buf)?;
+            let read = self.uart.info().read_buffered(buf)?;
             buf = &mut buf[read..];
         }
 
@@ -1076,20 +1053,7 @@ where
     /// If a FIFO overflow is detected, the RX FIFO is reset.
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
-        let errors = RxEvent::FifoOvf
-            | RxEvent::FifoTout
-            | RxEvent::GlitchDetected
-            | RxEvent::FrameError
-            | RxEvent::ParityError;
-        let events = self.uart.info().rx_events().intersection(errors);
-        let result = rx_event_check_for_error(events);
-        if result.is_err() {
-            self.uart.info().clear_rx_events(errors);
-            if events.contains(RxEvent::FifoOvf) {
-                self.uart.info().rxfifo_reset();
-            }
-        }
-        result
+        self.uart.info().check_for_errors()
     }
 
     /// Read bytes.
@@ -1112,16 +1076,7 @@ where
     /// the FIFO are not modified.
     #[instability::unstable]
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        if buf.is_empty() {
-            return Ok(0);
-        }
-
-        while self.rx_fifo_count() == 0 {
-            // Block until we received at least one byte
-            self.check_for_errors()?;
-        }
-
-        self.read_buffered(buf)
+        self.uart.info().read(buf)
     }
 
     /// Read already received bytes.
@@ -1143,43 +1098,7 @@ where
     /// the FIFO are not modified.
     #[instability::unstable]
     pub fn read_buffered(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
-        // Get the count first, to avoid accidentally reading a corrupted byte received
-        // after the error check.
-        let to_read = (self.rx_fifo_count() as usize).min(buf.len());
-        self.check_for_errors()?;
-
-        for byte_into in buf[..to_read].iter_mut() {
-            *byte_into = self.uart.info().read_next_from_fifo();
-        }
-
-        Ok(to_read)
-    }
-
-    #[cfg(not(esp32))]
-    #[allow(clippy::unnecessary_cast)]
-    fn rx_fifo_count(&self) -> u16 {
-        self.regs().status().read().rxfifo_cnt().bits() as u16
-    }
-
-    #[cfg(esp32)]
-    fn rx_fifo_count(&self) -> u16 {
-        let fifo_cnt = self.regs().status().read().rxfifo_cnt().bits();
-
-        // Calculate the real count based on the FIFO read and write offset address:
-        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
-        let status = self.regs().mem_rx_status().read();
-        let rd_addr: u16 = status.mem_rx_rd_addr().bits();
-        let wr_addr: u16 = status.mem_rx_wr_addr().bits();
-
-        if wr_addr > rd_addr {
-            wr_addr - rd_addr
-        } else if wr_addr < rd_addr {
-            (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
-        } else if fifo_cnt > 0 {
-            Info::UART_FIFO_SIZE
-        } else {
-            0
-        }
+        self.uart.info().read_buffered(buf)
     }
 
     /// Disables all RX-related interrupts for this UART instance.
@@ -1895,7 +1814,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.rx_fifo_count() > 0)
+        Ok(self.uart.info().rx_fifo_count() > 0)
     }
 }
 
@@ -2969,6 +2888,103 @@ impl Info {
         }
 
         access_fifo_register(|| fifo_reg.read().rxfifo_rd_byte().bits())
+    }
+
+    #[allow(clippy::useless_conversion)]
+    fn tx_fifo_count(&self) -> u16 {
+        u16::from(self.regs().status().read().txfifo_cnt().bits())
+    }
+
+    fn write_byte(&self, byte: u8) {
+        self.regs()
+            .fifo()
+            .write(|w| unsafe { w.rxfifo_rd_byte().bits(byte) });
+    }
+
+    fn check_for_errors(&self) -> Result<(), RxError> {
+        let errors = RxEvent::FifoOvf
+            | RxEvent::FifoTout
+            | RxEvent::GlitchDetected
+            | RxEvent::FrameError
+            | RxEvent::ParityError;
+        let events = self.rx_events().intersection(errors);
+        let result = rx_event_check_for_error(events);
+        if result.is_err() {
+            self.clear_rx_events(errors);
+            if events.contains(RxEvent::FifoOvf) {
+                self.rxfifo_reset();
+            }
+        }
+        result
+    }
+
+    #[cfg(not(esp32))]
+    #[allow(clippy::unnecessary_cast)]
+    fn rx_fifo_count(&self) -> u16 {
+        self.regs().status().read().rxfifo_cnt().bits() as u16
+    }
+
+    #[cfg(esp32)]
+    fn rx_fifo_count(&self) -> u16 {
+        let fifo_cnt = self.regs().status().read().rxfifo_cnt().bits();
+
+        // Calculate the real count based on the FIFO read and write offset address:
+        // https://docs.espressif.com/projects/esp-chip-errata/en/latest/esp32/03-errata-description/esp32/uart-fifo-cnt-indicates-data-length-incorrectly.html
+        let status = self.regs().mem_rx_status().read();
+        let rd_addr: u16 = status.mem_rx_rd_addr().bits();
+        let wr_addr: u16 = status.mem_rx_wr_addr().bits();
+
+        if wr_addr > rd_addr {
+            wr_addr - rd_addr
+        } else if wr_addr < rd_addr {
+            (wr_addr + Info::UART_FIFO_SIZE) - rd_addr
+        } else if fifo_cnt > 0 {
+            Info::UART_FIFO_SIZE
+        } else {
+            0
+        }
+    }
+
+    fn write(&self, data: &[u8]) -> Result<usize, TxError> {
+        if data.is_empty() {
+            return Ok(0);
+        }
+
+        while self.tx_fifo_count() >= Info::UART_FIFO_SIZE {}
+
+        let space = (Info::UART_FIFO_SIZE - self.tx_fifo_count()) as usize;
+        let to_write = space.min(data.len());
+        for &byte in &data[..to_write] {
+            self.write_byte(byte);
+        }
+
+        Ok(to_write)
+    }
+
+    fn read(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        while self.rx_fifo_count() == 0 {
+            // Block until we received at least one byte
+            self.check_for_errors()?;
+        }
+
+        self.read_buffered(buf)
+    }
+
+    fn read_buffered(&self, buf: &mut [u8]) -> Result<usize, RxError> {
+        // Get the count first, to avoid accidentally reading a corrupted byte received
+        // after the error check.
+        let to_read = (self.rx_fifo_count() as usize).min(buf.len());
+        self.check_for_errors()?;
+
+        for byte_into in buf[..to_read].iter_mut() {
+            *byte_into = self.read_next_from_fifo();
+        }
+
+        Ok(to_read)
     }
 }
 

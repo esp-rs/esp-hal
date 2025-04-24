@@ -829,16 +829,7 @@ impl<'d> Spi<'d, Async> {
 
     /// Waits for the completion of previous operations.
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        let driver = self.driver();
-
-        if !driver.busy() {
-            return Ok(());
-        }
-
-        let future = SpiFuture::setup(&driver).await;
-        future.await;
-
-        Ok(())
+        self.driver().flush_async().await
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave.
@@ -850,7 +841,7 @@ impl<'d> Spi<'d, Async> {
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.flush_async().await?;
+        self.driver().flush_async().await?;
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place_async(words).await
     }
@@ -1056,8 +1047,9 @@ where
         self.driver().read(words)
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave.
-    pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+    /// Sends `words` to the slave. The received data will be written to
+    /// `words`, overwriting its contents.
+    pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().transfer(words)
     }
@@ -2594,7 +2586,7 @@ mod ehal1 {
         }
 
         fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-            self.driver().transfer(words).map(|_| ())
+            self.driver().transfer(words)
         }
 
         fn flush(&mut self) -> Result<(), Self::Error> {
@@ -3459,6 +3451,17 @@ impl Driver {
 
     // Check if the bus is busy and if it is wait for it to be idle
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    async fn flush_async(&self) -> Result<(), Error> {
+        if self.busy() {
+            let future = SpiFuture::setup(self).await;
+            future.await;
+        }
+
+        Ok(())
+    }
+
+    // Check if the bus is busy and if it is wait for it to be idle
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     fn flush(&self) -> Result<(), Error> {
         while self.busy() {
             // wait for bus to be clear
@@ -3467,14 +3470,14 @@ impl Driver {
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-    fn transfer<'w>(&self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
+    fn transfer(&self, words: &mut [u8]) -> Result<(), Error> {
         for chunk in words.chunks_mut(FIFO_SIZE) {
             self.write(chunk)?;
             self.flush()?;
             self.read_from_fifo(chunk)?;
         }
 
-        Ok(words)
+        Ok(())
     }
 
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
