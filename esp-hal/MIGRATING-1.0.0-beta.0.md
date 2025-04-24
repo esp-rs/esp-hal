@@ -292,6 +292,17 @@ The data and ctrl pins of the camera have been split out into individual `with_*
 + camera.with_data0(peripherals.GPIO11).with_data1(peripherals.GPIO9).with_dataX();
 ```
 
+## SPI changes
+
+`Spi::transfer` no longer returns the input buffer.
+
+```diff
+-let received = spi.transfer(&mut data[..]).unwrap();
+-work_with(received);
++spi.transfer(&mut data[..]).unwrap();
++work_with(&data[..]);
+```
+
 ## Configuration changes
 
 Some configuration options are now unstable and they require the `unstable` feature to be
