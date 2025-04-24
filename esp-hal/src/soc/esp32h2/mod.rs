@@ -33,13 +33,12 @@ macro_rules! trm_link {
     () => { "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf" };
 }
 
-pub use chip;
-
-#[allow(unused)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x60010000;
 }
 
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;
 
