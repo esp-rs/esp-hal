@@ -21,13 +21,13 @@ bench = false
 test  = false
 
 [dependencies]
-bitflags                 = "2.8.0"
-bytemuck                 = "1.21.0"
-bitfield                 = "0.18.1"
+bitflags                 = "2.9.0"
+bytemuck                 = "1.22.0"
+bitfield                 = "0.19.0"
 cfg-if                   = "1.0.0"
 critical-section         = { version = "1.2.0", features = ["restore-state-u32"] }
-defmt                    = { version = "0.3.10", optional = true }
-delegate                 = "0.13.2"
+defmt                    = { version = "1.0.1", optional = true }
+delegate                 = "0.13.3"
 digest                   = { version = "0.10.7", default-features = false, optional = true }
 document-features        = "0.2.11"
 embassy-embedded-hal     = { version = "0.3.0", optional = true }
@@ -47,7 +47,7 @@ esp-metadata             = { version = "0.6.0", path = "../esp-metadata", defaul
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
 fugit                    = "0.3.7"
 instability              = "0.3.7"
-log                      = { version = "0.4.26", optional = true }
+log                      = { version = "0.4.27", optional = true }
 nb                       = "1.1.0"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11.0", default-features = false }
@@ -79,15 +79,15 @@ xtensa-lx        = { version = "0.10.0", path = "../xtensa-lx" }
 xtensa-lx-rt     = { version = "0.18.0", path = "../xtensa-lx-rt" }
 
 [build-dependencies]
-basic-toml   = "0.1.9"
+basic-toml   = "0.1.10"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.2.0", path = "../esp-build" }
 esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
-serde        = { version = "1.0.218", features = ["derive"] }
+serde        = { version = "1.0.219", features = ["derive"] }
 
 [dev-dependencies]
-jiff = { version = "0.2.2", default-features = false, features = ["static"] }
+jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
 default = []

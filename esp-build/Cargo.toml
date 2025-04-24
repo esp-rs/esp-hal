@@ -12,6 +12,6 @@ license       = "MIT OR Apache-2.0"
 proc-macro = true
 
 [dependencies]
-quote     = "1.0.38"
-syn       = { version = "2.0.96", features = ["fold", "full"] }
+quote     = "1.0.40"
+syn       = { version = "2.0.100", features = ["fold", "full"] }
 termcolor = "1.4.1"
