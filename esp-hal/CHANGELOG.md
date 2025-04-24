@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Added `Flex::enable_output` (#3387)
 - Added `Flex::set_output_enable` (#3387)
+- ESP32-H2: Support for ADC calibration (#3414)
 
 ### Changed
 
