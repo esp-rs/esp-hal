@@ -829,16 +829,7 @@ impl<'d> Spi<'d, Async> {
 
     /// Waits for the completion of previous operations.
     pub async fn flush_async(&mut self) -> Result<(), Error> {
-        let driver = self.driver();
-
-        if !driver.busy() {
-            return Ok(());
-        }
-
-        let future = SpiFuture::setup(&driver).await;
-        future.await;
-
-        Ok(())
+        self.driver().flush_async().await
     }
 
     /// Sends `words` to the slave. Returns the `words` received from the slave.
@@ -850,7 +841,7 @@ impl<'d> Spi<'d, Async> {
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
-        self.flush_async().await?;
+        self.driver().flush_async().await?;
         self.driver().setup_full_duplex()?;
         self.driver().transfer_in_place_async(words).await
     }
@@ -3455,6 +3446,17 @@ impl Driver {
 
     fn busy(&self) -> bool {
         self.regs().cmd().read().usr().bit_is_set()
+    }
+
+    // Check if the bus is busy and if it is wait for it to be idle
+    #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+    async fn flush_async(&self) -> Result<(), Error> {
+        if self.busy() {
+            let future = SpiFuture::setup(&self).await;
+            future.await;
+        }
+
+        Ok(())
     }
 
     // Check if the bus is busy and if it is wait for it to be idle
