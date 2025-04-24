@@ -838,12 +838,19 @@ impl<'d> Spi<'d, Async> {
     /// amount of data may have been transferred before the Future is
     /// dropped. Dropping the future may block for a short while to ensure
     /// the transfer is aborted.
-    pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        // We need to flush because the blocking transfer functions may return while a
-        // transfer is still in progress.
-        self.driver().flush_async().await?;
-        self.driver().setup_full_duplex()?;
-        self.driver().transfer_in_place_async(words).await
+    pub async fn transfer_in_place_async(
+        &mut self,
+        mut words: impl AsMut<[u8]>,
+    ) -> Result<(), Error> {
+        async fn inner(driver: Driver, words: &mut [u8]) -> Result<(), Error> {
+            // We need to flush because the blocking transfer functions may return while a
+            // transfer is still in progress.
+            driver.flush_async().await?;
+            driver.setup_full_duplex()?;
+            driver.transfer_in_place_async(words).await
+        }
+
+        inner(self.driver(), words.as_mut()).await
     }
 }
 
@@ -1032,25 +1039,38 @@ where
 
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
-    pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-        self.driver().setup_full_duplex()?;
-        self.driver().write(words)?;
-        self.driver().flush()?;
+    pub fn write(&mut self, words: impl AsRef<[u8]>) -> Result<(), Error> {
+        fn inner(driver: Driver, words: &[u8]) -> Result<(), Error> {
+            driver.flush()?;
+            driver.setup_full_duplex()?;
+            driver.write(words)
+        }
 
-        Ok(())
+        inner(self.driver(), words.as_ref())
     }
 
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
-    pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-        self.driver().setup_full_duplex()?;
-        self.driver().read(words)
+    pub fn read(&mut self, mut words: impl AsMut<[u8]>) -> Result<(), Error> {
+        fn inner(driver: Driver, words: &mut [u8]) -> Result<(), Error> {
+            driver.flush()?;
+            driver.setup_full_duplex()?;
+            driver.read(words)
+        }
+
+        inner(self.driver(), words.as_mut())
     }
 
-    /// Sends `words` to the slave. Returns the `words` received from the slave.
-    pub fn transfer<'w>(&mut self, words: &'w mut [u8]) -> Result<&'w [u8], Error> {
-        self.driver().setup_full_duplex()?;
-        self.driver().transfer(words)
+    /// Sends `words` to the slave. The received data will be written to
+    /// `words`, overwriting its contents.
+    pub fn transfer(&mut self, mut words: impl AsMut<[u8]>) -> Result<(), Error> {
+        fn inner(driver: Driver, words: &mut [u8]) -> Result<(), Error> {
+            driver.setup_full_duplex()?;
+            driver.transfer(words)?;
+            Ok(())
+        }
+
+        inner(self.driver(), words.as_mut())
     }
 
     /// Half-duplex read.
@@ -1068,31 +1088,49 @@ where
         cmd: Command,
         address: Address,
         dummy: u8,
-        buffer: &mut [u8],
+        mut buffer: impl AsMut<[u8]>,
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
+        fn inner(
+            driver: Driver,
+            data_mode: DataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: &mut [u8],
+        ) -> Result<(), Error> {
+            if buffer.len() > FIFO_SIZE {
+                return Err(Error::FifoSizeExeeded);
+            }
+
+            if buffer.is_empty() {
+                error!("Half-duplex mode does not support empty buffer");
+                return Err(Error::Unsupported);
+            }
+
+            driver.setup_half_duplex(
+                false,
+                cmd,
+                address,
+                false,
+                dummy,
+                buffer.is_empty(),
+                data_mode,
+            )?;
+
+            driver.configure_datalen(buffer.len(), 0);
+            driver.start_operation();
+            driver.flush()?;
+            driver.read_from_fifo(buffer)
         }
 
-        if buffer.is_empty() {
-            error!("Half-duplex mode does not support empty buffer");
-            return Err(Error::Unsupported);
-        }
-
-        self.driver().setup_half_duplex(
-            false,
+        inner(
+            self.driver(),
+            data_mode,
             cmd,
             address,
-            false,
             dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        self.driver().configure_datalen(buffer.len(), 0);
-        self.driver().start_operation();
-        self.driver().flush()?;
-        self.driver().read_from_fifo(buffer)
+            buffer.as_mut(),
+        )
     }
 
     /// Half-duplex write.
@@ -1112,56 +1150,68 @@ where
         cmd: Command,
         address: Address,
         dummy: u8,
-        buffer: &[u8],
+        buffer: impl AsRef<[u8]>,
     ) -> Result<(), Error> {
-        if buffer.len() > FIFO_SIZE {
-            return Err(Error::FifoSizeExeeded);
-        }
+        fn inner(
+            driver: Driver,
+            data_mode: DataMode,
+            cmd: Command,
+            address: Address,
+            dummy: u8,
+            buffer: &[u8],
+        ) -> Result<(), Error> {
+            if buffer.len() > FIFO_SIZE {
+                return Err(Error::FifoSizeExeeded);
+            }
 
-        cfg_if::cfg_if! {
-            if #[cfg(all(esp32, spi_address_workaround))] {
-                let mut buffer = buffer;
-                let mut data_mode = data_mode;
-                let mut address = address;
-                let addr_bytes;
-                if buffer.is_empty() && !address.is_none() {
-                    // If the buffer is empty, we need to send a dummy byte
-                    // to trigger the address phase.
-                    let bytes_to_write = address.width().div_ceil(8);
-                    // The address register is read in big-endian order,
-                    // we have to prepare the emulated write in the same way.
-                    addr_bytes = address.value().to_be_bytes();
-                    buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
-                    data_mode = address.mode();
-                    address = Address::None;
-                }
+            cfg_if::cfg_if! {
+                if #[cfg(all(esp32, spi_address_workaround))] {
+                    let mut buffer = buffer;
+                    let mut data_mode = data_mode;
+                    let mut address = address;
+                    let addr_bytes;
+                    if buffer.is_empty() && !address.is_none() {
+                        // If the buffer is empty, we need to send a dummy byte
+                        // to trigger the address phase.
+                        let bytes_to_write = address.width().div_ceil(8);
+                        // The address register is read in big-endian order,
+                        // we have to prepare the emulated write in the same way.
+                        addr_bytes = address.value().to_be_bytes();
+                        buffer = &addr_bytes[4 - bytes_to_write..][..bytes_to_write];
+                        data_mode = address.mode();
+                        address = Address::None;
+                    }
 
-                if dummy > 0 {
-                    // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
-                    error!("Dummy bits are not supported without data");
-                    return Err(Error::Unsupported);
+                    if dummy > 0 {
+                        // FIXME: https://github.com/esp-rs/esp-hal/issues/2240
+                        error!("Dummy bits are not supported without data");
+                        return Err(Error::Unsupported);
+                    }
                 }
             }
+
+            driver.setup_half_duplex(
+                true,
+                cmd,
+                address,
+                false,
+                dummy,
+                buffer.is_empty(),
+                data_mode,
+            )?;
+
+            if !buffer.is_empty() {
+                // re-using the full-duplex write here
+                driver.write(buffer)?;
+            } else {
+                driver.start_operation();
+            }
+
+            driver.flush()
         }
 
-        self.driver().setup_half_duplex(
-            true,
-            cmd,
-            address,
-            false,
-            dummy,
-            buffer.is_empty(),
-            data_mode,
-        )?;
-
-        if !buffer.is_empty() {
-            // re-using the full-duplex write here
-            self.driver().write(buffer)?;
-        } else {
-            self.driver().start_operation();
-        }
-
-        self.driver().flush()
+        let driver = self.driver();
+        inner(driver, data_mode, cmd, address, dummy, buffer.as_ref())
     }
 
     fn driver(&self) -> Driver {
@@ -2047,117 +2097,148 @@ mod dma {
 
         /// Fill the given buffer with data from the bus.
         #[instability::unstable]
-        pub async fn read_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            self.spi_dma.wait_for_idle_async().await;
-            self.spi_dma.driver().setup_full_duplex()?;
-            let chunk_size = self.rx_buf.capacity();
+        pub async fn read_async(&mut self, mut words: impl AsMut<[u8]>) -> Result<(), Error> {
+            async fn inner(bus: &mut SpiDmaBus<'_, Async>, words: &mut [u8]) -> Result<(), Error> {
+                bus.spi_dma.wait_for_idle_async().await;
+                bus.spi_dma.driver().setup_full_duplex()?;
+                let chunk_size = bus.rx_buf.capacity();
 
-            for chunk in words.chunks_mut(chunk_size) {
-                let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
+                for chunk in words.chunks_mut(chunk_size) {
+                    let mut spi = DropGuard::new(&mut bus.spi_dma, |spi| spi.cancel_transfer());
 
-                unsafe { spi.start_dma_transfer(chunk.len(), 0, &mut self.rx_buf, &mut EmptyBuf)? };
+                    unsafe {
+                        spi.start_dma_transfer(chunk.len(), 0, &mut bus.rx_buf, &mut EmptyBuf)?
+                    };
 
-                spi.wait_for_idle_async().await;
+                    spi.wait_for_idle_async().await;
 
-                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
+                    chunk.copy_from_slice(&bus.rx_buf.as_slice()[..chunk.len()]);
 
-                spi.defuse();
+                    spi.defuse();
+                }
+
+                Ok(())
             }
 
-            Ok(())
+            inner(self, words.as_mut()).await
         }
 
         /// Transmit the given buffer to the bus.
         #[instability::unstable]
-        pub async fn write_async(&mut self, words: &[u8]) -> Result<(), Error> {
-            self.spi_dma.wait_for_idle_async().await;
-            self.spi_dma.driver().setup_full_duplex()?;
+        pub async fn write_async(&mut self, words: impl AsRef<[u8]>) -> Result<(), Error> {
+            async fn inner(bus: &mut SpiDmaBus<'_, Async>, words: &[u8]) -> Result<(), Error> {
+                bus.spi_dma.wait_for_idle_async().await;
+                bus.spi_dma.driver().setup_full_duplex()?;
 
-            let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-            let chunk_size = self.tx_buf.capacity();
+                let mut spi = DropGuard::new(&mut bus.spi_dma, |spi| spi.cancel_transfer());
+                let chunk_size = bus.tx_buf.capacity();
 
-            for chunk in words.chunks(chunk_size) {
-                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+                for chunk in words.chunks(chunk_size) {
+                    bus.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
-                unsafe { spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut self.tx_buf)? };
+                    unsafe {
+                        spi.start_dma_transfer(0, chunk.len(), &mut EmptyBuf, &mut bus.tx_buf)?
+                    };
 
-                spi.wait_for_idle_async().await;
+                    spi.wait_for_idle_async().await;
+                }
+                spi.defuse();
+
+                Ok(())
             }
-            spi.defuse();
 
-            Ok(())
+            inner(self, words.as_ref()).await
         }
 
         /// Transfer by writing out a buffer and reading the response from
         /// the bus into another buffer.
         #[instability::unstable]
-        pub async fn transfer_async(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-            self.spi_dma.wait_for_idle_async().await;
-            self.spi_dma.driver().setup_full_duplex()?;
+        pub async fn transfer_async(
+            &mut self,
+            mut read: impl AsMut<[u8]>,
+            write: impl AsRef<[u8]>,
+        ) -> Result<(), Error> {
+            async fn inner(
+                bus: &mut SpiDmaBus<'_, Async>,
+                read: &mut [u8],
+                write: &[u8],
+            ) -> Result<(), Error> {
+                bus.spi_dma.wait_for_idle_async().await;
+                bus.spi_dma.driver().setup_full_duplex()?;
 
-            let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-            let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
+                let mut spi = DropGuard::new(&mut bus.spi_dma, |spi| spi.cancel_transfer());
+                let chunk_size = min(bus.tx_buf.capacity(), bus.rx_buf.capacity());
 
-            let common_length = min(read.len(), write.len());
-            let (read_common, read_remainder) = read.split_at_mut(common_length);
-            let (write_common, write_remainder) = write.split_at(common_length);
+                let common_length = min(read.len(), write.len());
+                let (read_common, read_remainder) = read.split_at_mut(common_length);
+                let (write_common, write_remainder) = write.split_at(common_length);
 
-            for (read_chunk, write_chunk) in read_common
-                .chunks_mut(chunk_size)
-                .zip(write_common.chunks(chunk_size))
-            {
-                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+                for (read_chunk, write_chunk) in read_common
+                    .chunks_mut(chunk_size)
+                    .zip(write_common.chunks(chunk_size))
+                {
+                    bus.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
-                unsafe {
-                    spi.start_dma_transfer(
-                        read_chunk.len(),
-                        write_chunk.len(),
-                        &mut self.rx_buf,
-                        &mut self.tx_buf,
-                    )?;
+                    unsafe {
+                        spi.start_dma_transfer(
+                            read_chunk.len(),
+                            write_chunk.len(),
+                            &mut bus.rx_buf,
+                            &mut bus.tx_buf,
+                        )?;
+                    }
+                    spi.wait_for_idle_async().await;
+
+                    read_chunk.copy_from_slice(&bus.rx_buf.as_slice()[..read_chunk.len()]);
                 }
-                spi.wait_for_idle_async().await;
 
-                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
+                spi.defuse();
+
+                if !read_remainder.is_empty() {
+                    bus.read_async(read_remainder).await
+                } else if !write_remainder.is_empty() {
+                    bus.write_async(write_remainder).await
+                } else {
+                    Ok(())
+                }
             }
 
-            spi.defuse();
-
-            if !read_remainder.is_empty() {
-                self.read_async(read_remainder).await
-            } else if !write_remainder.is_empty() {
-                self.write_async(write_remainder).await
-            } else {
-                Ok(())
-            }
+            inner(self, read.as_mut(), write.as_ref()).await
         }
 
         /// Transfer by writing out a buffer and reading the response from
         /// the bus into the same buffer.
         #[instability::unstable]
-        pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            self.spi_dma.wait_for_idle_async().await;
-            self.spi_dma.driver().setup_full_duplex()?;
+        pub async fn transfer_in_place_async(
+            &mut self,
+            mut words: impl AsMut<[u8]>,
+        ) -> Result<(), Error> {
+            async fn inner(bus: &mut SpiDmaBus<'_, Async>, words: &mut [u8]) -> Result<(), Error> {
+                bus.spi_dma.wait_for_idle_async().await;
+                bus.spi_dma.driver().setup_full_duplex()?;
 
-            let mut spi = DropGuard::new(&mut self.spi_dma, |spi| spi.cancel_transfer());
-            for chunk in words.chunks_mut(self.tx_buf.capacity()) {
-                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+                let mut spi = DropGuard::new(&mut bus.spi_dma, |spi| spi.cancel_transfer());
+                for chunk in words.chunks_mut(bus.tx_buf.capacity()) {
+                    bus.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
-                unsafe {
-                    spi.start_dma_transfer(
-                        chunk.len(),
-                        chunk.len(),
-                        &mut self.rx_buf,
-                        &mut self.tx_buf,
-                    )?;
+                    unsafe {
+                        spi.start_dma_transfer(
+                            chunk.len(),
+                            chunk.len(),
+                            &mut bus.rx_buf,
+                            &mut bus.tx_buf,
+                        )?;
+                    }
+                    spi.wait_for_idle_async().await;
+                    chunk.copy_from_slice(&bus.rx_buf.as_slice()[..chunk.len()]);
                 }
-                spi.wait_for_idle_async().await;
-                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
+
+                spi.defuse();
+
+                Ok(())
             }
 
-            spi.defuse();
-
-            Ok(())
+            inner(self, words.as_mut()).await
         }
     }
 
@@ -2202,111 +2283,144 @@ mod dma {
 
         /// Reads data from the SPI bus using DMA.
         #[instability::unstable]
-        pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            self.wait_for_idle();
-            self.spi_dma.driver().setup_full_duplex()?;
-            for chunk in words.chunks_mut(self.rx_buf.capacity()) {
-                unsafe {
-                    self.spi_dma.start_dma_transfer(
-                        chunk.len(),
-                        0,
-                        &mut self.rx_buf,
-                        &mut EmptyBuf,
-                    )?;
+        pub fn read(&mut self, mut words: impl AsMut<[u8]>) -> Result<(), Error> {
+            fn inner(
+                bus: &mut SpiDmaBus<'_, impl DriverMode>,
+                words: &mut [u8],
+            ) -> Result<(), Error> {
+                bus.wait_for_idle();
+                bus.spi_dma.driver().setup_full_duplex()?;
+                let chunk_size = bus.rx_buf.capacity();
+
+                for chunk in words.chunks_mut(chunk_size) {
+                    unsafe {
+                        bus.spi_dma.start_dma_transfer(
+                            chunk.len(),
+                            0,
+                            &mut bus.rx_buf,
+                            &mut EmptyBuf,
+                        )?;
+                    }
+
+                    bus.wait_for_idle();
+                    chunk.copy_from_slice(&bus.rx_buf.as_slice()[..chunk.len()]);
                 }
 
-                self.wait_for_idle();
-                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
+                Ok(())
             }
 
-            Ok(())
+            inner(self, words.as_mut())
         }
 
         /// Writes data to the SPI bus using DMA.
         #[instability::unstable]
-        pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
-            self.wait_for_idle();
-            self.spi_dma.driver().setup_full_duplex()?;
-            for chunk in words.chunks(self.tx_buf.capacity()) {
-                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+        pub fn write(&mut self, words: impl AsRef<[u8]>) -> Result<(), Error> {
+            fn inner(bus: &mut SpiDmaBus<'_, impl DriverMode>, words: &[u8]) -> Result<(), Error> {
+                bus.wait_for_idle();
+                bus.spi_dma.driver().setup_full_duplex()?;
 
-                unsafe {
-                    self.spi_dma.start_dma_transfer(
-                        0,
-                        chunk.len(),
-                        &mut EmptyBuf,
-                        &mut self.tx_buf,
-                    )?;
+                for chunk in words.chunks(bus.tx_buf.capacity()) {
+                    bus.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+
+                    unsafe {
+                        bus.spi_dma.start_dma_transfer(
+                            0,
+                            chunk.len(),
+                            &mut EmptyBuf,
+                            &mut bus.tx_buf,
+                        )?;
+                    }
+
+                    bus.wait_for_idle();
                 }
 
-                self.wait_for_idle();
+                Ok(())
             }
 
-            Ok(())
+            inner(self, words.as_ref())
         }
 
         /// Transfers data to and from the SPI bus simultaneously using DMA.
         #[instability::unstable]
-        pub fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Error> {
-            self.wait_for_idle();
-            self.spi_dma.driver().setup_full_duplex()?;
-            let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
+        pub fn transfer(
+            &mut self,
+            mut read: impl AsMut<[u8]>,
+            write: impl AsRef<[u8]>,
+        ) -> Result<(), Error> {
+            fn inner(
+                bus: &mut SpiDmaBus<'_, impl DriverMode>,
+                read: &mut [u8],
+                write: &[u8],
+            ) -> Result<(), Error> {
+                bus.wait_for_idle();
+                bus.spi_dma.driver().setup_full_duplex()?;
+                let chunk_size = min(bus.tx_buf.capacity(), bus.rx_buf.capacity());
 
-            let common_length = min(read.len(), write.len());
-            let (read_common, read_remainder) = read.split_at_mut(common_length);
-            let (write_common, write_remainder) = write.split_at(common_length);
+                let common_length = min(read.len(), write.len());
+                let (read_common, read_remainder) = read.split_at_mut(common_length);
+                let (write_common, write_remainder) = write.split_at(common_length);
 
-            for (read_chunk, write_chunk) in read_common
-                .chunks_mut(chunk_size)
-                .zip(write_common.chunks(chunk_size))
-            {
-                self.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
+                for (read_chunk, write_chunk) in read_common
+                    .chunks_mut(chunk_size)
+                    .zip(write_common.chunks(chunk_size))
+                {
+                    bus.tx_buf.as_mut_slice()[..write_chunk.len()].copy_from_slice(write_chunk);
 
-                unsafe {
-                    self.spi_dma.start_dma_transfer(
-                        read_chunk.len(),
-                        write_chunk.len(),
-                        &mut self.rx_buf,
-                        &mut self.tx_buf,
-                    )?;
+                    unsafe {
+                        bus.spi_dma.start_dma_transfer(
+                            read_chunk.len(),
+                            write_chunk.len(),
+                            &mut bus.rx_buf,
+                            &mut bus.tx_buf,
+                        )?;
+                    }
+                    bus.wait_for_idle();
+
+                    read_chunk.copy_from_slice(&bus.rx_buf.as_slice()[..read_chunk.len()]);
                 }
-                self.wait_for_idle();
 
-                read_chunk.copy_from_slice(&self.rx_buf.as_slice()[..read_chunk.len()]);
+                if !read_remainder.is_empty() {
+                    bus.read(read_remainder)
+                } else if !write_remainder.is_empty() {
+                    bus.write(write_remainder)
+                } else {
+                    Ok(())
+                }
             }
 
-            if !read_remainder.is_empty() {
-                self.read(read_remainder)
-            } else if !write_remainder.is_empty() {
-                self.write(write_remainder)
-            } else {
-                Ok(())
-            }
+            inner(self, read.as_mut(), write.as_ref())
         }
 
         /// Transfers data in place on the SPI bus using DMA.
         #[instability::unstable]
-        pub fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Error> {
-            self.wait_for_idle();
-            self.spi_dma.driver().setup_full_duplex()?;
-            let chunk_size = min(self.tx_buf.capacity(), self.rx_buf.capacity());
+        pub fn transfer_in_place(&mut self, mut words: impl AsMut<[u8]>) -> Result<(), Error> {
+            fn inner(
+                bus: &mut SpiDmaBus<'_, impl DriverMode>,
+                words: &mut [u8],
+            ) -> Result<(), Error> {
+                bus.wait_for_idle();
+                bus.spi_dma.driver().setup_full_duplex()?;
+                let chunk_size = min(bus.tx_buf.capacity(), bus.rx_buf.capacity());
 
-            for chunk in words.chunks_mut(chunk_size) {
-                self.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
+                for chunk in words.chunks_mut(chunk_size) {
+                    bus.tx_buf.as_mut_slice()[..chunk.len()].copy_from_slice(chunk);
 
-                unsafe {
-                    self.spi_dma.start_dma_transfer(
-                        chunk.len(),
-                        chunk.len(),
-                        &mut self.rx_buf,
-                        &mut self.tx_buf,
-                    )?;
+                    unsafe {
+                        bus.spi_dma.start_dma_transfer(
+                            chunk.len(),
+                            chunk.len(),
+                            &mut bus.rx_buf,
+                            &mut bus.tx_buf,
+                        )?;
+                    }
+                    bus.wait_for_idle();
+                    chunk.copy_from_slice(&bus.rx_buf.as_slice()[..chunk.len()]);
                 }
-                self.wait_for_idle();
-                chunk.copy_from_slice(&self.rx_buf.as_slice()[..chunk.len()]);
+
+                Ok(())
             }
 
-            Ok(())
+            inner(self, words.as_mut())
         }
 
         /// Half-duplex read.
@@ -2317,29 +2431,40 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: &mut [u8],
+            mut buffer: impl AsMut<[u8]>,
         ) -> Result<(), Error> {
-            if buffer.len() > self.rx_buf.capacity() {
-                return Err(Error::from(DmaError::Overflow));
+            fn inner(
+                bus: &mut SpiDmaBus<'_, impl DriverMode>,
+                data_mode: DataMode,
+                cmd: Command,
+                address: Address,
+                dummy: u8,
+                buffer: &mut [u8],
+            ) -> Result<(), Error> {
+                if buffer.len() > bus.rx_buf.capacity() {
+                    return Err(Error::from(DmaError::Overflow));
+                }
+                bus.wait_for_idle();
+
+                unsafe {
+                    bus.spi_dma.start_half_duplex_read(
+                        data_mode,
+                        cmd,
+                        address,
+                        dummy,
+                        buffer.len(),
+                        &mut bus.rx_buf,
+                    )?;
+                }
+
+                bus.wait_for_idle();
+
+                buffer.copy_from_slice(&bus.rx_buf.as_slice()[..buffer.len()]);
+
+                Ok(())
             }
-            self.wait_for_idle();
 
-            unsafe {
-                self.spi_dma.start_half_duplex_read(
-                    data_mode,
-                    cmd,
-                    address,
-                    dummy,
-                    buffer.len(),
-                    &mut self.rx_buf,
-                )?;
-            }
-
-            self.wait_for_idle();
-
-            buffer.copy_from_slice(&self.rx_buf.as_slice()[..buffer.len()]);
-
-            Ok(())
+            inner(self, data_mode, cmd, address, dummy, buffer.as_mut())
         }
 
         /// Half-duplex write.
@@ -2350,28 +2475,39 @@ mod dma {
             cmd: Command,
             address: Address,
             dummy: u8,
-            buffer: &[u8],
+            buffer: impl AsRef<[u8]>,
         ) -> Result<(), Error> {
-            if buffer.len() > self.tx_buf.capacity() {
-                return Err(Error::from(DmaError::Overflow));
+            fn inner(
+                bus: &mut SpiDmaBus<'_, impl DriverMode>,
+                data_mode: DataMode,
+                cmd: Command,
+                address: Address,
+                dummy: u8,
+                buffer: &[u8],
+            ) -> Result<(), Error> {
+                if buffer.len() > bus.tx_buf.capacity() {
+                    return Err(Error::from(DmaError::Overflow));
+                }
+                bus.wait_for_idle();
+                bus.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
+
+                unsafe {
+                    bus.spi_dma.start_half_duplex_write(
+                        data_mode,
+                        cmd,
+                        address,
+                        dummy,
+                        buffer.len(),
+                        &mut bus.tx_buf,
+                    )?;
+                }
+
+                bus.wait_for_idle();
+
+                Ok(())
             }
-            self.wait_for_idle();
-            self.tx_buf.as_mut_slice()[..buffer.len()].copy_from_slice(buffer);
 
-            unsafe {
-                self.spi_dma.start_half_duplex_write(
-                    data_mode,
-                    cmd,
-                    address,
-                    dummy,
-                    buffer.len(),
-                    &mut self.tx_buf,
-                )?;
-            }
-
-            self.wait_for_idle();
-
-            Ok(())
+            inner(self, data_mode, cmd, address, dummy, buffer.as_ref())
         }
     }
 
@@ -3452,7 +3588,7 @@ impl Driver {
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     async fn flush_async(&self) -> Result<(), Error> {
         if self.busy() {
-            let future = SpiFuture::setup(&self).await;
+            let future = SpiFuture::setup(self).await;
             future.await;
         }
 

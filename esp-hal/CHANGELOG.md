@@ -48,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
 - Renamed `Flex::enable_input` to `set_input_enable` (#3387)
 - Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
+- `spi::master::Spi::transfer` no longer returns the received data as a slice (#3415)
+- Data transfer functions in the following modules now accept `AsRef<[u8]>` and `AsMut<[u8]>` in place of slices (#3415)
+  - `spi::master::{Spi, SpiDmaBus}`
 
 ### Fixed
 
