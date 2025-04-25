@@ -13,8 +13,7 @@ use super::{AdcCalSource, AdcConfig, Attenuation};
 #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
 use crate::efuse::Efuse;
 use crate::{
-    Async,
-    Blocking,
+    Async, Blocking,
     analog::adc::asynch::AdcFuture,
     interrupt::{InterruptConfigurable, InterruptHandler},
     peripherals::{APB_SARADC, Interrupt},
@@ -409,7 +408,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     }
 }
 
-#[cfg(all(adc1))]
+#[cfg(adc1)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
