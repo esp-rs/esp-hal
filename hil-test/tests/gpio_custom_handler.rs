@@ -34,17 +34,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
-use hil_test as _;
+use hil_test::mk_static;
 use portable_atomic::{AtomicUsize, Ordering};
-
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 #[unsafe(no_mangle)]
 unsafe extern "C" fn GPIO() {
@@ -116,6 +107,7 @@ async fn sense_pin(gpio: AnyPin<'static>, done: &'static Signal<CriticalSectionR
 #[cfg(test)]
 #[embedded_test::tests(executor = hil_test::Executor::new(), default_timeout = 3)]
 mod tests {
+
     use super::*;
 
     #[test]
