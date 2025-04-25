@@ -111,7 +111,7 @@ sys-logs = ["esp-wifi-sys/sys-logs"]
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
 
 ## Enable support for the `log` crate
-log = ["dep:log", "esp-hal/log", "esp-wifi-sys/log"]
+log = ["dep:log", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable WiFi support
 wifi = ["dep:enumset", "dep:embassy-net-driver", "dep:embassy-sync"]

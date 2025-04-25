@@ -2,13 +2,13 @@
 //!
 //! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/psram aligned esp-hal/unstable
+//% FEATURES: esp-hal/psram aligned esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
 #![no_main]
 
-use aligned::{A64, Aligned};
+use aligned::{Aligned, A64};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
