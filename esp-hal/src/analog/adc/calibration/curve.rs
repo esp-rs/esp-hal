@@ -195,9 +195,8 @@ mod impls {
             ],
         ];
 
-        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/be06a6f/components/esp_adc/esp32h2/curve_fitting_coefficients.c>
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/465b159cd8771ffab6be70c7675ecf6705b62649/components/esp_adc/esp32h2/curve_fitting_coefficients.c>
         #[cfg(esp32h2)]
-        #[allow(clippy::excessive_precision)]
         CURVES_COEFFS1 [
             _0dB => [
                 -0.5081991760658888,
@@ -210,7 +209,7 @@ mod impls {
                 0,
             ],
             _6dB => [
-                -1.1656687715819760,
+                -1.165668771581976,
                 0.0000008294679249,
                 0,
             ],
