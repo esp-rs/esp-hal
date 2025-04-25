@@ -158,7 +158,7 @@ esp32h2 = [
 # Target the ESP32-S2.
 esp32s2 = [
     "dep:esp32s2",
-    "portable-atomic/critical-section",
+    "portable-atomic/unsafe-assume-single-core",
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "xtensa-lx-rt/esp32s2",
