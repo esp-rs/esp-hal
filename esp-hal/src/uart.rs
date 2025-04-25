@@ -713,6 +713,14 @@ where
         Ok(())
     }
 
+    /// Returns whether the UART buffer is ready to accept more data.
+    ///
+    /// If this function returns `true`, [`Self::write`] will not block.
+    #[instability::unstable]
+    pub fn write_ready(&mut self) -> bool {
+        self.uart.info().tx_fifo_count() < Info::UART_FIFO_SIZE
+    }
+
     /// Write bytes.
     ///
     /// This function writes data to the internal TX FIFO of the UART
@@ -1054,6 +1062,14 @@ where
     #[instability::unstable]
     pub fn check_for_errors(&mut self) -> Result<(), RxError> {
         self.uart.info().check_for_errors()
+    }
+
+    /// Returns whether the UART buffer has data.
+    ///
+    /// If this function returns `true`, [`Self::read`] will not block.
+    #[instability::unstable]
+    pub fn read_ready(&mut self) -> bool {
+        self.uart.info().rx_fifo_count() > 0
     }
 
     /// Read bytes.
@@ -1409,6 +1425,14 @@ where
         self.tx.uart.info().regs()
     }
 
+    /// Returns whether the UART buffer is ready to accept more data.
+    ///
+    /// If this function returns `true`, [`Self::write`] will not block.
+    #[instability::unstable]
+    pub fn write_ready(&mut self) -> bool {
+        self.tx.write_ready()
+    }
+
     /// Writes bytes.
     ///
     /// This function writes data to the internal TX FIFO of the UART
@@ -1443,6 +1467,14 @@ where
     /// Flush the transmit buffer of the UART
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
+    }
+
+    /// Returns whether the UART buffer has data.
+    ///
+    /// If this function returns `true`, [`Self::read`] will not block.
+    #[instability::unstable]
+    pub fn read_ready(&mut self) -> bool {
+        self.rx.read_ready()
     }
 
     /// Read received bytes.
@@ -1804,7 +1836,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        self.rx.read_ready().map_err(IoError::Rx)
+        Ok(self.rx.read_ready())
     }
 }
 
@@ -1814,7 +1846,7 @@ where
     Dm: DriverMode,
 {
     fn read_ready(&mut self) -> Result<bool, Self::Error> {
-        Ok(self.uart.info().rx_fifo_count() > 0)
+        Ok(self.read_ready())
     }
 }
 
@@ -1843,6 +1875,26 @@ where
 
     fn flush(&mut self) -> Result<(), Self::Error> {
         self.flush()
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io::WriteReady for UartTx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.write_ready())
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embedded_io::WriteReady for Uart<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn write_ready(&mut self) -> Result<bool, Self::Error> {
+        Ok(self.tx.write_ready())
     }
 }
 
