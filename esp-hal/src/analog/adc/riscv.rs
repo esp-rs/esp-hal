@@ -194,7 +194,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
             // For the ESP32-H2 ground and internal reference voltage are mutually exclusive and
             // you can toggle between them.
             //
-            // See: https://github.com/espressif/esp-idf/blob/5c51472e82a58098dda8d40a1c4f250c374fc900/components/hal/esp32h2/include/hal/adc_ll.h#L645
+            // See: <https://github.com/espressif/esp-idf/blob/5c51472e82a58098dda8d40a1c4f250c374fc900/components/hal/esp32h2/include/hal/adc_ll.h#L645>
             #[cfg(esp32h2)]
             AdcCalSource::Ref => regi2c::ADC_SAR1_ENCAL_GND.write_field(!enable as _),
         }
@@ -415,7 +415,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
         Efuse::rtc_calib_init_code(1, atten)
     }
 
-    fn cal_mv(atten: Attenuation) -> Option<u16> {
+    fn cal_mv(atten: Attenuation) -> u16 {
         Efuse::rtc_calib_cal_mv(1, atten)
     }
 

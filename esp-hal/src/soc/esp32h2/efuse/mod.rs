@@ -77,7 +77,7 @@ impl Efuse {
 
     /// Get version of RTC calibration block
     ///
-    /// see <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L20>
+    /// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L20>
     /// //esp_efuse_rtc_calib_get_ver
     pub fn rtc_calib_version() -> u8 {
         let (_major, minor) = Self::block_version();
@@ -108,7 +108,7 @@ impl Efuse {
     /// Get ADC reference point voltage for specified attenuation in millivolts
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/be06a6f/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
-    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_cal_mv(_unit: u8, atten: Attenuation) -> u16 {
         const INPUT_VOUT_MV: [[u16; 4]; 1] = [
             [750, 1000, 1500, 2800], // Calibration V1 coefficients
         ];
@@ -120,12 +120,15 @@ impl Efuse {
         // ESP_EFUSE_ADC_CALIB_VER_MIN  ESP_EFUSE_ADC_CALIB_VER1
         // ESP_EFUSE_ADC_CALIB_VER_MAX  ESP_EFUSE_ADC_CALIB_VER1
         if version != 1 {
-            return None;
+            // The required efuse bits for this chip are not burnt.
+            // 1100 is the middle of the reference voltage range.
+            // See: <https://github.com/espressif/esp-idf/blob/465b159cd8771ffab6be70c7675ecf6705b62649/docs/en/api-reference/peripherals/adc_calibration.rst?plain=1#L9>
+            return 1100;
         }
 
         let mv = INPUT_VOUT_MV[version as usize - 1][atten as usize];
 
-        Some(mv)
+        mv
     }
 
     /// Returns the call code

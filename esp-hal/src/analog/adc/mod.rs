@@ -228,7 +228,7 @@ trait AdcCalEfuse {
     /// Get ADC calibration reference point voltage
     ///
     /// Returns reference voltage (millivolts) for a given attenuation
-    fn cal_mv(atten: Attenuation) -> Option<u16>;
+    fn cal_mv(atten: Attenuation) -> u16;
 
     /// Get ADC calibration reference point digital value
     ///
