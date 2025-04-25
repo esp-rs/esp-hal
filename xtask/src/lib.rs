@@ -112,7 +112,7 @@ impl Package {
                     features.push("psram".to_owned())
                 }
                 if config.contains("usb0") {
-                    features.push("usb-otg".to_owned());
+                    features.push("__usb_otg".to_owned());
                 }
                 if config.contains("bt") {
                     features.push("bluetooth".to_owned());
