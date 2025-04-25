@@ -352,3 +352,7 @@ Some configuration options are now unstable and they require the `unstable` feat
 enabled. You can learn about a particular option in the [esp-hal documentation](https://docs.espressif.com/projects/rust/esp-hal/latest/).
 
 The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`.
+
+## Changes related to cargo features
+
+The `log` feature has been replaced by `log-04`.

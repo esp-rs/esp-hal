@@ -70,7 +70,7 @@ rand_core-06             = { package = "rand_core", version = "0.6.4", optional 
 rand_core-09             = { package = "rand_core", version = "0.9.0", optional = true }
 
 # Unstable dependencies that need to be dealt with
-ufmt-write               = "0.1.0" # This should be optional, behind `ufmt_write01`
+ufmt-write               = "0.1.0" # This should be optional, behind `ufmt_write-01`
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -121,8 +121,8 @@ debug = [
     "esp32s2?/impl-register-debug",
     "esp32s3?/impl-register-debug",
 ]
-## Enable logging output using the `log` crate.
-log = ["dep:log"]
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log"]
 
 # Chip Support Feature Flags
 # Target the ESP32.
@@ -174,8 +174,8 @@ unstable = [
     "dep:embedded-can",
     "dep:embedded-io",
     "dep:embedded-io-async",
-    "dep:rand_core06",
-    "dep:rand_core09",
+    "dep:rand_core-06",
+    "dep:rand_core-09",
     "dep:nb",
 ]
 
