@@ -185,17 +185,6 @@ defmt = [
 
 #! ### PSRAM Feature Flags
 
-## Implement Debug on more types.
-debug = [
-    "esp32?/impl-register-debug",
-    "esp32c2?/impl-register-debug",
-    "esp32c3?/impl-register-debug",
-    "esp32c6?/impl-register-debug",
-    "esp32h2?/impl-register-debug",
-    "esp32s2?/impl-register-debug",
-    "esp32s3?/impl-register-debug",
-]
-
 ## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
 psram = []
 
