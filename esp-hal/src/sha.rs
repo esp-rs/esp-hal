@@ -527,8 +527,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::OutputSizeUser for ShaDige
 }
 
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
-    fn update(&mut self, data: &[u8]) {
-        let mut remaining = data.as_ref();
+    fn update(&mut self, mut remaining: &[u8]) {
         while !remaining.is_empty() {
             remaining = nb::block!(Self::update(self, remaining)).unwrap();
         }
