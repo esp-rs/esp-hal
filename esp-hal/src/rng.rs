@@ -25,7 +25,7 @@
 //! considered pseudo-random only.
 //!
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::chip!(), "/api-reference/system/random.html)")]
 //! ## Configuration
 //! To use the [Rng] Driver, you need to initialize it with the RNG peripheral.
 //! Once initialized, you can generate random numbers by calling the `random`

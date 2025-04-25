@@ -7,7 +7,7 @@
 //! TWAI protocol is suited for automotive and industrial applications.
 //!
 //! See ESP-IDF's
-#![doc = concat!("[TWAI documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/twai.html#twai-protocol-summary)")]
+#![doc = concat!("[TWAI documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::chip!(), "/api-reference/peripherals/twai.html#twai-protocol-summary)")]
 //! for a summary on the protocol.
 //!
 //! ## Configuration

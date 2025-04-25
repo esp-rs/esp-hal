@@ -188,7 +188,7 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-metadata!("build_info", CHIP_NAME, chip!());
+metadata!("build_info", CHIP_NAME, crate::chip!());
 
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
@@ -224,7 +224,7 @@ pub mod gpio;
 #[cfg(any(i2c0, i2c1))]
 pub mod i2c;
 pub mod peripheral;
-#[cfg(any(hmac, sha))]
+#[cfg(all(feature = "unstable", any(hmac, sha)))]
 mod reg_access;
 #[cfg(any(spi0, spi1, spi2, spi3))]
 pub mod spi;
@@ -267,40 +267,69 @@ macro_rules! unstable_module {
     };
 }
 
+// can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
+// we don't want unstable drivers to be compiled even, unless enabled
+#[doc(hidden)]
+macro_rules! unstable_driver {
+    ($(
+        $(#[$meta:meta])*
+        pub mod $module:ident;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub mod $module;
+        )*
+    };
+}
+
+pub(crate) use unstable_driver;
 pub(crate) use unstable_module;
 
 unstable_module! {
-    #[cfg(aes)]
-    pub mod aes;
-    #[cfg(any(adc1, adc2, dac))]
-    pub mod analog;
     pub mod asynch;
-    #[cfg(assist_debug)]
-    pub mod assist_debug;
     pub mod config;
     pub mod debugger;
-    #[cfg(any(xtensa, all(riscv, systimer)))]
-    pub mod delay;
+    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
+    pub mod interrupt;
+    pub mod rom;
+    #[doc(hidden)]
+    pub mod sync;
+    // Drivers needed for initialization or they are tightly coupled to something else.
+    #[cfg(any(adc1, adc2, dac))]
+    pub mod analog;
+    #[cfg(any(systimer, timg0, timg1))]
+    pub mod timer;
+    #[cfg(any(lp_clkrst, rtc_cntl))]
+    pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(ecc)]
-    pub mod ecc;
     #[cfg(soc_etm)]
     pub mod etm;
+    #[cfg(usb0)]
+    pub mod otg_fs;
+}
+
+unstable_driver! {
+    #[cfg(aes)]
+    pub mod aes;
+    #[cfg(assist_debug)]
+    pub mod assist_debug;
+    #[cfg(any(xtensa, all(riscv, systimer)))]
+    pub mod delay;
+    #[cfg(ecc)]
+    pub mod ecc;
     #[cfg(hmac)]
     pub mod hmac;
     #[cfg(any(i2s0, i2s1))]
     pub mod i2s;
-    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
-    pub mod interrupt;
     #[cfg(lcd_cam)]
     pub mod lcd_cam;
     #[cfg(ledc)]
     pub mod ledc;
     #[cfg(any(mcpwm0, mcpwm1))]
     pub mod mcpwm;
-    #[cfg(usb0)]
-    pub mod otg_fs;
     #[cfg(parl_io)]
     pub mod parl_io;
     #[cfg(pcnt)]
@@ -309,17 +338,10 @@ unstable_module! {
     pub mod rmt;
     #[cfg(rng)]
     pub mod rng;
-    pub mod rom;
     #[cfg(rsa)]
     pub mod rsa;
-    #[cfg(any(lp_clkrst, rtc_cntl))]
-    pub mod rtc_cntl;
     #[cfg(sha)]
     pub mod sha;
-    #[doc(hidden)]
-    pub mod sync;
-    #[cfg(any(systimer, timg0, timg1))]
-    pub mod timer;
     #[cfg(touch)]
     pub mod touch;
     #[cfg(trace0)]

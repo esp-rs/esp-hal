@@ -38,7 +38,7 @@
 )]
 #![doc = ""]
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
 //! Each TX/RX channel has the same functionality controlled by a dedicated set
 //! of registers and is able to independently transmit or receive data. TX
