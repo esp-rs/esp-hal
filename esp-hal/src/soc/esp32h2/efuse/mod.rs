@@ -126,9 +126,7 @@ impl Efuse {
             return 1100;
         }
 
-        let mv = INPUT_VOUT_MV[version as usize - 1][atten as usize];
-
-        mv
+        INPUT_VOUT_MV[version as usize - 1][atten as usize]
     }
 
     /// Returns the call code
@@ -146,7 +144,7 @@ impl Efuse {
         } else {
             2900 + cal_code
         };
-        return Some(cal_code);
+        Some(cal_code)
     }
 
     /// Returns the major hardware revision

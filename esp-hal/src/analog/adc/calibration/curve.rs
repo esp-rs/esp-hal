@@ -1,12 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::analog::adc::{
-    AdcCalEfuse,
-    AdcCalLine,
-    AdcCalScheme,
-    AdcHasLineCal,
-    Attenuation,
-    CalibrationAccess,
+    AdcCalEfuse, AdcCalLine, AdcCalScheme, AdcHasLineCal, Attenuation, CalibrationAccess,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
@@ -195,8 +190,9 @@ mod impls {
             ],
         ];
 
-                    /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/be06a6f/components/esp_adc/esp32h2/curve_fitting_coefficients.c>
+        /// Error curve coefficients derived from <https://github.com/espressif/esp-idf/blob/be06a6f/components/esp_adc/esp32h2/curve_fitting_coefficients.c>
         #[cfg(esp32h2)]
+        #[allow(clippy::excessive_precision)]
         CURVES_COEFFS1 [
             _0dB => [
                 -0.5081991760658888,
