@@ -42,7 +42,7 @@
 //! ```
 
 pub use self::fields::*;
-use crate::{analog::adc::Attenuation, peripherals::EFUSE, soc::efuse_field::EfuseField};
+use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 
 mod fields;
 
@@ -134,7 +134,7 @@ impl Efuse {
     /// Returns the call code
     ///
     /// See: <https://github.com/espressif/esp-idf/blob/17a2461297076481858b7f76482676a521cc727a/components/efuse/esp32h2/esp_efuse_rtc_calib.c#L91>
-    pub fn rtc_calib_cal_code(unit: u8, atten: Attenuation) -> Option<u16> {
+    pub fn rtc_calib_cal_code(_unit: u8, atten: Attenuation) -> Option<u16> {
         let cal_code: u16 = Self::read_field_le(match atten {
             Attenuation::_0dB => ADC1_HI_DOUT_ATTEN0,
             Attenuation::_2p5dB => ADC1_HI_DOUT_ATTEN1,
