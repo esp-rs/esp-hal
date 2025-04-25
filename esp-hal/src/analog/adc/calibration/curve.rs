@@ -1,7 +1,12 @@
 use core::marker::PhantomData;
 
 use crate::analog::adc::{
-    AdcCalEfuse, AdcCalLine, AdcCalScheme, AdcHasLineCal, Attenuation, CalibrationAccess,
+    AdcCalEfuse,
+    AdcCalLine,
+    AdcCalScheme,
+    AdcHasLineCal,
+    Attenuation,
+    CalibrationAccess,
 };
 
 const COEFF_MUL: i64 = 1 << 52;
