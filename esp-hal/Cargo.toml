@@ -113,19 +113,6 @@ __usb_otg = [
     "esp-synopsys-usb-otg/fs",
 ]
 
-## Enable debug features in the HAL (used for development).
-debug = [
-    "esp32?/impl-register-debug",
-    "esp32c2?/impl-register-debug",
-    "esp32c3?/impl-register-debug",
-    "esp32c6?/impl-register-debug",
-    "esp32h2?/impl-register-debug",
-    "esp32s2?/impl-register-debug",
-    "esp32s3?/impl-register-debug",
-]
-## Enable logging output using version 0.4 of the `log` crate.
-log-04 = ["dep:log"]
-
 # Chip Support Feature Flags
 # Target the ESP32.
 esp32   = [
@@ -173,8 +160,12 @@ esp32s3 = [
     "__usb_otg",
 ]
 
-#! ### Trait Implementation Feature Flags
-## Implement `defmt::Format` on certain types.
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = [
     "dep:defmt",
     "embassy-futures/defmt",
@@ -193,6 +184,18 @@ defmt = [
 ]
 
 #! ### PSRAM Feature Flags
+
+## Implement Debug on more types.
+debug = [
+    "esp32?/impl-register-debug",
+    "esp32c2?/impl-register-debug",
+    "esp32c3?/impl-register-debug",
+    "esp32c6?/impl-register-debug",
+    "esp32h2?/impl-register-debug",
+    "esp32s2?/impl-register-debug",
+    "esp32s3?/impl-register-debug",
+]
+
 ## Use externally connected PSRAM (`quad` by default, can be configured to `octal` via ESP_HAL_CONFIG_PSRAM_MODE)
 psram = []
 
