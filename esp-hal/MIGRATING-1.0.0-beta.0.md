@@ -90,17 +90,30 @@ types.
 +fn my_function(gpio2: GPIO2<'_>, gpio3: GPIO3<'_>) {...}
 ```
 
-### Interconnect types now have a lifetime
+### GPIO matrix (interconnect) has been reworked
 
-The GPIO interconnect types now have a lifetime. This lifetime prevents them to be live for longer
-than the GPIO that was used to create them.
+The GPIO matrix implementation has been reworked to solve known issues. The following changes have
+been made:
 
-The affected types in the `gpio::interconnect` module are:
-
-- `InputSignal`
-- `OutputSignal`
-- `InputConnection`
-- `OutputConnection`
+- `InputConnection` and `OutputConnection` have been removed and their functionality merged into `InputSignal` and `OutputSignal`.
+- The `InputSignal` and `OutputSignal` types now have a lifetime. This lifetime prevents them to be live for longer than the GPIO that was used to create them.
+- Because `InputSignal` and `OutputSignal` can now represent constant levels, the `number` method now returns `Option<u8>`.
+- The way to invert inputs and outputs has been changed:
+  - `InputSignal::inverted` has been renamed to `InputSignal::with_input_inverter`.
+  - `OutputSignal::inverted` has been renamed to `OutputSignal::with_output_inverter`.
+  - `InputSignal::invert` and `OutputSignal::invert` have been removed.
+  - `OutputSignal` now has an `inverted_input` property, which can be changed by using `with_output_inverter`.
+  - The signals have `is_{input, output}_inverted` methods to read the state that will be used when configuring the hardware.
+- Users can now force a signal through the GPIO matrix.
+- The `enable_input` and `enable_output` methods have been renamed to `set_input_enable` and `set_output_enable`.
+- A new `PeripheralSignal` trait has been added, which allows us to no longer imply `PeripheralInput` for `PeripheralOutput` types.
+- Functions that accept `PeripheralInput` **no longer accept** `PeripheralOutput` implementations.
+- Removed `Input::into_peripheral_output` and `Output::peripheral_input` functions. The drivers can be converted into `Flex` which offers both ways to acquire signal types, and more.
+- Various "unreasonable" signal conversions have been removed. `OutputSignal` can no longer be converted into `InputSignal`.
+- `InputSignal` and `OutputSignal` now have a "frozen" state. If they are created by a pin driver, they start frozen. If they are created by splitting a GPIO pin, they start unfrozen. Frozen signals will not be configured by peripheral drivers.
+- Splitting GPIO pins into signals is now unsafe.
+- `Flex` can now be (unsafely) split into `Input` and `Output` drivers with `split_into_drivers`.
+- Converting `AnyPin` into signals will now reset the pin's configuration. Creating an InputSignal will now enable the pin's input buffer.
 
 ### Flex API surface has been simplified
 
@@ -290,6 +303,17 @@ The data and ctrl pins of the camera have been split out into individual `with_*
   )?;
 
 + camera.with_data0(peripherals.GPIO11).with_data1(peripherals.GPIO9).with_dataX();
+```
+
+## SPI changes
+
+`Spi::transfer` no longer returns the input buffer.
+
+```diff
+-let received = spi.transfer(&mut data[..]).unwrap();
+-work_with(received);
++spi.transfer(&mut data[..]).unwrap();
++work_with(&data[..]);
 ```
 
 ## Configuration changes

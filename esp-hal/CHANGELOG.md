@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Added `Flex::enable_output` (#3387)
 - Added `Flex::set_output_enable` (#3387)
+- Added `{Uart, UartRx}::read_ready` (#3423)
+- Added `{Uart, UartTx}::write_ready` (#3423)
+- Implemented `embedded_io::ReadReady` for `Uart` and `UartRx` (#3423)
+- Implemented `embedded_io::WriteReady` for `Uart` and `UartTx` (#3423)
 - ESP32-H2: Support for ADC calibration (#3414)
 
 ### Changed
@@ -33,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpiDmaBus` no longer adjusts the DMA buffer length for each transfer (#3263)
 - `SpiDma<Async>` now uses the SPI interrupt (instead of DMA) to wait for completion (#3303)
 - I2S driver now takes `DmaDescriptor`s later in construction (#3324)
-- `gpio::interconnect` types now have a lifetime associated with them (#3302)
+- The `gpio::interconnect` module has been rewritten. For details, refer to the Migration guide (#3302, #3395)
 - Make `ParlIo` driver construction more consistent (#3345)
 - `ParlIo` driver now uses a config struct (#3359)
 - The `critical-section` implementation is now gated behind the `critical-section-impl` feature (#3293)
@@ -48,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`. (#3402)
 - Made the `ParlIo` traits for `TxPins`, `RxPins`, `ConfigurePins` public (#3398)
 - Renamed `Flex::enable_input` to `set_input_enable` (#3387)
+- Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
+- Update `defmt` to 1.0 (#3416)
+- `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
 
 ### Fixed
 

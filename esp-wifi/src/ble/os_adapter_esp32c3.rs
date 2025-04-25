@@ -251,6 +251,8 @@ unsafe extern "C" {
 }
 
 pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
+    // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
+    // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
         magic: 0x5a5aa5a5,
         version: 0x02404010,

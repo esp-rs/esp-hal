@@ -38,7 +38,7 @@
 )]
 #![doc = ""]
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/peripherals/rmt.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
 //! Each TX/RX channel has the same functionality controlled by a dedicated set
 //! of registers and is able to independently transmit or receive data. TX
@@ -233,7 +233,9 @@ use crate::{
     Blocking,
     asynch::AtomicWaker,
     gpio::{
+        InputConfig,
         Level,
+        OutputConfig,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     handler,
@@ -536,7 +538,10 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
     T::set_memory_blocks_unavailable(config.memsize);
 
     let pin = pin.into();
-    pin.init_input(crate::gpio::Pull::None);
+
+    pin.apply_input_config(&InputConfig::default());
+    pin.set_input_enable(true);
+
     T::input_signal().connect_to(&pin);
 
     T::set_divider(config.clk_divider);
@@ -576,7 +581,10 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     T::set_memory_blocks_unavailable(config.memsize);
 
     let pin = pin.into();
-    pin.set_to_push_pull_output();
+
+    pin.apply_output_config(&OutputConfig::default());
+    pin.set_output_enable(true);
+
     T::output_signal().connect_to(&pin);
 
     T::set_divider(config.clk_divider);

@@ -184,9 +184,9 @@ macro_rules! create_peripheral {
             /// You must ensure that you're only using one instance of this type at a time.
             #[inline]
             #[allow(dead_code)]
-            pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
-                Self::steal()
-            }}
+            pub unsafe fn clone_unchecked(&self) -> Self {
+                unsafe { Self::steal() }
+            }
 
             /// Creates a new peripheral reference with a shorter lifetime.
             ///

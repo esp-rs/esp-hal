@@ -127,6 +127,7 @@ impl<'d> Channels<'d> {
 }
 
 /// Configuration for an ETM controlled GPIO input pin
+// TODO: remove this
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InputConfig {
@@ -178,10 +179,12 @@ impl<const C: u8> EventChannel<C> {
         kind: EventKind,
     ) -> Event<'d> {
         let pin = pin.into();
+        if let Some(number) = pin.gpio_number() {
+            pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
+            pin.set_input_enable(true);
 
-        pin.init_input(pin_config.pull);
-
-        enable_event_channel(C, pin.number());
+            enable_event_channel(C, number);
+        }
         Event {
             id: kind.id() + C,
             _pin: PhantomData,
@@ -279,15 +282,22 @@ impl<const C: u8> TaskChannel<C> {
     ) -> Task<'d> {
         let pin = pin.into();
 
-        pin.set_output_high(pin_config.initial_state.into());
-        if pin_config.open_drain {
-            pin.pull_direction(pin_config.pull);
-            pin.set_to_open_drain_output();
-        } else {
-            pin.set_to_push_pull_output();
-        }
+        if let Some(number) = pin.gpio_number() {
+            let config = if pin_config.open_drain {
+                super::OutputConfig::default()
+                    .with_drive_mode(super::DriveMode::OpenDrain)
+                    .with_pull(pin_config.pull)
+            } else {
+                super::OutputConfig::default()
+            };
 
-        enable_task_channel(C, pin.number());
+            pin.set_output_high(pin_config.initial_state.into());
+            pin.apply_output_config(&config);
+            pin.set_output_enable(true);
+
+            // TODO: what should we do if the user passes a Level/NoPin?
+            enable_task_channel(C, number);
+        }
         Task {
             id: kind.id() + C,
             _pin: PhantomData,

@@ -2608,10 +2608,16 @@ pub struct Interfaces<'d> {
 /// Create a WiFi controller and it's associated interfaces.
 ///
 /// Dropping the controller will deinitialize / stop WiFi.
+///
+/// Make sure to **not** call this function while interrupts are disabled.
 pub fn new<'d>(
     inited: &'d EspWifiController<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+    if crate::is_interrupts_disabled() {
+        return Err(WifiError::Unsupported);
+    }
+
     let mut controller = WifiController {
         _phantom: Default::default(),
     };

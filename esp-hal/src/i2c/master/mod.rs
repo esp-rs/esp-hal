@@ -37,11 +37,13 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
+        DriveMode,
         InputSignal,
+        OutputConfig,
         OutputSignal,
         PinGuard,
         Pull,
-        interconnect::{OutputConnection, PeripheralOutput},
+        interconnect::{self, PeripheralOutput},
     },
     i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
@@ -555,11 +557,12 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
         address: u8,
         operations: &mut [embedded_hal::i2c::Operation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl(
-            I2cAddress::SevenBit(address),
-            operations.iter_mut().map(Operation::from),
-        )
-        .inspect_err(|_| self.internal_recover())
+        self.driver()
+            .transaction_impl(
+                I2cAddress::SevenBit(address),
+                operations.iter_mut().map(Operation::from),
+            )
+            .inspect_err(|_| self.internal_recover())
     }
 }
 
@@ -842,19 +845,10 @@ impl<'d> I2c<'d, Async> {
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let address = address.into();
-
         self.driver()
-            .write(address, write_buffer, true, read_buffer.is_empty())
+            .write_read(address.into(), write_buffer, read_buffer)
             .await
-            .inspect_err(|_| self.internal_recover())?;
-
-        self.driver()
-            .read(address, read_buffer, true, true, false)
-            .await
-            .inspect_err(|_| self.internal_recover())?;
-
-        Ok(())
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Execute the provided operations on the I2C bus as a single
@@ -889,62 +883,10 @@ impl<'d> I2c<'d, Async> {
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
+        self.driver()
+            .transaction_impl_async(address.into(), operations.into_iter().map(Operation::from))
             .await
             .inspect_err(|_| self.internal_recover())
-    }
-
-    async fn transaction_impl_async<'a>(
-        &mut self,
-        address: I2cAddress,
-        operations: impl Iterator<Item = Operation<'a>>,
-    ) -> Result<(), Error> {
-        address.validate()?;
-
-        let mut last_op: Option<OpKind> = None;
-        // filter out 0 length read operations
-        let mut op_iter = operations
-            .filter(|op| op.is_write() || !op.is_empty())
-            .peekable();
-
-        while let Some(op) = op_iter.next() {
-            let next_op = op_iter.peek().map(|v| v.kind());
-            let kind = op.kind();
-            match op {
-                Operation::Write(buffer) => {
-                    // execute a write operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    self.driver()
-                        .write(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Write)),
-                            next_op.is_none(),
-                        )
-                        .await?;
-                }
-                Operation::Read(buffer) => {
-                    // execute a read operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    // - will_continue is true if there is another read operation next
-                    self.driver()
-                        .read(
-                            address,
-                            buffer,
-                            !matches!(last_op, Some(OpKind::Read)),
-                            next_op.is_none(),
-                            matches!(next_op, Some(OpKind::Read)),
-                        )
-                        .await?;
-                }
-            }
-
-            last_op = Some(kind);
-        }
-
-        Ok(())
     }
 }
 
@@ -966,55 +908,6 @@ where
 
         // We know the configuration is valid, we can ignore the result.
         _ = self.driver().setup(&self.config);
-    }
-
-    fn transaction_impl<'a>(
-        &mut self,
-        address: I2cAddress,
-        operations: impl Iterator<Item = Operation<'a>>,
-    ) -> Result<(), Error> {
-        address.validate()?;
-
-        let mut last_op: Option<OpKind> = None;
-        // filter out 0 length read operations
-        let mut op_iter = operations
-            .filter(|op| op.is_write() || !op.is_empty())
-            .peekable();
-
-        while let Some(op) = op_iter.next() {
-            let next_op = op_iter.peek().map(|v| v.kind());
-            let kind = op.kind();
-            match op {
-                Operation::Write(buffer) => {
-                    // execute a write operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    self.driver().write_blocking(
-                        address,
-                        buffer,
-                        !matches!(last_op, Some(OpKind::Write)),
-                        next_op.is_none(),
-                    )?;
-                }
-                Operation::Read(buffer) => {
-                    // execute a read operation:
-                    // - issue START/RSTART if op is different from previous
-                    // - issue STOP if op is the last one
-                    // - will_continue is true if there is another read operation next
-                    self.driver().read_blocking(
-                        address,
-                        buffer,
-                        !matches!(last_op, Some(OpKind::Read)),
-                        next_op.is_none(),
-                        matches!(next_op, Some(OpKind::Read)),
-                    )?;
-                }
-            }
-
-            last_op = Some(kind);
-        }
-
-        Ok(())
     }
 
     /// Connect a pin to the I2C SDA signal.
@@ -1051,13 +944,17 @@ where
         // avoid the pin going low during configuration
         pin.set_output_high(true);
 
-        pin.set_to_open_drain_output();
+        pin.apply_output_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
+        pin.set_output_enable(true);
         pin.set_input_enable(true);
-        pin.pull_direction(Pull::Up);
 
         input.connect_to(&pin);
 
-        *guard = OutputConnection::connect_with_guard(pin, output);
+        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
     }
 
     /// Writes bytes to slave with given `address`
@@ -1132,17 +1029,9 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        let address = address.into();
-
         self.driver()
-            .write_blocking(address, write_buffer, true, read_buffer.is_empty())
-            .inspect_err(|_| self.internal_recover())?;
-
-        self.driver()
-            .read_blocking(address, read_buffer, true, true, false)
-            .inspect_err(|_| self.internal_recover())?;
-
-        Ok(())
+            .write_read_blocking(address.into(), write_buffer, read_buffer)
+            .inspect_err(|_| self.internal_recover())
     }
 
     /// Execute the provided operations on the I2C bus.
@@ -1194,7 +1083,8 @@ where
         address: A,
         operations: impl IntoIterator<Item = &'a mut Operation<'a>>,
     ) -> Result<(), Error> {
-        self.transaction_impl(address.into(), operations.into_iter().map(Operation::from))
+        self.driver()
+            .transaction_impl(address.into(), operations.into_iter().map(Operation::from))
             .inspect_err(|_| self.internal_recover())
     }
 
@@ -1217,7 +1107,8 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
         address: u8,
         operations: &mut [EhalOperation<'_>],
     ) -> Result<(), Self::Error> {
-        self.transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
+        self.driver()
+            .transaction_impl_async(address.into(), operations.iter_mut().map(Operation::from))
             .await
             .inspect_err(|_| self.internal_recover())
     }
@@ -2609,6 +2500,133 @@ impl Driver<'_> {
                 stop && idx == chunk_count - 1,
             )
             .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn write_read(
+        &self,
+        address: I2cAddress,
+        write_buffer: &[u8],
+        read_buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.write(address, write_buffer, true, read_buffer.is_empty())
+            .await?;
+
+        self.read(address, read_buffer, true, true, false).await?;
+
+        Ok(())
+    }
+
+    fn write_read_blocking(
+        &self,
+        address: I2cAddress,
+        write_buffer: &[u8],
+        read_buffer: &mut [u8],
+    ) -> Result<(), Error> {
+        self.write_blocking(address, write_buffer, true, read_buffer.is_empty())?;
+
+        self.read_blocking(address, read_buffer, true, true, false)?;
+
+        Ok(())
+    }
+
+    fn transaction_impl<'a>(
+        &self,
+        address: I2cAddress,
+        operations: impl Iterator<Item = Operation<'a>>,
+    ) -> Result<(), Error> {
+        address.validate()?;
+
+        let mut last_op: Option<OpKind> = None;
+        // filter out 0 length read operations
+        let mut op_iter = operations
+            .filter(|op| op.is_write() || !op.is_empty())
+            .peekable();
+
+        while let Some(op) = op_iter.next() {
+            let next_op = op_iter.peek().map(|v| v.kind());
+            let kind = op.kind();
+            match op {
+                Operation::Write(buffer) => {
+                    // execute a write operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.write_blocking(
+                        address,
+                        buffer,
+                        !matches!(last_op, Some(OpKind::Write)),
+                        next_op.is_none(),
+                    )?;
+                }
+                Operation::Read(buffer) => {
+                    // execute a read operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    // - will_continue is true if there is another read operation next
+                    self.read_blocking(
+                        address,
+                        buffer,
+                        !matches!(last_op, Some(OpKind::Read)),
+                        next_op.is_none(),
+                        matches!(next_op, Some(OpKind::Read)),
+                    )?;
+                }
+            }
+
+            last_op = Some(kind);
+        }
+
+        Ok(())
+    }
+
+    async fn transaction_impl_async<'a>(
+        &self,
+        address: I2cAddress,
+        operations: impl Iterator<Item = Operation<'a>>,
+    ) -> Result<(), Error> {
+        address.validate()?;
+
+        let mut last_op: Option<OpKind> = None;
+        // filter out 0 length read operations
+        let mut op_iter = operations
+            .filter(|op| op.is_write() || !op.is_empty())
+            .peekable();
+
+        while let Some(op) = op_iter.next() {
+            let next_op = op_iter.peek().map(|v| v.kind());
+            let kind = op.kind();
+            match op {
+                Operation::Write(buffer) => {
+                    // execute a write operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    self.write(
+                        address,
+                        buffer,
+                        !matches!(last_op, Some(OpKind::Write)),
+                        next_op.is_none(),
+                    )
+                    .await?;
+                }
+                Operation::Read(buffer) => {
+                    // execute a read operation:
+                    // - issue START/RSTART if op is different from previous
+                    // - issue STOP if op is the last one
+                    // - will_continue is true if there is another read operation next
+                    self.read(
+                        address,
+                        buffer,
+                        !matches!(last_op, Some(OpKind::Read)),
+                        next_op.is_none(),
+                        matches!(next_op, Some(OpKind::Read)),
+                    )
+                    .await?;
+                }
+            }
+
+            last_op = Some(kind);
         }
 
         Ok(())

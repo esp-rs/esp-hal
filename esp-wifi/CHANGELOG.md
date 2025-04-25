@@ -18,12 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove the `heapless` dependency (including from the public API) (#3317)
 
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Update `defmt` to 1.0 (#3416)
 
 ### Fixed
 
 - Update bt-hci version to fix serialization/deserialization of byte slices (#3340)
 
 - Allow `Configuration::None`, set country early, changed default power-save-mode to None (#3364)
+
+- Enterprise WPA fixed for ESP32-S2 (#3406)
+- COEX on ESP32 is now working (#3403)
 
 ### Removed
 

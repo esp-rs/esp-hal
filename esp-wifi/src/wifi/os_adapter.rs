@@ -177,10 +177,9 @@ pub unsafe extern "C" fn is_from_isr() -> bool {
 ///   Spin lock data pointer
 ///
 /// *************************************************************************
-static mut FAKE_SPIN_LOCK: u8 = 1;
 pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_void {
-    // original: return (void *)1;
-    let ptr = addr_of_mut!(FAKE_SPIN_LOCK);
+    let ptr = crate::compat::common::sem_create(1, 1);
+
     trace!("spin_lock_create {:?}", ptr);
     ptr as *mut crate::binary::c_types::c_void
 }
@@ -199,8 +198,9 @@ pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_vo
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn spin_lock_delete(lock: *mut crate::binary::c_types::c_void) {
-    // original: DEBUGASSERT((int)lock == 1);
     trace!("spin_lock_delete {:?}", lock);
+
+    crate::compat::common::sem_delete(lock);
 }
 
 /// **************************************************************************

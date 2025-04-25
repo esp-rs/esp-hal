@@ -349,6 +349,8 @@ impl private::Sealed for Trng<'_> {}
 
 /// Initialize for using WiFi and or BLE.
 ///
+/// Make sure to **not** call this function while interrupts are disabled.
+///
 /// # The `timer` argument
 ///
 /// The `timer` argument is a timer source that is used by the WiFi driver to
@@ -378,6 +380,10 @@ pub fn init<'d>(
     _rng: impl EspWifiRngSource + 'd,
     _radio_clocks: RADIO_CLK<'d>,
 ) -> Result<EspWifiController<'d>, InitializationError> {
+    if crate::is_interrupts_disabled() {
+        return Err(InitializationError::InterruptsDisabled);
+    }
+
     // A minimum clock of 80MHz is required to operate WiFi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
@@ -467,6 +473,17 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     Ok(())
 }
 
+/// Returns true if at least some interrupt levels are disabled.
+fn is_interrupts_disabled() -> bool {
+    #[cfg(target_arch = "xtensa")]
+    return hal::xtensa_lx::interrupt::get_level() != 0
+        || hal::xtensa_lx::interrupt::get_mask() == 0;
+
+    #[cfg(target_arch = "riscv32")]
+    return !hal::riscv::register::mstatus::read().mie()
+        || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
+}
+
 pub(crate) mod private {
     pub trait Sealed {}
 }
@@ -474,11 +491,19 @@ pub(crate) mod private {
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during [`init`].
+#[non_exhaustive]
 pub enum InitializationError {
+    /// A general error occurred.
+    /// The internal error code is reported.
     General(i32),
+    /// An error from the WiFi driver.
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
+    /// The current CPU clock frequency is too low.
     WrongClockConfig,
+    /// Tried to initialize while interrupts are disabled.
+    /// This is not supported.
+    InterruptsDisabled,
 }
 
 #[cfg(feature = "wifi")]

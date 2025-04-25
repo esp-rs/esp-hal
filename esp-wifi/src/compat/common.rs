@@ -205,6 +205,16 @@ pub(crate) fn sem_delete(semphr: *mut c_void) {
 }
 
 pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
+    // This shouldn't normally happen if we always report the correct state from
+    // `is_in_isr`. This is a last resort if the driver calls this anyways.
+    // (I haven't observed this to happen)
+    let tick = if tick == OSI_FUNCS_TIME_BLOCKING && crate::is_interrupts_disabled() {
+        warn!("blocking sem_take probably called from an ISR - return early");
+        1
+    } else {
+        tick
+    };
+
     trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
 
     let forever = tick == OSI_FUNCS_TIME_BLOCKING;

@@ -8,10 +8,7 @@
 
 use esp_hal::{
     Blocking,
-    gpio::{
-        AnyPin,
-        interconnect::{InputSignal, OutputSignal},
-    },
+    gpio::AnyPin,
     uart::{self, ClockSource, Uart},
 };
 use hil_test as _;
@@ -63,6 +60,9 @@ mod tests {
     fn flush_waits_for_data_to_be_transmitted(ctx: Context) {
         let mut uart = ctx.uart1.with_tx(ctx.tx).with_rx(ctx.rx);
 
+        assert!(uart.write_ready());
+        assert!(!uart.read_ready());
+
         let bauds = [1000, 5000000];
         for baud in bauds {
             uart.apply_config(&uart::Config::default().with_baudrate(baud))
@@ -72,7 +72,12 @@ mod tests {
                 uart.write(&[i as u8]).unwrap();
                 uart.flush().unwrap();
 
+                assert!(uart.write_ready());
+                assert!(uart.read_ready());
+
                 let read = uart.read_buffered(&mut byte).unwrap();
+
+                assert!(!uart.read_ready());
                 assert_eq!(read, 1, "Baud rate {}, iteration {}", baud, i);
                 assert_eq!(byte[0], i as u8, "Baud rate {}, iteration {}", baud, i);
             }
@@ -161,8 +166,8 @@ mod tests {
     fn test_send_receive_inverted(ctx: Context) {
         let mut uart = ctx
             .uart1
-            .with_tx(OutputSignal::from(ctx.tx).inverted())
-            .with_rx(InputSignal::from(ctx.rx).inverted());
+            .with_tx(ctx.tx.into_output_signal().with_output_inverter(true))
+            .with_rx(unsafe { ctx.rx.into_input_signal() }.with_input_inverter(true));
 
         uart.write(&[0x42]).unwrap();
         let mut byte = [0u8; 1];

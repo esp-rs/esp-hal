@@ -258,7 +258,7 @@ unsafe extern "C" fn task_delete(task: *const ()) {
 
 #[ram]
 unsafe extern "C" fn is_in_isr() -> i32 {
-    0
+    crate::is_interrupts_disabled() as i32
 }
 
 #[ram]
@@ -302,7 +302,6 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
     trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-    // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
 }
@@ -485,7 +484,19 @@ pub fn send_hci(data: &[u8]) {
                 }
 
                 PACKET_SENT.store(false, Ordering::Relaxed);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request_end(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 trace!("sent vhci host packet");
 
                 super::dump_packet_info(packet);

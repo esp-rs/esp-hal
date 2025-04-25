@@ -102,9 +102,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (clock_rx, clock_tx) = ctx.clock_pin.split();
-        let (valid_rx, valid_tx) = ctx.valid_pin.split();
-        let [(d0_rx, d0_tx), ..] = ctx.data_pins.map(|pin| pin.split());
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
+        let [(d0_rx, d0_tx), ..] = ctx.data_pins.map(|pin| unsafe { pin.split() });
 
         let tx_pins = TxOneBit::new(d0_tx);
         let rx_pins = RxOneBit::new(d0_rx);
@@ -165,9 +165,9 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (clock_rx, clock_tx) = ctx.clock_pin.split();
-        let (valid_rx, valid_tx) = ctx.valid_pin.split();
-        let [(d0_rx, d0_tx), (d1_rx, d1_tx), ..] = ctx.data_pins.map(|pin| pin.split());
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
+        let [(d0_rx, d0_tx), (d1_rx, d1_tx), ..] = ctx.data_pins.map(|pin| unsafe { pin.split() });
 
         let tx_pins = TxTwoBits::new(d0_tx, d1_tx);
         let rx_pins = RxTwoBits::new(d0_rx, d1_rx);
@@ -228,15 +228,15 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (clock_rx, clock_tx) = ctx.clock_pin.split();
-        let (valid_rx, valid_tx) = ctx.valid_pin.split();
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
         let [
             (d0_rx, d0_tx),
             (d1_rx, d1_tx),
             (d2_rx, d2_tx),
             (d3_rx, d3_tx),
             ..,
-        ] = ctx.data_pins.map(|pin| pin.split());
+        ] = ctx.data_pins.map(|pin| unsafe { pin.split() });
 
         let tx_pins = TxFourBits::new(d0_tx, d1_tx, d2_tx, d3_tx);
         let rx_pins = RxFourBits::new(d0_rx, d1_rx, d2_rx, d3_rx);
@@ -302,8 +302,8 @@ mod tests {
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
         let mut dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-        let (clock_rx, clock_tx) = ctx.clock_pin.split();
-        let (valid_rx, valid_tx) = ctx.valid_pin.split();
+        let (clock_rx, clock_tx) = unsafe { ctx.clock_pin.split() };
+        let (valid_rx, valid_tx) = unsafe { ctx.valid_pin.split() };
         let [
             (d0_rx, d0_tx),
             (d1_rx, d1_tx),
@@ -313,7 +313,7 @@ mod tests {
             (d5_rx, d5_tx),
             (d6_rx, d6_tx),
             (d7_rx, d7_tx),
-        ] = ctx.data_pins.map(|pin| pin.split());
+        ] = ctx.data_pins.map(|pin| unsafe { pin.split() });
 
         let tx_pins = TxEightBits::new(d0_tx, d1_tx, d2_tx, d3_tx, d4_tx, d5_tx, d6_tx, d7_tx);
         let rx_pins = RxEightBits::new(d0_rx, d1_rx, d2_rx, d3_rx, d4_rx, d5_rx, d6_rx, d7_rx);

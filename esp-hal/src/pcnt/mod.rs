@@ -41,8 +41,8 @@
 //! let config = InputConfig::default().with_pull(Pull::Up);
 //! let pin_a = Input::new(peripherals.GPIO4, config);
 //! let pin_b = Input::new(peripherals.GPIO5, config);
-//! let (input_a, _) = pin_a.split();
-//! let (input_b, _) = pin_b.split();
+//! let input_a = pin_a.peripheral_input();
+//! let input_b = pin_b.peripheral_input();
 //! ch0.set_ctrl_signal(input_a.clone());
 //! ch0.set_edge_signal(input_b.clone());
 //! ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);

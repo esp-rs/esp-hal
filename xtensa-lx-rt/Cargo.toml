@@ -18,18 +18,18 @@ bench = false
 test  = false
 
 [dependencies]
-document-features = "0.2.10"
+document-features = "0.2.11"
 macros            = { version = "0.2.2", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
 r0                = "1.0.0"
 xtensa-lx         = { version = "0.10.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-anyhow          = "1.0.95"
+anyhow          = "1.0.98"
 enum-as-inner   = "0.6.1"
-minijinja       = "2.6.0"
-serde           = { version = "1.0.217", features = ["derive"] }
-strum           = { version = "0.26.3", features = ["derive"] }
-toml            = "0.8.19"
+minijinja       = "2.9.0"
+serde           = { version = "1.0.219", features = ["derive"] }
+strum           = { version = "0.27.1", features = ["derive"] }
+toml            = "0.8.20"
 
 [features]
 ## Save and restore float registers for exceptions

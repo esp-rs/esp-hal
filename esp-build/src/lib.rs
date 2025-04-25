@@ -164,7 +164,7 @@ fn do_alert(color: Color, input: TokenStream) -> TokenStream {
 
             if let Some(heading) = maybe_heading {
                 stderr.set_color(color_spec.clone().set_bold(true)).ok();
-                write!(stderr, "\n{}", heading).ok();
+                write!(stderr, "\n{heading}").ok();
                 has_nonspace = true;
             }
 
@@ -175,7 +175,7 @@ fn do_alert(color: Color, input: TokenStream) -> TokenStream {
             writeln!(stderr).ok();
         } else {
             stderr.set_color(&color_spec).ok();
-            writeln!(stderr, "{}", line).ok();
+            writeln!(stderr, "{line}").ok();
 
             has_nonspace = has_nonspace || line.contains(|ch: char| ch != ' ');
         }

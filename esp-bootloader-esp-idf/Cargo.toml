@@ -18,7 +18,7 @@ bench = false
 test  = false
 
 [dependencies]
-defmt = { version = "0.3.10", optional = true }
+defmt = { version = "1.0.1", optional = true }
 document-features = "0.2.11"
 esp-config = { version = "0.3.0", path = "../esp-config" }
 embedded-storage = "0.3.1"

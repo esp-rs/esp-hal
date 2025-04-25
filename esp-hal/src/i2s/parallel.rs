@@ -117,8 +117,9 @@ use crate::{
         asynch::DmaTxFuture,
     },
     gpio::{
+        OutputConfig,
         OutputSignal,
-        interconnect::{OutputConnection, PeripheralOutput},
+        interconnect::{self, PeripheralOutput},
     },
     i2s::{AnyI2s, AnyI2sInner},
     pac::i2s0::RegisterBlock,
@@ -136,7 +137,7 @@ pub trait TxPins<'d> {
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pins: [OutputConnection<'d>; 16],
+    pins: [interconnect::OutputSignal<'d>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
@@ -191,7 +192,8 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
     fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -200,7 +202,7 @@ impl<'d> TxPins<'d> for TxSixteenBits<'d> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pins: [OutputConnection<'d>; 8],
+    pins: [interconnect::OutputSignal<'d>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
@@ -239,7 +241,8 @@ impl<'d> TxPins<'d> for TxEightBits<'d> {
     fn configure(&mut self, instance: &(impl Instance + 'd)) {
         let bits = self.bus_width();
         for (i, pin) in self.pins.iter_mut().enumerate() {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             instance.data_out_signal(i, bits).connect_to(pin);
         }
     }
@@ -275,7 +278,10 @@ impl<'d> I2sParallel<'d, Blocking> {
         i2s.setup(frequency, pins.bus_width());
         // setup the clock pin
         let clock_pin = clock_pin.into();
-        clock_pin.set_to_push_pull_output();
+
+        clock_pin.apply_output_config(&OutputConfig::default());
+        clock_pin.set_output_enable(true);
+
         i2s.ws_signal().connect_to(&clock_pin);
 
         pins.configure(&i2s);

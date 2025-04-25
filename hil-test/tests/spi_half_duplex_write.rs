@@ -124,7 +124,7 @@ mod tests {
             }
         }
 
-        let (mosi_loopback, mosi) = mosi.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
 
         let spi = Spi::new(
             peripherals.SPI2,

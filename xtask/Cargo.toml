@@ -21,7 +21,7 @@ rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", features = ["derive"] }
 serde_json   = "1.0.70"
-strum        = { version = "0.26.3", features = ["derive"] }
+strum        = { version = "0.27.1", features = ["derive"] }
 toml_edit    = "0.22.22"
 walkdir      = "2.5.0"
 
