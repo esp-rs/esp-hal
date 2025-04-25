@@ -356,3 +356,4 @@ The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renam
 ## Changes related to cargo features
 
 The `log` feature has been replaced by `log-04`.
+`ufmt` support is now gated behind `unstable`.
