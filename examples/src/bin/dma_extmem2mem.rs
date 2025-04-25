@@ -8,7 +8,7 @@
 #![no_std]
 #![no_main]
 
-use aligned::{Aligned, A64};
+use aligned::{A64, Aligned};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
