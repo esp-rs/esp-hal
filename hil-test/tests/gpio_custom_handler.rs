@@ -173,12 +173,12 @@ mod tests {
         );
         // Run the executor at interrupt priority 1, which is the same as the default
         // interrupt priority of the GPIO interrupt handler.
-        let interrupt_spwaner = interrupt_executor.start(Priority::Priority1);
+        let interrupt_spawner = interrupt_executor.start(Priority::Priority1);
 
         let done = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
-        interrupt_spwaner.must_spawn(sense_pin(gpio1.degrade(), done));
-        interrupt_spwaner.must_spawn(drive_pin(gpio2.degrade()));
+        interrupt_spawner.must_spawn(sense_pin(gpio1.degrade(), done));
+        interrupt_spawner.must_spawn(drive_pin(gpio2.degrade()));
 
         done.wait().await;
     }
