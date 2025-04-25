@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Added `Flex::enable_output` (#3387)
 - Added `Flex::set_output_enable` (#3387)
+- Added `{Uart, UartRx}::read_ready` (#3423)
+- Added `{Uart, UartTx}::write_ready` (#3423)
+- Implemented `embedded_io::ReadReady` for `Uart` and `UartRx` (#3423)
+- Implemented `embedded_io::WriteReady` for `Uart` and `UartTx` (#3423)
 
 ### Changed
 
