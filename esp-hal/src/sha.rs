@@ -60,7 +60,6 @@
 use core::{borrow::Borrow, convert::Infallible, marker::PhantomData, mem::size_of};
 
 /// Re-export digest for convenience
-#[cfg(feature = "digest")]
 pub use digest::Digest;
 
 #[cfg(not(esp32))]
@@ -490,7 +489,6 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     /// For example, in SHA-256, this would be 32 bytes.
     const DIGEST_LENGTH: usize;
 
-    #[cfg(feature = "digest")]
     #[doc(hidden)]
     type DigestOutputSize: digest::generic_array::ArrayLength<u8> + 'static;
 
@@ -522,15 +520,12 @@ pub trait ShaAlgorithm: crate::private::Sealed {
 /// implement digest traits if digest feature is present.
 /// Note: digest has a blanket trait implementation for [digest::Digest] for any
 /// element that implements FixedOutput + Default + Update + HashMarker
-#[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
 
-#[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::OutputSizeUser for ShaDigest<'d, A, S> {
     type OutputSize = A::DigestOutputSize;
 }
 
-#[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A, S> {
     fn update(&mut self, data: &[u8]) {
         let mut remaining = data.as_ref();
@@ -540,7 +535,6 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::Update for ShaDigest<'d, A
     }
 }
 
-#[cfg(feature = "digest")]
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<'d, A, S> {
     fn finalize_into(mut self, out: &mut digest::Output<Self>) {
         nb::block!(self.finish(out)).unwrap();
@@ -575,7 +569,6 @@ macro_rules! impl_sha {
             #[cfg(not(esp32))]
             const MODE_AS_BITS: u8 = $mode_bits;
 
-            #[cfg(feature = "digest")]
             // We use paste to append `U` to the digest size to match a const defined in
             // digest
             type DigestOutputSize = paste::paste!(digest::consts::[< U $digest_length >]);

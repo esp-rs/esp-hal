@@ -52,7 +52,7 @@ digest                   = { version = "0.10.7", default-features = false, optio
 embassy-usb-driver       = { version = "0.1.0", optional = true }
 embassy-usb-synopsys-otg = { version = "0.2.0", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
-esp-synopsys-usb-otg     = { version = "0.4.2", optional = true, features = ["fs", "esp32sx"] }
+esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1.0", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
@@ -104,9 +104,14 @@ default = []
 
 bluetooth = []
 
-usb-otg = ["dep:embassy-usb-driver", "dep:embassy-usb-synopsys-otg", "dep:esp-synopsys-usb-otg", "dep:usb-device"]
-
 __esp_hal_embassy = []
+__usb_otg = [
+    "dep:embassy-usb-driver",
+    "dep:embassy-usb-synopsys-otg",
+    "dep:esp-synopsys-usb-otg",
+    "esp-synopsys-usb-otg/esp32sx",
+    "esp-synopsys-usb-otg/fs",
+]
 
 ## Enable debug features in the HAL (used for development).
 debug = [
@@ -123,19 +128,50 @@ log-04 = ["dep:log"]
 
 # Chip Support Feature Flags
 # Target the ESP32.
-esp32   = ["dep:esp32", "procmacros/rtc-slow", "xtensa-lx-rt/esp32"]
+esp32   = [
+    "dep:esp32",
+    "procmacros/rtc-slow",
+    "xtensa-lx-rt/esp32",
+]
 # Target the ESP32-C2.
-esp32c2 = ["dep:esp32c2", "portable-atomic/unsafe-assume-single-core"]
+esp32c2 = [
+    "dep:esp32c2",
+    "portable-atomic/unsafe-assume-single-core",
+]
 # Target the ESP32-C3.
-esp32c3 = ["dep:esp32c3", "esp-riscv-rt/rtc-ram", "portable-atomic/unsafe-assume-single-core"]
+esp32c3 = [
+    "dep:esp32c3",
+    "esp-riscv-rt/rtc-ram",
+    "portable-atomic/unsafe-assume-single-core",
+]
 # Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6", "esp-riscv-rt/rtc-ram", "procmacros/has-lp-core"]
+esp32c6 = [
+    "dep:esp32c6",
+    "esp-riscv-rt/rtc-ram",
+    "procmacros/has-lp-core",
+]
 # Target the ESP32-H2.
-esp32h2 = ["dep:esp32h2", "esp-riscv-rt/rtc-ram"]
+esp32h2 = [
+    "dep:esp32h2",
+    "esp-riscv-rt/rtc-ram",
+]
 # Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2", "portable-atomic/critical-section", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s2"]
+esp32s2 = [
+    "dep:esp32s2",
+    "portable-atomic/critical-section",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "xtensa-lx-rt/esp32s2",
+    "__usb_otg",
+]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3", "procmacros/has-ulp-core", "procmacros/rtc-slow", "usb-otg", "xtensa-lx-rt/esp32s3"]
+esp32s3 = [
+    "dep:esp32s3",
+    "procmacros/has-ulp-core",
+    "procmacros/rtc-slow",
+    "xtensa-lx-rt/esp32s3",
+    "__usb_otg",
+]
 
 #! ### Trait Implementation Feature Flags
 ## Implement `defmt::Format` on certain types.
@@ -144,8 +180,8 @@ defmt = [
     "embassy-futures/defmt",
     "embassy-sync/defmt",
     "embedded-hal/defmt-03",
-    "embedded-io/defmt-03",
-    "embedded-io-async/defmt-03",
+    "embedded-io?/defmt-03",
+    "embedded-io-async?/defmt-03",
     "esp32?/defmt",
     "esp32c2?/defmt",
     "esp32c3?/defmt",
@@ -167,6 +203,7 @@ psram = []
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
 unstable = [
+    "dep:digest",
     "dep:embassy-embedded-hal",
     "dep:embedded-can",
     "dep:embedded-io",
