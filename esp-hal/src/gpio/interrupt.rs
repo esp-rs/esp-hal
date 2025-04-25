@@ -1,3 +1,46 @@
+//! GPIO interrupt handling
+//!
+//! GPIO interrupt handling must work at the same time as the async API. Async
+//! operations take pins by `&mut self`, so they can only be accessed after the
+//! operation is complete, or cancelled. This means that manual `listen`
+//! operations don't need to be prepared for async operations, but
+//! async operations need to be prepared to handle cases where the pin was
+//! configured to listen for an event.
+//!
+//! The async API communicated completion with an atomic bitfield. This
+//! bitfield is cleared when the interrupt handler is called. This is done
+//! because the user may register a custom interrupt handler which either
+//! disables the interrupts or clears the interrupt status bits. The user
+//! handler must not interfere with the async API, so we need some signaling
+//! mechanism private to the async API.
+//!
+//! The async API disables the pin's interrupt when triggered. This makes async
+//! operations single-shot. If there is no user handler, the other GPIO
+//! interrupts are also single-shot. This is because the user has no way to
+//! handle multiple events, the API only allows querying whether the interrupt
+//! has fired or not. Disabling the interrupt also means that the interrupt
+//! status bits are not cleared, so the `is_interrupt_set` works by default as
+//! expected.
+//!
+//! Disabling the interrupt also allows the async Future to complete cheaply by
+//! forgetting itself. Otherwise, to prevent a race condition, the Future's Drop
+//! implementation needs to take the critical section to disable the interrupt.
+//!
+//! When the user sets a custom interrupt handler, the built-in interrupt
+//! handler will only disable the async interrupts. The user handler is
+//! responsible for clearing the interrupt status bits or disabling the
+//! interrupts, based on their needs. This is communicated to the user in the
+//! documentation of the `Io::set_interrupt_handler` function.
+//!
+//! TODO: currently, direct-binding a GPIO interrupt handler will completely
+//! break the async API. We will need to expose a way to handle async events.
+//!
+//! The interrupt handler runs in a GPIO-specific critical section. The critical
+//! section is required because interrupts are disabled by modifying the pin
+//! register, which is not an atomic operation. The critical section also
+//! ensures that a higher priority task waken by an async pin event (or the user
+//! handler) will only run after the interrupt handler has finished.
+
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
