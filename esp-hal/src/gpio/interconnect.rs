@@ -38,7 +38,7 @@
 //!
 //! Each GPIO pin driver such as [`Input`], can be converted
 //! into input or output signals. [`Flex`], which can be either input or output,
-//! can be [`split`][Flex::split] into both signals at once. These signals can
+//! can be [`split`](Flex::split) into both signals at once. These signals can
 //! then be individually connected to a peripheral input or output signal. This
 //! allows for flexible routing of signals between peripherals and GPIO pins.
 //!
@@ -55,7 +55,7 @@
 //! [freezing](`InputSignal::freeze`) the signals.
 //!
 //! For example, if you want to route GPIO3 to both a Pulse Counter
-//! input and a [UART][crate::uart::Uart] RX line, you will need to make sure
+//! input and a [UART](crate::uart::Uart) RX line, you will need to make sure
 //! one of the signals is frozen, otherwise the driver that is configured later
 //! will overwrite the other driver's configuration. Configuring the signals on
 //! multiple cores is undefined behaviour unless you ensure the configuration
@@ -63,14 +63,12 @@
 //!
 //! ### Using pins and signals
 //!
-//! A GPIO pin can be configured either with a GPIO driver such as
-//! [`Input`][crate::gpio::Input], or by a peripheral driver using a pin
-//! assignment method such as
-//! [`Spi::with_mosi`]. The peripheral
-//! drivers' preferences can be overridden by passing a pin driver to the
-//! peripheral driver. When converting a driver to signals, the underlying
-//! signals will be initially [frozen](InputSignal::freeze) to support this
-//! use case.
+//! A GPIO pin can be configured either with a GPIO driver such as [`Input`], or
+//! by a peripheral driver using a pin assignment method such as
+//! [`Spi::with_mosi`]. The peripheral drivers' preferences can be overridden by
+//! passing a pin driver to the peripheral driver. When converting a driver to
+//! signals, the underlying signals will be initially
+//! [frozen](InputSignal::freeze) to support this use case.
 //!
 //! ## Inverting inputs and outputs
 //!
@@ -521,7 +519,7 @@ bitflags::bitflags! {
 /// An input signal between a peripheral and a GPIO pin.
 ///
 /// If the `InputSignal` was obtained from a pin driver such as
-/// [`Input`][crate::gpio::Input::split], the GPIO driver will be responsible
+/// [`Input`](crate::gpio::Input::split), the GPIO driver will be responsible
 /// for configuring the pin with the correct settings, peripheral drivers will
 /// not be able to modify the pin settings.
 ///
@@ -705,7 +703,7 @@ bitflags::bitflags! {
 /// An (input and) output signal between a peripheral and a GPIO pin.
 ///
 /// If the `OutputSignal` was obtained from a pin driver such as
-/// [`Output`][crate::gpio::Output::split], the GPIO driver will be responsible
+/// [`Output`](crate::gpio::Output::split), the GPIO driver will be responsible
 /// for configuring the pin with the correct settings, peripheral drivers will
 /// not be able to modify the pin settings.
 ///
