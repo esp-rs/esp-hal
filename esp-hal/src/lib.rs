@@ -576,12 +576,12 @@ pub struct Config {
     cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(any(feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(any(feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(feature = "psram")]
     psram: psram::PsramConfig,

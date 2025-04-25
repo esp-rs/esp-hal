@@ -30,6 +30,14 @@ reqwest = { version = "0.12.12", features = [
     "native-tls-vendored",
 ], optional = true }
 
+# This pulls a gazillion crates - don't include it by default
+cargo-semver-checks = { version = "0.41.0", optional = true }
+
+# THIS NEEDS TO MATCH THE rustfmt-json FORMAT - see https://github.com/rust-lang/rustdoc-types/blob/trunk/CHANGELOG.md
+rustdoc-types = { version = "0.34.0", optional = true }
+
 [features]
 deploy-docs  = ["dep:reqwest"]
 preview-docs = ["dep:opener", "dep:rocket"]
+semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types" ]
+

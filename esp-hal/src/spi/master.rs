@@ -2469,10 +2469,10 @@ mod dma {
     }
 
     mod ehal1 {
-        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg(feature = "unstable")]
         use embedded_hal::spi::{ErrorType, SpiBus};
 
-        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg(feature = "unstable")]
         use super::*;
 
         #[instability::unstable]
