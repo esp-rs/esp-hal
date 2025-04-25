@@ -13,7 +13,7 @@ use core::marker::PhantomData;
 
 use super::PeripheralGuard;
 use crate::{
-    gpio::interconnect::{OutputConnection, PeripheralOutput},
+    gpio::interconnect::{OutputSignal, PeripheralOutput},
     mcpwm::{PwmPeripheral, timer::Timer},
     pac,
 };
@@ -286,7 +286,7 @@ impl<const IS_A: bool> PwmPinConfig<IS_A> {
 
 /// A pin driven by an MCPWM operator
 pub struct PwmPin<'d, PWM, const OP: u8, const IS_A: bool> {
-    pin: OutputConnection<'d>,
+    pin: OutputSignal<'d>,
     phantom: PhantomData<PWM>,
     _guard: PeripheralGuard,
 }

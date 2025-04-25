@@ -860,19 +860,29 @@ macro_rules! gpio {
                     /// Peripheral signals allow connecting peripherals together without using
                     /// external hardware.
                     ///
+                    /// # Safety
+                    ///
+                    /// The caller must ensure that peripheral drivers don't configure the same
+                    /// GPIO at the same time in multiple places. This includes clones of the
+                    /// `InputSignal` struct, as well as the `OutputSignal` struct.
+                    ///
                     /// ```rust, no_run
                     #[doc = $crate::before_snippet!()]
-                    /// let (rx, tx) = peripherals.GPIO2.split();
+                    /// let (rx, tx) = unsafe { peripherals.GPIO2.split() };
+                    /// // rx and tx can then be passed to different peripherals to connect them.
                     /// # Ok(())
                     /// # }
                     /// ```
                     #[instability::unstable]
-                    pub fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
+                    pub unsafe fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
                         use $crate::gpio::Pin;
+
                         // FIXME: we should implement this in the gpio macro for output pins, but we
                         // should also have an input-only alternative for pins that can't be used as
                         // outputs.
-                        self.degrade().split()
+
+                        // This goes through AnyPin which calls `init_gpio` as needed.
+                        unsafe { self.degrade().split() }
                     }
                 }
 
@@ -1165,55 +1175,15 @@ impl<'d> Output<'d> {
         this
     }
 
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
-    /// # let config = OutputConfig::default();
-    /// let pin1 = Output::new(peripherals.GPIO1, Level::High, config);
-    /// let (input, output) = pin1.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn split(
-        self,
-    ) -> (
-        interconnect::InputSignal<'d>,
-        interconnect::OutputSignal<'d>,
-    ) {
-        self.pin.split()
-    }
-
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
-    ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
-    /// # let config = OutputConfig::default();
-    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
-    /// // Can be passed as an input.
-    /// let input = pin1_gpio.peripheral_input();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
-        self.pin.peripheral_input()
-    }
-
     /// Turns the pin object into a peripheral
     /// [output][interconnect::OutputSignal].
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::OutputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{Output, OutputConfig, Level};
@@ -1366,7 +1336,7 @@ impl<'d> Input<'d> {
     pub fn new(pin: impl InputPin + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
 
-        pin.pin.set_output_enable(false);
+        pin.set_output_enable(false);
         pin.set_input_enable(true);
         pin.apply_input_config(&config);
 
@@ -1377,6 +1347,10 @@ impl<'d> Input<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{Input, InputConfig, Pull};
@@ -1527,51 +1501,6 @@ impl<'d> Input<'d> {
         self.pin.wakeup_enable(enable, event)
     }
 
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
-    /// let config = InputConfig::default().with_pull(Pull::Up);
-    /// let pin1 = Input::new(peripherals.GPIO1, config);
-    /// let (input, output) = pin1.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn split(
-        self,
-    ) -> (
-        interconnect::InputSignal<'d>,
-        interconnect::OutputSignal<'d>,
-    ) {
-        self.pin.split()
-    }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
-    /// let config = InputConfig::default().with_pull(Pull::Up);
-    /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
-    /// // Can be passed as an output.
-    /// let pin1 = pin1_gpio.into_peripheral_output();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
-        self.pin.into_peripheral_output()
-    }
-
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1606,21 +1535,8 @@ impl<'d> Flex<'d> {
     pub fn new(pin: impl Pin + 'd) -> Self {
         let pin = pin.degrade();
 
-        #[cfg(usb_device)]
-        disable_usb_pads(pin.number());
-
-        pin.set_output_enable(false);
-
-        GPIO::regs()
-            .func_out_sel_cfg(pin.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
-        // Use RMW to not overwrite sleep configuration
-        io_mux_reg(pin.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(GPIO_FUNCTION as u8);
-            w.fun_ie().clear_bit();
-            w.slp_sel().clear_bit()
-        });
+        // Before each use, reset the GPIO to a known state.
+        pin.init_gpio();
 
         Self { pin }
     }
@@ -1639,7 +1555,7 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn apply_input_config(&mut self, config: &InputConfig) {
-        self.pin.pull_direction(config.pull);
+        self.pin.apply_input_config(config);
     }
 
     /// Enable or disable the GPIO pin input buffer.
@@ -1761,23 +1677,7 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn apply_output_config(&mut self, config: &OutputConfig) {
-        let pull_up = config.pull == Pull::Up;
-        let pull_down = config.pull == Pull::Down;
-
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(unsafe { self.pin.clone_unchecked() }, pull_up, pull_down);
-
-        io_mux_reg(self.number()).modify(|_, w| {
-            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
-            w.fun_wpu().bit(pull_up);
-            w.fun_wpd().bit(pull_down);
-            w
-        });
-
-        GPIO::regs().pin(self.number() as usize).modify(|_, w| {
-            w.pad_driver()
-                .bit(config.drive_mode == DriveMode::OpenDrain)
-        });
+        self.pin.apply_output_config(config);
     }
 
     /// Enable or disable the GPIO pin output driver.
@@ -1849,25 +1749,39 @@ impl<'d> Flex<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::Flex;
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
+    /// // You can keep using the Flex, as well as connect the pin to a
+    /// // peripheral input.
     /// # Ok(())
     /// # }
     /// ```
     #[inline]
     #[instability::unstable]
     pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
-        unsafe { AnyPin::steal(self.number()) }.split().0
+        self.pin.set_input_enable(true);
+        unsafe {
+            // Safety: the signal is frozen by this function.
+            self.pin.clone_unchecked().split_no_init().0.freeze()
+        }
     }
 
-    /// Split the pin into an input and output signal.
+    /// Split the pin into an input and output signal pair.
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    ///
+    /// Note that the signals returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::Flex;
@@ -1884,8 +1798,44 @@ impl<'d> Flex<'d> {
         interconnect::InputSignal<'d>,
         interconnect::OutputSignal<'d>,
     ) {
-        assert!(self.pin.is_output());
-        unsafe { AnyPin::steal(self.number()) }.split()
+        let input = self.peripheral_input();
+        let output = self.into_peripheral_output();
+
+        (input, output)
+    }
+
+    /// Split the pin into an [Input] and an [Output] driver pair.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze). On the other hand,
+    /// the pin driver is free to change settings.
+    ///
+    /// This function allows you to configure an input-output pin, then keep
+    /// working with the output half. This is mainly intended for testing,
+    /// allowing you to drive a peripheral from a signal generated by
+    /// software.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the pins are not being configured via their
+    /// `apply_config` functions in the same time in multiple places. The pin
+    /// drivers must not be turned back into `Flex`, unless one of the
+    /// drivers is dropped first.
+    // TODO is this enough? Register-wise config is the only non-atomic operation, but is it
+    // actually safe to have two drivers on the same pin, otherwise? Perhaps it would be better
+    // to implement ehal traits for signals?
+    #[inline]
+    #[instability::unstable]
+    pub unsafe fn split_into_drivers(self) -> (Input<'d>, Output<'d>) {
+        self.pin.set_input_enable(true);
+        let input = Input {
+            pin: Flex {
+                pin: unsafe { self.pin.clone_unchecked() },
+            },
+        };
+        let output = Output { pin: self };
+
+        (input, output)
     }
 
     /// Turns the pin object into a peripheral
@@ -1893,6 +1843,10 @@ impl<'d> Flex<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::OutputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::Flex;
@@ -1905,7 +1859,10 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
-        self.split().1
+        unsafe {
+            // Safety: the signals are frozen by this function.
+            self.pin.split_no_init().1.freeze()
+        }
     }
 }
 
@@ -1921,17 +1878,26 @@ impl<'lt> AnyPin<'lt> {
         GpioBank::_0
     }
 
-    /// Init as input with the given pull-up/pull-down
     #[inline]
-    pub(crate) fn init_input(&self, pull: Pull) {
-        self.pull_direction(pull);
-
+    /// Resets the GPIO to a known state.
+    ///
+    /// This function needs to be called before using the GPIO pin:
+    /// - Before converting it into signals
+    /// - Before using it as an input or output
+    pub(crate) fn init_gpio(&self) {
         #[cfg(usb_device)]
         disable_usb_pads(self.number());
 
+        self.set_output_enable(false);
+
+        GPIO::regs()
+            .func_out_sel_cfg(self.number() as usize)
+            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+        // Use RMW to not overwrite sleep configuration
         io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(GPIO_FUNCTION as u8);
-            w.fun_ie().set_bit();
+            w.fun_ie().clear_bit();
             w.slp_sel().clear_bit()
         });
     }
@@ -1940,33 +1906,114 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
+    ///
+    /// Creating an input signal enables the pin's input buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers don't configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct, as well as the `OutputSignal` struct.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the pin is not an output pin.
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{AnyPin, Pin};
     /// let pin1 = peripherals.GPIO1.degrade();
-    /// let (input, output) = pin1.split();
+    /// let (input, output) = unsafe { pin1.split() };
     /// # Ok(())
     /// # }
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(
+    pub unsafe fn split(
         self,
     ) -> (
         interconnect::InputSignal<'lt>,
         interconnect::OutputSignal<'lt>,
     ) {
         assert!(self.is_output());
-        (
-            interconnect::InputSignal::new(Self {
-                pin: self.pin,
-                _lifetime: self._lifetime,
-            }),
-            interconnect::OutputSignal::new(Self {
-                pin: self.pin,
-                _lifetime: self._lifetime,
-            }),
-        )
+
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+        self.set_input_enable(true);
+
+        let (input, output) = unsafe { self.split_no_init() };
+
+        // We don't know if the input signal(s) will support bypassing the GPIO matrix.
+        // Since the bypass option is common between input and output halves of
+        // a single GPIO, we can't assume anything about the output, either.
+        let output = output.with_gpio_matrix_forced(true);
+
+        (input, output)
+    }
+
+    /// Convert the pin into an input signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without
+    /// using external hardware.
+    ///
+    /// Creating an input signal enables the pin's input buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers don't configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct.
+    #[inline]
+    #[instability::unstable]
+    pub unsafe fn into_input_signal(self) -> interconnect::InputSignal<'lt> {
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+        self.set_input_enable(true);
+
+        let (input, _) = unsafe { self.split_no_init() };
+
+        input
+    }
+
+    /// Convert the pin into an output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without
+    /// using external hardware.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the pin is not an output pin.
+    #[inline]
+    #[instability::unstable]
+    pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
+        assert!(self.is_output());
+
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+
+        // AnyPin is used as output only, we can allow bypassing the GPIO matrix.
+        let (_, output) = unsafe { self.split_no_init() };
+
+        output
+    }
+
+    unsafe fn split_no_init(
+        self,
+    ) -> (
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
+    ) {
+        let input = interconnect::InputSignal::new(unsafe { self.clone_unchecked() });
+        let output = interconnect::OutputSignal::new(self);
+
+        // Since InputSignal can be cloned, we have no way of knowing how many signals
+        // end up being configured, and in what order. If multiple signals are
+        // passed to peripherals, and one of them would allow GPIO alternate
+        // function configurations, it would mean that the GPIO MCU_SEL bit's
+        // final value would depend on the order of operations.
+        let input = input.with_gpio_matrix_forced(true);
+
+        (input, output)
     }
 
     #[inline]
@@ -1994,9 +2041,9 @@ impl<'lt> AnyPin<'lt> {
     }
 
     #[inline]
-    pub(crate) fn pull_direction(&self, pull: Pull) {
-        let pull_up = pull == Pull::Up;
-        let pull_down = pull == Pull::Down;
+    pub(crate) fn apply_input_config(&self, config: &InputConfig) {
+        let pull_up = config.pull == Pull::Up;
+        let pull_down = config.pull == Pull::Down;
 
         #[cfg(esp32)]
         crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
@@ -2004,6 +2051,29 @@ impl<'lt> AnyPin<'lt> {
         io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
             w.fun_wpu().bit(pull_up)
+        });
+    }
+
+    #[inline]
+    fn apply_output_config(&self, config: &OutputConfig) {
+        let pull_up = config.pull == Pull::Up;
+        let pull_down = config.pull == Pull::Down;
+
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
+
+        io_mux_reg(self.number()).modify(|_, w| {
+            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
+            w.fun_wpu().bit(pull_up);
+            w.fun_wpd().bit(pull_down);
+            w
+        });
+
+        let gpio = GPIO::regs();
+
+        gpio.pin(self.number() as usize).modify(|_, w| {
+            w.pad_driver()
+                .bit(config.drive_mode == DriveMode::OpenDrain)
         });
     }
 
@@ -2018,67 +2088,10 @@ impl<'lt> AnyPin<'lt> {
         self.bank().read_input() & self.mask() != 0
     }
 
-    /// Set up as output
-    #[inline]
-    pub(crate) fn init_output(
-        &self,
-        alternate: AlternateFunction,
-        open_drain: bool,
-        input_enable: Option<bool>,
-    ) {
-        self.set_output_enable(true);
-
-        let gpio = GPIO::regs();
-
-        gpio.pin(self.number() as usize)
-            .modify(|_, w| w.pad_driver().bit(open_drain));
-
-        gpio.func_out_sel_cfg(self.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
-        #[cfg(usb_device)]
-        disable_usb_pads(self.number());
-
-        io_mux_reg(self.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(alternate as u8);
-            if let Some(input_enable) = input_enable {
-                w.fun_ie().bit(input_enable);
-            }
-            w.fun_drv().bits(DriveStrength::_20mA as u8);
-            w.slp_sel().clear_bit()
-        });
-    }
-
-    /// Configure open-drain mode
-    #[inline]
-    pub(crate) fn set_to_open_drain_output(&self) {
-        self.init_output(GPIO_FUNCTION, true, Some(true));
-    }
-
-    /// Configure output mode
-    #[inline]
-    pub(crate) fn set_to_push_pull_output(&self) {
-        self.init_output(GPIO_FUNCTION, false, None);
-    }
-
     /// Set the pin's level to high or low
     #[inline]
     pub(crate) fn set_output_high(&self, high: bool) {
         self.bank().write_output(self.mask(), high);
-    }
-
-    /// Configure the [DriveStrength] of the pin
-    #[inline]
-    pub(crate) fn set_drive_strength(&self, strength: DriveStrength) {
-        io_mux_reg(self.number()).modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
-    }
-
-    /// Enable/disable open-drain mode
-    #[inline]
-    pub(crate) fn enable_open_drain(&self, on: bool) {
-        GPIO::regs()
-            .pin(self.number() as usize)
-            .modify(|_, w| w.pad_driver().bit(on));
     }
 
     /// Is the output set to high

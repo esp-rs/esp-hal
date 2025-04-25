@@ -106,7 +106,7 @@ use crate::{
     DriverMode,
     clock::Clocks,
     dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
-    gpio::{Level, OutputSignal, interconnect::PeripheralOutput},
+    gpio::{Level, OutputConfig, OutputSignal, interconnect::PeripheralOutput},
     lcd_cam::{
         BitOrder,
         ByteOrder,
@@ -315,7 +315,8 @@ where
     /// signal.
     pub fn with_vsync(self, pin: impl PeripheralOutput<'d>) -> Self {
         let pin = pin.into();
-        pin.set_to_push_pull_output();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
         OutputSignal::LCD_V_SYNC.connect_to(&pin);
 
         self
@@ -327,7 +328,8 @@ where
     /// signal.
     pub fn with_hsync(self, pin: impl PeripheralOutput<'d>) -> Self {
         let pin = pin.into();
-        pin.set_to_push_pull_output();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
         OutputSignal::LCD_H_SYNC.connect_to(&pin);
 
         self
@@ -339,7 +341,8 @@ where
     /// signal.
     pub fn with_de(self, pin: impl PeripheralOutput<'d>) -> Self {
         let pin = pin.into();
-        pin.set_to_push_pull_output();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
         OutputSignal::LCD_H_ENABLE.connect_to(&pin);
 
         self
@@ -351,7 +354,8 @@ where
     /// signal.
     pub fn with_pclk(self, pin: impl PeripheralOutput<'d>) -> Self {
         let pin = pin.into();
-        pin.set_to_push_pull_output();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
         OutputSignal::LCD_PCLK.connect_to(&pin);
 
         self
@@ -360,7 +364,8 @@ where
     fn with_data_pin(self, signal: OutputSignal, pin: impl PeripheralOutput<'d>) -> Self {
         let pin = pin.into();
 
-        pin.set_to_push_pull_output();
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
         signal.connect_to(&pin);
 
         self

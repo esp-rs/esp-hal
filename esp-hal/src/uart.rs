@@ -55,7 +55,9 @@ use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
     gpio::{
+        InputConfig,
         InputSignal,
+        OutputConfig,
         OutputSignal,
         PinGuard,
         Pull,
@@ -675,7 +677,10 @@ where
     #[instability::unstable]
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         let rts = rts.into();
-        rts.set_to_push_pull_output();
+
+        rts.apply_output_config(&OutputConfig::default());
+        rts.set_output_enable(true);
+
         self.rts_pin = rts.connect_with_guard(self.uart.info().rts_signal);
 
         self
@@ -690,9 +695,12 @@ where
     #[instability::unstable]
     pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
         let tx = tx.into();
+
         // Make sure we don't cause an unexpected low pulse on the pin.
         tx.set_output_high(true);
-        tx.set_to_push_pull_output();
+        tx.apply_output_config(&OutputConfig::default());
+        tx.set_output_enable(true);
+
         self.tx_pin = tx.connect_with_guard(self.uart.info().tx_signal);
 
         self
@@ -1014,7 +1022,10 @@ where
     #[instability::unstable]
     pub fn with_cts(self, cts: impl PeripheralInput<'d>) -> Self {
         let cts = cts.into();
-        cts.init_input(Pull::None);
+
+        cts.apply_input_config(&InputConfig::default());
+        cts.set_input_enable(true);
+
         self.uart.info().cts_signal.connect_to(&cts);
 
         self
@@ -1031,7 +1042,10 @@ where
     #[instability::unstable]
     pub fn with_rx(self, rx: impl PeripheralInput<'d>) -> Self {
         let rx = rx.into();
-        rx.init_input(Pull::Up);
+
+        rx.apply_input_config(&InputConfig::default().with_pull(Pull::Up));
+        rx.set_input_enable(true);
+
         self.uart.info().rx_signal.connect_to(&rx);
 
         self

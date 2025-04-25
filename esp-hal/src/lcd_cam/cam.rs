@@ -63,9 +63,10 @@ use crate::{
     clock::Clocks,
     dma::{ChannelRx, DmaError, DmaPeripheral, DmaRxBuffer, PeripheralRxChannel, RxChannelFor},
     gpio::{
+        InputConfig,
         InputSignal,
+        OutputConfig,
         OutputSignal,
-        Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     lcd_cam::{BitOrder, ByteOrder, ClockError, calculate_clkm},
@@ -236,7 +237,10 @@ impl<'d> Camera<'d> {
     /// Configures the master clock (MCLK) pin for the camera interface.
     pub fn with_master_clock(self, mclk: impl PeripheralOutput<'d>) -> Self {
         let mclk = mclk.into();
-        mclk.set_to_push_pull_output();
+
+        mclk.apply_output_config(&OutputConfig::default());
+        mclk.set_output_enable(true);
+
         OutputSignal::CAM_CLK.connect_to(&mclk);
 
         self
@@ -246,7 +250,8 @@ impl<'d> Camera<'d> {
     pub fn with_pixel_clock(self, pclk: impl PeripheralInput<'d>) -> Self {
         let pclk = pclk.into();
 
-        pclk.init_input(Pull::None);
+        pclk.apply_input_config(&InputConfig::default());
+        pclk.set_input_enable(true);
         InputSignal::CAM_PCLK.connect_to(&pclk);
 
         self
@@ -256,7 +261,8 @@ impl<'d> Camera<'d> {
     pub fn with_vsync(self, pin: impl PeripheralInput<'d>) -> Self {
         let pin = pin.into();
 
-        pin.init_input(Pull::None);
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
         InputSignal::CAM_V_SYNC.connect_to(&pin);
 
         self
@@ -266,7 +272,8 @@ impl<'d> Camera<'d> {
     pub fn with_hsync(self, pin: impl PeripheralInput<'d>) -> Self {
         let pin = pin.into();
 
-        pin.init_input(Pull::None);
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
         InputSignal::CAM_H_SYNC.connect_to(&pin);
 
         self
@@ -278,7 +285,8 @@ impl<'d> Camera<'d> {
     pub fn with_h_enable(self, pin: impl PeripheralInput<'d>) -> Self {
         let pin = pin.into();
 
-        pin.init_input(Pull::None);
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
         InputSignal::CAM_H_ENABLE.connect_to(&pin);
 
         self
@@ -287,7 +295,8 @@ impl<'d> Camera<'d> {
     fn with_data_pin(self, signal: InputSignal, pin: impl PeripheralInput<'d>) -> Self {
         let pin = pin.into();
 
-        pin.init_input(Pull::None);
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
         signal.connect_to(&pin);
 
         self

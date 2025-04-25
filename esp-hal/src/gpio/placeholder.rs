@@ -7,43 +7,6 @@
 
 use super::*;
 
-impl Level {
-    pub(crate) fn pull_direction(&self, _pull: Pull) {}
-
-    pub(crate) fn input_signals(
-        &self,
-        _: private::Internal,
-    ) -> &'static [(AlternateFunction, InputSignal)] {
-        &[]
-    }
-
-    pub(crate) fn init_input(&self, _pull: Pull) {}
-
-    pub(crate) fn set_input_enable(&self, _on: bool) {}
-
-    pub(crate) fn is_input_high(&self) -> bool {
-        *self == Level::High
-    }
-
-    pub(crate) fn set_to_open_drain_output(&self) {}
-    pub(crate) fn set_to_push_pull_output(&self) {}
-    pub(crate) fn set_output_enable(&self, _on: bool) {}
-    pub(crate) fn set_output_high(&self, _on: bool) {}
-    pub(crate) fn set_drive_strength(&self, _strength: DriveStrength) {}
-    pub(crate) fn enable_open_drain(&self, _on: bool) {}
-
-    pub(crate) fn is_set_high(&self) -> bool {
-        false
-    }
-
-    pub(crate) fn output_signals(
-        &self,
-        _: private::Internal,
-    ) -> &'static [(AlternateFunction, OutputSignal)] {
-        &[]
-    }
-}
-
 /// Placeholder pin, used when no pin is required when using a peripheral.
 ///
 /// When used as a peripheral signal, `NoPin` is equivalent to [`Level::Low`].

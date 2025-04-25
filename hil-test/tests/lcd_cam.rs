@@ -60,18 +60,18 @@ mod tests {
 
         let (rx_channel, tx_channel) = peripherals.DMA_CH2.split();
 
-        let (vsync_in, vsync_out) = peripherals.GPIO6.split();
-        let (hsync_in, hsync_out) = peripherals.GPIO7.split();
-        let (de_in, de_out) = peripherals.GPIO14.split();
-        let (pclk_in, pclk_out) = peripherals.GPIO13.split();
-        let (d0_in, d0_out) = peripherals.GPIO11.split();
-        let (d1_in, d1_out) = peripherals.GPIO9.split();
-        let (d2_in, d2_out) = peripherals.GPIO8.split();
-        let (d3_in, d3_out) = peripherals.GPIO47.split();
-        let (d4_in, d4_out) = peripherals.GPIO12.split();
-        let (d5_in, d5_out) = peripherals.GPIO18.split();
-        let (d6_in, d6_out) = peripherals.GPIO17.split();
-        let (d7_in, d7_out) = peripherals.GPIO16.split();
+        let (vsync_in, vsync_out) = unsafe { peripherals.GPIO6.split() };
+        let (hsync_in, hsync_out) = unsafe { peripherals.GPIO7.split() };
+        let (de_in, de_out) = unsafe { peripherals.GPIO14.split() };
+        let (pclk_in, pclk_out) = unsafe { peripherals.GPIO13.split() };
+        let (d0_in, d0_out) = unsafe { peripherals.GPIO11.split() };
+        let (d1_in, d1_out) = unsafe { peripherals.GPIO9.split() };
+        let (d2_in, d2_out) = unsafe { peripherals.GPIO8.split() };
+        let (d3_in, d3_out) = unsafe { peripherals.GPIO47.split() };
+        let (d4_in, d4_out) = unsafe { peripherals.GPIO12.split() };
+        let (d5_in, d5_out) = unsafe { peripherals.GPIO18.split() };
+        let (d6_in, d6_out) = unsafe { peripherals.GPIO17.split() };
+        let (d7_in, d7_out) = unsafe { peripherals.GPIO16.split() };
 
         let config = dpi::Config::default()
             .with_clock_mode(ClockMode {

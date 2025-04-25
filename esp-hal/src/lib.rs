@@ -179,6 +179,7 @@
 #![allow(asm_sub_register, async_fn_in_trait, stable_features)]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
+#![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 

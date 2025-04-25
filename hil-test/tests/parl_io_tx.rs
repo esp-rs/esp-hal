@@ -57,8 +57,8 @@ mod tests {
 
         let (clock, _) = hil_test::common_test_pins!(peripherals);
         let valid = hil_test::unconnected_pin!(peripherals);
-        let (clock_loopback, clock) = clock.split();
-        let (valid_loopback, valid) = valid.split();
+        let (clock_loopback, clock) = unsafe { clock.split() };
+        let (valid_loopback, valid) = unsafe { valid.split() };
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma_channel = peripherals.DMA_CH0;

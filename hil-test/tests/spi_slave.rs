@@ -13,7 +13,7 @@ use esp_hal::{
     Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
-    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
+    gpio::{Flex, Input, InputConfig, Level, OutputConfig, Pull},
     spi::{Mode, slave::Spi},
 };
 use hil_test as _;
@@ -33,18 +33,18 @@ struct Context {
 }
 
 struct BitbangSpi {
-    sclk: Output<'static>,
-    mosi: Output<'static>,
+    sclk: Flex<'static>,
+    mosi: Flex<'static>,
     miso: Input<'static>,
-    cs: Output<'static>,
+    cs: Flex<'static>,
 }
 
 impl BitbangSpi {
     fn new(
-        sclk: Output<'static>,
-        mosi: Output<'static>,
+        sclk: Flex<'static>,
+        mosi: Flex<'static>,
         miso: Input<'static>,
-        cs: Output<'static>,
+        cs: Flex<'static>,
     ) -> Self {
         Self {
             sclk,
@@ -115,28 +115,38 @@ mod tests {
             }
         }
 
-        // A bit of test-specific hackery, we need to be able to work with the Input
-        // driver directly while the SPI is driving the output signal part of
-        // the GPIO. This is currently not possible to describe in safe code.
-        let miso_pin_clone = unsafe { miso_pin.clone_unchecked() };
+        let mut mosi_gpio = Flex::new(mosi_pin);
+        mosi_gpio.apply_output_config(&OutputConfig::default());
+        mosi_gpio.set_level(Level::Low);
+        mosi_gpio.set_output_enable(true);
 
-        let mosi_gpio = Output::new(mosi_pin, Level::Low, OutputConfig::default());
-        let cs_gpio = Output::new(cs_pin, Level::High, OutputConfig::default());
-        let sclk_gpio = Output::new(sclk_pin, Level::Low, OutputConfig::default());
-        let miso_gpio = Input::new(miso_pin, InputConfig::default().with_pull(Pull::None));
+        let mut cs_gpio = Flex::new(cs_pin);
+        cs_gpio.apply_output_config(&OutputConfig::default());
+        cs_gpio.set_level(Level::High);
+        cs_gpio.set_output_enable(true);
+
+        let mut sclk_gpio = Flex::new(sclk_pin);
+        sclk_gpio.apply_output_config(&OutputConfig::default());
+        sclk_gpio.set_level(Level::Low);
+        sclk_gpio.set_output_enable(true);
+
+        let mut miso_gpio = Flex::new(miso_pin);
+        miso_gpio.set_input_enable(true);
+        miso_gpio.apply_input_config(&InputConfig::default().with_pull(Pull::None));
+        miso_gpio.apply_output_config(&OutputConfig::default());
 
         let cs = cs_gpio.peripheral_input();
         let sclk = sclk_gpio.peripheral_input();
         let mosi = mosi_gpio.peripheral_input();
-        let miso = miso_pin_clone.split().1;
+        let (miso_in, miso_out) = unsafe { miso_gpio.split_into_drivers() };
 
         Context {
             spi: Spi::new(peripherals.SPI2, Mode::_1)
                 .with_sck(sclk)
                 .with_mosi(mosi)
-                .with_miso(miso)
+                .with_miso(miso_out)
                 .with_cs(cs),
-            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_gpio, cs_gpio),
+            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_in, cs_gpio),
             dma_channel,
         }
     }

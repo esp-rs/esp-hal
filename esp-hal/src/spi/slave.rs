@@ -75,6 +75,7 @@ use crate::{
     gpio::{
         InputSignal,
         NoPin,
+        OutputConfig,
         OutputSignal,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
@@ -118,21 +119,23 @@ impl<'d> Spi<'d, Blocking> {
             .with_cs(NoPin)
     }
 
+    fn connect_input_pin(&self, pin: impl PeripheralInput<'d>, signal: InputSignal) {
+        let pin = pin.into();
+        pin.set_input_enable(true);
+        signal.connect_to(&pin);
+    }
+
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_sck(self, sclk: impl PeripheralInput<'d>) -> Self {
-        let sclk = sclk.into();
-        sclk.set_input_enable(true);
-        self.spi.info().sclk.connect_to(&sclk);
+        self.connect_input_pin(sclk, self.spi.info().sclk);
         self
     }
 
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_mosi(self, mosi: impl PeripheralInput<'d>) -> Self {
-        let mosi = mosi.into();
-        mosi.set_input_enable(true);
-        self.spi.info().mosi.connect_to(&mosi);
+        self.connect_input_pin(mosi, self.spi.info().mosi);
         self
     }
 
@@ -140,7 +143,10 @@ impl<'d> Spi<'d, Blocking> {
     #[instability::unstable]
     pub fn with_miso(self, miso: impl PeripheralOutput<'d>) -> Self {
         let miso = miso.into();
-        miso.set_to_push_pull_output();
+
+        miso.apply_output_config(&OutputConfig::default());
+        miso.set_output_enable(true);
+
         self.spi.info().miso.connect_to(&miso);
         self
     }
@@ -148,9 +154,7 @@ impl<'d> Spi<'d, Blocking> {
     /// Assign the CS (Chip Select) pin for the SPI instance.
     #[instability::unstable]
     pub fn with_cs(self, cs: impl PeripheralInput<'d>) -> Self {
-        let cs = cs.into();
-        cs.set_input_enable(true);
-        self.spi.info().cs.connect_to(&cs);
+        self.connect_input_pin(cs, self.spi.info().cs);
         self
     }
 }

@@ -29,7 +29,7 @@ mod tests {
 
         let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
-        let (rx, tx) = loopback_pin.split();
+        let (rx, tx) = unsafe { loopback_pin.split() };
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,

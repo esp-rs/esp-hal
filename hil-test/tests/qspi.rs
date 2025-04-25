@@ -318,7 +318,7 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -341,8 +341,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -374,8 +374,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -407,8 +407,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
