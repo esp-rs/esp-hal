@@ -388,7 +388,7 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
 
 #[cfg(feature = "esp32")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserve_dram = if cfg!(feature = "bluetooth") {
+    let reserve_dram = if cfg!(feature = "__bluetooth") {
         "0x10000"
     } else {
         "0x0"

@@ -102,8 +102,7 @@ jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 [features]
 default = []
 
-bluetooth = []
-
+__bluetooth = []
 __esp_hal_embassy = []
 __usb_otg = [
     "dep:embassy-usb-driver",
