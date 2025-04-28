@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Define all necessary configuration symbols for the configured device:
-    println!("cargo:rustc-cfg={}", device_name);
+    println!("cargo:rustc-cfg={device_name}");
 
     // Put the linker script somewhere the linker can find it:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());

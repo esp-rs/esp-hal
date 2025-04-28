@@ -295,7 +295,7 @@ impl core::fmt::Display for Error {
         match self {
             Error::FifoExceeded => write!(f, "The transmission exceeded the FIFO size"),
             Error::AcknowledgeCheckFailed(reason) => {
-                write!(f, "The acknowledgment check failed. Reason: {}", reason)
+                write!(f, "The acknowledgment check failed. Reason: {reason}")
             }
             Error::Timeout => write!(f, "A timeout occurred during transmission"),
             Error::ArbitrationLost => write!(f, "The arbitration for the bus was lost"),
@@ -307,7 +307,7 @@ impl core::fmt::Display for Error {
             }
             Error::ZeroLengthInvalid => write!(f, "Zero length read or write operation"),
             Error::AddressInvalid(address) => {
-                write!(f, "The given address ({:?}) is invalid", address)
+                write!(f, "The given address ({address:?}) is invalid")
             }
         }
     }

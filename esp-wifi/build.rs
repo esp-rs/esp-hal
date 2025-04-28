@@ -297,5 +297,5 @@ fn main() {
 }
 
 fn print_warning(message: impl core::fmt::Display) {
-    println!("cargo:warning={}", message);
+    println!("cargo:warning={message}");
 }

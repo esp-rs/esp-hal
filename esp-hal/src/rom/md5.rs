@@ -185,7 +185,7 @@ pub struct Digest(pub [u8; 16]);
 impl fmt::LowerHex for Digest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &byte in &self.0 {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         Ok(())
     }
@@ -194,7 +194,7 @@ impl fmt::LowerHex for Digest {
 impl fmt::UpperHex for Digest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &byte in &self.0 {
-            write!(f, "{:02X}", byte)?;
+            write!(f, "{byte:02X}")?;
         }
         Ok(())
     }

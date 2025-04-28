@@ -90,7 +90,7 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     let orig = f.sig.ident;
     let vis = f.vis.clone();
     f.sig.ident = Ident::new(
-        &format!("__esp_hal_internal_{}", orig),
+        &format!("__esp_hal_internal_{orig}"),
         proc_macro2::Span::call_site(),
     );
     let new = f.sig.ident.clone();
