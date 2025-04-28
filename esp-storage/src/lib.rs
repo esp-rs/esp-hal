@@ -26,19 +26,13 @@ mod chip_specific;
 #[path = "stub.rs"]
 mod chip_specific;
 
-#[cfg(any(feature = "storage", feature = "nor-flash"))]
 mod common;
 
-#[cfg(any(feature = "storage", feature = "nor-flash"))]
 use common::FlashSectorBuffer;
-#[cfg(any(feature = "storage", feature = "nor-flash"))]
 pub use common::{FlashStorage, FlashStorageError};
 
-#[cfg(feature = "storage")]
-mod storage;
-
-#[cfg(feature = "nor-flash")]
 mod nor_flash;
+mod storage;
 
 #[cfg(feature = "low-level")]
 pub mod ll;
