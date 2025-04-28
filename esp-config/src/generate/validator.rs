@@ -60,7 +60,7 @@ impl Validator {
                 "One of: <ul style=\"display: inline-block; text-align: left\">{}</ul>",
                 values
                     .iter()
-                    .map(|v| format!("<li>{}</li>", v))
+                    .map(|v| format!("<li>{v}</li>"))
                     .collect::<Vec<_>>()
                     .join("")
             )),
@@ -98,8 +98,7 @@ pub(crate) fn enumeration(values: &Vec<String>, value: &Value) -> Result<(), Err
     if let Value::String(value) = value {
         if !values.contains(value) {
             return Err(Error::validation(format!(
-                "Expected one of {:?}, found '{}'",
-                values, value
+                "Expected one of {values:?}, found '{value}'"
             )));
         }
 
@@ -159,8 +158,7 @@ pub(crate) fn positive_integer(value: &Value) -> Result<(), Error> {
 pub(crate) fn integer_in_range(range: &Range<i128>, value: &Value) -> Result<(), Error> {
     if !value.is_integer() || !range.contains(&value.as_integer()) {
         Err(Error::validation(format!(
-            "Value '{}' does not fall within range '{:?}'",
-            value, range
+            "Value '{value}' does not fall within range '{range:?}'"
         )))
     } else {
         Ok(())

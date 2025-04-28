@@ -76,8 +76,7 @@ fn generate_filter_snippet() {
             let mut snippet = String::new();
 
             snippet.push_str(&format!(
-                "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::{};",
-                max
+                "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::{max};"
             ));
 
             snippet
@@ -110,7 +109,7 @@ fn generate_filter_snippet() {
 
             // Place the fallback rule at the end
             if let Some(level) = global_level {
-                snippet.push_str(&format!("level <= log::LevelFilter::{}", level));
+                snippet.push_str(&format!("level <= log::LevelFilter::{level}"));
             } else {
                 snippet.push_str(" false");
             }

@@ -231,10 +231,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             REGION_ALIAS("RWTEXT", iram_seg);
             REGION_ALIAS("RODATA", drom_seg);
             REGION_ALIAS("RWDATA", dram_seg);
-            REGION_ALIAS("RTC_FAST_RWTEXT", {});
-            REGION_ALIAS("RTC_FAST_RWDATA", {});
-        "#,
-            irtc, drtc
+            REGION_ALIAS("RTC_FAST_RWTEXT", {irtc});
+            REGION_ALIAS("RTC_FAST_RWDATA", {drtc});
+        "#
         );
 
         fs::write(out.join("alias.x"), alias)?;

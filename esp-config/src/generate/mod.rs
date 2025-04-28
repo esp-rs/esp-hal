@@ -310,7 +310,7 @@ fn capture_from_env(
     }
 
     if !failed.is_empty() {
-        panic!("Invalid configuration options detected: {:?}", failed);
+        panic!("Invalid configuration options detected: {failed:?}");
     }
 
     if !unstable.is_empty() {
@@ -321,7 +321,7 @@ fn capture_from_env(
     }
 
     if !unknown.is_empty() {
-        panic!("Unknown configuration options detected: {:?}", unknown);
+        panic!("Unknown configuration options detected: {unknown:?}");
     }
 }
 
@@ -332,8 +332,8 @@ fn emit_configuration(mut stdout: impl Write, configs: &[(String, &ConfigOption,
         // Output the raw configuration as an env var. Values that haven't been seen
         // will be output here with the default value. Also trigger a rebuild if config
         // environment variable changed.
-        writeln!(stdout, "cargo:rustc-env={}={}", env_var_name, value).ok();
-        writeln!(stdout, "cargo:rerun-if-env-changed={}", env_var_name).ok();
+        writeln!(stdout, "cargo:rustc-env={env_var_name}={value}").ok();
+        writeln!(stdout, "cargo:rerun-if-env-changed={env_var_name}").ok();
 
         // Emit known config symbol:
         writeln!(stdout, "cargo:rustc-check-cfg=cfg({cfg_name})").ok();

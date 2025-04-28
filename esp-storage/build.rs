@@ -9,8 +9,7 @@ fn main() -> Result<(), String> {
             Ok(level) if std::env::var("CI").is_err() => {
                 if level != "2" && level != "3" {
                     Err(format!(
-                        "Building esp-storage for ESP32 needs optimization level 2 or 3 - yours is {}. See https://github.com/esp-rs/esp-storage",
-                        level
+                        "Building esp-storage for ESP32 needs optimization level 2 or 3 - yours is {level}. See https://github.com/esp-rs/esp-storage"
                     ))
                 } else {
                     Ok(())
