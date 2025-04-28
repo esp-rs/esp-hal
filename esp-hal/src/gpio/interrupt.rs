@@ -1,30 +1,32 @@
 //! GPIO interrupt handling
 //!
-//! GPIO interrupt handling must work at the same time as the async API. Async
-//! operations take pins by `&mut self`, so they can only be accessed after the
-//! operation is complete, or cancelled. This means that manual `listen`
-//! operations don't need to be prepared for async operations, but
-//! async operations need to be prepared to handle cases where the pin was
-//! configured to listen for an event.
+//! ## Requirements
 //!
-//! The async API communicated completion with an atomic bitfield. This
-//! bitfield is cleared when the interrupt handler is called. This is done
-//! because the user may register a custom interrupt handler which either
-//! disables the interrupts or clears the interrupt status bits. The user
-//! handler must not interfere with the async API, so we need some signaling
-//! mechanism private to the async API.
+//! - On devices other than the P4, there is a single interrupt handler. GPIO
+//!   interrupt handling must not interfere with the async API in this single
+//!   handler.
+//! - Async operations take pins by `&mut self`, so they can only be accessed
+//!   after the operation is complete, or cancelled. They may be defined to
+//!   overwrite the configuration of the manual interrupt API, but not affect
+//!   the interrupt handler.
+//! - Manual `listen` operations don't need to be prepared for async operations,
+//!   but async operations need to be prepared to handle cases where the pin was
+//!   configured to listen for an event - or even that the user unlistened the
+//!   pin but left the interrupt status set.
+//!
+//! The user should be careful when using the async API and the manual interrupt
+//! API together. For performance reasons, we will not prevent the user handler
+//! from running in response to an async event.
+//!
+//! ## Single-shot interaction with user interrupt handlers
 //!
 //! The async API disables the pin's interrupt when triggered. This makes async
 //! operations single-shot. If there is no user handler, the other GPIO
 //! interrupts are also single-shot. This is because the user has no way to
-//! handle multiple events, the API only allows querying whether the interrupt
-//! has fired or not. Disabling the interrupt also means that the interrupt
-//! status bits are not cleared, so the `is_interrupt_set` works by default as
-//! expected.
-//!
-//! Disabling the interrupt also allows the async Future to complete cheaply by
-//! forgetting itself. Otherwise, to prevent a race condition, the Future's Drop
-//! implementation needs to take the critical section to disable the interrupt.
+//! handle multiple events in this case, the API only allows querying whether
+//! the interrupt has fired or not. Disabling the interrupt also means that the
+//! interrupt status bits are not cleared, so the `is_interrupt_set` works by
+//! default as expected.
 //!
 //! When the user sets a custom interrupt handler, the built-in interrupt
 //! handler will only disable the async interrupts. The user handler is
@@ -32,14 +34,28 @@
 //! interrupts, based on their needs. This is communicated to the user in the
 //! documentation of the `Io::set_interrupt_handler` function.
 //!
-//! TODO: currently, direct-binding a GPIO interrupt handler will completely
-//! break the async API. We will need to expose a way to handle async events.
+//! ## Critical sections
 //!
 //! The interrupt handler runs in a GPIO-specific critical section. The critical
 //! section is required because interrupts are disabled by modifying the pin
 //! register, which is not an atomic operation. The critical section also
 //! ensures that a higher priority task waken by an async pin event (or the user
 //! handler) will only run after the interrupt handler has finished.
+//!
+//! ## Signaling async completion
+//!
+//! The completion is signalled by clearing a flag in an AtomicU32. This flag is
+//! set at the start of the async operation, and cleared when the interrupt
+//! handler is called. The flag is not accessible by the user, so they can't
+//! force-complete an async operation accidentally from the interrupt handler.
+//!
+//! We could technically use the interrupt status on single-core chips, but it
+//! would be slightly more complicated to prevent the user from breaking things.
+//! (If the user were to clear the interrupt status, we would need to re-enable
+//! it, for PinFuture to detect the completion).
+//!
+//! TODO: currently, direct-binding a GPIO interrupt handler will completely
+//! break the async API. We will need to expose a way to handle async events.
 
 use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
@@ -116,10 +132,10 @@ extern "C" fn default_gpio_interrupt_handler() {
             // Get the mask of active async pins and clear the relevant bits to signal
             // completion. This way the user may clear the interrupt status
             // without worrying about the async bit being cleared.
-            let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+            let async_pins = bank.async_operations().load(Ordering::Relaxed);
 
             // Wake up the tasks
-            handle_async_pins(bank, intrs & async_pins);
+            handle_async_pins(bank, async_pins, intrs);
 
             // Disable the remaining interrupts.
             let mut intrs = intrs & !async_pins;
@@ -129,9 +145,7 @@ extern "C" fn default_gpio_interrupt_handler() {
 
                 let pin_nr = pin_pos as u8 + bank.offset();
 
-                // Disable the interrupt for this pin. This must be done as the last operation
-                // on the pin, so that `async fn wait_for` will not
-                // race with the interrupt handler.
+                // The remaining interrupts are not async, we treat them as single-shot.
                 set_int_enable(pin_nr, Some(0), 0, false);
             }
         }
@@ -146,6 +160,7 @@ extern "C" fn default_gpio_interrupt_handler() {
 #[ram]
 pub(super) extern "C" fn user_gpio_interrupt_handler() {
     GPIO_LOCK.lock(|| {
+        // Read interrupt status before the user has a chance to modify them.
         let banks = interrupt_status();
 
         // Call the user handler before clearing interrupts. The user can use the enable
@@ -159,10 +174,10 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
             // Get the mask of active async pins and clear the relevant bits to signal
             // completion. This way the user may clear the interrupt status
             // without worrying about the async bit being cleared.
-            let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+            let async_pins = bank.async_operations().load(Ordering::Relaxed);
 
             // Wake up the tasks
-            handle_async_pins(bank, intrs & async_pins);
+            handle_async_pins(bank, async_pins, intrs);
         }
     });
 }
@@ -180,18 +195,39 @@ fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
     ]
 }
 
-fn handle_async_pins(bank: GpioBank, mut async_intrs: u32) {
+fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
+    let mut async_intrs = async_pins & intrs;
+
     while async_intrs != 0 {
         let pin_pos = async_intrs.trailing_zeros();
         async_intrs -= 1 << pin_pos;
 
         let pin_nr = pin_pos as u8 + bank.offset();
-        // The pin is async, we need to wake up the task.
         asynch::PIN_WAKERS[pin_nr as usize].wake();
 
         // Disable the interrupt for this pin. This must be done as the last operation
-        // on the pin, so that `async fn wait_for` will not
-        // race with the interrupt handler.
+        // on the pin, so that `async fn wait_for` will not race with the interrupt
+        // handler.
         set_int_enable(pin_nr, Some(0), 0, false);
+    }
+
+    // This is an optimization (in case multiple pin interrupts are handled at once)
+    // so that PinFuture doesn't have to clear interrupt status bits one by one
+    // for each pin. We need to clear after disabling the interrupt, so that a pin
+    // event can't re-set the bit.
+    bank.write_interrupt_status_clear(async_pins & intrs);
+
+    // Clearing the async bit needs to be last.
+    cfg_if::cfg_if! {
+        if #[cfg(multi_core)] {
+            // On multi-core chips, we need to use a CAS to ensure that only
+            // the handled async bits are cleared.
+            bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+        } else {
+            // On a single-core chip, the lock around `handle_async_pins` ensures
+            // that the interrupt handler will not be interrupted by other code,
+            // so we can safely write back without an atomic CAS.
+            bank.async_operations().store(async_pins & !intrs, Ordering::Relaxed);
+        }
     }
 }

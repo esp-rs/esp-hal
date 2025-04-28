@@ -25,32 +25,29 @@ impl Flex<'_> {
     #[inline]
     #[instability::unstable]
     pub async fn wait_for(&mut self, event: Event) {
-        // Make sure this pin is not being processed by an interrupt handler.
-        if self.is_listening() {
-            // An interrupt may happen at any point, and the interrupt handler disables the
-            // interrupt enable bit (meaning any unlisten call here might be a race
-            // condition without the critical section). On dual cores, this may happen in
-            // parallel, with the interrupt handler running on the other core.
-            // The safe way to handle this case is to take a GPIO-global
-            // critical section so that we won't run in parallel with the
-            // interrupt handler.
-            // Note that the critical section is taken inside `unlisten`.
-
-            // The pin is already listening, let's turn that off to prevent the interrupt
-            // handler from being called while we are setting up the pin.
-            self.unlisten();
-            self.clear_interrupt();
+        // Make sure this pin is not being processed by an interrupt handler. We need to
+        // always take a critical section even if the pin is not listening, because the
+        // interrupt handler may be running on another core and the interrupt handler
+        // may be in the process of processing the pin if the interrupt status is set -
+        // regardless of the pin actually listening or not.
+        if self.is_listening() || self.is_interrupt_set() {
+            self.unlisten_and_clear();
         }
 
-        // At this point the pin is no longer listening, we can safely
-        // do our setup.
+        // At this point the pin is no longer listening, and not being processed, so we
+        // can safely do our setup.
 
-        // Mark pin as async.
+        // Mark pin as async. The interrupt handler clears this bit before processing a
+        // pin and unlistens it, so this call will not race with the interrupt
+        // handler (because it must have finished before `unlisten` above, or the
+        // handler no longer )
         self.pin
             .bank()
             .async_operations()
             .fetch_or(self.pin.mask(), Ordering::Relaxed);
 
+        // Start listening for the event. We only need to do this once, as disabling
+        // the interrupt will signal the future to complete.
         self.listen(event);
 
         PinFuture { pin: self }.await
@@ -188,17 +185,10 @@ impl PinFuture<'_, '_> {
 impl core::future::Future for PinFuture<'_, '_> {
     type Output = ();
 
-    fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         PIN_WAKERS[self.number() as usize].register(cx.waker());
 
         if self.is_done() {
-            self.pin.clear_interrupt();
-
-            // Forget self - we don't want to take a critical section to deconfigure the
-            // interrupt, and we don't need to - it's done by the interrupt
-            // handler.
-            #[allow(clippy::forget_non_drop)]
-            core::mem::forget(self);
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -208,16 +198,17 @@ impl core::future::Future for PinFuture<'_, '_> {
 
 impl Drop for PinFuture<'_, '_> {
     fn drop(&mut self) {
-        // Resolving the Future forgets self so if this function runs, the wait is being
-        // cancelled.
+        // If the future has completed, unlistening and removing the async bit will have
+        // been done by the interrupt handler.
 
-        self.pin.unlisten();
-        self.pin.clear_interrupt();
+        if !self.is_done() {
+            self.pin.unlisten_and_clear();
 
-        // Unmark pin as async so that a future listen call doesn't wake a waker for no
-        // reason.
-        self.bank()
-            .async_operations()
-            .fetch_and(!self.mask(), Ordering::Relaxed);
+            // Unmark pin as async so that a future listen call doesn't wake a waker for no
+            // reason.
+            self.bank()
+                .async_operations()
+                .fetch_and(!self.mask(), Ordering::Relaxed);
+        }
     }
 }

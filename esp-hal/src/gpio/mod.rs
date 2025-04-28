@@ -1520,6 +1520,13 @@ impl<'d> Flex<'d> {
         });
     }
 
+    fn unlisten_and_clear(&mut self) {
+        GPIO_LOCK.lock(|| {
+            set_int_enable(self.pin.number(), Some(0), 0, false);
+            self.clear_interrupt();
+        });
+    }
+
     /// Check if the pin is listening for interrupts.
     #[inline]
     #[instability::unstable]
