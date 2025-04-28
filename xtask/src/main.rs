@@ -5,15 +5,15 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, ensure, Context as _, Result};
+use anyhow::{Context as _, Result, bail, ensure};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
-    cargo::{CargoAction, CargoArgsBuilder},
-    firmware::Metadata,
     Package,
     Version,
+    cargo::{CargoAction, CargoArgsBuilder},
+    firmware::Metadata,
 };
 
 // ----------------------------------------------------------------------------
@@ -36,8 +36,6 @@ enum Cli {
     /// Format all packages in the workspace with rustfmt
     #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
-    /// Generate the eFuse fields source file from a CSV.
-    GenerateEfuseFields(GenerateEfuseFieldsArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Attempt to publish the specified package.
@@ -235,7 +233,6 @@ fn main() -> Result<()> {
         ),
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
-        Cli::GenerateEfuseFields(args) => generate_efuse_src(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::Publish(args) => publish(&workspace, args),
         Cli::RunDocTests(args) => run_doc_tests(&workspace, args),
@@ -563,28 +560,6 @@ fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     for package in args.packages {
         xtask::bump_version(workspace, package, args.amount)?;
     }
-
-    Ok(())
-}
-
-fn generate_efuse_src(workspace: &Path, args: GenerateEfuseFieldsArgs) -> Result<()> {
-    let idf_path = args.idf_path.canonicalize()?;
-
-    // Build the path for the generated source file, for the specified chip:
-    let esp_hal = workspace.join("esp-hal");
-    let out_path = esp_hal
-        .join("src")
-        .join("soc")
-        .join(args.chip.to_string())
-        .join("efuse")
-        .join("fields.rs");
-
-    // Generate the Rust source file from the CSV file, and write it out to
-    // the appropriate path:
-    xtask::generate_efuse_table(&args.chip, idf_path, out_path)?;
-
-    // Format the generated code:
-    xtask::cargo::run(&["fmt".into()], &esp_hal)?;
 
     Ok(())
 }

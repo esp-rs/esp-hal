@@ -1,5 +1,5 @@
 [package]
-name = "xtask"
+name    = "xtask"
 version = "0.0.0"
 edition = "2024"
 publish = false
@@ -7,10 +7,8 @@ publish = false
 [dependencies]
 anyhow       = "1.0.93"
 basic-toml   = "0.1.9"
-chrono       = "0.4.38"
 clap         = { version = "4.5.20", features = ["derive", "wrap_help"] }
 console      = "0.15.10"
-csv          = "1.3.1"
 env_logger   = "0.11.5"
 esp-metadata = { path = "../esp-metadata", features = ["clap"] }
 kuchikiki    = "0.8.2"
@@ -33,5 +31,5 @@ reqwest = { version = "0.12.12", features = [
 ], optional = true }
 
 [features]
-deploy-docs = ["dep:reqwest"]
-preview-docs = ["dep:rocket", "dep:opener"]
+deploy-docs  = ["dep:reqwest"]
+preview-docs = ["dep:opener", "dep:rocket"]
