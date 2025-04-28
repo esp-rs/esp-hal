@@ -472,7 +472,9 @@ impl Timer<'_> {
                 let clk_src = Clocks::get().apb_clock;
             }
         }
-        let ticks = timeout_to_ticks(value, clk_src, self.divider());
+        let Some(ticks) = timeout_to_ticks(value, clk_src, self.divider()) else {
+            return Err(Error::InvalidTimeout);
+        };
 
         // The counter is 54-bits wide, so we must ensure that the provided
         // value is not too wide:
@@ -580,13 +582,11 @@ fn ticks_to_timeout(ticks: u64, clock: Rate, divider: u32) -> u64 {
     ticks * period / 1_000_000
 }
 
-fn timeout_to_ticks(timeout: Duration, clock: Rate, divider: u32) -> u64 {
+fn timeout_to_ticks(timeout: Duration, clock: Rate, divider: u32) -> Option<u64> {
     let micros = timeout.as_micros();
+    let ticks_per_sec = (clock.as_hz() / divider) as u64;
 
-    // 1_000_000 is used to get rid of `float` calculations
-    let period: u64 = 1_000_000 * 1_000_000 / ((clock.as_hz() / divider) as u64);
-
-    (1_000_000 * micros) / period
+    micros.checked_mul(ticks_per_sec).map(|n| n / 1_000_000)
 }
 
 /// Behavior of the MWDT stage if it times out.

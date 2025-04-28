@@ -77,6 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Async I2C is doesn't do blocking reads anymore (#3344)
 - Passing an invalid seven bit I2C address is now rejected (#3343)
 - PARL_IO: Use correct max transfer size (#3346)
+- `OneShot` timer now returns an InvalidTimeout from `schedule` instead of panicking (#3433)
 
 ### Removed
 

@@ -12,7 +12,7 @@ use esp_hal::{
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
     time::{Duration, Instant},
-    timer::OneShotTimer,
+    timer::{Error, OneShotTimer},
 };
 
 pub type Timer = OneShotTimer<'static, Blocking>;
@@ -206,8 +206,20 @@ impl EmbassyTimer {
         let now = Instant::now().duration_since_epoch().as_micros();
 
         if timestamp > now {
-            let timeout = Duration::from_micros(timestamp - now);
-            unwrap!(timer.schedule(timeout));
+            let mut timeout = Duration::from_micros(timestamp - now);
+            loop {
+                // The timer API doesn't let us query a maximum timeout, so let's try backing
+                // off on failure.
+                match timer.schedule(timeout) {
+                    Ok(()) => break,
+                    Err(Error::InvalidTimeout) => {
+                        // It's okay to wake up earlier than scheduled.
+                        timeout = timeout / 2;
+                        assert_ne!(timeout, Duration::ZERO);
+                    }
+                    other => unwrap!(other),
+                }
+            }
             true
         } else {
             // If the timestamp is past, we return `false` to ask embassy to poll again
