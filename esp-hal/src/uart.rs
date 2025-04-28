@@ -233,9 +233,11 @@ pub enum SwFlowControl {
         xon_char: u8,
         /// Xoff flow control char.
         xoff_char: u8,
-        /// If the software flow control is enabled and the data amount in rxfifo is less than xon_thrd, an xon_char will be sent.
+        /// If the software flow control is enabled and the data amount in
+        /// rxfifo is less than xon_thrd, an xon_char will be sent.
         xon_threshold: u8,
-        /// If the software flow control is enabled and the data amount in rxfifo is more than xoff_thrd, an xoff_char will be sent
+        /// If the software flow control is enabled and the data amount in
+        /// rxfifo is more than xoff_thrd, an xoff_char will be sent
         xoff_threshold: u8,
     },
 }
@@ -2918,16 +2920,16 @@ impl Info {
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
                     } else if #[cfg(esp32)]{
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit());
-                        self.regs().flow_conf().modify(|_, w| unsafe { w.sw_flow_con_en().set_bit() });
+                        self.regs().flow_conf().modify(|_, w| w.sw_flow_con_en().set_bit());
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
                         self.regs().swfc_conf().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
                     } else {
                         self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit());
-                        self.regs().flow_conf().modify(|_, w| unsafe { w.sw_flow_con_en().set_bit() });
-                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold) });
-                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold) });
+                        self.regs().flow_conf().modify(|_, w| w.sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
+                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
                     }
@@ -2944,8 +2946,8 @@ impl Info {
                     }
                 }
 
-                reg.modify(|_, w| w.sw_flow_con_en().clear_bit() );
-                reg.modify(|_, w| w.xonoff_del().clear_bit() );
+                reg.modify(|_, w| w.sw_flow_con_en().clear_bit());
+                reg.modify(|_, w| w.xonoff_del().clear_bit());
 
                 #[cfg(any(esp32c6, esp32h2))]
                 sync_regs(self.regs());
@@ -2958,17 +2960,17 @@ impl Info {
                 self.set_rts(false, None);
                 self.set_cts(false);
             }
-        
+
             HwFlowControl::Cts => {
                 self.set_rts(false, None);
                 self.set_cts(true);
             }
-        
+
             HwFlowControl::Rts(threshold) => {
                 self.set_rts(true, Some(threshold));
                 self.set_cts(false);
             }
-        
+
             HwFlowControl::Full(rts_threshold) => {
                 self.set_rts(true, Some(rts_threshold));
                 self.set_cts(true);
@@ -2977,11 +2979,11 @@ impl Info {
     }
 
     fn set_cts(&self, enable: bool) {
-        self.regs().conf0().modify(|_, w| {
-            w.tx_flow_en().bit(enable)
-        });
+        self.regs()
+            .conf0()
+            .modify(|_, w| w.tx_flow_en().bit(enable));
     }
-    
+
     fn set_rts(&self, enable: bool, threshold: Option<u8>) {
         if let Some(threshold) = threshold {
             cfg_if::cfg_if! {
@@ -2990,11 +2992,11 @@ impl Info {
                 } else if #[cfg(any(esp32c6, esp32h2))] {
                     self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
                 } else {
-                    self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
+                    self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
                 }
             }
         }
-    
+
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
                 self.regs().hwfc_conf().modify(|_, w| {
