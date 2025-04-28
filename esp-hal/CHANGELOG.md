@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented `embedded_io::WriteReady` for `Uart` and `UartTx` (#3423)
 - ESP32-H2: Support for ADC calibration (#3414)
 - Added `UartInterrupt::RxTimeout` support (#3493)
+- UART: Added HW and SW flow control config option (#3435)
 
 ### Changed
 

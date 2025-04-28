@@ -2900,7 +2900,6 @@ impl Info {
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
     }
 
-    #[cfg(feature = "unstable")]
     fn change_flow_control(&self, sw_flow_ctrl: SwFlowControl, hw_flow_ctrl: HwFlowControl) {
         // set SW flow control
         match sw_flow_ctrl {
