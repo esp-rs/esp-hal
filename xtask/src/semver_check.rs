@@ -162,7 +162,7 @@ fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
         }
     }
 
-    log::info!("Items to remove {:?}", to_remove);
+    log::debug!("Items to remove {:?}", to_remove);
 
     for id in &to_remove {
         krate.index.remove(&id);
