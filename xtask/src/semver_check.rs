@@ -68,6 +68,11 @@ pub fn check(
 
             let baseline_path = package_path.join(format!("api_baseline{}.json", suffix));
 
+            log::info!("Current path {current_path:?}");
+            log::info!("Exists? {:?}", current_path.exists());
+            log::info!("Baseline path {baseline_path:?}");
+            log::info!("Exists? {:?}", baseline_path.exists());
+
             remove_unstable_items(&current_path)?;
 
             let mut check = cargo_semver_checks::Check::new(
