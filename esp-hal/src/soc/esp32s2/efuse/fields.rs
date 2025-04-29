@@ -68,7 +68,7 @@ pub const VDD_SPI_TIEH: EfuseField = EfuseField::new(0, 2, 69, 1);
 /// Set this bit to use XPD_VDD_PSI_REG and VDD_SPI_TIEH to configure VDD_SPI
 /// LDO
 pub const VDD_SPI_FORCE: EfuseField = EfuseField::new(0, 2, 70, 1);
-/// Set SPI regulator to 0 to configure init[1:0]=0
+/// Set SPI regulator to 0 to configure init\[1:0\]=0
 pub const VDD_SPI_EN_INIT: EfuseField = EfuseField::new(0, 2, 71, 1);
 /// Set SPI regulator to 1 to enable output current limit
 pub const VDD_SPI_ENCURLIM: EfuseField = EfuseField::new(0, 2, 72, 1);

@@ -18,8 +18,8 @@ pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
 /// Set this bit to disable function of usb switch to jtag in module of usb
 /// device
 pub const DIS_USB_JTAG: EfuseField = EfuseField::new(0, 1, 41, 1);
-/// Set this bit to disable Icache in download mode (boot_mode[3:0] is 0; 1; 2;
-/// 3; 6; 7)
+/// Set this bit to disable Icache in download mode (boot_mode\[3:0\] is 0; 1;
+/// 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_ICACHE: EfuseField = EfuseField::new(0, 1, 42, 1);
 /// USB-Serial-JTAG
 pub const DIS_USB_SERIAL_JTAG: EfuseField = EfuseField::new(0, 1, 43, 1);
@@ -92,7 +92,7 @@ pub const RPT4_RESERVED0: EfuseField = EfuseField::new(0, 3, 118, 6);
 /// less than 15; the waiting time is the configurable value; Otherwise; the
 /// waiting time is twice the configurable value
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 3, 124, 4);
-/// Set this bit to disable download mode (boot_mode[3:0] = 0; 1; 2; 3; 6; 7)
+/// Set this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
 /// Disable direct boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 4, 129, 1);

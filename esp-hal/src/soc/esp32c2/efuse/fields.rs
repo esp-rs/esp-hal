@@ -29,7 +29,8 @@ pub const XTS_KEY_LENGTH_256: EfuseField = EfuseField::new(0, 1, 42, 1);
 pub const UART_PRINT_CONTROL: EfuseField = EfuseField::new(0, 1, 43, 2);
 /// Set this bit to force ROM code to send a resume command during SPI boot
 pub const FORCE_SEND_RESUME: EfuseField = EfuseField::new(0, 1, 45, 1);
-/// Set this bit to disable download mode (boot_mode[3:0] = 0; 1; 2; 4; 5; 6; 7)
+/// Set this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 4; 5; 6;
+/// 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 1, 46, 1);
 /// This bit set means disable direct_boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 1, 47, 1);
@@ -55,7 +56,7 @@ pub const RESERVED_0_61: EfuseField = EfuseField::new(0, 1, 61, 3);
 pub const CUSTOM_MAC: EfuseField = EfuseField::new(1, 0, 0, 48);
 /// reserved
 pub const RESERVED_1_48: EfuseField = EfuseField::new(1, 1, 48, 16);
-/// Stores the bits [64:87] of system data
+/// Stores the bits \[64:87\] of system data
 pub const SYSTEM_DATA2: EfuseField = EfuseField::new(1, 2, 64, 24);
 /// MAC address
 pub const MAC0: EfuseField = EfuseField::new(2, 0, 0, 32);
@@ -105,11 +106,11 @@ pub const RTC_LDO_ACT_DBIAS31: EfuseField = EfuseField::new(2, 4, 157, 6);
 pub const RTC_LDO_ACT_DBIAS13: EfuseField = EfuseField::new(2, 5, 163, 8);
 /// reserved
 pub const RESERVED_2_171: EfuseField = EfuseField::new(2, 5, 171, 21);
-/// Store the bit [86:96] of ADC calibration data
+/// Store the bit \[86:96\] of ADC calibration data
 pub const ADC_CALIBRATION_3: EfuseField = EfuseField::new(2, 6, 192, 11);
-/// Store the bit [0:20] of block2 reserved data
+/// Store the bit \[0:20\] of block2 reserved data
 pub const BLK2_RESERVED_DATA_0: EfuseField = EfuseField::new(2, 6, 203, 21);
-/// Store the bit [21:52] of block2 reserved data
+/// Store the bit \[21:52\] of block2 reserved data
 pub const BLK2_RESERVED_DATA_1: EfuseField = EfuseField::new(2, 7, 224, 32);
 /// BLOCK_KEY0 - 256-bits. 256-bit key of Flash Encryption
 pub const BLOCK_KEY0: EfuseField = EfuseField::new(3, 0, 0, 256);

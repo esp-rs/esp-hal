@@ -17,11 +17,11 @@ pub const DIS_RTC_RAM_BOOT: EfuseField = EfuseField::new(0, 1, 39, 1);
 pub const DIS_ICACHE: EfuseField = EfuseField::new(0, 1, 40, 1);
 /// Set this bit to disable Dcache
 pub const DIS_DCACHE: EfuseField = EfuseField::new(0, 1, 41, 1);
-/// Set this bit to disable Icache in download mode (boot_mode[3:0] is 0; 1; 2;
-/// 3; 6; 7)
+/// Set this bit to disable Icache in download mode (boot_mode\[3:0\] is 0; 1;
+/// 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_ICACHE: EfuseField = EfuseField::new(0, 1, 42, 1);
-/// Set this bit to disable Dcache in download mode ( boot_mode[3:0] is 0; 1; 2;
-/// 3; 6; 7)
+/// Set this bit to disable Dcache in download mode ( boot_mode\[3:0\] is 0; 1;
+/// 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_DCACHE: EfuseField = EfuseField::new(0, 1, 43, 1);
 /// Set this bit to disable the function that forces chip into download mode
 pub const DIS_FORCE_DOWNLOAD: EfuseField = EfuseField::new(0, 1, 44, 1);
@@ -65,7 +65,7 @@ pub const VDD_SPI_TIEH: EfuseField = EfuseField::new(0, 2, 69, 1);
 /// Set this bit and force to use the configuration of eFuse to configure
 /// VDD_SPI
 pub const VDD_SPI_FORCE: EfuseField = EfuseField::new(0, 2, 70, 1);
-/// Set SPI regulator to 0 to configure init[1:0]=0
+/// Set SPI regulator to 0 to configure init\[1:0\]=0
 pub const VDD_SPI_EN_INIT: EfuseField = EfuseField::new(0, 2, 71, 1);
 /// Set SPI regulator to 1 to enable output current limit
 pub const VDD_SPI_ENCURLIM: EfuseField = EfuseField::new(0, 2, 72, 1);
@@ -122,7 +122,7 @@ pub const POWER_GLITCH_DSENSE: EfuseField = EfuseField::new(0, 3, 122, 2);
 /// less than 15; the waiting time is the configurable value.  Otherwise; the
 /// waiting time is twice the configurable value
 pub const FLASH_TPUW: EfuseField = EfuseField::new(0, 3, 124, 4);
-/// Set this bit to disable download mode (boot_mode[3:0] = 0; 1; 2; 3; 6; 7)
+/// Set this bit to disable download mode (boot_mode\[3:0\] = 0; 1; 2; 3; 6; 7)
 pub const DIS_DOWNLOAD_MODE: EfuseField = EfuseField::new(0, 4, 128, 1);
 /// Disable direct boot mode
 pub const DIS_DIRECT_BOOT: EfuseField = EfuseField::new(0, 4, 129, 1);
