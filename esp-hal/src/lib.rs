@@ -578,12 +578,14 @@ pub struct Config {
     /// Enable watchdog timer(s).
     #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[builder_lite(unstable)]
     watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
     #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(feature = "psram")]
+    #[builder_lite(unstable)]
     psram: psram::PsramConfig,
 }
 
