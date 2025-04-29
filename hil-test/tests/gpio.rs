@@ -459,4 +459,32 @@ mod tests {
 
         loop {}
     }
+
+    #[test]
+    #[cfg(feature = "unstable")]
+    async fn pending_interrupt_does_not_cause_future_to_resolve_immediately(ctx: Context) {
+        use embassy_futures::{
+            select::{Either, select},
+            yield_now,
+        };
+
+        let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let mut in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        in_pin.listen(Event::RisingEdge);
+
+        out_pin.set_high();
+
+        assert!(in_pin.is_interrupt_set());
+
+        let should_timeout = select(in_pin.wait_for_falling_edge(), async {
+            // Give the future a bit of time, don't rely on the first poll resolving
+            for _ in 0..5 {
+                yield_now().await;
+            }
+        })
+        .await;
+
+        assert!(matches!(should_timeout, Either::Second(_)));
+    }
 }
