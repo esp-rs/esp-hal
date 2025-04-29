@@ -1,9 +1,9 @@
 use core::marker::PhantomData;
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 pub use self::calibration::*;
 use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuation};
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 use crate::efuse::Efuse;
 use crate::{
     peripherals::{APB_SARADC, SENS},
@@ -16,7 +16,7 @@ mod calibration;
 pub(super) const NUM_ATTENS: usize = 10;
 
 cfg_if::cfg_if! {
-    if #[cfg(esp32s3)] {
+    if #[cfg(any(esp32s2, esp32s3))] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
@@ -193,14 +193,16 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        regi2c::ADC_SAR1_DREF.write_field(enable as u8);
+        // For enable value 4, see <https://github.com/espressif/esp-idf/blob/a25e7ab59ed197817d4a78e139220b2707481f67/components/hal/esp32s3/include/hal/adc_ll.h#L812>
+        // For disable value 1, see <https://github.com/espressif/esp-idf/blob/a25e7ab59ed197817d4a78e139220b2707481f67/components/bootloader_support/src/bootloader_random_esp32s2.c#L81>
+        regi2c::ADC_SAR1_DREF.write_field(if enable { 4 } else { 1 });
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
@@ -296,14 +298,14 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
     const ADC_VAL_MASK: u16 = ADC_VAL_MASK;
 
     fn enable_vdef(enable: bool) {
-        regi2c::ADC_SAR2_DREF.write_field(enable as u8);
+        regi2c::ADC_SAR2_DREF.write_field(if enable { 4 } else { 1 });
     }
 
     fn connect_cal(source: AdcCalSource, enable: bool) {
@@ -489,7 +491,7 @@ where
     }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
@@ -502,9 +504,13 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn cal_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_cal_code(1, atten)
     }
+
+    fn coeff_b(atten: Attenuation) -> Option<i32> {
+        Efuse::rtc_calib_coeff_b(1, atten)
+    }
 }
 
-#[cfg(esp32s3)]
+#[cfg(any(esp32s2, esp32s3))]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)
@@ -516,6 +522,9 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
 
     fn cal_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_cal_code(2, atten)
+    }
+    fn coeff_b(atten: Attenuation) -> Option<i32> {
+        Efuse::rtc_calib_coeff_b(2, atten)
     }
 }
 
