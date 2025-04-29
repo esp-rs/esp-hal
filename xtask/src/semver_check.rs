@@ -144,21 +144,25 @@ fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
     let mut to_remove = vec![];
 
     // first pass - just look for cfg-gated items
+    //
+    // the string to match depends on the rustfmt-json version!
+    // later version emit `#[<cfg>(...` instead
+    let cfg_gates = vec![
+        "#[cfg(any(doc, feature = \"unstable\"))]",
+        "#[cfg(feature = \"unstable\")]",
+    ];
+
     for (id, item) in &mut krate.index {
-        // the string to match depends on the rustfmt-json version!
-        // later version emit `#[<cfg>(...` instead
         if item
             .attrs
-            .contains(&"#[cfg(any(doc, feature = \"unstable\"))]".to_string())
-            || item
-                .attrs
-                .contains(&"#[cfg(feature = \"unstable\")]".to_string())
+            .iter()
+            .any(|attr| cfg_gates.contains(&attr.as_str()))
         {
             to_remove.push(id.clone());
         }
     }
 
-    log::debug!("Items to remove {:?}", to_remove);
+    log::info!("Items to remove {:?}", to_remove);
 
     for id in &to_remove {
         krate.index.remove(&id);
