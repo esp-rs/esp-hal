@@ -136,6 +136,8 @@ fn build_doc_json(
 fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
     // this leaves orphaned items! cargo-semver-checks seems to be fine with that however
     // the json fmt is unstable - we might fail when using the "wrong" version of `rustdoc_types` here
+    //
+    // Hopefully this whole pre-processing is just a stop-gap solution until it's possible to generate docs for the stable-API only.
 
     log::info!("{:?}", path);
     let json_string = std::fs::read_to_string(path)?;
@@ -245,7 +247,8 @@ fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
                 }
             }
 
-            // don't honor:
+            // don't honor (because they either don't contain sub-items (= already handled in the first pass) or we currently don't use them)
+            //
             // ItemEnum::Use(_)
             // ItemEnum::Union(union)
             // ItemEnum::StructField(_)
