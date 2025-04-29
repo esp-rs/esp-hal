@@ -217,19 +217,54 @@ fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
     ]
 }
 
+// We have separate variants for single-core and multi-core async pin handling.
+// Single core can be much simpler because no code is running in parallel, so we
+// don't have to be so careful with the order of operations. On multi-core,
+// however, the order can actually break things, regardless of the critical
+// section (because tasks on the other core may be waken in inappropriate
+// times).
+
+#[cfg(single_core)]
 fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
     let mut async_intrs = async_pins & intrs;
-
     while async_intrs != 0 {
         let pin_pos = async_intrs.trailing_zeros();
         async_intrs -= 1 << pin_pos;
 
         let pin_nr = pin_pos as u8 + bank.offset();
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
 
-        // Disable the interrupt for this pin. This must be done as the last operation
-        // on the pin, so that `async fn wait_for` will not race with the interrupt
-        // handler.
+        // Disable the interrupt for this pin.
+        set_int_enable(pin_nr, Some(0), 0, false);
+
+        asynch::PIN_WAKERS[pin_nr as usize].wake();
+    }
+
+    // This is an optimization (in case multiple pin interrupts are handled at once)
+    // so that PinFuture doesn't have to clear interrupt status bits one by one
+    // for each pin. We need to clear after disabling the interrupt, so that a pin
+    // event can't re-set the bit.
+    bank.write_interrupt_status_clear(async_pins & intrs);
+
+    // On a single-core chip, the lock around `handle_async_pins` ensures
+    // that the interrupt handler will not be interrupted by other code,
+    // so we can safely write back without an atomic CAS.
+    bank.async_operations()
+        .store(async_pins & !intrs, Ordering::Relaxed);
+}
+
+#[cfg(multi_core)]
+fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
+    // First, disable pin interrupts. If we were to do this after clearing the async
+    // flags, the PinFuture destructor may try to take a critical section which
+    // isn't necessary.
+    let mut async_intrs = async_pins & intrs;
+    while async_intrs != 0 {
+        let pin_pos = async_intrs.trailing_zeros();
+        async_intrs -= 1 << pin_pos;
+
+        let pin_nr = pin_pos as u8 + bank.offset();
+
+        // Disable the interrupt for this pin.
         set_int_enable(pin_nr, Some(0), 0, false);
     }
 
@@ -239,17 +274,24 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
     // event can't re-set the bit.
     bank.write_interrupt_status_clear(async_pins & intrs);
 
-    // Clearing the async bit needs to be last.
-    cfg_if::cfg_if! {
-        if #[cfg(multi_core)] {
-            // On multi-core chips, we need to use a CAS to ensure that only
-            // the handled async bits are cleared.
-            bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
-        } else {
-            // On a single-core chip, the lock around `handle_async_pins` ensures
-            // that the interrupt handler will not be interrupted by other code,
-            // so we can safely write back without an atomic CAS.
-            bank.async_operations().store(async_pins & !intrs, Ordering::Relaxed);
-        }
+    // Clearing the async bit needs to be the last state change, as this signals
+    // completion.
+    // On multi-core chips, we need to use a CAS to ensure that only
+    // the handled async bits are cleared.
+    bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
+
+    // Now we can wake the tasks. This needs to happen after completion - waking an
+    // already running task isn't a big issue, but not waking a waiting one is.
+    // Doing it sooner would mean that on a multi-core chip a task could be
+    // waken, but the Future wouldn't actually be resolved, and so it might
+    // never wake again.
+    let mut async_intrs = async_pins & intrs;
+    while async_intrs != 0 {
+        let pin_pos = async_intrs.trailing_zeros();
+        async_intrs -= 1 << pin_pos;
+
+        let pin_nr = pin_pos as u8 + bank.offset();
+
+        asynch::PIN_WAKERS[pin_nr as usize].wake();
     }
 }
