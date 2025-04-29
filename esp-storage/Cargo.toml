@@ -26,14 +26,9 @@ critical-section = { version = "1.2.0", optional = true }
 esp-build = { version = "0.2.0", path = "../esp-build" }
 
 [features]
-default          = ["critical-section", "storage"]
+default          = ["critical-section"]
 critical-section = ["dep:critical-section"]
-# ReadStorage/Storage traits
-storage = []
-# ReadNorFlash/NorFlash traits
-nor-flash = []
-# Bytewise read emulation
-bytewise-read = []
+
 esp32c2       = []
 esp32c3       = []
 esp32c6       = []
@@ -41,6 +36,10 @@ esp32h2       = []
 esp32         = []
 esp32s2       = []
 esp32s3       = []
+
+# Bytewise read emulation
+bytewise-read = []
+
 # Enable flash emulation to run tests
 emulation = []
 

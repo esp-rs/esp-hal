@@ -158,8 +158,6 @@ impl Package {
                 features.push("defmt-espflash".to_owned());
             }
             Package::EspStorage => {
-                features.push("storage".to_owned());
-                features.push("nor-flash".to_owned());
                 features.push("low-level".to_owned());
             }
             Package::EspBootloaderEspIdf => {

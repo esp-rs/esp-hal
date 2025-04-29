@@ -87,7 +87,6 @@ impl FlashStorage {
         storage
     }
 
-    #[cfg(feature = "nor-flash")]
     #[inline(always)]
     pub(crate) fn check_alignment<const ALIGN: u32>(
         &self,
