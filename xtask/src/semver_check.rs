@@ -68,11 +68,6 @@ pub fn check(
 
             let baseline_path = package_path.join(format!("api_baseline{}.json", suffix));
 
-            log::info!("Current path {current_path:?}");
-            log::info!("Exists? {:?}", current_path.exists());
-            log::info!("Baseline path {baseline_path:?}");
-            log::info!("Exists? {:?}", baseline_path.exists());
-
             remove_unstable_items(&current_path)?;
 
             let mut check = cargo_semver_checks::Check::new(
@@ -111,11 +106,18 @@ fn build_doc_json(
     chip: &Chip,
     package_path: &PathBuf,
 ) -> Result<PathBuf, anyhow::Error> {
-    let current_path = PathBuf::from(package_path)
-        .join("target")
+    let target_dir = std::env::var("CARGO_TARGET_DIR");
+
+    let target_path = if let Ok(target) = target_dir {
+        PathBuf::from(target)
+    } else {
+        PathBuf::from(package_path).join("target")
+    };
+    let current_path = target_path
         .join(chip.target())
         .join("doc")
         .join(format!("{}.json", package.to_string().replace("-", "_")));
+
     std::fs::remove_file(&current_path).ok();
     let toolchain = "esp";
     let features = if package.chip_features_matter() {
