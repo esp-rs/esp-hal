@@ -7,30 +7,33 @@
 #![no_std]
 #![no_main]
 
-#[cfg(feature = "unstable")] // unused in stable build
-use core::cell::RefCell;
-
-#[cfg(feature = "unstable")] // unused in stable build
-use critical_section::Mutex;
-#[cfg(feature = "unstable")]
-use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
-#[cfg(feature = "unstable")]
-use esp_hal::{
-    // OutputOpenDrain is here because will be unused otherwise
-    delay::Delay,
-    gpio::{DriveMode, Event, Flex, Io},
-    handler,
-    timer::timg::TimerGroup,
-};
 use hil_test as _;
-#[cfg(feature = "unstable")]
-use portable_atomic::{AtomicUsize, Ordering};
 
-#[cfg(feature = "unstable")] // unused in stable build
-static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-#[cfg(feature = "unstable")] // unused in stable build
-static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+cfg_if::cfg_if! {
+    if #[cfg(feature = "unstable")] {
+        use core::cell::RefCell;
+        use critical_section::Mutex;
+        use embassy_time::{Duration, Timer};
+        use esp_hal::{
+            // OutputOpenDrain is here because will be unused otherwise
+            delay::Delay,
+            gpio::{DriveMode, Event, Flex, Io},
+            handler,
+            timer::timg::TimerGroup,
+        };
+        use portable_atomic::{AtomicUsize, Ordering};
+
+        static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+        static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(all(multi_core, feature = "unstable"))] {
+        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    }
+}
 
 struct Context {
     test_gpio1: AnyPin<'static>,
@@ -77,6 +80,29 @@ fn _gpios_can_be_reused() {
             gpio1.reborrow(),
             InputConfig::default().with_pull(Pull::Down),
         );
+    }
+}
+
+#[cfg(all(multi_core, feature = "unstable"))]
+#[embassy_executor::task]
+async fn edge_counter_task(
+    mut in_pin: Input<'static>,
+    signal: &'static Signal<CriticalSectionRawMutex, u32>,
+) {
+    let mut edge_count = 0;
+    loop {
+        // This join will:
+        // - first set up the pin to listen
+        // - then poll the pin future once (which will return Pending)
+        // - then signal that the pin is listening, which enables the other core to
+        //   toggle the matching OutputPin
+        // - then will wait for the pin future to resolve.
+        embassy_futures::join::join(in_pin.wait_for_any_edge(), async {
+            signal.signal(edge_count);
+        })
+        .await;
+
+        edge_count += 1;
     }
 }
 
@@ -486,5 +512,54 @@ mod tests {
         .await;
 
         assert!(matches!(should_timeout, Either::Second(_)));
+    }
+
+    #[test]
+    #[cfg(all(multi_core, feature = "unstable"))]
+    async fn pin_waits_on_core_different_from_interrupt_handler(ctx: Context) {
+        // This test exercises cross-core pin events. Core 1 will wait for edge events
+        // that Core 0 generates. Interrupts are handled on Core 0. A signal is used to
+        // throttle the toggling, so that Core 1 will be expected to count the
+        // exact number of edge transitions.
+
+        use esp_hal::{
+            peripherals::CPU_CTRL,
+            system::{CpuControl, Stack},
+        };
+        use esp_hal_embassy::Executor;
+        use hil_test::mk_static;
+
+        let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        // `edge_counter_task` also returns the edge count as part of this signal
+        let input_pin_listening = &*mk_static!(Signal<CriticalSectionRawMutex, u32>, Signal::new());
+
+        // No need to thread this through `Context` for one test case
+        let cpu_ctrl = unsafe { CPU_CTRL::steal() };
+        const CORE1_STACK_SIZE: usize = 8192;
+        let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
+        let _second_core = CpuControl::new(cpu_ctrl)
+            .start_app_core(app_core_stack, {
+                move || {
+                    let executor = mk_static!(Executor, Executor::new());
+                    executor.run(|spawner| {
+                        spawner.must_spawn(edge_counter_task(in_pin, input_pin_listening));
+                    });
+                }
+            })
+            .unwrap();
+
+        // Now drive the OutputPin and assert that the other core saw exactly as many
+        // edges as we generated here.
+        const EDGE_COUNT: u32 = 10_000;
+        for _ in 0..EDGE_COUNT {
+            input_pin_listening.wait().await;
+            out_pin.toggle();
+        }
+        // wait for signal
+        let edge_counter = input_pin_listening.wait().await;
+
+        assert_eq!(edge_counter, EDGE_COUNT);
     }
 }
