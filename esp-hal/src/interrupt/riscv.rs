@@ -423,6 +423,14 @@ mod vectored {
     /// Note that interrupts still need to be enabled globally for interrupts
     /// to be serviced.
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
+        enable_on_cpu(Cpu::current(), interrupt, level)
+    }
+
+    pub(crate) fn enable_on_cpu(
+        cpu: Cpu,
+        interrupt: Interrupt,
+        level: Priority,
+    ) -> Result<(), Error> {
         if matches!(level, Priority::None) {
             return Err(Error::InvalidInterruptPriority);
         }
@@ -430,7 +438,7 @@ mod vectored {
             let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(
                 PRIORITY_TO_INTERRUPT[(level as usize) - 1] as u32,
             );
-            map(Cpu::current(), interrupt, cpu_interrupt);
+            map(cpu, interrupt, cpu_interrupt);
             enable_cpu_interrupt(cpu_interrupt);
         }
         Ok(())

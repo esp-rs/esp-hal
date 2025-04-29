@@ -497,11 +497,19 @@ mod vectored {
 
     /// Enable the given peripheral interrupt
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
+        enable_on_cpu(Cpu::current(), interrupt, level)
+    }
+
+    pub(crate) fn enable_on_cpu(
+        cpu: Cpu,
+        interrupt: Interrupt,
+        level: Priority,
+    ) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            map(Cpu::current(), interrupt, cpu_interrupt);
+            map(cpu, interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),

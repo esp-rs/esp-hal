@@ -631,7 +631,7 @@ impl<'d> Io<'d> {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        unwrap!(crate::interrupt::enable(Interrupt::GPIO, prio));
+        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
     }
 
     #[cfg_attr(

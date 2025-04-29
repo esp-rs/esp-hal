@@ -104,17 +104,39 @@ pub(crate) fn bind_default_interrupt_handler() {
             return;
         }
     }
-    // The vector table doesn't contain a custom entry.Still, the
+
+    // The vector table doesn't contain a custom entry. Still, the
     // peripheral interrupt may already be bound to something else.
-    if interrupt::bound_cpu_interrupt_for(crate::system::Cpu::current(), Interrupt::GPIO).is_some()
-    {
-        info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
-        return;
+    for cpu in cores() {
+        if interrupt::bound_cpu_interrupt_for(cpu, Interrupt::GPIO).is_some() {
+            info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
+            return;
+        }
     }
 
     unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
+
     // By default, we use lowest priority
-    unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
+    set_interrupt_priority(Interrupt::GPIO, Priority::min());
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        // On ESP32, the interrupt fires on the core that started listening for a pin event.
+        fn cores() -> impl Iterator<Item = crate::system::Cpu> {
+            crate::system::Cpu::all()
+        }
+    } else {
+        fn cores() -> [crate::system::Cpu; 1] {
+            [crate::system::Cpu::current()]
+        }
+    }
+}
+
+pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
+    for cpu in cores() {
+        unwrap!(crate::interrupt::enable_on_cpu(cpu, interrupt, priority));
+    }
 }
 
 /// The default GPIO interrupt handler, when the user has not set one.
