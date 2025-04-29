@@ -13,6 +13,7 @@ use xtask::{
     Package,
     Version,
     cargo::{CargoAction, CargoArgsBuilder},
+    commands::*,
     firmware::Metadata,
 };
 
@@ -21,16 +22,10 @@ use xtask::{
 
 #[derive(Debug, Parser)]
 enum Cli {
-    /// Build documentation for the specified chip.
-    BuildDocumentation(BuildDocumentationArgs),
-    /// Build documentation index including the specified packages.
-    BuildDocumentationIndex(BuildDocumentationIndexArgs),
-    /// Build all examples for the specified chip.
-    BuildExamples(ExampleArgs),
-    /// Build the specified package with the given options.
-    BuildPackage(BuildPackageArgs),
-    /// Build all applicable tests or the specified test for a specified chip.
-    BuildTests(TestArgs),
+    /// Build-related subcommands
+    #[clap(subcommand)]
+    Build(Build),
+
     /// Bump the version of the specified package(s).
     BumpVersion(BumpVersionArgs),
     /// Format all packages in the workspace with rustfmt
@@ -44,9 +39,9 @@ enum Cli {
     #[clap(alias = "run-doc-test")]
     RunDocTests(ExampleArgs),
     /// Run the given example for the specified chip.
-    RunExample(ExampleArgs),
+    RunExample(BuildExamplesArgs),
     /// Run all applicable tests or the specified test for a specified chip.
-    RunTests(TestArgs),
+    RunTests(BuildTestsArgs),
     /// Run all ELFs in a folder.
     RunElfs(RunElfArgs),
     /// Perform (parts of) the checks done in CI
@@ -81,48 +76,6 @@ struct TestArgs {
     /// Repeat the tests for a specific number of times.
     #[arg(long)]
     repeat: Option<usize>,
-}
-
-#[derive(Debug, Args)]
-struct BuildDocumentationArgs {
-    /// Package(s) to document.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
-    packages: Vec<Package>,
-    /// Chip(s) to build documentation for.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    chips: Vec<Chip>,
-    /// Base URL of the deployed documentation.
-    #[arg(long)]
-    base_url: Option<String>,
-}
-
-#[derive(Debug, Args)]
-struct BuildDocumentationIndexArgs {
-    /// Package(s) to build documentation index for.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
-    packages: Vec<Package>,
-    #[cfg(feature = "preview-docs")]
-    #[arg(long)]
-    serve: bool,
-}
-
-#[derive(Debug, Args)]
-struct BuildPackageArgs {
-    /// Package to build.
-    #[arg(value_enum)]
-    package: Package,
-    /// Target to build for.
-    #[arg(long)]
-    target: Option<String>,
-    /// Features to build with.
-    #[arg(long, value_delimiter = ',')]
-    features: Vec<String>,
-    /// Toolchain to build with.
-    #[arg(long)]
-    toolchain: Option<String>,
-    /// Don't enabled the default features.
-    #[arg(long)]
-    no_default_features: bool,
 }
 
 #[derive(Debug, Args)]
@@ -218,19 +171,22 @@ fn main() -> Result<()> {
     let target_path = Path::new("target");
 
     match Cli::parse() {
-        Cli::BuildDocumentation(args) => build_documentation(&workspace, args),
-        Cli::BuildDocumentationIndex(args) => build_documentation_index(&workspace, args),
-        Cli::BuildExamples(args) => examples(
-            &workspace,
-            args,
-            CargoAction::Build(target_path.join("examples")),
-        ),
-        Cli::BuildPackage(args) => build_package(&workspace, args),
-        Cli::BuildTests(args) => tests(
-            &workspace,
-            args,
-            CargoAction::Build(target_path.join("tests")),
-        ),
+        // Build-related subcommands:
+        Cli::Build(build) => match build {
+            Build::Documentation(args) => build_documentation(&workspace, args),
+            Build::Examples(args) => examples(
+                &workspace,
+                args,
+                CargoAction::Build(target_path.join("examples")),
+            ),
+            Build::Package(args) => build_package(&workspace, args),
+            Build::Tests(args) => tests(
+                &workspace,
+                args,
+                CargoAction::Build(target_path.join("tests")),
+            ),
+        },
+
         Cli::BumpVersion(args) => bump_version(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
@@ -247,7 +203,7 @@ fn main() -> Result<()> {
 // ----------------------------------------------------------------------------
 // Subcommands
 
-fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Result<()> {
+pub fn examples(workspace: &Path, mut args: BuildExamplesArgs, action: CargoAction) -> Result<()> {
     // Ensure that the package/chip combination provided are valid:
     args.package.validate_package_chip(&args.chip)?;
 
@@ -288,59 +244,75 @@ fn examples(workspace: &Path, mut args: ExampleArgs, action: CargoAction) -> Res
 
     // Execute the specified action:
     match action {
-        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, out_path),
+        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, &out_path),
         CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
         CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
-fn build_examples(
-    args: ExampleArgs,
-    examples: Vec<Metadata>,
-    package_path: &Path,
-    out_path: PathBuf,
-) -> Result<()> {
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&args.chip)?;
+pub fn tests(workspace: &Path, args: BuildTestsArgs, action: CargoAction) -> Result<()> {
+    // Absolute path of the 'hil-test' package's root:
+    let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
 
-    if examples
-        .iter()
-        .find(|ex| ex.matches(&args.example))
-        .is_some()
-    {
-        // Attempt to build only the specified example:
-        for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
+    // Determine the appropriate build target for the given package and chip:
+    let target = Package::HilTest.target_triple(&args.chip)?;
+
+    // Load all tests which support the specified chip and parse their metadata:
+    let mut tests = xtask::firmware::load(&package_path.join("tests"))?
+        .into_iter()
+        .filter(|example| example.supports_chip(args.chip))
+        .collect::<Vec<_>>();
+
+    // Sort all tests by name:
+    tests.sort_by_key(|a| a.binary_name());
+
+    // Execute the specified action:
+    if tests.iter().find(|test| test.matches(&args.test)).is_some() {
+        for test in tests.iter().filter(|test| test.matches(&args.test)) {
             xtask::execute_app(
-                package_path,
+                &package_path,
                 args.chip,
                 target,
-                example,
-                CargoAction::Build(out_path.clone()),
-                1,
-                args.debug,
+                test,
+                action.clone(),
+                args.repeat.unwrap_or(1),
+                false,
             )?;
         }
         Ok(())
-    } else if args.example.is_some() {
-        // An invalid argument was provided:
-        bail!("Example not found or unsupported for the given chip")
+    } else if args.test.is_some() {
+        bail!("Test not found or unsupported for the given chip")
     } else {
-        // Attempt to build each supported example, with all required features enabled:
-        examples.iter().try_for_each(|example| {
-            xtask::execute_app(
-                package_path,
+        let mut failed = Vec::new();
+        for test in tests {
+            if xtask::execute_app(
+                &package_path,
                 args.chip,
                 target,
-                example,
-                CargoAction::Build(out_path.clone()),
-                1,
-                args.debug,
+                &test,
+                action.clone(),
+                args.repeat.unwrap_or(1),
+                false,
             )
-        })
+            .is_err()
+            {
+                failed.push(test.name_with_configuration());
+            }
+        }
+
+        if !failed.is_empty() {
+            bail!("Failed tests: {:#?}", failed);
+        }
+
+        Ok(())
     }
 }
 
-fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+fn run_example(
+    args: BuildExamplesArgs,
+    examples: Vec<Metadata>,
+    package_path: &Path,
+) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&args.chip)?;
 
@@ -369,7 +341,11 @@ fn run_example(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) 
     Ok(())
 }
 
-fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
+fn run_examples(
+    args: BuildExamplesArgs,
+    examples: Vec<Metadata>,
+    package_path: &Path,
+) -> Result<()> {
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&args.chip)?;
 
@@ -440,119 +416,6 @@ fn run_examples(args: ExampleArgs, examples: Vec<Metadata>, package_path: &Path)
     }
 
     Ok(())
-}
-
-fn tests(workspace: &Path, args: TestArgs, action: CargoAction) -> Result<()> {
-    // Absolute path of the 'hil-test' package's root:
-    let package_path = xtask::windows_safe_path(&workspace.join("hil-test"));
-
-    // Determine the appropriate build target for the given package and chip:
-    let target = Package::HilTest.target_triple(&args.chip)?;
-
-    // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = xtask::firmware::load(&package_path.join("tests"))?
-        .into_iter()
-        .filter(|example| example.supports_chip(args.chip))
-        .collect::<Vec<_>>();
-
-    // Sort all tests by name:
-    tests.sort_by_key(|a| a.binary_name());
-
-    // Execute the specified action:
-    if tests.iter().find(|test| test.matches(&args.test)).is_some() {
-        for test in tests.iter().filter(|test| test.matches(&args.test)) {
-            xtask::execute_app(
-                &package_path,
-                args.chip,
-                target,
-                test,
-                action.clone(),
-                args.repeat.unwrap_or(1),
-                false,
-            )?;
-        }
-        Ok(())
-    } else if args.test.is_some() {
-        bail!("Test not found or unsupported for the given chip")
-    } else {
-        let mut failed = Vec::new();
-        for test in tests {
-            if xtask::execute_app(
-                &package_path,
-                args.chip,
-                target,
-                &test,
-                action.clone(),
-                args.repeat.unwrap_or(1),
-                false,
-            )
-            .is_err()
-            {
-                failed.push(test.name_with_configuration());
-            }
-        }
-
-        if !failed.is_empty() {
-            bail!("Failed tests: {:#?}", failed);
-        }
-
-        Ok(())
-    }
-}
-
-fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    xtask::documentation::build_documentation(
-        workspace,
-        &mut args.packages,
-        &mut args.chips,
-        args.base_url,
-    )
-}
-
-fn build_documentation_index(
-    workspace: &Path,
-    mut args: BuildDocumentationIndexArgs,
-) -> Result<()> {
-    xtask::documentation::build_documentation_index(workspace, &mut args.packages)?;
-
-    #[cfg(feature = "preview-docs")]
-    if args.serve {
-        std::thread::spawn(|| {
-            std::thread::sleep(std::time::Duration::from_millis(1000));
-            opener::open_browser("http://127.0.0.1:8000/").ok();
-        });
-
-        rocket::async_main(
-            {
-                rocket::build().mount(
-                    "/",
-                    rocket::fs::FileServer::new(
-                        "docs",
-                        rocket::fs::Options::Index
-                            | rocket::fs::Options::IndexFile
-                            | rocket::fs::Options::DotFiles,
-                    ),
-                )
-            }
-            .launch(),
-        )?;
-    }
-
-    Ok(())
-}
-
-fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
-    // Absolute path of the package's root:
-    let package_path = xtask::windows_safe_path(&workspace.join(args.package.to_string()));
-
-    // Build the package using the provided features and/or target, if any:
-    xtask::build_package(
-        &package_path,
-        args.features,
-        args.no_default_features,
-        args.toolchain,
-        args.target,
-    )
 }
 
 fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
@@ -849,6 +712,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             packages: vec![Package::EspHal, Package::EspWifi, Package::EspHalEmbassy],
             chips: vec![args.chip],
             base_url: None,
+            serve: false,
         },
     )
     .inspect_err(|_| failure = true)
@@ -863,7 +727,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // expects it
         examples(
             workspace,
-            ExampleArgs {
+            BuildExamplesArgs {
                 package: Package::EspLpHal,
                 chip: args.chip,
                 example: None,
@@ -902,6 +766,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 packages: vec![Package::EspLpHal],
                 chips: vec![args.chip],
                 base_url: None,
+                serve: false,
             },
         )
         .inspect_err(|_| failure = true)
@@ -925,7 +790,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (examples)
     examples(
         workspace,
-        ExampleArgs {
+        BuildExamplesArgs {
             package: Package::Examples,
             chip: args.chip,
             example: None,
@@ -939,7 +804,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (qa-test)
     examples(
         workspace,
-        ExampleArgs {
+        BuildExamplesArgs {
             package: Package::QaTest,
             chip: args.chip,
             example: None,

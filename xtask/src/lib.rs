@@ -12,6 +12,7 @@ use strum::{Display, EnumIter, IntoEnumIterator as _};
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
 pub mod cargo;
+pub mod commands;
 pub mod documentation;
 pub mod firmware;
 
