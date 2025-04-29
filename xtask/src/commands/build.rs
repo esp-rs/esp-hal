@@ -5,6 +5,7 @@ use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
 
+use super::{ExamplesArgs, TestsArgs};
 use crate::{Package, cargo::CargoAction, firmware::Metadata};
 
 // ----------------------------------------------------------------------------
@@ -15,11 +16,11 @@ pub enum Build {
     /// Build documentation for the specified chip.
     Documentation(BuildDocumentationArgs),
     /// Build all examples for the specified chip.
-    Examples(BuildExamplesArgs),
+    Examples(ExamplesArgs),
     /// Build the specified package with the given options.
     Package(BuildPackageArgs),
     /// Build all applicable tests or the specified test for a specified chip.
-    Tests(BuildTestsArgs),
+    Tests(TestsArgs),
 }
 
 // ----------------------------------------------------------------------------
@@ -42,21 +43,6 @@ pub struct BuildDocumentationArgs {
 }
 
 #[derive(Debug, Args)]
-pub struct BuildExamplesArgs {
-    /// Package whose examples we which to act on.
-    #[arg(value_enum)]
-    pub package: Package,
-    /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
-    /// Optional example to act on (all examples used if omitted)
-    pub example: Option<String>,
-    /// Build examples in debug mode only
-    #[arg(long)]
-    pub debug: bool,
-}
-
-#[derive(Debug, Args)]
 pub struct BuildPackageArgs {
     /// Package to build.
     #[arg(value_enum)]
@@ -73,19 +59,6 @@ pub struct BuildPackageArgs {
     /// Don't enabled the default features.
     #[arg(long)]
     pub no_default_features: bool,
-}
-
-#[derive(Debug, Args)]
-pub struct BuildTestsArgs {
-    /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
-    /// Optional test to act on (all tests used if omitted)
-    #[arg(short = 't', long)]
-    pub test: Option<String>,
-    /// Repeat the tests for a specific number of times.
-    #[arg(long)]
-    pub repeat: Option<usize>,
 }
 
 // ----------------------------------------------------------------------------
@@ -133,7 +106,7 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
 }
 
 pub fn build_examples(
-    args: BuildExamplesArgs,
+    args: ExamplesArgs,
     examples: Vec<Metadata>,
     package_path: &Path,
     out_path: &Path,
