@@ -6,6 +6,7 @@
 #![no_std]
 #![no_main]
 
+use embassy_futures::select::select;
 use embassy_time::{Duration, Ticker, Timer};
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
@@ -122,6 +123,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
+
     use super::*;
     use crate::test_cases::*;
     #[cfg(not(feature = "esp32"))]
@@ -270,5 +272,17 @@ mod test {
         }
 
         assert!(false, "Test failed after 5 retries");
+    }
+
+    /// Test that timg0 and systimer don't have vastly different tick rates.
+    #[test]
+    async fn test_that_a_very_long_wakeup_does_not_panic(peripherals: Peripherals) {
+        set_up_embassy_with_timg0(peripherals);
+
+        select(
+            Timer::after(Duration::from_micros(u64::MAX / 2)),
+            embassy_futures::yield_now(), // we don't actually want to wait forever
+        )
+        .await;
     }
 }
