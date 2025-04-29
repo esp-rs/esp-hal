@@ -360,9 +360,7 @@ The following dependencies are now gated behind the `unstable` feature and their
 invididual features are no longer available:
 - `digest`
 - `ufmt-write`
-- `embassy-usb-driver`
-- `embassy-usb-synopsys-otg`
-- `esp-synopsys-otg`
-- `usb-otg`
+
+The `usb_otg` and `bluetooth` features are now considered private and have been renamed accordingly.
 
 The `debug` feature has been removed. If you used it, enable `impl-register-debug` on the PAC of your device.
