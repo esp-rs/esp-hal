@@ -30,15 +30,16 @@ impl Efuse {
     pub fn read_base_mac_address() -> [u8; 6] {
         let mut mac_addr = [0u8; 6];
 
-        let mac0 = Self::read_field_be::<[u8; 4]>(crate::soc::efuse::MAC0);
-        let mac1 = Self::read_field_be::<[u8; 2]>(crate::soc::efuse::MAC1);
+        let mac0 = Self::read_field_le::<[u8; 4]>(crate::soc::efuse::MAC0);
+        let mac1 = Self::read_field_le::<[u8; 2]>(crate::soc::efuse::MAC1);
 
-        mac_addr[0] = mac1[0];
-        mac_addr[1] = mac1[1];
-        mac_addr[2] = mac0[0];
-        mac_addr[3] = mac0[1];
-        mac_addr[4] = mac0[2];
-        mac_addr[5] = mac0[3];
+        // MAC address is stored in big endian, so load the bytes in reverse:
+        mac_addr[0] = mac1[1];
+        mac_addr[1] = mac1[0];
+        mac_addr[2] = mac0[3];
+        mac_addr[3] = mac0[2];
+        mac_addr[4] = mac0[1];
+        mac_addr[5] = mac0[0];
 
         mac_addr
     }
@@ -109,21 +110,6 @@ impl Efuse {
         bytes.fill(0);
 
         unsafe { output.assume_init() }
-    }
-
-    /// Read field value in a big-endian order
-    #[inline(always)]
-    pub fn read_field_be<T: AnyBitPattern>(field: EfuseField) -> T {
-        // Read value in a little-endian order:
-        let mut output = Self::read_field_le::<T>(field);
-        // Represent output value as a byte slice:
-        let bytes = unsafe {
-            slice::from_raw_parts_mut(&mut output as *mut T as *mut u8, mem::size_of::<T>())
-        };
-        // Reverse byte order:
-        bytes.reverse();
-
-        output
     }
 
     /// Read bit value.
