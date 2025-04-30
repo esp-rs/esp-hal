@@ -52,8 +52,6 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "esp32"))]
-use esp_hal::timer::systimer::Alarm;
 use esp_hal::timer::{AnyTimer, timg::Timer as TimgTimer};
 pub use macros::embassy_main as main;
 
@@ -91,11 +89,9 @@ pub trait TimerCollection {
 trait IntoAnyTimer: Into<AnyTimer<'static>> {}
 
 impl IntoAnyTimer for AnyTimer<'static> {}
-
-impl IntoAnyTimer for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
-
-#[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
+impl IntoAnyTimer for TimgTimer<'static> {}
+#[cfg(systimer)]
+impl IntoAnyTimer for esp_hal::timer::systimer::Alarm<'static> {}
 
 impl<T> TimerCollection for T
 where
