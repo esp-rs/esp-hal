@@ -157,9 +157,7 @@ impl Package {
                 features.push("auto".to_owned());
                 features.push("defmt-espflash".to_owned());
             }
-            Package::EspStorage => {
-                features.push("low-level".to_owned());
-            }
+            Package::EspStorage => {}
             Package::EspBootloaderEspIdf => {
                 features.push("defmt".to_owned());
                 features.push("validation".to_owned());
