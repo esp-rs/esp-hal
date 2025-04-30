@@ -15,35 +15,40 @@ bench = false
 test  = false
 
 [dependencies]
+esp-hal = { version = "1.0.0-beta.0", path = "../esp-hal", default-features = false }
+critical-section = "1.2.0"
+cfg-if = "1.0.0"
+portable-atomic = { version = "1.11.0", default-features = false }
+enumset   = { version = "1.1.5", default-features = false, optional = true }
+
+# ⚠️ Unstable dependencies
+embedded-io = { version = "0.6.1", default-features = false }
+embedded-io-async = { version = "0.6.1" }
+rand_core = "0.9.3"
+
+# Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.2.0", default-features = false, features = ["alloc"] }
-defmt = { version = "1.0.1", optional = true }
-log = { version = "0.4.27", optional = true }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.7.0", path = "../esp-alloc", optional = true }
-esp-hal = { version = "1.0.0-beta.0", path = "../esp-hal", default-features = false }
+esp-config = { version = "0.3.0", path = "../esp-config" }
+esp-wifi-sys = "0.7.1"
+num-derive = { version = "0.4.2" }
+num-traits = { version = "0.2.19", default-features = false }
+portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
+xtensa-lx-rt = { version = "0.18.0", path = "../xtensa-lx-rt", optional = true }
+
+# Optional dependencies enabling ecosystem features
+serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
 smoltcp = { version = "0.12.0", default-features = false, features = [
   "medium-ethernet",
   "socket-raw",
 ], optional = true }
-critical-section = "1.2.0"
-enumset = { version = "1.1.5", default-features = false, optional = true }
-embedded-io = { version = "0.6.1", default-features = false }
-embedded-io-async = { version = "0.6.1" }
-num-derive = { version = "0.4.2" }
-num-traits = { version = "0.2.19", default-features = false }
-esp-wifi-sys = "0.7.1"
-embassy-sync = { version = "0.6.2", optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
-cfg-if = "1.0.0"
-portable-atomic = { version = "1.11.0", default-features = false }
-portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-rand_core           = "0.9.3"
-
 bt-hci = { version = "0.3.0", optional = true }
-esp-config = { version = "0.3.0", path = "../esp-config" }
 
-xtensa-lx-rt = { version = "0.18.0", path = "../xtensa-lx-rt", optional = true }
-serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt            = { version = "1.0.1", optional = true }
+log-04           = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
 esp-build    = { version = "0.2.0", path = "../esp-build" }
@@ -52,14 +57,6 @@ esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 
 [features]
 default = ["builtin-scheduler", "esp-alloc"]
-
-## Use `esp-alloc` for dynamic allocations.
-##
-## If you opt-out you need to provide implementations for the following functions:
-## - `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
-## - `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
-## - `pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8)`
-esp-alloc = ["dep:esp-alloc"]
 
 # Chip Support Feature Flags
 # Target the ESP32-C2.
@@ -101,20 +98,24 @@ esp32s3 = [
   "xtensa-lx-rt/float-save-restore",
 ]
 
-## Enable WiFi-BLE coexistence support
-coex = []
+## Use `esp-alloc` for dynamic allocations.
+##
+## If you opt-out you need to provide implementations for the following functions:
+## - `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
+## - `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
+## - `pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8)`
+esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
-## Enable support for `defmt`
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
+## Use builtin scheduler
+builtin-scheduler = []
 
-## Enable support for the `log` crate
-log = ["dep:log", "esp-hal/log-04", "esp-wifi-sys/log"]
+#! ### Wireless Feature Flags
 
 ## Enable WiFi support
-wifi = ["dep:enumset", "dep:embassy-net-driver", "dep:embassy-sync"]
+wifi = ["dep:enumset", "dep:embassy-net-driver"]
 
 ## Enable esp-now support
 esp-now = ["wifi"]
@@ -123,19 +124,28 @@ esp-now = ["wifi"]
 sniffer = ["wifi"]
 
 ## Enable BLE support
-ble = ["esp-hal/__bluetooth", "dep:bt-hci", "dep:embassy-sync"]
+ble = ["esp-hal/__bluetooth", "dep:bt-hci"]
+
+## Enable WiFi-BLE coexistence support
+coex = []
 
 ## Enable WiFi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE)",
 csi = []
 
+#! ### Ecosystem Feature Flags
+
 ## Provide implementations of smoltcp traits
 smoltcp = ["dep:smoltcp"]
 
-## Use builtin scheduler
-builtin-scheduler = []
-
-# Implement serde Serialize / Deserialize
+## Implement serde Serialize / Deserialize
 serde = ["dep:serde", "enumset?/serde"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt"]
 
 [package.metadata.docs.rs]
 features = [
