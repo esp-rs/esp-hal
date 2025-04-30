@@ -5,10 +5,9 @@ use std::{
     fs::{self, File},
     io::{BufRead, Write},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
-use esp_build::{assert_unique_features, assert_unique_used_features};
+use esp_build::assert_unique_features;
 use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
@@ -20,38 +19,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // NOTE: update when adding new device support!
-    // Ensure that exactly one chip has been specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
-
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
-    // NOTE: update when adding new device support!
-    // Determine the name of the configured device:
-    let device_name = if cfg!(feature = "esp32") {
-        "esp32"
-    } else if cfg!(feature = "esp32c2") {
-        "esp32c2"
-    } else if cfg!(feature = "esp32c3") {
-        "esp32c3"
-    } else if cfg!(feature = "esp32c6") {
-        "esp32c6"
-    } else if cfg!(feature = "esp32h2") {
-        "esp32h2"
-    } else if cfg!(feature = "esp32s2") {
-        "esp32s2"
-    } else if cfg!(feature = "esp32s3") {
-        "esp32s3"
-    } else {
-        unreachable!() // We've confirmed exactly one known device was selected
-    };
+    // Ensure that exactly one chip has been specified:
+    let chip = Chip::from_cargo_feature()?;
 
-    let chip = Chip::from_str(device_name)?;
     if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
         panic!("
         Seems you are building for an unsupported or wrong target (e.g. the host environment).
@@ -113,15 +88,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 automatically detect the frequency. `auto` may not be able to identify the clock \
                 frequency in some cases. Also, configuring a specific frequency may increase \
                 performance slightly.",
-                default_value: Value::String(match device_name {
-                    "esp32" | "esp32c2" => String::from("auto"),
+                default_value: Value::String(match chip {
+                    Chip::Esp32 | Chip::Esp32c2 => String::from("auto"),
                     // The rest has only one option
-                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
-                    "esp32h2" => String::from("32"),
-                    _ => unreachable!(),
+                    Chip::Esp32c3 | Chip::Esp32c6 | Chip::Esp32s2 | Chip::Esp32s3 => {
+                        String::from("40")
+                    }
+                    Chip::Esp32h2 => String::from("32"),
                 }),
-                constraint: match device_name {
-                    "esp32" | "esp32c2" => Some(Validator::Enumeration(vec![
+                constraint: match chip {
+                    Chip::Esp32 | Chip::Esp32c2 => Some(Validator::Enumeration(vec![
                         String::from("auto"),
                         String::from("26"),
                         String::from("40"),
@@ -130,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     _ => None,
                 },
                 stability: Stability::Unstable,
-                active: ["esp32", "esp32s2"].contains(&device_name),
+                active: [Chip::Esp32, Chip::Esp32c2].contains(&chip),
             },
             ConfigOption {
                 name: "spi-address-workaround",
@@ -140,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
-                active: device_name == "esp32",
+                active: chip == Chip::Esp32,
             },
             ConfigOption {
                 name: "flip-link",
@@ -148,7 +124,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 default_value: Value::Bool(false),
                 constraint: None,
                 stability: Stability::Unstable,
-                active: ["esp32c6", "esp32h2"].contains(&device_name),
+                active: [Chip::Esp32c6, Chip::Esp32h2].contains(&chip),
             },
             // TODO: automate "enum of single choice" handling - they don't need
             // to be presented to the user
@@ -218,9 +194,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        // Xtensa devices:
-
+    if chip.is_xtensa() {
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
@@ -269,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{device_name}"), &out)?;
+    copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip), &out)?;
 
     Ok(())
 }

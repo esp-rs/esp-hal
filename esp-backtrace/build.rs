@@ -3,9 +3,7 @@ use esp_config::{ConfigOption, Stability, Value, generate_config};
 
 fn main() {
     // Ensure that only a single chip is specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32p4", "esp32s2", "esp32s3"
-    );
+    let _ = esp_metadata::Chip::from_cargo_feature().unwrap();
 
     // Ensure that exactly a backend is selected:
     assert_unique_used_features!("defmt", "println");

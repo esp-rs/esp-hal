@@ -28,7 +28,8 @@ critical-section = { version = "1.2.0", optional = true }
 document-features = "0.2.11"
 
 [build-dependencies]
-esp-build = { version = "0.2.0", path = "../esp-build" }
+esp-build    = { version = "0.2.0", path = "../esp-build" }
+esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 
 [features]
 default = ["critical-section"]
