@@ -33,23 +33,6 @@ use esp_println::println;
 
 You can now `println!("Hello world")` as usual.
 
-# Features
-
-- There is one feature for each supported target: `esp32`, `esp32c2`,
-  `esp32c3`, `esp32c6`, `esp32h2`, `esp32s2`, and `esp32s3`.
-  - One of these features must be enabled.
-  - Only one of these features can be enabled at a time.
-- There is one feature for each supported communication method: `uart`, `jtag-serial` and `auto`.
-  - Only one of these features can be enabled at a time.
-- `no-op`: Don't print anything.
-- `log-04`: Enables logging using version 0.4 of the [`log` crate].
-- `colors`: Enable colored logging.
-  - Only effective when using the `log` feature.
-- `critical-section`: Enables critical sections.
-- `defmt-espflash`: This is intended to be used with [`espflash`], see `-L/--log-format` argument
-  of `flash` or `monitor` subcommands of `espflash` and `cargo-espflash`. Uses [rzCOBS] encoding
-  and adds framing.
-
 ## Logging
 
 With the feature `log-04` activated, and version 0.4 of the `log` crate added to your dependencies,

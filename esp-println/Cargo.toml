@@ -66,7 +66,10 @@ no-op       = []
 #! ### Logging framework features
 ## Enables using the `log` crate for logging.
 log-04         = ["dep:log-04"]
-## Enables printing using `defmt`. defmt-encoded output can only be read using espflash.
+## Enables printing using `defmt`.
+##
+## defmt-encoded output can only be read using espflash. With esp_hal, this works out of the box.
+## Without esp_hal, you need to set the `--log-format defmt` argument for espflash.
 defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
 
 #! ### `log`-specific features
