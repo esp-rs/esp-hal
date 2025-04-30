@@ -216,7 +216,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         for chip in &args.chips {
             let device = Config::for_chip(chip);
 
-            if let Err(_) = package.validate_package_chip(chip) {
+            if package.validate_package_chip(chip).is_err() {
                 continue;
             }
 
@@ -370,8 +370,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         BuildDocumentationArgs {
             packages: vec![Package::EspHal, Package::EspWifi, Package::EspHalEmbassy],
             chips: vec![args.chip],
-            base_url: None,
-            serve: false,
+            ..Default::default()
         },
     )
     .inspect_err(|_| failure = true)
@@ -402,7 +401,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             let from_dir = PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
                 args.chip.target(),
-                args.chip.to_string()
+                args.chip
             ));
             let to_dir = PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -424,8 +423,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             BuildDocumentationArgs {
                 packages: vec![Package::EspLpHal],
                 chips: vec![args.chip],
-                base_url: None,
-                serve: false,
+                ..Default::default()
             },
         )
         .inspect_err(|_| failure = true)
@@ -455,7 +453,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
         },
-        CargoAction::Build(PathBuf::from(format!("./examples/target/"))),
+        CargoAction::Build(PathBuf::from("./examples/target/")),
     )
     .inspect_err(|_| failure = true)
     .ok();
@@ -469,7 +467,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
         },
-        CargoAction::Build(PathBuf::from(format!("./qa-test/target/"))),
+        CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )
     .inspect_err(|_| failure = true)
     .ok();

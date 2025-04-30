@@ -26,7 +26,7 @@ pub enum Build {
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
-#[derive(Debug, Args)]
+#[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
     /// Package(s) to document.
     #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
@@ -114,11 +114,7 @@ pub fn build_examples(
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&args.chip)?;
 
-    if examples
-        .iter()
-        .find(|ex| ex.matches(&args.example))
-        .is_some()
-    {
+    if examples.iter().any(|ex| ex.matches(&args.example)) {
         // Attempt to build only the specified example:
         for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
             crate::execute_app(

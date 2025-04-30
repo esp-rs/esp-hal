@@ -173,15 +173,12 @@ impl Package {
     pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
 
-        match self {
-            Package::EspWifi => {
-                // minimal set of features that when enabled _should_ still compile
-                cases.push(vec![
-                    "esp-hal/unstable".to_owned(),
-                    "builtin-scheduler".to_owned(),
-                ]);
-            }
-            _ => {}
+        if self == &Package::EspWifi {
+            // Minimal set of features that when enabled _should_ still compile:
+            cases.push(vec![
+                "esp-hal/unstable".to_owned(),
+                "builtin-scheduler".to_owned(),
+            ]);
         }
 
         cases
@@ -308,7 +305,7 @@ pub fn execute_app(
         let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(&chip.to_string());
+                let out_dir = out_dir.join(chip.to_string());
                 std::fs::create_dir_all(&out_dir)?;
 
                 let output_file = out_dir.join(app.output_file_name());
@@ -432,9 +429,9 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
                 "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
             );
 
-            manifest["dependencies"].as_table_mut().map(|table| {
-                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
-            });
+            if let Some(table) = manifest["dependencies"].as_table_mut() {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string());
+            }
 
             fs::write(&manifest_path, manifest.to_string())
                 .with_context(|| format!("Could not write {}", manifest_path.display()))?;
@@ -472,10 +469,8 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for entry in fs::read_dir(workspace)? {
         let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            if entry.path().join("Cargo.toml").exists() {
-                paths.push(entry.path());
-            }
+        if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
+            paths.push(entry.path());
         }
     }
 

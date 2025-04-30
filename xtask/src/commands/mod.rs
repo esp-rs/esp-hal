@@ -37,8 +37,8 @@ pub struct TestsArgs {
     pub chip: Chip,
 
     /// Repeat the tests for a specific number of times.
-    #[arg(long)]
-    pub repeat: Option<usize>,
+    #[arg(long, default_value_t = 1)]
+    pub repeat: usize,
     /// Optional test to act on (all tests used if omitted)
     #[arg(long, short = 't')]
     pub test: Option<String>,
@@ -73,14 +73,8 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     // Load all examples which support the specified chip and parse their metadata:
     let mut examples = crate::firmware::load(&example_path)?
-        .iter()
-        .filter_map(|example| {
-            if example.supports_chip(args.chip) {
-                Some(example.clone())
-            } else {
-                None
-            }
-        })
+        .into_iter()
+        .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
 
     // Sort all examples by name:
@@ -111,7 +105,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     tests.sort_by_key(|a| a.binary_name());
 
     // Execute the specified action:
-    if tests.iter().find(|test| test.matches(&args.test)).is_some() {
+    if tests.iter().any(|test| test.matches(&args.test)) {
         for test in tests.iter().filter(|test| test.matches(&args.test)) {
             crate::execute_app(
                 &package_path,
@@ -119,7 +113,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 target,
                 test,
                 action.clone(),
-                args.repeat.unwrap_or(1),
+                args.repeat,
                 false,
             )?;
         }
@@ -135,7 +129,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 target,
                 &test,
                 action.clone(),
-                args.repeat.unwrap_or(1),
+                args.repeat,
                 false,
             )
             .is_err()
