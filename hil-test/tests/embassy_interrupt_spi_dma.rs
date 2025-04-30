@@ -24,17 +24,8 @@ use esp_hal::{
     timer::AnyTimer,
 };
 use esp_hal_embassy::InterruptExecutor;
-use hil_test as _;
+use hil_test::mk_static;
 use portable_atomic::AtomicBool;
-
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 static STOP_INTERRUPT_TASK: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);

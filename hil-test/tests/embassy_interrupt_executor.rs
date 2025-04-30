@@ -26,16 +26,7 @@ use esp_hal::{
 #[cfg(multi_core)]
 use esp_hal_embassy::Executor;
 use esp_hal_embassy::InterruptExecutor;
-use hil_test as _;
-
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
+use hil_test::mk_static;
 
 #[embassy_executor::task]
 async fn responder_task(

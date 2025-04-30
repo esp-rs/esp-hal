@@ -7,36 +7,41 @@
 #![no_std]
 #![no_main]
 
-#[cfg(feature = "unstable")] // unused in stable build
-use core::cell::RefCell;
-
-#[cfg(feature = "unstable")] // unused in stable build
-use critical_section::Mutex;
-#[cfg(feature = "unstable")]
-use embassy_time::{Duration, Timer};
 use esp_hal::gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull};
-#[cfg(feature = "unstable")]
-use esp_hal::{
-    // OutputOpenDrain is here because will be unused otherwise
-    delay::Delay,
-    gpio::{DriveMode, Event, Flex, Io},
-    handler,
-    timer::timg::TimerGroup,
-};
 use hil_test as _;
-#[cfg(feature = "unstable")]
-use portable_atomic::{AtomicUsize, Ordering};
 
-#[cfg(feature = "unstable")] // unused in stable build
-static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
-#[cfg(feature = "unstable")] // unused in stable build
-static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+cfg_if::cfg_if! {
+    if #[cfg(feature = "unstable")] {
+        use core::cell::RefCell;
+        use critical_section::Mutex;
+        use embassy_time::{Duration, Timer};
+        use esp_hal::{
+            // OutputOpenDrain is here because will be unused otherwise
+            delay::Delay,
+            gpio::{DriveMode, Event, Flex, Io},
+            handler,
+            timer::timg::TimerGroup,
+        };
+        use portable_atomic::{AtomicUsize, Ordering};
+
+        static COUNTER: Mutex<RefCell<u32>> = Mutex::new(RefCell::new(0));
+        static INPUT_PIN: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+    }
+}
+
+cfg_if::cfg_if! {
+    if #[cfg(all(multi_core, feature = "unstable"))] {
+        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    }
+}
 
 struct Context {
     test_gpio1: AnyPin<'static>,
     test_gpio2: AnyPin<'static>,
     #[cfg(feature = "unstable")]
     delay: Delay,
+    #[cfg(feature = "unstable")]
+    io: Io<'static>,
 }
 
 #[cfg_attr(feature = "unstable", handler)]
@@ -46,7 +51,7 @@ pub fn interrupt_handler() {
         *COUNTER.borrow_ref_mut(cs) += 1;
         INPUT_PIN
             .borrow_ref_mut(cs)
-            .as_mut() // we can't unwrap as the handler may get called for async operations
+            .as_mut()
             .map(|pin| pin.clear_interrupt());
     });
 }
@@ -78,6 +83,29 @@ fn _gpios_can_be_reused() {
     }
 }
 
+#[cfg(all(multi_core, feature = "unstable"))]
+#[embassy_executor::task]
+async fn edge_counter_task(
+    mut in_pin: Input<'static>,
+    signal: &'static Signal<CriticalSectionRawMutex, u32>,
+) {
+    let mut edge_count = 0;
+    loop {
+        // This join will:
+        // - first set up the pin to listen
+        // - then poll the pin future once (which will return Pending)
+        // - then signal that the pin is listening, which enables the other core to
+        //   toggle the matching OutputPin
+        // - then will wait for the pin future to resolve.
+        embassy_futures::join::join(in_pin.wait_for_any_edge(), async {
+            signal.signal(edge_count);
+        })
+        .await;
+
+        edge_count += 1;
+    }
+}
+
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
@@ -92,12 +120,12 @@ mod tests {
 
         let (gpio1, gpio2) = hil_test::common_test_pins!(peripherals);
 
+        // Interrupts are unstable
+        #[cfg(feature = "unstable")]
+        let io = Io::new(peripherals.IO_MUX);
+
         #[cfg(feature = "unstable")]
         {
-            // Interrupts are unstable
-            let mut io = Io::new(peripherals.IO_MUX);
-            io.set_interrupt_handler(interrupt_handler);
-
             // Timers are unstable
             let timg0 = TimerGroup::new(peripherals.TIMG0);
             esp_hal_embassy::init(timg0.timer0);
@@ -108,6 +136,8 @@ mod tests {
             test_gpio2: gpio2.degrade(),
             #[cfg(feature = "unstable")]
             delay,
+            #[cfg(feature = "unstable")]
+            io,
         }
     }
 
@@ -144,6 +174,22 @@ mod tests {
 
     #[test]
     async fn a_pin_can_wait(ctx: Context) {
+        let mut first = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        embassy_futures::select::select(
+            first.wait_for_rising_edge(),
+            // Other futures won't return, this one will, make sure its last so all other futures
+            // are polled first
+            embassy_futures::yield_now(),
+        )
+        .await;
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")] // Interrupts are unstable
+    async fn a_pin_can_wait_with_custom_handler(mut ctx: Context) {
+        ctx.io.set_interrupt_handler(interrupt_handler);
+
         let mut first = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
 
         embassy_futures::select::select(
@@ -241,7 +287,9 @@ mod tests {
 
     #[test]
     #[cfg(feature = "unstable")] // Interrupts are unstable
-    fn gpio_interrupt(ctx: Context) {
+    fn gpio_interrupt(mut ctx: Context) {
+        ctx.io.set_interrupt_handler(interrupt_handler);
+
         let mut test_gpio1 =
             Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
         let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
@@ -436,5 +484,82 @@ mod tests {
         }
 
         loop {}
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")]
+    async fn pending_interrupt_does_not_cause_future_to_resolve_immediately(ctx: Context) {
+        use embassy_futures::{
+            select::{Either, select},
+            yield_now,
+        };
+
+        let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let mut in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        in_pin.listen(Event::RisingEdge);
+
+        out_pin.set_high();
+
+        assert!(in_pin.is_interrupt_set());
+
+        let should_timeout = select(in_pin.wait_for_falling_edge(), async {
+            // Give the future a bit of time, don't rely on the first poll resolving
+            for _ in 0..5 {
+                yield_now().await;
+            }
+        })
+        .await;
+
+        assert!(matches!(should_timeout, Either::Second(_)));
+    }
+
+    #[test]
+    #[cfg(all(multi_core, feature = "unstable"))]
+    async fn pin_waits_on_core_different_from_interrupt_handler(ctx: Context) {
+        // This test exercises cross-core pin events. Core 1 will wait for edge events
+        // that Core 0 generates. Interrupts are handled on Core 0. A signal is used to
+        // throttle the toggling, so that Core 1 will be expected to count the
+        // exact number of edge transitions.
+
+        use esp_hal::{
+            peripherals::CPU_CTRL,
+            system::{CpuControl, Stack},
+        };
+        use esp_hal_embassy::Executor;
+        use hil_test::mk_static;
+
+        let mut out_pin = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+        let in_pin = Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+
+        // `edge_counter_task` also returns the edge count as part of this signal
+        let input_pin_listening = &*mk_static!(Signal<CriticalSectionRawMutex, u32>, Signal::new());
+
+        // No need to thread this through `Context` for one test case
+        let cpu_ctrl = unsafe { CPU_CTRL::steal() };
+        const CORE1_STACK_SIZE: usize = 8192;
+        let app_core_stack = mk_static!(Stack<CORE1_STACK_SIZE>, Stack::new());
+        let _second_core = CpuControl::new(cpu_ctrl)
+            .start_app_core(app_core_stack, {
+                move || {
+                    let executor = mk_static!(Executor, Executor::new());
+                    executor.run(|spawner| {
+                        spawner.must_spawn(edge_counter_task(in_pin, input_pin_listening));
+                    });
+                }
+            })
+            .unwrap();
+
+        // Now drive the OutputPin and assert that the other core saw exactly as many
+        // edges as we generated here.
+        const EDGE_COUNT: u32 = 10_000;
+        for _ in 0..EDGE_COUNT {
+            input_pin_listening.wait().await;
+            out_pin.toggle();
+        }
+        // wait for signal
+        let edge_counter = input_pin_listening.wait().await;
+
+        assert_eq!(edge_counter, EDGE_COUNT);
     }
 }

@@ -147,6 +147,36 @@ Normally you only need to configure your pin once, after which changing modes ca
 + flex.set_output_enable(true);
 ```
 
+### Interrupt handling changes
+
+The interrupt status bits are no longer cleared automatically. Depending on your use case, you will
+need to either do this yourself, or disable the pin's interrupt.
+
+If you want your interrupt to keep firing, clear the interrupt status. Keep in mind that
+this affects `is_interrupt_set`.
+
+```diff
+ #[handler]
+ pub fn interrupt_handler() {
+     critical_section::with(|cs| {
+         let pin = INPUT_PIN.borrow_ref_mut(cs).as_mut().unwrap();
++        pin.clear_interrupt();
+     });
+ }
+```
+
+If you want your interrupt to fire once per `listen` call, disable the interrupt.
+
+```diff
+ #[handler]
+ pub fn interrupt_handler() {
+     critical_section::with(|cs| {
+         let pin = INPUT_PIN.borrow_ref_mut(cs).as_mut().unwrap();
++        pin.unlisten();
+     });
+ }
+```
+
 ## I2S driver now takes `DmaDescriptor`s later in construction
 
 ```diff

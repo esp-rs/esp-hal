@@ -665,7 +665,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(esp32)]
     crate::time::time_init();
 
-    crate::gpio::bind_default_interrupt_handler();
+    crate::gpio::interrupt::bind_default_interrupt_handler();
 
     #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);

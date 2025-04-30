@@ -21,17 +21,8 @@ use esp_hal::{
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_wifi::InitializationError;
-use hil_test as _;
+use hil_test::mk_static;
 use static_cell::StaticCell;
-
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
 
 #[embassy_executor::task]
 async fn try_init(
