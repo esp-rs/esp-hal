@@ -1,3 +1,5 @@
+use log_04 as log;
+
 use super::println;
 
 #[cfg(not(host_is_windows))]
@@ -117,8 +119,7 @@ fn print_log_record(record: &log::Record) {
 /// # Notes
 ///
 /// - If no implementations is provided, attempting to use this function will
-///   result in a linker
-/// error.
+///   result in a linker error.
 #[cfg(feature = "timestamp")]
 extern "Rust" {
     fn _esp_println_timestamp() -> u64;

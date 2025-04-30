@@ -27,9 +27,9 @@ esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal             = { path = "../esp-hal", features = ["log-04"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
 esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
-esp-println         = { path = "../esp-println", features = ["log"] }
+esp-println         = { path = "../esp-println", features = ["log-04"] }
 esp-storage         = { path = "../esp-storage", optional = true }
-esp-wifi            = { path = "../esp-wifi", features = ["log"], optional = true }
+esp-wifi            = { path = "../esp-wifi", features = ["log-04"], optional = true }
 heapless            = "0.8.0"
 hmac                = { version = "0.12.1", default-features = false }
 ieee80211           = { version = "0.4.0", default-features = false }

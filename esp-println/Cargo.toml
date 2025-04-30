@@ -21,21 +21,23 @@ bench = false
 test  = false
 
 [dependencies]
+document-features = "0.2.11"
+
+# Optional dependencies
 critical-section = { version = "1.2.0", optional = true }
-defmt            = { version = "1.0.1", optional = true }
-log              = { version = "0.4.27", optional = true }
 portable-atomic  = { version = "1.11.0", optional = true, default-features = false }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt            = { version = "1.0.1", optional = true }
+log-04           = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
 esp-build = { version = "0.2.0", path = "../esp-build" }
-log       = "0.4.27"
+log-04    = { package = "log", version = "0.4.27" }
 
 [features]
 default          = ["auto", "colors", "critical-section"]
-critical-section = ["dep:critical-section"]
-log              = ["dep:log"]
 
-# You must enable exactly 1 of the below features to support the correct chip:
 esp32   = []
 esp32c2 = []
 esp32c3 = []
@@ -45,20 +47,39 @@ esp32p4 = []
 esp32s2 = []
 esp32s3 = []
 
-# You must enable exactly 1 of the below features to enable to intended
-# communication method (note that "auto" is enabled by default):
-jtag-serial = ["dep:portable-atomic"] # C3, C6, H2, P4, and S3 only!
-uart        = []
-auto        = ["dep:portable-atomic"]
+## Use a critical section around print calls. This ensures that the output is consistent.
+critical-section = ["dep:critical-section"]
 
-# Don't print anything
+#! ### Output interfaces
+#! You must enable exactly 1 of the below features to enable to intended
+#! communication method.
+
+## Automatically select the best output interface for the target.
+auto        = ["dep:portable-atomic"]
+## Use the `USB_SERIAL_JTAG` interface for printing. Available on ESP32-C3, ESP32-C6, ESP32-H2, ESP32-P4, and ESP32-S3.
+jtag-serial = ["dep:portable-atomic"]
+## Use the `UART0` peripehral for printing. Available on all devices.
+uart        = []
+## Don't print anything
 no-op       = []
 
-# Enables a `defmt` backend usable with espflash. We force rzcobs encoding to simplify implementation
+#! ### Logging framework features
+## Enables using the `log` crate for logging.
+log-04         = ["dep:log-04"]
+## Enables printing using `defmt`. defmt-encoded output can only be read using espflash.
 defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
 
-# logging sub-features
+#! ### `log`-specific features
+## Colors the message severity in the terminal.
 colors = []
+## Prints the timestamp in the log message.
+##
+## This option requires the following function to be implemented:
+## ```rust
+## extern "Rust" {
+##     fn _esp_println_timestamp() -> u64;
+## }
+## ```
 timestamp = []
 
 [lints.rust]
