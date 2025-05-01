@@ -1,7 +1,6 @@
 use portable_atomic::{AtomicU32, Ordering};
 
-use super::phy_init_data::PHY_INIT_DATA_DEFAULT;
-use crate::{binary::include::*, compat::common::str_from_c};
+use crate::binary::include::*;
 
 const SOC_PHY_DIG_REGS_MEM_SIZE: usize = 21 * 4;
 
@@ -22,6 +21,10 @@ pub(crate) fn phy_mem_init() {
     }
 }
 
+pub(crate) unsafe fn bbpll_en_usb() {
+    // nothing for ESP32-C2
+}
+
 pub(crate) unsafe fn phy_enable() {
     let count = PHY_ACCESS_REF.fetch_add(1, Ordering::SeqCst);
     if count == 0 {
@@ -30,27 +33,9 @@ pub(crate) unsafe fn phy_enable() {
                 super::phy_enable_clock();
             }
 
-            if !unsafe { G_IS_PHY_CALIBRATED } {
-                let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
-                    [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
-
-                let phy_version = unsafe { get_phy_version_str() };
-                trace!("phy_version {}", unsafe { str_from_c(phy_version) });
-
-                let init_data = &PHY_INIT_DATA_DEFAULT;
-
-                // DON'T CALL `phy_bbpll_en_usb` on ESP32-C2
-
-                unsafe {
-                    register_chipv7_phy(
-                        init_data,
-                        &mut cal_data as *mut _
-                            as *mut crate::binary::include::esp_phy_calibration_data_t,
-                        esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-                    );
-
-                    G_IS_PHY_CALIBRATED = true;
-                }
+            if unsafe { !G_IS_PHY_CALIBRATED } {
+                super::phy_calibrate();
+                unsafe { G_IS_PHY_CALIBRATED = true };
             } else {
                 unsafe {
                     phy_wakeup_init();
