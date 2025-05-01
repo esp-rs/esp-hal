@@ -1232,7 +1232,15 @@ where
         PCR::regs()
             .parl_clk_tx_conf()
             .modify(|_, w| w.parl_tx_rst_en().set_bit());
+        PCR::regs()
+            .parl_clk_tx_conf()
+            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
 
+        PCR::regs()
+            .parl_clk_tx_conf()
+            .modify(|_, w| w.parl_clk_tx_en().clear_bit());
+
+        Instance::reset_tx_fifo();
         Instance::clear_tx_interrupts();
         Instance::set_tx_bytes(number_of_bytes as u16);
 
@@ -1251,7 +1259,7 @@ where
 
         PCR::regs()
             .parl_clk_tx_conf()
-            .modify(|_, w| w.parl_tx_rst_en().clear_bit());
+            .modify(|_, w| w.parl_clk_tx_en().set_bit());
 
         Ok(ParlIoTxTransfer {
             parl_io: ManuallyDrop::new(self),
@@ -1727,6 +1735,17 @@ mod private {
             });
         }
 
+        pub fn reset_tx_fifo() {
+            let reg_block = PARL_IO::regs();
+
+            reg_block
+                .tx_cfg0()
+                .modify(|_, w| w.tx_fifo_srst().set_bit());
+            reg_block
+                .tx_cfg0()
+                .modify(|_, w| w.tx_fifo_srst().clear_bit());
+        }
+
         pub fn set_tx_bytes(len: u16) {
             let reg_block = PARL_IO::regs();
 
@@ -1939,6 +1958,17 @@ mod private {
                     .tx_eof()
                     .clear_bit_by_one()
             });
+        }
+
+        pub fn reset_tx_fifo() {
+            let reg_block = PARL_IO::regs();
+
+            reg_block
+                .tx_cfg0()
+                .modify(|_, w| w.tx_fifo_srst().set_bit());
+            reg_block
+                .tx_cfg0()
+                .modify(|_, w| w.tx_fifo_srst().clear_bit());
         }
 
         pub fn set_tx_bytes(len: u16) {
