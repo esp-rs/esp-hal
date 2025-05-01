@@ -114,8 +114,6 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-#[cfg(not(feature = "esp32"))]
-use esp_hal::timer::systimer::Alarm;
 use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
 use hal::{
     Blocking,
@@ -318,8 +316,8 @@ pub trait EspWifiTimerSource: private::Sealed {
 impl private::Sealed for TimeBase {}
 impl private::Sealed for AnyTimer<'_> {}
 impl private::Sealed for TimgTimer<'_> {}
-#[cfg(not(feature = "esp32"))]
-impl private::Sealed for Alarm<'_> {}
+#[cfg(systimer)]
+impl private::Sealed for esp_hal::timer::systimer::Alarm<'_> {}
 
 impl<T> EspWifiTimerSource for T
 where

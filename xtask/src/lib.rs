@@ -82,7 +82,7 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi)
+        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy)
     }
 
     /// Should documentation be built for the package?
