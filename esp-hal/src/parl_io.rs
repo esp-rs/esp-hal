@@ -1964,10 +1964,10 @@ mod private {
             let reg_block = PARL_IO::regs();
 
             reg_block
-                .tx_cfg0()
+                .fifo_cfg()
                 .modify(|_, w| w.tx_fifo_srst().set_bit());
             reg_block
-                .tx_cfg0()
+                .fifo_cfg()
                 .modify(|_, w| w.tx_fifo_srst().clear_bit());
         }
 
