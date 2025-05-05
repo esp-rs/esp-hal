@@ -96,3 +96,8 @@ fn print_log_record(record: &log::Record) {
     #[cfg(not(feature = "timestamp"))]
     println!("{}{} - {}{}", color, record.level(), record.args(), reset);
 }
+
+#[cfg(feature = "timestamp")]
+unsafe extern "Rust" {
+    fn _esp_println_timestamp() -> u64;
+}

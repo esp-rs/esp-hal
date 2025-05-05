@@ -530,31 +530,3 @@ fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
     #[cfg(not(feature = "critical-section"))]
     f(unsafe { LockToken::conjure() })
 }
-
-/// A user-provided hook to supply a timestamp in milliseconds for logging.
-///
-/// When enabled via the `"timestamp"` feature, this function should be
-/// implemented to return a timestamp in milliseconds since a reference point
-/// (e.g., system boot or Unix epoch).
-///
-/// # Example
-///
-/// When using [`esp-hal`], you can define this function as follows:
-///
-/// ```rust
-/// #[no_mangle]
-/// pub extern "Rust" fn _esp_println_timestamp() -> u64 {
-///     esp_hal::time::Instant::now()
-///         .duration_since_epoch()
-///         .as_millis()
-/// }
-/// ```
-///
-/// # Notes
-///
-/// - If no implementations is provided, attempting to use this function will
-///   result in a linker error.
-#[cfg(feature = "timestamp")]
-extern "Rust" {
-    fn _esp_println_timestamp() -> u64;
-}

@@ -49,6 +49,30 @@ esp32s3 = []
 
 ## Use a critical section around print calls. This ensures that the output is consistent.
 critical-section = ["dep:critical-section"]
+## Prints the timestamp in the log message.
+##
+## This option requires the following function to be implemented:
+##
+## ```rust
+## extern "Rust" {
+##     fn _esp_println_timestamp() -> u64;
+## }
+## ```
+##
+## This function should return the current timestamp in milliseconds since power on.
+## When using [`esp_hal`], you can define this function as follows:
+##
+## ```rust
+## #[no_mangle]
+## pub extern "Rust" fn _esp_println_timestamp() -> u64 {
+##     esp_hal::time::Instant::now()
+##         .duration_since_epoch()
+##         .as_millis()
+## }
+## ```
+##
+## [`esp_hal`]: https://crates.io/crates/esp-hal
+timestamp = []
 
 #! ### Output interfaces
 #! You must enable exactly 1 of the below features to enable to intended
@@ -75,15 +99,6 @@ defmt-espflash = ["dep:defmt", "defmt?/encoding-rzcobs"]
 #! ### `log`-specific features
 ## Colors the message severity in the terminal.
 colors = []
-## Prints the timestamp in the log message.
-##
-## This option requires the following function to be implemented:
-## ```rust
-## extern "Rust" {
-##     fn _esp_println_timestamp() -> u64;
-## }
-## ```
-timestamp = []
 
 [lints.rust]
 static_mut_refs = "allow"
