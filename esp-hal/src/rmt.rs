@@ -1666,18 +1666,16 @@ mod chip_specific {
             return Err(Error::UnreachableTargetFrequency);
         }
 
-        let div = (src_clock / frequency) - 1;
-
-        if div > u8::MAX as u32 {
+        let Ok(div) = u8::try_from((src_clock / frequency) - 1) else {
             return Err(Error::UnreachableTargetFrequency);
-        }
+        };
 
         #[cfg(not(pcr))]
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
                 w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
-                w.sclk_div_num().bits(div as u8);
+                w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
                 w.apb_fifo_mask().set_bit()
@@ -1688,7 +1686,7 @@ mod chip_specific {
         {
             use crate::peripherals::PCR;
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                w.sclk_div_num().bits(div as u8);
+                w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0)
             });
