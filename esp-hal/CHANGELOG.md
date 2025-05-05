@@ -81,6 +81,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OneShot` timer now returns an InvalidTimeout from `schedule` instead of panicking (#3433)
 - GPIO interrupt handling no longer causes infinite looping if a task at higher priority is awaiting on a pin event (#3408)
 - `esp_hal::gpio::Input::is_interrupt_set` can now return true (#3408)
+- PARL_IO: Reset TX fifo before each transfer (#3448)
 
 ### Removed
 

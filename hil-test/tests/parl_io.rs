@@ -117,7 +117,7 @@ mod tests {
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
-        let pio_tx = pio
+        let mut pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
@@ -128,7 +128,7 @@ mod tests {
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
-        let pio_rx = pio
+        let mut pio_rx = pio
             .rx
             .with_config(
                 rx_pins,
@@ -139,22 +139,25 @@ mod tests {
             )
             .unwrap();
 
-        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *b = i as u8;
+        for _ in 0..2 {
+            dma_rx_buf.as_mut_slice().fill(0);
+            for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+                *b = i as u8;
+            }
+
+            let rx_transfer = pio_rx
+                .read(Some(dma_rx_buf.len()), dma_rx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            let tx_transfer = pio_tx
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            (_, pio_tx, dma_tx_buf) = tx_transfer.wait();
+            (_, pio_rx, dma_rx_buf) = rx_transfer.wait();
+
+            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
-
-        let rx_transfer = pio_rx
-            .read(Some(dma_rx_buf.len()), dma_rx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let tx_transfer = pio_tx
-            .write(dma_tx_buf.len(), dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        (_, _, dma_tx_buf) = tx_transfer.wait();
-        (_, _, dma_rx_buf) = rx_transfer.wait();
-
-        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
     #[test]
@@ -180,7 +183,7 @@ mod tests {
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
-        let pio_tx = pio
+        let mut pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
@@ -191,7 +194,7 @@ mod tests {
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
-        let pio_rx = pio
+        let mut pio_rx = pio
             .rx
             .with_config(
                 rx_pins,
@@ -202,22 +205,25 @@ mod tests {
             )
             .unwrap();
 
-        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *b = i as u8;
+        for _ in 0..2 {
+            dma_rx_buf.as_mut_slice().fill(0);
+            for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+                *b = i as u8;
+            }
+
+            let rx_transfer = pio_rx
+                .read(Some(dma_rx_buf.len()), dma_rx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            let tx_transfer = pio_tx
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            (_, pio_tx, dma_tx_buf) = tx_transfer.wait();
+            (_, pio_rx, dma_rx_buf) = rx_transfer.wait();
+
+            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
-
-        let rx_transfer = pio_rx
-            .read(Some(dma_rx_buf.len()), dma_rx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let tx_transfer = pio_tx
-            .write(dma_tx_buf.len(), dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        (_, _, dma_tx_buf) = tx_transfer.wait();
-        (_, _, dma_rx_buf) = rx_transfer.wait();
-
-        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
     #[test]
@@ -249,7 +255,7 @@ mod tests {
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
-        let pio_tx = pio
+        let mut pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
@@ -260,7 +266,7 @@ mod tests {
                     .with_bit_order(BitPackOrder::Lsb),
             )
             .unwrap();
-        let pio_rx = pio
+        let mut pio_rx = pio
             .rx
             .with_config(
                 rx_pins,
@@ -271,22 +277,25 @@ mod tests {
             )
             .unwrap();
 
-        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *b = i as u8;
+        for _ in 0..2 {
+            dma_rx_buf.as_mut_slice().fill(0);
+            for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+                *b = i as u8;
+            }
+
+            let rx_transfer = pio_rx
+                .read(Some(dma_rx_buf.len()), dma_rx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            let tx_transfer = pio_tx
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            (_, pio_tx, dma_tx_buf) = tx_transfer.wait();
+            (_, pio_rx, dma_rx_buf) = rx_transfer.wait();
+
+            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
-
-        let rx_transfer = pio_rx
-            .read(Some(dma_rx_buf.len()), dma_rx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let tx_transfer = pio_tx
-            .write(dma_tx_buf.len(), dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        (_, _, dma_tx_buf) = tx_transfer.wait();
-        (_, _, dma_rx_buf) = rx_transfer.wait();
-
-        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 
     // This test is disabled on the H2 because in 8-bit mode, there's no external
@@ -296,7 +305,7 @@ mod tests {
     #[cfg(not(esp32h2))]
     #[test]
     fn test_parl_io_rx_can_read_tx_in_8_bit_mode(ctx: Context) {
-        const BUFFER_SIZE: usize = 250;
+        const BUFFER_SIZE: usize = 252;
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(BUFFER_SIZE);
         let mut dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
@@ -326,7 +335,7 @@ mod tests {
 
         let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel).unwrap();
 
-        let pio_tx = pio
+        let mut pio_tx = pio
             .tx
             .with_config(
                 tx_pins,
@@ -337,7 +346,7 @@ mod tests {
                     .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
-        let pio_rx = pio
+        let mut pio_rx = pio
             .rx
             .with_config(
                 rx_pins,
@@ -348,21 +357,24 @@ mod tests {
             )
             .unwrap();
 
-        for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
-            *b = i as u8;
+        for _ in 0..2 {
+            dma_rx_buf.as_mut_slice().fill(0);
+            for (i, b) in dma_tx_buf.as_mut_slice().iter_mut().enumerate() {
+                *b = i as u8;
+            }
+
+            let rx_transfer = pio_rx
+                .read(Some(dma_rx_buf.len()), dma_rx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            let tx_transfer = pio_tx
+                .write(dma_tx_buf.len(), dma_tx_buf)
+                .map_err(|e| e.0)
+                .unwrap();
+            (_, pio_tx, dma_tx_buf) = tx_transfer.wait();
+            (_, pio_rx, dma_rx_buf) = rx_transfer.wait();
+
+            assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
         }
-
-        let rx_transfer = pio_rx
-            .read(Some(dma_rx_buf.len()), dma_rx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        let tx_transfer = pio_tx
-            .write(dma_tx_buf.len(), dma_tx_buf)
-            .map_err(|e| e.0)
-            .unwrap();
-        (_, _, dma_tx_buf) = tx_transfer.wait();
-        (_, _, dma_rx_buf) = rx_transfer.wait();
-
-        assert_eq!(dma_rx_buf.as_slice(), dma_tx_buf.as_slice());
     }
 }
