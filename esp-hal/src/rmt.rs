@@ -1863,30 +1863,22 @@ mod chip_specific {
 
                 fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
                     let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
 
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.ch_tx_conf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
+                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                        if rmt.ch_tx_conf0(i as usize).read().mem_size().bits() != 0 {
+                            return false;
                         }
-                    } else {
-                        memory_block_is_available =
-                            rmt.ch_tx_conf0($ch_num).read().mem_size().bits() == 0;
                     }
 
-                    memory_block_is_available
+                    true
                 }
 
                 fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.ch_tx_conf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
+
+                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                        rmt.ch_tx_conf0(i as usize)
+                            .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
                 }
 
@@ -2043,30 +2035,22 @@ mod chip_specific {
 
                 fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
                     let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
 
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_index..$ch_index + memory_blocks_requested {
-                            if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
+                    for i in $ch_index..$ch_index + memory_blocks_requested {
+                        if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
+                            return false;
                         }
-                    } else {
-                        memory_block_is_available =
-                            rmt.ch_rx_conf0($ch_index).read().mem_size().bits() == 0;
                     }
 
-                    memory_block_is_available
+                    true
                 }
 
                 fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_index + 1..$ch_index + num_memory_blocks {
-                            rmt.ch_rx_conf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
+
+                    for i in $ch_index + 1..$ch_index + num_memory_blocks {
+                        rmt.ch_rx_conf0(i as usize)
+                            .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
                 }
 
@@ -2332,30 +2316,22 @@ mod chip_specific {
 
                 fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
                     let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
 
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
+                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                        if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
+                            return false;
                         }
-                    } else {
-                        memory_block_is_available =
-                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
                     }
 
-                    memory_block_is_available
+                    true
                 }
 
                 fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.chconf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
+
+                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                        rmt.chconf0(i as usize)
+                            .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
                 }
 
@@ -2511,30 +2487,22 @@ mod chip_specific {
 
                 fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
                     let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
 
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
+                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                        if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
+                            return false;
                         }
-                    } else {
-                        memory_block_is_available =
-                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
                     }
 
-                    memory_block_is_available
+                    true
                 }
 
                 fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
                     let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.chconf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
+
+                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                        rmt.chconf0(i as usize)
+                            .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
                 }
 
