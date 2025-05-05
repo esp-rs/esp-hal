@@ -1827,21 +1827,24 @@ mod chip_specific {
         if memsize > super::NUM_CHANNELS as u8 - ch_num {
             return Err(Error::InvalidMemsize);
         }
-        // If a channel's memory block is available then its memory size will be 0
-        for i in ch_num..ch_num + memsize {
-            if channel_mem_size(i) != 0 {
-                return Err(Error::MemoryBlockNotAvailable);
+
+        critical_section::with(|_cs| {
+            // If a channel's memory block is available then its memory size will be 0
+            for i in ch_num..ch_num + memsize {
+                if channel_mem_size(i) != 0 {
+                    return Err(Error::MemoryBlockNotAvailable);
+                }
             }
-        }
 
-        // If configured to use extended memory blocks then set the extended memory
-        // blocks to 1 to indicate they are unavailable. Setting the memsize for
-        // this channel will be set further down in the code
-        for i in ch_num + 1..ch_num + memsize {
-            set_channel_mem_size(i, 1);
-        }
+            // If configured to use extended memory blocks then set the extended memory
+            // blocks to 1 to indicate they are unavailable. Setting the memsize for
+            // this channel will be set further down in the code
+            for i in ch_num + 1..ch_num + memsize {
+                set_channel_mem_size(i, 1);
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     macro_rules! impl_tx_channel {
@@ -2266,24 +2269,26 @@ mod chip_specific {
             return Err(Error::InvalidMemsize);
         }
 
-        let rmt = RMT::regs();
+        critical_section::with(|_cs| {
+            let rmt = RMT::regs();
 
-        // If a channel's memory block is available then its memory size will be 0
-        for i in ch_num..ch_num + memsize {
-            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                return Err(Error::MemoryBlockNotAvailable);
+            // If a channel's memory block is available then its memory size will be 0
+            for i in ch_num..ch_num + memsize {
+                if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
+                    return Err(Error::MemoryBlockNotAvailable);
+                }
             }
-        }
 
-        // If configured to use extended memory blocks then set the extended memory
-        // blocks to 1 to indicate they are unavailable. Setting the memsize for
-        // this channel will be set further down in the code
-        for i in ch_num + 1..ch_num + memsize {
-            rmt.chconf0(i as usize)
-                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-        }
+            // If configured to use extended memory blocks then set the extended memory
+            // blocks to 1 to indicate they are unavailable. Setting the memsize for
+            // this channel will be set further down in the code
+            for i in ch_num + 1..ch_num + memsize {
+                rmt.chconf0(i as usize)
+                    .modify(|_, w| unsafe { w.mem_size().bits(1) });
+            }
 
-        Ok(())
+            Ok(())
+        })
     }
 
     macro_rules! impl_tx_channel {
