@@ -465,19 +465,11 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
+    // FIXME: Release on Drop
     if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
         return Err(Error::InvalidMemsize);
     }
-
-    // If a channel's memory block is available then its memory size will be 0
-    if !T::is_memory_blocks_available(config.memsize) {
-        return Err(Error::MemoryBlockNotAvailable);
-    }
-
-    // If configured to use extended memory blocks then set the extended memory
-    // blocks to 1 to indicate they are unavailable. Setting the memsize for
-    // this channel will be set further down in the code
-    T::set_memory_blocks_unavailable(config.memsize);
+    T::reserve_memory(config.memsize)?;
 
     let pin = pin.into();
 
@@ -504,19 +496,11 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
+    // FIXME: Release on Drop
     if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
         return Err(Error::InvalidMemsize);
     }
-
-    // If a channel's memory block is available then its memory size will be 0
-    if !T::is_memory_blocks_available(config.memsize) {
-        return Err(Error::MemoryBlockNotAvailable);
-    }
-
-    // If configured to use extended memory blocks then set the extended memory
-    // blocks to 1 to indicate they are unavailable. Setting the memsize for
-    // this channel will be set further down in the code
-    T::set_memory_blocks_unavailable(config.memsize);
+    T::reserve_memory(config.memsize)?;
 
     let pin = pin.into();
 
@@ -1524,9 +1508,7 @@ pub trait TxChannelInternal {
 
     fn set_idle_output(enable: bool, level: Level);
 
-    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
-
-    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
+    fn reserve_memory(memsize: u8) -> Result<(), Error>;
 
     fn set_memsize(memsize: u8);
 
@@ -1616,9 +1598,7 @@ pub trait RxChannelInternal {
 
     fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
-    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
-
-    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
+    fn reserve_memory(memsize: u8) -> Result<(), Error>;
 
     fn set_memsize(value: u8);
 
@@ -1861,25 +1841,25 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
+                fn reserve_memory(memsize: u8) -> Result<(), $crate::rmt::Error> {
+                    let rmt = $crate::peripherals::RMT::regs();
 
-                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                    // If a channel's memory block is available then its memory size will be 0
+                    for i in $ch_num..$ch_num + memsize {
                         if rmt.ch_tx_conf0(i as usize).read().mem_size().bits() != 0 {
-                            return false;
+                            return Err($crate::rmt::Error::MemoryBlockNotAvailable);
                         }
                     }
 
-                    true
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-
-                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                    // If configured to use extended memory blocks then set the extended memory
+                    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+                    // this channel will be set further down in the code
+                    for i in $ch_num + 1..$ch_num + memsize {
                         rmt.ch_tx_conf0(i as usize)
                             .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
+
+                    Ok(())
                 }
 
                 fn set_memsize(value: u8) {
@@ -2033,25 +2013,25 @@ mod chip_specific {
                     });
                 }
 
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
+                fn reserve_memory(memsize: u8) -> Result<(), $crate::rmt::Error> {
+                    let rmt = $crate::peripherals::RMT::regs();
 
-                    for i in $ch_index..$ch_index + memory_blocks_requested {
+                    // If a channel's memory block is available then its memory size will be 0
+                    for i in $ch_index..$ch_index + memsize {
                         if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
-                            return false;
+                            return Err($crate::rmt::Error::MemoryBlockNotAvailable);
                         }
                     }
 
-                    true
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-
-                    for i in $ch_index + 1..$ch_index + num_memory_blocks {
+                    // If configured to use extended memory blocks then set the extended memory
+                    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+                    // this channel will be set further down in the code
+                    for i in $ch_index + 1..$ch_index + memsize {
                         rmt.ch_rx_conf0(i as usize)
                             .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
+
+                    Ok(())
                 }
 
                 fn set_memsize(value: u8) {
@@ -2314,25 +2294,25 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
+                fn reserve_memory(memsize: u8) -> Result<(), $crate::rmt::Error> {
+                    let rmt = $crate::peripherals::RMT::regs();
 
-                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                    // If a channel's memory block is available then its memory size will be 0
+                    for i in $ch_num..$ch_num + memsize {
                         if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                            return false;
+                            return Err($crate::rmt::Error::MemoryBlockNotAvailable);
                         }
                     }
 
-                    true
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-
-                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                    // If configured to use extended memory blocks then set the extended memory
+                    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+                    // this channel will be set further down in the code
+                    for i in $ch_num + 1..$ch_num + memsize {
                         rmt.chconf0(i as usize)
                             .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
+
+                    Ok(())
                 }
 
                 fn set_memsize(value: u8) {
@@ -2485,25 +2465,25 @@ mod chip_specific {
                     });
                 }
 
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
+                fn reserve_memory(memsize: u8) -> Result<(), $crate::rmt::Error> {
+                    let rmt = $crate::peripherals::RMT::regs();
 
-                    for i in $ch_num..$ch_num + memory_blocks_requested {
+                    // If a channel's memory block is available then its memory size will be 0
+                    for i in $ch_num..$ch_num + memsize {
                         if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                            return false;
+                            return Err($crate::rmt::Error::MemoryBlockNotAvailable);
                         }
                     }
 
-                    true
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-
-                    for i in $ch_num + 1..$ch_num + num_memory_blocks {
+                    // If configured to use extended memory blocks then set the extended memory
+                    // blocks to 1 to indicate they are unavailable. Setting the memsize for
+                    // this channel will be set further down in the code
+                    for i in $ch_num + 1..$ch_num + memsize {
                         rmt.chconf0(i as usize)
                             .modify(|_, w| unsafe { w.mem_size().bits(1) });
                     }
+
+                    Ok(())
                 }
 
                 fn set_memsize(value: u8) {
