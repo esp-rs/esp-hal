@@ -519,10 +519,6 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    if config.memsize > NUM_CHANNELS as u8 {
-        return Err(Error::InvalidMemsize);
-    }
-
     if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
         return Err(Error::InvalidMemsize);
     }
@@ -562,10 +558,6 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    if config.memsize > NUM_CHANNELS as u8 {
-        return Err(Error::InvalidMemsize);
-    }
-
     if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
         return Err(Error::InvalidMemsize);
     }
