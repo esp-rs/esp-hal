@@ -50,7 +50,7 @@
 //!         PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
 //!             psram::psram_vaddr_start() as *mut u8,
 //!             psram::PSRAM_BYTES,
-//!             esp_alloc::MemoryCapability::Internal.into(),
+//!             esp_alloc::MemoryCapability::External.into(),
 //!         ));
 //!     }
 //! }
