@@ -465,7 +465,6 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    // FIXME: Release on Drop
     chip_specific::reserve_memory(T::CHANNEL, config.memsize)?;
 
     let pin = pin.into();
@@ -493,7 +492,6 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    // FIXME: Release on Drop
     chip_specific::reserve_memory(T::CHANNEL, config.memsize)?;
 
     let pin = pin.into();
@@ -1133,6 +1131,15 @@ where
 {
     phantom: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
+}
+
+impl<Dm, const CHANNEL: u8> Drop for Channel<Dm, CHANNEL>
+where
+    Dm: crate::DriverMode,
+{
+    fn drop(&mut self) {
+        chip_specific::release_memory(CHANNEL);
+    }
 }
 
 /// Channel in TX mode
@@ -1847,6 +1854,16 @@ mod chip_specific {
         })
     }
 
+    pub fn release_memory(ch_num: u8) {
+        let memsize = channel_mem_size(ch_num);
+
+        critical_section::with(|_cs| {
+            for i in ch_num..ch_num + memsize {
+                set_channel_mem_size(i, 0);
+            }
+        })
+    }
+
     macro_rules! impl_tx_channel {
         ($signal:ident, $ch_num:literal) => {
             impl<Dm> $crate::rmt::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
@@ -2288,6 +2305,20 @@ mod chip_specific {
             }
 
             Ok(())
+        })
+    }
+
+    pub fn release_memory(ch_num: u8) {
+        let ch_num = ch_num as usize;
+        let rmt = RMT::regs();
+
+        let memsize = rmt.chconf0(ch_num).read().mem_size().bits() as usize;
+
+        critical_section::with(|_cs| {
+            for i in ch_num..ch_num + memsize {
+                rmt.chconf0(i)
+                    .modify(|_, w| unsafe { w.mem_size().bits(0) });
+            }
         })
     }
 
