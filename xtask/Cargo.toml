@@ -36,8 +36,10 @@ cargo-semver-checks = { version = "0.41.0", optional = true }
 # THIS NEEDS TO MATCH THE rustfmt-json FORMAT - see https://github.com/rust-lang/rustdoc-types/blob/trunk/CHANGELOG.md
 rustdoc-types = { version = "0.34.0", optional = true }
 
+flate2 = { version = "1.1.1", optional = true }
+temp-file = { version = "0.1.9", optional = true }
+
 [features]
 deploy-docs  = ["dep:reqwest"]
 preview-docs = ["dep:opener", "dep:rocket"]
-semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types" ]
-
+semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types", "dep:flate2", "dep:temp-file" ]

@@ -1,6 +1,5 @@
 use std::{
-    fs,
-    path::{Path, PathBuf},
+    fs, io::Write, path::{Path, PathBuf}
 };
 
 use esp_metadata::Chip;
@@ -23,18 +22,20 @@ pub fn generate_baseline(
 
             let current_path = build_doc_json(package, chip, &package_path)?;
 
-            let suffix = if package.chip_features_matter() {
-                format!("_{}", chip.to_string())
-            } else {
-                "".to_string()
-            };
-
-            let to_path = PathBuf::from(&package_path).join(format!("api_baseline{}.json", suffix));
-
             remove_unstable_items(&current_path)?;
 
-            log::debug!("Copy {current_path:?}");
-            fs::copy(current_path, to_path)?;
+            let file_name = if package.chip_features_matter() {
+                format!("{}", chip.to_string())
+            } else {
+                "api".to_string()
+            };
+
+            let to_path = PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
+            fs::create_dir_all(to_path.parent().unwrap())?;
+
+            log::debug!("Compress into {current_path:?}");
+            let mut encoder = flate2::write::GzEncoder::new(fs::File::create(to_path)?, flate2::Compression::default());
+            encoder.write_all(&std::fs::read(current_path)?)?;
 
             if !package.chip_features_matter() {
                 break;
@@ -59,21 +60,26 @@ pub fn check(
             let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
             let current_path = build_doc_json(package, chip, &package_path)?;
+            remove_unstable_items(&current_path)?;
 
-            let suffix = if package.chip_features_matter() {
-                format!("_{}", chip.to_string())
+            let file_name = if package.chip_features_matter() {
+                format!("{}", chip.to_string())
             } else {
-                "".to_string()
+                "api".to_string()
             };
 
-            let baseline_path = package_path.join(format!("api_baseline{}.json", suffix));
+            let baseline_path_gz = PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
 
-            remove_unstable_items(&current_path)?;
+            let baseline_path = temp_file::TempFile::new()?;
+            let buffer = Vec::new();
+            let mut decoder = flate2::write::GzDecoder::new(buffer);
+            decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
+            fs::write( baseline_path.path(), decoder.finish()?)?;
 
             let mut check = cargo_semver_checks::Check::new(
                 cargo_semver_checks::Rustdoc::from_path(current_path),
             );
-            check.set_baseline(cargo_semver_checks::Rustdoc::from_path(baseline_path));
+            check.set_baseline(cargo_semver_checks::Rustdoc::from_path(baseline_path.path()));
             let mut cfg = cargo_semver_checks::GlobalConfig::new();
             // seems there is no way of getting the details via the API - so lets log them
             cfg.set_log_level(Some(log::Level::Info));
