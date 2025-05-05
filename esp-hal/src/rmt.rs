@@ -408,63 +408,9 @@ where
 {
     pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
-        me.configure_clock(frequency)?;
-        me.clear_memsizes();
+        self::chip_specific::configure_clock(frequency)?;
+        self::chip_specific::clear_memsizes();
         Ok(me)
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
-        if frequency != Rate::from_mhz(80) {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock();
-
-        Ok(())
-    }
-
-    // A memsize = 0 indicates that the channel memory is available
-    #[cfg(any(esp32, esp32s2))]
-    fn clear_memsizes(&self) {
-        let rmt = crate::peripherals::RMT::regs();
-        for i in 0..NUM_CHANNELS {
-            rmt.chconf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-    }
-
-    // A memsize = 0 indicates that the channel memory is available
-    #[cfg(not(any(esp32, esp32s2)))]
-    fn clear_memsizes(&self) {
-        let rmt = crate::peripherals::RMT::regs();
-        for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_tx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-        for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_rx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
-        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-
-        if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        let div = (src_clock / frequency) - 1;
-
-        if div > u8::MAX as u32 {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock(div);
-
-        Ok(())
     }
 }
 
@@ -1710,9 +1656,22 @@ pub trait RxChannelInternal {
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
-    use crate::peripherals::RMT;
+    use super::Error;
+    use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock(div: u32) {
+    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+
+        if frequency > src_clock {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
+        let div = (src_clock / frequency) - 1;
+
+        if div > u8::MAX as u32 {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
         #[cfg(not(pcr))]
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
@@ -1747,6 +1706,8 @@ mod chip_specific {
                 .sys_conf()
                 .modify(|_, w| w.apb_fifo_mask().set_bit());
         }
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -1790,6 +1751,19 @@ mod chip_specific {
             Some(7)
         } else {
             None
+        }
+    }
+
+    // A memsize = 0 indicates that the channel memory is available
+    pub fn clear_memsizes() {
+        let rmt = RMT::regs();
+        for i in 0..super::NUM_CHANNELS / 2 {
+            rmt.ch_tx_conf0(i)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
+        }
+        for i in 0..super::NUM_CHANNELS / 2 {
+            rmt.ch_rx_conf0(i)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
     }
 
@@ -2183,9 +2157,14 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
-    use crate::peripherals::RMT;
+    use super::Error;
+    use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock() {
+    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+        if frequency != Rate::from_mhz(80) {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
         let rmt = RMT::regs();
 
         rmt.ch0conf1().modify(|_, w| w.ref_always_on().set_bit());
@@ -2204,6 +2183,8 @@ mod chip_specific {
 
         #[cfg(not(esp32))]
         rmt.apb_conf().modify(|_, w| w.clk_en().set_bit());
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -2249,6 +2230,15 @@ mod chip_specific {
             Some(3)
         } else {
             None
+        }
+    }
+
+    // A memsize = 0 indicates that the channel memory is available
+    pub fn clear_memsizes() {
+        let rmt = RMT::regs();
+        for i in 0..super::NUM_CHANNELS {
+            rmt.chconf0(i)
+                .modify(|_, w| unsafe { w.mem_size().bits(0) });
         }
     }
 
