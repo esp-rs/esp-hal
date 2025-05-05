@@ -1,6 +1,7 @@
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![cfg_attr(not(all(test, feature = "emulation")), no_std)]
 
-#[cfg(not(feature = "emulation"))]
 #[cfg_attr(feature = "esp32c2", path = "esp32c2.rs")]
 #[cfg_attr(feature = "esp32c3", path = "esp32c3.rs")]
 #[cfg_attr(feature = "esp32c6", path = "esp32c6.rs")]
@@ -8,22 +9,7 @@
 #[cfg_attr(feature = "esp32", path = "esp32.rs")]
 #[cfg_attr(feature = "esp32s2", path = "esp32s2.rs")]
 #[cfg_attr(feature = "esp32s3", path = "esp32s3.rs")]
-#[cfg_attr(
-    not(any(
-        feature = "esp32c2",
-        feature = "esp32c3",
-        feature = "esp32c6",
-        feature = "esp32",
-        feature = "esp32s2",
-        feature = "esp32s3",
-        feature = "esp32h2"
-    )),
-    path = "stub.rs"
-)]
-mod chip_specific;
-
-#[cfg(feature = "emulation")]
-#[path = "stub.rs"]
+#[cfg_attr(feature = "emulation", path = "stub.rs")]
 mod chip_specific;
 
 mod common;
@@ -31,11 +17,9 @@ mod common;
 use common::FlashSectorBuffer;
 pub use common::{FlashStorage, FlashStorageError};
 
+pub mod ll;
 mod nor_flash;
 mod storage;
-
-#[cfg(feature = "low-level")]
-pub mod ll;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]

@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `defmt` to 1.0 (#3416)
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
 - esp-hal no longer clears the GPIO interrupt status bits by default. (#3408)
+- `spi::master::Spi::transfer` no longer returns the received data as a slice (#3417)
+- The `log` feature has been replaced by `log-04`. (#3425)
+- Multiple feature flags have been replaced by `unstable`. (#3425)
+- The `debug` feature has been removed. (#3425)
+- The `usb_otg` and `bluetooth` features are now considered private and have been renamed accordingly. (#3425)
 
 ### Fixed
 

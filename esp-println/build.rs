@@ -1,6 +1,7 @@
 use std::{env, path::Path};
 
 use esp_build::assert_unique_used_features;
+use log_04::LevelFilter;
 
 fn main() {
     // Ensure that only a single chip is specified
@@ -25,10 +26,10 @@ fn main() {
         );
     }
 
-    // Ensure that, if the `colors` is used with `log`.`
-    if cfg!(feature = "colors") && !cfg!(feature = "log") {
+    // Ensure that, if the `colors` is used with `log-04`.
+    if cfg!(feature = "colors") && !cfg!(feature = "log-04") {
         println!(
-            "cargo:warning=The `colors` feature is only effective when using the `log` feature"
+            "cargo:warning=The `colors` feature is only effective when using the `log-04` feature"
         );
     }
 
@@ -63,40 +64,41 @@ fn generate_filter_snippet() {
                 .iter()
                 .map(|v| v.level)
                 .max()
-                .unwrap_or(log::LevelFilter::Off);
+                .unwrap_or(LevelFilter::Off);
             let max = match max {
-                log::LevelFilter::Off => "Off",
-                log::LevelFilter::Error => "Error",
-                log::LevelFilter::Warn => "Warn",
-                log::LevelFilter::Info => "Info",
-                log::LevelFilter::Debug => "Debug",
-                log::LevelFilter::Trace => "Trace",
+                LevelFilter::Off => "Off",
+                LevelFilter::Error => "Error",
+                LevelFilter::Warn => "Warn",
+                LevelFilter::Info => "Info",
+                LevelFilter::Debug => "Debug",
+                LevelFilter::Trace => "Trace",
             };
 
             let mut snippet = String::new();
 
             snippet.push_str(&format!(
-                "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::{max};"
+                "pub(crate) const FILTER_MAX: log_04::LevelFilter = log_04::LevelFilter::{max};"
             ));
 
-            snippet
-                .push_str("pub(crate) fn is_enabled(level: log::Level, _target: &str) -> bool {");
+            snippet.push_str(
+                "pub(crate) fn is_enabled(level: log_04::Level, _target: &str) -> bool {",
+            );
 
             let mut global_level = None;
             for directive in res.directives {
                 let level = match directive.level {
-                    log::LevelFilter::Off => "Off",
-                    log::LevelFilter::Error => "Error",
-                    log::LevelFilter::Warn => "Warn",
-                    log::LevelFilter::Info => "Info",
-                    log::LevelFilter::Debug => "Debug",
-                    log::LevelFilter::Trace => "Trace",
+                    LevelFilter::Off => "Off",
+                    LevelFilter::Error => "Error",
+                    LevelFilter::Warn => "Warn",
+                    LevelFilter::Info => "Info",
+                    LevelFilter::Debug => "Debug",
+                    LevelFilter::Trace => "Trace",
                 };
 
                 if let Some(name) = directive.name {
                     // If a prefix matches, don't continue to the next directive
                     snippet.push_str(&format!(
-                        "if _target.starts_with(\"{}\") {{ return level <= log::LevelFilter::{}; }}",
+                        "if _target.starts_with(\"{}\") {{ return level <= log_04::LevelFilter::{}; }}",
                         &name, level
                     ));
                 } else {
@@ -109,7 +111,7 @@ fn generate_filter_snippet() {
 
             // Place the fallback rule at the end
             if let Some(level) = global_level {
-                snippet.push_str(&format!("level <= log::LevelFilter::{level}"));
+                snippet.push_str(&format!("level <= log_04::LevelFilter::{level}"));
             } else {
                 snippet.push_str(" false");
             }
@@ -117,7 +119,7 @@ fn generate_filter_snippet() {
             snippet
         }
     } else {
-        "pub(crate) const FILTER_MAX: log::LevelFilter = log::LevelFilter::Off; pub(crate) fn is_enabled(_level: log::Level, _target: &str) -> bool { true }".to_string()
+        "pub(crate) const FILTER_MAX: log_04::LevelFilter = log_04::LevelFilter::Off; pub(crate) fn is_enabled(_level: log_04::Level, _target: &str) -> bool { true }".to_string()
     };
 
     std::fs::write(&dest_path, &snippet).unwrap();
@@ -142,7 +144,7 @@ impl ParseResult {
 #[derive(Debug)]
 struct Directive {
     pub(crate) name: Option<String>,
-    pub(crate) level: log::LevelFilter,
+    pub(crate) level: LevelFilter,
 }
 
 /// Parse a logging specification string (e.g:
@@ -167,10 +169,10 @@ fn parse_spec(spec: &str) -> ParseResult {
                         // treat that as a global fallback
                         match part0.parse() {
                             Ok(num) => (num, None),
-                            Err(_) => (log::LevelFilter::max(), Some(part0)),
+                            Err(_) => (LevelFilter::max(), Some(part0)),
                         }
                     }
-                    (Some(part0), Some(""), None) => (log::LevelFilter::max(), Some(part0)),
+                    (Some(part0), Some(""), None) => (LevelFilter::max(), Some(part0)),
                     (Some(part0), Some(part1), None) => {
                         if let Ok(num) = part1.parse() {
                             (num, Some(part0))

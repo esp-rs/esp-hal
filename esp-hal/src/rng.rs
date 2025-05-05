@@ -134,7 +134,7 @@ impl Rng {
 impl Sealed for Rng {}
 
 #[instability::unstable]
-impl rand_core06::RngCore for Rng {
+impl rand_core_06::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -150,14 +150,14 @@ impl rand_core06::RngCore for Rng {
         self.read(dest);
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core06::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core_06::Error> {
         self.read(dest);
         Ok(())
     }
 }
 
 #[instability::unstable]
-impl rand_core09::RngCore for Rng {
+impl rand_core_09::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -231,7 +231,7 @@ impl Drop for Trng<'_> {
 
 /// Implementing RngCore trait from rand_core for `Trng` structure
 #[instability::unstable]
-impl rand_core06::RngCore for Trng<'_> {
+impl rand_core_06::RngCore for Trng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.rng.next_u32()
     }
@@ -244,13 +244,13 @@ impl rand_core06::RngCore for Trng<'_> {
         self.rng.fill_bytes(dest)
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core06::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core_06::Error> {
         self.rng.try_fill_bytes(dest)
     }
 }
 
 #[instability::unstable]
-impl rand_core09::RngCore for Trng<'_> {
+impl rand_core_09::RngCore for Trng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.rng.next_u32()
     }
@@ -265,8 +265,8 @@ impl rand_core09::RngCore for Trng<'_> {
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
 #[instability::unstable]
-impl rand_core06::CryptoRng for Trng<'_> {}
+impl rand_core_06::CryptoRng for Trng<'_> {}
 #[instability::unstable]
-impl rand_core09::CryptoRng for Trng<'_> {}
+impl rand_core_09::CryptoRng for Trng<'_> {}
 
 impl Sealed for Trng<'_> {}

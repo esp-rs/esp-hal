@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Update `defmt` to 1.0 (#3416)
+- The `log` feature has been replaced by `log-04`. (#3425)
 
 ### Fixed
 

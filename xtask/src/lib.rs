@@ -112,10 +112,10 @@ impl Package {
                     features.push("psram".to_owned())
                 }
                 if config.contains("usb0") {
-                    features.push("usb-otg".to_owned());
+                    features.push("__usb_otg".to_owned());
                 }
                 if config.contains("bt") {
-                    features.push("bluetooth".to_owned());
+                    features.push("__bluetooth".to_owned());
                 }
             }
             Package::EspWifi => {
@@ -157,9 +157,7 @@ impl Package {
                 features.push("auto".to_owned());
                 features.push("defmt-espflash".to_owned());
             }
-            Package::EspStorage => {
-                features.push("low-level".to_owned());
-            }
+            Package::EspStorage => {}
             Package::EspBootloaderEspIdf => {
                 features.push("defmt".to_owned());
                 features.push("validation".to_owned());
