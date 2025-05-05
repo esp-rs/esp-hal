@@ -98,6 +98,6 @@ fn print_log_record(record: &log::Record) {
 }
 
 #[cfg(feature = "timestamp")]
-extern "Rust" {
+unsafe extern "Rust" {
     fn _esp_println_timestamp() -> u64;
 }

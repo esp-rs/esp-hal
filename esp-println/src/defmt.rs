@@ -104,7 +104,7 @@ fn do_write(bytes: &[u8]) {
 
 #[cfg(feature = "timestamp")]
 defmt::timestamp!("{=u64:us}", {
-    extern "Rust" {
+    unsafe extern "Rust" {
         fn _esp_println_timestamp() -> u64;
     }
     unsafe { _esp_println_timestamp() }
