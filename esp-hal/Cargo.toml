@@ -102,6 +102,8 @@ jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 [features]
 default = []
 
+# These features are considered private and unstable. They are not covered by
+# semver guarantees and may change or be removed without notice.
 __bluetooth = []
 __esp_hal_embassy = []
 __usb_otg = [
