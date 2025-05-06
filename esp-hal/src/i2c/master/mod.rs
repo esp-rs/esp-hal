@@ -51,7 +51,7 @@ use crate::{
     peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
-    time::Rate,
+    time::{Duration, Instant, Rate},
 };
 
 const I2C_LL_INTR_MASK: u32 = if cfg!(esp32s2) { 0x1ffff } else { 0x3ffff };
@@ -59,9 +59,7 @@ const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
-
-// on ESP32 there is a chance to get trapped in `wait_for_completion` forever
-const MAX_ITERATIONS: u32 = 1_000_000;
+const TIMEOUT: Duration = Duration::from_millis(10);
 
 /// Representation of I2C address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1921,100 +1919,100 @@ impl Driver<'_> {
             Event::TxComplete | Event::EndDetect
         };
         I2cFuture::new(event, self.info, self.state).await?;
-        self.check_all_commands_done()?;
-
-        Ok(())
+        self.check_all_commands_done().await
     }
 
     #[cfg(esp32)]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        // for ESP32 we need a timeout here but wasting a timer seems unnecessary
-        // given the short time we spend here
+        let start = Instant::now();
 
-        let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
-        loop {
-            let interrupts = self.regs().int_raw().read();
-
-            self.check_errors()?;
-
-            // Handle completion cases
-            // A full transmission was completed (either a STOP condition or END was
-            // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set())
-                || interrupts.end_detect().bit_is_set()
-            {
-                break;
-            }
-
-            tout -= 1;
-            if tout == 0 {
+        while !self.is_completed(end_only)? {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::Timeout);
             }
-
             embassy_futures::yield_now().await;
         }
-        self.check_all_commands_done()?;
-        Ok(())
+
+        self.check_all_commands_done().await
     }
 
     /// Waits for the completion of an I2C transaction.
     fn wait_for_completion_blocking(&self, end_only: bool) -> Result<(), Error> {
-        let mut tout = MAX_ITERATIONS;
-        loop {
-            let interrupts = self.regs().int_raw().read();
+        let start = Instant::now();
 
-            self.check_errors()?;
-
-            // Handle completion cases
-            // A full transmission was completed (either a STOP condition or END was
-            // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set())
-                || interrupts.end_detect().bit_is_set()
-            {
-                break;
-            }
-
-            tout -= 1;
-            if tout == 0 {
+        while !self.is_completed(end_only)? {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::Timeout);
             }
         }
-        self.check_all_commands_done()?;
+
+        self.check_all_commands_done_blocking()
+    }
+
+    fn is_completed(&self, end_only: bool) -> Result<bool, Error> {
+        let interrupts = self.regs().int_raw().read();
+
+        self.check_errors()?;
+
+        // Handle completion cases
+        // A full transmission was completed (either a STOP condition or END was
+        // processed)
+        Ok((!end_only && interrupts.trans_complete().bit_is_set())
+            || interrupts.end_detect().bit_is_set())
+    }
+
+    fn all_commands_done(&self) -> bool {
+        for cmd_reg in self.regs().comd_iter() {
+            let cmd = cmd_reg.read();
+
+            // if there is a valid command which is not END, check if it's marked as done
+            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                // Let's retry
+                return false;
+            }
+
+            // once we hit END or STOP we can break the loop
+            if cmd.opcode().is_end() || cmd.opcode().is_stop() {
+                break;
+            }
+        }
+        true
+    }
+
+    /// Checks whether all I2C commands have completed execution.
+    fn check_all_commands_done_blocking(&self) -> Result<(), Error> {
+        // NOTE: on esp32 executing the end command generates the end_detect interrupt
+        //       but does not seem to clear the done bit! So we don't check the done
+        //       status of an end command
+        // loop until commands are actually done
+
+        let start = Instant::now();
+
+        while !self.all_commands_done() {
+            if Instant::now() - start > TIMEOUT {
+                return Err(Error::ExecutionIncomplete);
+            }
+        }
+
         Ok(())
     }
 
     /// Checks whether all I2C commands have completed execution.
-    fn check_all_commands_done(&self) -> Result<(), Error> {
+    async fn check_all_commands_done(&self) -> Result<(), Error> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
-        let mut cnt = MAX_ITERATIONS;
         // loop until commands are actually done
-        loop {
-            let mut not_done = false;
-            for cmd_reg in self.regs().comd_iter() {
-                let cmd = cmd_reg.read();
 
-                // if there is a valid command which is not END, check if it's marked as done
-                if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
-                    not_done = true;
-                }
+        let start = Instant::now();
 
-                // once we hit END or STOP we can break the loop
-                if cmd.opcode().is_end() || cmd.opcode().is_stop() {
-                    break;
-                }
-            }
-
-            if !not_done {
-                break;
-            }
-
-            cnt -= 1;
-            if cnt == 0 {
+        while !self.all_commands_done() {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::ExecutionIncomplete);
             }
+            embassy_futures::yield_now().await;
         }
+
         Ok(())
     }
 
