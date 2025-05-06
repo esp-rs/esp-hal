@@ -1,13 +1,11 @@
 use std::{io::Write, ops::Range};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{Error, snake_case, value::Value};
 
-type CustomValidatorFn = Box<dyn Fn(&Value) -> Result<(), Error>>;
-
 /// Configuration value validation functions.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Validator {
     /// Only allow negative integers, i.e. any values less than 0.
     NegativeInteger,
@@ -20,29 +18,17 @@ pub enum Validator {
     IntegerInRange(Range<i128>),
     /// String-Enumeration. Only allows one of the given Strings.
     Enumeration(Vec<String>),
-    /// A custom validation function to run against any supported value
-    /// type.
-    #[serde(serialize_with = "serialize_custom")]
-    #[serde(untagged)]
-    Custom(CustomValidatorFn),
-}
-
-pub(crate) fn serialize_custom<S>(_: &CustomValidatorFn, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_str("Custom")
 }
 
 impl Validator {
-    pub(crate) fn validate(&self, value: &Value) -> Result<(), Error> {
+    /// Validate the value
+    pub fn validate(&self, value: &Value) -> Result<(), Error> {
         match self {
             Validator::NegativeInteger => negative_integer(value)?,
             Validator::NonNegativeInteger => non_negative_integer(value)?,
             Validator::PositiveInteger => positive_integer(value)?,
             Validator::IntegerInRange(range) => integer_in_range(range, value)?,
             Validator::Enumeration(values) => enumeration(values, value)?,
-            Validator::Custom(validator_fn) => validator_fn(value)?,
         }
 
         Ok(())
@@ -64,7 +50,6 @@ impl Validator {
                     .collect::<Vec<_>>()
                     .join("")
             )),
-            Validator::Custom(_) => None,
         }
     }
 

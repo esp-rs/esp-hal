@@ -1,11 +1,11 @@
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::Error;
 
 /// Supported configuration value types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Value {
     /// Booleans.
     Bool(bool),
