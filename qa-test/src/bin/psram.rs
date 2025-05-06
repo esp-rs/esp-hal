@@ -6,7 +6,7 @@
 //! the device comes with octal-SPIRAM
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats esp-hal/log
+//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 
 #![no_std]
 #![no_main]

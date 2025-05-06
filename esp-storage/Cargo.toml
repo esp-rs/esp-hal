@@ -20,28 +20,43 @@ test  = false
 
 [dependencies]
 embedded-storage = "0.3.1"
+
+# Optional dependencies
 critical-section = { version = "1.2.0", optional = true }
+
+# Unstable dependencies that are not (strictly) part of the public API
+document-features = "0.2.11"
 
 [build-dependencies]
 esp-build = { version = "0.2.0", path = "../esp-build" }
 
 [features]
-default          = ["critical-section"]
+default = ["critical-section"]
+
+## Place the flash operations in a critical section
 critical-section = ["dep:critical-section"]
 
-esp32c2       = []
-esp32c3       = []
-esp32c6       = []
-esp32h2       = []
-esp32         = []
-esp32s2       = []
-esp32s3       = []
-
-# Bytewise read emulation
+## Bytewise read emulation
 bytewise-read = []
 
-# Enable flash emulation to run tests
-emulation = []
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
 
-# this feature is reserved for very specific use-cases - usually you don't want to use this!
-low-level = []
+# The following trailing spaces ("## ") are important to display the feature names.
+
+## 
+esp32c2   = []
+## 
+esp32c3   = []
+## 
+esp32c6   = []
+## 
+esp32h2   = []
+## 
+esp32     = []
+## 
+esp32s2   = []
+## 
+esp32s3   = []
+## Used for testing on a host.
+emulation = []

@@ -15,9 +15,9 @@ embedded-graphics  = "0.8.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc" }
 esp-backtrace      = { path = "../esp-backtrace", features = ["exception-handler", "panic-handler", "println"] }
-esp-hal            = { path = "../esp-hal", features = ["unstable", "log"] }
+esp-hal            = { path = "../esp-hal", features = ["unstable", "log-04"] }
 esp-hal-embassy    = { path = "../esp-hal-embassy" }
-esp-println        = { path = "../esp-println", features = ["log"] }
+esp-println        = { path = "../esp-println", features = ["log-04"] }
 lis3dh-async       = "0.9.3"
 ssd1306            = "0.10.0"
 

@@ -747,6 +747,14 @@ where
         self.uart.info().write(data)
     }
 
+    fn write_all(&mut self, mut data: &[u8]) -> Result<(), TxError> {
+        while !data.is_empty() {
+            let bytes_written = self.write(data)?;
+            data = &data[bytes_written..];
+        }
+        Ok(())
+    }
+
     /// Flush the transmit buffer.
     ///
     /// This function blocks until all data in the TX FIFO has been
@@ -1737,8 +1745,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write(s.as_bytes())?;
-        Ok(())
+        self.write_all(s.as_bytes())
     }
 }
 
@@ -1758,8 +1765,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
-        Ok(())
+        self.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 

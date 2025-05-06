@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `IntoAnyTimer` trait has been removed (#3444)
 - The `TimerCollection` trait has been sealed and renamed to `TimeBase`. Former `IntoAnyTimer` functionality has been merged into `TimeBase`. (#3444)
 - `esp_hal_embassy::init` will panic if called multiple times (#3444)
+- The `log` feature has been replaced by `log-04`. (#3425)
 
 ### Fixed
 

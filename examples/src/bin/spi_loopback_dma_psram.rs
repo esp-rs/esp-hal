@@ -15,7 +15,7 @@
 //!
 //! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/psram esp-hal/unstable
+//% FEATURES: esp-hal/psram esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]

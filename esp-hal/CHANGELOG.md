@@ -57,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
 - esp-hal no longer clears the GPIO interrupt status bits by default. (#3408)
 - eFuse field definitions have been updated/corrected (#3440)
+- `spi::master::Spi::transfer` no longer returns the received data as a slice (#3417)
+- The `log` feature has been replaced by `log-04`. (#3425)
+- Multiple feature flags have been replaced by `unstable`. (#3425)
+- The `debug` feature has been removed. (#3425)
+- The `usb_otg` and `bluetooth` features are now considered private and have been renamed accordingly. (#3425)
 
 ### Fixed
 
@@ -82,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `OneShot` timer now returns an InvalidTimeout from `schedule` instead of panicking (#3433)
 - GPIO interrupt handling no longer causes infinite looping if a task at higher priority is awaiting on a pin event (#3408)
 - `esp_hal::gpio::Input::is_interrupt_set` can now return true (#3408)
+- `Uart::write_str` (both core::fmt and uWrite implementations) no longer stops writing when the internal buffer fills up (#3452)
 
 ### Removed
 

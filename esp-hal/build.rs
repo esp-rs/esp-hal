@@ -8,7 +8,7 @@ use std::{
     str::FromStr,
 };
 
-use esp_build::assert_unique_used_features;
+use esp_build::{assert_unique_features, assert_unique_used_features};
 use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
@@ -25,6 +25,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_used_features!(
         "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
     );
+
+    // Log and defmt are mutually exclusive features. The main technical reason is
+    // that allowing both would make the exact panicking behaviour a fragile
+    // implementation detail.
+    assert_unique_features!("log-04", "defmt");
 
     // NOTE: update when adding new device support!
     // Determine the name of the configured device:
@@ -383,7 +388,7 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
 
 #[cfg(feature = "esp32")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserve_dram = if cfg!(feature = "bluetooth") {
+    let reserve_dram = if cfg!(feature = "__bluetooth") {
         "0x10000"
     } else {
         "0x0"

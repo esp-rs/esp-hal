@@ -299,19 +299,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[cfg(not(any(
-    feature = "esp32",
-    feature = "esp32c2",
-    feature = "esp32c3",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s2",
-    feature = "esp32s3",
-)))]
-fn main() {
-    panic!("Select a chip via it's cargo feature");
-}
-
 fn print_warning(message: impl core::fmt::Display) {
     println!("cargo:warning={message}");
 }
