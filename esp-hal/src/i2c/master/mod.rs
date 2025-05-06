@@ -677,21 +677,23 @@ pub enum Event {
 #[cfg(not(esp32))]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct I2cFuture<'a> {
-    event: Event,
+    events: EnumSet<Event>,
     info: &'a Info,
     state: &'a State,
 }
 
 #[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
-    pub fn new(event: Event, info: &'a Info, state: &'a State) -> Self {
+    pub fn new(events: EnumSet<Event>, info: &'a Info, state: &'a State) -> Self {
         info.regs().int_ena().modify(|_, w| {
-            let w = match event {
-                Event::EndDetect => w.end_detect().set_bit(),
-                Event::TxComplete => w.trans_complete().set_bit(),
-                #[cfg(not(any(esp32, esp32s2)))]
-                Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
-            };
+            for event in events {
+                match event {
+                    Event::EndDetect => w.end_detect().set_bit(),
+                    Event::TxComplete => w.trans_complete().set_bit(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
+                };
+            }
 
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
@@ -705,18 +707,15 @@ impl<'a> I2cFuture<'a> {
             w
         });
 
-        Self { event, state, info }
+        Self {
+            events,
+            state,
+            info,
+        }
     }
 
-    fn event_bit_is_clear(&self) -> bool {
-        let r = self.info.regs().int_ena().read();
-
-        match self.event {
-            Event::EndDetect => r.end_detect().bit_is_clear(),
-            Event::TxComplete => r.trans_complete().bit_is_clear(),
-            #[cfg(not(any(esp32, esp32s2)))]
-            Event::TxFifoWatermark => r.txfifo_wm().bit_is_clear(),
-        }
+    fn is_done(&self) -> bool {
+        !self.info.interrupts().is_disjoint(self.events)
     }
 
     fn check_error(&self) -> Result<(), Error> {
@@ -768,10 +767,8 @@ impl core::future::Future for I2cFuture<'_> {
         let error = self.check_error();
 
         if error.is_err() {
-            return Poll::Ready(error);
-        }
-
-        if self.event_bit_is_clear() {
+            Poll::Ready(error)
+        } else if self.is_done() {
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending
@@ -1106,6 +1103,8 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
 }
 
 fn async_handler(info: &Info, state: &State) {
+    // Disable all interrupts. The I2C Future will check events based on the
+    // interrupt status bits.
     info.regs().int_ena().write(|w| unsafe { w.bits(0) });
 
     state.waker.wake();
@@ -1409,9 +1408,7 @@ impl Driver<'_> {
         self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
 
         // Clear all I2C interrupts
-        self.regs()
-            .int_clr()
-            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
+        self.clear_all_interrupts();
 
         // Reset fifo
         self.reset_fifo();
@@ -1918,20 +1915,12 @@ impl Driver<'_> {
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
         self.check_errors()?;
 
-        if end_only {
-            I2cFuture::new(Event::EndDetect, self.info, self.state).await?;
+        let event = if end_only {
+            Event::EndDetect.into()
         } else {
-            let res = embassy_futures::select::select(
-                I2cFuture::new(Event::TxComplete, self.info, self.state),
-                I2cFuture::new(Event::EndDetect, self.info, self.state),
-            )
-            .await;
-
-            match res {
-                embassy_futures::select::Either::First(res) => res?,
-                embassy_futures::select::Either::Second(res) => res?,
-            }
-        }
+            Event::TxComplete | Event::EndDetect
+        };
+        I2cFuture::new(event, self.info, self.state).await?;
         self.check_all_commands_done()?;
 
         Ok(())
