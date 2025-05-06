@@ -264,14 +264,14 @@ pub struct ConfigOption {
 }
 
 impl ConfigOption {
-    /// An integer config option
+    /// Create a new config option.
     ///
-    /// Unstable and active by default.
-    pub fn integer(name: &str, description: &str, default_value: i128) -> Self {
+    /// Unstable, active, no display-hint and not constrained by default.
+    pub fn new(name: &str, description: &str, default_value: impl Into<Value>) -> Self {
         Self {
             name: name.to_string(),
             description: description.to_string(),
-            default_value: Value::Integer(default_value),
+            default_value: default_value.into(),
             constraint: None,
             stability: Stability::Unstable,
             active: true,
@@ -279,43 +279,13 @@ impl ConfigOption {
         }
     }
 
-    /// An string config option
-    ///
-    /// Unstable and active by default.
-    pub fn string(name: &str, description: &str, default_value: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            description: description.to_string(),
-            default_value: Value::String(default_value.to_string()),
-            constraint: None,
-            stability: Stability::Unstable,
-            active: true,
-            display_hint: DisplayHint::None,
-        }
-    }
-
-    /// An boolean config option
-    ///
-    /// Unstable and active by default.
-    pub fn boolean(name: &str, description: &str, default_value: bool) -> Self {
-        Self {
-            name: name.to_string(),
-            description: description.to_string(),
-            default_value: Value::Bool(default_value),
-            constraint: None,
-            stability: Stability::Unstable,
-            active: true,
-            display_hint: DisplayHint::None,
-        }
-    }
-
-    /// Constraint the config option
+    /// Constrain the config option
     pub fn constraint(mut self, validator: Validator) -> Self {
         self.constraint = Some(validator);
         self
     }
 
-    /// Constraint the config option
+    /// Constrain the config option
     pub fn constraint_by(mut self, validator: Option<Validator>) -> Self {
         self.constraint = validator;
         self

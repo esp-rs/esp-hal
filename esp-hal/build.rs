@@ -51,12 +51,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cfg = generate_config(
         "esp_hal",
         &[
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "place-spi-master-driver-in-ram",
                 "Places the SPI master driver in RAM for better performance",
                 false,
             ),
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "place-switch-tables-in-ram",
                 "Places switch-tables, some lookup tables and constants related to \
                 interrupt handling into RAM - resulting in better performance but slightly more \
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 true,
             )
             .stable("1.0.0-beta.0"),
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "place-anon-in-ram",
                 "Places anonymous symbols into RAM - resulting in better performance \
                 at the cost of significant more RAM consumption. Best to be combined with \
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             // Ideally, we should be able to set any clock frequency for any chip. However,
             // currently only the 32 and C2 implements any sort of configurability, and
             // the rest have a fixed clock frequeny.
-            ConfigOption::string(
+            ConfigOption::new(
                 "xtal-frequency",
                 "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
                 automatically detect the frequency. `auto` may not be able to identify the clock \
@@ -98,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 _ => None,
             })
             .active([Chip::Esp32, Chip::Esp32c2].contains(&chip)),
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "spi-address-workaround",
                 "Enables a workaround for the issue where SPI in \
                 half-duplex mode incorrectly transmits the address on a single line if the \
@@ -106,7 +106,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 true,
             )
             .active(chip == Chip::Esp32),
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "flip-link",
                 "Move the stack to start of RAM to get zero-cost stack overflow protection.",
                 false,
@@ -114,7 +114,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .active([Chip::Esp32c6, Chip::Esp32h2].contains(&chip)),
             // TODO: automate "enum of single choice" handling - they don't need
             // to be presented to the user
-            ConfigOption::string("psram-mode", "SPIRAM chip mode", "quad")
+            ConfigOption::new("psram-mode", "SPIRAM chip mode", "quad")
                 .constraint(Validator::Enumeration(
                     if config
                         .symbols()
@@ -133,21 +133,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                         .any(|s| s.eq_ignore_ascii_case("psram")),
                 ),
             // Rust's stack smashing protection configuration
-            ConfigOption::integer(
+            ConfigOption::new(
                 "stack-guard-offset",
                 "The stack guard variable will be placed this many bytes from \
                 the stack's end.",
                 4096,
             )
             .stable("1.0.0-beta.0"),
-            ConfigOption::integer(
+            ConfigOption::new(
                 "stack-guard-value",
                 "The value to be written to the stack guard variable.",
                 0xDEED_BAAD,
             )
             .stable("1.0.0-beta.0")
             .display_hint(DisplayHint::Hex),
-            ConfigOption::boolean(
+            ConfigOption::new(
                 "impl-critical-section",
                 "Provide a `critical-section` implementation. Note that if disabled, \
                 you will need to provide a `critical-section` implementation which is \

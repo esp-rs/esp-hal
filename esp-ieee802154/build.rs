@@ -10,7 +10,7 @@ fn main() {
     generate_config(
         "esp_ieee802154",
         &[
-            ConfigOption::integer("rx_queue_size", "Size of the RX queue in frames", 50)
+            ConfigOption::new("rx_queue_size", "Size of the RX queue in frames", 50)
                 .constraint(Validator::PositiveInteger),
         ],
         true,

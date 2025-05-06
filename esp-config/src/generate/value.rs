@@ -94,3 +94,27 @@ impl fmt::Display for Value {
         }
     }
 }
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Bool(value)
+    }
+}
+
+impl From<i128> for Value {
+    fn from(value: i128) -> Self {
+        Value::Integer(value)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(value: &str) -> Self {
+        Value::String(value.to_string())
+    }
+}
+
+impl From<String> for Value {
+    fn from(value: String) -> Self {
+        Value::String(value)
+    }
+}

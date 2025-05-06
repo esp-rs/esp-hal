@@ -19,7 +19,7 @@ fn main() {
     generate_config(
         "esp-bootloader-esp-idf",
         &[
-            ConfigOption::string(
+            ConfigOption::new(
                 "mmu_page_size",
                 "ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. \
                 This is currently only used to populate the app descriptor.",
@@ -31,13 +31,13 @@ fn main() {
                 String::from("32k"),
                 String::from("64k"),
             ])), // .active(true) TODO we need to know the device here
-            ConfigOption::string(
+            ConfigOption::new(
                 "esp_idf_version",
                 "ESP-IDF version used in the application descriptor. Currently it's \
                 not checked by the bootloader.",
                 "0.0.0",
             ),
-            ConfigOption::integer(
+            ConfigOption::new(
                 "partition-table-offset",
                 "The address of partition table (by default 0x8000). Allows you to \
                 move the partition table, it gives more space for the bootloader. Note that the \

@@ -15,7 +15,7 @@ fn main() {
     // emit config
     generate_config(
         "esp_backtrace",
-        &[ConfigOption::integer(
+        &[ConfigOption::new(
             "backtrace-frames",
             "The maximum number of frames that will be printed in a backtrace",
             10,
