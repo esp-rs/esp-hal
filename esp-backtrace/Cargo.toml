@@ -29,6 +29,7 @@ semihosting = { version = "0.1.20", optional = true }
 [build-dependencies]
 esp-build = { version = "0.2.0", path = "../esp-build" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
+esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
 
 [features]
 default = ["colors"]
