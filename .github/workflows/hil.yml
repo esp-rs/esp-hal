@@ -9,7 +9,7 @@ on:
       repository:
         description: "Owner and repository to test"
         required: true
-        default: 'esp-rs/esp-hal'
+        default: "esp-rs/esp-hal"
       branch:
         description: "Branch, tag or SHA to checkout."
         required: true
@@ -118,7 +118,7 @@ jobs:
           version: 1.85.0.0
 
       - name: Build tests
-        run: cargo xtask build-tests ${{ matrix.target.soc }}
+        run: cargo xtask build tests ${{ matrix.target.soc }}
 
       - uses: actions/upload-artifact@v4
         with:

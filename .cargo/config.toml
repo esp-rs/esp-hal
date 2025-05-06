@@ -1,5 +1,5 @@
 [alias]
 xtask = "run --package xtask --"
-xdoc = "run --package xtask --features=deploy-docs,preview-docs --"
-xfmt = "xtask fmt-packages"
-qa = "xtask run-example qa-test"
+xdoc  = "run --package xtask --features=deploy-docs,preview-docs --"
+xfmt  = "xtask fmt-packages"
+qa    = "xtask run example qa-test"
