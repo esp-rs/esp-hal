@@ -56,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `defmt` to 1.0 (#3416)
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
 - esp-hal no longer clears the GPIO interrupt status bits by default. (#3408)
+- eFuse field definitions have been updated/corrected (#3440)
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#3417)
 - The `log` feature has been replaced by `log-04`. (#3425)
 - Multiple feature flags have been replaced by `unstable`. (#3425)
@@ -94,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed the inherent `degrade` method from peripheral singletons. (#3305)
 - Removed the `FullDuplex` trait from the PARL_IO driver. (#3339)
 - Removed `Flex::{set_as_input, set_as_output, set_drive_strength, set_as_open_drain, pull_direction}` functions (#3387)
+- The `Efuse::read_field_be` function has been removed (#3440)
 
 ## v1.0.0-beta.0
 
