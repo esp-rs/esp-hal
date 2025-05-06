@@ -1400,11 +1400,13 @@ impl Driver<'_> {
     /// Resets the I2C controller (FIFO + FSM + command list)
     fn reset(&self) {
         // Reset the FSM
-        // (the option to reset the FSM is not available
-        // for the ESP32)
+        // (the option to reset the FSM is not available for the ESP32)
         #[cfg(not(esp32))]
         self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
+        self.reset_before_transmission();
+    }
 
+    fn reset_before_transmission(&self) {
         // Clear all I2C interrupts
         self.clear_all_interrupts();
 
@@ -2139,9 +2141,6 @@ impl Driver<'_> {
         bytes: &[u8],
         start: bool,
     ) -> Result<(), Error> {
-        address.validate()?;
-        self.reset_fifo();
-        self.reset_command_list();
         let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
@@ -2173,10 +2172,6 @@ impl Driver<'_> {
         start: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        address.validate()?;
-        self.reset_fifo();
-        self.reset_command_list();
-
         let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
@@ -2206,7 +2201,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2243,7 +2238,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2297,7 +2292,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2334,7 +2329,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
