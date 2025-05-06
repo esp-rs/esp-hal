@@ -15,12 +15,12 @@ mod run;
 
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
-    /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
     /// Package whose examples we which to act on.
     #[arg(value_enum)]
     pub package: Package,
+    /// Chip to target.
+    #[arg(value_enum)]
+    pub chip: Chip,
 
     /// Build examples in debug mode only
     #[arg(long)]
