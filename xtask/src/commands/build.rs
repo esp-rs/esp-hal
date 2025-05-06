@@ -6,7 +6,11 @@ use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
 
 use super::{ExamplesArgs, TestsArgs};
-use crate::{Package, cargo::CargoAction, firmware::Metadata};
+use crate::{
+    Package,
+    cargo::{self, CargoAction, CargoArgsBuilder},
+    firmware::Metadata,
+};
 
 // ----------------------------------------------------------------------------
 // Subcommands
@@ -152,11 +156,44 @@ pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
     let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
 
     // Build the package using the provided features and/or target, if any:
-    crate::build_package(
-        &package_path,
-        args.features,
-        args.no_default_features,
-        args.toolchain,
-        args.target,
-    )
+
+    log::info!("Building package '{}'", package_path.display());
+    if !args.features.is_empty() {
+        log::info!("  Features: {}", args.features.join(","));
+    }
+    if let Some(ref target) = args.target {
+        log::info!("  Target:   {}", target);
+    }
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("build")
+        .arg("--release");
+
+    if let Some(toolchain) = args.toolchain {
+        builder = builder.toolchain(toolchain);
+    }
+
+    if let Some(target) = args.target {
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        if target.starts_with("xtensa") {
+            builder = builder.toolchain("esp");
+            builder = builder.arg("-Zbuild-std=core,alloc")
+        }
+        builder = builder.target(target);
+    }
+
+    if !args.features.is_empty() {
+        builder = builder.features(&args.features);
+    }
+
+    if args.no_default_features {
+        builder = builder.arg("--no-default-features");
+    }
+
+    let args = builder.build();
+    log::debug!("{args:#?}");
+
+    cargo::run(&args, &package_path)?;
+
+    Ok(())
 }

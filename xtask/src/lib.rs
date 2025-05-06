@@ -325,56 +325,6 @@ pub fn execute_app(
     Ok(())
 }
 
-/// Build the specified package, using the given toolchain/target/features if
-/// provided.
-pub fn build_package(
-    package_path: &Path,
-    features: Vec<String>,
-    no_default_features: bool,
-    toolchain: Option<String>,
-    target: Option<String>,
-) -> Result<()> {
-    log::info!("Building package '{}'", package_path.display());
-    if !features.is_empty() {
-        log::info!("  Features: {}", features.join(","));
-    }
-    if let Some(ref target) = target {
-        log::info!("  Target:   {}", target);
-    }
-
-    let mut builder = CargoArgsBuilder::default()
-        .subcommand("build")
-        .arg("--release");
-
-    if let Some(toolchain) = toolchain {
-        builder = builder.toolchain(toolchain);
-    }
-
-    if let Some(target) = target {
-        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-        if target.starts_with("xtensa") {
-            builder = builder.toolchain("esp");
-            builder = builder.arg("-Zbuild-std=core,alloc")
-        }
-        builder = builder.target(target);
-    }
-
-    if !features.is_empty() {
-        builder = builder.features(&features);
-    }
-
-    if no_default_features {
-        builder = builder.arg("--no-default-features");
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    cargo::run(&args, package_path)?;
-
-    Ok(())
-}
-
 /// Bump the version of the specified package by the specified amount.
 pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Result<()> {
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
