@@ -1,7 +1,10 @@
 use std::{
-    fs, io::Write, path::{Path, PathBuf}
+    fs,
+    io::Write,
+    path::{Path, PathBuf},
 };
 
+use cargo_semver_checks::{Check, Rustdoc};
 use esp_metadata::Chip;
 use rustdoc_types::ItemEnum;
 
@@ -30,11 +33,15 @@ pub fn generate_baseline(
                 "api".to_string()
             };
 
-            let to_path = PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
+            let to_path =
+                PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
             fs::create_dir_all(to_path.parent().unwrap())?;
 
             log::debug!("Compress into {current_path:?}");
-            let mut encoder = flate2::write::GzEncoder::new(fs::File::create(to_path)?, flate2::Compression::default());
+            let mut encoder = flate2::write::GzEncoder::new(
+                fs::File::create(to_path)?,
+                flate2::Compression::default(),
+            );
             encoder.write_all(&std::fs::read(current_path)?)?;
 
             if !package.chip_features_matter() {
@@ -68,26 +75,25 @@ pub fn check(
                 "api".to_string()
             };
 
-            let baseline_path_gz = PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
+            let baseline_path_gz =
+                PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
 
             let baseline_path = temp_file::TempFile::new()?;
             let buffer = Vec::new();
             let mut decoder = flate2::write::GzDecoder::new(buffer);
             decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
-            fs::write( baseline_path.path(), decoder.finish()?)?;
+            fs::write(baseline_path.path(), decoder.finish()?)?;
 
-            let mut check = cargo_semver_checks::Check::new(
-                cargo_semver_checks::Rustdoc::from_path(current_path),
-            );
-            check.set_baseline(cargo_semver_checks::Rustdoc::from_path(baseline_path.path()));
+            let mut semver_check = Check::new(Rustdoc::from_path(current_path));
+            semver_check.set_baseline(Rustdoc::from_path(baseline_path.path()));
             let mut cfg = cargo_semver_checks::GlobalConfig::new();
             // seems there is no way of getting the details via the API - so lets log them
             cfg.set_log_level(Some(log::Level::Info));
-            let check_result = check.check_release(&mut cfg)?;
+            let result = semver_check.check_release(&mut cfg)?;
 
-            log::info!("Result {:?}", check_result);
+            log::info!("Result {:?}", result);
 
-            for (_, report) in check_result.crate_reports() {
+            for (_, report) in result.crate_reports() {
                 if let Some(required_bump) = report.required_bump() {
                     if required_bump == cargo_semver_checks::ReleaseType::Major {
                         return Err(anyhow::anyhow!(
@@ -147,10 +153,12 @@ fn build_doc_json(
 }
 
 fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
-    // this leaves orphaned items! cargo-semver-checks seems to be fine with that however
-    // the json fmt is unstable - we might fail when using the "wrong" version of `rustdoc_types` here
+    // this leaves orphaned items! cargo-semver-checks seems to be fine with that
+    // however the json fmt is unstable - we might fail when using the "wrong"
+    // version of `rustdoc_types` here
     //
-    // Hopefully this whole pre-processing is just a stop-gap solution until it's possible to generate docs for the stable-API only.
+    // Hopefully this whole pre-processing is just a stop-gap solution until it's
+    // possible to generate docs for the stable-API only.
 
     log::info!("{:?}", path);
     let json_string = std::fs::read_to_string(path)?;
@@ -260,7 +268,8 @@ fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
                 }
             }
 
-            // don't honor (because they either don't contain sub-items (= already handled in the first pass) or we currently don't use them)
+            // don't honor (because they either don't contain sub-items (= already handled in the
+            // first pass) or we currently don't use them)
             //
             // ItemEnum::Use(_)
             // ItemEnum::Union(union)
@@ -282,7 +291,8 @@ fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
         }
     }
 
-    // if we added something more to remove (because the items are "empty" now - remove them, too)
+    // if we added something more to remove (because the items are "empty" now -
+    // remove them, too)
     for id in &to_remove {
         krate.index.remove(&id);
         krate.paths.remove(&id);
