@@ -400,9 +400,7 @@ pub fn bump_version(
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
 
-    for pkg in
-        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
-    {
+    for pkg in Package::iter() {
         let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
         let manifest = fs::read_to_string(&manifest_path)
             .with_context(|| format!("Could not read {}", manifest_path.display()))?;
