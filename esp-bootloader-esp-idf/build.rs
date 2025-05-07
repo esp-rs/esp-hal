@@ -41,7 +41,7 @@ fn main() {
                 "partition-table-offset",
                 "The address of partition table (by default 0x8000). Allows you to \
                 move the partition table, it gives more space for the bootloader. Note that the \
-                bootloader and app will both need to be compiled with the same |
+                bootloader and app will both need to be compiled with the same \
                 PARTITION_TABLE_OFFSET value.",
                 0x8000,
             )
