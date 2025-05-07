@@ -3,13 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
-use semver::Prerelease;
-use strum::{Display, EnumIter, IntoEnumIterator as _};
-use toml_edit::{Item, Value};
+use strum::{Display, EnumIter};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
@@ -327,125 +325,6 @@ pub fn execute_app(
     Ok(())
 }
 
-fn do_version_bump(
-    version: &str,
-    package: Package,
-    amount: Version,
-    pre: Option<&str>,
-) -> Result<semver::Version> {
-    fn bump_version_number(version: &mut semver::Version, amount: Version) {
-        match amount {
-            Version::Major => {
-                version.major += 1;
-                version.minor = 0;
-                version.patch = 0;
-            }
-            Version::Minor => {
-                version.minor += 1;
-                version.patch = 0;
-            }
-            Version::Patch => {
-                version.patch += 1;
-            }
-        }
-    }
-    let mut version = semver::Version::parse(version)?;
-
-    if let Some(pre) = pre {
-        if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
-            let pre_version = pre_version.parse::<u32>()?;
-            version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1)).unwrap();
-        } else if version.pre.as_str().is_empty() {
-            // Start a new pre-release
-            bump_version_number(&mut version, amount);
-            version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
-        } else {
-            bail!(
-                "Unexpected pre-release version format found for {package}: {}",
-                version.pre.as_str()
-            );
-        }
-    } else if !version.pre.is_empty() {
-        version.pre = Prerelease::EMPTY;
-    } else {
-        bump_version_number(&mut version, amount);
-    }
-
-    Ok(version)
-}
-
-/// Bump the version of the specified package by the specified amount.
-pub fn bump_version(
-    workspace: &Path,
-    package: Package,
-    amount: Version,
-    pre: Option<&str>,
-) -> Result<()> {
-    let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
-    let manifest = fs::read_to_string(&manifest_path)
-        .with_context(|| format!("Could not read {}", manifest_path.display()))?;
-
-    let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
-
-    let version = manifest["package"]["version"]
-        .to_string()
-        .trim()
-        .trim_matches('"')
-        .to_string();
-    let prev_version = &version;
-
-    let version = do_version_bump(&version, package, amount, pre)?;
-
-    log::info!("Bumping version for package: {package} ({prev_version} -> {version})");
-
-    manifest["package"]["version"] = toml_edit::value(version.to_string());
-    fs::write(manifest_path, manifest.to_string())?;
-
-    let dependency_kinds = ["dependencies", "dev-dependencies", "build-dependencies"];
-
-    for pkg in Package::iter() {
-        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
-        let manifest = fs::read_to_string(&manifest_path)
-            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
-
-        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
-
-        let mut changed = false;
-        let package_name = package.to_string();
-        for dependency_kind in dependency_kinds {
-            let Some(table) = manifest[dependency_kind].as_table_mut() else {
-                continue;
-            };
-
-            let dependency = &mut table[package_name.as_str()];
-
-            // Update dependencies which specify a version:
-            match dependency {
-                Item::Table(table) if table.contains_key("version") => {
-                    table["version"] = toml_edit::value(version.to_string());
-                    changed = true;
-                }
-                Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
-                    table["version"] = version.to_string().into();
-                    changed = true;
-                }
-                _ => continue,
-            }
-        }
-
-        if changed {
-            log::info!(
-                "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
-            );
-
-            fs::write(&manifest_path, manifest.to_string())
-                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
-        }
-    }
-
-    Ok(())
-}
-
 // ----------------------------------------------------------------------------
 // Helper Functions
 
@@ -508,31 +387,4 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 /// Make the path "Windows"-safe
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_version_bump() {
-        let test_cases = vec![
-            ("0.1.0", Version::Patch, None, "0.1.1"),
-            ("0.1.0", Version::Minor, None, "0.2.0"),
-            ("0.1.0", Version::Major, None, "1.0.0"),
-            ("0.1.0", Version::Patch, Some("alpha"), "0.1.1-alpha.0"),
-            ("0.1.0", Version::Minor, Some("alpha"), "0.2.0-alpha.0"),
-            ("0.1.0", Version::Major, Some("alpha"), "1.0.0-alpha.0"),
-            // amount is ignored, assuming same release cycle
-            ("0.1.0-beta.0", Version::Minor, None, "0.1.0"),
-            ("0.1.0-beta.0", Version::Major, None, "0.1.0"),
-            ("0.1.0-beta.0", Version::Minor, Some("beta"), "0.1.0-beta.1"),
-            ("0.1.0-beta.0", Version::Major, Some("beta"), "0.1.0-beta.1"),
-        ];
-
-        for (version, amount, pre, expected) in test_cases {
-            let new_version = do_version_bump(version, Package::EspHal, amount, pre).unwrap();
-            assert_eq!(new_version.to_string(), expected);
-        }
-    }
 }
