@@ -418,8 +418,13 @@ pub fn bump_version(
                 "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
             );
 
+            // Update dependencies which specify a version:
             if let Some(table) = manifest["dependencies"].as_table_mut() {
-                table[&package.to_string()]["version"] = toml_edit::value(version.to_string());
+                if let Some(table) = table[&package.to_string()].as_table_mut() {
+                    if table.contains_key("version") {
+                        table["version"] = toml_edit::value(version.to_string());
+                    }
+                }
             }
 
             fs::write(&manifest_path, manifest.to_string())
