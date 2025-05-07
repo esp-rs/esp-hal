@@ -626,33 +626,6 @@ mod test {
     }
 
     #[test]
-    fn custom_validation_passes() {
-        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("13"))], || {
-            generate_config(
-                "esp-test",
-                &[ConfigOption {
-                    name: String::from("number"),
-                    description: String::from("NA"),
-                    default_value: Value::Integer(-1),
-                    constraint: Some(Validator::Custom(Box::new(|value| {
-                        let range = 10..20;
-                        if !value.is_integer() || !range.contains(&value.as_integer()) {
-                            Err(Error::validation("value does not fall within range"))
-                        } else {
-                            Ok(())
-                        }
-                    }))),
-                    stability: Stability::Stable(String::from("testing")),
-                    active: true,
-                    display_hint: DisplayHint::None,
-                }],
-                false,
-                false,
-            )
-        });
-    }
-
-    #[test]
     #[should_panic]
     fn builtin_validation_bails() {
         temp_env::with_vars([("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("-99"))], || {
@@ -663,34 +636,6 @@ mod test {
                     description: String::from("NA"),
                     default_value: Value::Integer(-1),
                     constraint: Some(Validator::PositiveInteger),
-                    stability: Stability::Stable(String::from("testing")),
-                    active: true,
-                    display_hint: DisplayHint::None,
-                }],
-                false,
-                false,
-            )
-        });
-    }
-
-    #[test]
-    #[should_panic]
-    fn custom_validation_bails() {
-        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("37"))], || {
-            generate_config(
-                "esp-test",
-                &[ConfigOption {
-                    name: String::from("number"),
-                    description: String::from("NA"),
-                    default_value: Value::Integer(-1),
-                    constraint: Some(Validator::Custom(Box::new(|value| {
-                        let range = 10..20;
-                        if !value.is_integer() || !range.contains(&value.as_integer()) {
-                            Err(Error::validation("value does not fall within range"))
-                        } else {
-                            Ok(())
-                        }
-                    }))),
                     stability: Stability::Stable(String::from("testing")),
                     active: true,
                     display_hint: DisplayHint::None,
@@ -835,37 +780,44 @@ mod test {
             });
 
         let json_output = config_json(&configs, true);
+        println!("{json_output}");
         pretty_assertions::assert_eq!(
             r#"[
   {
-    "name": "some-key",
-    "description": "NA",
-    "default_value": {
-      "String": "variant-0"
+    "option": {
+      "name": "some-key",
+      "description": "NA",
+      "default_value": {
+        "String": "variant-0"
+      },
+      "constraint": {
+        "Enumeration": [
+          "variant-0",
+          "variant-1"
+        ]
+      },
+      "stability": {
+        "Stable": "testing"
+      },
+      "active": true,
+      "display_hint": "None"
     },
-    "constraint": {
-      "Enumeration": [
-        "variant-0",
-        "variant-1"
-      ]
-    },
-    "stability": {
-      "Stable": "testing"
-    },
-    "active": true,
     "actual_value": {
       "String": "variant-0"
     }
   },
   {
-    "name": "some-key2",
-    "description": "NA",
-    "default_value": {
-      "Bool": true
+    "option": {
+      "name": "some-key2",
+      "description": "NA",
+      "default_value": {
+        "Bool": true
+      },
+      "constraint": null,
+      "stability": "Unstable",
+      "active": true,
+      "display_hint": "None"
     },
-    "constraint": null,
-    "stability": "Unstable",
-    "active": true,
     "actual_value": {
       "Bool": true
     }
@@ -923,5 +875,64 @@ mod test {
                 false,
             );
         });
+    }
+
+    #[test]
+    fn convenience_constructors() {
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: None,
+                stability: Stability::Unstable,
+                active: true,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("number", "NA", 999)
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("string"),
+                description: String::from("descr"),
+                default_value: Value::String("some string".to_string()),
+                constraint: None,
+                stability: Stability::Stable("1.0.0".to_string()),
+                active: true,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("string", "descr", "some string").stable("1.0.0")
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: Some(Validator::PositiveInteger),
+                stability: Stability::Unstable,
+                active: false,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("number", "NA", 999)
+                .active(false)
+                .constraint(Validator::PositiveInteger)
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: Some(Validator::PositiveInteger),
+                stability: Stability::Unstable,
+                active: true,
+                display_hint: DisplayHint::Hex,
+            },
+            ConfigOption::new("number", "NA", 999)
+                .constraint_by(Some(Validator::PositiveInteger))
+                .display_hint(DisplayHint::Hex)
+        );
     }
 }
