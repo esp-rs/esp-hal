@@ -227,6 +227,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use portable_atomic::{AtomicU8, Ordering};
 
 use crate::{
     Async,
@@ -409,7 +410,6 @@ where
     pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
         self::chip_specific::configure_clock(frequency)?;
-        self::chip_specific::clear_memsizes();
         Ok(me)
     }
 }
@@ -449,6 +449,42 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
+// Mark the channel as used and reserve the channel RAM.
+//
+// If this is not possible (because a preceding channel is using the RAM, or
+// because subsequent channels are in use so that we can't reserve the RAM),
+// restore all state and return with an error.
+fn reserve_channel(channel: u8, state: RmtState, memsize: u8) -> Result<(), Error> {
+    if memsize > NUM_CHANNELS as u8 - channel {
+        return Err(Error::InvalidMemsize);
+    }
+
+    let mut next_state = state;
+    for cur_channel in channel..channel + memsize {
+        if STATE[cur_channel as usize]
+            .compare_exchange(
+                RmtState::Unconfigured as u8,
+                next_state as u8,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_err()
+        {
+            for i in (channel..cur_channel).rev() {
+                STATE[i as usize].store(RmtState::Unconfigured as u8, Ordering::Release);
+            }
+
+            return Err(Error::MemoryBlockNotAvailable);
+        }
+
+        // Set the first channel to `state` (`Rx`|`Tx`), the remaining (if any) to
+        // `Reserved`
+        next_state = RmtState::Reserved;
+    }
+
+    Ok(())
+}
+
 fn configure_rx_channel<'d, T: RxChannelInternal>(
     pin: impl PeripheralInput<'d>,
     config: RxChannelConfig,
@@ -465,7 +501,7 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    chip_specific::reserve_memory(T::CHANNEL, config.memsize)?;
+    reserve_channel(T::CHANNEL, RmtState::Rx, config.memsize)?;
 
     let pin = pin.into();
 
@@ -492,7 +528,7 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    chip_specific::reserve_memory(T::CHANNEL, config.memsize)?;
+    reserve_channel(T::CHANNEL, RmtState::Tx, config.memsize)?;
 
     let pin = pin.into();
 
@@ -1138,7 +1174,19 @@ where
     Dm: crate::DriverMode,
 {
     fn drop(&mut self) {
-        chip_specific::release_memory(CHANNEL);
+        // This isn't really necessary, but be extra sure that this channel can't
+        // interfere with others.
+        chip_specific::set_channel_mem_size(CHANNEL, 0);
+
+        let memsize = chip_specific::channel_mem_size(CHANNEL);
+        for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
+            .iter()
+            .rev()
+        {
+            // Existence of this `Channel` struct implies exclusive access to these hardware
+            // channels, thus simply store the new state.
+            s.store(RmtState::Unconfigured as u8, Ordering::Release);
+        }
     }
 }
 
@@ -1260,7 +1308,26 @@ const NUM_CHANNELS: usize = 8;
 #[cfg(not(any(esp32, esp32s3)))]
 const NUM_CHANNELS: usize = 4;
 
+#[repr(u8)]
+enum RmtState {
+    // The channel is not configured for either rx or tx, and its memory is available
+    Unconfigured,
+
+    // The channels is not in use, but one of the preceding channels is using its memory
+    Reserved,
+
+    // The channel is configured for rx
+    Rx,
+
+    // The channel is configured for tx
+    Tx,
+}
+
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
+// This must only holds value of RmtState. However, we need atomic access, thus
+// represent as AtomicU8.
+static STATE: [AtomicU8; NUM_CHANNELS] =
+    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct RmtTxFuture<T>
@@ -1729,22 +1796,9 @@ mod chip_specific {
         }
     }
 
-    // A memsize = 0 indicates that the channel memory is available
-    pub fn clear_memsizes() {
-        let rmt = RMT::regs();
-        for i in 0..super::NUM_CHANNELS / 2 {
-            rmt.ch_tx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-        for i in 0..super::NUM_CHANNELS / 2 {
-            rmt.ch_rx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-    }
-
     #[cfg(not(esp32s3))]
     #[inline]
-    fn channel_mem_size(ch_num: u8) -> u8 {
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
         let rmt = RMT::regs();
 
         match ch_num {
@@ -1758,7 +1812,7 @@ mod chip_specific {
 
     #[cfg(not(esp32s3))]
     #[inline]
-    fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
         let rmt = RMT::regs();
 
         match ch_num {
@@ -1780,7 +1834,7 @@ mod chip_specific {
 
     #[cfg(esp32s3)]
     #[inline]
-    fn channel_mem_size(ch_num: u8) -> u8 {
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
         let rmt = RMT::regs();
 
         match ch_num {
@@ -1798,7 +1852,7 @@ mod chip_specific {
 
     #[cfg(esp32s3)]
     #[inline]
-    fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
         let rmt = RMT::regs();
 
         match ch_num {
@@ -1828,40 +1882,6 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
             _ => panic!("invalid channel number"),
         };
-    }
-
-    pub fn reserve_memory(ch_num: u8, memsize: u8) -> Result<(), Error> {
-        if memsize > super::NUM_CHANNELS as u8 - ch_num {
-            return Err(Error::InvalidMemsize);
-        }
-
-        critical_section::with(|_cs| {
-            // If a channel's memory block is available then its memory size will be 0
-            for i in ch_num..ch_num + memsize {
-                if channel_mem_size(i) != 0 {
-                    return Err(Error::MemoryBlockNotAvailable);
-                }
-            }
-
-            // If configured to use extended memory blocks then set the extended memory
-            // blocks to 1 to indicate they are unavailable. Setting the memsize for
-            // this channel will be set further down in the code
-            for i in ch_num + 1..ch_num + memsize {
-                set_channel_mem_size(i, 1);
-            }
-
-            Ok(())
-        })
-    }
-
-    pub fn release_memory(ch_num: u8) {
-        let memsize = channel_mem_size(ch_num);
-
-        critical_section::with(|_cs| {
-            for i in ch_num..ch_num + memsize {
-                set_channel_mem_size(i, 0);
-            }
-        })
     }
 
     macro_rules! impl_tx_channel {
@@ -2272,54 +2292,18 @@ mod chip_specific {
         }
     }
 
-    // A memsize = 0 indicates that the channel memory is available
-    pub fn clear_memsizes() {
-        let rmt = RMT::regs();
-        for i in 0..super::NUM_CHANNELS {
-            rmt.chconf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
+    #[inline]
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
+        let rmt = crate::peripherals::RMT::regs();
+        rmt.chconf0(ch_num as usize).read().mem_size().bits()
     }
 
-    pub fn reserve_memory(ch_num: u8, memsize: u8) -> Result<(), Error> {
-        if memsize > super::NUM_CHANNELS as u8 - ch_num {
-            return Err(Error::InvalidMemsize);
-        }
+    #[inline]
+    pub fn set_channel_mem_size(ch_num: u8, value: u8) {
+        let rmt = crate::peripherals::RMT::regs();
 
-        critical_section::with(|_cs| {
-            let rmt = RMT::regs();
-
-            // If a channel's memory block is available then its memory size will be 0
-            for i in ch_num..ch_num + memsize {
-                if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                    return Err(Error::MemoryBlockNotAvailable);
-                }
-            }
-
-            // If configured to use extended memory blocks then set the extended memory
-            // blocks to 1 to indicate they are unavailable. Setting the memsize for
-            // this channel will be set further down in the code
-            for i in ch_num + 1..ch_num + memsize {
-                rmt.chconf0(i as usize)
-                    .modify(|_, w| unsafe { w.mem_size().bits(1) });
-            }
-
-            Ok(())
-        })
-    }
-
-    pub fn release_memory(ch_num: u8) {
-        let ch_num = ch_num as usize;
-        let rmt = RMT::regs();
-
-        let memsize = rmt.chconf0(ch_num).read().mem_size().bits() as usize;
-
-        critical_section::with(|_cs| {
-            for i in ch_num..ch_num + memsize {
-                rmt.chconf0(i)
-                    .modify(|_, w| unsafe { w.mem_size().bits(0) });
-            }
-        })
+        rmt.chconf0(ch_num as usize)
+            .modify(|_, w| unsafe { w.mem_size().bits(value) });
     }
 
     macro_rules! impl_tx_channel {
