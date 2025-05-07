@@ -3,10 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
+use semver::Prerelease;
 use strum::{Display, EnumIter, IntoEnumIterator as _};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
@@ -225,6 +226,7 @@ pub enum Version {
     Major,
     Minor,
     Patch,
+    Beta,
 }
 
 /// Run or build the specified test or example for the specified chip.
@@ -346,13 +348,34 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
             version.major += 1;
             version.minor = 0;
             version.patch = 0;
+            version.pre = Prerelease::EMPTY;
         }
         Version::Minor => {
             version.minor += 1;
             version.patch = 0;
+            version.pre = Prerelease::EMPTY;
         }
         Version::Patch => {
             version.patch += 1;
+            version.pre = Prerelease::EMPTY;
+        }
+        Version::Beta => {
+            ensure!(
+                !version.pre.is_empty(),
+                "No pre-release version found for {package}"
+            );
+            let pre_str = version.pre.as_str();
+            // Increment the number after the last dot:
+            if let Some(separator) = pre_str.rfind('.') {
+                let (pre, num) = pre_str.split_at(separator);
+                let num = num.trim_start_matches('.');
+                let num = num.parse::<u32>()?;
+                version.pre = Prerelease::new(&format!("{pre}.{}", num + 1)).unwrap();
+            } else if pre_str.is_empty() {
+                version.pre = Prerelease::new("beta.0").unwrap();
+            } else {
+                bail!("Unexpected pre-release version format found for {package}: {pre_str}");
+            };
         }
     }
 
