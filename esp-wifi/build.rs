@@ -11,38 +11,33 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
-    #[cfg(all(feature = "ble", feature = "esp32s2"))]
-    {
-        panic!(
-            r#"
+    assert!(
+        !cfg!(feature = "ble") || config.contains("bt"),
+        r#"
 
         BLE is not supported on this target.
 
         "#
-        );
-    }
-    #[cfg(all(feature = "wifi", feature = "esp32h2"))]
-    {
-        panic!(
-            r#"
+    );
+    assert!(
+        !cfg!(feature = "wifi") || config.contains("wifi"),
+        r#"
 
         WiFi is not supported on this target.
 
         "#
-        );
-    }
-    #[cfg(all(feature = "coex", any(feature = "esp32s2", feature = "esp32h2")))]
-    {
-        panic!(
-            r#"
+    );
+    assert!(
+        !cfg!(feature = "coex") || (config.contains("wifi") && config.contains("bt")),
+        r#"
 
         COEX is not supported on this target.
 
         See https://github.com/esp-rs/esp-wifi/issues/92.
 
         "#
-        );
-    }
+    );
+
     if let Ok(level) = std::env::var("OPT_LEVEL") {
         if level != "2" && level != "3" {
             let message = format!(
