@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use cargo_semver_checks::{Check, Rustdoc};
+use cargo_semver_checks::{Check, GlobalConfig, ReleaseType, Rustdoc};
 use esp_metadata::Chip;
 use rustdoc_types::ItemEnum;
 
@@ -62,46 +62,11 @@ pub fn check(
         log::info!("Semver-check API for {package}");
 
         for chip in &chips {
-            log::info!("Chip = {}", chip.to_string());
-            let package_name = package.to_string();
-            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+            let result = minimum_update(workspace, package, *chip)?;
+            log::info!("Required bump = {:?}", result);
 
-            let current_path = build_doc_json(package, chip, &package_path)?;
-            remove_unstable_items(&current_path)?;
-
-            let file_name = if package.chip_features_matter() {
-                format!("{}", chip.to_string())
-            } else {
-                "api".to_string()
-            };
-
-            let baseline_path_gz =
-                PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
-
-            let baseline_path = temp_file::TempFile::new()?;
-            let buffer = Vec::new();
-            let mut decoder = flate2::write::GzDecoder::new(buffer);
-            decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
-            fs::write(baseline_path.path(), decoder.finish()?)?;
-
-            let mut semver_check = Check::new(Rustdoc::from_path(current_path));
-            semver_check.set_baseline(Rustdoc::from_path(baseline_path.path()));
-            let mut cfg = cargo_semver_checks::GlobalConfig::new();
-            // seems there is no way of getting the details via the API - so lets log them
-            cfg.set_log_level(Some(log::Level::Info));
-            let result = semver_check.check_release(&mut cfg)?;
-
-            log::info!("Result {:?}", result);
-
-            for (_, report) in result.crate_reports() {
-                if let Some(required_bump) = report.required_bump() {
-                    if required_bump == cargo_semver_checks::ReleaseType::Major {
-                        return Err(anyhow::anyhow!(
-                            "Semver check failed: {:?}",
-                            report.required_bump()
-                        ));
-                    }
-                }
+            if result == ReleaseType::Major {
+                return Err(anyhow::anyhow!("Semver check failed - needs a major bump"));
             }
 
             if !package.chip_features_matter() {
@@ -111,6 +76,62 @@ pub fn check(
     }
 
     Ok(())
+}
+
+/// Return the minimum required bump for the next release.
+/// Even if nothing changed this will be [ReleaseType::Patch]
+pub fn minimum_update(
+    workspace: &PathBuf,
+    package: Package,
+    chip: Chip,
+) -> Result<ReleaseType, anyhow::Error> {
+    log::info!("Chip = {}", chip.to_string());
+
+    let package_name = package.to_string();
+    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    let current_path = build_doc_json(package, &chip, &package_path)?;
+    remove_unstable_items(&current_path)?;
+
+    let file_name = if package.chip_features_matter() {
+        format!("{}", chip.to_string())
+    } else {
+        "api".to_string()
+    };
+
+    let baseline_path_gz =
+        PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
+    let baseline_path = temp_file::TempFile::new()?;
+    let buffer = Vec::new();
+    let mut decoder = flate2::write::GzDecoder::new(buffer);
+    decoder.write_all(&(fs::read(&baseline_path_gz)?))?;
+    fs::write(baseline_path.path(), decoder.finish()?)?;
+
+    let mut semver_check = Check::new(Rustdoc::from_path(current_path));
+    semver_check.set_baseline(Rustdoc::from_path(baseline_path.path()));
+    let mut cfg = GlobalConfig::new();
+    cfg.set_log_level(Some(log::Level::Info));
+    let result = semver_check.check_release(&mut cfg)?;
+    log::info!("Result {:?}", result);
+
+    let mut min_required_update = ReleaseType::Patch;
+    for (_, report) in result.crate_reports() {
+        if let Some(required_bump) = report.required_bump() {
+            min_required_update = match required_bump {
+                ReleaseType::Major
+                    if min_required_update == ReleaseType::Patch
+                        || min_required_update == ReleaseType::Minor =>
+                {
+                    ReleaseType::Major
+                }
+                ReleaseType::Minor if min_required_update == ReleaseType::Patch => {
+                    ReleaseType::Minor
+                }
+                _ => ReleaseType::Patch,
+            }
+        }
+    }
+
+    Ok(min_required_update)
 }
 
 fn build_doc_json(
