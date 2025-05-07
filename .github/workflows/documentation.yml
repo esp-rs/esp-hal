@@ -25,7 +25,7 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      packages: '${{ github.event.inputs.packages }}'
+      packages: "${{ github.event.inputs.packages }}"
     steps:
       - run: echo "Setup complete!"
   build:
@@ -71,7 +71,7 @@ jobs:
           ref: ${{ matrix.packages.tag }}
 
       - name: Build documentation
-        run: hal-xtask build-documentation --packages=${{ matrix.packages.name }} --base-url /projects/rust/
+        run: hal-xtask build documentation --packages=${{ matrix.packages.name }} --base-url /projects/rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
@@ -97,11 +97,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
-
-      # Create an index for _all_ packages.
-      - name: Create index.html
-        run: cargo xtask build-documentation-index
-
 
       - if: ${{ github.event.inputs.server == 'preview' }}
         name: Deploy to preview server

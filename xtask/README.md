@@ -8,22 +8,15 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: xtask <COMMAND>
 
 Commands:
-  build-documentation        Build documentation for the specified chip
-  build-documentation-index  Build documentation index including the specified packages
-  build-examples             Build all examples for the specified chip
-  build-package              Build the specified package with the given options
-  build-tests                Build all applicable tests or the specified test for a specified chip
-  bump-version               Bump the version of the specified package(s)
-  fmt-packages               Format all packages in the workspace with rustfmt
-  lint-packages              Lint all packages in the workspace with clippy
-  publish                    Attempt to publish the specified package
-  run-doc-tests              Run doctests for specified chip and package
-  run-example                Run the given example for the specified chip
-  run-tests                  Run all applicable tests or the specified test for a specified chip
-  run-elfs                   Run all ELFs in a folder
-  ci                         Perform (parts of) the checks done in CI
-  tag-releases               Generate git tags for all new package releases
-  help                       Print this message or the help of the given subcommand(s)
+  build          Build-related subcommands
+  run            Run-related subcommands
+  bump-version   Bump the version of the specified package(s)
+  ci             Perform (parts of) the checks done in CI
+  fmt-packages   Format all packages in the workspace with rustfmt
+  lint-packages  Lint all packages in the workspace with clippy
+  publish        Attempt to publish the specified package
+  tag-releases   Generate git tags for all new package releases
+  help           Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
@@ -32,14 +25,15 @@ Options:
 You can get help for subcommands, too!
 
 ```text
-cargo xtask build-examples --help
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.21s
-     Running `target\debug\xtask.exe build-examples --help`
+cargo xtask build examples --help
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s
+     Running `[...]/target/debug/xtask build examples --help`
+
 Build all examples for the specified chip
 
-Usage: xtask.exe build-examples [OPTIONS] <PACKAGE> <CHIP> [EXAMPLE]
+Usage: xtask build examples [OPTIONS] <CHIP> <PACKAGE>
 
-...
+[...]
 ```
 
 ## Test/example metadata use

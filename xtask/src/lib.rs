@@ -12,6 +12,7 @@ use strum::{Display, EnumIter, IntoEnumIterator as _};
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
 pub mod cargo;
+pub mod commands;
 pub mod documentation;
 pub mod firmware;
 
@@ -172,15 +173,12 @@ impl Package {
     pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
 
-        match self {
-            Package::EspWifi => {
-                // minimal set of features that when enabled _should_ still compile
-                cases.push(vec![
-                    "esp-hal/unstable".to_owned(),
-                    "builtin-scheduler".to_owned(),
-                ]);
-            }
-            _ => {}
+        if self == &Package::EspWifi {
+            // Minimal set of features that when enabled _should_ still compile:
+            cases.push(vec![
+                "esp-hal/unstable".to_owned(),
+                "builtin-scheduler".to_owned(),
+            ]);
         }
 
         cases
@@ -307,7 +305,7 @@ pub fn execute_app(
         let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(&chip.to_string());
+                let out_dir = out_dir.join(chip.to_string());
                 std::fs::create_dir_all(&out_dir)?;
 
                 let output_file = out_dir.join(app.output_file_name());
@@ -323,56 +321,6 @@ pub fn execute_app(
             cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
         }
     }
-
-    Ok(())
-}
-
-/// Build the specified package, using the given toolchain/target/features if
-/// provided.
-pub fn build_package(
-    package_path: &Path,
-    features: Vec<String>,
-    no_default_features: bool,
-    toolchain: Option<String>,
-    target: Option<String>,
-) -> Result<()> {
-    log::info!("Building package '{}'", package_path.display());
-    if !features.is_empty() {
-        log::info!("  Features: {}", features.join(","));
-    }
-    if let Some(ref target) = target {
-        log::info!("  Target:   {}", target);
-    }
-
-    let mut builder = CargoArgsBuilder::default()
-        .subcommand("build")
-        .arg("--release");
-
-    if let Some(toolchain) = toolchain {
-        builder = builder.toolchain(toolchain);
-    }
-
-    if let Some(target) = target {
-        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-        if target.starts_with("xtensa") {
-            builder = builder.toolchain("esp");
-            builder = builder.arg("-Zbuild-std=core,alloc")
-        }
-        builder = builder.target(target);
-    }
-
-    if !features.is_empty() {
-        builder = builder.features(&features);
-    }
-
-    if no_default_features {
-        builder = builder.arg("--no-default-features");
-    }
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    cargo::run(&args, package_path)?;
 
     Ok(())
 }
@@ -431,9 +379,9 @@ pub fn bump_version(workspace: &Path, package: Package, amount: Version) -> Resu
                 "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
             );
 
-            manifest["dependencies"].as_table_mut().map(|table| {
-                table[&package.to_string()]["version"] = toml_edit::value(version.to_string())
-            });
+            if let Some(table) = manifest["dependencies"].as_table_mut() {
+                table[&package.to_string()]["version"] = toml_edit::value(version.to_string());
+            }
 
             fs::write(&manifest_path, manifest.to_string())
                 .with_context(|| format!("Could not write {}", manifest_path.display()))?;
@@ -471,10 +419,8 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
     for entry in fs::read_dir(workspace)? {
         let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            if entry.path().join("Cargo.toml").exists() {
-                paths.push(entry.path());
-            }
+        if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
+            paths.push(entry.path());
         }
     }
 
