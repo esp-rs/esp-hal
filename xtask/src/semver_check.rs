@@ -10,78 +10,10 @@ use rustdoc_types::ItemEnum;
 
 use crate::{Package, cargo::CargoArgsBuilder};
 
-pub fn generate_baseline(
-    workspace: &PathBuf,
-    packages: Vec<Package>,
-    chips: Vec<Chip>,
-) -> Result<(), anyhow::Error> {
-    for package in packages {
-        log::info!("Generating API baseline for {package}");
-
-        for chip in &chips {
-            log::info!("Chip = {}", chip.to_string());
-            let package_name = package.to_string();
-            let package_path = crate::windows_safe_path(&workspace.join(&package_name));
-
-            let current_path = build_doc_json(package, chip, &package_path)?;
-
-            remove_unstable_items(&current_path)?;
-
-            let file_name = if package.chip_features_matter() {
-                format!("{}", chip.to_string())
-            } else {
-                "api".to_string()
-            };
-
-            let to_path =
-                PathBuf::from(&package_path).join(format!("api-baseline/{}.json.gz", file_name));
-            fs::create_dir_all(to_path.parent().unwrap())?;
-
-            log::debug!("Compress into {current_path:?}");
-            let mut encoder = flate2::write::GzEncoder::new(
-                fs::File::create(to_path)?,
-                flate2::Compression::default(),
-            );
-            encoder.write_all(&std::fs::read(current_path)?)?;
-
-            if !package.chip_features_matter() {
-                break;
-            }
-        }
-    }
-
-    Ok(())
-}
-
-pub fn check(
-    workspace: &PathBuf,
-    packages: Vec<Package>,
-    chips: Vec<Chip>,
-) -> Result<(), anyhow::Error> {
-    for package in packages {
-        log::info!("Semver-check API for {package}");
-
-        for chip in &chips {
-            let result = minimum_update(workspace, package, *chip)?;
-            log::info!("Required bump = {:?}", result);
-
-            if result == ReleaseType::Major {
-                return Err(anyhow::anyhow!("Semver check failed - needs a major bump"));
-            }
-
-            if !package.chip_features_matter() {
-                break;
-            }
-        }
-    }
-
-    Ok(())
-}
-
 /// Return the minimum required bump for the next release.
 /// Even if nothing changed this will be [ReleaseType::Patch]
 pub fn minimum_update(
-    workspace: &PathBuf,
+    workspace: &Path,
     package: Package,
     chip: Chip,
 ) -> Result<ReleaseType, anyhow::Error> {
@@ -134,7 +66,7 @@ pub fn minimum_update(
     Ok(min_required_update)
 }
 
-fn build_doc_json(
+pub(crate) fn build_doc_json(
     package: Package,
     chip: &Chip,
     package_path: &PathBuf,
@@ -173,7 +105,7 @@ fn build_doc_json(
     Ok(current_path)
 }
 
-fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
+pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
     // this leaves orphaned items! cargo-semver-checks seems to be fine with that
     // however the json fmt is unstable - we might fail when using the "wrong"
     // version of `rustdoc_types` here

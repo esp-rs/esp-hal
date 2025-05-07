@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{Result, bail};
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
@@ -101,26 +101,6 @@ struct TagReleasesArgs {
     no_dry_run: bool,
 }
 
-#[derive(Debug, Subcommand)]
-enum SemverCheckCmd {
-    GenerateBaseline,
-    Check,
-}
-
-#[derive(Debug, Args)]
-struct SemverCheckArgs {
-    #[command(subcommand)]
-    command: SemverCheckCmd,
-
-    /// Package(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = vec![Package::EspHal])]
-    packages: Vec<Package>,
-
-    /// Chip(s) to target.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
-    chips: Vec<Chip>,
-}
-
 // ----------------------------------------------------------------------------
 // Application
 
@@ -161,17 +141,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::Publish(args) => publish(&workspace, args),
         Cli::TagReleases(args) => tag_releases(&workspace, args),
-        #[cfg(feature = "semver-checks")]
-        Cli::SemverCheck(args) => match args.command {
-            SemverCheckCmd::GenerateBaseline => {
-                xtask::semver_check::generate_baseline(&workspace, args.packages, args.chips)
-            }
-            SemverCheckCmd::Check => xtask::semver_check::check(&workspace, args.packages, args.chips),
-        },
-        #[cfg(not(feature = "semver-checks"))]
-        Cli::SemverCheck(_) => Err(anyhow::anyhow!(
-            "Feature `semver-checks` is not enabled. Use the `xcheck` alias",
-        ))
+        Cli::SemverCheck(args) => semver_checks(&workspace, args),
     }
 }
 
