@@ -54,19 +54,8 @@ use crate::{
     time::Rate,
 };
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32s2)] {
-        const I2C_LL_INTR_MASK: u32 = 0x1ffff;
-    } else {
-        const I2C_LL_INTR_MASK: u32 = 0x3ffff;
-    }
-}
-
-#[cfg(not(esp32c2))]
-const I2C_FIFO_SIZE: usize = 32;
-
-#[cfg(esp32c2)]
-const I2C_FIFO_SIZE: usize = 16;
+const I2C_LL_INTR_MASK: u32 = if cfg!(esp32s2) { 0x1ffff } else { 0x3ffff };
+const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
@@ -145,14 +134,15 @@ pub enum BusTimeout {
 impl BusTimeout {
     fn cycles(&self) -> u32 {
         match self {
-            #[cfg(esp32)]
-            BusTimeout::Maximum => 0xF_FFFF,
-
-            #[cfg(esp32s2)]
-            BusTimeout::Maximum => 0xFF_FFFF,
-
-            #[cfg(not(any(esp32, esp32s2)))]
-            BusTimeout::Maximum => 0x1F,
+            BusTimeout::Maximum => {
+                if cfg!(esp32) {
+                    0xF_FFFF
+                } else if cfg!(esp32s2) {
+                    0xFF_FFFF
+                } else {
+                    0x1F
+                }
+            }
 
             #[cfg(not(any(esp32, esp32s2)))]
             BusTimeout::Disabled => 1,
@@ -707,9 +697,10 @@ impl<'a> I2cFuture<'a> {
             w.time_out().set_bit();
             w.nack().set_bit();
             #[cfg(not(any(esp32, esp32s2)))]
-            w.scl_main_st_to().set_bit();
-            #[cfg(not(any(esp32, esp32s2)))]
-            w.scl_st_to().set_bit();
+            {
+                w.scl_main_st_to().set_bit();
+                w.scl_st_to().set_bit();
+            }
 
             w
         });
@@ -746,13 +737,13 @@ impl<'a> I2cFuture<'a> {
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
-        if r.scl_st_to().bit_is_set() {
-            return Err(Error::Timeout);
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        if r.scl_main_st_to().bit_is_set() {
-            return Err(Error::Timeout);
+        {
+            if r.scl_st_to().bit_is_set() {
+                return Err(Error::Timeout);
+            }
+            if r.scl_main_st_to().bit_is_set() {
+                return Err(Error::Timeout);
+            }
         }
 
         #[cfg(not(esp32))]
@@ -1115,22 +1106,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
 }
 
 fn async_handler(info: &Info, state: &State) {
-    let regs = info.regs();
-    regs.int_ena().modify(|_, w| {
-        w.end_detect().clear_bit();
-        w.trans_complete().clear_bit();
-        w.arbitration_lost().clear_bit();
-        w.time_out().clear_bit();
-        #[cfg(not(esp32))]
-        w.scl_main_st_to().clear_bit();
-        #[cfg(not(esp32))]
-        w.scl_st_to().clear_bit();
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        w.txfifo_wm().clear_bit();
-
-        w.nack().clear_bit()
-    });
+    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
 
     state.waker.wake();
 }
