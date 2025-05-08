@@ -643,7 +643,17 @@ where
             }
 
             // wait for TX-THR
-            while !<C as TxChannelInternal>::is_threshold_set() {}
+            // FIXME: We also need to check for is_done, since we don't prevent
+            // stop codes in the middle of the data. Otherwise, this may lock up.
+            while !<C as TxChannelInternal>::is_threshold_set() {
+                if <C as TxChannelInternal>::is_done() {
+                    // Unexpectedly done, even though we have data left
+                    return Err((Error::TransmissionError, self.channel));
+                }
+                if <C as TxChannelInternal>::is_error() {
+                    return Err((Error::TransmissionError, self.channel));
+                }
+            }
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
@@ -663,6 +673,11 @@ where
             // slice is empty and we won't use ram_index again.
             self.ram_index = memsize / 2 - self.ram_index;
             self.remaining_data = &self.remaining_data[count..];
+            assert!(
+                self.ram_index == 0
+                    || self.ram_index == memsize / 2
+                    || self.remaining_data.is_empty()
+            );
         }
 
         loop {
@@ -1602,11 +1617,12 @@ pub trait TxChannelInternal {
 
         let ptr = channel_ram_start(Self::CHANNEL);
         let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
-        for (idx, entry) in data.iter().take(memsize).enumerate() {
-            unsafe {
-                ptr.add(idx).write_volatile(*entry);
-            }
-        }
+        let written = data
+            .iter()
+            .take(memsize)
+            .enumerate()
+            .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
+            .count();
 
         Self::set_threshold((memsize / 2) as u8);
         Self::set_continuous(continuous);
@@ -1616,11 +1632,7 @@ pub trait TxChannelInternal {
         Self::start_tx();
         Self::update();
 
-        if data.len() >= memsize {
-            Ok(memsize)
-        } else {
-            Ok(data.len())
-        }
+        Ok(written)
     }
 
     fn stop();
