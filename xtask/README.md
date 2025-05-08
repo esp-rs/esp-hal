@@ -8,15 +8,16 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: xtask <COMMAND>
 
 Commands:
-  build          Build-related subcommands
-  run            Run-related subcommands
-  bump-version   Bump the version of the specified package(s)
-  ci             Perform (parts of) the checks done in CI
-  fmt-packages   Format all packages in the workspace with rustfmt
-  lint-packages  Lint all packages in the workspace with clippy
-  publish        Attempt to publish the specified package
-  tag-releases   Generate git tags for all new package releases
-  help           Print this message or the help of the given subcommand(s)
+  build            Build-related subcommands
+  run              Run-related subcommands
+  bump-version     Bump the version of the specified package(s)
+  ci               Perform (parts of) the checks done in CI
+  fmt-packages     Format all packages in the workspace with rustfmt
+  lint-packages    Lint all packages in the workspace with clippy
+  publish          Attempt to publish the specified package
+  tag-releases     Generate git tags for all new package releases
+  check-changelog  Check the changelog for packages
+  help             Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help
