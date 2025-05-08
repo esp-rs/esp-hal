@@ -2358,6 +2358,11 @@ mod chip_specific {
                 fn start_tx() {
                     let rmt = crate::peripherals::RMT::regs();
 
+                    for i in 0..Self::memsize() {
+                        rmt.chconf1(($ch_num + i).into())
+                            .modify(|_, w| w.mem_owner().clear_bit());
+                    }
+
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_rd_rst().set_bit();
                         w.apb_mem_rst().set_bit();
