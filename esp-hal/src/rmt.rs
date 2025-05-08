@@ -460,7 +460,7 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
 fn reserve_channel(channel: u8, state: RmtState, memsize: u8) -> Result<(), Error> {
-    if memsize > NUM_CHANNELS as u8 - channel {
+    if memsize == 0 || memsize > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
     }
 
