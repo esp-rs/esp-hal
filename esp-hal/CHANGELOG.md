@@ -54,7 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `Flex::enable_input` to `set_input_enable` (#3387)
 - Make `esp_hal::interrupt::current_runlevel` public under the unstable feature (#3403)
 - Update `defmt` to 1.0 (#3416)
-- `spi::master::Spi::transfer` no longer returns the received data as a slice (#?)
+- `spi::master::Spi::transfer` no longer returns the received data as a slice (#3417)
 - esp-hal no longer clears the GPIO interrupt status bits by default. (#3408)
 - eFuse field definitions have been updated/corrected (#3440)
 - `spi::master::Spi::transfer` no longer returns the received data as a slice (#3417)
@@ -97,7 +97,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Flex::{set_as_input, set_as_output, set_drive_strength, set_as_open_drain, pull_direction}` functions (#3387)
 - The `Efuse::read_field_be` function has been removed (#3440)
 
-## v1.0.0-beta.0
+## v1.0.0-beta.0 - 2025-02-24
 
 ### Added
 
@@ -125,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rng` and `Trng` now implement `Peripheral<P = Self>` (#2992)
 - SPI, UART, I2C: `with_<pin>` functions of peripheral drivers now disconnect the previously assigned pins from the peripheral. (#3012)
 - SPI, UART, I2C: Dropping a driver now disconnects pins from their peripherals. (#3012)
-- TWAI: Async transmission future resolves after successful transmission and can be aborted by dropping the future.
+- TWAI: Async transmission future resolves after successful transmission and can be aborted by dropping the future. (#3132)
 - Migrate PARL_IO driver to DMA move API (#3033)
 - `Async` drivers are no longer `Send` (#2980)
 - GPIO drivers now take configuration structs (#2990, #3029)
@@ -255,7 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART driver's `StopBits` enum variants now correctly use UpperCamelCase (#2669)
 - The `PeripheralInput` and `PeripheralOutput` traits are now sealed (#2690)
 - `esp_hal::sync::Lock` has been renamed to RawMutex (#2684)
-- Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual
+- Updated `esp-pacs` with support for Wi-Fi on the ESP32 and made the peripheral non virtual (#2822)
 - `SpiBitOrder`, `SpiDataMode`, `SpiMode` were renamed to `BitOder`, `DataMode` and `Mode` (#2828)
 - `crate::Mode` was renamed to `crate::DriverMode` (#2828)
 - `Spi::with_miso` has been overloaded into `Spi::with_miso` and `Spi::with_sio1` (#2557)
@@ -626,14 +626,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ROM Functions: Fix address of `ets_update_cpu_frequency_rom` (#1722)
 - Fix `regi2c_*` functions for `esp32h2` (#1737)
 - Improved `#[ram(zeroed)]` soundness by adding a `bytemuck::Zeroable` type bound (#1677)
-- EESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20
+- ESP32-S2 / ESP32-S3: Fix UsbDm and UsbDp for Gpio19 and Gpio20 (#1764)
 - Fix reading/writing small buffers via SPI master async dma (#1760)
 - Remove unnecessary delay in rtc_ctnl (#1794)
 
 ### Changed
 
 - Refactor `Dac1`/`Dac2` drivers into a single `Dac` driver (#1661)
-- esp-hal-embassy: make executor code optional (but default) again
+- esp-hal-embassy: make executor code optional (but default) again (#1683)
 - Improved interrupt latency on RISC-V based chips (#1679)
 - `esp_wifi::initialize` no longer requires running maximum CPU clock, instead check it runs above 80MHz. (#1688)
 - Move DMA descriptors from DMA Channel to each individual peripheral driver. (#1719)
@@ -660,7 +660,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `embassy-usb` support (#1517)
 - SPI Slave support for ESP32-S2 (#1562)
 - Add new generic `OneShotTimer` and `PeriodicTimer` drivers, plus new `Timer` trait which is implemented for `TIMGx` and `SYSTIMER` (#1570)
-- Feature: correct `TRNG` mechanism #1804
+- Feature: correct `TRNG` mechanism (#1804)
 
 ### Fixed
 
@@ -705,16 +705,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ADC::read_blocking` to xtensa chips (#1293)
 - ESP32-C6 / ESP32-H2: Implement `ETM` for general purpose timers (#1274)
 - `interrupt::enable` now has a direct CPU enable counter part, `interrupt::enable_direct` (#1310)
-- `Delay::delay(time: fugit::MicrosDurationU64)`
+- `Delay::delay(time: fugit::MicrosDurationU64)` (#1298)
 - Added async support for TWAI (#1320)
 - Add TWAI support for ESP32-C6 (#1323)
 - `GpioPin::steal` unsafe API (#1363)
-- Inherent implementions of GPIO pin `set_low`, `is_low`, etc.
+- Inherent implementions of GPIO pin `set_low`, `is_low`, etc. (#1284)
 - Warn users when attempting to build using the `dev` profile (#1420)
 - Async uart now reports interrupt errors(overflow, glitch, frame error, parity) back to user of read/write. uart clock decimal part configured for c2,c3,s3 (#1168, #1445)
 - Add mechanism to configure UART source clock (#1416)
 - `GpioPin` got a function `set_state(bool)` (#1462)
-- Add definitions of external USB PHY peripheral I/O signals
+- Add definitions of external USB PHY peripheral I/O signals (#1463)
 - Expose e-hal ErrorKind::NoAcknowledge in I2C driver (#1454)
 - Add remaining peripheral signals for LCD_CAM (#1466)
 
@@ -741,8 +741,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - TIMG: Allow use without the embedded-hal-02 traits in scope (#1367)
-- DMA: use channel clusters
-- Remove `Ext32` and `RateExtU64` from prelude
+- DMA: use channel clusters (#1330)
+- Remove `Ext32` and `RateExtU64` from prelude (#1298)
 - Prefer mutable references over moving for DMA transactions (#1238)
 - Support runtime interrupt binding, adapt GPIO driver (#1231)
 - Renamed `eh1` feature to `embedded-hal`, feature-gated `embedded-hal@0.2.x` trait implementations (#1273)
@@ -773,6 +773,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove partial support for the ESP32-P4 (#1461)
 
 ## [0.16.1] - 2024-03-12
+
+### Fixed
 
 - Resolved an issue with the `defmt` dependency/feature (#1264)
 
@@ -843,7 +845,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
 - The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 - The `ADC` driver's constructor is now `new` instead of `adc`, to be more consistent with other APIs (#1133)
-- `embassy-executor`'s `integrated-timers` is no longer enabled by default.
+- `embassy-executor`'s `integrated-timers` is no longer enabled by default. (#1196)
 - Renamed `embassy-time-systick` to `embassy-time-systick-16mhz` for use with all chips with a systimer, except `esp32s2`. Added `embassy-time-systick-80mhz` specifically for the `esp32s2`. (#1247)
 
 ## [0.15.0] - 2024-01-19
@@ -944,7 +946,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Breaking
 
 - `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
-- ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904) (#985)
+- ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904, #985)
   - When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`.
   - Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic).
 - RSA driver now takes `u32` words instead of `u8` bytes. The expected slice length is now 4 times shorter. (#981)
@@ -1162,7 +1164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: Support FOSC CLK calibration for ECO1+ chip revisions (#593)
 - Fixed CI by pinning the log crate to 0.4.18 (#600)
 - ESP32-S3: Fix calculation of PSRAM start address (#601)
-- Fixed wrong variable access (FOSC CLK calibration for ESP32-C6 #593)
+- Fixed wrong variable access (FOSC CLK calibration for ESP32-C6) (#593)
 - Fixed [trap location in ram](https://github.com/esp-rs/esp-hal/pull/605#issuecomment-1604039683) (#605)
 - Fix rom::crc docs (#611)
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
