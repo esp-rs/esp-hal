@@ -2460,14 +2460,6 @@ mod chip_specific {
                 fn clear_interrupts() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.chconf1($ch_num).modify(|_, w| {
-                        w.mem_wr_rst().set_bit();
-                        w.apb_mem_rst().set_bit();
-                        w.mem_owner().set_bit();
-                        w.rx_en().clear_bit()
-                    });
-                    Self::update();
-
                     rmt.int_clr().write(|w| {
                         w.ch_rx_end($ch_num).set_bit();
                         w.ch_err($ch_num).set_bit();
