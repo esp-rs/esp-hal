@@ -101,7 +101,10 @@ impl Package {
         let mut features = vec![];
         match self {
             Package::EspBacktrace => features.push("defmt".to_owned()),
-            Package::EspConfig => features.push("build".to_owned()),
+            Package::EspConfig => {
+                features.push("build".to_owned());
+                features.push("tui".to_owned());
+            },
             Package::EspHal => {
                 features.push("unstable".to_owned());
                 if config.contains("psram") {

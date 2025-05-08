@@ -179,7 +179,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build
+      - run: cd esp-config && cargo test --features build,tui
 
       # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test --features=std
