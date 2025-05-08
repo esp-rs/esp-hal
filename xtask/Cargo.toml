@@ -31,6 +31,9 @@ reqwest = { version = "0.12.12", features = [
     "native-tls-vendored",
 ], optional = true }
 
+[dev-dependencies]
+pretty_assertions = "1.2.0"
+
 [features]
 deploy-docs  = ["dep:reqwest"]
 preview-docs = ["dep:opener", "dep:rocket"]

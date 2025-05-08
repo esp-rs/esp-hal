@@ -32,9 +32,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed saving the state of the FPU co-processor. (#2311)
 
-### Removed
-
-
 ## 0.17.1 - 2024-09-02
 
 ### Added

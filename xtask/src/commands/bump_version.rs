@@ -178,7 +178,7 @@ fn finalize_changelog(
     let mut changelog = Changelog::parse(&changelog_str)
         .with_context(|| format!("Could not parse {}", changelog_path.display()))?;
 
-    changelog.finalize(package, new_version);
+    changelog.finalize(package, new_version, jiff::Timestamp::now());
 
     std::fs::write(&changelog_path, changelog.to_string())?;
 

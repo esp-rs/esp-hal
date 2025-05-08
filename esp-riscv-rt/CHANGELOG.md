@@ -74,9 +74,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix RISC-V stack allocation (#988)
 - ESP32-C6/ESP32-H2: Add `fix-sp` feature to support `flip-link` in `esp-hal-common` (#1008)
 
-### Removed
-
-
 ## 0.5.0 - 2023-09-05
 
 ### Changed
