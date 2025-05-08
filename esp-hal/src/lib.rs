@@ -532,7 +532,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    unsafe extern "C" {
+    extern "C" {
         static mut __stack_chk_guard: u32;
     }
 
