@@ -1471,13 +1471,13 @@ fn async_interrupt_handler() {
         2 => Channel::<Async, 2>::unlisten_interrupt(Event::End | Event::Error),
         3 => Channel::<Async, 3>::unlisten_interrupt(Event::End | Event::Error),
 
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         4 => Channel::<Async, 4>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         5 => Channel::<Async, 5>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         6 => Channel::<Async, 6>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         7 => Channel::<Async, 7>::unlisten_interrupt(Event::End | Event::Error),
 
         _ => unreachable!(),
@@ -1514,17 +1514,17 @@ fn async_interrupt_handler() {
             <Channel<Async, 4> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 4> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         5 => {
             <Channel<Async, 5> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 5> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         6 => {
             <Channel<Async, 6> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 6> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         7 => {
             <Channel<Async, 7> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 7> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
