@@ -14,15 +14,12 @@
 #![no_main]
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+use esp_hal::interrupt::{
+    Priority,
+    software::{SoftwareInterrupt, SoftwareInterruptControl},
+};
 #[cfg(multi_core)]
 use esp_hal::system::{CpuControl, Stack};
-use esp_hal::{
-    interrupt::{
-        Priority,
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
-    },
-    timer::AnyTimer,
-};
 #[cfg(multi_core)]
 use esp_hal_embassy::Executor;
 use esp_hal_embassy::InterruptExecutor;
@@ -55,31 +52,7 @@ mod test {
     fn init() -> Context {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
-        cfg_if::cfg_if! {
-            if #[cfg(timg_timer1)] {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new(peripherals.TIMG0);
-                esp_hal_embassy::init([
-                    AnyTimer::from(timg0.timer0),
-                    AnyTimer::from(timg0.timer1),
-                ]);
-            } else if #[cfg(timg1)] {
-                use esp_hal::timer::timg::TimerGroup;
-                let timg0 = TimerGroup::new(peripherals.TIMG0);
-                let timg1 = TimerGroup::new(peripherals.TIMG1);
-                esp_hal_embassy::init([
-                    AnyTimer::from(timg0.timer0),
-                    AnyTimer::from(timg1.timer0),
-                ]);
-            } else if #[cfg(systimer)] {
-                use esp_hal::timer::systimer::SystemTimer;
-                let systimer = SystemTimer::new(peripherals.SYSTIMER);
-                esp_hal_embassy::init([
-                    AnyTimer::from(systimer.alarm0),
-                    AnyTimer::from(systimer.alarm1),
-                ]);
-            }
-        }
+        hil_test::init_embassy!(peripherals, 2);
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
         Context {
@@ -98,7 +71,7 @@ mod test {
 
         let spawner = interrupt_executor.start(Priority::Priority3);
 
-        spawner.spawn(responder_task(signal, response)).unwrap();
+        spawner.must_spawn(responder_task(signal, response));
 
         response.wait().await;
         for _ in 0..3 {

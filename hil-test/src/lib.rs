@@ -131,3 +131,35 @@ mod executor {
 pub use esp_hal_embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
+
+/// Initialize esp-hal-embassy with 2 timers.
+#[macro_export]
+macro_rules! init_embassy {
+    ($peripherals:expr, 2) => {{
+        cfg_if::cfg_if! {
+            if #[cfg(timg_timer1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new($peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    timg0.timer0,
+                    timg0.timer1,
+                ]);
+            } else if #[cfg(timg1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new($peripherals.TIMG0);
+                let timg1 = TimerGroup::new($peripherals.TIMG1);
+                esp_hal_embassy::init([
+                    timg0.timer0,
+                    timg1.timer0,
+                ]);
+            } else if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new($peripherals.SYSTIMER);
+                esp_hal_embassy::init([
+                    systimer.alarm0,
+                    systimer.alarm1,
+                ]);
+            }
+        }
+    }};
+}

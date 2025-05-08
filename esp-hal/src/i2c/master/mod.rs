@@ -763,11 +763,10 @@ impl core::future::Future for I2cFuture<'_> {
         self.state.waker.register(ctx.waker());
 
         let error = self.check_error();
-
-        if error.is_err() {
-            Poll::Ready(error)
-        } else if self.is_done() {
+        if self.is_done() {
             Poll::Ready(Ok(()))
+        } else if error.is_err() {
+            Poll::Ready(error)
         } else {
             Poll::Pending
         }
@@ -1913,8 +1912,6 @@ impl Driver<'_> {
 
     #[cfg(not(esp32))]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        self.check_errors()?;
-
         let event = if end_only {
             Event::EndDetect.into()
         } else {
@@ -1954,13 +1951,18 @@ impl Driver<'_> {
     fn is_completed(&self, end_only: bool) -> Result<bool, Error> {
         let interrupts = self.regs().int_raw().read();
 
+        if (!end_only && interrupts.trans_complete().bit_is_set())
+            || interrupts.end_detect().bit_is_set()
+        {
+            // Handle completion cases
+            // A full transmission was completed (either a STOP condition or END was
+            // processed)
+            return Ok(true);
+        }
+
         self.check_errors()?;
 
-        // Handle completion cases
-        // A full transmission was completed (either a STOP condition or END was
-        // processed)
-        Ok((!end_only && interrupts.trans_complete().bit_is_set())
-            || interrupts.end_detect().bit_is_set())
+        Ok(false)
     }
 
     fn all_commands_done(&self) -> bool {
