@@ -1,6 +1,6 @@
 use std::error::Error as StdError;
 
-use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
+use esp_config::{ConfigOption, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn StdError>> {
@@ -15,50 +15,44 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let crate_config = generate_config(
         "esp_hal_embassy",
         &[
-            ConfigOption {
-                name: "low-power-wait",
-                description: "Enables the lower-power wait if no tasks are ready to run on the \
+            ConfigOption::new(
+                "low-power-wait",
+                "Enables the lower-power wait if no tasks are ready to run on the \
                 thread-mode executor. This allows the MCU to use less power if the workload allows. \
                 Recommended for battery-powered systems. May impact analog performance.",
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-            },
-            ConfigOption {
-                name: "timer-queue",
-                description: "The flavour of the timer queue provided by this crate. Integrated \
+                true,
+            ),
+            ConfigOption::new(
+                "timer-queue",
+                "The flavour of the timer queue provided by this crate. Integrated \
                 queues require the `executors` feature to be enabled.</p><p>If you use \
                 embassy-executor, the `single-integrated` queue is recommended for ease of use, \
                 while the `multiple-integrated` queue is recommended for performance. The \
                 `multiple-integrated` option needs one timer per executor.</p><p>The `generic` \
                 queue allows using embassy-time without the embassy executors.",
-                default_value: Value::String(if cfg!(feature = "executors") {
-                    String::from("single-integrated")
+                if cfg!(feature = "executors") {
+                    "single-integrated"
                 } else {
-                    String::from("generic")
-                }),
-                constraint: Some(if cfg!(feature = "executors") {
-                    Validator::Enumeration(vec![
-                        String::from("generic"),
-                        String::from("single-integrated"),
-                        String::from("multiple-integrated"),
-                    ])
-                } else {
-                    Validator::Enumeration(vec![String::from("generic")])
-                }),
-                stability: Stability::Unstable,
-                active: cfg!(feature = "executors"),
-            },
-            ConfigOption {
-                name: "generic-queue-size",
-                description: "The capacity of the queue when the `generic` timer \
+                    "generic"
+                },
+            )
+            .constraint(if cfg!(feature = "executors") {
+                Validator::Enumeration(vec![
+                    String::from("generic"),
+                    String::from("single-integrated"),
+                    String::from("multiple-integrated"),
+                ])
+            } else {
+                Validator::Enumeration(vec![String::from("generic")])
+            })
+            .active(cfg!(feature = "executors")),
+            ConfigOption::new(
+                "generic-queue-size",
+                "The capacity of the queue when the `generic` timer \
                 queue flavour is selected.",
-                default_value: Value::Integer(64),
-                constraint: Some(Validator::PositiveInteger),
-                stability: Stability::Unstable,
-                active: true,
-            },
+                64,
+            )
+            .constraint(Validator::PositiveInteger),
         ],
         true,
         true,

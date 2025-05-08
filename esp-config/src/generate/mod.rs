@@ -1,7 +1,7 @@
 use core::fmt::Display;
 use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::generate::{validator::Validator, value::Value};
 
@@ -140,7 +140,6 @@ pub fn generate_config_internal<'a>(
 fn config_json(config: &[(String, &ConfigOption, Value)], pretty: bool) -> String {
     #[derive(Serialize)]
     struct Item<'a> {
-        #[serde(flatten)]
         option: &'a ConfigOption,
         actual_value: Value,
     }
@@ -198,14 +197,14 @@ fn env_change_work_around(mut stdout: impl Write) {
 }
 
 /// The stability of the configuration option.
-#[derive(Serialize, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum Stability {
     /// Unstable options need to be activated with the `unstable` feature
     /// of the package that defines them.
     Unstable,
     /// Stable options contain the first version in which they were
     /// stabilized.
-    Stable(&'static str),
+    Stable(String),
 }
 
 impl Display for Stability {
@@ -217,20 +216,33 @@ impl Display for Stability {
     }
 }
 
+/// A display hint (for tooling only)
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum DisplayHint {
+    /// No display hint
+    None,
+
+    /// Use a binary representation
+    Binary,
+
+    /// Use a hexadecimal representation
+    Hex,
+}
+
 /// A configuration option.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct ConfigOption {
     /// The name of the configuration option.
     ///
     /// The associated environment variable has the format of
     /// `<PREFIX>_CONFIG_<NAME>`.
-    pub name: &'static str,
+    pub name: String,
 
     /// The description of the configuration option.
     ///
     /// The description will be included in the generated markdown
     /// documentation.
-    pub description: &'static str,
+    pub description: String,
 
     /// The default value of the configuration option.
     pub default_value: Value,
@@ -246,15 +258,63 @@ pub struct ConfigOption {
     /// Inactive options are not included in the documentation, and accessing
     /// them provides the default value.
     pub active: bool,
+
+    /// A display hint (for tooling)
+    pub display_hint: DisplayHint,
 }
 
 impl ConfigOption {
+    /// Create a new config option.
+    ///
+    /// Unstable, active, no display-hint and not constrained by default.
+    pub fn new(name: &str, description: &str, default_value: impl Into<Value>) -> Self {
+        Self {
+            name: name.to_string(),
+            description: description.to_string(),
+            default_value: default_value.into(),
+            constraint: None,
+            stability: Stability::Unstable,
+            active: true,
+            display_hint: DisplayHint::None,
+        }
+    }
+
+    /// Constrain the config option
+    pub fn constraint(mut self, validator: Validator) -> Self {
+        self.constraint = Some(validator);
+        self
+    }
+
+    /// Constrain the config option
+    pub fn constraint_by(mut self, validator: Option<Validator>) -> Self {
+        self.constraint = validator;
+        self
+    }
+
+    /// Mark this config option as stable
+    pub fn stable(mut self, version: &str) -> Self {
+        self.stability = Stability::Stable(version.to_string());
+        self
+    }
+
+    /// Sets the active flag of this config option
+    pub fn active(mut self, active: bool) -> Self {
+        self.active = active;
+        self
+    }
+
+    /// Sets the display hint
+    pub fn display_hint(mut self, display_hint: DisplayHint) -> Self {
+        self.display_hint = display_hint;
+        self
+    }
+
     fn env_var(&self, prefix: &str) -> String {
-        format!("{}{}", prefix, screaming_snake_case(self.name))
+        format!("{}{}", prefix, screaming_snake_case(&self.name))
     }
 
     fn cfg_name(&self) -> String {
-        snake_case(self.name)
+        snake_case(&self.name)
     }
 
     fn is_stable(&self) -> bool {
@@ -415,60 +475,67 @@ mod test {
                     "esp-test",
                     &[
                         ConfigOption {
-                            name: "number",
-                            description: "NA",
+                            name: String::from("number"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(999),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "number_signed",
-                            description: "NA",
+                            name: String::from("number_signed"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(-777),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "string",
-                            description: "NA",
+                            name: String::from("string"),
+                            description: String::from("NA"),
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "bool",
-                            description: "NA",
+                            name: String::from("bool"),
+                            description: String::from("NA"),
                             default_value: Value::Bool(false),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "number_default",
-                            description: "NA",
+                            name: String::from("number_default"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(999),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "string_default",
-                            description: "NA",
+                            name: String::from("string_default"),
+                            description: String::from("NA"),
                             default_value: Value::String("Demo".to_string()),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "bool_default",
-                            description: "NA",
+                            name: String::from("bool_default"),
+                            description: String::from("NA"),
                             default_value: Value::Bool(false),
                             constraint: None,
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                     ],
                     false,
@@ -515,36 +582,40 @@ mod test {
                     "esp-test",
                     &[
                         ConfigOption {
-                            name: "positive_number",
-                            description: "NA",
+                            name: String::from("positive_number"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::PositiveInteger),
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "negative_number",
-                            description: "NA",
+                            name: String::from("negative_number"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(1),
                             constraint: Some(Validator::NegativeInteger),
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "non_negative_number",
-                            description: "NA",
+                            name: String::from("non_negative_number"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(-1),
                             constraint: Some(Validator::NonNegativeInteger),
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                         ConfigOption {
-                            name: "range",
-                            description: "NA",
+                            name: String::from("range"),
+                            description: String::from("NA"),
                             default_value: Value::Integer(0),
                             constraint: Some(Validator::IntegerInRange(5..10)),
-                            stability: Stability::Stable("testing"),
+                            stability: Stability::Stable(String::from("testing")),
                             active: true,
+                            display_hint: DisplayHint::None,
                         },
                     ],
                     false,
@@ -555,71 +626,19 @@ mod test {
     }
 
     #[test]
-    fn custom_validation_passes() {
-        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("13"))], || {
-            generate_config(
-                "esp-test",
-                &[ConfigOption {
-                    name: "number",
-                    description: "NA",
-                    default_value: Value::Integer(-1),
-                    constraint: Some(Validator::Custom(Box::new(|value| {
-                        let range = 10..20;
-                        if !value.is_integer() || !range.contains(&value.as_integer()) {
-                            Err(Error::validation("value does not fall within range"))
-                        } else {
-                            Ok(())
-                        }
-                    }))),
-                    stability: Stability::Stable("testing"),
-                    active: true,
-                }],
-                false,
-                false,
-            )
-        });
-    }
-
-    #[test]
     #[should_panic]
     fn builtin_validation_bails() {
         temp_env::with_vars([("ESP_TEST_CONFIG_POSITIVE_NUMBER", Some("-99"))], || {
             generate_config(
                 "esp-test",
                 &[ConfigOption {
-                    name: "positive_number",
-                    description: "NA",
+                    name: String::from("positive_number"),
+                    description: String::from("NA"),
                     default_value: Value::Integer(-1),
                     constraint: Some(Validator::PositiveInteger),
-                    stability: Stability::Stable("testing"),
+                    stability: Stability::Stable(String::from("testing")),
                     active: true,
-                }],
-                false,
-                false,
-            )
-        });
-    }
-
-    #[test]
-    #[should_panic]
-    fn custom_validation_bails() {
-        temp_env::with_vars([("ESP_TEST_CONFIG_NUMBER", Some("37"))], || {
-            generate_config(
-                "esp-test",
-                &[ConfigOption {
-                    name: "number",
-                    description: "NA",
-                    default_value: Value::Integer(-1),
-                    constraint: Some(Validator::Custom(Box::new(|value| {
-                        let range = 10..20;
-                        if !value.is_integer() || !range.contains(&value.as_integer()) {
-                            Err(Error::validation("value does not fall within range"))
-                        } else {
-                            Ok(())
-                        }
-                    }))),
-                    stability: Stability::Stable("testing"),
-                    active: true,
+                    display_hint: DisplayHint::None,
                 }],
                 false,
                 false,
@@ -639,12 +658,13 @@ mod test {
                 generate_config(
                     "esp-test",
                     &[ConfigOption {
-                        name: "number",
-                        description: "NA",
+                        name: String::from("number"),
+                        description: String::from("NA"),
                         default_value: Value::Integer(999),
                         constraint: None,
-                        stability: Stability::Stable("testing"),
+                        stability: Stability::Stable(String::from("testing")),
                         active: true,
+                        display_hint: DisplayHint::None,
                     }],
                     false,
                     false,
@@ -660,12 +680,13 @@ mod test {
             generate_config(
                 "esp-test",
                 &[ConfigOption {
-                    name: "number",
-                    description: "NA",
+                    name: String::from("number"),
+                    description: String::from("NA"),
                     default_value: Value::Integer(999),
                     constraint: None,
-                    stability: Stability::Stable("testing"),
+                    stability: Stability::Stable(String::from("testing")),
                     active: true,
+                    display_hint: DisplayHint::None,
                 }],
                 false,
                 false,
@@ -681,12 +702,13 @@ mod test {
                 generate_config(
                     "esp-test",
                     &[ConfigOption {
-                        name: "number",
-                        description: "NA",
+                        name: String::from("number"),
+                        description: String::from("NA"),
                         default_value: Value::Integer(999),
                         constraint: None,
-                        stability: Stability::Stable("testing"),
+                        stability: Stability::Stable(String::from("testing")),
                         active: true,
+                        display_hint: DisplayHint::None,
                     }],
                     false,
                     false,
@@ -703,15 +725,16 @@ mod test {
                 &mut stdout,
                 "esp-test",
                 &[ConfigOption {
-                    name: "some-key",
-                    description: "NA",
+                    name: String::from("some-key"),
+                    description: String::from("NA"),
                     default_value: Value::String("variant-0".to_string()),
                     constraint: Some(Validator::Enumeration(vec![
                         "variant-0".to_string(),
                         "variant-1".to_string(),
                     ])),
-                    stability: Stability::Stable("testing"),
+                    stability: Stability::Stable(String::from("testing")),
                     active: true,
+                    display_hint: DisplayHint::None,
                 }],
                 false,
             );
@@ -730,23 +753,25 @@ mod test {
         let mut stdout = Vec::new();
         let config = [
             ConfigOption {
-                name: "some-key",
-                description: "NA",
+                name: String::from("some-key"),
+                description: String::from("NA"),
                 default_value: Value::String("variant-0".to_string()),
                 constraint: Some(Validator::Enumeration(vec![
                     "variant-0".to_string(),
                     "variant-1".to_string(),
                 ])),
-                stability: Stability::Stable("testing"),
+                stability: Stability::Stable(String::from("testing")),
                 active: true,
+                display_hint: DisplayHint::None,
             },
             ConfigOption {
-                name: "some-key2",
-                description: "NA",
+                name: String::from("some-key2"),
+                description: String::from("NA"),
                 default_value: Value::Bool(true),
                 constraint: None,
                 stability: Stability::Unstable,
                 active: true,
+                display_hint: DisplayHint::None,
             },
         ];
         let configs =
@@ -755,37 +780,44 @@ mod test {
             });
 
         let json_output = config_json(&configs, true);
+        println!("{json_output}");
         pretty_assertions::assert_eq!(
             r#"[
   {
-    "name": "some-key",
-    "description": "NA",
-    "default_value": {
-      "String": "variant-0"
+    "option": {
+      "name": "some-key",
+      "description": "NA",
+      "default_value": {
+        "String": "variant-0"
+      },
+      "constraint": {
+        "Enumeration": [
+          "variant-0",
+          "variant-1"
+        ]
+      },
+      "stability": {
+        "Stable": "testing"
+      },
+      "active": true,
+      "display_hint": "None"
     },
-    "constraint": {
-      "Enumeration": [
-        "variant-0",
-        "variant-1"
-      ]
-    },
-    "stability": {
-      "Stable": "testing"
-    },
-    "active": true,
     "actual_value": {
       "String": "variant-0"
     }
   },
   {
-    "name": "some-key2",
-    "description": "NA",
-    "default_value": {
-      "Bool": true
+    "option": {
+      "name": "some-key2",
+      "description": "NA",
+      "default_value": {
+        "Bool": true
+      },
+      "constraint": null,
+      "stability": "Unstable",
+      "active": true,
+      "display_hint": "None"
     },
-    "constraint": null,
-    "stability": "Unstable",
-    "active": true,
     "actual_value": {
       "Bool": true
     }
@@ -804,8 +836,8 @@ mod test {
                 &mut stdout,
                 "esp-test",
                 &[ConfigOption {
-                    name: "some-key",
-                    description: "NA",
+                    name: String::from("some-key"),
+                    description: String::from("NA"),
                     default_value: Value::String("variant-0".to_string()),
                     constraint: Some(Validator::Enumeration(vec![
                         "variant-0".to_string(),
@@ -813,6 +845,7 @@ mod test {
                     ])),
                     stability: Stability::Unstable,
                     active: true,
+                    display_hint: DisplayHint::None,
                 }],
                 false,
             );
@@ -828,18 +861,78 @@ mod test {
                 &mut stdout,
                 "esp-test",
                 &[ConfigOption {
-                    name: "some-key",
-                    description: "NA",
+                    name: String::from("some-key"),
+                    description: String::from("NA"),
                     default_value: Value::String("variant-0".to_string()),
                     constraint: Some(Validator::Enumeration(vec![
                         "variant-0".to_string(),
                         "variant-1".to_string(),
                     ])),
-                    stability: Stability::Stable("testing"),
+                    stability: Stability::Stable(String::from("testing")),
                     active: false,
+                    display_hint: DisplayHint::None,
                 }],
                 false,
             );
         });
+    }
+
+    #[test]
+    fn convenience_constructors() {
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: None,
+                stability: Stability::Unstable,
+                active: true,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("number", "NA", 999)
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("string"),
+                description: String::from("descr"),
+                default_value: Value::String("some string".to_string()),
+                constraint: None,
+                stability: Stability::Stable("1.0.0".to_string()),
+                active: true,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("string", "descr", "some string").stable("1.0.0")
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: Some(Validator::PositiveInteger),
+                stability: Stability::Unstable,
+                active: false,
+                display_hint: DisplayHint::None,
+            },
+            ConfigOption::new("number", "NA", 999)
+                .active(false)
+                .constraint(Validator::PositiveInteger)
+        );
+
+        assert_eq!(
+            ConfigOption {
+                name: String::from("number"),
+                description: String::from("NA"),
+                default_value: Value::Integer(999),
+                constraint: Some(Validator::PositiveInteger),
+                stability: Stability::Unstable,
+                active: true,
+                display_hint: DisplayHint::Hex,
+            },
+            ConfigOption::new("number", "NA", 999)
+                .constraint_by(Some(Validator::PositiveInteger))
+                .display_hint(DisplayHint::Hex)
+        );
     }
 }

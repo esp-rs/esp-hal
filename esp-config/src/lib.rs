@@ -10,6 +10,7 @@ mod generate;
 #[cfg(feature = "build")]
 pub use generate::{
     ConfigOption,
+    DisplayHint,
     Error,
     Stability,
     generate_config,

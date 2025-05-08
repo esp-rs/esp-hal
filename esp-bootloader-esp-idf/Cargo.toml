@@ -15,7 +15,7 @@ default-target = "riscv32imac-unknown-none-elf"
 
 [lib]
 bench = false
-test  = false
+test  = true
 
 [dependencies]
 defmt = { version = "1.0.1", optional = true }

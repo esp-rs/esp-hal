@@ -1,5 +1,5 @@
 use esp_build::assert_unique_used_features;
-use esp_config::{ConfigOption, Stability, Value, generate_config};
+use esp_config::{ConfigOption, generate_config};
 
 fn main() {
     // Ensure that only a single chip is specified:
@@ -15,14 +15,11 @@ fn main() {
     // emit config
     generate_config(
         "esp_backtrace",
-        &[ConfigOption {
-            name: "backtrace-frames",
-            description: "The maximum number of frames that will be printed in a backtrace",
-            default_value: Value::Integer(10),
-            constraint: None,
-            stability: Stability::Unstable,
-            active: true,
-        }],
+        &[ConfigOption::new(
+            "backtrace-frames",
+            "The maximum number of frames that will be printed in a backtrace",
+            10,
+        )],
         true,
         true,
     );
