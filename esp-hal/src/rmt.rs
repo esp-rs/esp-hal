@@ -625,6 +625,8 @@ where
 {
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
+        let memsize =
+            constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize;
         loop {
             if <C as TxChannelInternal>::is_error() {
                 return Err((Error::TransmissionError, self.channel));
@@ -639,31 +641,16 @@ where
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
-            let ram_index = (((self.index
-                - constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize)
-                / (constants::RMT_CHANNEL_RAM_SIZE
-                    * <C as TxChannelInternal>::memsize() as usize
-                    / 2))
-                % 2)
-                * (constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
-                    / 2);
+            let ram_index = (((self.index - memsize) / (memsize / 2)) % 2) * (memsize / 2);
 
             let ptr = unsafe { channel_ram_start(C::CHANNEL).add(ram_index) };
-            for (idx, entry) in self.data[self.index..]
-                .iter()
-                .take(
-                    constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
-                        / 2,
-                )
-                .enumerate()
-            {
+            for (idx, entry) in self.data[self.index..].iter().take(memsize / 2).enumerate() {
                 unsafe {
                     ptr.add(idx).write_volatile(*entry);
                 }
             }
 
-            self.index +=
-                constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize / 2;
+            self.index += memsize / 2;
         }
 
         loop {
@@ -1594,17 +1581,14 @@ pub trait TxChannelInternal {
         }
 
         let ptr = channel_ram_start(Self::CHANNEL);
-        for (idx, entry) in data
-            .iter()
-            .take(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
-            .enumerate()
-        {
+        let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
+        for (idx, entry) in data.iter().take(memsize).enumerate() {
             unsafe {
                 ptr.add(idx).write_volatile(*entry);
             }
         }
 
-        Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize / 2) as u8);
+        Self::set_threshold((memsize / 2) as u8);
         Self::set_continuous(continuous);
         Self::set_generate_repeat_interrupt(repeat);
         Self::set_wrap_mode(true);
@@ -1612,8 +1596,8 @@ pub trait TxChannelInternal {
         Self::start_tx();
         Self::update();
 
-        if data.len() >= constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
-            Ok(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
+        if data.len() >= memsize {
+            Ok(memsize)
         } else {
             Ok(data.len())
         }
