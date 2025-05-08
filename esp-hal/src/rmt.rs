@@ -650,7 +650,10 @@ where
                 + ram_index * 4) as *mut u32;
             for (idx, entry) in self.data[self.index..]
                 .iter()
-                .take(constants::RMT_CHANNEL_RAM_SIZE / 2)
+                .take(
+                    constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
+                        / 2,
+                )
                 .enumerate()
             {
                 unsafe {
