@@ -3,11 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
-use toml_edit::{DocumentMut, Item, Value};
+use toml_edit::{DocumentMut, Item, TableLike, Value};
 
 use crate::{Package, Version, changelog::Changelog};
 
@@ -37,6 +37,9 @@ struct BumpedPackage<'a> {
     manifest_path: PathBuf,
     manifest: toml_edit::DocumentMut,
 }
+
+const DEPENDENCY_KINDS: [&'static str; 3] =
+    ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl<'a> BumpedPackage<'a> {
     fn new(workspace: &'a Path, package: Package) -> Result<Self> {
@@ -81,9 +84,124 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
         let mut package = BumpedPackage::new(workspace, package)?;
+        check_crate_before_bumping(package.package, &package.manifest)?;
         let new_version = bump_crate_version(&mut package, args.amount, args.pre.as_deref())?;
         finalize_changelog(&package, new_version)?;
     }
+
+    Ok(())
+}
+
+fn check_crate_before_bumping(package: Package, manifest: &DocumentMut) -> Result<()> {
+    // Collect errors into a vector to preserve order.
+    let mut errors = Vec::new();
+
+    recurse(String::new(), &mut errors, manifest.as_table());
+
+    fn recurse(
+        path: String,
+        errors: &mut Vec<(&'static str, Vec<(String, Error)>)>,
+        table: &toml_edit::Table,
+    ) {
+        for (key, item) in table.iter() {
+            if let Item::Table(table) = item {
+                let path = if path.is_empty() {
+                    key.to_string()
+                } else {
+                    format!("{path}.{key}")
+                };
+                recurse(path, errors, table);
+            }
+        }
+        for dependency_kind in DEPENDENCY_KINDS {
+            // Display the section in case we have a more complex path to the dependency
+            // (like [target.'cfg(target_arch = "riscv32")'.dependencies])
+            let path = if path.is_empty() {
+                String::new()
+            } else {
+                format!("[{path}.{dependency_kind}] ")
+            };
+
+            let Some(Item::Table(table)) = table.get(dependency_kind) else {
+                continue;
+            };
+
+            for (name, item) in table.iter() {
+                let Err(e) = check_dependency_before_bumping(item) else {
+                    continue;
+                };
+
+                let position = match errors.iter().position(|(k, _)| *k == dependency_kind) {
+                    Some(position) => position,
+                    None => {
+                        errors.push((dependency_kind, vec![]));
+                        errors.len() - 1
+                    }
+                };
+                errors[position].1.push((format!("{path}{name}"), e));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        let mut error_message = String::new();
+        for (dep_kind, errors) in errors {
+            if !error_message.is_empty() {
+                error_message.push_str("\n");
+            }
+            error_message.push_str(&format!("In [{dep_kind}]:\n"));
+            for (krate, error) in errors {
+                error_message.push_str(&format!("- {krate}: {error}\n"));
+            }
+        }
+        bail!(
+            "The following errors were found in the dependencies of {}:\n{}",
+            package,
+            error_message
+        );
+    }
+
+    Ok(())
+}
+
+fn check_dependency_before_bumping(item: &Item) -> Result<()> {
+    fn validate_simple_version(version: &str) -> Result<()> {
+        if version == "*" {
+            bail!("Dependency specifies a wildcard version.");
+        }
+        Ok(())
+    }
+
+    fn check_for_non_version_deps<'a, T: TableLike>(dependency: &T) -> Result<()> {
+        if let Some(version) = dependency.get("version") {
+            if let Some(version) = version.as_str() {
+                validate_simple_version(version)?;
+            }
+        } else {
+            bail!("Dependency does not specify a version.");
+        }
+        if dependency.contains_key("git") {
+            bail!("Dependency specifies a git dependency.");
+        }
+        Ok(())
+    }
+
+    match item {
+        Item::Value(Value::String(version)) => {
+            // package = "version"
+            validate_simple_version(version.value())?;
+        }
+        Item::Value(Value::InlineTable(table)) => {
+            // package = { version = "version" }
+            check_for_non_version_deps(table)?
+        }
+        Item::Table(table) => {
+            // [dependency.package]
+            // version = "version"
+            check_for_non_version_deps(table)?
+        }
+        other => unreachable!("{other:#?}"),
+    };
 
     Ok(())
 }
@@ -106,8 +224,6 @@ fn bump_crate_version(
         bumped_package.manifest.to_string(),
     )?;
 
-    let dependency_kinds = ["dependencies", "dev-dependencies", "build-dependencies"];
-
     let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
         let manifest_path = bumped_package
@@ -120,7 +236,7 @@ fn bump_crate_version(
         let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
         let mut changed = false;
-        for dependency_kind in dependency_kinds {
+        for dependency_kind in DEPENDENCY_KINDS {
             let Some(table) = manifest[dependency_kind].as_table_mut() else {
                 continue;
             };
@@ -253,5 +369,35 @@ mod test {
             let new_version = do_version_bump(version, amount, pre).unwrap();
             assert_eq!(new_version.to_string(), expected);
         }
+    }
+
+    #[test]
+    fn test_rejected_dependencies() {
+        let toml = r#"
+            [dependencies]
+            package = { version = "*" }
+            package2 = "*"
+
+            [dev-dependencies]
+            package3 = { version = "1.0", git = "" }
+
+            [target.'cfg(target_arch = "riscv32")'.dependencies]
+            package4 = {  }
+            "#;
+        let doc = toml.parse::<DocumentMut>().unwrap();
+
+        let errors = check_crate_before_bumping(Package::EspHal, &doc);
+        pretty_assertions::assert_eq!(
+            errors.unwrap_err().to_string(),
+            r#"The following errors were found in the dependencies of esp-hal:
+In [dependencies]:
+- [target.cfg(target_arch = "riscv32").dependencies] package4: Dependency does not specify a version.
+- package: Dependency specifies a wildcard version.
+- package2: Dependency specifies a wildcard version.
+
+In [dev-dependencies]:
+- package3: Dependency specifies a git dependency.
+"#
+        );
     }
 }
