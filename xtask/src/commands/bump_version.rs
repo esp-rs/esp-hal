@@ -1,9 +1,10 @@
 use std::{
+    fmt::Write,
     fs,
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Error, Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
@@ -31,7 +32,7 @@ pub struct BumpVersionArgs {
     packages: Vec<Package>,
 }
 
-struct BumpedPackage<'a> {
+struct CargoToml<'a> {
     workspace: &'a Path,
     package: Package,
     manifest_path: PathBuf,
@@ -41,7 +42,7 @@ struct BumpedPackage<'a> {
 const DEPENDENCY_KINDS: [&'static str; 3] =
     ["dependencies", "dev-dependencies", "build-dependencies"];
 
-impl<'a> BumpedPackage<'a> {
+impl<'a> CargoToml<'a> {
     fn new(workspace: &'a Path, package: Package) -> Result<Self> {
         let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
         if !manifest_path.exists() {
@@ -78,13 +79,63 @@ impl<'a> BumpedPackage<'a> {
         );
         self.manifest["package"]["version"] = toml_edit::value(version.to_string());
     }
+
+    fn save(&self) -> Result<()> {
+        fs::write(&self.manifest_path, self.manifest.to_string())
+            .with_context(|| format!("Could not write {}", self.manifest_path.display()))?;
+
+        Ok(())
+    }
+
+    /// Calls a callback for each table that contains dependencies.
+    ///
+    /// Callback arguments:
+    /// - `path`: The path to the table (e.g. `dependencies.package`)
+    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`,
+    ///   `dev-dependencies`)
+    /// - `table`: The table itself
+    fn visit_dependencies(
+        &mut self,
+        mut handle_dependencies: impl FnMut(&str, &'static str, &mut toml_edit::Table),
+    ) {
+        fn recurse_dependencies(
+            path: String,
+            table: &mut toml_edit::Table,
+            handle_dependencies: &mut impl FnMut(&str, &'static str, &mut toml_edit::Table),
+        ) {
+            // Walk through tables recursively so that we can find *all* dependencies.
+            for (key, item) in table.iter_mut() {
+                if let Item::Table(table) = item {
+                    let path = if path.is_empty() {
+                        key.to_string()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    recurse_dependencies(path, table, handle_dependencies);
+                }
+            }
+            for dependency_kind in DEPENDENCY_KINDS {
+                let Some(Item::Table(table)) = table.get_mut(dependency_kind) else {
+                    continue;
+                };
+
+                handle_dependencies(&path, dependency_kind, table);
+            }
+        }
+
+        recurse_dependencies(
+            String::new(),
+            self.manifest.as_table_mut(),
+            &mut handle_dependencies,
+        );
+    }
 }
 
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
-        let mut package = BumpedPackage::new(workspace, package)?;
-        check_crate_before_bumping(package.package, &package.manifest)?;
+        let mut package = CargoToml::new(workspace, package)?;
+        check_crate_before_bumping(&mut package)?;
         let new_version = bump_crate_version(&mut package, args.amount, args.pre.as_deref())?;
         finalize_changelog(&package, new_version)?;
     }
@@ -92,72 +143,51 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     Ok(())
 }
 
-fn check_crate_before_bumping(package: Package, manifest: &DocumentMut) -> Result<()> {
+fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
     // Collect errors into a vector to preserve order.
     let mut errors = Vec::new();
 
-    recurse(String::new(), &mut errors, manifest.as_table());
+    manifest.visit_dependencies(|path, dep_kind, table| {
+        // Display the section in case we have a more complex path to the dependency
+        // (like [target.'cfg(target_arch = "riscv32")'.dependencies])
+        let path = if path.is_empty() {
+            String::new()
+        } else {
+            format!("[{path}.{dep_kind}] ")
+        };
 
-    fn recurse(
-        path: String,
-        errors: &mut Vec<(&'static str, Vec<(String, Error)>)>,
-        table: &toml_edit::Table,
-    ) {
-        for (key, item) in table.iter() {
-            if let Item::Table(table) = item {
-                let path = if path.is_empty() {
-                    key.to_string()
-                } else {
-                    format!("{path}.{key}")
-                };
-                recurse(path, errors, table);
-            }
-        }
-        for dependency_kind in DEPENDENCY_KINDS {
-            // Display the section in case we have a more complex path to the dependency
-            // (like [target.'cfg(target_arch = "riscv32")'.dependencies])
-            let path = if path.is_empty() {
-                String::new()
-            } else {
-                format!("[{path}.{dependency_kind}] ")
-            };
-
-            let Some(Item::Table(table)) = table.get(dependency_kind) else {
+        for (name, item) in table.iter() {
+            let Err(e) = check_dependency_before_bumping(item) else {
+                // Dependency is well-formed
                 continue;
             };
 
-            for (name, item) in table.iter() {
-                let Err(e) = check_dependency_before_bumping(item) else {
-                    continue;
-                };
-
-                let position = match errors.iter().position(|(k, _)| *k == dependency_kind) {
-                    Some(position) => position,
-                    None => {
-                        errors.push((dependency_kind, vec![]));
-                        errors.len() - 1
-                    }
-                };
-                errors[position].1.push((format!("{path}{name}"), e));
-            }
+            let position = match errors.iter().position(|(k, _)| *k == dep_kind) {
+                Some(position) => position,
+                None => {
+                    errors.push((dep_kind, vec![]));
+                    errors.len() - 1
+                }
+            };
+            errors[position].1.push((format!("{path}{name}"), e));
         }
-    }
+    });
 
+    // We've processed the dependencies, let's assemble the error message:
     if !errors.is_empty() {
         let mut error_message = String::new();
         for (dep_kind, errors) in errors {
             if !error_message.is_empty() {
                 error_message.push_str("\n");
             }
-            error_message.push_str(&format!("In [{dep_kind}]:\n"));
+            writeln!(&mut error_message, "In [{dep_kind}]:").unwrap();
             for (krate, error) in errors {
-                error_message.push_str(&format!("- {krate}: {error}\n"));
+                writeln!(&mut error_message, "- {krate}: {error}").unwrap();
             }
         }
         bail!(
-            "The following errors were found in the dependencies of {}:\n{}",
-            package,
-            error_message
+            "The following errors were found in the dependencies of {}:\n{error_message}",
+            manifest.package
         );
     }
 
@@ -181,6 +211,9 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
             bail!("Dependency does not specify a version.");
         }
         if dependency.contains_key("git") {
+            // These are not allowed because usually they indicate that the dependency
+            // (usually a PAC) needs to be released. `cargo publish` would still
+            // succeed, but the end result would not be what we want.
             bail!("Dependency specifies a git dependency.");
         }
         Ok(())
@@ -208,7 +241,7 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
 
 /// Bump the version of the specified package by the specified amount.
 fn bump_crate_version(
-    bumped_package: &mut BumpedPackage<'_>,
+    bumped_package: &mut CargoToml<'_>,
     amount: Version,
     pre: Option<&str>,
 ) -> Result<semver::Version> {
@@ -219,6 +252,8 @@ fn bump_crate_version(
 
     bumped_package.set_version(&version);
 
+    bumped_package.save()?;
+
     fs::write(
         &bumped_package.manifest_path,
         bumped_package.manifest.to_string(),
@@ -226,25 +261,14 @@ fn bump_crate_version(
 
     let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
-        let manifest_path = bumped_package
-            .workspace
-            .join(pkg.to_string())
-            .join("Cargo.toml");
-        let manifest = fs::read_to_string(&manifest_path)
-            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
-
-        let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+        let mut dependent = CargoToml::new(bumped_package.workspace, pkg)
+            .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
 
         let mut changed = false;
-        for dependency_kind in DEPENDENCY_KINDS {
-            let Some(table) = manifest[dependency_kind].as_table_mut() else {
-                continue;
-            };
 
-            let dependency = &mut table[package_name.as_str()];
-
+        dependent.visit_dependencies(|_, _, table| {
             // Update dependencies which specify a version:
-            match dependency {
+            match &mut table[&package_name] {
                 Item::Table(table) if table.contains_key("version") => {
                     table["version"] = toml_edit::value(version.to_string());
                     changed = true;
@@ -253,17 +277,16 @@ fn bump_crate_version(
                     table["version"] = version.to_string().into();
                     changed = true;
                 }
-                _ => continue,
+                _ => {}
             }
-        }
+        });
 
         if changed {
             log::info!(
                 "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
             );
 
-            fs::write(&manifest_path, manifest.to_string())
-                .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+            dependent.save()?;
         }
     }
 
@@ -312,10 +335,7 @@ fn do_version_bump(version: &str, amount: Version, pre: Option<&str>) -> Result<
     Ok(version)
 }
 
-fn finalize_changelog(
-    bumped_package: &BumpedPackage<'_>,
-    new_version: semver::Version,
-) -> Result<()> {
+fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: semver::Version) -> Result<()> {
     let changelog_path = bumped_package
         .workspace
         .join(bumped_package.package.to_string())
@@ -384,14 +404,19 @@ mod test {
             [target.'cfg(target_arch = "riscv32")'.dependencies]
             package4 = {  }
             "#;
-        let doc = toml.parse::<DocumentMut>().unwrap();
 
-        let errors = check_crate_before_bumping(Package::EspHal, &doc);
+        let mut doc = CargoToml {
+            manifest: toml.parse::<DocumentMut>().unwrap(),
+            package: Package::EspHal,
+            workspace: Path::new(""),
+            manifest_path: PathBuf::new(),
+        };
+        let errors = check_crate_before_bumping(&mut doc);
         pretty_assertions::assert_eq!(
             errors.unwrap_err().to_string(),
             r#"The following errors were found in the dependencies of esp-hal:
 In [dependencies]:
-- [target.cfg(target_arch = "riscv32").dependencies] package4: Dependency does not specify a version.
+- [target.'cfg(target_arch = "riscv32")'.dependencies] package4: Dependency does not specify a version.
 - package: Dependency specifies a wildcard version.
 - package2: Dependency specifies a wildcard version.
 
