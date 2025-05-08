@@ -504,7 +504,7 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         }
 
         let version = xtask::package_version(workspace, package)?;
-        let tag = format!("{package}-v{version}");
+        let tag = package.tag(version);
 
         if args.no_dry_run {
             let output = Command::new("git")
