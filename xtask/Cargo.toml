@@ -34,7 +34,7 @@ reqwest = { version = "0.12.12", features = [
 cargo-semver-checks = { version = "0.41.0", optional = true }
 
 # THIS NEEDS TO MATCH THE rustfmt-json FORMAT - see https://github.com/rust-lang/rustdoc-types/blob/trunk/CHANGELOG.md
-rustdoc-types = { version = "0.34.0", optional = true }
+rustdoc-types = { version = "0.35.0", optional = true }
 
 flate2 = { version = "1.1.1", optional = true }
 temp-file = { version = "0.1.9", optional = true }
