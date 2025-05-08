@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
+
 
 ### Changed
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed compatibility with `defmt` (#3374)
 
 ### Removed
+
 
 ## [0.6.0] - 2025-02-24
 
@@ -38,7 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.3.1 - 2024-10-10
 
-- Bumped esp-wifi-sys to `v0.6.0`
+### Changed
+
+- Bumped esp-wifi-sys to `v0.6.0` (#2328)
 
 ## 0.3.0 - 2024-10-10 - YANKED
 
@@ -71,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release
+- Initial release (#1800)
 
 [0.6.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-ieee802154-v0.6.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-ieee802154-v0.6.0...HEAD

@@ -2,12 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
+
 
 ### Changed
 
@@ -16,7 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+
 ### Removed
+
 
 ## [0.17.0] - 2025-02-24
 
@@ -28,9 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
 ### Fixed
 
+
 ### Removed
+
 
 ## 0.16.0 - 2025-01-15
 
@@ -81,6 +87,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-08-25
 
-- Initial release
+### Added
+
+- Initial release (#2518)
 
 [0.17.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-procmacros-v0.17.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...HEAD

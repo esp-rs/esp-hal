@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - COEX on ESP32 is now working (#3403)
 
 ### Removed
+
 
 ## [0.13.0] - 2025-02-24
 
@@ -73,18 +74,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `esp_wifi::init` no longer requires `EspWifiInitFor`, and now returns `EspWifiController`, see the migration guide for more details (#2301)
 - No need to add `rom_functions.x` manually anymore (#2374)
-- esp-now: Data is now private in `ReceivedData` - use `data()`(#2396)
+- esp-now: Data is now private in `ReceivedData` - use `data()` (#2396)
 - Changed the async APIs to have a `_async` postfix to avoid name collisions (#2446)
 - `phy_enable_usb` is enabled by default (#2446)
 - Removed `get_` prefixes from functions (#2528)
 - Opting out of `esp-alloc` now requires implementing `esp_wifi_deallocate_internal_ram` (#3320)
-
 - Config: Crate prefixes and configuration keys are now separated by `_CONFIG_` (#2848)
 
 ### Fixed
 
 - Fixed a possible crash when parsing results from a radius server (#2380)
-- Fixed `async fn WifiController::disconnect` hanging forever when awaited if not connected when called (#2392).
+- Fixed `async fn WifiController::disconnect` hanging forever when awaited if not connected when called (#2392)
 - Fixed building esp-wifi without either `ble` or `wifi` enabled (#3336)
 
 ### Removed
@@ -99,7 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bumped esp-wifi-sys to `v0.6.0`
+- Bumped esp-wifi-sys to `v0.6.0` (#2328)
 
 ## 0.10.0 - 2024-10-10 - YANKED
 
@@ -135,13 +135,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 ### Changed
+
 
 ### Fixed
 
 - Builds on stable, again (#2067)
 
 ### Removed
+
 
 ## 0.9.0 - 2024-09-03
 
@@ -151,9 +154,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
 ### Fixed
 
+
 ### Removed
+
 
 ## 0.8.0 - 2024-08-29
 
@@ -176,7 +182,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Check no password is set when using `AuthMethod::None`(#1806)
+- Check no password is set when using `AuthMethod::None` (#1806)
 
 ### Fixed
 
@@ -202,17 +208,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Removed embedded-hal v0.2 dependency
+- Removed embedded-hal v0.2 dependency (#1582)
 
 ## 0.5.1 - 2024-04-22
 
-Patch release to fix docs.rs build
+### Fixed
+
+- Patch release to fix docs.rs build (#1582)
 
 ## 0.5.0 - 2024-04-19
 
 ### Fixed
 
-- Fix compile error when using smoltcp `DNS_MAX_RESULT_COUNT` values other than 1
+- Fix compile error when using smoltcp `DNS_MAX_RESULT_COUNT` values other than 1 (#1654)
 
 ## 0.4.0 - 2024-03-12
 
@@ -220,7 +228,7 @@ Patch release to fix docs.rs build
 
 - Users don't need embedded-svc to control wifi anymore. The wifi trait is optionally implemented now. (#429)
 - Better network performance by forced yielding of the task when buffers are full / empty. (#430)
-- Depend on esp-hal 0.16.1, update other dependencies
+- Depend on esp-hal 0.16.1, update other dependencies (#1582)
 
 ## 0.3.0 - 2024-01-29
 
@@ -236,16 +244,22 @@ Patch release to fix docs.rs build
 ### Changed
 
 - Update driver blobs (#410)
-- Update dependencies to fit `embedded-hal` `1.0`
+- Update dependencies to fit `embedded-hal` `1.0` (#1582)
 
 ### Removed
 
+
 ## 0.2.0 - 2024-01-05
 
-Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, ESP32-H2
+### Added
+
+- Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, ESP32-H2 (#1582)
 
 ## 0.1.0 - 2023-11-27
 
-Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6
+### Added
+
+- Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6 (#1582)
 
 [0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...HEAD

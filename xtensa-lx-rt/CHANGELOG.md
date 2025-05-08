@@ -9,15 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
 ### Changed
 
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 
 ### Fixed
 
+
 ### Removed
 
-## 0.18.0 - 2025-01-15
+
+## [0.18.0] - 2025-01-15
 
 ### Changed
 
@@ -31,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
 ## 0.17.1 - 2024-09-02
 
 ### Added
@@ -43,4 +47,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Initial releases
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/commits/main/xtensa-lx?since=2025-01-15
+[0.18.0]: https://github.com/esp-rs/esp-hal/releases/tag/xtensa-lx-rt-v0.18.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.18.0...HEAD

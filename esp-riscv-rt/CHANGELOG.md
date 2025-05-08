@@ -5,9 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
+
 
 ### Changed
 
@@ -15,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+
 ### Removed
+
 
 ## [0.10.0] - 2025-02-24
 
@@ -26,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.9.1 - 2024-11-20
 
-## Fixed
+### Fixed
 
 - Fix interrupt stack alignment (#2425)
 
@@ -38,10 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- All existing features controlling ram initialization. Most (`init-data`, `init-rw-text`,
-  `init-rtc-fast-data`, and `init-rtc-fast-text`) were only used for the (already removed) direct
-  boot support. `zero-bss` is now enabled unconditionally. `zero-rtc-fast-bss` was merged into the
-  new `rtc-ram` feature. (#1677)
+- All existing features controlling ram initialization. (#1677)
 
 ## 0.8.0 - 2024-04-18
 
@@ -64,7 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated to latest version of `riscv` and `riscv-rt-macros` dependencies
+- Updated to latest version of `riscv` and `riscv-rt-macros` dependencies (#1098)
 
 ## 0.6.0 - 2023-12-12
 
@@ -75,6 +75,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6/ESP32-H2: Add `fix-sp` feature to support `flip-link` in `esp-hal-common` (#1008)
 
 ### Removed
+
 
 ## 0.5.0 - 2023-09-05
 
@@ -95,3 +96,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2023-01-26
 
 [0.10.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-riscv-rt-v0.10.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.10.0...HEAD
