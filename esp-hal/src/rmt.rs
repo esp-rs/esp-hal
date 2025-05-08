@@ -489,13 +489,11 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
     pin: impl PeripheralInput<'d>,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
-            let threshold = 0b111_1111_1111_1111;
-        } else {
-            let threshold = 0b11_1111_1111_1111;
-        }
-    }
+    let threshold = if cfg!(any(esp32, esp32s2)) {
+        0b111_1111_1111_1111
+    } else {
+        0b11_1111_1111_1111
+    };
 
     if config.idle_threshold > threshold {
         return Err(Error::InvalidArgument);
@@ -1299,10 +1297,7 @@ pub trait RxChannel: RxChannelInternal {
     }
 }
 
-#[cfg(any(esp32, esp32s3))]
-const NUM_CHANNELS: usize = 8;
-#[cfg(not(any(esp32, esp32s3)))]
-const NUM_CHANNELS: usize = 4;
+const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 
 #[repr(u8)]
 enum RmtState {
@@ -2212,7 +2207,7 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
-    use super::Error;
+    use super::{Error, NUM_CHANNELS};
     use crate::{peripherals::RMT, time::Rate};
 
     pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
@@ -2222,16 +2217,9 @@ mod chip_specific {
 
         let rmt = RMT::regs();
 
-        rmt.ch0conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch1conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch2conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch3conf1().modify(|_, w| w.ref_always_on().set_bit());
-        #[cfg(esp32)]
-        {
-            rmt.ch4conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch5conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch6conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch7conf1().modify(|_, w| w.ref_always_on().set_bit());
+        for ch_num in 0..NUM_CHANNELS {
+            rmt.chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().set_bit());
         }
 
         rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
@@ -2243,49 +2231,15 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    #[cfg(esp32)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
-        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
-            Some(0)
-        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
-            Some(1)
-        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
-            Some(2)
-        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
-            Some(3)
-        } else if st.ch4_rx_end().bit() || st.ch4_tx_end().bit() || st.ch4_err().bit() {
-            Some(4)
-        } else if st.ch5_rx_end().bit() || st.ch5_tx_end().bit() || st.ch5_err().bit() {
-            Some(5)
-        } else if st.ch6_rx_end().bit() || st.ch6_tx_end().bit() || st.ch6_err().bit() {
-            Some(6)
-        } else if st.ch7_rx_end().bit() || st.ch7_tx_end().bit() || st.ch7_err().bit() {
-            Some(7)
-        } else {
-            None
-        }
-    }
-
-    #[allow(unused)]
-    #[cfg(esp32s2)]
-    pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = RMT::regs();
-        let st = rmt.int_st().read();
-
-        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
-            Some(0)
-        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
-            Some(1)
-        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
-            Some(2)
-        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
-            Some(3)
-        } else {
-            None
-        }
+        (0..NUM_CHANNELS).find(|&ch_num| {
+            st.ch_rx_end(ch_num as u8).bit()
+                || st.ch_tx_end(ch_num as u8).bit()
+                || st.ch_err(ch_num as u8).bit()
+        })
     }
 
     #[inline]
