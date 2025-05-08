@@ -327,6 +327,11 @@ impl PulseCode for u32 {
     }
 }
 
+#[inline]
+fn channel_ram_start(ch_num: impl Into<usize>) -> *mut u32 {
+    (constants::RMT_RAM_START + ch_num.into() * constants::RMT_CHANNEL_RAM_SIZE * 4) as *mut u32
+}
+
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -643,9 +648,7 @@ where
                 * (constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
                     / 2);
 
-            let ptr = (constants::RMT_RAM_START
-                + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
-                + ram_index * 4) as *mut u32;
+            let ptr = unsafe { channel_ram_start(C::CHANNEL).add(ram_index) };
             for (idx, entry) in self.data[self.index..]
                 .iter()
                 .take(
@@ -712,9 +715,7 @@ where
         <C as TxChannelInternal>::set_continuous(false);
         <C as TxChannelInternal>::update();
 
-        let ptr = (constants::RMT_RAM_START
-            + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
+        let ptr = channel_ram_start(C::CHANNEL);
         for idx in 0..constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
         {
             unsafe {
@@ -1262,9 +1263,7 @@ where
         <C as RxChannelInternal>::clear_interrupts();
         <C as RxChannelInternal>::update();
 
-        let ptr = (constants::RMT_RAM_START
-            + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
+        let ptr = channel_ram_start(C::CHANNEL);
         let len = self.data.len();
         for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
             *entry = unsafe { ptr.add(idx).read_volatile() };
@@ -1444,9 +1443,7 @@ pub trait RxChannelAsync: RxChannelInternal {
             Self::clear_interrupts();
             Self::update();
 
-            let ptr = (constants::RMT_RAM_START
-                + Self::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-                as *mut u32;
+            let ptr = channel_ram_start(Self::CHANNEL);
             let len = data.len();
             for (idx, entry) in data.iter_mut().take(len).enumerate() {
                 *entry = unsafe { ptr.add(idx).read_volatile().into() };
@@ -1596,9 +1593,7 @@ pub trait TxChannelInternal {
             return Err(Error::InvalidArgument);
         }
 
-        let ptr = (constants::RMT_RAM_START
-            + Self::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
+        let ptr = channel_ram_start(Self::CHANNEL);
         for (idx, entry) in data
             .iter()
             .take(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
