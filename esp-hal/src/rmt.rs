@@ -2134,11 +2134,12 @@ mod chip_specific {
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 0..Self::memsize() {
+                    for i in 1..Self::memsize() {
                         rmt.ch_rx_conf1(($ch_index + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| {
+                        w.mem_owner().set_bit();
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.rx_en().set_bit()
@@ -2359,12 +2360,13 @@ mod chip_specific {
                 fn start_tx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 0..Self::memsize() {
+                    for i in 1..Self::memsize() {
                         rmt.chconf1(($ch_num + i).into())
                             .modify(|_, w| w.mem_owner().clear_bit());
                     }
 
                     rmt.chconf1($ch_num).modify(|_, w| {
+                        w.mem_owner().clear_bit();
                         w.mem_rd_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.tx_start().set_bit()
@@ -2506,12 +2508,13 @@ mod chip_specific {
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 0..Self::memsize() {
+                    for i in 1..Self::memsize() {
                         rmt.chconf1(($ch_num + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
 
                     rmt.chconf1($ch_num).modify(|_, w| {
+                        w.mem_owner().set_bit();
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.rx_en().set_bit()
