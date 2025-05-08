@@ -35,15 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added trait MultiwriteNorFlash to FlashStorage (#2478)
 
-### Changed
-
-
-### Fixed
-
-
-### Removed
-
-
 ## 0.3.1 - 2024-10-10
 
 ## 0.3.0 - 2023-08-16

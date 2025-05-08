@@ -878,9 +878,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
 - ESP32: ADC readings are no longer inverted (#1093)
 
-### Removed
-
-
 ## [0.14.1] - 2023-12-13
 
 ### Fixed

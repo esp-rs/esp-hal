@@ -44,7 +44,12 @@ impl Changelog {
         Ok(this)
     }
 
-    pub fn finalize(&mut self, package: Package, version: semver::Version) {
+    pub fn finalize(
+        &mut self,
+        package: Package,
+        version: semver::Version,
+        timestamp: jiff::Timestamp,
+    ) {
         // Find the entry for the version
         let Some(unreleased_entry) = self.entries.iter_mut().find(|e| e.version == "Unreleased")
         else {
@@ -54,7 +59,7 @@ impl Changelog {
 
         unreleased_entry.version = format!("v{version}");
         unreleased_entry.tag = Some(package.tag(version));
-        unreleased_entry.date = Some(jiff::Timestamp::now().strftime("%Y-%m-%d").to_string());
+        unreleased_entry.date = Some(timestamp.strftime("%Y-%m-%d").to_string());
 
         self.entries.insert(
             0,
@@ -206,7 +211,10 @@ impl Display for ChangelogForVersion {
         writeln!(f)?;
 
         for group in self.groups.iter() {
-            write!(f, "{group}")?;
+            // Keep empty groups for Unreleased only
+            if self.version == "Unreleased" || !group.lines.is_empty() {
+                write!(f, "{group}")?;
+            }
         }
 
         Ok(())
@@ -331,4 +339,199 @@ fn parse_tag_link(line: &str) -> Result<(&str, &str)> {
     };
 
     Ok((version, tag))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_normalization() {
+        struct TestCase {
+            input: &'static str,
+            expected: &'static str,
+        }
+
+        let changelog = [
+            // Adds header and Unreleased link
+            TestCase {
+                input: "
+## Unreleased
+
+## [0.1.0] - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+                expected: "# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.1.0] - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/v0.1.0...HEAD
+",
+            },
+            // Turns header into link if it exists
+            TestCase {
+                input: "
+## 0.1.0 - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+                expected: "# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+            },
+            // Merges changelog groups
+            TestCase {
+                input: "
+## [0.1.0] - 2023-10-01
+
+### Added
+
+- Added support for ESP32-S3 (#1)
+
+### Added
+
+- Added support for ESP32-C3 (#2)
+
+### Changed
+
+- Change (#1)
+
+### Breaking
+
+- Bad change (#2)
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+                expected: "# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2023-10-01
+
+### Added
+
+- Added support for ESP32-S3 (#1)
+- Added support for ESP32-C3 (#2)
+
+### Changed
+
+- Change (#1)
+- Bad change (#2)
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+            },
+        ];
+
+        for TestCase { input, expected } in changelog {
+            let normalized = Changelog::parse(input).unwrap().to_string();
+
+            pretty_assertions::assert_eq!(normalized, expected);
+        }
+    }
+
+    #[test]
+    fn test_finalization() {
+        let mut changelog = Changelog::parse(
+            "## Unreleased
+
+### Added
+
+- Added support for ESP32-S3 (#1)
+
+### Added
+
+- Added support for ESP32-C3 (#2)
+
+### Changed
+
+- Change (#1)
+
+### Breaking
+
+- Bad change (#2)
+
+
+### Fixed
+
+
+### Removed
+
+
+
+## [0.1.0] - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+",
+        )
+        .unwrap();
+
+        changelog.finalize(
+            Package::EspHal,
+            semver::Version::new(0, 2, 0),
+            jiff::Timestamp::now(),
+        );
+
+        let expected = "# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.2.0] - 2025-05-08
+
+### Added
+
+- Added support for ESP32-S3 (#1)
+- Added support for ESP32-C3 (#2)
+
+### Changed
+
+- Change (#1)
+- Bad change (#2)
+
+## [0.1.0] - 2023-10-01
+
+[0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+[v0.2.0]: https://github.com/esp-rs/esp-hal/compare/v0.1.0...esp-hal-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v0.2.0...HEAD
+";
+
+        pretty_assertions::assert_eq!(changelog.to_string(), expected);
+    }
 }
