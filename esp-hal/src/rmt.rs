@@ -616,7 +616,9 @@ where
 {
     channel: C,
     index: usize,
-    data: &'a [u32],
+
+    // Remaining data that has not yet been written to channel RAM. May be empty.
+    remaining_data: &'a [u32],
 }
 
 impl<C> SingleShotTxTransaction<'_, C>
@@ -632,7 +634,7 @@ where
                 return Err((Error::TransmissionError, self.channel));
             }
 
-            if self.index >= self.data.len() {
+            if self.remaining_data.is_empty() {
                 break;
             }
 
@@ -644,13 +646,17 @@ where
             let ram_index = (((self.index - memsize) / (memsize / 2)) % 2) * (memsize / 2);
 
             let ptr = unsafe { channel_ram_start(C::CHANNEL).add(ram_index) };
-            for (idx, entry) in self.data[self.index..].iter().take(memsize / 2).enumerate() {
-                unsafe {
-                    ptr.add(idx).write_volatile(*entry);
-                }
-            }
+            let count = self
+                .remaining_data
+                .iter()
+                .take(memsize / 2)
+                .enumerate()
+                .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
+                .count();
 
             self.index += memsize / 2;
+            // Note that if count < memsize / 2, the new slice is empty.
+            self.remaining_data = &self.remaining_data[count..];
         }
 
         loop {
@@ -1186,7 +1192,7 @@ pub trait TxChannel: TxChannelInternal {
         Ok(SingleShotTxTransaction {
             channel: self,
             index,
-            data,
+            remaining_data: &data[index..],
         })
     }
 
