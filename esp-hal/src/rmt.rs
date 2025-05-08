@@ -227,6 +227,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use portable_atomic::{AtomicU8, Ordering};
 
 use crate::{
     Async,
@@ -408,63 +409,8 @@ where
 {
     pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let me = Rmt::create(peripheral);
-        me.configure_clock(frequency)?;
-        me.clear_memsizes();
+        self::chip_specific::configure_clock(frequency)?;
         Ok(me)
-    }
-
-    #[cfg(any(esp32, esp32s2))]
-    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
-        if frequency != Rate::from_mhz(80) {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock();
-
-        Ok(())
-    }
-
-    // A memsize = 0 indicates that the channel memory is available
-    #[cfg(any(esp32, esp32s2))]
-    fn clear_memsizes(&self) {
-        let rmt = crate::peripherals::RMT::regs();
-        for i in 0..NUM_CHANNELS {
-            rmt.chconf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-    }
-
-    // A memsize = 0 indicates that the channel memory is available
-    #[cfg(not(any(esp32, esp32s2)))]
-    fn clear_memsizes(&self) {
-        let rmt = crate::peripherals::RMT::regs();
-        for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_tx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-        for i in 0..NUM_CHANNELS / 2 {
-            rmt.ch_rx_conf0(i)
-                .modify(|_, w| unsafe { w.mem_size().bits(0) });
-        }
-    }
-
-    #[cfg(not(any(esp32, esp32s2)))]
-    fn configure_clock(&self, frequency: Rate) -> Result<(), Error> {
-        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
-
-        if frequency > src_clock {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        let div = (src_clock / frequency) - 1;
-
-        if div > u8::MAX as u32 {
-            return Err(Error::UnreachableTargetFrequency);
-        }
-
-        self::chip_specific::configure_clock(div);
-
-        Ok(())
     }
 }
 
@@ -503,6 +449,42 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
     }
 }
 
+// Mark the channel as used and reserve the channel RAM.
+//
+// If this is not possible (because a preceding channel is using the RAM, or
+// because subsequent channels are in use so that we can't reserve the RAM),
+// restore all state and return with an error.
+fn reserve_channel(channel: u8, state: RmtState, memsize: u8) -> Result<(), Error> {
+    if memsize > NUM_CHANNELS as u8 - channel {
+        return Err(Error::InvalidMemsize);
+    }
+
+    let mut next_state = state;
+    for cur_channel in channel..channel + memsize {
+        if STATE[cur_channel as usize]
+            .compare_exchange(
+                RmtState::Unconfigured as u8,
+                next_state as u8,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_err()
+        {
+            for i in (channel..cur_channel).rev() {
+                STATE[i as usize].store(RmtState::Unconfigured as u8, Ordering::Release);
+            }
+
+            return Err(Error::MemoryBlockNotAvailable);
+        }
+
+        // Set the first channel to `state` (`Rx`|`Tx`), the remaining (if any) to
+        // `Reserved`
+        next_state = RmtState::Reserved;
+    }
+
+    Ok(())
+}
+
 fn configure_rx_channel<'d, T: RxChannelInternal>(
     pin: impl PeripheralInput<'d>,
     config: RxChannelConfig,
@@ -519,23 +501,7 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    if config.memsize > NUM_CHANNELS as u8 {
-        return Err(Error::InvalidMemsize);
-    }
-
-    if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
-        return Err(Error::InvalidMemsize);
-    }
-
-    // If a channel's memory block is available then its memory size will be 0
-    if !T::is_memory_blocks_available(config.memsize) {
-        return Err(Error::MemoryBlockNotAvailable);
-    }
-
-    // If configured to use extended memory blocks then set the extended memory
-    // blocks to 1 to indicate they are unavailable. Setting the memsize for
-    // this channel will be set further down in the code
-    T::set_memory_blocks_unavailable(config.memsize);
+    reserve_channel(T::CHANNEL, RmtState::Rx, config.memsize)?;
 
     let pin = pin.into();
 
@@ -562,23 +528,7 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    if config.memsize > NUM_CHANNELS as u8 {
-        return Err(Error::InvalidMemsize);
-    }
-
-    if config.memsize > NUM_CHANNELS as u8 - T::CHANNEL {
-        return Err(Error::InvalidMemsize);
-    }
-
-    // If a channel's memory block is available then its memory size will be 0
-    if !T::is_memory_blocks_available(config.memsize) {
-        return Err(Error::MemoryBlockNotAvailable);
-    }
-
-    // If configured to use extended memory blocks then set the extended memory
-    // blocks to 1 to indicate they are unavailable. Setting the memsize for
-    // this channel will be set further down in the code
-    T::set_memory_blocks_unavailable(config.memsize);
+    reserve_channel(T::CHANNEL, RmtState::Tx, config.memsize)?;
 
     let pin = pin.into();
 
@@ -700,7 +650,10 @@ where
                 + ram_index * 4) as *mut u32;
             for (idx, entry) in self.data[self.index..]
                 .iter()
-                .take(constants::RMT_CHANNEL_RAM_SIZE / 2)
+                .take(
+                    constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
+                        / 2,
+                )
                 .enumerate()
             {
                 unsafe {
@@ -1219,6 +1172,27 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
+impl<Dm, const CHANNEL: u8> Drop for Channel<Dm, CHANNEL>
+where
+    Dm: crate::DriverMode,
+{
+    fn drop(&mut self) {
+        // This isn't really necessary, but be extra sure that this channel can't
+        // interfere with others.
+        chip_specific::set_channel_mem_size(CHANNEL, 0);
+
+        let memsize = chip_specific::channel_mem_size(CHANNEL);
+        for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
+            .iter()
+            .rev()
+        {
+            // Existence of this `Channel` struct implies exclusive access to these hardware
+            // channels, thus simply store the new state.
+            s.store(RmtState::Unconfigured as u8, Ordering::Release);
+        }
+    }
+}
+
 /// Channel in TX mode
 pub trait TxChannel: TxChannelInternal {
     /// Start transmitting the given pulse code sequence.
@@ -1337,7 +1311,26 @@ const NUM_CHANNELS: usize = 8;
 #[cfg(not(any(esp32, esp32s3)))]
 const NUM_CHANNELS: usize = 4;
 
+#[repr(u8)]
+enum RmtState {
+    // The channel is not configured for either rx or tx, and its memory is available
+    Unconfigured,
+
+    // The channels is not in use, but one of the preceding channels is using its memory
+    Reserved,
+
+    // The channel is configured for rx
+    Rx,
+
+    // The channel is configured for tx
+    Tx,
+}
+
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
+// This must only holds value of RmtState. However, we need atomic access, thus
+// represent as AtomicU8.
+static STATE: [AtomicU8; NUM_CHANNELS] =
+    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct RmtTxFuture<T>
@@ -1586,10 +1579,6 @@ pub trait TxChannelInternal {
 
     fn set_idle_output(enable: bool, level: Level);
 
-    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
-
-    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
-
     fn set_memsize(memsize: u8);
 
     fn memsize() -> u8;
@@ -1678,10 +1667,6 @@ pub trait RxChannelInternal {
 
     fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
-    fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool;
-
-    fn set_memory_blocks_unavailable(num_memory_blocks: u8);
-
     fn set_memsize(value: u8);
 
     fn memsize() -> u8;
@@ -1718,15 +1703,26 @@ pub trait RxChannelInternal {
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
-    use crate::peripherals::RMT;
+    use super::Error;
+    use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock(div: u32) {
+    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+
+        if frequency > src_clock {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
+        let Ok(div) = u8::try_from((src_clock / frequency) - 1) else {
+            return Err(Error::UnreachableTargetFrequency);
+        };
+
         #[cfg(not(pcr))]
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
                 w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
-                w.sclk_div_num().bits(div as u8);
+                w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
                 w.apb_fifo_mask().set_bit()
@@ -1737,7 +1733,7 @@ mod chip_specific {
         {
             use crate::peripherals::PCR;
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {
-                w.sclk_div_num().bits(div as u8);
+                w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0)
             });
@@ -1755,6 +1751,8 @@ mod chip_specific {
                 .sys_conf()
                 .modify(|_, w| w.apb_fifo_mask().set_bit());
         }
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -1799,6 +1797,94 @@ mod chip_specific {
         } else {
             None
         }
+    }
+
+    #[cfg(not(esp32s3))]
+    #[inline]
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
+        let rmt = RMT::regs();
+
+        match ch_num {
+            0 => rmt.ch0_tx_conf0().read().mem_size().bits(),
+            1 => rmt.ch1_tx_conf0().read().mem_size().bits(),
+            2 => rmt.ch2_rx_conf0().read().mem_size().bits(),
+            3 => rmt.ch3_rx_conf0().read().mem_size().bits(),
+            _ => panic!("invalid channel number"),
+        }
+    }
+
+    #[cfg(not(esp32s3))]
+    #[inline]
+    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+        let rmt = RMT::regs();
+
+        match ch_num {
+            0 => rmt
+                .ch0_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            1 => rmt
+                .ch1_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            2 => rmt
+                .ch2_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            3 => rmt
+                .ch3_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            _ => panic!("invalid channel number"),
+        };
+    }
+
+    #[cfg(esp32s3)]
+    #[inline]
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
+        let rmt = RMT::regs();
+
+        match ch_num {
+            0 => rmt.ch0_tx_conf0().read().mem_size().bits(),
+            1 => rmt.ch1_tx_conf0().read().mem_size().bits(),
+            2 => rmt.ch2_tx_conf0().read().mem_size().bits(),
+            3 => rmt.ch3_tx_conf0().read().mem_size().bits(),
+            4 => rmt.ch4_rx_conf0().read().mem_size().bits(),
+            5 => rmt.ch5_rx_conf0().read().mem_size().bits(),
+            6 => rmt.ch6_rx_conf0().read().mem_size().bits(),
+            7 => rmt.ch7_rx_conf0().read().mem_size().bits(),
+            _ => panic!("invalid channel number"),
+        }
+    }
+
+    #[cfg(esp32s3)]
+    #[inline]
+    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+        let rmt = RMT::regs();
+
+        match ch_num {
+            0 => rmt
+                .ch0_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            1 => rmt
+                .ch1_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            2 => rmt
+                .ch2_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            3 => rmt
+                .ch3_tx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            4 => rmt
+                .ch4_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            5 => rmt
+                .ch5_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            6 => rmt
+                .ch6_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            7 => rmt
+                .ch7_rx_conf0()
+                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+            _ => panic!("invalid channel number"),
+        };
     }
 
     macro_rules! impl_tx_channel {
@@ -1895,35 +1981,6 @@ mod chip_specific {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.ch_tx_conf0($ch_num)
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
-                }
-
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
-
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.ch_tx_conf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
-                        }
-                    } else {
-                        memory_block_is_available =
-                            rmt.ch_tx_conf0($ch_num).read().mem_size().bits() == 0;
-                    }
-
-                    memory_block_is_available
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.ch_tx_conf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
-                    }
                 }
 
                 fn set_memsize(value: u8) {
@@ -2077,35 +2134,6 @@ mod chip_specific {
                     });
                 }
 
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
-
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_index..$ch_index + memory_blocks_requested {
-                            if rmt.ch_rx_conf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
-                        }
-                    } else {
-                        memory_block_is_available =
-                            rmt.ch_rx_conf0($ch_index).read().mem_size().bits() == 0;
-                    }
-
-                    memory_block_is_available
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_index + 1..$ch_index + num_memory_blocks {
-                            rmt.ch_rx_conf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
-                    }
-                }
-
                 fn set_memsize(value: u8) {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.ch_rx_conf0($ch_index)
@@ -2191,9 +2219,14 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
-    use crate::peripherals::RMT;
+    use super::Error;
+    use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock() {
+    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+        if frequency != Rate::from_mhz(80) {
+            return Err(Error::UnreachableTargetFrequency);
+        }
+
         let rmt = RMT::regs();
 
         rmt.ch0conf1().modify(|_, w| w.ref_always_on().set_bit());
@@ -2212,6 +2245,8 @@ mod chip_specific {
 
         #[cfg(not(esp32))]
         rmt.apb_conf().modify(|_, w| w.clk_en().set_bit());
+
+        Ok(())
     }
 
     #[allow(unused)]
@@ -2258,6 +2293,20 @@ mod chip_specific {
         } else {
             None
         }
+    }
+
+    #[inline]
+    pub fn channel_mem_size(ch_num: u8) -> u8 {
+        let rmt = crate::peripherals::RMT::regs();
+        rmt.chconf0(ch_num as usize).read().mem_size().bits()
+    }
+
+    #[inline]
+    pub fn set_channel_mem_size(ch_num: u8, value: u8) {
+        let rmt = crate::peripherals::RMT::regs();
+
+        rmt.chconf0(ch_num as usize)
+            .modify(|_, w| unsafe { w.mem_size().bits(value) });
     }
 
     macro_rules! impl_tx_channel {
@@ -2348,35 +2397,6 @@ mod chip_specific {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.chconf1($ch_num)
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
-                }
-
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
-
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
-                        }
-                    } else {
-                        memory_block_is_available =
-                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
-                    }
-
-                    memory_block_is_available
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.chconf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
-                    }
                 }
 
                 fn set_memsize(value: u8) {
@@ -2527,35 +2547,6 @@ mod chip_specific {
                             .carrier_out_lv()
                             .bit(level.into())
                     });
-                }
-
-                fn is_memory_blocks_available(memory_blocks_requested: u8) -> bool {
-                    let rmt = crate::peripherals::RMT::regs();
-                    let mut memory_block_is_available = true;
-
-                    if memory_blocks_requested > 1 {
-                        for i in $ch_num..$ch_num + memory_blocks_requested {
-                            if rmt.chconf0(i as usize).read().mem_size().bits() != 0 {
-                                memory_block_is_available = false;
-                                break;
-                            }
-                        }
-                    } else {
-                        memory_block_is_available =
-                            rmt.chconf0($ch_num).read().mem_size().bits() == 0;
-                    }
-
-                    memory_block_is_available
-                }
-
-                fn set_memory_blocks_unavailable(num_memory_blocks: u8) {
-                    let rmt = crate::peripherals::RMT::regs();
-                    if num_memory_blocks > 1 {
-                        for i in $ch_num + 1..$ch_num + num_memory_blocks {
-                            rmt.chconf0(i as usize)
-                                .modify(|_, w| unsafe { w.mem_size().bits(1) });
-                        }
-                    }
                 }
 
                 fn set_memsize(value: u8) {
