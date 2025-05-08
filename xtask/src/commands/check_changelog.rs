@@ -28,7 +28,7 @@ fn check_changelog_for_package(workspace: &Path, package: Package, normalize: bo
         return Ok(());
     }
 
-    log::info!("  Updating changelog for package: {package}");
+    log::info!("  Checking changelog for package: {package}");
 
     // Let's parse the old changelog first
     let changelog_str = std::fs::read_to_string(&changelog_path)
