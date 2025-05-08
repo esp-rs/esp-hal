@@ -46,8 +46,18 @@ enum Cli {
 #[derive(Debug, Args)]
 struct BumpVersionArgs {
     /// How much to bump the version by.
+    ///
+    /// If the version is a pre-release, this will just remove the pre-release
+    /// version tag.
     #[arg(value_enum)]
     amount: Version,
+    /// Pre-release version to append to the version.
+    ///
+    /// If the package is already a pre-release, this will ignore `amount`. If
+    /// the package is not a pre-release, this will bump the version by
+    /// `amount` and append the pre-release version as `<pre>.0`.
+    #[arg(long)]
+    pre: Option<String>,
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
@@ -157,7 +167,7 @@ fn main() -> Result<()> {
 fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
-        xtask::bump_version(workspace, package, args.amount)?;
+        xtask::bump_version(workspace, package, args.amount, args.pre.as_deref())?;
     }
 
     Ok(())
