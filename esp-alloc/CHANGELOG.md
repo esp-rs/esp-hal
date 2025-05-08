@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -13,12 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnyMemory`, `InternalMemory`, `ExternalMemory` allocators. (#3318)
 
 ### Changed
+
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Update `defmt` to 1.0 (#3416)
 
 ### Fixed
 
+
 ### Removed
+
 
 ## [0.7.0] - 2025-02-24
 
@@ -57,3 +60,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2022-07-25
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-alloc-v0.7.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.7.0...HEAD
