@@ -2147,14 +2147,20 @@ mod chip_specific {
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 1..Self::memsize() {
+                    for i in 0..Self::memsize() {
                         rmt.ch_rx_conf1(($ch_index + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
+
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| {
-                        w.mem_owner().set_bit();
                         w.mem_wr_rst().set_bit();
-                        w.apb_mem_rst().set_bit();
+                        w.apb_mem_rst().set_bit()
+                    });
+                    rmt.ch_rx_conf1($ch_index).modify(|_, w| {
+                        w.mem_wr_rst().clear_bit();
+                        w.apb_mem_rst().clear_bit()
+                    });
+                    rmt.ch_rx_conf1($ch_index).modify(|_, w| {
                         w.rx_en().set_bit()
                     });
                 }
@@ -2528,7 +2534,13 @@ mod chip_specific {
 
                     rmt.chconf1($ch_num).modify(|_, w| {
                         w.mem_wr_rst().set_bit();
-                        w.apb_mem_rst().set_bit();
+                        w.apb_mem_rst().set_bit()
+                    });
+                    rmt.chconf1($ch_num).modify(|_, w| {
+                        w.mem_wr_rst().clear_bit();
+                        w.apb_mem_rst().clear_bit()
+                    });
+                    rmt.chconf1($ch_num).modify(|_, w| {
                         w.rx_en().set_bit()
                     });
                 }
