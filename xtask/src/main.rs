@@ -344,6 +344,8 @@ fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
 }
 
 fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    println!("::add-matcher::.github/rust-matchers.json");
+
     let mut failure = false;
     let started_at = Instant::now();
 
