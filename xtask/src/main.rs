@@ -340,6 +340,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Clippy and docs checks
 
     // Clippy
+    println!("::group::Lint");
     lint_packages(
         workspace,
         LintPackagesArgs {
@@ -350,8 +351,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     // Check doc-tests
+    println!("::group::Doc Test");
     run_doc_tests(
         workspace,
         ExamplesArgs {
@@ -363,8 +366,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     // Check documentation
+    println!("::group::Build Docs");
     build_documentation(
         workspace,
         BuildDocumentationArgs {
@@ -375,6 +380,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     // for chips with esp-lp-hal: Build all supported examples for the low-power
     // core first
@@ -383,6 +389,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // `examples` copies the examples to a folder with the chip name as the last
         // path element then we copy it to the place where the HP core example
         // expects it
+        println!("::group::Build LP-HAL Examples");
         examples(
             workspace,
             ExamplesArgs {
@@ -416,8 +423,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             Ok(())
         })
         .ok();
+        println!("::endgroup");
 
         // Check documentation
+        println!("::group::Build LP-HAL docs");
         build_documentation(
             workspace,
             BuildDocumentationArgs {
@@ -428,9 +437,11 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
         .inspect_err(|_| failure = true)
         .ok();
+        println!("::endgroup");
     }
 
     // Make sure we're able to build the HAL without the default features enabled
+    println!("::group::Build HAL");
     build_package(
         workspace,
         BuildPackageArgs {
@@ -443,8 +454,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     // Build (examples)
+    println!("::group::Build examples");
     examples(
         workspace,
         ExamplesArgs {
@@ -457,8 +470,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     // Build (qa-test)
+    println!("::group::Build qa-test");
     examples(
         workspace,
         ExamplesArgs {
@@ -471,6 +486,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     )
     .inspect_err(|_| failure = true)
     .ok();
+    println!("::endgroup");
 
     let completed_at = Instant::now();
     log::info!("CI checks completed in {:?}", completed_at - started_at);
