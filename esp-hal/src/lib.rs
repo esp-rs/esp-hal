@@ -532,9 +532,8 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
         fn main(a0: usize, a1: usize, a2: usize) -> !;
     }
 
-    unsafe extern "C" {
-        static mut __stack_chk_guard: u32;
-    }
+     extern "C" {        static mut __stack_chk_guard: u32;
+        }
 
     unsafe {
         let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
