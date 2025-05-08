@@ -1,10 +1,13 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
-use toml_edit::{Item, Value};
+use toml_edit::{DocumentMut, Item, Value};
 
 use crate::{Package, Version, changelog::Changelog};
 
@@ -28,11 +31,58 @@ pub struct BumpVersionArgs {
     packages: Vec<Package>,
 }
 
+struct BumpedPackage<'a> {
+    workspace: &'a Path,
+    package: Package,
+    manifest_path: PathBuf,
+    manifest: toml_edit::DocumentMut,
+}
+
+impl<'a> BumpedPackage<'a> {
+    fn new(workspace: &'a Path, package: Package) -> Result<Self> {
+        let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
+        if !manifest_path.exists() {
+            bail!(
+                "Could not find Cargo.toml for package {package} at {}",
+                manifest_path.display()
+            );
+        }
+
+        let manifest = fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        Ok(Self {
+            workspace,
+            package,
+            manifest_path,
+            manifest: manifest.parse::<DocumentMut>()?,
+        })
+    }
+
+    fn version(&self) -> &str {
+        self.manifest["package"]["version"]
+            .as_str()
+            .unwrap()
+            .trim()
+            .trim_matches('"')
+    }
+
+    fn set_version(&mut self, version: &semver::Version) {
+        log::info!(
+            "Bumping version for package: {} ({} -> {version})",
+            self.package,
+            self.version(),
+        );
+        self.manifest["package"]["version"] = toml_edit::value(version.to_string());
+    }
+}
+
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
-        let new_version = bump_crate_version(workspace, package, args.amount, args.pre.as_deref())?;
-        finalize_changelog(workspace, package, new_version)?;
+        let mut package = BumpedPackage::new(workspace, package)?;
+        let new_version = bump_crate_version(&mut package, args.amount, args.pre.as_deref())?;
+        finalize_changelog(&package, new_version)?;
     }
 
     Ok(())
@@ -40,42 +90,36 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
 
 /// Bump the version of the specified package by the specified amount.
 fn bump_crate_version(
-    workspace: &Path,
-    package: Package,
+    bumped_package: &mut BumpedPackage<'_>,
     amount: Version,
     pre: Option<&str>,
 ) -> Result<semver::Version> {
-    let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
-    let manifest = fs::read_to_string(&manifest_path)
-        .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+    let prev_version = bumped_package.version().to_string();
 
-    let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
+    let version = do_version_bump(&prev_version, amount, pre)
+        .with_context(|| format!("Failed to bump version of {}", bumped_package.package))?;
 
-    let version = manifest["package"]["version"]
-        .to_string()
-        .trim()
-        .trim_matches('"')
-        .to_string();
-    let prev_version = &version;
+    bumped_package.set_version(&version);
 
-    let version = do_version_bump(&version, package, amount, pre)?;
-
-    log::info!("Bumping version for package: {package} ({prev_version} -> {version})");
-
-    manifest["package"]["version"] = toml_edit::value(version.to_string());
-    fs::write(manifest_path, manifest.to_string())?;
+    fs::write(
+        &bumped_package.manifest_path,
+        bumped_package.manifest.to_string(),
+    )?;
 
     let dependency_kinds = ["dependencies", "dev-dependencies", "build-dependencies"];
 
+    let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
-        let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
+        let manifest_path = bumped_package
+            .workspace
+            .join(pkg.to_string())
+            .join("Cargo.toml");
         let manifest = fs::read_to_string(&manifest_path)
             .with_context(|| format!("Could not read {}", manifest_path.display()))?;
 
         let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
         let mut changed = false;
-        let package_name = package.to_string();
         for dependency_kind in dependency_kinds {
             let Some(table) = manifest[dependency_kind].as_table_mut() else {
                 continue;
@@ -110,12 +154,7 @@ fn bump_crate_version(
     Ok(version)
 }
 
-fn do_version_bump(
-    version: &str,
-    package: Package,
-    amount: Version,
-    pre: Option<&str>,
-) -> Result<semver::Version> {
+fn do_version_bump(version: &str, amount: Version, pre: Option<&str>) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: Version) {
         match amount {
             Version::Major => {
@@ -144,7 +183,7 @@ fn do_version_bump(
             version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
         } else {
             bail!(
-                "Unexpected pre-release version format found for {package}: {}",
+                "Unexpected pre-release version format found: {}",
                 version.pre.as_str()
             );
         }
@@ -158,18 +197,23 @@ fn do_version_bump(
 }
 
 fn finalize_changelog(
-    workspace: &Path,
-    package: Package,
+    bumped_package: &BumpedPackage<'_>,
     new_version: semver::Version,
 ) -> Result<()> {
-    let changelog_path = workspace.join(package.to_string()).join("CHANGELOG.md");
+    let changelog_path = bumped_package
+        .workspace
+        .join(bumped_package.package.to_string())
+        .join("CHANGELOG.md");
 
     if !changelog_path.exists() {
         // No changelog exists for this package
         return Ok(());
     }
 
-    log::info!("  Updating changelog for package: {package}");
+    log::info!(
+        "  Updating changelog for package: {}",
+        bumped_package.package
+    );
 
     // Let's parse the old changelog first
     let changelog_str = fs::read_to_string(&changelog_path)
@@ -178,7 +222,7 @@ fn finalize_changelog(
     let mut changelog = Changelog::parse(&changelog_str)
         .with_context(|| format!("Could not parse {}", changelog_path.display()))?;
 
-    changelog.finalize(package, new_version, jiff::Timestamp::now());
+    changelog.finalize(bumped_package.package, new_version, jiff::Timestamp::now());
 
     std::fs::write(&changelog_path, changelog.to_string())?;
 
@@ -206,7 +250,7 @@ mod test {
         ];
 
         for (version, amount, pre, expected) in test_cases {
-            let new_version = do_version_bump(version, Package::EspHal, amount, pre).unwrap();
+            let new_version = do_version_bump(version, amount, pre).unwrap();
             assert_eq!(new_version.to_string(), expected);
         }
     }
