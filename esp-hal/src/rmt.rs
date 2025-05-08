@@ -364,7 +364,7 @@ impl Default for TxChannelConfig {
             carrier_high: Default::default(),
             carrier_low: Default::default(),
             carrier_level: Level::Low,
-            memsize: 1u8,
+            memsize: 1,
         }
     }
 }
