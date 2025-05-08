@@ -615,7 +615,11 @@ where
     C: TxChannel,
 {
     channel: C,
-    index: usize,
+
+    // The position in channel RAM to continue writing at; must be either
+    // 0 or half the available RAM size if there's further data.
+    // The position may be invalid if there's no data left.
+    ram_index: usize,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     remaining_data: &'a [u32],
@@ -643,9 +647,7 @@ where
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
-            let ram_index = (((self.index - memsize) / (memsize / 2)) % 2) * (memsize / 2);
-
-            let ptr = unsafe { channel_ram_start(C::CHANNEL).add(ram_index) };
+            let ptr = unsafe { channel_ram_start(C::CHANNEL).add(self.ram_index) };
             let count = self
                 .remaining_data
                 .iter()
@@ -654,9 +656,18 @@ where
                 .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
                 .count();
 
-            self.index += memsize / 2;
-            // Note that if count < memsize / 2, the new slice is empty.
+            // If count == memsize / 2 codes were written, update ram_index as
+            // - 0 -> memsize / 2
+            // - memsize / 2 -> 0
+            // Otherwise, for count < memsize / 2, the new position is invalid but the new
+            // slice is empty and we won't use ram_index again.
+            self.ram_index = memsize / 2 - self.ram_index;
             self.remaining_data = &self.remaining_data[count..];
+            debug_assert!(
+                self.ram_index == 0
+                    || self.ram_index == memsize / 2
+                    || self.remaining_data.is_empty()
+            );
         }
 
         loop {
@@ -1191,7 +1202,8 @@ pub trait TxChannel: TxChannelInternal {
         let index = Self::send_raw(data, false, 0)?;
         Ok(SingleShotTxTransaction {
             channel: self,
-            index,
+            // Either, remaining_data is empty, or we filled the entire buffer.
+            ram_index: 0,
             remaining_data: &data[index..],
         })
     }
