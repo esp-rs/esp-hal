@@ -49,8 +49,6 @@ pub fn minimum_update(
     for (_, report) in result.crate_reports() {
         if let Some(required_bump) = report.required_bump() {
             let required_is_stricter = (min_required_update == ReleaseType::Patch)
-                || (min_required_update == ReleaseType::Minor
-                    && required_bump == ReleaseType::Major)
                 || (required_bump == ReleaseType::Major);
             if required_is_stricter {
                 min_required_update = required_bump;
