@@ -1,0 +1,110 @@
+crate: esp-hal
+
+options:
+- name: place-spi-master-driver-in-ram
+  description: Places the SPI master driver in RAM for better performance
+  default:
+    - value: false
+
+- name: place-switch-tables-in-ram
+  description: "Places switch-tables, some lookup tables and constants related to
+               interrupt handling into RAM - resulting in better performance but slightly more
+               RAM consumption."
+  default:
+    - value: true
+  stability: !Stable '1.0.0-beta.0'
+
+- name: place-anon-in-ram
+  description: "Places anonymous symbols into RAM - resulting in better performance
+               at the cost of significant more RAM consumption. Best to be combined with
+               `place-switch-tables-in-ram`."
+  default:
+    - value: false
+  stability: !Stable '1.0.0-beta.0'
+
+# Ideally, we should be able to set any clock frequency for any chip. However,
+# currently only the 32 and C2 implements any sort of configurability, and
+# the rest have a fixed clock frequency.
+- name: xtal-frequency
+  description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to
+               automatically detect the frequency. `auto` may not be able to identify the clock
+               frequency in some cases. Also, configuring a specific frequency may increase
+               performance slightly."
+  default:
+    - if: 'chip == "esp32" || chip == "esp32c2"'
+      value: 'auto'
+    - if: 'chip == "esp32c3" || chip == "esp32c6" || chip == "esp32s2" || chip == "esp32s3"'
+      value: '40'
+    - if: 'chip == "esp32h2"'
+      value: '32'
+  constraints:
+    - if: 'chip == "esp32" || chip == "esp32c2"'
+      type:
+        validator: enumeration
+        value:
+        - 'auto'
+        - '26'
+        - '40'
+    - if: 'chip == "esp32c3" || chip == "esp32c6" || chip == "esp32s2" || chip == "esp32s3"'
+      type:
+        validator: enumeration
+        value:
+        - '40'
+    - if: 'chip == "esp32h2"'
+      type:
+        validator: enumeration
+        value:
+        - '32'
+
+- name: spi-address-workaround
+  description: "Enables a workaround for the issue where SPI in
+               half-duplex mode incorrectly transmits the address on a single line if the
+               data buffer is empty."
+  default:
+    - value: true
+  active: 'chip == "esp32"'
+
+- name: flip-link
+  description: Move the stack to start of RAM to get zero-cost stack overflow protection.
+  default:
+    - value: false
+  active: 'chip == "esp32c6" || chip == "esp32h2"'
+
+- name: psram-mode
+  description: SPIRAM chip mode
+  default:
+    - value: 'quad'
+  constraints:
+    - if: 'feature("octal_psram")'
+      type:
+        validator: enumeration
+        value:
+        - 'quad'
+        - 'octal'
+    - if: '!feature("octal_psram")'
+      type:
+        validator: enumeration
+        value:
+        - 'quad'
+  active: 'feature("psram")'
+
+- name: stack-guard-offset
+  description: The stack guard variable will be placed this many bytes from the stack's end.
+  default:
+    - value: 4096
+  stability: !Stable '1.0.0-beta.0'
+  active: 'true'
+
+- name: stack-guard-value
+  description: The value to be written to the stack guard variable.
+  default:
+    - value: 3740121773
+  stability: !Stable '1.0.0-beta.0'
+  display_hint: Hex
+
+- name: impl-critical-section
+  description: "Provide a `critical-section` implementation. Note that if disabled,
+               you will need to provide a `critical-section` implementation which is
+               using `restore-state-u32`."
+  default:
+    - value: true

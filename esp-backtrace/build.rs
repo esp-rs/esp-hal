@@ -1,5 +1,5 @@
 use esp_build::assert_unique_used_features;
-use esp_config::{ConfigOption, generate_config};
+use esp_config::generate_config_from_yaml_definition;
 
 fn main() {
     // Ensure that only a single chip is specified:
@@ -13,14 +13,7 @@ fn main() {
     }
 
     // emit config
-    generate_config(
-        "esp_backtrace",
-        &[ConfigOption::new(
-            "backtrace-frames",
-            "The maximum number of frames that will be printed in a backtrace",
-            10,
-        )],
-        true,
-        true,
-    );
+    println!("cargo:rerun-if-changed=./esp_config.yml");
+    let cfg_yaml = std::fs::read_to_string("./esp_config.yml").unwrap();
+    generate_config_from_yaml_definition(&cfg_yaml, true, true, None).unwrap();
 }

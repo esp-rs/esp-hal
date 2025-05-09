@@ -1,0 +1,45 @@
+crate: esp-hal-embassy
+
+options:
+- name: low-power-wait
+  description: "Enables the lower-power wait if no tasks are ready to run on the
+               thread-mode executor. This allows the MCU to use less power if the workload allows.
+               Recommended for battery-powered systems. May impact analog performance."
+  default:
+    - value: true
+
+- name: timer-queue
+  description: "The flavour of the timer queue provided by this crate. Integrated
+               queues require the `executors` feature to be enabled.</p><p>If you use
+               embassy-executor, the `single-integrated` queue is recommended for ease of use,
+               while the `multiple-integrated` queue is recommended for performance. The
+               `multiple-integrated` option needs one timer per executor.</p><p>The `generic`
+               queue allows using embassy-time without the embassy executors."
+  default:
+    - if: 'cargo_feature("executors") || is_tooling()'
+      value: single-integrated
+    - if: '!cargo_feature("executors") && !is_tooling()'
+      value: generic
+  constraints:
+    - if: 'cargo_feature("executors") || is_tooling()'
+      type:
+        validator: enumeration
+        value:
+        - 'generic'
+        - 'single-integrated'
+        - 'multiple-integrated'
+    - if: '!cargo_feature("executors") && !is_tooling()'
+      type:
+        validator: enumeration
+        value:
+        - 'generic'
+  stability: Unstable
+  active: 'cargo_feature("executors")'
+
+- name: generic-queue-size
+  description: The capacity of the queue when the `generic` timer queue flavour is selected.
+  default:
+    - value: 64
+  constraints:
+    - type:
+        validator: positive_integer
