@@ -96,6 +96,10 @@ jobs:
         shell: bash
         run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
 
+      - name: Semver-Check
+        shell: bash
+        run: cargo +${{ matrix.device.toolchain }} xcheck semver-check --chips ${{ matrix.device.soc }} check
+
   extras:
     runs-on: macos-m1-self-hosted
 

@@ -51,7 +51,7 @@ macro_rules! peripherals {
                     #[doc = "**This API is marked as unstable** and is only available when the `unstable`
                             crate feature is enabled. This comes with no stability guarantees, and could be changed
                             or removed at any time."]
-                    #[cfg(any(doc, feature = "unstable"))]
+                    #[cfg(feature = "unstable")]
                     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
                     pub $unstable_name: $unstable_name<'static>,
 
@@ -59,7 +59,7 @@ macro_rules! peripherals {
                     #[doc = "**This API is marked as unstable** and is only available when the `unstable`
                             crate feature is enabled. This comes with no stability guarantees, and could be changed
                             or removed at any time."]
-                    #[cfg(not(any(doc, feature = "unstable")))]
+                    #[cfg(not(feature = "unstable"))]
                     #[allow(unused)]
                     pub(crate) $unstable_name: $unstable_name<'static>,
                 )*

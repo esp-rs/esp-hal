@@ -4,12 +4,13 @@ use anyhow::{Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 
-pub use self::{build::*, bump_version::*, run::*};
+pub use self::{build::*, bump_version::*, run::*, semver_check::*};
 use crate::{Package, cargo::CargoAction};
 
 mod build;
 mod bump_version;
 mod run;
+mod semver_check;
 
 // ----------------------------------------------------------------------------
 // Subcommand Arguments

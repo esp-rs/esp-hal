@@ -450,7 +450,7 @@ pub struct UartRx<'d, Dm: DriverMode> {
 #[non_exhaustive]
 pub enum ConfigError {
     /// The requested baud rate is not achievable.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
 

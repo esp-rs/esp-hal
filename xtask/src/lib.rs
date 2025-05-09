@@ -16,6 +16,9 @@ pub mod commands;
 pub mod documentation;
 pub mod firmware;
 
+#[cfg(feature = "semver-checks")]
+pub mod semver_check;
+
 #[derive(
     Debug,
     Clone,

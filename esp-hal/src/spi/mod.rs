@@ -23,7 +23,7 @@ crate::unstable_module! {
 #[non_exhaustive]
 pub enum Error {
     /// Error occurred due to a DMA-related issue.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[allow(clippy::enum_variant_names, reason = "DMA is unstable")]
     DmaError(DmaError),
@@ -48,7 +48,7 @@ impl From<DmaError> for Error {
 }
 
 #[doc(hidden)]
-#[cfg(not(any(doc, feature = "unstable")))]
+#[cfg(not(feature = "unstable"))]
 impl From<DmaError> for Error {
     fn from(_value: DmaError) -> Self {
         Error::Unknown

@@ -15,6 +15,8 @@ use xtask::{
     commands::*,
 };
 
+
+
 // ----------------------------------------------------------------------------
 // Command-line Interface
 
@@ -40,6 +42,8 @@ enum Cli {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
+    /// Semver Checks
+    SemverCheck(SemverCheckArgs),
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +141,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::Publish(args) => publish(&workspace, args),
         Cli::TagReleases(args) => tag_releases(&workspace, args),
+        Cli::SemverCheck(args) => semver_checks(&workspace, args),
     }
 }
 
