@@ -98,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `Flex::{set_as_input, set_as_output, set_drive_strength, set_as_open_drain, pull_direction}` functions (#3387)
 - The `Efuse::read_field_be` function has been removed (#3440)
 
-## v1.0.0-beta.0 - 2025-02-24
+## [v1.0.0-beta.0] - 2025-02-24
 
 ### Added
 
@@ -417,7 +417,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Io::new_with_priority` and `Io::new_no_bind_interrupt`. (#2486)
 - `parl_io::{no_clk_pin(), NoClkPin}` (#2531)
 - Removed `get_core` function in favour of `Cpu::current` (#2533)
-
 - Removed `uart::Config` setters and `symbol_length`. (#2847)
 
 ## [0.21.1]
@@ -480,7 +479,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `NO_PIN` constant has been removed. (#2133)
 - MSRV bump to 1.79 (#2156)
 - Allow handling interrupts while trying to lock critical section on multi-core chips. (#2197)
-- Migrate `Camera` to a move based API (#2242).
+- Migrate `Camera` to a move based API (#2242)
 - Removed the PS-RAM related features, replaced by `quad-psram`/`octal-psram`, `init_psram` takes a configuration parameter, it's now possible to auto-detect PS-RAM size (#2178)
 - `EspTwaiFrame` constructors now accept any type that converts into `esp_hal::twai::Id` (#2207)
 - Change `DmaTxBuf` to support PSRAM on `esp32s3` (#2161)
@@ -557,7 +556,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `debugger::debugger_connected`. (#1961)
 - DMA: don't require `Sealed` to implement `ReadBuffer` and `WriteBuffer` (#1921)
 - Allow DMA to/from psram for esp32s3 (#1827)
-- Added missing methods to `SpiDmaBus` (#2016).
+- Added missing methods to `SpiDmaBus` (#2016)
 - PARL_IO use ReadBuffer and WriteBuffer for Async DMA (#1996)
 
 ### Changed
@@ -723,7 +722,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Reserve `esp32` ROM stacks to prevent the trashing of dram2 section (#1289)
 - Fixing `esp-wifi` + `TRNG` issue on `ESP32-S2` (#1272)
-- Fixed core1 startup using the wrong stack on the esp32 and esp32s3 (#1286).
+- Fixed core1 startup using the wrong stack on the esp32 and esp32s3 (#1286)
 - ESP32: Apply fix for Errata 3.6 in all the places necessary. (#1315)
 - ESP32 & ESP32-S2: Fix I²C frequency (#1306)
 - UART's TX/RX FIFOs are now cleared during initialization (#1344)
@@ -834,20 +833,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Configure 32k ICACHE (#1169)
 - Lift the minimal buffer size requirement for I2S (#1189)
 - Replaced `SystemTimer::TICKS_PER_SEC` with `SystemTimer::ticks_per_sec()` (#1981)
-
-### Removed
-
-- Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
-- All chip-specific HAL packages have been removed (#1196)
-
-### Breaking
-
 - `ADC` and `DAC` drivers now take virtual peripherals in their constructors, instead of splitting `APB_SARADC`/`SENS` (#1100)
 - The `DAC` driver's constructor is now `new` instead of `dac`, to be more consistent with other APIs (#1100)
 - The DMA peripheral is now called `Dma` for devices with both PDMA and GDMA controllers (#1125)
 - The `ADC` driver's constructor is now `new` instead of `adc`, to be more consistent with other APIs (#1133)
 - `embassy-executor`'s `integrated-timers` is no longer enabled by default. (#1196)
 - Renamed `embassy-time-systick` to `embassy-time-systick-16mhz` for use with all chips with a systimer, except `esp32s2`. Added `embassy-time-systick-80mhz` specifically for the `esp32s2`. (#1247)
+
+### Removed
+
+- Remove `xtal-26mhz` and `xtal-40mhz` features (#1165)
+- All chip-specific HAL packages have been removed (#1196)
 
 ## [0.15.0] - 2024-01-19
 
@@ -860,7 +856,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `embedded-io` feature to each chip-specific HAL (#1072)
 - Add `embassy-time-driver` to `esp-hal-common` due to updating `embassy-time` to `v0.3.0` (#1075)
 - ESP32-S3: Added support for 80Mhz PSRAM (#1069)
-- ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104).
+- ESP32-C3/S3: Add workaround for USB pin exchange on usb-serial-jtag (#1104)
 - ESP32C6: Added LP_UART initialization (#1113)
 - Add `place-spi-driver-in-ram` feature to `esp-hal-common` (#1096)
 
@@ -871,6 +867,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `embassy-time` to `0.3.0` and embassy-executor to `0.5.0` release due to the release of the `embedded-hal-*` packages (#1075)
 - No longer depend on `embassy-time` (#1092)
 - Update to latest `smart-leds-trait` and `smart-leds` packages (#1094)
+- Unify the low-power peripheral names (`RTC_CNTL` and `LP_CLKRST` to `LPWR`) (#1064)
 
 ### Fixed
 
@@ -880,12 +877,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32/ESP32-S3: Fix stack-top calculation for app-core (#1081)
 - ESP32/ESP32-S2/ESP32-S3: Fix embassy-time-timg0 driver (#1091)
 - ESP32: ADC readings are no longer inverted (#1093)
-
-### Removed
-
-### Breaking
-
-- Unify the low-power peripheral names (`RTC_CNTL` and `LP_CLKRST` to `LPWR`) (#1064)
 
 ## [0.14.1] - 2023-12-13
 
@@ -921,7 +912,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2/S3: Don't require GPIO 18 to create a USB peripheral driver instance (#990)
 - Updated to latest release candidate (`1.0.0-rc.2`) for `embedded-hal{-async,-nb}` (#994)
 - Explicit panic when hitting the `DefaultHandler` (#1005)
-- Relevant interrupts are now auto enabled in `embassy::init` (#1014).
+- Relevant interrupts are now auto enabled in `embassy::init` (#1014)
+- `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901)
+- ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904, #985)
 
 ### Fixed
 
@@ -940,17 +933,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Direct boot support has been removed (#903).
+- Direct boot support has been removed (#903)
 - Removed the `mcu-boot` feature from `esp32c3-hal` (#938)
 - Removed SpiBusController and SpiBusDevice in favour of embedded-hal-bus and embassy-embedded-hal implementataions. (#978)
-
-### Breaking
-
-- `Spi::new`/`Spi::new_half_duplex` takes no gpio pin now, instead you need to call `with_pins` to setup those (#901).
-- ESP32-C2, ESP32-C3, ESP32-S2: atomic emulation trap has been removed. (#904, #985)
-  - When upgrading you must either remove [these lines](https://github.com/esp-rs/riscv-atomic-emulation-trap#usage) from your `.cargo/config.toml`.
-  - Usage of `core::sync::atomic::*` in dependent crates should be replaced with [portable-atomic](https://github.com/taiki-e/portable-atomic).
-- RSA driver now takes `u32` words instead of `u8` bytes. The expected slice length is now 4 times shorter. (#981)
 
 ## [0.13.1] - 2023-11-02
 
@@ -975,7 +960,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ETM driver, GPIO ETM (#819)
 - (G)DMA AES support (#821)
 - SYSTIMER ETM functionality (#828)
-- Adding async support for RSA peripheral(doesn't work properly for `esp32` chip - issue will be created)(#790)
+- Adding async support for RSA peripheral(doesn't work properly for `esp32` chip - issue will be created) (#790)
 - Added sleep support for ESP32-C3 with timer and GPIO wakeups (#795)
 - Support for ULP-RISCV including Delay and GPIO (#840, #845)
 - Add bare-bones SPI slave support, DMA only (#580, #843)
@@ -990,6 +975,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped MSRV to 1.67 (#798)
 - Optimised multi-core critical section implementation (#797)
 - Changed linear- and curve-calibrated ADC to provide readings in mV (#836)
+- `Uart::new` now takes the `&Clocks` struct to ensure baudrate is correct for CPU/APB speed. (#808)
+- `Uart::new_with_config` takes an `Config` instead of `Option<Config>`. (#808)
+- `Alarm::set_period` takes a period (duration) instead of a frequency (#812)
+- `Alarm::interrupt_clear` is now `Alarm::clear_interrupt` to be consistent (#812)
+- The `PeripheralClockControl` struct is no longer public, drivers no longer take this as a parameter (#817)
+- Unify the system peripheral, `SYSTEM`, `DPORT` and `PCR` are now all exposed as `SYSTEM` (#832)
+- Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
+- Replace any underscores in feature names with dashes (#833)
+- The `spi` and `spi_slave` modules have been refactored into the `spi`, `spi::master`, and `spi::slave` modules (#843)
+- The `WithDmaSpi2`/`WithDmaSpi3` structs are no longer generic around the inner peripheral type (#853)
+- The `SarAdcExt`/`SensExt` traits are now collectively named `AnalogExt` instead (#857)
+- Replace the `radio` module with peripheral singleton structs (#852)
+- The SPI traits are no longer re-exported in the main prelude, but from preludes in `spi::master`/`spi::slave` instead (#860)
+- The `embedded-hal-1` and `embedded-hal-async` traits are no longer re-exported in the prelude (#860)
 
 ### Fixed
 
@@ -998,7 +997,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Xtensa targets: Use ESP32Reset - not Reset (#823)
 - Examples should now work with the `defmt` feature (#810)
 - Fixed a race condition causing SpiDma to stop working unexpectedly (#869)
-- Fixed async uart serial, and updated the embassy_serial examples (#871).
+- Fixed async uart serial, and updated the embassy_serial examples (#871)
 - Fix ESP32-S3 direct-boot (#873)
 - Fix ESP32-C6 ADC (#876)
 - Fix ADC Calibration not being used on ESP32-S2 and ESP32-S3 (#1000)
@@ -1012,23 +1011,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pin::enable_hold` (#793)
 - Removed the generic return type for ADC reads (#792)
 
-### Breaking
-
-- `Uart::new` now takes the `&Clocks` struct to ensure baudrate is correct for CPU/APB speed. (#808)
-- `Uart::new_with_config` takes an `Config` instead of `Option<Config>`. (#808)
-- `Alarm::set_period` takes a period (duration) instead of a frequency (#812)
-- `Alarm::interrupt_clear` is now `Alarm::clear_interrupt` to be consistent (#812)
-- The `PeripheralClockControl` struct is no longer public, drivers no longer take this as a parameter (#817)
-- Unify the system peripheral, `SYSTEM`, `DPORT` and `PCR` are now all exposed as `SYSTEM` (#832).
-- Unified the ESP32's and ESP32-C2's xtal frequency features (#831)
-- Replace any underscores in feature names with dashes (#833)
-- The `spi` and `spi_slave` modules have been refactored into the `spi`, `spi::master`, and `spi::slave` modules (#843)
-- The `WithDmaSpi2`/`WithDmaSpi3` structs are no longer generic around the inner peripheral type (#853)
-- The `SarAdcExt`/`SensExt` traits are now collectively named `AnalogExt` instead (#857)
-- Replace the `radio` module with peripheral singleton structs (#852)
-- The SPI traits are no longer re-exported in the main prelude, but from preludes in `spi::master`/`spi::slave` instead (#860)
-- The `embedded-hal-1` and `embedded-hal-async` traits are no longer re-exported in the prelude (#860)
-
 ## [0.12.0] - 2023-09-05
 
 ### Added
@@ -1038,15 +1020,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add PARL_IO driver for ESP32-C6 / ESP32-H2 (#733, #760)
 - Implement `ufmt_write::uWrite` trait for USB Serial JTAG (#751)
 - Add HMAC peripheral support (#755)
-- Add multicore-aware embassy executor for Xtensa MCUs (#723, #756).
-- Add interrupt-executor for Xtensa MCUs (#723, #756).
+- Add multicore-aware embassy executor for Xtensa MCUs (#723, #756)
+- Add interrupt-executor for Xtensa MCUs (#723, #756)
 - Add missing `Into<Gpio<Analog, GPIONUN>>` conversion (#764)
 - Updated `clock` module documentation (#774)
 - Add `log` feature to enable log output (#773)
 - Add `defmt` feature to enable log output (#773)
 - A new macro to load LP core code on ESP32-C6 (#779)
 - Add `ECC`` peripheral driver (#785)
-- Initial LLD support for Xtensa chips (#861).
+- Initial LLD support for Xtensa chips (#861)
 
 ### Changed
 
@@ -1054,6 +1036,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Moved AlignmentHelper to its own module (#753)
 - Disable all watchdog timers by default at startup (#763)
 - `log` crate is now opt-in (#773)
+- `CpuControl::start_app_core()` now takes an `FnOnce` closure (#739)
 
 ### Fixed
 
@@ -1063,10 +1046,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `Instant::now()` not counting in some cases when using TIMG0 as the timebase (#737)
 - Fix number of ADC attenuations for ESP32-C6 (#771)
 - Fix SHA registers access (#805)
-
-### Breaking
-
-- `CpuControl::start_app_core()` now takes an `FnOnce` closure (#739)
 
 ## [0.11.0] - 2023-08-10
 
@@ -1089,6 +1068,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `embedded-hal-*` alpha packages to their latest versions (#640)
 - Implement the `Clone` and `Copy` traits for the `Rng` driver (#650)
 - Use all remaining memory as core-0's stack (#716)
+- `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
+- `gpio::Pin` is now object-safe (#687)
 
 ### Fixed
 
@@ -1105,11 +1086,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove the `allow-opt-level-z` feature from `esp32c3-hal` (#654)
 - Remove the old `pulse_control` driver (#694)
-
-### Breaking
-
-- `DmaTransfer::wait` and `I2sReadDmaTransfer::wait_receive` now return `Result` (#665)
-- `gpio::Pin` is now object-safe (#687)
 
 ## [0.10.0] - 2023-06-04
 
@@ -1134,7 +1110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add embassy async `read` support for `uart` (#620)
 - Add bare-bones support to run code on ULP-RISCV / LP core (#631)
 - Add ADC calibration implementation for a riscv chips (#555)
-- Add `async` implementation for `USB Serial/JTAG`(#632)
+- Add `async` implementation for `USB Serial/JTAG` (#632)
 
 ### Changed
 
@@ -1148,6 +1124,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve examples documentation (#533)
 - esp32h2-hal: added README (#585)
 - Update `esp-hal-procmacros` package dependencies and features (#628)
+- Simplified user-facing SpiDma and I2s types (#626)
+- Significantly simplified user-facing GPIO pin types. (#553)
+- No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 
 ### Fixed
 
@@ -1170,12 +1149,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix rom::crc docs (#611)
 - Fixed a possible overlap of `.data` and `.rwtext` (#616)
 - Avoid SDA/SCL being low while configuring pins for I2C (#619)
-
-### Breaking
-
-- Simplified user-facing SpiDma and I2s types (#626)
-- Significantly simplified user-facing GPIO pin types. (#553)
-- No longer re-export the `soc` module and the contents of the `interrupt` module at the package level (#607)
 
 ## [0.9.0] - 2023-05-02
 
@@ -1228,34 +1201,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2022-08-05
 
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...HEAD
-[v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1..esp-hal-v1.0.0-beta.0
-[0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0..v0.23.1
-[0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0..v0.23.0
-[0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
-[0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
-[0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
-[0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
-[0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
-[0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
-[0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
-[0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
-[0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
-[0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0
-[0.15.0]: https://github.com/esp-rs/esp-hal/compare/v0.14.1...v0.15.0
-[0.14.1]: https://github.com/esp-rs/esp-hal/compare/v0.14.0...v0.14.1
-[0.14.0]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...v0.14.0
-[0.13.1]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...v0.13.1
-[0.13.0]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...v0.13.0
-[0.12.0]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...v0.12.0
-[0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
-[0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0
-[0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
-[0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0
-[0.7.1]: https://github.com/esp-rs/esp-hal/compare/v0.7.0...v0.7.1
-[0.7.0]: https://github.com/esp-rs/esp-hal/compare/v0.5.0...v0.7.0
-[0.5.0]: https://github.com/esp-rs/esp-hal/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/esp-rs/esp-hal/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/esp-rs/esp-hal/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/esp-rs/esp-hal/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/v0.1.0
+[0.2.0]: https://github.com/esp-rs/esp-hal/compare/v0.1.0...v0.2.0
+[0.3.0]: https://github.com/esp-rs/esp-hal/compare/v0.2.0...v0.3.0
+[0.4.0]: https://github.com/esp-rs/esp-hal/compare/v0.3.0...v0.4.0
+[0.5.0]: https://github.com/esp-rs/esp-hal/compare/v0.4.0...v0.5.0
+[0.7.0]: https://github.com/esp-rs/esp-hal/compare/v0.5.0...v0.7.0
+[0.7.1]: https://github.com/esp-rs/esp-hal/compare/v0.7.0...v0.7.1
+[0.8.0]: https://github.com/esp-rs/esp-hal/compare/v0.7.1...v0.8.0
+[0.9.0]: https://github.com/esp-rs/esp-hal/compare/v0.8.0...v0.9.0
+[0.10.0]: https://github.com/esp-rs/esp-hal/compare/v0.9.0...v0.10.0
+[0.11.0]: https://github.com/esp-rs/esp-hal/compare/v0.10.0...v0.11.0
+[0.12.0]: https://github.com/esp-rs/esp-hal/compare/v0.11.0...v0.12.0
+[0.13.0]: https://github.com/esp-rs/esp-hal/compare/v0.12.0...v0.13.0
+[0.13.1]: https://github.com/esp-rs/esp-hal/compare/v0.13.0...v0.13.1
+[0.14.0]: https://github.com/esp-rs/esp-hal/compare/v0.13.1...v0.14.0
+[0.14.1]: https://github.com/esp-rs/esp-hal/compare/v0.14.0...v0.14.1
+[0.15.0]: https://github.com/esp-rs/esp-hal/compare/v0.14.1...v0.15.0
+[0.16.0]: https://github.com/esp-rs/esp-hal/compare/v0.15.0...v0.16.0
+[0.16.1]: https://github.com/esp-rs/esp-hal/compare/v0.16.0...v0.16.1
+[0.17.0]: https://github.com/esp-rs/esp-hal/compare/v0.16.1...v0.17.0
+[0.18.0]: https://github.com/esp-rs/esp-hal/compare/v0.17.0...v0.18.0
+[0.19.0]: https://github.com/esp-rs/esp-hal/compare/v0.18.0...v0.19.0
+[0.20.0]: https://github.com/esp-rs/esp-hal/compare/v0.19.0...v0.20.0
+[0.20.1]: https://github.com/esp-rs/esp-hal/compare/v0.20.0...v0.20.1
+[0.21.0]: https://github.com/esp-rs/esp-hal/compare/v0.20.1...v0.21.0
+[0.21.1]: https://github.com/esp-rs/esp-hal/compare/v0.21.0...v0.21.1
+[0.22.0]: https://github.com/esp-rs/esp-hal/compare/v0.21.1...v0.22.0
+[0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...v0.23.0
+[0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0...v0.23.1
+[v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...esp-hal-v1.0.0-beta.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...HEAD
