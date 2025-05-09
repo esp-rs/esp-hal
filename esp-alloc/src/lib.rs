@@ -91,7 +91,7 @@
 //! you will need it for the `Box` and `Vec` types.
 //!
 //! ```toml
-//! allocator-api2 = { version = "0.2", default-features = false, features = ["alloc"] }
+//! allocator-api2 = { version = "0.3", default-features = false, features = ["alloc"] }
 //! ```
 //!
 //! With this, you can use the `Box` and `Vec` types from `allocator_api2`, with
@@ -107,6 +107,11 @@
 //! vec.push(0xabcd1234);
 //! assert_eq!(vec[0], 0xabcd1234);
 //! ```
+//!
+//! Note that if you use the nightly `allocator_api` feature, you can use the
+//! `Box` and `Vec` types from `alloc`. `allocator_api2` is still available as
+//! an option, but types from `allocator_api2` are not compatible with the
+//! standard library types.
 //!
 //! # Heap stats
 //!

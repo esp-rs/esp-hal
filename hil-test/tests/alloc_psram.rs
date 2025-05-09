@@ -4,10 +4,13 @@
 // The S3 dev kit in the HIL-tester has octal PSRAM.
 //% CHIPS(octal): esp32s3
 //% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
-//% FEATURES: unstable psram
+//% FEATURES: unstable psram esp-alloc/nightly
 
 #![no_std]
 #![no_main]
+// TODO: this test is Xtensa-only, so we can enable allocator_api unconditionally. This will not
+// always be the case. Will this need a //% TOOLCHAIN?
+#![feature(allocator_api)]
 
 use hil_test as _;
 
@@ -16,6 +19,8 @@ extern crate alloc;
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
+    use alloc::vec::Vec as AllocVec;
+
     use allocator_api2::vec::Vec;
     use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
 
@@ -29,7 +34,7 @@ mod tests {
 
     #[test]
     fn test_simple() {
-        let mut vec = alloc::vec::Vec::new();
+        let mut vec = AllocVec::new();
 
         for i in 0..10000 {
             vec.push(i);
@@ -44,7 +49,7 @@ mod tests {
     fn all_psram_is_usable() {
         let free = esp_alloc::HEAP.free();
         defmt::info!("Free: {}", free);
-        let mut vec = alloc::vec::Vec::with_capacity(free);
+        let mut vec = AllocVec::with_capacity(free);
 
         for i in 0..free {
             vec.push((i % 256) as u8);
