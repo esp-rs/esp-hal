@@ -42,7 +42,9 @@ pub fn semver_checks(workspace: &Path, args: SemverCheckArgs) -> anyhow::Result<
         SemverCheckCmd::GenerateBaseline => {
             checker::generate_baseline(&workspace, args.packages, args.chips)
         }
-        SemverCheckCmd::Check => checker::check(&workspace, args.packages, args.chips),
+        SemverCheckCmd::Check => {
+            checker::check_for_breaking_changes(&workspace, args.packages, args.chips)
+        }
     }
 }
 
@@ -80,7 +82,7 @@ pub mod checker {
                 remove_unstable_items(&current_path)?;
 
                 let file_name = if package.chip_features_matter() {
-                    format!("{}", chip.to_string())
+                    chip.to_string()
                 } else {
                     "api".to_string()
                 };
@@ -105,11 +107,13 @@ pub mod checker {
         Ok(())
     }
 
-    pub fn check(
+    pub fn check_for_breaking_changes(
         workspace: &Path,
         packages: Vec<Package>,
         chips: Vec<Chip>,
     ) -> Result<(), anyhow::Error> {
+        let mut semver_incompatible_packages = Vec::new();
+
         for package in packages {
             log::info!("Semver-check API for {package}");
 
@@ -118,7 +122,9 @@ pub mod checker {
                 log::info!("Required bump = {:?}", result);
 
                 if result == ReleaseType::Major {
-                    return Err(anyhow::anyhow!("Semver check failed - needs a major bump"));
+                    semver_incompatible_packages.push(package.to_string());
+                    // no need to check other chips for this package
+                    break;
                 }
 
                 if !package.chip_features_matter() {
@@ -127,6 +133,13 @@ pub mod checker {
             }
         }
 
-        Ok(())
+        if !semver_incompatible_packages.is_empty() {
+            Err(anyhow::anyhow!(
+                "Semver check failed - needs a major bump: {}",
+                semver_incompatible_packages.join(", ")
+            ))
+        } else {
+            Ok(())
+        }
     }
 }

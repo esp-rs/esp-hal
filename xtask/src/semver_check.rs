@@ -25,7 +25,7 @@ pub fn minimum_update(
     remove_unstable_items(&current_path)?;
 
     let file_name = if package.chip_features_matter() {
-        format!("{}", chip.to_string())
+        chip.to_string()
     } else {
         "api".to_string()
     };
@@ -48,17 +48,12 @@ pub fn minimum_update(
     let mut min_required_update = ReleaseType::Patch;
     for (_, report) in result.crate_reports() {
         if let Some(required_bump) = report.required_bump() {
-            min_required_update = match required_bump {
-                ReleaseType::Major
-                    if min_required_update == ReleaseType::Patch
-                        || min_required_update == ReleaseType::Minor =>
-                {
-                    ReleaseType::Major
-                }
-                ReleaseType::Minor if min_required_update == ReleaseType::Patch => {
-                    ReleaseType::Minor
-                }
-                _ => ReleaseType::Patch,
+            let required_is_stricter = (min_required_update == ReleaseType::Patch)
+                || (min_required_update == ReleaseType::Minor
+                    && required_bump == ReleaseType::Major)
+                || (required_bump == ReleaseType::Major);
+            if required_is_stricter {
+                min_required_update = required_bump;
             }
         }
     }
@@ -84,14 +79,16 @@ pub(crate) fn build_doc_json(
         .join(format!("{}.json", package.to_string().replace("-", "_")));
 
     std::fs::remove_file(&current_path).ok();
-    let toolchain = "esp";
     let features = if package.chip_features_matter() {
         vec![chip.to_string(), "unstable".to_string()]
     } else {
         vec!["unstable".to_string()]
     };
+
+    // always use `esp` toolchain so we don't have to deal with potentially
+    // different versions of the doc-json
     let mut cargo_builder = CargoArgsBuilder::default()
-        .toolchain(toolchain)
+        .toolchain("esp")
         .subcommand("rustdoc")
         .features(&features)
         .target(chip.target())
@@ -148,27 +145,10 @@ pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
     for (_id, item) in &mut krate.index {
         match &mut item.inner {
             ItemEnum::Module(module) => {
-                module.items = module
-                    .items
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
+                module.items.retain(|id| !to_remove.contains(id));
             }
             ItemEnum::Struct(struct_) => {
-                struct_.impls = struct_
-                    .impls
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
-
-                struct_.impls = struct_
-                    .impls
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
+                struct_.impls.retain(|id| !to_remove.contains(id));
 
                 match &mut struct_.kind {
                     rustdoc_types::StructKind::Unit => (),
@@ -190,31 +170,16 @@ pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
                 }
             }
             ItemEnum::Enum(enum_) => {
-                enum_.impls = enum_
-                    .impls
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
+                enum_.impls.retain(|id| !to_remove.contains(id));
 
-                enum_.variants = enum_
-                    .variants
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
+                enum_.variants.retain(|id| !to_remove.contains(id));
 
                 if enum_.impls.is_empty() {
                     to_remove.push(_id.clone());
                 }
             }
             ItemEnum::Impl(impl_) => {
-                impl_.items = impl_
-                    .items
-                    .iter()
-                    .filter(|id| !to_remove.contains(id))
-                    .map(|id| id.clone())
-                    .collect();
+                impl_.items.retain(|id| !to_remove.contains(id));
 
                 if impl_.items.is_empty() {
                     to_remove.push(_id.clone());
