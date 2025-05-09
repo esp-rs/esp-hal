@@ -9,6 +9,7 @@ use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
 use semver::Prerelease;
 use strum::{Display, EnumIter, IntoEnumIterator as _};
+use toml_edit::{Item, Value};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
@@ -400,27 +401,42 @@ pub fn bump_version(
     manifest["package"]["version"] = toml_edit::value(version.to_string());
     fs::write(manifest_path, manifest.to_string())?;
 
-    for pkg in
-        Package::iter().filter(|p| ![package, Package::Examples, Package::HilTest].contains(p))
-    {
+    let dependency_kinds = ["dependencies", "dev-dependencies", "build-dependencies"];
+
+    for pkg in Package::iter() {
         let manifest_path = workspace.join(pkg.to_string()).join("Cargo.toml");
         let manifest = fs::read_to_string(&manifest_path)
             .with_context(|| format!("Could not read {}", manifest_path.display()))?;
 
         let mut manifest = manifest.parse::<toml_edit::DocumentMut>()?;
 
-        if manifest["dependencies"]
-            .as_table()
-            .unwrap()
-            .contains_key(&package.to_string())
-        {
-            log::info!(
-                "  Bumping {package} version for package {pkg}: ({prev_version} -> {version})"
-            );
+        let mut changed = false;
+        let package_name = package.to_string();
+        for dependency_kind in dependency_kinds {
+            let Some(table) = manifest[dependency_kind].as_table_mut() else {
+                continue;
+            };
 
-            if let Some(table) = manifest["dependencies"].as_table_mut() {
-                table[&package.to_string()]["version"] = toml_edit::value(version.to_string());
+            let dependency = &mut table[package_name.as_str()];
+
+            // Update dependencies which specify a version:
+            match dependency {
+                Item::Table(table) if table.contains_key("version") => {
+                    table["version"] = toml_edit::value(version.to_string());
+                    changed = true;
+                }
+                Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
+                    table["version"] = version.to_string().into();
+                    changed = true;
+                }
+                _ => continue,
             }
+        }
+
+        if changed {
+            log::info!(
+                "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
+            );
 
             fs::write(&manifest_path, manifest.to_string())
                 .with_context(|| format!("Could not write {}", manifest_path.display()))?;
