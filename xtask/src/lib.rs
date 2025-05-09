@@ -222,7 +222,7 @@ impl Package {
         }
     }
 
-    pub fn tag(&self, version: semver::Version) -> String {
+    pub fn tag(&self, version: &semver::Version) -> String {
         format!("{self}-v{version}")
     }
 }

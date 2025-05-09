@@ -47,7 +47,7 @@ impl Changelog {
     pub fn finalize(
         &mut self,
         package: Package,
-        version: semver::Version,
+        version: &semver::Version,
         timestamp: jiff::Timestamp,
     ) {
         // Find the entry for the version
