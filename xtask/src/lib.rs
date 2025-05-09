@@ -12,6 +12,7 @@ use strum::{Display, EnumIter};
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
 
 pub mod cargo;
+pub mod changelog;
 pub mod commands;
 pub mod documentation;
 pub mod firmware;
@@ -216,6 +217,10 @@ impl Package {
                 chip
             ))
         }
+    }
+
+    pub fn tag(&self, version: &semver::Version) -> String {
+        format!("{self}-v{version}")
     }
 }
 

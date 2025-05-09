@@ -28,6 +28,16 @@ enum Cli {
     Run(Run),
 
     /// Bump the version of the specified package(s).
+    ///
+    /// This command will, for each specified package:
+    /// - Verify that the crate can be released (e.g. it doesn't refer to git
+    ///   dependencies)
+    /// - Update the version in `Cargo.toml` files
+    /// - Update the version in dependencies' `Cargo.toml` files
+    /// - Check if the changelog can be finalized
+    /// - Update the version in the changelog
+    /// - Replaces `{{currentVersion}}` markers in source files and the
+    ///   migration guide.
     BumpVersion(BumpVersionArgs),
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
@@ -40,6 +50,8 @@ enum Cli {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
+    /// Check the changelog for packages.
+    CheckChangelog(CheckChangelogArgs),
 }
 
 #[derive(Debug, Args)]
@@ -97,6 +109,17 @@ struct TagReleasesArgs {
     no_dry_run: bool,
 }
 
+#[derive(Debug, Args)]
+struct CheckChangelogArgs {
+    /// Package(s) to tag.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    packages: Vec<Package>,
+
+    /// Re-generate the changelog with consistent formatting.
+    #[arg(long)]
+    normalize: bool,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -137,6 +160,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::Publish(args) => publish(&workspace, args),
         Cli::TagReleases(args) => tag_releases(&workspace, args),
+        Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
     }
 }
 
@@ -499,7 +523,7 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         }
 
         let version = xtask::package_version(workspace, package)?;
-        let tag = format!("{package}-v{version}");
+        let tag = package.tag(&version);
 
         if args.no_dry_run {
             let output = Command::new("git")
