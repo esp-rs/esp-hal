@@ -1,0 +1,180 @@
+crate: esp-wifi
+
+options:
+  - name: rx_queue_size
+    description: Size of the RX queue in frames
+    default:
+      - value: 5
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: tx_queue_size
+    description: Size of the TX queue in frames
+    default:
+      - value: 3
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: static_rx_buf_num
+    description: "WiFi static RX buffer number. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: 10
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: dynamic_rx_buf_num
+    description: "WiFi dynamic RX buffer number. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: 32
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: static_tx_buf_num
+    description: "WiFi static TX buffer number. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: 0
+
+  - name: dynamic_tx_buf_num
+    description: "WiFi dynamic TX buffer number. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: 32
+
+  - name: ampdu_rx_enable
+    description: "WiFi AMPDU RX feature enable flag.
+                 See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: true
+
+  - name: ampdu_tx_enable
+    description: "WiFi AMPDU TX feature enable flag. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: true
+
+  - name: amsdu_tx_enable
+    description: "WiFi AMSDU TX feature enable flag. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: false
+
+  - name: rx_ba_win
+    description: "WiFi Block Ack RX window size. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)"
+    default:
+      - value: 6
+
+  - name: max_burst_size
+    description: See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)
+    default:
+      - value: 1
+
+  - name: country_code
+    description: "Country code. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)"
+    default:
+      - value: 'CN'
+
+  - name: country_code_operating_class
+    description: 'If not 0: Operating Class table number. See
+                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)'
+    default:
+      - value: 0
+
+  - name: mtu
+    description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
+    default:
+      - value: 1492
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: tick_rate_hz
+    description: 'Tick rate of the internal task scheduler in hertz'
+    default:
+      - value: 100
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: listen_interval
+    description: 'Interval for station to listen to beacon from AP.
+                 The unit of listen interval is one beacon interval.
+                 For example, if beacon interval is 100 ms and listen interval is 3,
+                 the interval for station to listen to beacon is 300 ms'
+    default:
+      - value: 3
+
+  - name: beacon_timeout
+    description: 'For Station, If the station does not receive a beacon frame
+                 from the connected SoftAP during the  inactive time, disconnect from SoftAP.
+                 Default 6s. Range 6-30'
+    default:
+      - value: 6
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 6
+            end: 31
+
+  - name: ap_beacon_timeout
+    description: "For SoftAP, If the SoftAP doesn't receive any data from the connected STA
+                 during inactive time, the SoftAP will force deauth the STA. Default is 300s"
+    default:
+      - value: 300
+
+  - name: failure_retry_cnt
+    description: "Number of connection retries station will do before moving to next AP.
+                scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config.
+                Note: Enabling this may cause connection time to increase incase best AP
+                doesn't behave properly. Defaults to 1"
+    default:
+      - value: 1
+    constraints:
+      - type:
+          validator: positive_integer
+
+  - name: scan_method
+    description: "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0"
+    default:
+      - value: 0
+    constraints:
+      - type:
+          validator: integer_in_range
+          value:
+            start: 0
+            end: 2
+
+  - name: dump_packets
+    description: "Dump packets via an info log statement"
+    default:
+      - value: false
+
+  - name: phy_enable_usb
+    description: "Keeps USB running when using WiFi.
+                 This allows debugging and log messages via USB Serial JTAG.
+                 Turn off for best WiFi performance."
+    default:
+      - value: true
+
+  - name: phy_skip_calibration_after_deep_sleep
+    description: "Use PHY_RF_CAL_NONE after deep sleep."
+    default:
+      - value: false
+
+  - name: phy_full_calibration
+    description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL."
+    default:
+      - value: true
+
+checks:
+  - 'ESP_WIFI_CONFIG_RX_BA_WIN < ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM'
+  - 'ESP_WIFI_CONFIG_RX_BA_WIN < (ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM * 2)'
