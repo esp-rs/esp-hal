@@ -1,4 +1,4 @@
-# Migration Guide from 0.13.x to 0.14.x
+# Migration Guide from 0.13.x to {{currentVersion}}
 
 ## Initializing esp-wifi
 
