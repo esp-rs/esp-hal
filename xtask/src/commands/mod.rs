@@ -4,10 +4,11 @@ use anyhow::{Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 
-pub use self::{build::*, run::*};
+pub use self::{build::*, bump_version::*, run::*};
 use crate::{Package, cargo::CargoAction};
 
 mod build;
+mod bump_version;
 mod run;
 
 // ----------------------------------------------------------------------------
