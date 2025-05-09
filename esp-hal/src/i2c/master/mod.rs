@@ -715,44 +715,6 @@ impl<'a> I2cFuture<'a> {
     fn is_done(&self) -> bool {
         !self.info.interrupts().is_disjoint(self.events)
     }
-
-    fn check_error(&self) -> Result<(), Error> {
-        let r = self.info.regs().int_raw().read();
-
-        if r.arbitration_lost().bit_is_set() {
-            return Err(Error::ArbitrationLost);
-        }
-
-        if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
-        }
-
-        if r.nack().bit_is_set() {
-            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
-                self.info.regs(),
-            )));
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        {
-            if r.scl_st_to().bit_is_set() {
-                return Err(Error::Timeout);
-            }
-            if r.scl_main_st_to().bit_is_set() {
-                return Err(Error::Timeout);
-            }
-        }
-
-        #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set() && self.info.regs().sr().read().resp_rec().bit_is_clear()
-        {
-            return Err(Error::AcknowledgeCheckFailed(
-                AcknowledgeCheckFailedReason::Data,
-            ));
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(not(esp32))]
@@ -762,7 +724,12 @@ impl core::future::Future for I2cFuture<'_> {
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         self.state.waker.register(ctx.waker());
 
-        let error = self.check_error();
+        let error = Driver {
+            info: self.info,
+            state: self.state,
+        }
+        .check_errors();
+
         if self.is_done() {
             Poll::Ready(Ok(()))
         } else if error.is_err() {
@@ -1917,7 +1884,9 @@ impl Driver<'_> {
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, self.info, self.state).await?;
+        I2cFuture::new(event, self.info, self.state)
+            .await
+            .inspect_err(|_| self.reset())?;
         self.check_all_commands_done().await
     }
 
@@ -1960,7 +1929,7 @@ impl Driver<'_> {
             return Ok(true);
         }
 
-        self.check_errors()?;
+        self.check_errors().inspect_err(|_| self.reset())?;
 
         Ok(false)
     }
@@ -2028,43 +1997,42 @@ impl Driver<'_> {
     /// by resetting the I2C peripheral to clear the error condition and then
     /// returns an appropriate error.
     fn check_errors(&self) -> Result<(), Error> {
-        let interrupts = self.regs().int_raw().read();
+        let r = self.regs().int_raw().read();
 
         // The ESP32 variant has a slightly different interrupt naming
         // scheme!
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // Handle error cases
-                let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::Timeout)
-                } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
-                } else if interrupts.arbitration_lost().bit_is_set() {
-                    Err(Error::ArbitrationLost)
-                } else {
-                    Ok(())
-                };
-            } else {
-                // Handle error cases
-                let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::Timeout)
-                } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
-                } else if interrupts.arbitration_lost().bit_is_set() {
-                    Err(Error::ArbitrationLost)
-                } else if interrupts.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
-                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
-                } else {
-                    Ok(())
-                };
+
+        // Handle error cases
+        if r.time_out().bit_is_set() {
+            return Err(Error::Timeout);
+        }
+        if r.nack().bit_is_set() {
+            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
+                self.regs(),
+            )));
+        }
+        if r.arbitration_lost().bit_is_set() {
+            return Err(Error::ArbitrationLost);
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        {
+            if r.scl_st_to().bit_is_set() {
+                return Err(Error::Timeout);
+            }
+            if r.scl_main_st_to().bit_is_set() {
+                return Err(Error::Timeout);
             }
         }
 
-        if retval.is_err() {
-            self.reset();
+        #[cfg(not(esp32))]
+        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
-        retval
+        Ok(())
     }
 
     /// Updates the configuration of the I2C peripheral.
@@ -2270,7 +2238,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors()?;
+                self.check_errors().inspect_err(|_| self.reset())?;
                 break;
             }
         }
@@ -2362,7 +2330,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors()?;
+                self.check_errors().inspect_err(|_| self.reset())?;
                 embassy_futures::yield_now().await;
                 break;
             }
