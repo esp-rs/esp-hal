@@ -1,14 +1,15 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use clap::Args;
 use esp_metadata::Chip;
 
-pub use self::{build::*, bump_version::*, run::*, semver_check::*};
-use crate::{Package, cargo::CargoAction};
+pub use self::{build::*, bump_version::*, check_changelog::*, run::*, semver_check::*};
+use crate::{cargo::CargoAction, Package};
 
 mod build;
 mod bump_version;
+mod check_changelog;
 mod run;
 mod semver_check;
 
