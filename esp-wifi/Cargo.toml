@@ -27,7 +27,7 @@ embedded-io-async = { version = "0.6.1" }
 rand_core = "0.9.3"
 
 # Unstable dependencies that are not (strictly) part of the public API
-allocator-api2 = { version = "0.2.0", default-features = false, features = ["alloc"] }
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.7.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.3.0", path = "../esp-config" }
