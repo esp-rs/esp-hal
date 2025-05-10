@@ -130,8 +130,6 @@
 //! Total allocated: 46148
 //! Memory Layout:
 //! Internal | ████████████░░░░░░░░░░░░░░░░░░░░░░░ | Used: 35% (Used 46148 of 131068, free: 84920)
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
 //! ```
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
@@ -338,11 +336,6 @@ impl Display for HeapStats {
             if let Some(region) = region.as_ref() {
                 region.fmt(f)?;
                 writeln!(f)?;
-            } else {
-                // Display unused memory regions
-                write!(f, "Unused   | ")?;
-                write_bar(f, 0)?;
-                writeln!(f, " |")?;
             }
         }
         Ok(())
@@ -365,10 +358,6 @@ impl defmt::Format for HeapStats {
         for region in self.region_stats.iter() {
             if let Some(region) = region.as_ref() {
                 defmt::write!(fmt, "{}\n", region);
-            } else {
-                defmt::write!(fmt, "Unused   | ");
-                write_bar_defmt(fmt, 0);
-                defmt::write!(fmt, " |\n");
             }
         }
     }
