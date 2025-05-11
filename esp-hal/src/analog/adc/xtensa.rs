@@ -19,7 +19,7 @@ cfg_if::cfg_if! {
     if #[cfg(any(esp32s2, esp32s3))] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
-        const ADC_CAL_CHANNEL: u16 = 15;
+        const ADC_CAL_CHANNEL: u16 = 0;
     }
 }
 
@@ -42,29 +42,95 @@ where
     where
         ADCI: super::CalibrationAccess,
     {
+        let guard = GenericPeripheralGuard::<{ Peripheral::ApbSarAdc as u8 }>::new();
         let mut adc_max: u16 = 0;
         let mut adc_min: u16 = u16::MAX;
         let mut adc_sum: u32 = 0;
 
         ADCI::enable_vdef(true);
 
+        let sensors = SENS::regs();
+        unsafe {
+            // sensors
+            //.sar_meas2_mux()
+            //.write(|w| w.sar2_pwdet_cct().bits(4));
+        }
+
+        ADCI::clear_dig_force();
+        ADCI::set_start_force();
+        ADCI::set_en_pad_force();
+        sensors
+            .sar_hall_ctrl()
+            .modify(|_, w| w.xpd_hall_force().set_bit());
+        sensors
+            .sar_hall_ctrl()
+            .modify(|_, w| w.hall_phase_force().set_bit());
+
+        // Set power to SW power on
+        #[cfg(esp32s2)]
+        sensors
+            .sar_meas1_ctrl1()
+            .modify(|_, w| w.rtc_saradc_clkgate_en().set_bit());
+
+        #[cfg(esp32s3)]
+        sensors
+            .sar_peri_clk_gate_conf()
+            .modify(|_, w| w.saradc_clk_en().set_bit());
+
+        sensors
+            .sar_power_xpd_sar()
+            .modify(|_, w| w.sarclk_en().set_bit());
+
+        sensors
+            .sar_power_xpd_sar()
+            .modify(|_, w| unsafe { w.force_xpd_sar().bits(0b11) });
+
+        // disable AMP
+        sensors
+            .sar_meas1_ctrl1()
+            .modify(|_, w| unsafe { w.force_xpd_amp().bits(0b11) });
+        sensors
+            .sar_amp_ctrl3()
+            .modify(|_, w| unsafe { w.amp_rst_fb_fsm().bits(0) });
+        sensors
+            .sar_amp_ctrl3()
+            .modify(|_, w| unsafe { w.amp_short_ref_fsm().bits(0) });
+        sensors
+            .sar_amp_ctrl3()
+            .modify(|_, w| unsafe { w.amp_short_ref_gnd_fsm().bits(0) });
+        sensors
+            .sar_amp_ctrl1()
+            .modify(|_, w| unsafe { w.sar_amp_wait1().bits(1) });
+        sensors
+            .sar_amp_ctrl1()
+            .modify(|_, w| unsafe { w.sar_amp_wait2().bits(1) });
+        sensors
+            .sar_amp_ctrl2()
+            .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
+
         // Start sampling
         ADCI::set_en_pad(ADCI::ADC_CAL_CHANNEL as u8);
+        // ADCI::clear_en_pad();
         ADCI::set_attenuation(ADCI::ADC_CAL_CHANNEL as usize, atten as u8);
 
         // Connect calibration source
-        ADCI::connect_cal(source, true);
+        // ADCI::connect_cal(source, true);
 
         ADCI::set_init_code(0);
 
         for _ in 0..ADCI::ADC_CAL_CNT_MAX {
+            ADCI::clear_start_sample();
             // Trigger ADC sampling
             ADCI::start_sample();
 
-            // Wait until ADC1 sampling is done
+            // Wait until ADCI sampling is done
             while !ADCI::is_done() {}
 
-            let adc = ADCI::read_data() & ADCI::ADC_VAL_MASK;
+            let adc = ADCI::read_data();
+            use defmt::println;
+            println!("Calibration read {} -> {}", adc, adc & ADCI::ADC_VAL_MASK);
+
+            let adc = adc & ADCI::ADC_VAL_MASK;
 
             ADCI::reset();
 
@@ -75,6 +141,9 @@ where
 
         let cal_val =
             (adc_sum - adc_max as u32 - adc_min as u32) as u16 / (ADCI::ADC_CAL_CNT_MAX - 2);
+
+        use defmt::println;
+        println!("Calibration result {}", cal_val);
 
         // Disconnect calibration source
         ADCI::connect_cal(source, false);
@@ -94,6 +163,7 @@ pub trait RegisterAccess {
     fn set_en_pad_force();
 
     fn set_en_pad(channel: u8);
+    fn clear_en_pad();
 
     fn clear_start_sample();
 
@@ -144,6 +214,11 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
         SENS::regs()
             .sar_meas1_ctrl2()
             .modify(|_, w| unsafe { w.sar1_en_pad().bits(1 << channel) });
+    }
+    fn clear_en_pad() {
+        SENS::regs()
+            .sar_meas1_ctrl2()
+            .modify(|_, w| unsafe { w.sar1_en_pad().bits(0) });
     }
 
     fn clear_start_sample() {
@@ -249,6 +324,11 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
         SENS::regs()
             .sar_meas2_ctrl2()
             .modify(|_, w| unsafe { w.sar2_en_pad().bits(1 << channel) });
+    }
+    fn clear_en_pad() {
+        SENS::regs()
+            .sar_meas2_ctrl2()
+            .modify(|_, w| unsafe { w.sar2_en_pad().bits(0) });
     }
 
     fn clear_start_sample() {
@@ -480,6 +560,8 @@ where
         // Set ADC unit calibration according used scheme for pin
         let init_code = pin.cal_scheme.adc_cal();
         if self.last_init_code != init_code {
+            use defmt::println;
+            println!("Setting init_code = {}", init_code);
             ADCI::set_init_code(init_code);
             self.last_init_code = init_code;
         }
