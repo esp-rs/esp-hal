@@ -633,17 +633,21 @@ where
     pub fn wait(mut self) -> Result<C, (Error, C)> {
         let memsize =
             constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize;
-        loop {
-            if <C as TxChannelInternal>::is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
 
-            if self.remaining_data.is_empty() {
-                break;
-            }
-
+        while !self.remaining_data.is_empty() {
             // wait for TX-THR
-            while !<C as TxChannelInternal>::is_threshold_set() {}
+            while !<C as TxChannelInternal>::is_threshold_set() {
+                if <C as TxChannelInternal>::is_done() {
+                    // Unexpectedly done, even though we have data left: For example, this could
+                    // happen if there is a stop code inside the data and not just at the end.
+                    return Err((Error::TransmissionError, self.channel));
+                }
+                if <C as TxChannelInternal>::is_error() {
+                    // Not sure that this can happen? In any case, be sure that we don't lock up
+                    // here in case it can.
+                    return Err((Error::TransmissionError, self.channel));
+                }
+            }
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
