@@ -327,6 +327,11 @@ impl PulseCode for u32 {
     }
 }
 
+#[inline]
+fn channel_ram_start(ch_num: impl Into<usize>) -> *mut u32 {
+    (constants::RMT_RAM_START + ch_num.into() * constants::RMT_CHANNEL_RAM_SIZE * 4) as *mut u32
+}
+
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -359,7 +364,7 @@ impl Default for TxChannelConfig {
             carrier_high: Default::default(),
             carrier_low: Default::default(),
             carrier_level: Level::Low,
-            memsize: 1u8,
+            memsize: 1,
         }
     }
 }
@@ -455,7 +460,7 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
 fn reserve_channel(channel: u8, state: RmtState, memsize: u8) -> Result<(), Error> {
-    if memsize > NUM_CHANNELS as u8 - channel {
+    if memsize == 0 || memsize > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
     }
 
@@ -489,13 +494,11 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
     pin: impl PeripheralInput<'d>,
     config: RxChannelConfig,
 ) -> Result<T, Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
-            let threshold = 0b111_1111_1111_1111;
-        } else {
-            let threshold = 0b11_1111_1111_1111;
-        }
-    }
+    let threshold = if cfg!(any(esp32, esp32s2)) {
+        0b111_1111_1111_1111
+    } else {
+        0b11_1111_1111_1111
+    };
 
     if config.idle_threshold > threshold {
         return Err(Error::InvalidArgument);
@@ -612,8 +615,14 @@ where
     C: TxChannel,
 {
     channel: C,
-    index: usize,
-    data: &'a [u32],
+
+    // The position in channel RAM to continue writing at; must be either
+    // 0 or half the available RAM size if there's further data.
+    // The position may be invalid if there's no data left.
+    ram_index: usize,
+
+    // Remaining data that has not yet been written to channel RAM. May be empty.
+    remaining_data: &'a [u32],
 }
 
 impl<C> SingleShotTxTransaction<'_, C>
@@ -622,47 +631,47 @@ where
 {
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
-        loop {
-            if <C as TxChannelInternal>::is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
+        let memsize =
+            constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize;
 
-            if self.index >= self.data.len() {
-                break;
-            }
-
+        while !self.remaining_data.is_empty() {
             // wait for TX-THR
-            while !<C as TxChannelInternal>::is_threshold_set() {}
+            while !<C as TxChannelInternal>::is_threshold_set() {
+                if <C as TxChannelInternal>::is_done() {
+                    // Unexpectedly done, even though we have data left: For example, this could
+                    // happen if there is a stop code inside the data and not just at the end.
+                    return Err((Error::TransmissionError, self.channel));
+                }
+                if <C as TxChannelInternal>::is_error() {
+                    // Not sure that this can happen? In any case, be sure that we don't lock up
+                    // here in case it can.
+                    return Err((Error::TransmissionError, self.channel));
+                }
+            }
             <C as TxChannelInternal>::reset_threshold_set();
 
             // re-fill TX RAM
-            let ram_index = (((self.index
-                - constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize)
-                / (constants::RMT_CHANNEL_RAM_SIZE
-                    * <C as TxChannelInternal>::memsize() as usize
-                    / 2))
-                % 2)
-                * (constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
-                    / 2);
-
-            let ptr = (constants::RMT_RAM_START
-                + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4
-                + ram_index * 4) as *mut u32;
-            for (idx, entry) in self.data[self.index..]
+            let ptr = unsafe { channel_ram_start(C::CHANNEL).add(self.ram_index) };
+            let count = self
+                .remaining_data
                 .iter()
-                .take(
-                    constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
-                        / 2,
-                )
+                .take(memsize / 2)
                 .enumerate()
-            {
-                unsafe {
-                    ptr.add(idx).write_volatile(*entry);
-                }
-            }
+                .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
+                .count();
 
-            self.index +=
-                constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize / 2;
+            // If count == memsize / 2 codes were written, update ram_index as
+            // - 0 -> memsize / 2
+            // - memsize / 2 -> 0
+            // Otherwise, for count < memsize / 2, the new position is invalid but the new
+            // slice is empty and we won't use ram_index again.
+            self.ram_index = memsize / 2 - self.ram_index;
+            self.remaining_data = &self.remaining_data[count..];
+            assert!(
+                self.ram_index == 0
+                    || self.ram_index == memsize / 2
+                    || self.remaining_data.is_empty()
+            );
         }
 
         loop {
@@ -714,9 +723,7 @@ where
         <C as TxChannelInternal>::set_continuous(false);
         <C as TxChannelInternal>::update();
 
-        let ptr = (constants::RMT_RAM_START
-            + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
+        let ptr = channel_ram_start(C::CHANNEL);
         for idx in 0..constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
         {
             unsafe {
@@ -1177,11 +1184,12 @@ where
     Dm: crate::DriverMode,
 {
     fn drop(&mut self) {
+        let memsize = chip_specific::channel_mem_size(CHANNEL);
+
         // This isn't really necessary, but be extra sure that this channel can't
         // interfere with others.
         chip_specific::set_channel_mem_size(CHANNEL, 0);
 
-        let memsize = chip_specific::channel_mem_size(CHANNEL);
         for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
             .iter()
             .rev()
@@ -1206,8 +1214,9 @@ pub trait TxChannel: TxChannelInternal {
         let index = Self::send_raw(data, false, 0)?;
         Ok(SingleShotTxTransaction {
             channel: self,
-            index,
-            data,
+            // Either, remaining_data is empty, or we filled the entire buffer.
+            ram_index: 0,
+            remaining_data: &data[index..],
         })
     }
 
@@ -1271,9 +1280,7 @@ where
         <C as RxChannelInternal>::clear_interrupts();
         <C as RxChannelInternal>::update();
 
-        let ptr = (constants::RMT_RAM_START
-            + C::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
+        let ptr = channel_ram_start(C::CHANNEL);
         let len = self.data.len();
         for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
             *entry = unsafe { ptr.add(idx).read_volatile() };
@@ -1306,10 +1313,7 @@ pub trait RxChannel: RxChannelInternal {
     }
 }
 
-#[cfg(any(esp32, esp32s3))]
-const NUM_CHANNELS: usize = 8;
-#[cfg(not(any(esp32, esp32s3)))]
-const NUM_CHANNELS: usize = 4;
+const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 
 #[repr(u8)]
 enum RmtState {
@@ -1456,9 +1460,7 @@ pub trait RxChannelAsync: RxChannelInternal {
             Self::clear_interrupts();
             Self::update();
 
-            let ptr = (constants::RMT_RAM_START
-                + Self::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-                as *mut u32;
+            let ptr = channel_ram_start(Self::CHANNEL);
             let len = data.len();
             for (idx, entry) in data.iter_mut().take(len).enumerate() {
                 *entry = unsafe { ptr.add(idx).read_volatile().into() };
@@ -1481,13 +1483,13 @@ fn async_interrupt_handler() {
         2 => Channel::<Async, 2>::unlisten_interrupt(Event::End | Event::Error),
         3 => Channel::<Async, 3>::unlisten_interrupt(Event::End | Event::Error),
 
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         4 => Channel::<Async, 4>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         5 => Channel::<Async, 5>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         6 => Channel::<Async, 6>::unlisten_interrupt(Event::End | Event::Error),
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32s3)]
         7 => Channel::<Async, 7>::unlisten_interrupt(Event::End | Event::Error),
 
         _ => unreachable!(),
@@ -1524,17 +1526,17 @@ fn async_interrupt_handler() {
             <Channel<Async, 4> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 4> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         5 => {
             <Channel<Async, 5> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 5> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         6 => {
             <Channel<Async, 6> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 6> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
         }
-        #[cfg(any(esp32, esp32s3))]
+        #[cfg(esp32)]
         7 => {
             <Channel<Async, 7> as TxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
             <Channel<Async, 7> as RxChannelInternal>::unlisten_interrupt(Event::End | Event::Error);
@@ -1608,20 +1610,16 @@ pub trait TxChannelInternal {
             return Err(Error::InvalidArgument);
         }
 
-        let ptr = (constants::RMT_RAM_START
-            + Self::CHANNEL as usize * constants::RMT_CHANNEL_RAM_SIZE * 4)
-            as *mut u32;
-        for (idx, entry) in data
+        let ptr = channel_ram_start(Self::CHANNEL);
+        let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
+        let written = data
             .iter()
-            .take(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
+            .take(memsize)
             .enumerate()
-        {
-            unsafe {
-                ptr.add(idx).write_volatile(*entry);
-            }
-        }
+            .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
+            .count();
 
-        Self::set_threshold((constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize / 2) as u8);
+        Self::set_threshold((memsize / 2) as u8);
         Self::set_continuous(continuous);
         Self::set_generate_repeat_interrupt(repeat);
         Self::set_wrap_mode(true);
@@ -1629,11 +1627,7 @@ pub trait TxChannelInternal {
         Self::start_tx();
         Self::update();
 
-        if data.len() >= constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
-            Ok(constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize)
-        } else {
-            Ok(data.len())
-        }
+        Ok(written)
     }
 
     fn stop();
@@ -2148,11 +2142,12 @@ mod chip_specific {
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 0..Self::memsize() {
+                    for i in 1..Self::memsize() {
                         rmt.ch_rx_conf1(($ch_index + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
                     rmt.ch_rx_conf1($ch_index).modify(|_, w| {
+                        w.mem_owner().set_bit();
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.rx_en().set_bit()
@@ -2219,7 +2214,7 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
-    use super::Error;
+    use super::{Error, NUM_CHANNELS};
     use crate::{peripherals::RMT, time::Rate};
 
     pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
@@ -2229,16 +2224,9 @@ mod chip_specific {
 
         let rmt = RMT::regs();
 
-        rmt.ch0conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch1conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch2conf1().modify(|_, w| w.ref_always_on().set_bit());
-        rmt.ch3conf1().modify(|_, w| w.ref_always_on().set_bit());
-        #[cfg(esp32)]
-        {
-            rmt.ch4conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch5conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch6conf1().modify(|_, w| w.ref_always_on().set_bit());
-            rmt.ch7conf1().modify(|_, w| w.ref_always_on().set_bit());
+        for ch_num in 0..NUM_CHANNELS {
+            rmt.chconf1(ch_num)
+                .modify(|_, w| w.ref_always_on().set_bit());
         }
 
         rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
@@ -2250,49 +2238,15 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    #[cfg(esp32)]
     pub fn pending_interrupt_for_channel() -> Option<usize> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
-        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
-            Some(0)
-        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
-            Some(1)
-        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
-            Some(2)
-        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
-            Some(3)
-        } else if st.ch4_rx_end().bit() || st.ch4_tx_end().bit() || st.ch4_err().bit() {
-            Some(4)
-        } else if st.ch5_rx_end().bit() || st.ch5_tx_end().bit() || st.ch5_err().bit() {
-            Some(5)
-        } else if st.ch6_rx_end().bit() || st.ch6_tx_end().bit() || st.ch6_err().bit() {
-            Some(6)
-        } else if st.ch7_rx_end().bit() || st.ch7_tx_end().bit() || st.ch7_err().bit() {
-            Some(7)
-        } else {
-            None
-        }
-    }
-
-    #[allow(unused)]
-    #[cfg(esp32s2)]
-    pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let rmt = RMT::regs();
-        let st = rmt.int_st().read();
-
-        if st.ch0_rx_end().bit() || st.ch0_tx_end().bit() || st.ch0_err().bit() {
-            Some(0)
-        } else if st.ch1_rx_end().bit() || st.ch1_tx_end().bit() || st.ch1_err().bit() {
-            Some(1)
-        } else if st.ch2_rx_end().bit() || st.ch2_tx_end().bit() || st.ch2_err().bit() {
-            Some(2)
-        } else if st.ch3_rx_end().bit() || st.ch3_tx_end().bit() || st.ch3_err().bit() {
-            Some(3)
-        } else {
-            None
-        }
+        (0..NUM_CHANNELS).find(|&ch_num| {
+            st.ch_rx_end(ch_num as u8).bit()
+                || st.ch_tx_end(ch_num as u8).bit()
+                || st.ch_err(ch_num as u8).bit()
+        })
     }
 
     #[inline]
@@ -2414,7 +2368,13 @@ mod chip_specific {
                 fn start_tx() {
                     let rmt = crate::peripherals::RMT::regs();
 
+                    for i in 1..Self::memsize() {
+                        rmt.chconf1(($ch_num + i).into())
+                            .modify(|_, w| w.mem_owner().clear_bit());
+                    }
+
                     rmt.chconf1($ch_num).modify(|_, w| {
+                        w.mem_owner().clear_bit();
                         w.mem_rd_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.tx_start().set_bit()
@@ -2516,14 +2476,6 @@ mod chip_specific {
                 fn clear_interrupts() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    rmt.chconf1($ch_num).modify(|_, w| {
-                        w.mem_wr_rst().set_bit();
-                        w.apb_mem_rst().set_bit();
-                        w.mem_owner().set_bit();
-                        w.rx_en().clear_bit()
-                    });
-                    Self::update();
-
                     rmt.int_clr().write(|w| {
                         w.ch_rx_end($ch_num).set_bit();
                         w.ch_err($ch_num).set_bit();
@@ -2564,12 +2516,13 @@ mod chip_specific {
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 0..Self::memsize() {
+                    for i in 1..Self::memsize() {
                         rmt.chconf1(($ch_num + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
 
                     rmt.chconf1($ch_num).modify(|_, w| {
+                        w.mem_owner().set_bit();
                         w.mem_wr_rst().set_bit();
                         w.apb_mem_rst().set_bit();
                         w.rx_en().set_bit()
