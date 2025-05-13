@@ -1600,11 +1600,12 @@ pub trait TxChannelInternal {
 
         let ptr = channel_ram_start(Self::CHANNEL);
         let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
-        for (idx, entry) in data.iter().take(memsize).enumerate() {
-            unsafe {
-                ptr.add(idx).write_volatile(*entry);
-            }
-        }
+        let written = data
+            .iter()
+            .take(memsize)
+            .enumerate()
+            .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
+            .count();
 
         Self::set_threshold((memsize / 2) as u8);
         Self::set_continuous(continuous);
@@ -1614,11 +1615,7 @@ pub trait TxChannelInternal {
         Self::start_tx();
         Self::update();
 
-        if data.len() >= memsize {
-            Ok(memsize)
-        } else {
-            Ok(data.len())
-        }
+        Ok(written)
     }
 
     fn stop();
