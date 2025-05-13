@@ -327,9 +327,33 @@ impl PulseCode for u32 {
     }
 }
 
+/// Memory size associated to a channel.
+#[doc(hidden)]
+#[derive(Copy, Clone)]
+pub struct MemSize(u8);
+
+impl MemSize {
+    #[inline]
+    const fn from_blocks(blocks: u8) -> Self {
+        Self(blocks)
+    }
+
+    #[inline]
+    const fn blocks(self) -> u8 {
+        self.0
+    }
+
+    #[inline]
+    const fn codes(self) -> usize {
+        self.0 as usize * constants::RMT_CHANNEL_RAM_SIZE
+    }
+}
+
 #[inline]
 fn channel_ram_start(ch_num: impl Into<usize>) -> *mut u32 {
-    (constants::RMT_RAM_START + ch_num.into() * constants::RMT_CHANNEL_RAM_SIZE * 4) as *mut u32
+    unsafe {
+        (constants::RMT_RAM_START as *mut u32).add(ch_num.into() * constants::RMT_CHANNEL_RAM_SIZE)
+    }
 }
 
 /// Channel configuration for TX channels
@@ -459,13 +483,13 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // If this is not possible (because a preceding channel is using the RAM, or
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
-fn reserve_channel(channel: u8, state: RmtState, memsize: u8) -> Result<(), Error> {
-    if memsize == 0 || memsize > NUM_CHANNELS as u8 - channel {
+fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
+    if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
     }
 
     let mut next_state = state;
-    for cur_channel in channel..channel + memsize {
+    for cur_channel in channel..channel + memsize.blocks() {
         if STATE[cur_channel as usize]
             .compare_exchange(
                 RmtState::Unconfigured as u8,
@@ -504,7 +528,8 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
         return Err(Error::InvalidArgument);
     }
 
-    reserve_channel(T::CHANNEL, RmtState::Rx, config.memsize)?;
+    let memsize = MemSize::from_blocks(config.memsize);
+    reserve_channel(T::CHANNEL, RmtState::Rx, memsize)?;
 
     let pin = pin.into();
 
@@ -522,7 +547,7 @@ fn configure_rx_channel<'d, T: RxChannelInternal>(
     );
     T::set_filter_threshold(config.filter_threshold);
     T::set_idle_threshold(config.idle_threshold);
-    T::set_memsize(config.memsize);
+    T::set_memsize(memsize);
 
     Ok(T::new())
 }
@@ -531,7 +556,8 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
     pin: impl PeripheralOutput<'d>,
     config: TxChannelConfig,
 ) -> Result<T, Error> {
-    reserve_channel(T::CHANNEL, RmtState::Tx, config.memsize)?;
+    let memsize = MemSize::from_blocks(config.memsize);
+    reserve_channel(T::CHANNEL, RmtState::Tx, memsize)?;
 
     let pin = pin.into();
 
@@ -548,7 +574,7 @@ fn configure_tx_channel<'d, T: TxChannelInternal>(
         config.carrier_level,
     );
     T::set_idle_output(config.idle_output, config.idle_output_level);
-    T::set_memsize(config.memsize);
+    T::set_memsize(memsize);
 
     Ok(T::new())
 }
@@ -631,8 +657,7 @@ where
 {
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
-        let memsize =
-            constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize;
+        let memsize = <C as TxChannelInternal>::memsize().codes();
 
         while !self.remaining_data.is_empty() {
             // wait for TX-THR
@@ -724,8 +749,7 @@ where
         <C as TxChannelInternal>::update();
 
         let ptr = channel_ram_start(C::CHANNEL);
-        for idx in 0..constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
-        {
+        for idx in 0..<C as TxChannelInternal>::memsize().codes() {
             unsafe {
                 ptr.add(idx).write_volatile(0);
             }
@@ -1180,9 +1204,9 @@ where
 
         // This isn't really necessary, but be extra sure that this channel can't
         // interfere with others.
-        chip_specific::set_channel_mem_size(CHANNEL, 0);
+        chip_specific::set_channel_mem_size(CHANNEL, MemSize::from_blocks(0));
 
-        for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
+        for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize.blocks())]
             .iter()
             .rev()
         {
@@ -1234,7 +1258,7 @@ pub trait TxChannel: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > Self::memsize().codes() {
             return Err(Error::Overflow);
         }
 
@@ -1292,7 +1316,7 @@ pub trait RxChannel: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1373,7 +1397,7 @@ pub trait TxChannelAsync: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1435,7 +1459,7 @@ pub trait RxChannelAsync: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1573,9 +1597,9 @@ pub trait TxChannelInternal {
 
     fn set_idle_output(enable: bool, level: Level);
 
-    fn set_memsize(memsize: u8);
+    fn set_memsize(memsize: MemSize);
 
-    fn memsize() -> u8;
+    fn memsize() -> MemSize;
 
     fn start_tx();
 
@@ -1603,7 +1627,7 @@ pub trait TxChannelInternal {
         }
 
         let ptr = channel_ram_start(Self::CHANNEL);
-        let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
+        let memsize = Self::memsize().codes();
         for (idx, entry) in data.iter().take(memsize).enumerate() {
             unsafe {
                 ptr.add(idx).write_volatile(*entry);
@@ -1652,9 +1676,9 @@ pub trait RxChannelInternal {
 
     fn set_carrier(carrier: bool, high: u16, low: u16, level: Level);
 
-    fn set_memsize(value: u8);
+    fn set_memsize(value: MemSize);
 
-    fn memsize() -> u8;
+    fn memsize() -> MemSize;
 
     fn start_rx();
 
@@ -1688,7 +1712,7 @@ pub trait RxChannelInternal {
 
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
-    use super::Error;
+    use super::{Error, MemSize};
     use crate::{peripherals::RMT, time::Rate};
 
     pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
@@ -1786,46 +1810,49 @@ mod chip_specific {
 
     #[cfg(not(esp32s3))]
     #[inline]
-    pub fn channel_mem_size(ch_num: u8) -> u8 {
+    pub fn channel_mem_size(ch_num: u8) -> MemSize {
         let rmt = RMT::regs();
 
-        match ch_num {
+        let blocks = match ch_num {
             0 => rmt.ch0_tx_conf0().read().mem_size().bits(),
             1 => rmt.ch1_tx_conf0().read().mem_size().bits(),
             2 => rmt.ch2_rx_conf0().read().mem_size().bits(),
             3 => rmt.ch3_rx_conf0().read().mem_size().bits(),
             _ => panic!("invalid channel number"),
-        }
+        };
+
+        MemSize::from_blocks(blocks)
     }
 
     #[cfg(not(esp32s3))]
     #[inline]
-    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+    pub fn set_channel_mem_size(ch_num: u8, memsize: MemSize) {
+        let blocks = memsize.blocks();
         let rmt = RMT::regs();
 
         match ch_num {
             0 => rmt
                 .ch0_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             1 => rmt
                 .ch1_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             2 => rmt
                 .ch2_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             3 => rmt
                 .ch3_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             _ => panic!("invalid channel number"),
         };
     }
 
     #[cfg(esp32s3)]
     #[inline]
-    pub fn channel_mem_size(ch_num: u8) -> u8 {
+    pub fn channel_mem_size(ch_num: u8) -> MemSize {
         let rmt = RMT::regs();
 
-        match ch_num {
+        let blocks = match ch_num {
             0 => rmt.ch0_tx_conf0().read().mem_size().bits(),
             1 => rmt.ch1_tx_conf0().read().mem_size().bits(),
             2 => rmt.ch2_tx_conf0().read().mem_size().bits(),
@@ -1835,39 +1862,42 @@ mod chip_specific {
             6 => rmt.ch6_rx_conf0().read().mem_size().bits(),
             7 => rmt.ch7_rx_conf0().read().mem_size().bits(),
             _ => panic!("invalid channel number"),
-        }
+        };
+
+        MemSize::from_blocks(blocks)
     }
 
     #[cfg(esp32s3)]
     #[inline]
-    pub fn set_channel_mem_size(ch_num: u8, memsize: u8) {
+    pub fn set_channel_mem_size(ch_num: u8, memsize: MemSize) {
+        let blocks = memsize.blocks();
         let rmt = RMT::regs();
 
         match ch_num {
             0 => rmt
                 .ch0_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             1 => rmt
                 .ch1_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             2 => rmt
                 .ch2_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             3 => rmt
                 .ch3_tx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             4 => rmt
                 .ch4_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             5 => rmt
                 .ch5_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             6 => rmt
                 .ch6_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             7 => rmt
                 .ch7_rx_conf0()
-                .modify(|_, w| unsafe { w.mem_size().bits(memsize) }),
+                .modify(|_, w| unsafe { w.mem_size().bits(blocks) }),
             _ => panic!("invalid channel number"),
         };
     }
@@ -1968,16 +1998,17 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn set_memsize(value: u8) {
+                fn set_memsize(value: crate::rmt::MemSize) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.ch_tx_conf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
                 }
 
-                fn memsize() -> u8 {
+                fn memsize() -> crate::rmt::MemSize {
                     let rmt = crate::peripherals::RMT::regs();
-                    rmt.ch_tx_conf0($ch_num).read().mem_size().bits()
+                    let blocks = rmt.ch_tx_conf0($ch_num).read().mem_size().bits();
+                    crate::rmt::MemSize::from_blocks(blocks)
                 }
 
                 fn start_tx() {
@@ -2119,21 +2150,22 @@ mod chip_specific {
                     });
                 }
 
-                fn set_memsize(value: u8) {
+                fn set_memsize(value: crate::rmt::MemSize) {
                     let rmt = crate::peripherals::RMT::regs();
                     rmt.ch_rx_conf0($ch_index)
-                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
                 }
 
-                fn memsize() -> u8 {
+                fn memsize() -> crate::rmt::MemSize {
                     let rmt = crate::peripherals::RMT::regs();
-                    rmt.ch_rx_conf0($ch_index).read().mem_size().bits()
+                    let blocks = rmt.ch_rx_conf0($ch_index).read().mem_size().bits();
+                    crate::rmt::MemSize::from_blocks(blocks)
                 }
 
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 1..Self::memsize() {
+                    for i in 1..Self::memsize().blocks() {
                         rmt.ch_rx_conf1(($ch_index + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
@@ -2205,7 +2237,7 @@ mod chip_specific {
 
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
-    use super::{Error, NUM_CHANNELS};
+    use super::{Error, MemSize, NUM_CHANNELS};
     use crate::{peripherals::RMT, time::Rate};
 
     pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
@@ -2241,17 +2273,18 @@ mod chip_specific {
     }
 
     #[inline]
-    pub fn channel_mem_size(ch_num: u8) -> u8 {
+    pub fn channel_mem_size(ch_num: u8) -> MemSize {
         let rmt = crate::peripherals::RMT::regs();
-        rmt.chconf0(ch_num as usize).read().mem_size().bits()
+        let blocks = rmt.chconf0(ch_num as usize).read().mem_size().bits();
+        MemSize::from_blocks(blocks)
     }
 
     #[inline]
-    pub fn set_channel_mem_size(ch_num: u8, value: u8) {
+    pub fn set_channel_mem_size(ch_num: u8, value: MemSize) {
         let rmt = crate::peripherals::RMT::regs();
 
         rmt.chconf0(ch_num as usize)
-            .modify(|_, w| unsafe { w.mem_size().bits(value) });
+            .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
     }
 
     macro_rules! impl_tx_channel {
@@ -2344,22 +2377,23 @@ mod chip_specific {
                         .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
                 }
 
-                fn set_memsize(value: u8) {
+                fn set_memsize(value: crate::rmt::MemSize) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
                 }
 
-                fn memsize() -> u8 {
+                fn memsize() -> crate::rmt::MemSize {
                     let rmt = crate::peripherals::RMT::regs();
-                    rmt.chconf0($ch_num).read().mem_size().bits()
+                    let blocks = rmt.chconf0($ch_num).read().mem_size().bits();
+                    crate::rmt::MemSize::from_blocks(blocks)
                 }
 
                 fn start_tx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 1..Self::memsize() {
+                    for i in 1..Self::memsize().blocks() {
                         rmt.chconf1(($ch_num + i).into())
                             .modify(|_, w| w.mem_owner().clear_bit());
                     }
@@ -2492,22 +2526,23 @@ mod chip_specific {
                     });
                 }
 
-                fn set_memsize(value: u8) {
+                fn set_memsize(value: crate::rmt::MemSize) {
                     let rmt = crate::peripherals::RMT::regs();
 
                     rmt.chconf0($ch_num)
-                        .modify(|_, w| unsafe { w.mem_size().bits(value) });
+                        .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
                 }
 
-                fn memsize() -> u8 {
+                fn memsize() -> crate::rmt::MemSize {
                     let rmt = crate::peripherals::RMT::regs();
-                    rmt.chconf0($ch_num).read().mem_size().bits()
+                    let blocks = rmt.chconf0($ch_num).read().mem_size().bits();
+                    crate::rmt::MemSize::from_blocks(blocks)
                 }
 
                 fn start_rx() {
                     let rmt = crate::peripherals::RMT::regs();
 
-                    for i in 1..Self::memsize() {
+                    for i in 1..Self::memsize().blocks() {
                         rmt.chconf1(($ch_num + i).into())
                             .modify(|_, w| w.mem_owner().set_bit());
                     }
