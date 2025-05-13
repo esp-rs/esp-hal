@@ -663,6 +663,11 @@ where
             // slice is empty and we won't use ram_index again.
             self.ram_index = memsize / 2 - self.ram_index;
             self.remaining_data = &self.remaining_data[count..];
+            assert!(
+                self.ram_index == 0
+                    || self.ram_index == memsize / 2
+                    || self.remaining_data.is_empty()
+            );
         }
 
         loop {
