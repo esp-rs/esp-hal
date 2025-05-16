@@ -2470,6 +2470,9 @@ impl Info {
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
+        if ints.rxfifo_tout().bit_is_set() {
+            res.insert(UartInterrupt::RxTimeout);
+        }
 
         res
     }
