@@ -75,7 +75,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ### TX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -107,7 +107,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### RX operation
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -216,7 +216,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
@@ -230,20 +230,17 @@ use enumset::{EnumSet, EnumSetType};
 use portable_atomic::{AtomicU8, Ordering};
 
 use crate::{
-    Async,
-    Blocking,
     asynch::AtomicWaker,
     gpio::{
-        InputConfig,
-        Level,
-        OutputConfig,
         interconnect::{PeripheralInput, PeripheralOutput},
+        InputConfig, Level, OutputConfig,
     },
     handler,
     peripherals::{Interrupt, RMT},
     soc::constants,
     system::{self, GenericPeripheralGuard},
     time::Rate,
+    Async, Blocking,
 };
 
 /// Errors
@@ -841,6 +838,21 @@ mod impl_for_chip {
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
+    impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+        /// Unsafely steal a channel creator instance.
+        ///
+        /// # Safety
+        ///
+        /// Circumvents HAL ownership and safety guarantees and allows creating multiple
+        /// handles to the same peripheral structure.
+        pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
+            ChannelCreator {
+                phantom: PhantomData,
+                _guard: GenericPeripheralGuard::new(),
+            }
+        }
+    }
+
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
 
@@ -938,6 +950,21 @@ mod impl_for_chip {
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
+    impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+        /// Unsafely steal a channel creator instance.
+        ///
+        /// # Safety
+        ///
+        /// Circumvents HAL ownership and safety guarantees and allows creating multiple
+        /// handles to the same peripheral structure.
+        pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
+            ChannelCreator {
+                phantom: PhantomData,
+                _guard: GenericPeripheralGuard::new(),
+            }
+        }
+    }
+
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
@@ -1033,6 +1060,21 @@ mod impl_for_chip {
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    }
+
+    impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+        /// Unsafely steal a channel creator instance.
+        ///
+        /// # Safety
+        ///
+        /// Circumvents HAL ownership and safety guarantees and allows creating multiple
+        /// handles to the same peripheral structure.
+        pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
+            ChannelCreator {
+                phantom: PhantomData,
+                _guard: GenericPeripheralGuard::new(),
+            }
+        }
     }
 
     impl_tx_channel_creator!(0);
@@ -1138,6 +1180,21 @@ mod impl_for_chip {
     {
         phantom: PhantomData<Dm>,
         _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    }
+
+    impl<Dm, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+        /// Unsafely steal a channel creator instance.
+        ///
+        /// # Safety
+        ///
+        /// Circumvents HAL ownership and safety guarantees and allows creating multiple
+        /// handles to the same peripheral structure.
+        pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
+            ChannelCreator {
+                phantom: PhantomData,
+                _guard: GenericPeripheralGuard::new(),
+            }
+        }
     }
 
     impl_tx_channel_creator!(0);
