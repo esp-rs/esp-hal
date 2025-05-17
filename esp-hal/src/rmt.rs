@@ -1234,11 +1234,12 @@ where
     Dm: crate::DriverMode,
 {
     fn drop(&mut self) {
+        let memsize = chip_specific::channel_mem_size(CHANNEL);
+
         // This isn't really necessary, but be extra sure that this channel can't
         // interfere with others.
         chip_specific::set_channel_mem_size(CHANNEL, 0);
 
-        let memsize = chip_specific::channel_mem_size(CHANNEL);
         for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
             .iter()
             .rev()
