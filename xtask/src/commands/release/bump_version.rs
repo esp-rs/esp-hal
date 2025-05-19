@@ -147,7 +147,7 @@ fn bump_crate_version(
     amount: Version,
     pre: Option<&str>,
 ) -> Result<semver::Version> {
-    let prev_version = bumped_package.version().to_string();
+    let prev_version = bumped_package.package_version();
 
     let version = do_version_bump(&prev_version, amount, pre)
         .with_context(|| format!("Failed to bump version of {}", bumped_package.package))?;
@@ -207,7 +207,11 @@ fn bump_crate_version(
     Ok(version)
 }
 
-fn do_version_bump(version: &str, amount: Version, pre: Option<&str>) -> Result<semver::Version> {
+pub fn do_version_bump(
+    version: &semver::Version,
+    amount: Version,
+    pre: Option<&str>,
+) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: Version) {
         match amount {
             Version::Major => {
@@ -224,7 +228,7 @@ fn do_version_bump(version: &str, amount: Version, pre: Option<&str>) -> Result<
             }
         }
     }
-    let mut version = semver::Version::parse(version)?;
+    let mut version = version.clone();
 
     if let Some(pre) = pre {
         if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
@@ -337,7 +341,8 @@ mod test {
         ];
 
         for (version, amount, pre, expected) in test_cases {
-            let new_version = do_version_bump(version, amount, pre).unwrap();
+            let version = semver::Version::parse(version).unwrap();
+            let new_version = do_version_bump(&version, amount, pre).unwrap();
             assert_eq!(new_version.to_string(), expected);
         }
     }

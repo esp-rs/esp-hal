@@ -1,11 +1,13 @@
 use clap::Subcommand;
 
 pub mod bump_version;
+pub mod plan;
 pub mod publish;
 pub mod semver_check;
 pub mod tag_releases;
 
 pub use bump_version::*;
+pub use plan::*;
 pub use publish::*;
 pub use semver_check::*;
 pub use tag_releases::*;
@@ -31,4 +33,9 @@ pub enum Release {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
+    /// Create a release plan.
+    ///
+    /// The result of this command is a json file that can be customized to
+    /// control what and how gets released.
+    Plan(PlanArgs),
 }

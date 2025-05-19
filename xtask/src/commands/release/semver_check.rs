@@ -107,29 +107,56 @@ pub mod checker {
         Ok(())
     }
 
+    pub fn min_package_update(
+        workspace: &Path,
+        package: Package,
+        chips: &[Chip],
+    ) -> anyhow::Result<ReleaseType> {
+        fn stricter(a: ReleaseType, b: ReleaseType) -> ReleaseType {
+            fn index_of(rt: ReleaseType) -> usize {
+                match rt {
+                    ReleaseType::Major => 2,
+                    ReleaseType::Minor => 1,
+                    ReleaseType::Patch => 0,
+                    _ => unreachable!(),
+                }
+            }
+            if index_of(b) > index_of(a) { b } else { a }
+        }
+
+        let mut highest_result = ReleaseType::Patch;
+        for chip in chips {
+            let result = minimum_update(workspace, package, *chip)?;
+
+            if result == ReleaseType::Major {
+                return Ok(result);
+            }
+
+            highest_result = stricter(highest_result, result);
+
+            if !package.chip_features_matter() {
+                break;
+            }
+        }
+
+        Ok(highest_result)
+    }
+
     pub fn check_for_breaking_changes(
         workspace: &Path,
         packages: Vec<Package>,
         chips: Vec<Chip>,
-    ) -> Result<(), anyhow::Error> {
+    ) -> anyhow::Result<()> {
         let mut semver_incompatible_packages = Vec::new();
 
         for package in packages {
             log::info!("Semver-check API for {package}");
 
-            for chip in &chips {
-                let result = minimum_update(workspace, package, *chip)?;
-                log::info!("Required bump = {:?}", result);
-
-                if result == ReleaseType::Major {
-                    semver_incompatible_packages.push(package.to_string());
-                    // no need to check other chips for this package
-                    break;
-                }
-
-                if !package.chip_features_matter() {
-                    break;
-                }
+            let result = min_package_update(workspace, package, &chips)?;
+            log::info!("Required bump = {:?}", result);
+            if result == ReleaseType::Major {
+                semver_incompatible_packages.push(package.to_string());
+                // no need to check other chips for this package
             }
         }
 
