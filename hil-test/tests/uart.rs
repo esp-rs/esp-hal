@@ -7,6 +7,7 @@
 #![no_main]
 
 use esp_hal::{
+    delay::Delay,
     Blocking,
     gpio::AnyPin,
     uart::{self, ClockSource, Uart},
@@ -18,6 +19,9 @@ struct Context {
     uart1: Uart<'static, Blocking>,
     rx: AnyPin<'static>,
     tx: AnyPin<'static>,
+    rts: AnyPin<'static>, 
+    rts_replicant: AnyPin<'static>, 
+    delay: Delay,
 }
 
 #[cfg(test)]
@@ -34,6 +38,11 @@ mod tests {
         );
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        // TODO: HARDCODED FOR NOW, WILL CONNECT THEM ON THE HIL SET AND MAKE A PROPER MACRO
+        let rts = peripherals.GPIO7;
+        let rts_replicant = peripherals.GPIO15;
+
+        let delay = Delay::new();
 
         let uart0 = Uart::new(peripherals.UART0, uart::Config::default()).unwrap();
         let uart1 = Uart::new(peripherals.UART1, uart::Config::default()).unwrap();
@@ -43,6 +52,9 @@ mod tests {
             uart1,
             rx: rx.degrade(),
             tx: tx.degrade(),
+            rts: rts.degrade(),
+            rts_replicant: rts_replicant.degrade(),
+            delay: delay,
         }
     }
 
@@ -105,6 +117,32 @@ mod tests {
             uart.read(&mut byte).unwrap();
             assert_eq!(byte[0], 0x42);
         }
+    }
+
+    #[test]
+    fn test_hw_flow_control(ctx: Context) {
+        
+        let mut uart = ctx.uart1.with_tx(ctx.tx).with_rx(ctx.rx).with_rts(ctx.rts);
+
+        uart.apply_config(
+            &uart::Config::default().with_hw_flow_ctrl(
+                esp_hal::uart::HwFlowControl {
+                    cts: uart::CtsConfig::Disabled,
+                    rts: uart::RtsConfig::Enabled(4),
+                },
+            )
+        ).unwrap();
+
+        // Can't get the RTS status directly, so we need to "replicate" it.
+        let mut rts_replicant = esp_hal::gpio::Flex::new(ctx.rts_replicant);
+        rts_replicant.set_input_enable(true);
+        
+        let data: [u8; 10] = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9];
+        let written = uart.write(&data).unwrap();
+        ctx.delay.delay_millis(1);
+        
+        // RTS pin should go high when the threshold is exceeded.
+        assert_eq!(rts_replicant.is_high(), true);
     }
 
     #[test]

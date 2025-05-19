@@ -242,21 +242,39 @@ pub enum SwFlowControl {
     },
 }
 
+/// Configuration for CTS (Clear To Send) flow control.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum CtsConfig {
+    /// Enable CTS flow control (TX).
+    Enabled,
+    #[default]
+    /// Disable CTS flow control (TX).
+    Disabled,
+}
+
+/// Configuration for RTS (Request To Send) flow control.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum RtsConfig {
+    /// Enable RTS flow control with a FIFO threshold (RX).
+    Enabled(u8),
+    #[default]
+    /// Disable RTS flow control.
+    Disabled,
+}
+
 /// Hardware flow control configuration.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub enum HwFlowControl {
-    /// Enables RTS flow control with a configurable FIFO threshold.
-    Rts(u8),
-    /// Enables CTS flow control.
-    Cts,
-    /// Enables both RTS and CTS flow control. RTS uses a configurable
-    /// threshold.
-    Full(u8),
-    #[default]
-    /// Disables hardware flow control.
-    Disabled,
+pub struct HwFlowControl {
+    /// CTS configuration.
+    pub cts: CtsConfig,
+    /// RTS configuration.
+    pub rts: RtsConfig,
 }
 
 /// Defines how strictly the requested baud rate must be met.
@@ -2933,8 +2951,6 @@ impl Info {
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
                     }
                 }
-                #[cfg(any(esp32c6, esp32h2))]
-                sync_regs(self.regs());
             }
             SwFlowControl::Disabled => {
                 cfg_if::cfg_if! {
@@ -2947,34 +2963,18 @@ impl Info {
 
                 reg.modify(|_, w| w.sw_flow_con_en().clear_bit());
                 reg.modify(|_, w| w.xonoff_del().clear_bit());
-
-                #[cfg(any(esp32c6, esp32h2))]
-                sync_regs(self.regs());
             }
         }
 
-        // set HW flow control
-        match hw_flow_ctrl {
-            HwFlowControl::Disabled => {
-                self.set_rts(false, None);
-                self.set_cts(false);
-            }
+        self.set_cts(matches!(hw_flow_ctrl.cts, CtsConfig::Enabled));
 
-            HwFlowControl::Cts => {
-                self.set_rts(false, None);
-                self.set_cts(true);
-            }
-
-            HwFlowControl::Rts(threshold) => {
-                self.set_rts(true, Some(threshold));
-                self.set_cts(false);
-            }
-
-            HwFlowControl::Full(rts_threshold) => {
-                self.set_rts(true, Some(rts_threshold));
-                self.set_cts(true);
-            }
+        match hw_flow_ctrl.rts {
+            RtsConfig::Enabled(threshold) => self.set_rts(true, Some(threshold)),
+            RtsConfig::Disabled => self.set_rts(false, None),
         }
+        
+        #[cfg(any(esp32c6, esp32h2))]
+        sync_regs(self.regs());
     }
 
     fn set_cts(&self, enable: bool) {
