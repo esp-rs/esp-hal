@@ -401,7 +401,7 @@ impl Default for RxChannelConfig {
     }
 }
 
-pub use impl_for_chip::{ChannelCreator, Rmt};
+pub use impl_for_chip::Rmt;
 
 impl<'d, Dm> Rmt<'d, Dm>
 where
@@ -781,10 +781,35 @@ macro_rules! impl_rx_channel_creator {
     };
 }
 
+/// RMT Channel Creator
+pub struct ChannelCreator<Dm, const CHANNEL: u8>
+where
+    Dm: crate::DriverMode,
+{
+    phantom: PhantomData<Dm>,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+}
+
+impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+    /// Unsafely steal a channel creator instance.
+    ///
+    /// # Safety
+    ///
+    /// Circumvents HAL ownership and safety guarantees and allows creating
+    /// multiple handles to the same peripheral structure.
+    pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
+        ChannelCreator {
+            phantom: PhantomData,
+            _guard: GenericPeripheralGuard::new(),
+        }
+    }
+}
+
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
+    use super::ChannelCreator;
     use crate::system::GenericPeripheralGuard;
 
     /// RMT Instance
@@ -832,15 +857,6 @@ mod impl_for_chip {
         }
     }
 
-    /// RMT Channel Creator
-    pub struct ChannelCreator<Dm, const CHANNEL: u8>
-    where
-        Dm: crate::DriverMode,
-    {
-        phantom: PhantomData<Dm>,
-        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
 
@@ -858,6 +874,7 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -927,15 +944,6 @@ mod impl_for_chip {
                 phantom: PhantomData,
             }
         }
-    }
-
-    /// RMT Channel Creator
-    pub struct ChannelCreator<Dm, const CHANNEL: u8>
-    where
-        Dm: crate::DriverMode,
-    {
-        phantom: PhantomData<Dm>,
-        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
     }
 
     impl_tx_channel_creator!(0);
@@ -979,6 +987,7 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1026,15 +1035,6 @@ mod impl_for_chip {
         }
     }
 
-    /// RMT Channel Creator
-    pub struct ChannelCreator<Dm, const CHANNEL: u8>
-    where
-        Dm: crate::DriverMode,
-    {
-        phantom: PhantomData<Dm>,
-        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
@@ -1060,6 +1060,7 @@ mod impl_for_chip {
 mod impl_for_chip {
     use core::marker::PhantomData;
 
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1131,15 +1132,6 @@ mod impl_for_chip {
         }
     }
 
-    /// RMT Channel Creator
-    pub struct ChannelCreator<Dm, const CHANNEL: u8>
-    where
-        Dm: crate::DriverMode,
-    {
-        phantom: PhantomData<Dm>,
-        _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
@@ -1177,11 +1169,12 @@ where
     Dm: crate::DriverMode,
 {
     fn drop(&mut self) {
+        let memsize = chip_specific::channel_mem_size(CHANNEL);
+
         // This isn't really necessary, but be extra sure that this channel can't
         // interfere with others.
         chip_specific::set_channel_mem_size(CHANNEL, 0);
 
-        let memsize = chip_specific::channel_mem_size(CHANNEL);
         for s in STATE[usize::from(CHANNEL)..usize::from(CHANNEL + memsize)]
             .iter()
             .rev()
