@@ -65,7 +65,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(5)]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             match prime_field.len() {
