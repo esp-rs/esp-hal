@@ -1402,6 +1402,10 @@ pub enum UartInterrupt {
     /// The receiver has received more data than what
     /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
+
+    /// The receiver has not received any data for the time
+    /// [`RxConfig::with_timeout`] specifies.
+    RxTimeout,
 }
 
 impl<'d, Dm> Uart<'d, Dm>
@@ -2444,6 +2448,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                    UartInterrupt::RxTimeout => w.rxfifo_tout().bit(enable),
                 };
             }
             w
@@ -2465,6 +2470,9 @@ impl Info {
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
+        if ints.rxfifo_tout().bit_is_set() {
+            res.insert(UartInterrupt::RxTimeout);
+        }
 
         res
     }
@@ -2478,6 +2486,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    UartInterrupt::RxTimeout => w.rxfifo_tout().clear_bit_by_one(),
                 };
             }
             w
