@@ -7,6 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
+use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
 use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
@@ -230,9 +231,13 @@ impl Package {
     pub fn tag(&self, version: &semver::Version) -> String {
         format!("{self}-v{version}")
     }
+
+    fn is_semver_checked(&self) -> bool {
+        [Self::EspHal].contains(self)
+    }
 }
 
-#[derive(Debug, Clone, Copy, Display, ValueEnum)]
+#[derive(Debug, Clone, Copy, Display, ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum Version {
     Major,

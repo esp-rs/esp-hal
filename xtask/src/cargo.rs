@@ -7,8 +7,9 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, bail};
+use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
-use toml_edit::{DocumentMut, Item};
+use toml_edit::{DocumentMut, Item, Value};
 
 use crate::{Package, windows_safe_path};
 
@@ -253,6 +254,10 @@ impl<'a> CargoToml<'a> {
             .trim_matches('"')
     }
 
+    pub fn package_version(&self) -> semver::Version {
+        semver::Version::parse(self.version()).expect("Failed to parse version")
+    }
+
     pub fn set_version(&mut self, version: &semver::Version) {
         log::info!(
             "Bumping version for package: {} ({} -> {version})",
@@ -311,5 +316,33 @@ impl<'a> CargoToml<'a> {
             self.manifest.as_table_mut(),
             &mut handle_dependencies,
         );
+    }
+
+    pub fn package(&self) -> Package {
+        self.package
+    }
+
+    pub fn repo_dependencies(&mut self) -> Vec<Package> {
+        let mut dependencies = Vec::new();
+        self.visit_dependencies(|_, _, table| {
+            for (name, value) in table.iter() {
+                let name = if let Item::Value(Value::InlineTable(t)) = value {
+                    if let Some(Value::String(name)) = t.get("package") {
+                        name.value()
+                    } else {
+                        name
+                    }
+                } else {
+                    name
+                };
+
+                if let Ok(package) = Package::from_str(name, true) {
+                    if !dependencies.contains(&package) {
+                        dependencies.push(package);
+                    }
+                }
+            }
+        });
+        dependencies
     }
 }
