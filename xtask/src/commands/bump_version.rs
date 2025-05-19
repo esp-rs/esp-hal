@@ -4,13 +4,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
 use toml_edit::{DocumentMut, Item, TableLike, Value};
 
-use crate::{Package, Version, changelog::Changelog};
+use crate::{changelog::Changelog, Package, Version};
 
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
@@ -253,11 +253,6 @@ fn bump_crate_version(
     bumped_package.set_version(&version);
 
     bumped_package.save()?;
-
-    fs::write(
-        &bumped_package.manifest_path,
-        bumped_package.manifest.to_string(),
-    )?;
 
     let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
