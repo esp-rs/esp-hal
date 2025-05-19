@@ -5,17 +5,15 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
-    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
+    Package,
 };
-
-
 
 // ----------------------------------------------------------------------------
 // Command-line Interface
@@ -44,6 +42,8 @@ enum Cli {
     TagReleases(TagReleasesArgs),
     /// Semver Checks
     SemverCheck(SemverCheckArgs),
+    /// Check the changelog for packages.
+    CheckChangelog(CheckChangelogArgs),
 }
 
 #[derive(Debug, Args)]
@@ -101,6 +101,17 @@ struct TagReleasesArgs {
     no_dry_run: bool,
 }
 
+#[derive(Debug, Args)]
+struct CheckChangelogArgs {
+    /// Package(s) to tag.
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
+    packages: Vec<Package>,
+
+    /// Re-generate the changelog with consistent formatting.
+    #[arg(long)]
+    normalize: bool,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -142,6 +153,7 @@ fn main() -> Result<()> {
         Cli::Publish(args) => publish(&workspace, args),
         Cli::TagReleases(args) => tag_releases(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
+        Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
     }
 }
 
@@ -504,7 +516,7 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         }
 
         let version = xtask::package_version(workspace, package)?;
-        let tag = format!("{package}-v{version}");
+        let tag = package.tag(version);
 
         if args.no_dry_run {
             let output = Command::new("git")

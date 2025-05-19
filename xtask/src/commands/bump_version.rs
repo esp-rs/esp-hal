@@ -6,7 +6,7 @@ use semver::Prerelease;
 use strum::IntoEnumIterator;
 use toml_edit::{Item, Value};
 
-use crate::{Package, Version};
+use crate::{Package, Version, changelog::Changelog};
 
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
@@ -31,7 +31,8 @@ pub struct BumpVersionArgs {
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
-        bump_crate_version(workspace, package, args.amount, args.pre.as_deref())?;
+        let new_version = bump_crate_version(workspace, package, args.amount, args.pre.as_deref())?;
+        finalize_changelog(workspace, package, new_version)?;
     }
 
     Ok(())
@@ -43,7 +44,7 @@ fn bump_crate_version(
     package: Package,
     amount: Version,
     pre: Option<&str>,
-) -> Result<()> {
+) -> Result<semver::Version> {
     let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
     let manifest = fs::read_to_string(&manifest_path)
         .with_context(|| format!("Could not read {}", manifest_path.display()))?;
@@ -106,7 +107,7 @@ fn bump_crate_version(
         }
     }
 
-    Ok(())
+    Ok(version)
 }
 
 fn do_version_bump(
@@ -154,6 +155,34 @@ fn do_version_bump(
     }
 
     Ok(version)
+}
+
+fn finalize_changelog(
+    workspace: &Path,
+    package: Package,
+    new_version: semver::Version,
+) -> Result<()> {
+    let changelog_path = workspace.join(package.to_string()).join("CHANGELOG.md");
+
+    if !changelog_path.exists() {
+        // No changelog exists for this package
+        return Ok(());
+    }
+
+    log::info!("  Updating changelog for package: {package}");
+
+    // Let's parse the old changelog first
+    let changelog_str = fs::read_to_string(&changelog_path)
+        .with_context(|| format!("Could not read {}", changelog_path.display()))?;
+
+    let mut changelog = Changelog::parse(&changelog_str)
+        .with_context(|| format!("Could not parse {}", changelog_path.display()))?;
+
+    changelog.finalize(package, new_version, jiff::Timestamp::now());
+
+    std::fs::write(&changelog_path, changelog.to_string())?;
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed a panic on very long wakeup times (#3433)
 
 ### Removed
+
 
 ## [0.7.0] - 2025-02-24
 
@@ -66,14 +67,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reduce memory footprint by 4 bytes on multi-core MCUs.
+- Reduce memory footprint by 4 bytes on multi-core MCUs. (#2377)
 - The time driver no longer uses cross-core critical sections. (#2559)
 
 ### Fixed
 
 - Alarm interrupts are now handled on the core that allocated them. (For executors created on the second core after calling `esp_hal_embassy::init`) (#2451)
-
-### Removed
 
 ## 0.4.0 - 2024-10-10
 
@@ -110,3 +109,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2024-06-04
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-embassy-v0.7.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.7.0...HEAD
