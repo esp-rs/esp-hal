@@ -488,8 +488,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
         changelog.finalize(
             Package::EspHal,
-            semver::Version::new(0, 2, 0),
-            jiff::Timestamp::now(),
+            &semver::Version::new(0, 2, 0),
+            "2025-05-08 08:36-04".parse().unwrap(),
         );
 
         let expected = "# Changelog
