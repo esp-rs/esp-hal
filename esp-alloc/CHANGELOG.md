@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `allocator_api2` to support allocator APIs on stable Rust. (#3318)
+- `allocator_api2` to support allocator APIs on stable Rust. (#3318, #3487)
 - `AnyMemory`, `InternalMemory`, `ExternalMemory` allocators. (#3318)
 - Removed the `Unused` section for `stats()` to make the output cleaner (#3486)
 
