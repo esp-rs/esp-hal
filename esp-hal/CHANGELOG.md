@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented `embedded_io::ReadReady` for `Uart` and `UartRx` (#3423)
 - Implemented `embedded_io::WriteReady` for `Uart` and `UartTx` (#3423)
 - ESP32-H2: Support for ADC calibration (#3414)
+- Expose ADC asynchrounous functionalities where applicable (#3441)
 
 ### Changed
 
