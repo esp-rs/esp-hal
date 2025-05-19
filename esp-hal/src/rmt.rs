@@ -652,13 +652,13 @@ where
 
             // re-fill TX RAM
             let ptr = unsafe { channel_ram_start(C::CHANNEL).add(self.ram_index) };
-            let count = self
-                .remaining_data
-                .iter()
-                .take(memsize / 2)
-                .enumerate()
-                .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
-                .count();
+            let count = self.remaining_data.len().min(memsize / 2);
+            let (chunk, remaining) = self.remaining_data.split_at(count);
+            for (idx, entry) in chunk.iter().enumerate() {
+                unsafe {
+                    ptr.add(idx).write_volatile(*entry);
+                }
+            }
 
             // If count == memsize / 2 codes were written, update ram_index as
             // - 0 -> memsize / 2
@@ -666,7 +666,7 @@ where
             // Otherwise, for count < memsize / 2, the new position is invalid but the new
             // slice is empty and we won't use ram_index again.
             self.ram_index = memsize / 2 - self.ram_index;
-            self.remaining_data = &self.remaining_data[count..];
+            self.remaining_data = remaining;
             debug_assert!(
                 self.ram_index == 0
                     || self.ram_index == memsize / 2
@@ -1604,12 +1604,11 @@ pub trait TxChannelInternal {
 
         let ptr = channel_ram_start(Self::CHANNEL);
         let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
-        let written = data
-            .iter()
-            .take(memsize)
-            .enumerate()
-            .map(|(idx, entry)| unsafe { ptr.add(idx).write_volatile(*entry) })
-            .count();
+        for (idx, entry) in data.iter().take(memsize).enumerate() {
+            unsafe {
+                ptr.add(idx).write_volatile(*entry);
+            }
+        }
 
         Self::set_threshold((memsize / 2) as u8);
         Self::set_continuous(continuous);
@@ -1619,7 +1618,7 @@ pub trait TxChannelInternal {
         Self::start_tx();
         Self::update();
 
-        Ok(written)
+        Ok(data.len().min(memsize))
     }
 
     fn stop();
