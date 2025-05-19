@@ -281,6 +281,23 @@ fn bump_crate_version(
                     table["version"] = version.to_string().into();
                     changed = true;
                 }
+                Item::None => {
+                    // Maybe we have a renamed package (alias = { package = "foo" })?
+                    let update_renamed_dep = table.get_values().iter().any(|(_, p)| {
+                        if let Value::InlineTable(table) = p {
+                            if let Some(Value::String(name)) = &table.get("package") {
+                                return name.value() == &package_name;
+                            }
+                        }
+
+                        false
+                    });
+
+                    if update_renamed_dep {
+                        table[&package_name]["version"] = version.to_string().into();
+                        changed = true;
+                    }
+                }
                 _ => {}
             }
         });
