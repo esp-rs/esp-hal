@@ -229,9 +229,9 @@ pub enum SwFlowControl {
     Disabled,
     /// Enables software flow control with configured parameters
     Enabled {
-        /// Xon flow control char.
+        /// Xon flow control byte.
         xon_char: u8,
-        /// Xoff flow control char.
+        /// Xoff flow control byte.
         xoff_char: u8,
         /// If the software flow control is enabled and the data amount in
         /// rxfifo is less than xon_thrd, an xon_char will be sent.
@@ -408,12 +408,12 @@ pub struct AtCmdConfig {
     /// Optional idle time after the AT command detection ends, in clock
     /// cycles.
     post_idle_count: Option<u16>,
-    /// Optional timeout between characters in the AT command, in clock
+    /// Optional timeout between bytes in the AT command, in clock
     /// cycles.
     gap_timeout: Option<u16>,
-    /// The character that triggers the AT command detection.
+    /// The byte (character) that triggers the AT command detection.
     cmd_char: u8,
-    /// Optional number of characters to detect as part of the AT command.
+    /// Optional number of bytes to detect as part of the AT command.
     char_num: u8,
 }
 
@@ -1209,7 +1209,7 @@ where
     ///
     /// This function clears and disables the `receive FIFO full` interrupt,
     /// `receive FIFO overflow`, `receive FIFO timeout`, and `AT command
-    /// character detection` interrupts.
+    /// byte detection` interrupts.
     fn disable_rx_interrupts(&self) {
         self.regs().int_clr().write(|w| {
             w.rxfifo_full().clear_bit_by_one();
@@ -1459,7 +1459,7 @@ impl<'d> Uart<'d, Async> {
 #[instability::unstable]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
-    /// [`Uart::set_at_cmd`] character.
+    /// [`Uart::set_at_cmd`] byte.
     AtCmd,
 
     /// The transmitter has finished sending out all data from the FIFO.
@@ -2929,22 +2929,15 @@ impl Info {
             } => {
                 cfg_if::cfg_if! {
                     if #[cfg(any(esp32c6, esp32h2))] {
-                        self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit());
-                        self.regs().swfc_conf0().modify(|_, w| w.sw_flow_con_en().set_bit());
-                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold) });
-                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold) });
-                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
-                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
+                        self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
+                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
                     } else if #[cfg(esp32)]{
-                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit());
-                        self.regs().flow_conf().modify(|_, w| w.sw_flow_con_en().set_bit());
-                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold) });
-                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold) });
-                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
-                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
+                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold) });
+                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
                     } else {
-                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit());
-                        self.regs().flow_conf().modify(|_, w| w.sw_flow_con_en().set_bit());
+                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
                         self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
                         self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
@@ -2966,24 +2959,21 @@ impl Info {
             }
         }
 
-        self.set_cts(matches!(hw_flow_ctrl.cts, CtsConfig::Enabled));
+        self.regs().conf0().modify(|_, w| {
+            w.tx_flow_en()
+                .bit(matches!(hw_flow_ctrl.cts, CtsConfig::Enabled))
+        });
 
         match hw_flow_ctrl.rts {
-            RtsConfig::Enabled(threshold) => self.set_rts(true, Some(threshold)),
-            RtsConfig::Disabled => self.set_rts(false, None),
+            RtsConfig::Enabled(threshold) => self.configure_rts_flow_ctrl(true, Some(threshold)),
+            RtsConfig::Disabled => self.configure_rts_flow_ctrl(false, None),
         }
 
         #[cfg(any(esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
 
-    fn set_cts(&self, enable: bool) {
-        self.regs()
-            .conf0()
-            .modify(|_, w| w.tx_flow_en().bit(enable));
-    }
-
-    fn set_rts(&self, enable: bool, threshold: Option<u8>) {
+    fn configure_rts_flow_ctrl(&self, enable: bool, threshold: Option<u8>) {
         if let Some(threshold) = threshold {
             cfg_if::cfg_if! {
                 if #[cfg(esp32)] {

@@ -136,6 +136,8 @@ mod tests {
 
         // This will make RTS pin go high, as we write more than the RTS threshold.
         uart.write(&data).unwrap();
+        // Required, otherwise we'll run into a timing issue and won't be able to
+        // determine that the RTS is at a high level.
         ctx.delay.delay_millis(1);
 
         // RTS pin should go high when the threshold is exceeded.
