@@ -322,9 +322,12 @@ pub fn evaluate_yaml_config(
         };
 
         let option = ConfigOption {
-            name: option.name,
+            name: option.name.clone(),
             description: option.description,
-            default_value: default_value.ok_or(Error::Parse("()".to_string()))?,
+            default_value: default_value.ok_or(Error::Parse(format!(
+                "No default value found for {}",
+                &option.name
+            )))?,
             constraint,
             stability: option.stability,
             active,
