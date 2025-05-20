@@ -1,18 +1,17 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     time::Instant,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
-    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -26,19 +25,10 @@ enum Cli {
     /// Run-related subcommands
     #[clap(subcommand)]
     Run(Run),
+    /// Release-related subcommands
+    #[clap(subcommand)]
+    Release(Release),
 
-    /// Bump the version of the specified package(s).
-    ///
-    /// This command will, for each specified package:
-    /// - Verify that the crate can be released (e.g. it doesn't refer to git
-    ///   dependencies)
-    /// - Update the version in `Cargo.toml` files
-    /// - Update the version in dependencies' `Cargo.toml` files
-    /// - Check if the changelog can be finalized
-    /// - Update the version in the changelog
-    /// - Replaces `{{currentVersion}}` markers in source files and the
-    ///   migration guide.
-    BumpVersion(BumpVersionArgs),
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
     /// Format all packages in the workspace with rustfmt
@@ -46,10 +36,6 @@ enum Cli {
     FmtPackages(FmtPackagesArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
-    /// Attempt to publish the specified package.
-    Publish(PublishArgs),
-    /// Generate git tags for all new package releases.
-    TagReleases(TagReleasesArgs),
     /// Semver Checks
     SemverCheck(SemverCheckArgs),
     /// Check the changelog for packages.
@@ -87,28 +73,6 @@ struct LintPackagesArgs {
     /// Automatically apply fixes
     #[arg(long)]
     fix: bool,
-}
-
-#[derive(Debug, Args)]
-struct PublishArgs {
-    /// Package to publish (performs a dry-run by default).
-    #[arg(value_enum)]
-    package: Package,
-
-    /// Do not pass the `--dry-run` argument, actually try to publish.
-    #[arg(long)]
-    no_dry_run: bool,
-}
-
-#[derive(Debug, Args)]
-struct TagReleasesArgs {
-    /// Package(s) to tag.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
-    packages: Vec<Package>,
-
-    /// Actually try and create the tags
-    #[arg(long)]
-    no_dry_run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -156,12 +120,16 @@ fn main() -> Result<()> {
             Run::Tests(args) => tests(&workspace, args, CargoAction::Run),
         },
 
-        Cli::BumpVersion(args) => bump_version(&workspace, args),
+        // Release-related subcommands:
+        Cli::Release(release) => match release {
+            Release::BumpVersion(args) => bump_version(&workspace, args),
+            Release::TagReleases(args) => tag_releases(&workspace, args),
+            Release::Publish(args) => publish(&workspace, args),
+        },
+
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
-        Cli::Publish(args) => publish(&workspace, args),
-        Cli::TagReleases(args) => tag_releases(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
     }
@@ -300,42 +268,6 @@ fn lint_package(
     let cargo_args = builder.build();
 
     xtask::cargo::run_with_env(&cargo_args, &path, [("CI", "1")], false)?;
-
-    Ok(())
-}
-
-fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
-    let package_name = args.package.to_string();
-    let package_path = xtask::windows_safe_path(&workspace.join(&package_name));
-
-    use Package::*;
-    let mut publish_args = match args.package {
-        Examples | HilTest | QaTest => {
-            bail!(
-                "Invalid package '{}' specified, this package should not be published!",
-                args.package
-            )
-        }
-
-        EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
-        | EspRiscvRt | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
-
-        _ => vec![],
-    };
-
-    if !args.no_dry_run {
-        publish_args.push("--dry-run");
-    }
-
-    let builder = CargoArgsBuilder::default()
-        .subcommand("publish")
-        .args(&publish_args);
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    // Execute `cargo publish` command from the package root:
-    xtask::cargo::run(&args, &package_path)?;
 
     Ok(())
 }
@@ -503,63 +435,6 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     if failure {
         bail!("CI checks failed");
     }
-
-    Ok(())
-}
-
-fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
-    args.packages.sort();
-
-    #[derive(serde::Serialize)]
-    struct DocumentationItem {
-        name: String,
-        tag: String,
-    }
-
-    let mut created = Vec::new();
-    for package in args.packages {
-        // If a package does not require documentation, this also means that it is not
-        // published (maybe this function needs a better name), so we can skip tagging
-        // it:
-        if !package.is_published() {
-            continue;
-        }
-
-        let version = xtask::package_version(workspace, package)?;
-        let tag = package.tag(&version);
-
-        if args.no_dry_run {
-            let output = Command::new("git")
-                .arg("tag")
-                .arg(&tag)
-                .current_dir(workspace)
-                .output()?;
-
-            if output.stderr.is_empty() {
-                log::info!("Created tag '{tag}'");
-            } else {
-                let err = String::from_utf8_lossy(&output.stderr);
-                let err = err.trim_start_matches("fatal: ");
-                log::warn!("{}", err);
-            }
-        } else {
-            log::info!("Would create '{tag}' if `--no-dry-run` was passed.")
-        }
-        created.push(DocumentationItem {
-            name: package.to_string(),
-            tag,
-        });
-    }
-
-    if args.no_dry_run {
-        log::info!("Created {} tags", created.len());
-        log::info!("IMPORTANT: Don't forget to push the tags to the correct remote!");
-    }
-
-    log::info!(
-        "Documentation workflow input for these packages:\r\n\r\n {:#}",
-        serde_json::to_string(&created)?
-    );
 
     Ok(())
 }
