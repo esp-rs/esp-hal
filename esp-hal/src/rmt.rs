@@ -193,6 +193,7 @@
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
+    borrow::Borrow,
     default::Default,
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -246,6 +247,8 @@ pub enum Error {
     ReceiverError,
     /// Memory block is not available for channel
     MemoryBlockNotAvailable,
+    /// An endmarker was encounted in the middle of the data
+    UnexpectedEndMarker,
 }
 
 /// Convenience newtype to work with pulse codes.
@@ -509,6 +512,104 @@ impl MemSize {
     #[inline]
     const fn codes(self) -> usize {
         self.0 as usize * property!("rmt.channel_ram_size")
+    }
+}
+
+#[derive(Copy, Clone, PartialEq)]
+enum WriterState {
+    // Ready to continue writing data to the hardware buffer
+    Active,
+
+    // Data exhausted, and last code was a stop code
+    Done,
+
+    // Data exhausted, but no stop code encountered
+    DoneNoEnd,
+
+    // Data not exhausted, but encountered a stop code
+    DoneEarly,
+}
+
+/// docs
+struct RmtWriter {
+    // Offset in RMT RAM section to start writing from (number of PulseCode!)
+    // u16 is sufficient to store this for all devices, and should be small enough such that
+    // size_of::<RmtWriter>() == 2 * size_of::<PulseCode>()
+    offset: u16,
+
+    // ...
+    written: usize,
+
+    // ...
+    state: WriterState,
+}
+
+impl RmtWriter {
+    fn new() -> Self {
+        Self {
+            offset: 0,
+            written: 0,
+            state: WriterState::Active,
+        }
+    }
+
+    fn write(
+        &mut self,
+        data: &mut impl Iterator<Item: Borrow<PulseCode>>,
+        raw: impl TxChannelInternal,
+        count: usize,
+    ) {
+        if !matches!(self.state, WriterState::Active) {
+            // Don't call next() on data again!
+            return;
+        }
+
+        let start = raw.channel_ram_start();
+        let memsize = raw.memsize().codes();
+        let mut offset = self.offset as usize;
+
+        // This is only used to fill the entire RAM from its start, or to refill
+        // either the first or second half. The code below may rely on this.
+        // In particular, this implies that the offset might only need to be wrapped at
+        // the end.
+        debug_assert!(count == memsize && offset == 0 || count == memsize / 2);
+        // Offset might take a different value only if there's not data; but in that
+        // case we already returned above.
+        debug_assert!(offset == 0 || offset == memsize / 2);
+
+        let initial_offset = offset;
+        while offset < initial_offset + count {
+            match data.next() {
+                Some(code) => {
+                    let code = *code.borrow();
+
+                    unsafe { start.add(offset).write_volatile(*code.borrow()) }
+                    offset += 1;
+
+                    // FIXME: Maybe remove this for more efficiency?
+                    if code.is_end_marker() {
+                        self.state = if data.next().is_some() {
+                            WriterState::DoneEarly
+                        } else {
+                            WriterState::Done
+                        };
+                        break;
+                    }
+                }
+                None => {
+                    self.state = WriterState::DoneNoEnd;
+                    break;
+                }
+            }
+        }
+
+        debug_assert!(offset <= memsize);
+        self.written += offset - initial_offset;
+        if offset == memsize {
+            // Wrap around
+            offset = 0;
+        }
+        self.offset = offset as u16;
     }
 }
 
@@ -1335,25 +1436,24 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
-pub struct SingleShotTxTransaction<'a, T>
+pub struct SingleShotTxTransaction<'a, D>
 where
-    T: Into<PulseCode> + Copy,
+    D: Iterator,
+    D::Item: Borrow<PulseCode>,
 {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
 
-    // The position in channel RAM to continue writing at; must be either
-    // 0 or half the available RAM size if there's further data.
-    // The position may be invalid if there's no data left.
-    ram_index: usize,
+    writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'a [T],
+    data: D,
 }
 
-impl<T> SingleShotTxTransaction<'_, T>
+impl<D> SingleShotTxTransaction<'_, D>
 where
-    T: Into<PulseCode> + Copy,
+    D: Iterator,
+    D::Item: Borrow<PulseCode>,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
@@ -1363,30 +1463,12 @@ where
         if status == Some(Event::Threshold) {
             raw.reset_tx_threshold_set();
 
-            if !self.remaining_data.is_empty() {
+            if self.writer.state == WriterState::Active {
                 // re-fill TX RAM
                 let memsize = raw.memsize().codes();
-                let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
-                let count = self.remaining_data.len().min(memsize / 2);
-                let (chunk, remaining) = self.remaining_data.split_at(count);
-                for (idx, entry) in chunk.iter().enumerate() {
-                    unsafe {
-                        ptr.add(idx).write_volatile((*entry).into());
-                    }
-                }
-
-                // If count == memsize / 2 codes were written, update ram_index as
-                // - 0 -> memsize / 2
-                // - memsize / 2 -> 0
-                // Otherwise, for count < memsize / 2, the new position is invalid but the new
-                // slice is empty and we won't use ram_index again.
-                self.ram_index = memsize / 2 - self.ram_index;
-                self.remaining_data = remaining;
-                debug_assert!(
-                    self.ram_index == 0
-                        || self.ram_index == memsize / 2
-                        || self.remaining_data.is_empty()
-                );
+                self.writer.write(&mut self.data, raw, memsize / 2);
+                // FIXME: Return if writer.state indicates an error (ensure
+                // to stop transmission first)
             }
         }
 
@@ -1415,7 +1497,7 @@ where
             match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::TransmissionError),
                 Some(Event::End) => {
-                    if !self.remaining_data.is_empty() {
+                    if self.writer.state == WriterState::Active {
                         // Unexpectedly done, even though we have data left: For example, this could
                         // happen if there is a stop code inside the data and not just at the end.
                         break Err(Error::TransmissionError);
@@ -1434,9 +1516,10 @@ where
     }
 }
 
-impl<T> Drop for SingleShotTxTransaction<'_, T>
+impl<D> Drop for SingleShotTxTransaction<'_, D>
 where
-    T: Into<PulseCode> + Copy,
+    D: Iterator,
+    D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -1532,17 +1615,38 @@ impl Channel<Blocking, Tx> {
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<'a, T>(&'a mut self, data: &'a [T]) -> Result<SingleShotTxTransaction<'a, T>, Error>
+    pub fn transmit<D>(
+        &mut self,
+        data: D,
+    ) -> Result<SingleShotTxTransaction<'_, <D as IntoIterator>::IntoIter>, Error>
     where
-        T: Into<PulseCode> + Copy,
+        D: IntoIterator,
+        D::Item: Borrow<PulseCode>,
     {
-        let index = self.raw.start_send(data, false, 0)?;
+        let raw = self.raw;
+
+        let memsize = raw.memsize();
+        let mut data = data.into_iter();
+        let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, memsize.codes());
+
+        if writer.written == 0 {
+            return Err(Error::InvalidArgument);
+        }
+
+        match writer.state {
+            WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
+            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            _ => (),
+        };
+
+        raw.start_send(false, 0);
+
         Ok(SingleShotTxTransaction {
             raw: self.raw,
             _phantom: PhantomData,
-            // Either, remaining_data is empty, or we filled the entire buffer.
-            ram_index: 0,
-            remaining_data: &data[index..],
+            writer,
+            data,
         })
     }
 
@@ -1551,9 +1655,10 @@ impl Channel<Blocking, Tx> {
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
     #[inline]
-    pub fn transmit_continuously<T>(&mut self, data: &[T]) -> Result<ContinuousTxTransaction<'_>, Error>
+    pub fn transmit_continuously<D>(&mut self, data: D) -> Result<ContinuousTxTransaction<'_>, Error>
     where
-        T: Into<PulseCode> + Copy,
+        D: IntoIterator,
+        D::Item: Borrow<PulseCode>,
     {
         self.transmit_continuously_with_loopcount(0, data)
     }
@@ -1562,23 +1667,36 @@ impl Channel<Blocking, Tx> {
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_continuously_with_loopcount<T>(
+    pub fn transmit_continuously_with_loopcount<D>(
         &mut self,
         loopcount: u16,
-        data: &[T],
+        data: D,
     ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
-        T: Into<PulseCode> + Copy,
+        D: IntoIterator,
+        D::Item: Borrow<PulseCode>,
     {
-        if data.len() > self.raw.memsize().codes() {
-            return Err(Error::Overflow);
+        let raw = self.raw;
+
+        let memsize = raw.memsize();
+        let mut data = data.into_iter();
+        let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, memsize.codes());
+
+        if writer.written == 0 {
+            return Err(Error::InvalidArgument);
         }
 
-        let _index = self.raw.start_send(data, true, loopcount)?;
-        Ok(ContinuousTxTransaction {
-            raw: self.raw,
-            _phantom: PhantomData,
-        })
+        match writer.state {
+            WriterState::Active => return Err(Error::Overflow),
+            WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
+            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            WriterState::Done => (),
+        };
+
+        raw.start_send(true, loopcount);
+
+        Ok(ContinuousTxTransaction { raw: self.raw, _phantom: PhantomData })
     }
 }
 
@@ -1738,20 +1856,33 @@ impl Channel<Async, Tx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
+    pub async fn transmit<D>(&mut self, data: D) -> Result<(), Error>
     where
         Self: Sized,
-        T: Into<PulseCode> + Copy,
+        D: IntoIterator,
+        D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
-        if data.len() > raw.memsize().codes() {
-            return Err(Error::InvalidDataLength);
+        let memsize = raw.memsize();
+        let mut data = data.into_iter();
+        let mut writer = RmtWriter::new();
+        writer.write(&mut data, raw, memsize.codes());
+
+        if writer.written == 0 {
+            return Err(Error::InvalidArgument);
         }
+
+        match writer.state {
+            WriterState::Active => return Err(Error::Overflow),
+            WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
+            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            WriterState::Done => (),
+        };
 
         raw.clear_tx_interrupts();
         raw.listen_tx_interrupt(Event::End | Event::Error);
-        raw.start_send(data, false, 0)?;
+        raw.start_send(false, 0);
 
         (RmtTxFuture {
             raw,
@@ -1920,37 +2051,16 @@ pub trait TxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Tx> {
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
     #[inline]
-    fn start_send<T>(&self, data: &[T], continuous: bool, repeat: u16) -> Result<usize, Error>
-    where
-        T: Into<PulseCode> + Copy,
-    {
+    fn start_send(&self, continuous: bool, repeat: u16) {
         self.clear_tx_interrupts();
 
-        if let Some(last) = data.last() {
-            if !continuous && !(*last).into().is_end_marker() {
-                return Err(Error::EndMarkerMissing);
-            }
-        } else {
-            return Err(Error::InvalidArgument);
-        }
-
-        let ptr = self.channel_ram_start();
-        let memsize = self.memsize().codes();
-        for (idx, entry) in data.iter().take(memsize).enumerate() {
-            unsafe {
-                ptr.add(idx).write_volatile((*entry).into());
-            }
-        }
-
-        self.set_tx_threshold((memsize / 2) as u8);
+        self.set_tx_threshold((self.memsize().codes() / 2) as u8);
         self.set_tx_continuous(continuous);
         self.set_generate_repeat_interrupt(repeat);
         self.set_tx_wrap_mode(true);
         self.update();
         self.start_tx();
         self.update();
-
-        Ok(data.len().min(memsize))
     }
 
     fn stop_tx(&self);
