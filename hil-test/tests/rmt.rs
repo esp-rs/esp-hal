@@ -91,7 +91,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (mut tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+    let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
