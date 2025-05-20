@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- RMT: Return an error when trying create a channel with `memsize: 0` (#3477)
+- RMT: fix a potential hang on transmitting data with an embedded stop code (#3477)
 - RMT channel drop implementation bugfix where the channel was not released properly (#3496)
 - RMT now uses correct max filter threshold of 255 instead of 127 (#3192)
 - Full-duplex SPI works when mixed with half-duplex SPI (#3176)
