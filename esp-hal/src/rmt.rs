@@ -138,10 +138,9 @@
 //!     }
 //!
 //!     match transaction.wait() {
-//!         Ok(channel_res) => {
-//!             channel = channel_res;
+//!         Ok(count) => {
 //!             let mut total = 0usize;
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -153,7 +152,7 @@
 //!                 total += entry.length2() as usize;
 //!             }
 //!
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -183,9 +182,7 @@
 //!
 //!             println!();
 //!         }
-//!         Err((_err, channel_res)) => {
-//!             channel = channel_res;
-//!         }
+//!         Err(_err) => {}
 //!     }
 //!
 //!     delay.delay_millis(1500);
@@ -1586,21 +1583,22 @@ impl Channel<Blocking, Tx> {
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, T>
+pub struct RxTransaction<'ch, 'a, T>
 where
     T: From<PulseCode>,
 {
-    channel: Channel<Blocking, Rx>,
+    raw: DynChannelAccess<Rx>,
+    _phantom: PhantomData<&'ch mut DynChannelAccess<Rx>>,
     data: &'a mut [T],
 }
 
-impl<T> RxTransaction<'_, T>
+impl<T> RxTransaction<'_, '_, T>
 where
     T: From<PulseCode>,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw;
+        let raw = self.raw;
 
         let status = raw.get_rx_status();
         if status == Some(Event::End) {
@@ -1634,20 +1632,40 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Rx>, (Error, Channel<Blocking, Rx>)> {
-        let raw = self.channel.raw;
+    pub fn wait(mut self) -> Result<(), Error> {
+        let raw = self.raw;
 
         let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::ReceiverError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
+                Some(Event::Error) => break Err(Error::ReceiverError),
+                Some(Event::End) => break Ok(()),
                 _ => continue,
             }
         };
 
         raw.clear_rx_interrupts();
 
+        // Disable Drop handler since the transaction is stopped already.
+        let _ = ManuallyDrop::new(self);
         result
+    }
+}
+
+impl<T> Drop for RxTransaction<'_, '_, T>
+where
+    T: From<PulseCode>,
+{
+    fn drop(&mut self) {
+        // If this is dropped, that implies that the transaction was not properly
+        // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
+        // block in the meantime, such that subsequent uses of the channel are
+        // safe (i.e. start from a state where the hardware is stopped).
+        let raw = self.raw;
+
+        raw.stop_rx();
+        raw.update();
+
+        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
@@ -1658,7 +1676,10 @@ impl Channel<Blocking, Rx> {
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
+    pub fn receive<'ch, 'a, T>(
+        &'ch mut self,
+        data: &'a mut [T],
+    ) -> Result<RxTransaction<'ch, 'a, T>, Error>
     where
         Self: Sized,
         T: From<PulseCode>,
@@ -1670,7 +1691,8 @@ impl Channel<Blocking, Rx> {
         self.raw.start_receive();
 
         Ok(RxTransaction {
-            channel: self,
+            raw: self.raw,
+            _phantom: PhantomData,
             data,
         })
     }
