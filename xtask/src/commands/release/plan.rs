@@ -183,6 +183,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     serde_json::to_writer_pretty(&mut plan_file, &plan)?;
     log::info!("Release plan written to {}", plan_path.display());
 
+    println!("Release plan written to {}.", plan_path.display());
+    println!("Please review the release plan and make changes where appropriate.");
+    println!(
+        "To apply the release plan, you'll need to remove the heading comment, save the \
+        file, then run the following command: `<placeholder, yet to be implemented>`",
+    );
+
     Ok(())
 }
 

@@ -232,6 +232,7 @@ impl Package {
         format!("{self}-v{version}")
     }
 
+    #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
         [Self::EspHal].contains(self)
     }
