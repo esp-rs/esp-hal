@@ -1234,15 +1234,44 @@ where
     D: Iterator,
     D::Item: Borrow<u32>,
 {
+    fn poll_internal(&mut self) -> Option<Event> {
+        let raw = self.channel.raw();
+
+        let status = raw.get_tx_status();
+        if status == Some(Event::Threshold) {
+            raw.reset_tx_threshold_set();
+
+            if self.writer.state == WriterState::Active {
+                // re-fill TX RAM
+                let memsize = raw.memsize().codes();
+                self.writer.write(&mut self.data, raw, memsize / 2);
+                // FIXME: Return if writer.state indicates an error (ensure
+                // to stop transmission first)
+            }
+        }
+
+        status
+    }
+
+    /// Check transmission status and write new data to the hardware if
+    /// necessary.
+    ///
+    /// Returns whether transmission has ended (whether successfully or with an
+    /// error). In that case, a subsequent call to `wait()` should return
+    /// immediately.
+    pub fn poll(&mut self) -> bool {
+        match self.poll_internal() {
+            Some(Event::Error | Event::End) => true,
+            Some(Event::Threshold) | None => false,
+        }
+    }
+
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<(), Error> {
-        let raw = self.channel.raw();
-        let memsize = raw.memsize().codes();
-
+        // Not sure that all the error cases below can happen. However, it's best to
+        // handle them to be sure that we don't lock up here in case they can happen.
         let result = loop {
-            // Not sure that all the error cases below can happen. However, it's best to
-            // handle them to be sure that we don't lock up here in case they can happen.
-            match raw.get_tx_status() {
+            match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::TransmissionError),
                 Some(Event::End) => {
                     if self.writer.state == WriterState::Active {
@@ -1251,17 +1280,6 @@ where
                     } else {
                         break Ok(());
                     }
-                }
-                Some(Event::Threshold) => {
-                    if self.writer.state == WriterState::Active {
-                        continue;
-                    }
-                    raw.reset_tx_threshold_set();
-
-                    // re-fill TX RAM
-                    self.writer.write(&mut self.data, raw, memsize / 2);
-                    // FIXME: Return if writer.state indicates an error (ensure
-                    // to stop transmission first)
                 }
                 _ => continue,
             }
@@ -1511,32 +1529,49 @@ pub struct RxTransaction<'ch, 'a, C: RxChannel> {
 }
 
 impl<C: RxChannel> RxTransaction<'_, '_, C> {
-    /// Wait for the transaction to complete
-    pub fn wait(self) -> Result<(), Error> {
+    fn poll_internal(&mut self) -> Option<Event> {
         let raw = &self.channel.raw();
 
+        let status = raw.get_rx_status();
+        if status == Some(Event::End) {
+            raw.stop_rx();
+            raw.clear_rx_interrupts();
+            raw.update();
+
+            let ptr = raw.channel_ram_start();
+            // SAFETY: RxChannel.receive() verifies that the length of self.data does not
+            // exceed the channel RAM size.
+            for (idx, entry) in self.data.iter_mut().enumerate() {
+                *entry = unsafe { ptr.add(idx).read_volatile() };
+            }
+        }
+
+        status
+    }
+
+    /// Check receive status
+    ///
+    /// Returns whether reception has ended (whether successfully or with an
+    /// error). In that case, a subsequent call to `wait()` should return
+    /// immediately.
+    pub fn poll(&mut self) -> bool {
+        match self.poll_internal() {
+            Some(Event::Error | Event::End) => true,
+            Some(Event::Threshold) | None => false,
+        }
+    }
+
+    /// Wait for the transaction to complete
+    pub fn wait(mut self) -> Result<(), Error> {
         let result = loop {
-            match raw.get_rx_status() {
+            match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::ReceiverError),
-                Some(Event::End) => {
-                    raw.stop_rx();
-                    raw.clear_rx_interrupts();
-                    raw.update();
-
-                    let ptr = raw.channel_ram_start();
-                    // SAFETY: RxChannel.receive() verifies that the length of self.data does not
-                    // exceed the channel RAM size.
-                    for (idx, entry) in self.data.iter_mut().enumerate() {
-                        *entry = unsafe { ptr.add(idx).read_volatile() };
-                    }
-
-                    break Ok(());
-                }
+                Some(Event::End) => break Ok(()),
                 _ => continue,
             }
         };
 
-        // Disable Drop handler since the transaction is stopped already.
+        // Disable Drop handler since the receiver is stopped already.
         let _ = ManuallyDrop::new(self);
         result
     }
