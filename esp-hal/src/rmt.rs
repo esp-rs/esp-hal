@@ -1642,6 +1642,19 @@ where
     }
 }
 
+impl<Raw> Drop for RmtTxFuture<'_, Raw>
+where
+    Raw: TxChannelInternal,
+{
+    fn drop(&mut self) {
+        let raw = self.raw;
+        raw.stop_tx();
+
+        // block until the channel is safe to use again
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+    }
+}
+
 /// TX channel in async mode
 pub trait TxChannelAsync {
     /// Start transmitting the given pulse code sequence.
@@ -1723,6 +1736,21 @@ where
             Some(ev @ (Event::Error | Event::End)) => Poll::Ready(ev),
             _ => Poll::Pending,
         }
+    }
+}
+
+impl<Raw> Drop for RmtRxFuture<'_, Raw>
+where
+    Raw: RxChannelInternal,
+{
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        raw.stop_rx();
+        raw.update();
+
+        // block until the channel is safe to use again
+        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
