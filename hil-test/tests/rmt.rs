@@ -88,7 +88,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+    let (mut tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
@@ -156,13 +156,11 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
     let tx_config = TxChannelConfig::default()
         .with_clk_divider(DIV)
         .with_memsize(tx_memsize);
-    let (tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
+    let (mut tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
     let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker);
 
-    tx_channel.transmit(&tx_data)?.wait().map_err(|(e, _)| e)?;
-
-    Ok(())
+    tx_channel.transmit(&tx_data)?.wait()
 }
 
 #[cfg(test)]
