@@ -162,10 +162,9 @@
 //!     }
 //!
 //!     match transaction.wait() {
-//!         Ok(channel_res) => {
-//!             channel = channel_res;
+//!         Ok(count) => {
 //!             let mut total = 0usize;
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -177,7 +176,7 @@
 //!                 total += entry.length2() as usize;
 //!             }
 //!
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -207,9 +206,7 @@
 //!
 //!             println!();
 //!         }
-//!         Err((_err, channel_res)) => {
-//!             channel = channel_res;
-//!         }
+//!         Err(_err) => {}
 //!     }
 //!
 //!     delay.delay_millis(1500);
@@ -1507,38 +1504,55 @@ where
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, C: RxChannel> {
-    channel: C,
+pub struct RxTransaction<'ch, 'a, C: RxChannel> {
+    channel: &'ch mut C,
     data: &'a mut [u32],
 }
 
-impl<C: RxChannel> RxTransaction<'_, C> {
+impl<C: RxChannel> RxTransaction<'_, '_, C> {
     /// Wait for the transaction to complete
-    pub fn wait(self) -> Result<C, (Error, C)> {
+    pub fn wait(self) -> Result<(), Error> {
         let raw = &self.channel.raw();
 
-        loop {
-            if raw.is_error() {
-                return Err((Error::ReceiverError, self.channel));
-            }
+        let result = loop {
+            match raw.get_rx_status() {
+                Some(Event::Error) => break Err(Error::ReceiverError),
+                Some(Event::End) => {
+                    raw.stop_rx();
+                    raw.clear_rx_interrupts();
+                    raw.update();
 
-            if raw.is_rx_done() {
-                break;
+                    let ptr = raw.channel_ram_start();
+                    // SAFETY: RxChannel.receive() verifies that the length of self.data does not
+                    // exceed the channel RAM size.
+                    for (idx, entry) in self.data.iter_mut().enumerate() {
+                        *entry = unsafe { ptr.add(idx).read_volatile() };
+                    }
+
+                    break Ok(());
+                }
+                _ => continue,
             }
-        }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let _ = ManuallyDrop::new(self);
+        result
+    }
+}
+
+impl<C: RxChannel> Drop for RxTransaction<'_, '_, C> {
+    fn drop(&mut self) {
+        // If this is dropped, that implies that the transaction was not properly
+        // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
+        // block in the meantime, such that subsequent uses of the channel are
+        // safe (i.e. start from a state where the hardware is stopped).
+        let raw = self.channel.raw();
 
         raw.stop_rx();
-        raw.clear_rx_interrupts();
         raw.update();
 
-        let ptr = raw.channel_ram_start();
-        // SAFETY: RxChannel.receive() verifies that the length of self.data does not
-        // exceed the channel RAM size.
-        for (idx, entry) in self.data.iter_mut().enumerate() {
-            *entry = unsafe { ptr.add(idx).read_volatile() };
-        }
-
-        Ok(self.channel)
+        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
@@ -1553,7 +1567,10 @@ pub trait RxChannel: Sized {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>;
+    fn receive<'ch, 'a>(
+        &'ch mut self,
+        data: &'a mut [u32],
+    ) -> Result<RxTransaction<'ch, 'a, Self>, Error>;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
@@ -1568,7 +1585,10 @@ where
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
+    fn receive<'ch, 'a>(
+        &'ch mut self,
+        data: &'a mut [u32],
+    ) -> Result<RxTransaction<'ch, 'a, Self>, Error>
     where
         Self: Sized,
     {
@@ -1693,14 +1713,14 @@ impl<Raw> core::future::Future for RmtRxFuture<'_, Raw>
 where
     Raw: RxChannelInternal,
 {
-    type Output = ();
+    type Output = Event;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
-        if self.raw.is_error() || self.raw.is_rx_done() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+
+        match self.raw.get_rx_status() {
+            Some(ev @ (Event::Error | Event::End)) => Poll::Ready(ev),
+            _ => Poll::Pending,
         }
     }
 }
@@ -1733,22 +1753,22 @@ where
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive();
 
-        RmtRxFuture::new(raw).await;
+        match RmtRxFuture::new(raw).await {
+            Event::Error => Err(Error::ReceiverError),
+            Event::End => {
+                raw.stop_rx();
+                raw.clear_rx_interrupts();
+                raw.update();
 
-        if raw.is_error() {
-            Err(Error::ReceiverError)
-        } else {
-            raw.stop_rx();
-            raw.clear_rx_interrupts();
-            raw.update();
+                let ptr = raw.channel_ram_start();
+                let len = data.len();
+                for (idx, entry) in data.iter_mut().take(len).enumerate() {
+                    *entry = unsafe { ptr.add(idx).read_volatile().into() };
+                }
 
-            let ptr = raw.channel_ram_start();
-            let len = data.len();
-            for (idx, entry) in data.iter_mut().take(len).enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile().into() };
+                Ok(())
             }
-
-            Ok(())
+            Event::Threshold => unreachable!(),
         }
     }
 }
