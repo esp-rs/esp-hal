@@ -1240,45 +1240,38 @@ where
         let raw = self.channel.raw();
         let memsize = raw.memsize().codes();
 
-        // FIXME: Return if writer.state indicates an error
-        while self.writer.state == WriterState::Active {
-            // wait for TX-THR
-            while !raw.is_tx_threshold_set() {
-                // FIXME: Merge is_done and is_error checks
-                if raw.is_tx_done() {
-                    // Unexpectedly done, even though we have data left: For example, this could
-                    // happen if there is a stop code inside the data and not just at the end.
-                    let _ = ManuallyDrop::new(self);
-                    return Err(Error::TransmissionError);
+        let result = loop {
+            // Not sure that all the error cases below can happen. However, it's best to
+            // handle them to be sure that we don't lock up here in case they can happen.
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => {
+                    if self.writer.state == WriterState::Active {
+                        // Unexpectedly done, even though we have data left.
+                        break Err(Error::TransmissionError);
+                    } else {
+                        break Ok(());
+                    }
                 }
-                if raw.is_error() {
-                    // Not sure that this can happen? In any case, be sure that we don't lock up
-                    // here in case it can.
-                    let _ = ManuallyDrop::new(self);
-                    return Err(Error::TransmissionError);
+                Some(Event::Threshold) => {
+                    if self.writer.state == WriterState::Active {
+                        continue;
+                    }
+                    raw.reset_tx_threshold_set();
+
+                    // re-fill TX RAM
+                    self.writer.write(&mut self.data, raw, memsize / 2);
+                    // FIXME: Return if writer.state indicates an error (ensure
+                    // to stop transmission first)
                 }
+                _ => continue,
             }
-            raw.reset_tx_threshold_set();
-
-            // re-fill TX RAM
-            self.writer.write(&mut self.data, raw, memsize / 2);
-        }
-
-        loop {
-            // FIXME: Merge is_done and is_error checks
-            if raw.is_error() {
-                return Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break;
-            }
-        }
+        };
 
         // Disable the Drop handler since the transaction is properly stopped
         // already.
         let _ = ManuallyDrop::new(self);
-        Ok(())
+        result
     }
 }
 impl<'ch, C, D> Drop for SingleShotTxTransaction<'ch, C, D>
@@ -1294,7 +1287,8 @@ where
         // safe (i.e. start from a state where the hardware is stopped).
         let raw = self.channel.raw();
         raw.stop_tx();
-        while !raw.is_error() && !raw.is_tx_done() {}
+
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
@@ -1311,14 +1305,11 @@ impl<'ch, C: TxChannel> ContinuousTxTransaction<'ch, C> {
         raw.set_tx_continuous(false);
         raw.update();
 
-        // FIXME: Merge is_done and is_error checks
         let result = loop {
-            if raw.is_error() {
-                break Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break Ok(());
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
+                _ => continue,
             }
         };
 
@@ -1338,13 +1329,10 @@ impl<'ch, C: TxChannel> ContinuousTxTransaction<'ch, C> {
         raw.stop_tx();
 
         let result = loop {
-            // FIXME: Merge is_done and is_error checks
-            if raw.is_error() {
-                break Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break Ok(());
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
+                _ => continue,
             }
         };
 
@@ -1373,7 +1361,7 @@ impl<'ch, C: TxChannel> Drop for ContinuousTxTransaction<'ch, C> {
 
         raw.stop_tx();
 
-        while !raw.is_error() && !raw.is_tx_done() {}
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
@@ -1619,15 +1607,15 @@ impl<Raw> core::future::Future for RmtTxFuture<'_, Raw>
 where
     Raw: TxChannelInternal,
 {
-    type Output = ();
+    type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
 
-        if self.raw.is_error() || self.raw.is_tx_done() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+        match self.raw.get_tx_status() {
+            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
+            Some(Event::End) => Poll::Ready(Ok(())),
+            _ => Poll::Pending,
         }
     }
 }
@@ -1679,13 +1667,7 @@ where
         raw.listen_tx_interrupt(Event::End | Event::Error);
         raw.start_send(false, 0);
 
-        RmtTxFuture::new(raw).await;
-
-        if raw.is_error() {
-            Err(Error::TransmissionError)
-        } else {
-            Ok(())
-        }
+        RmtTxFuture::new(raw).await
     }
 }
 
@@ -1857,6 +1839,10 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn start_tx(&self);
 
+    // Return the first flag that is set of, in order of decreasing priority,
+    // Event::Error, Event::End, Event::Threshold
+    fn get_tx_status(&self) -> Option<Event>;
+
     fn is_tx_done(&self) -> bool;
 
     fn is_tx_threshold_set(&self) -> bool;
@@ -1905,6 +1891,10 @@ pub trait RxChannelInternal: ChannelInternal {
     fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level);
 
     fn start_rx(&self);
+
+    // Return the first flag that is set of, in order of decreasing priority,
+    // Event::Error, Event::End, Event::Threshold
+    fn get_rx_status(&self) -> Option<Event>;
 
     fn is_rx_done(&self) -> bool;
 
@@ -2184,6 +2174,22 @@ mod chip_specific {
             self.update();
         }
 
+        fn get_tx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_tx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_tx_err(ch).bit() {
+                Some(Event::Error)
+            } else if reg.ch_tx_thr_event(ch).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
+        }
+
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
@@ -2294,6 +2300,22 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.rx_en().set_bit()
             });
+        }
+
+        fn get_rx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_rx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_rx_err(ch).bit() {
+                Some(Event::Error)
+            } else if reg.ch_rx_thr_event(ch).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
         }
 
         fn is_rx_done(&self) -> bool {
@@ -2532,6 +2554,22 @@ mod chip_specific {
             });
         }
 
+        fn get_tx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_tx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_err(ch).bit() {
+                Some(Event::Error)
+            } else if reg.ch_tx_thr_event(ch).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
+        }
+
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
@@ -2643,6 +2681,20 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.rx_en().set_bit()
             });
+        }
+
+        fn get_rx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_rx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_err(ch).bit() {
+                Some(Event::Error)
+            } else {
+                None
+            }
         }
 
         fn is_rx_done(&self) -> bool {
