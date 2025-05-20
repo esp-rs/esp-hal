@@ -6,11 +6,20 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Debug;
-
 use esp_hal::{
+    Blocking,
     gpio::{Level, NoPin},
-    rmt::{Error, PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
+    rmt::{
+        AnyRxChannel,
+        AnyTxChannel,
+        Error,
+        PulseCode,
+        Rmt,
+        RxChannel,
+        RxChannelConfig,
+        TxChannel,
+        TxChannelConfig,
+    },
     time::Rate,
 };
 use hil_test as _;
@@ -30,7 +39,7 @@ cfg_if::cfg_if! {
 fn setup(
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (impl TxChannel + Debug, impl RxChannel + Debug) {
+) -> (AnyTxChannel<Blocking>, AnyRxChannel<Blocking>) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
@@ -42,6 +51,7 @@ fn setup(
         rmt.channel0
             .configure(tx, tx_config.with_clk_divider(DIV))
             .unwrap()
+            .degrade()
     };
 
     cfg_if::cfg_if! {
@@ -56,6 +66,7 @@ fn setup(
         rx_channel_creator
             .configure(rx, rx_config.with_clk_divider(DIV))
             .unwrap()
+            .degrade()
     };
 
     (tx_channel, rx_channel)
