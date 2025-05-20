@@ -102,7 +102,7 @@
 //!
 //! loop {
 //!     let transaction = channel.transmit(&data)?;
-//!     channel = transaction.wait()?;
+//!     transaction.wait()?;
 //!     delay.delay_millis(500);
 //! }
 //! # }
@@ -222,6 +222,7 @@
 use core::{
     default::Default,
     marker::PhantomData,
+    mem::ManuallyDrop,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -1284,7 +1285,8 @@ where
     Raw: TxChannelInternal,
     T: Into<PulseCode> + Copy,
 {
-    channel: Channel<Blocking, Raw>,
+    raw: Raw,
+    _phantom: PhantomData<&'a mut Raw>,
 
     // The position in channel RAM to continue writing at; must be either
     // 0 or half the available RAM size if there's further data.
@@ -1301,7 +1303,7 @@ where
     T: Into<PulseCode> + Copy,
 {
     fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw;
+        let raw = self.raw;
 
         let status = raw.get_tx_status();
         if status == Some(Event::Threshold) {
@@ -1350,69 +1352,119 @@ where
     }
 
     /// Wait for the transaction to complete
-    pub fn wait(mut self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
+    pub fn wait(mut self) -> Result<(), Error> {
         // Not sure that all the error cases below can happen. However, it's best to
         // handle them to be sure that we don't lock up here in case they can happen.
-        loop {
+        let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
+                Some(Event::Error) => break Err(Error::TransmissionError),
                 Some(Event::End) => {
                     if !self.remaining_data.is_empty() {
                         // Unexpectedly done, even though we have data left: For example, this could
                         // happen if there is a stop code inside the data and not just at the end.
-                        break Err((Error::TransmissionError, self.channel));
+                        break Err(Error::TransmissionError);
                     } else {
-                        break Ok(self.channel);
+                        break Ok(());
                     }
                 }
                 _ => continue,
             }
-        }
+        };
+
+        // Disable the Drop handler since the transaction is properly stopped
+        // already.
+        let _ = ManuallyDrop::new(self);
+        result
+    }
+}
+
+impl<Raw, T> Drop for SingleShotTxTransaction<'_, Raw, T>
+where
+    Raw: TxChannelInternal,
+    T: Into<PulseCode> + Copy,
+{
+    fn drop(&mut self) {
+        // If this is dropped, that implies that the transaction was not properly
+        // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
+        // block in the meantime, such that subsequent uses of the channel are
+        // safe (i.e. start from a state where the hardware is stopped).
+        let raw = self.raw;
+
+        raw.stop_tx();
+        raw.update();
+
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
 /// An in-progress continuous TX transaction
-pub struct ContinuousTxTransaction<Raw: TxChannelInternal> {
-    channel: Channel<Blocking, Raw>,
+pub struct ContinuousTxTransaction<'a, Raw: TxChannelInternal> {
+    raw: Raw,
+    _phantom: PhantomData<&'a mut Raw>,
 }
 
-impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
+impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
     /// Stop transaction when the current iteration ends.
-    pub fn stop_next(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
-        let raw = self.channel.raw;
+    pub fn stop_next(self) -> Result<(), Error> {
+        let raw = self.raw;
 
         raw.set_tx_continuous(false);
         raw.update();
 
-        loop {
+        let result = loop {
             match raw.get_tx_status() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
                 _ => continue,
             }
-        }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let _ = ManuallyDrop::new(self);
+        result
     }
 
     /// Stop transaction as soon as possible.
-    pub fn stop(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
-        let raw = self.channel.raw;
+    pub fn stop(self) -> Result<(), Error> {
+        let raw = self.raw;
 
         raw.set_tx_continuous(false);
         raw.stop_tx();
         raw.update();
 
-        loop {
+        let result = loop {
             match raw.get_tx_status() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
                 _ => continue,
             }
-        }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let _ = ManuallyDrop::new(self);
+        result
     }
 
     /// Check if the `loopcount` interrupt bit is set
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        self.channel.raw.is_tx_loopcount_interrupt_set()
+        self.raw.is_tx_loopcount_interrupt_set()
+    }
+}
+
+impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
+    fn drop(&mut self) {
+        // If this is dropped, that implies that the transaction was not manually
+        // stopped with `stop()` or `stop_next()`.
+        // Thus, attempt to stop it as quickly as possible and block in the meantime,
+        // such that subsequent uses of the channel are safe (i.e. start from a
+        // state where the hardware is stopped).
+        let raw = self.raw;
+
+        raw.set_tx_continuous(false);
+        raw.stop_tx();
+        raw.update();
+
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
@@ -1425,7 +1477,7 @@ pub trait TxChannel: Sized {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Self::Raw, T>, Error>
+    fn transmit<'a, T>(&'a mut self, data: &'a [T]) -> Result<SingleShotTxTransaction<'a, Self::Raw, T>, Error>
     where
         T: Into<PulseCode> + Copy;
 
@@ -1434,9 +1486,9 @@ pub trait TxChannel: Sized {
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
     fn transmit_continuously<T>(
-        self,
+        &mut self,
         data: &[T],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         T: Into<PulseCode> + Copy;
 
@@ -1444,10 +1496,10 @@ pub trait TxChannel: Sized {
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
     fn transmit_continuously_with_loopcount<T>(
-        self,
+        &mut self,
         loopcount: u16,
         data: &[T],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         T: Into<PulseCode> + Copy;
 }
@@ -1458,20 +1510,21 @@ where
 {
     type Raw = Raw;
 
-    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Raw, T>, Error>
+    fn transmit<'a, T>(&'a mut self, data: &'a [T]) -> Result<SingleShotTxTransaction<'a, Raw, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
         let index = self.raw.start_send(data, false, 0)?;
         Ok(SingleShotTxTransaction {
-            channel: self,
+            raw: self.raw,
+            _phantom: PhantomData,
             // Either, remaining_data is empty, or we filled the entire buffer.
             ram_index: 0,
             remaining_data: &data[index..],
         })
     }
 
-    fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction<Raw>, Error>
+    fn transmit_continuously<T>(&mut self, data: &[T]) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1479,10 +1532,10 @@ where
     }
 
     fn transmit_continuously_with_loopcount<T>(
-        self,
+        &mut self,
         loopcount: u16,
         data: &[T],
-    ) -> Result<ContinuousTxTransaction<Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1491,7 +1544,10 @@ where
         }
 
         let _index = self.raw.start_send(data, true, loopcount)?;
-        Ok(ContinuousTxTransaction { channel: self })
+        Ok(ContinuousTxTransaction {
+            raw: self.raw,
+            _phantom: PhantomData,
+        })
     }
 }
 
