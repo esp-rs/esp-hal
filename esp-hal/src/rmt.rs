@@ -61,7 +61,7 @@
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //! let mut channel = rmt
 //!     .channel0
-//!     .configure(
+//!     .configure_tx(
 //!         peripherals.GPIO1,
 //!         TxChannelConfig::default()
 //!             .with_clk_divider(1)
@@ -92,7 +92,7 @@
 //!
 //! let mut channel = rmt
 //!     .channel0
-//!     .configure(peripherals.GPIO4, tx_config)?;
+//!     .configure_tx(peripherals.GPIO4, tx_config)?;
 //!
 //! let delay = Delay::new();
 //!
@@ -133,15 +133,15 @@
 //!     .with_idle_threshold(10000);
 #![cfg_attr(
     any(esp32, esp32s2),
-    doc = "let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config)?;"
+    doc = "let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     esp32s3,
-    doc = "let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config)?;"
+    doc = "let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, rx_config)?;"
 )]
 #![cfg_attr(
     not(any(esp32, esp32s2, esp32s3)),
-    doc = "let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config)?;"
+    doc = "let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config)?;"
 )]
 //! let delay = Delay::new();
 //! let mut data: [u32; 48] = [PulseCode::empty(); 48];
@@ -735,7 +735,7 @@ pub trait TxChannelCreator<Dm: crate::DriverMode> {
     type Raw: TxChannelInternal;
 
     /// FIXME: docs
-    fn configure<'pin>(
+    fn configure_tx<'pin>(
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
@@ -748,7 +748,7 @@ pub trait RxChannelCreator<Dm: crate::DriverMode> {
     type Raw: RxChannelInternal;
 
     /// FIXME: docs
-    fn configure<'pin>(
+    fn configure_rx<'pin>(
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
@@ -767,7 +767,7 @@ where
     type Raw = ConstChannelAccess<Tx, CHANNEL>;
 
     /// Configure the TX channel
-    fn configure<'pin>(
+    fn configure_tx<'pin>(
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
@@ -786,7 +786,7 @@ where
     type Raw = ConstChannelAccess<Rx, CHANNEL>;
 
     /// Configure the RX channel
-    fn configure<'pin>(
+    fn configure_rx<'pin>(
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
@@ -805,7 +805,7 @@ where
     type Raw = ConstChannelAccess<Tx, CHANNEL>;
 
     /// Configure the TX channel
-    fn configure<'pin>(
+    fn configure_tx<'pin>(
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
@@ -824,7 +824,7 @@ where
     type Raw = ConstChannelAccess<Rx, CHANNEL>;
 
     /// Configure the RX channel
-    fn configure<'pin>(
+    fn configure_rx<'pin>(
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
