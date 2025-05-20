@@ -979,6 +979,10 @@ where
 }
 
 /// An in-progress transaction for a single shot TX transaction.
+///
+/// If the data size exceeds the size of the internal buffer, `.poll()` or
+/// `.wait()` needs to be called before the entire buffer has been sent to avoid
+/// underruns.
 pub struct SingleShotTxTransaction<'a, Raw>
 where
     Raw: TxChannelInternal,
@@ -998,16 +1002,64 @@ impl<Raw> SingleShotTxTransaction<'_, Raw>
 where
     Raw: TxChannelInternal,
 {
-    /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
+    fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
-        let memsize = raw.memsize().codes();
 
+        let status = raw.get_tx_status();
+        if status == Some(Event::Threshold) {
+            raw.reset_tx_threshold_set();
+
+            if !self.remaining_data.is_empty() {
+                // re-fill TX RAM
+                let memsize = raw.memsize().codes();
+                let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
+                let count = self.remaining_data.len().min(memsize / 2);
+                let (chunk, remaining) = self.remaining_data.split_at(count);
+                for (idx, entry) in chunk.iter().enumerate() {
+                    unsafe {
+                        ptr.add(idx).write_volatile(*entry);
+                    }
+                }
+
+                // If count == memsize / 2 codes were written, update ram_index as
+                // - 0 -> memsize / 2
+                // - memsize / 2 -> 0
+                // Otherwise, for count < memsize / 2, the new position is invalid but the new
+                // slice is empty and we won't use ram_index again.
+                self.ram_index = memsize / 2 - self.ram_index;
+                self.remaining_data = remaining;
+                debug_assert!(
+                    self.ram_index == 0
+                        || self.ram_index == memsize / 2
+                        || self.remaining_data.is_empty()
+                );
+            }
+        }
+
+        status
+    }
+
+    /// Check transmission status and write new data to the hardware if
+    /// necessary.
+    ///
+    /// Returns whether transmission has ended (whether successfully or with an
+    /// error). In that case, a subsequent call to `wait()` returns immediately.
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn poll(&mut self) -> bool {
+        match self.poll_internal() {
+            Some(Event::Error | Event::End) => true,
+            Some(Event::Threshold) | None => false,
+        }
+    }
+
+    /// Wait for the transaction to complete
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn wait(mut self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
+        // Not sure that all the error cases below can happen. However, it's best to
+        // handle them to be sure that we don't lock up here in case they can happen.
         loop {
-            // Not sure that all the error cases below can happen. However, it's best to
-            // handle them to be sure that we don't lock up here in case they can happen.
-            match raw.get_tx_status() {
+            match self.poll_internal() {
                 Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
                 Some(Event::End) => {
                     if !self.remaining_data.is_empty() {
@@ -1016,34 +1068,6 @@ where
                         break Err((Error::TransmissionError, self.channel));
                     } else {
                         break Ok(self.channel);
-                    }
-                }
-                Some(Event::Threshold) => {
-                    raw.reset_tx_threshold_set();
-
-                    if !self.remaining_data.is_empty() {
-                        // re-fill TX RAM
-                        let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
-                        let count = self.remaining_data.len().min(memsize / 2);
-                        let (chunk, remaining) = self.remaining_data.split_at(count);
-                        for (idx, entry) in chunk.iter().enumerate() {
-                            unsafe {
-                                ptr.add(idx).write_volatile(*entry);
-                            }
-                        }
-
-                        // If count == memsize / 2 codes were written, update ram_index as
-                        // - 0 -> memsize / 2
-                        // - memsize / 2 -> 0
-                        // Otherwise, for count < memsize / 2, the new position is invalid but the new
-                        // slice is empty and we won't use ram_index again.
-                        self.ram_index = memsize / 2 - self.ram_index;
-                        self.remaining_data = remaining;
-                        debug_assert!(
-                            self.ram_index == 0
-                                || self.ram_index == memsize / 2
-                                || self.remaining_data.is_empty()
-                        );
                     }
                 }
                 _ => continue,
@@ -1286,33 +1310,56 @@ pub struct RxTransaction<'a, Raw: RxChannelInternal> {
 }
 
 impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
-    /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn wait(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
+    fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
 
-        loop {
-            if raw.is_error() {
-                return Err((Error::ReceiverError, self.channel));
-            }
+        let status = raw.get_rx_status();
+        if status == Some(Event::End) {
+            // Do not clear the interrupt flags here: Subsequent calls of wait() must
+            // be able to observe them if this is currently called via poll()
+            raw.stop_rx();
+            raw.update();
 
-            if raw.is_rx_done() {
-                break;
+            let ptr = raw.channel_ram_start();
+            // SAFETY: RxChannel.receive() verifies that the length of self.data does not
+            // exceed the channel RAM size.
+            for (idx, entry) in self.data.iter_mut().enumerate() {
+                *entry = unsafe { ptr.add(idx).read_volatile() };
             }
         }
 
-        raw.stop_rx();
+        status
+    }
+
+    /// Check receive status
+    ///
+    /// Returns whether reception has ended (whether successfully or with an
+    /// error). In that case, a subsequent call to `wait()` returns immediately.
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn poll(&mut self) -> bool {
+        match self.poll_internal() {
+            Some(Event::Error | Event::End) => true,
+            Some(Event::Threshold) | None => false,
+        }
+    }
+
+    /// Wait for the transaction to complete
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn wait(mut self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
+        let raw = self.channel.raw;
+
+        let result = loop {
+            match self.poll_internal() {
+                Some(Event::Error) => break Err((Error::ReceiverError, self.channel)),
+                Some(Event::End) => break Ok(self.channel),
+                _ => continue,
+            }
+        };
+
         raw.clear_rx_interrupts();
-        raw.update();
 
-        let ptr = raw.channel_ram_start();
-        // SAFETY: RxChannel.receive() verifies that the length of self.data does not
-        // exceed the channel RAM size.
-        for (idx, entry) in self.data.iter_mut().enumerate() {
-            *entry = unsafe { ptr.add(idx).read_volatile() };
-        }
-
-        Ok(self.channel)
+        result
     }
 }
 

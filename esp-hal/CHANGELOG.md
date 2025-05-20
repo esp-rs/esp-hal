@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::Key` variants have been renamed from bytes to bits (e.g. `Key16 -> Key128`) (#3845)
 - `aes::Mode` has been replaced by `Operation`. The key length is now solely determined by the key. (#3882)
 - `Aes::process` has been split into `Aes::encrypt` and `Aes::decrypt` (#3882)
+- Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
 
 ### Fixed
 
