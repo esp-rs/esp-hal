@@ -50,7 +50,7 @@ fn setup(
 
     let tx_channel = rmt
         .channel0
-        .configure(tx, tx_config.with_clk_divider(DIV))
+        .configure_tx(tx, tx_config.with_clk_divider(DIV))
         .unwrap()
         .degrade();
 
@@ -62,7 +62,7 @@ fn setup(
         }
     };
     let rx_channel = rx_channel_creator
-        .configure(rx, rx_config.with_clk_divider(DIV))
+        .configure_rx(rx, rx_config.with_clk_divider(DIV))
         .unwrap()
         .degrade();
 
@@ -209,9 +209,9 @@ mod tests {
 
         let ch0 = rmt
             .channel0
-            .configure(NoPin, TxChannelConfig::default().with_memsize(2));
+            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2));
 
-        let ch1 = rmt.channel1.configure(NoPin, TxChannelConfig::default());
+        let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
         assert!(ch0.is_ok());
         assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
