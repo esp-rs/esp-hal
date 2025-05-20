@@ -2972,7 +2972,7 @@ impl Info {
             RtsConfig::Enabled(threshold) => self.set_rts(true, Some(threshold)),
             RtsConfig::Disabled => self.set_rts(false, None),
         }
-        
+
         #[cfg(any(esp32c6, esp32h2))]
         sync_regs(self.regs());
     }
