@@ -49,9 +49,21 @@ Instead, `TxChannelCreator` and `RxChannelCreator` now carry a `Dm: DriverMode`
 generic parameter. `ChannelCreator<Dm, CHANNEL>` thus implements `TxChannelCreator<Dm>`
 and `RxChannelCreator<Dm>`, respectively.
 
+Additionally, the `configure` methods have been renamed to `configure_tx` and
+`configure_rx` to avoid trait disambiguation issues.
+
 ```diff
--use esp_hal::rmt::TxChannelCreatorAsync;
-+use esp_hal::rmt::TxChannelCreator;
- 
- let channel = rmt.into_async().channel0.configure(pin, tx_config);
++use esp_hal::rmt::{RxChannelCreator, TxChannelCreator};
++
+ let rmt = rmt.into_async();
+-let tx_channel = {
+-    use esp_hal::rmt::TxChannelCreatorAsync;
+-    rmt.channel0.configure(pin, tx_config)
+-};
++ let tx_channel = rmt.channel0.configure_tx(pin, tx_config);
+-let rx_channel = {
+-    use esp_hal::rmt::RxChannelCreatorAsync;
+-    rmt.channel2.configure(pin, rx_config)
+-};
++ let rx_channel = rmt.channel2.configure_rx(pin, rx_config);
 ```

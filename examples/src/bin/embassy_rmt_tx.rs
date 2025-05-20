@@ -44,7 +44,7 @@ async fn main(_spawner: Spawner) {
 
     let mut channel = rmt
         .channel0
-        .configure(
+        .configure_tx(
             peripherals.GPIO4,
             TxChannelConfig::default().with_clk_divider(255),
         )

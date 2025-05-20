@@ -61,11 +61,11 @@ async fn main(spawner: Spawner) {
 
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "esp32", feature = "esp32s2"))] {
-            let mut channel = rmt.channel0.configure(peripherals.GPIO4, rx_config).unwrap();
+            let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, rx_config).unwrap();
         } else if #[cfg(feature = "esp32s3")] {
-            let mut channel = rmt.channel7.configure(peripherals.GPIO4, rx_config).unwrap();
+            let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, rx_config).unwrap();
         } else {
-            let mut channel = rmt.channel2.configure(peripherals.GPIO4, rx_config).unwrap();
+            let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config).unwrap();
         }
     }
 
