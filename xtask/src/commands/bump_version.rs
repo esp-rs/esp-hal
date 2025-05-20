@@ -4,13 +4,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
 use toml_edit::{DocumentMut, Item, TableLike, Value};
 
-use crate::{changelog::Changelog, Package, Version};
+use crate::{Package, Version, changelog::Changelog};
 
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
@@ -35,7 +35,6 @@ pub struct BumpVersionArgs {
 struct CargoToml<'a> {
     workspace: &'a Path,
     package: Package,
-    manifest_path: PathBuf,
     manifest: toml_edit::DocumentMut,
 }
 
@@ -44,7 +43,8 @@ const DEPENDENCY_KINDS: [&'static str; 3] =
 
 impl<'a> CargoToml<'a> {
     fn new(workspace: &'a Path, package: Package) -> Result<Self> {
-        let manifest_path = workspace.join(package.to_string()).join("Cargo.toml");
+        let package_path = workspace.join(package.to_string());
+        let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
             bail!(
                 "Could not find Cargo.toml for package {package} at {}",
@@ -58,9 +58,16 @@ impl<'a> CargoToml<'a> {
         Ok(Self {
             workspace,
             package,
-            manifest_path,
             manifest: manifest.parse::<DocumentMut>()?,
         })
+    }
+
+    fn package_path(&self) -> PathBuf {
+        self.workspace.join(self.package.to_string())
+    }
+
+    fn manifest_path(&self) -> PathBuf {
+        self.package_path().join("Cargo.toml")
     }
 
     fn version(&self) -> &str {
@@ -81,8 +88,9 @@ impl<'a> CargoToml<'a> {
     }
 
     fn save(&self) -> Result<()> {
-        fs::write(&self.manifest_path, self.manifest.to_string())
-            .with_context(|| format!("Could not write {}", self.manifest_path.display()))?;
+        let manifest_path = self.manifest_path();
+        fs::write(&manifest_path, self.manifest.to_string())
+            .with_context(|| format!("Could not write {}", manifest_path.display()))?;
 
         Ok(())
     }
@@ -137,7 +145,8 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
         let mut package = CargoToml::new(workspace, package)?;
         check_crate_before_bumping(&mut package)?;
         let new_version = bump_crate_version(&mut package, args.amount, args.pre.as_deref())?;
-        finalize_changelog(&package, new_version)?;
+        finalize_changelog(&package, &new_version)?;
+        finalize_placeholders(&package, &new_version)?;
     }
 
     Ok(())
@@ -330,7 +339,7 @@ fn do_version_bump(version: &str, amount: Version, pre: Option<&str>) -> Result<
     Ok(version)
 }
 
-fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: semver::Version) -> Result<()> {
+fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: &semver::Version) -> Result<()> {
     let changelog_path = bumped_package
         .workspace
         .join(bumped_package.package.to_string())
@@ -356,6 +365,41 @@ fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: semver::Versi
     changelog.finalize(bumped_package.package, new_version, jiff::Timestamp::now());
 
     std::fs::write(&changelog_path, changelog.to_string())?;
+
+    Ok(())
+}
+
+fn finalize_placeholders(
+    bumped_package: &CargoToml<'_>,
+    new_version: &semver::Version,
+) -> Result<()> {
+    const PLACEHOLDER: &str = "{{currentVersion}}";
+
+    let skip_paths = [bumped_package.package_path().join("target")];
+
+    fn walk_dir(dir: &Path, skip_paths: &[PathBuf], callback: &mut impl FnMut(&Path)) {
+        for entry in dir.read_dir().unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if skip_paths.contains(&path) {
+                continue;
+            }
+            if path.is_dir() {
+                walk_dir(&path, skip_paths, callback);
+            } else if path.is_file() {
+                callback(&path);
+            }
+        }
+    }
+
+    walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
+        let content = fs::read_to_string(path).unwrap();
+        if content.contains(PLACEHOLDER) {
+            log::info!("  Replacing placeholder in {}", path.display());
+            let new_content = content.replace(PLACEHOLDER, &new_version.to_string());
+            fs::write(path, new_content).unwrap();
+        }
+    });
 
     Ok(())
 }
@@ -404,7 +448,6 @@ mod test {
             manifest: toml.parse::<DocumentMut>().unwrap(),
             package: Package::EspHal,
             workspace: Path::new(""),
-            manifest_path: PathBuf::new(),
         };
         let errors = check_crate_before_bumping(&mut doc);
         pretty_assertions::assert_eq!(

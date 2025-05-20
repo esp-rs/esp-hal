@@ -28,6 +28,16 @@ enum Cli {
     Run(Run),
 
     /// Bump the version of the specified package(s).
+    ///
+    /// This command will, for each specified package:
+    /// - Verify that the crate can be released (e.g. it doesn't refer to git
+    ///   dependencies)
+    /// - Update the version in `Cargo.toml` files
+    /// - Update the version in dependencies' `Cargo.toml` files
+    /// - Check if the changelog can be finalized
+    /// - Update the version in the changelog
+    /// - Replaces `{{currentVersion}}` markers in source files and the
+    ///   migration guide.
     BumpVersion(BumpVersionArgs),
     /// Perform (parts of) the checks done in CI
     Ci(CiArgs),
@@ -516,7 +526,7 @@ fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         }
 
         let version = xtask::package_version(workspace, package)?;
-        let tag = package.tag(version);
+        let tag = package.tag(&version);
 
         if args.no_dry_run {
             let output = Command::new("git")
