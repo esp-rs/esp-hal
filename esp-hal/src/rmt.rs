@@ -1649,6 +1649,18 @@ impl core::future::Future for RmtTxFuture<'_> {
     }
 }
 
+impl Drop for RmtTxFuture<'_> {
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        raw.stop_tx();
+        raw.update();
+
+        // block until the channel is safe to use again
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+    }
+}
+
 /// TX channel in async mode
 impl Channel<Async, Tx> {
     /// Start transmitting the given pulse code sequence.
@@ -1700,6 +1712,20 @@ where
             Some(Event::End) => Poll::Ready(Ok(())),
             _ => Poll::Pending,
         }
+    }
+}
+
+impl Drop for RmtRxFuture<'_>
+where
+{
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        raw.stop_rx();
+        raw.update();
+
+        // block until the channel is safe to use again
+        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
