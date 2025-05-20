@@ -132,8 +132,6 @@ mod tests {
         ))
         .unwrap();
 
-        rts_input.set_input_enable(true);
-
         let data: [u8; 10] = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9];
 
         // This will make RTS pin go high, as we write more than the RTS threshold.
