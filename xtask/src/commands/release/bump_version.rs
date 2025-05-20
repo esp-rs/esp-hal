@@ -307,7 +307,13 @@ fn finalize_placeholders(
     }
 
     walk_dir(&bumped_package.package_path(), &skip_paths, &mut |path| {
-        let content = fs::read_to_string(path).unwrap();
+        let content = match fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(e) => {
+                log::debug!("  Could not read {}: {}", path.display(), e);
+                return;
+            }
+        };
         if content.contains(PLACEHOLDER) {
             log::info!("  Replacing placeholder in {}", path.display());
             let new_content = content.replace(PLACEHOLDER, &new_version.to_string());
