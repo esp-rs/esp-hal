@@ -146,7 +146,6 @@ pub fn generate_config_from_yaml_definition(
     let cfg = generate_config(&config.krate, &options, enable_unstable, emit_md_tables);
 
     if let Some(checks) = config.checks {
-        println!("{:#?}", cfg);
         let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
         for (k, v) in cfg.iter() {
             eval_ctx
@@ -158,7 +157,7 @@ pub fn generate_config_from_yaml_definition(
                         Value::String(v) => evalexpr::Value::String(v.clone()),
                     },
                 )
-                .unwrap();
+                .map_err(|err| Error::Parse(format!("Error setting value for {} ({})", k, err)))?;
         }
         for check in checks {
             if !evalexpr::eval_with_context(&check, &eval_ctx)
