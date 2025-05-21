@@ -1862,7 +1862,7 @@ impl AnyChannelAccess {
 
 #[handler]
 fn async_interrupt_handler() {
-    if let Some(raw) = chip_specific::pending_interrupt_for_channel() {
+    for (raw, _event) in chip_specific::pending_interrupt_for_channel() {
         match raw {
             AnyChannelAccess::Tx(ref raw) => raw.unlisten_tx_interrupt(Event::End | Event::Error),
             AnyChannelAccess::Rx(ref raw) => raw.unlisten_rx_interrupt(Event::End | Event::Error),
@@ -2075,23 +2075,33 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub(super) fn pending_interrupt_for_channel() -> Option<AnyChannelAccess> {
+    pub(super) fn pending_interrupt_for_channel() -> impl Iterator<Item = (AnyChannelAccess, Event)>
+    {
         let st = RMT::regs().int_st().read();
 
-        for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
-            if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
-                // The first half of all channels support tx...
-                let ch_num = ch_idx;
-                return Some(AnyChannelAccess::conjure(ch_num, true));
-            }
-            if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
-                // ...whereas the second half of channels support rx.
-                let ch_num = NUM_CHANNELS as u8 / 2 + ch_idx;
-                return Some(AnyChannelAccess::conjure(ch_num, false));
-            }
-        }
+        (0..NUM_CHANNELS as u8 / 2).filter_map(move |ch_idx| {
+            let (is_tx, event) = if st.ch_tx_err(ch_idx).bit() {
+                (true, Event::Error)
+            } else if st.ch_rx_err(ch_idx).bit() {
+                (false, Event::Error)
+            } else if st.ch_tx_end(ch_idx).bit() {
+                (true, Event::End)
+            } else if st.ch_rx_end(ch_idx).bit() {
+                (false, Event::End)
+            } else {
+                return None;
+            };
 
-        None
+            let ch_num = if is_tx {
+                // The first half of all channels support tx...
+                ch_idx
+            } else {
+                // ...whereas the second half of channels support rx.
+                NUM_CHANNELS as u8 / 2 + ch_idx
+            };
+
+            Some((AnyChannelAccess::conjure(ch_num, is_tx), event))
+        })
     }
 
     // The index of this channel among all Tx/Rx channels (which may be different
@@ -2498,27 +2508,31 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub(super) fn pending_interrupt_for_channel() -> Option<AnyChannelAccess> {
-        let rmt = RMT::regs();
-        let st = rmt.int_st().read();
+    pub(super) fn pending_interrupt_for_channel() -> impl Iterator<Item = (AnyChannelAccess, Event)>
+    {
+        let st = RMT::regs().int_st().read();
 
-        for ch_num in 0..NUM_CHANNELS as u8 {
-            if st.ch_rx_end(ch_num).bit() {
-                return Some(AnyChannelAccess::conjure(ch_num, false));
-            }
-            if st.ch_tx_end(ch_num).bit() {
-                return Some(AnyChannelAccess::conjure(ch_num, true));
-            }
-            if st.ch_err(ch_num).bit() {
+        (0..NUM_CHANNELS as u8).filter_map(move |ch_num| {
+            let (is_tx, event) = if st.ch_err(ch_num).bit() {
                 if let Some(is_tx) =
                     unsafe { RmtState::load_unchecked(ch_num, Ordering::Relaxed) }.is_tx()
                 {
-                    return Some(AnyChannelAccess::conjure(ch_num, is_tx));
+                    (is_tx, Event::Error)
+                } else {
+                    // Shouldn't happen: The channel isn't configured for rx or tx, but an error
+                    // interrupt occured. Ignore it.
+                    return None;
                 }
-            }
-        }
+            } else if st.ch_tx_end(ch_num).bit() {
+                (true, Event::End)
+            } else if st.ch_rx_end(ch_num).bit() {
+                (false, Event::End)
+            } else {
+                return None;
+            };
 
-        None
+            Some((AnyChannelAccess::conjure(ch_num, is_tx), event))
+        })
     }
 
     impl<A> ChannelInternal for A
