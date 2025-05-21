@@ -57,7 +57,7 @@ async fn main(_spawner: Spawner) {
 
     loop {
         println!("transmit");
-        channel.transmit(&data).await.unwrap();
+        channel.transmit(&data).unwrap().await.unwrap();
         println!("transmitted\n");
         Timer::after(Duration::from_millis(500)).await;
     }
