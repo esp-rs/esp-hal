@@ -2717,6 +2717,10 @@ mod chip_specific {
                     unsafe { RmtState::load_unchecked(ch_num, Ordering::Relaxed) }.is_tx()
                 {
                     (is_tx, Event::Error)
+                } else {
+                    // Shouldn't happen: The channel isn't configured for rx or tx, but an error
+                    // interrupt occured. Ignore it.
+                    return None;
                 }
             } else if st.ch_tx_end(ch_num).bit() {
                 (true, Event::End)
