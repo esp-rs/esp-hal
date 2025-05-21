@@ -201,10 +201,27 @@ fn do_rmt_single_shot_iter(
     let tx_config = TxChannelConfig::default()
         .with_clk_divider(DIV)
         .with_memsize(tx_memsize);
-    let (mut tx_channel, _) = setup(tx_config, Default::default());
+    let (mut tx_channel, _) = setup::<Blocking>(tx_config, Default::default());
 
     let mut tx_data = TxDataIter { remaining: tx_len, i: 0, write_end_marker };
     tx_channel.transmit(&mut tx_data)?.wait()
+}
+
+#[must_use = "Tests should fail on errors"]
+async fn do_rmt_single_shot_iter_async(
+    tx_len: usize,
+    tx_memsize: u8,
+    write_end_marker: bool,
+) -> Result<(), Error> {
+    use esp_hal::rmt::TxChannelAsync;
+
+    let tx_config = TxChannelConfig::default()
+        .with_clk_divider(DIV)
+        .with_memsize(tx_memsize);
+    let (mut tx_channel, _) = setup::<Async>(tx_config, Default::default());
+
+    let mut tx_data = TxDataIter { remaining: tx_len, i: 0, write_end_marker };
+    tx_channel.transmit(&mut tx_data)?.await
 }
 
 #[cfg(test)]
@@ -263,6 +280,12 @@ mod tests {
     fn rmt_single_shot_wrap() {
         // Single RAM block (48 or 64 codes), requires wrapping
         do_rmt_single_shot_iter(80, 1, true).unwrap();
+    }
+
+    #[test]
+    async fn rmt_single_shot_wrap_async() {
+        // Single RAM block (48 or 64 codes), requires wrapping
+        do_rmt_single_shot_iter_async(80, 1, true).await.unwrap();
     }
 
     #[test]
