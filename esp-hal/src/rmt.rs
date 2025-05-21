@@ -1775,13 +1775,13 @@ impl Channel<Async, Rx> {
 // #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
-    fn on_tx(raw: DynChannelAccess<Tx>) {
+    fn on_tx(raw: DynChannelAccess<Tx>, _event: Event) {
         raw.unlisten_tx_interrupt(Event::End | Event::Error);
 
         WAKER[raw.channel() as usize].wake();
     }
 
-    fn on_rx(raw: DynChannelAccess<Rx>) {
+    fn on_rx(raw: DynChannelAccess<Rx>, _event: Event) {
         raw.unlisten_rx_interrupt(Event::End | Event::Error);
 
         WAKER[raw.channel() as usize].wake();
@@ -2017,22 +2017,37 @@ mod chip_specific {
     #[allow(unused)]
     #[inline]
     pub(super) fn handle_channel_interrupts(
-        on_tx: fn(DynChannelAccess<Tx>),
-        on_rx: fn(DynChannelAccess<Rx>),
+        on_tx: fn(DynChannelAccess<Tx>, Event),
+        on_rx: fn(DynChannelAccess<Rx>, Event),
     ) {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in ChannelIndex::iter_all() {
-            if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                on_tx(raw);
-                return;
-            }
-            if st.ch_rx_end(ch_idx as u8).bit() || st.ch_rx_err(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                on_rx(raw);
-                return;
-            }
+            let event = if st.ch_tx_err(ch_idx as u8).bit() {
+                Event::Error
+            } else if st.ch_tx_end(ch_idx as u8).bit() {
+                Event::End
+            } else {
+                continue;
+            };
+
+            let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+            on_tx(raw, event);
+            return;
+        }
+
+        for ch_idx in ChannelIndex::iter_all() {
+            let event = if st.ch_rx_err(ch_idx as u8).bit() {
+                Event::Error
+            } else if st.ch_rx_end(ch_idx as u8).bit() {
+                Event::End
+            } else {
+                continue;
+            };
+
+            let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+            on_rx(raw, event);
+            return;
         }
     }
 
@@ -2429,34 +2444,38 @@ mod chip_specific {
     #[allow(unused)]
     #[inline]
     pub(super) fn handle_channel_interrupts(
-        on_tx: fn(DynChannelAccess<Tx>),
-        on_rx: fn(DynChannelAccess<Rx>),
+        on_tx: fn(DynChannelAccess<Tx>, Event),
+        on_rx: fn(DynChannelAccess<Rx>, Event),
     ) {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in ChannelIndex::iter_all() {
-            if st.ch_rx_end(ch_idx).bit() {
-                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                on_rx(raw);
-                return;
-            }
-            if st.ch_tx_end(ch_idx).bit() {
-                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                on_tx(raw);
-                return;
-            }
-            if st.ch_err(ch_idx).bit() {
-                if let Some(is_tx) = RmtState::load_by_idx(ch_idx, Ordering::Relaxed).is_tx() {
-                    if is_tx {
-                        let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                        on_tx(raw);
-                    } else {
-                        let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                        on_rx(raw);
-                    }
-                    return;
+            let (is_tx, event) = if st.ch_err(ch_idx as u8).bit() {
+                // FIXME: Is it really necessary to determine tx/rx here?
+                // Ultimately, we just need to signal the waker, so it doesn't really matter.
+                if let Some(is_tx) = RmtState::load_by_idx(ch_idx as u8, Ordering::Relaxed).is_tx() {
+                    (is_tx, Event::Error)
+                } else {
+                    // Shouldn't happen: The channel isn't configured for rx or tx, but an error
+                    // interrupt occured. Ignore it.
+                    continue;
                 }
+            } else if st.ch_tx_end(ch_idx as u8).bit() {
+                (true, Event::End)
+            } else if st.ch_rx_end(ch_idx as u8).bit() {
+                (false, Event::End)
+            } else {
+                continue;
+            };
+
+            if is_tx {
+                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+                on_tx(raw, event);
+            } else {
+                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+                on_rx(raw, event);
             }
+            return;
         }
     }
 
