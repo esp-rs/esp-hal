@@ -23,7 +23,7 @@ allocator-api2        = { version = "0.2.0", default-features = false }
 defmt                 = { version = "1.0.1", optional = true }
 cfg-if                = "1.0.0"
 critical-section      = "1.2.0"
-enumset               = "1.1.5"
+enumset               = "1.1.6"
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
 document-features     = "0.2.11"
 
@@ -32,7 +32,7 @@ default = []
 nightly = ["allocator-api2/nightly"]
 
 ## Implement `defmt::Format` on certain types.
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "enumset/defmt"]
 
 ## Enable this feature if you want to keep stats about the internal heap usage such as:
 ## - Max memory usage since initialization of the heap
