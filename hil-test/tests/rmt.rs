@@ -89,13 +89,18 @@ where
     (tx_channel, rx_channel)
 }
 
-fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN] {
+fn generate_tx_data<const TX_LEN: usize>(scale: u16, write_end_marker: bool) -> [u32; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
-        PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
+        PulseCode::new(
+            Level::High,
+            scale * (100 + (i * 10) % 200) as u16,
+            Level::Low,
+            scale * 50,
+        )
     });
 
     if write_end_marker {
-        tx_data[TX_LEN - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
+        tx_data[TX_LEN - 2] = PulseCode::new(Level::High, scale * 3000, Level::Low, scale * 500);
         tx_data[TX_LEN - 1] = PulseCode::empty();
     }
 
@@ -106,6 +111,7 @@ struct TxDataIter {
     remaining: usize,
     i: u16,
     write_end_marker: bool,
+    scale: u16,
 }
 
 impl Iterator for TxDataIter {
@@ -115,12 +121,14 @@ impl Iterator for TxDataIter {
         let code = match self.remaining {
             0 => return None,
             1 if self.write_end_marker => PulseCode::empty(),
-            2 if self.write_end_marker => PulseCode::new(Level::High, 3000, Level::Low, 500),
+            2 if self.write_end_marker => {
+                PulseCode::new(Level::High, self.scale * 3000, Level::Low, self.scale * 500)
+            }
             _ => PulseCode::new(
                 Level::High,
-                (100 + (self.i * 10) % 200) as u16,
+                self.scale * (100 + (self.i * 10) % 200) as u16,
                 Level::Low,
-                50,
+                self.scale * 50,
             ),
         };
 
@@ -143,7 +151,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 
     let (mut tx_channel, mut rx_channel) = setup::<Blocking>(tx_config, rx_config);
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let tx_data: [_; TX_LEN] = generate_tx_data(1, true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
 
     let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
@@ -177,7 +185,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
 
     let (mut tx_channel, mut rx_channel) = setup::<Async>(tx_config, rx_config);
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let tx_data: [_; TX_LEN] = generate_tx_data(4, true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
 
     let (rx_res, tx_res) = embassy_futures::join::join(
@@ -213,6 +221,7 @@ fn do_rmt_single_shot_iter(
         remaining: tx_len,
         i: 0,
         write_end_marker,
+        scale: 1,
     };
     tx_channel.transmit(&mut tx_data)?.wait()
 }
@@ -234,6 +243,7 @@ async fn do_rmt_single_shot_iter_async(
         remaining: tx_len,
         i: 0,
         write_end_marker,
+        scale: 4,
     };
     tx_channel.transmit(&mut tx_data)?.await
 }
