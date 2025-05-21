@@ -8,9 +8,9 @@ use anyhow::{Context, Result, bail};
 use clap::Args;
 use semver::Prerelease;
 use strum::IntoEnumIterator;
-use toml_edit::{DocumentMut, Item, TableLike, Value};
+use toml_edit::{Item, TableLike, Value};
 
-use crate::{Package, Version, changelog::Changelog};
+use crate::{Package, Version, cargo::CargoToml, changelog::Changelog};
 
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
@@ -32,113 +32,6 @@ pub struct BumpVersionArgs {
     packages: Vec<Package>,
 }
 
-struct CargoToml<'a> {
-    workspace: &'a Path,
-    package: Package,
-    manifest: toml_edit::DocumentMut,
-}
-
-const DEPENDENCY_KINDS: [&'static str; 3] =
-    ["dependencies", "dev-dependencies", "build-dependencies"];
-
-impl<'a> CargoToml<'a> {
-    fn new(workspace: &'a Path, package: Package) -> Result<Self> {
-        let package_path = workspace.join(package.to_string());
-        let manifest_path = package_path.join("Cargo.toml");
-        if !manifest_path.exists() {
-            bail!(
-                "Could not find Cargo.toml for package {package} at {}",
-                manifest_path.display()
-            );
-        }
-
-        let manifest = fs::read_to_string(&manifest_path)
-            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
-
-        Ok(Self {
-            workspace,
-            package,
-            manifest: manifest.parse::<DocumentMut>()?,
-        })
-    }
-
-    fn package_path(&self) -> PathBuf {
-        self.workspace.join(self.package.to_string())
-    }
-
-    fn manifest_path(&self) -> PathBuf {
-        self.package_path().join("Cargo.toml")
-    }
-
-    fn version(&self) -> &str {
-        self.manifest["package"]["version"]
-            .as_str()
-            .unwrap()
-            .trim()
-            .trim_matches('"')
-    }
-
-    fn set_version(&mut self, version: &semver::Version) {
-        log::info!(
-            "Bumping version for package: {} ({} -> {version})",
-            self.package,
-            self.version(),
-        );
-        self.manifest["package"]["version"] = toml_edit::value(version.to_string());
-    }
-
-    fn save(&self) -> Result<()> {
-        let manifest_path = self.manifest_path();
-        fs::write(&manifest_path, self.manifest.to_string())
-            .with_context(|| format!("Could not write {}", manifest_path.display()))?;
-
-        Ok(())
-    }
-
-    /// Calls a callback for each table that contains dependencies.
-    ///
-    /// Callback arguments:
-    /// - `path`: The path to the table (e.g. `dependencies.package`)
-    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`,
-    ///   `dev-dependencies`)
-    /// - `table`: The table itself
-    fn visit_dependencies(
-        &mut self,
-        mut handle_dependencies: impl FnMut(&str, &'static str, &mut toml_edit::Table),
-    ) {
-        fn recurse_dependencies(
-            path: String,
-            table: &mut toml_edit::Table,
-            handle_dependencies: &mut impl FnMut(&str, &'static str, &mut toml_edit::Table),
-        ) {
-            // Walk through tables recursively so that we can find *all* dependencies.
-            for (key, item) in table.iter_mut() {
-                if let Item::Table(table) = item {
-                    let path = if path.is_empty() {
-                        key.to_string()
-                    } else {
-                        format!("{path}.{key}")
-                    };
-                    recurse_dependencies(path, table, handle_dependencies);
-                }
-            }
-            for dependency_kind in DEPENDENCY_KINDS {
-                let Some(Item::Table(table)) = table.get_mut(dependency_kind) else {
-                    continue;
-                };
-
-                handle_dependencies(&path, dependency_kind, table);
-            }
-        }
-
-        recurse_dependencies(
-            String::new(),
-            self.manifest.as_table_mut(),
-            &mut handle_dependencies,
-        );
-    }
-}
-
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
@@ -152,7 +45,7 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     Ok(())
 }
 
-fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
+fn check_crate_before_bumping(manifest: &mut CargoToml<'_>) -> Result<()> {
     // Collect errors into a vector to preserve order.
     let mut errors = Vec::new();
 
@@ -423,6 +316,8 @@ fn finalize_placeholders(
 
 #[cfg(test)]
 mod test {
+    use toml_edit::DocumentMut;
+
     use super::*;
 
     #[test]

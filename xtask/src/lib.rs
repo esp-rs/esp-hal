@@ -87,9 +87,14 @@ impl Package {
         matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy)
     }
 
-    /// Should documentation be built for the package?
-    pub fn is_published(&self) -> bool {
-        !matches!(self, Package::Examples | Package::HilTest | Package::QaTest)
+    /// Should documentation be built for the package, and should the package be
+    /// published?
+    pub fn is_published(&self, workspace: &Path) -> bool {
+        // TODO: we should use some sort of cache instead of parsing the TOML every
+        // time, but for now this should be good enough.
+        let toml =
+            crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
+        toml.is_published()
     }
 
     /// Build on host

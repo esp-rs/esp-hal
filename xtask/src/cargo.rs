@@ -6,10 +6,11 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Context as _, Result, bail};
 use serde::{Deserialize, Serialize};
+use toml_edit::{DocumentMut, Item};
 
-use crate::windows_safe_path;
+use crate::{Package, windows_safe_path};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
@@ -189,5 +190,126 @@ impl CargoArgsBuilder {
         }
 
         args
+    }
+}
+
+pub struct CargoToml<'a> {
+    pub workspace: &'a Path,
+    pub package: Package,
+    pub manifest: toml_edit::DocumentMut,
+}
+
+const DEPENDENCY_KINDS: [&'static str; 3] =
+    ["dependencies", "dev-dependencies", "build-dependencies"];
+
+impl<'a> CargoToml<'a> {
+    pub fn new(workspace: &'a Path, package: Package) -> Result<Self> {
+        let package_path = workspace.join(package.to_string());
+        let manifest_path = package_path.join("Cargo.toml");
+        if !manifest_path.exists() {
+            bail!(
+                "Could not find Cargo.toml for package {package} at {}",
+                manifest_path.display()
+            );
+        }
+
+        let manifest = std::fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        Ok(Self {
+            workspace,
+            package,
+            manifest: manifest.parse::<DocumentMut>()?,
+        })
+    }
+
+    pub fn is_published(&self) -> bool {
+        // Check if the package is published by looking for the `publish` key
+        // in the manifest.
+        let Item::Table(package) = &self.manifest["package"] else {
+            unreachable!("The package table is missing in the manifest");
+        };
+
+        let Some(publish) = package.get("publish") else {
+            return true;
+        };
+
+        publish.as_bool().unwrap_or(true)
+    }
+
+    pub fn package_path(&self) -> PathBuf {
+        self.workspace.join(self.package.to_string())
+    }
+
+    pub fn manifest_path(&self) -> PathBuf {
+        self.package_path().join("Cargo.toml")
+    }
+
+    pub fn version(&self) -> &str {
+        self.manifest["package"]["version"]
+            .as_str()
+            .unwrap()
+            .trim()
+            .trim_matches('"')
+    }
+
+    pub fn set_version(&mut self, version: &semver::Version) {
+        log::info!(
+            "Bumping version for package: {} ({} -> {version})",
+            self.package,
+            self.version(),
+        );
+        self.manifest["package"]["version"] = toml_edit::value(version.to_string());
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let manifest_path = self.manifest_path();
+        std::fs::write(&manifest_path, self.manifest.to_string())
+            .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+
+        Ok(())
+    }
+
+    /// Calls a callback for each table that contains dependencies.
+    ///
+    /// Callback arguments:
+    /// - `path`: The path to the table (e.g. `dependencies.package`)
+    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`,
+    ///   `dev-dependencies`)
+    /// - `table`: The table itself
+    pub fn visit_dependencies(
+        &mut self,
+        mut handle_dependencies: impl FnMut(&str, &'static str, &mut toml_edit::Table),
+    ) {
+        fn recurse_dependencies(
+            path: String,
+            table: &mut toml_edit::Table,
+            handle_dependencies: &mut impl FnMut(&str, &'static str, &mut toml_edit::Table),
+        ) {
+            // Walk through tables recursively so that we can find *all* dependencies.
+            for (key, item) in table.iter_mut() {
+                if let Item::Table(table) = item {
+                    let path = if path.is_empty() {
+                        key.to_string()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    recurse_dependencies(path, table, handle_dependencies);
+                }
+            }
+            for dependency_kind in DEPENDENCY_KINDS {
+                let Some(Item::Table(table)) = table.get_mut(dependency_kind) else {
+                    continue;
+                };
+
+                handle_dependencies(&path, dependency_kind, table);
+            }
+        }
+
+        recurse_dependencies(
+            String::new(),
+            self.manifest.as_table_mut(),
+            &mut handle_dependencies,
+        );
     }
 }

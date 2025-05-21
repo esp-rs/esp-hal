@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Result, ensure};
 use clap::Args;
 
 use crate::{Package, cargo::CargoArgsBuilder, windows_safe_path};
@@ -20,19 +20,16 @@ pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     let package_name = args.package.to_string();
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
-    use Package::*;
-    let mut publish_args = match args.package {
-        Examples | HilTest | QaTest => {
-            bail!(
-                "Invalid package '{}' specified, this package should not be published!",
-                args.package
-            )
-        }
+    ensure!(
+        args.package.is_published(workspace),
+        "Invalid package '{}' specified, this package should not be published!",
+        args.package
+    );
 
-        EspBacktrace | EspHal | EspHalEmbassy | EspIeee802154 | EspLpHal | EspPrintln
-        | EspRiscvRt | EspStorage | EspWifi | XtensaLxRt => vec!["--no-verify"],
-
-        _ => vec![],
+    let mut publish_args = if args.package.has_chip_features() {
+        vec!["--no-verify"]
+    } else {
+        vec![]
     };
 
     if !args.no_dry_run {

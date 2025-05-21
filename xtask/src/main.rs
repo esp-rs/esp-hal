@@ -184,7 +184,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    for package in packages.iter().filter(|p| p.is_published()) {
+    for package in packages.iter().filter(|p| p.is_published(workspace)) {
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
