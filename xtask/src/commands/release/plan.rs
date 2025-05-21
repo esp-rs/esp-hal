@@ -10,7 +10,7 @@ use strum::IntoEnumIterator;
 use crate::{
     Package,
     cargo::CargoToml,
-    commands::{checker::min_package_update, do_version_bump},
+    commands::{VersionBump, checker::min_package_update, do_version_bump},
 };
 
 #[derive(Debug, Args)]
@@ -21,22 +21,14 @@ pub struct PlanArgs {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-enum VersionBump {
-    PreRelease(String),
-    Patch,
-    Minor,
-    Major,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct PackagePlan {
-    package: Package,
-    semver_checked: bool,
-    current_version: semver::Version,
-    new_version: semver::Version,
-    tag_name: String,
+pub struct PackagePlan {
+    pub package: Package,
+    pub semver_checked: bool,
+    pub current_version: semver::Version,
+    pub new_version: semver::Version,
+    pub tag_name: String,
     /// The version bump that will be applied to the package.
-    bump: VersionBump,
+    pub bump: VersionBump,
 }
 
 /// A release plan is a list of packages and their version increments.
@@ -45,8 +37,8 @@ struct PackagePlan {
 /// The order of the packages in the plan is important, as it determines the
 /// order in which the packages are released.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct Plan {
-    packages: Vec<PackagePlan>,
+pub struct Plan {
+    pub packages: Vec<PackagePlan>,
 }
 
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
@@ -139,14 +131,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
                         }
                     };
 
-                    let (amount, pre) = match &bump {
-                        VersionBump::PreRelease(pre) => (crate::Version::Patch, Some(pre.as_str())),
-                        VersionBump::Patch => (crate::Version::Patch, None),
-                        VersionBump::Minor => (crate::Version::Minor, None),
-                        VersionBump::Major => (crate::Version::Major, None),
-                    };
-
-                    let new_version = do_version_bump(&current_version, amount, pre).unwrap();
+                    let new_version = do_version_bump(&current_version, &bump).unwrap();
                     let tag_name = package.tag(&new_version);
 
                     PackagePlan {
@@ -200,7 +185,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     println!("Please review the release plan and make changes where appropriate.");
     println!(
         "To apply the release plan, you'll need to remove the heading comment, save the \
-        file, then run the following command: `<placeholder, yet to be implemented>`",
+        file, then run the following command: `cargo xrelease apply-plan`",
     );
 
     Ok(())

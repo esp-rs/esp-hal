@@ -127,6 +127,8 @@ fn main() -> Result<()> {
             Release::Publish(args) => publish(&workspace, args),
             #[cfg(feature = "release")]
             Release::Plan(args) => plan(&workspace, args),
+            #[cfg(feature = "release")]
+            Release::ApplyPlan(args) => apply_plan(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
