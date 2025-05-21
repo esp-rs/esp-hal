@@ -1824,6 +1824,9 @@ where
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
+                if this.writer.state == WriterState::Done {
+                    raw.unlisten_tx_interrupt(Event::Threshold);
+                }
 
                 Poll::Pending
             }
@@ -1831,6 +1834,7 @@ where
         };
 
         if matches!(result, Poll::Ready(_)) {
+            raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
             raw.clear_tx_interrupts();
             STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
         }
@@ -1850,6 +1854,7 @@ where
 
         // STATE should be TxIdle if the future was polled to completion
         if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::TxAsync as u8 {
+            raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
             raw.stop_tx();
 
             // block until the channel is safe to use again
@@ -2306,6 +2311,7 @@ mod chip_specific {
     {
         let st = RMT::regs().int_st().read();
 
+        // FIXME: Modify this to really go channel-by-channel and not interleave rx/tx
         (0..NUM_CHANNELS as u8 / 2).filter_map(move |ch_idx| {
             let (is_tx, event) = if st.ch_tx_err(ch_idx).bit() {
                 (true, Event::Error)

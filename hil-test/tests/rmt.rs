@@ -277,6 +277,12 @@ mod tests {
     }
 
     #[test]
+    async fn rmt_single_shot_simple_async() {
+        // 20 codes fit a single RAM block
+        do_rmt_single_shot_iter_async(20, 1, true).await.unwrap();
+    }
+
+    #[test]
     fn rmt_single_shot_wrap() {
         // Single RAM block (48 or 64 codes), requires wrapping
         do_rmt_single_shot_iter(80, 1, true).unwrap();
