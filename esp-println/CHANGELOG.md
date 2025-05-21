@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.14.0] - 2025-05-21
+
+### Added
+
 - Added new `_esp_println_timestamp()` hook, gated by the `timestamp` feature to provide timestamp for logging (#3194)
 - Added metadata for espflash to help setting log format (#3276)
 
@@ -23,9 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Manually setting a log level now correctly ignores `ESP_LOG`. (#3240)
 - Fixed logging rules being order-dependent. (#3240)
-
-### Removed
-
 
 ## [0.13.1] - 2025-02-24
 
@@ -85,4 +96,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove RTT and defmt-raw support (#1658)
 
 [0.13.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-println-v0.13.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.13.1...HEAD
+[v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.13.1...esp-println-v0.14.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.14.0...HEAD
