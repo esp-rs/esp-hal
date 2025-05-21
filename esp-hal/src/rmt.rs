@@ -1977,14 +1977,24 @@ impl Channel<Async, Rx> {
 // #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
-    fn on_tx(raw: DynChannelAccess<Tx>, _event: Event) {
-        raw.unlisten_tx_interrupt(Event::End | Event::Error);
+    fn on_tx(raw: DynChannelAccess<Tx>, event: Event) {
+        let events_to_unlisten = match event {
+            Event::End | Event::Error => Event::End | Event::Error | Event::Threshold,
+            // The RmtTxFuture will wnable the threshold interrupt again if required
+            Event::Threshold => Event::Threshold.into(),
+        };
+        raw.unlisten_tx_interrupt(events_to_unlisten);
 
         WAKER[raw.channel() as usize].wake();
     }
 
-    fn on_rx(raw: DynChannelAccess<Rx>, _event: Event) {
-        raw.unlisten_rx_interrupt(Event::End | Event::Error);
+    fn on_rx(raw: DynChannelAccess<Rx>, event: Event) {
+        let events_to_unlisten = match event {
+            Event::End | Event::Error => Event::End | Event::Error | Event::Threshold,
+            // The RmtRxFuture will wnable the threshold interrupt again if required
+            Event::Threshold => Event::Threshold.into(),
+        };
+        raw.unlisten_rx_interrupt(events_to_unlisten);
 
         WAKER[raw.channel() as usize].wake();
     }
@@ -2208,6 +2218,8 @@ mod chip_specific {
                 Event::Error
             } else if st.ch_tx_end(ch_idx as u8).bit() {
                 Event::End
+            } else if st.ch_tx_thr_event(ch_idx as u8).bit() {
+                Event::Threshold
             } else {
                 continue;
             };
@@ -2222,6 +2234,8 @@ mod chip_specific {
                 Event::Error
             } else if st.ch_rx_end(ch_idx as u8).bit() {
                 Event::End
+            } else if st.ch_rx_thr_event(ch_idx as u8).bit() {
+                Event::Threshold
             } else {
                 continue;
             };
@@ -2643,6 +2657,8 @@ mod chip_specific {
                 (true, Event::End)
             } else if st.ch_rx_end(ch_idx as u8).bit() {
                 (false, Event::End)
+            } else if st.ch_tx_thr_event(ch_idx as u8).bit() {
+                (true, Event::Threshold)
             } else {
                 continue;
             };
