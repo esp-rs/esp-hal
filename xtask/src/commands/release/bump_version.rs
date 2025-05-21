@@ -7,10 +7,19 @@ use std::{
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use semver::Prerelease;
+use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
 use crate::{Package, Version, cargo::CargoToml, changelog::Changelog};
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum VersionBump {
+    PreRelease(String),
+    Patch,
+    Minor,
+    Major,
+}
 
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
@@ -35,12 +44,27 @@ pub struct BumpVersionArgs {
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
+        let version = if let Some(pre) = &args.pre {
+            VersionBump::PreRelease(pre.clone())
+        } else {
+            match args.amount {
+                Version::Major => VersionBump::Major,
+                Version::Minor => VersionBump::Minor,
+                Version::Patch => VersionBump::Patch,
+            }
+        };
         let mut package = CargoToml::new(workspace, package)?;
-        check_crate_before_bumping(&mut package)?;
-        let new_version = bump_crate_version(&mut package, args.amount, args.pre.as_deref())?;
-        finalize_changelog(&package, &new_version)?;
-        finalize_placeholders(&package, &new_version)?;
+        update_package(&mut package, &version)?;
     }
+
+    Ok(())
+}
+
+pub fn update_package(package: &mut CargoToml<'_>, version: &VersionBump) -> Result<()> {
+    check_crate_before_bumping(package)?;
+    let new_version = bump_crate_version(package, version)?;
+    finalize_changelog(package, &new_version)?;
+    finalize_placeholders(package, &new_version)?;
 
     Ok(())
 }
@@ -144,12 +168,11 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
 /// Bump the version of the specified package by the specified amount.
 fn bump_crate_version(
     bumped_package: &mut CargoToml<'_>,
-    amount: Version,
-    pre: Option<&str>,
+    amount: &VersionBump,
 ) -> Result<semver::Version> {
     let prev_version = bumped_package.package_version();
 
-    let version = do_version_bump(&prev_version, amount, pre)
+    let version = do_version_bump(&prev_version, amount)
         .with_context(|| format!("Failed to bump version of {}", bumped_package.package))?;
 
     bumped_package.set_version(&version);
@@ -207,47 +230,51 @@ fn bump_crate_version(
     Ok(version)
 }
 
-pub fn do_version_bump(
-    version: &semver::Version,
-    amount: Version,
-    pre: Option<&str>,
-) -> Result<semver::Version> {
-    fn bump_version_number(version: &mut semver::Version, amount: Version) {
+pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
+    fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
         match amount {
-            Version::Major => {
+            VersionBump::Major => {
                 version.major += 1;
                 version.minor = 0;
                 version.patch = 0;
             }
-            Version::Minor => {
+            VersionBump::Minor => {
                 version.minor += 1;
                 version.patch = 0;
             }
-            Version::Patch => {
+            VersionBump::Patch => {
                 version.patch += 1;
             }
+            VersionBump::PreRelease(_) => unreachable!(),
         }
     }
     let mut version = version.clone();
 
-    if let Some(pre) = pre {
-        if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
-            let pre_version = pre_version.parse::<u32>()?;
-            version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1)).unwrap();
-        } else if version.pre.as_str().is_empty() {
-            // Start a new pre-release
-            bump_version_number(&mut version, amount);
-            version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
-        } else {
-            bail!(
-                "Unexpected pre-release version format found: {}",
-                version.pre.as_str()
-            );
+    match amount {
+        VersionBump::Major | VersionBump::Minor | VersionBump::Patch => {
+            // If the version is a pre-release, we need to remove it
+            if !version.pre.is_empty() {
+                version.pre = Prerelease::EMPTY;
+            } else {
+                // If the version is not a pre-release, we need to bump the version
+                bump_version_number(&mut version, &amount);
+            }
         }
-    } else if !version.pre.is_empty() {
-        version.pre = Prerelease::EMPTY;
-    } else {
-        bump_version_number(&mut version, amount);
+        VersionBump::PreRelease(pre) => {
+            if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
+                let pre_version = pre_version.parse::<u32>()?;
+                version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1)).unwrap();
+            } else if version.pre.as_str().is_empty() {
+                // Start a new pre-release
+                bump_version_number(&mut version, &amount);
+                version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
+            } else {
+                bail!(
+                    "Unexpected pre-release version format found: {}",
+                    version.pre.as_str()
+                );
+            }
+        }
     }
 
     Ok(version)
@@ -333,22 +360,42 @@ mod test {
     #[test]
     fn test_version_bump() {
         let test_cases = vec![
-            ("0.1.0", Version::Patch, None, "0.1.1"),
-            ("0.1.0", Version::Minor, None, "0.2.0"),
-            ("0.1.0", Version::Major, None, "1.0.0"),
-            ("0.1.0", Version::Patch, Some("alpha"), "0.1.1-alpha.0"),
-            ("0.1.0", Version::Minor, Some("alpha"), "0.2.0-alpha.0"),
-            ("0.1.0", Version::Major, Some("alpha"), "1.0.0-alpha.0"),
+            ("0.1.0", VersionBump::Patch, "0.1.1"),
+            ("0.1.0", VersionBump::Minor, "0.2.0"),
+            ("0.1.0", VersionBump::Major, "1.0.0"),
+            (
+                "0.1.0",
+                VersionBump::PreRelease("alpha".to_string()),
+                "0.1.1-alpha.0",
+            ),
+            (
+                "0.1.0",
+                VersionBump::PreRelease("alpha".to_string()),
+                "0.2.0-alpha.0",
+            ),
+            (
+                "0.1.0",
+                VersionBump::PreRelease("alpha".to_string()),
+                "1.0.0-alpha.0",
+            ),
             // amount is ignored, assuming same release cycle
-            ("0.1.0-beta.0", Version::Minor, None, "0.1.0"),
-            ("0.1.0-beta.0", Version::Major, None, "0.1.0"),
-            ("0.1.0-beta.0", Version::Minor, Some("beta"), "0.1.0-beta.1"),
-            ("0.1.0-beta.0", Version::Major, Some("beta"), "0.1.0-beta.1"),
+            ("0.1.0-beta.0", VersionBump::Minor, "0.1.0"),
+            ("0.1.0-beta.0", VersionBump::Major, "0.1.0"),
+            (
+                "0.1.0-beta.0",
+                VersionBump::PreRelease("beta".to_string()),
+                "0.1.0-beta.1",
+            ),
+            (
+                "0.1.0-beta.0",
+                VersionBump::PreRelease("beta".to_string()),
+                "0.1.0-beta.1",
+            ),
         ];
 
-        for (version, amount, pre, expected) in test_cases {
+        for (version, amount, expected) in test_cases {
             let version = semver::Version::parse(version).unwrap();
-            let new_version = do_version_bump(&version, amount, pre).unwrap();
+            let new_version = do_version_bump(&version, &amount).unwrap();
             assert_eq!(new_version.to_string(), expected);
         }
     }

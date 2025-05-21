@@ -2,12 +2,16 @@ use clap::Subcommand;
 
 pub mod bump_version;
 #[cfg(feature = "release")]
+pub mod execute_plan;
+#[cfg(feature = "release")]
 pub mod plan;
 pub mod publish;
 pub mod semver_check;
 pub mod tag_releases;
 
 pub use bump_version::*;
+#[cfg(feature = "release")]
+pub use execute_plan::*;
 #[cfg(feature = "release")]
 pub use plan::*;
 pub use publish::*;
@@ -27,6 +31,10 @@ pub enum Release {
     /// control what and how gets released.
     #[cfg(feature = "release")]
     Plan(PlanArgs),
+    /// Execute a release plan. This command will update versions, changelogs,
+    /// and opens a pull request with the changes.
+    #[cfg(feature = "release")]
+    ExecutePlan(ApplyPlanArgs),
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:
