@@ -30,6 +30,7 @@ enum VersionBump {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct PackagePlan {
+    package: Package,
     semver_checked: bool,
     current_version: semver::Version,
     new_version: semver::Version,
@@ -45,7 +46,7 @@ struct PackagePlan {
 /// order in which the packages are released.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Plan {
-    packages: HashMap<Package, PackagePlan>,
+    packages: Vec<PackagePlan>,
 }
 
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
@@ -105,46 +106,44 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             .filter_map(|(package, bump)| {
                 bump.map(|b| {
                     let current_version = package_tomls[&package].package_version();
-                    (package, {
-                        let bump = if !current_version.pre.is_empty() {
-                            VersionBump::PreRelease(
-                                current_version
-                                    .pre
-                                    .as_str()
-                                    .split('.')
-                                    .next()
-                                    .unwrap()
-                                    .to_string(),
-                            )
-                        } else {
-                            match b {
-                                ReleaseType::Major => VersionBump::Major,
-                                ReleaseType::Minor => VersionBump::Minor,
-                                ReleaseType::Patch => VersionBump::Patch,
-                                _ => unreachable!(),
-                            }
-                        };
 
-                        let (amount, pre) = match &bump {
-                            VersionBump::PreRelease(pre) => {
-                                (crate::Version::Patch, Some(pre.as_str()))
-                            }
-                            VersionBump::Patch => (crate::Version::Patch, None),
-                            VersionBump::Minor => (crate::Version::Minor, None),
-                            VersionBump::Major => (crate::Version::Major, None),
-                        };
-
-                        let new_version = do_version_bump(&current_version, amount, pre).unwrap();
-                        let tag_name = package.tag(&new_version);
-
-                        PackagePlan {
-                            semver_checked: package.is_semver_checked(),
-                            current_version,
-                            new_version,
-                            tag_name,
-                            bump,
+                    let bump = if !current_version.pre.is_empty() {
+                        VersionBump::PreRelease(
+                            current_version
+                                .pre
+                                .as_str()
+                                .split('.')
+                                .next()
+                                .unwrap()
+                                .to_string(),
+                        )
+                    } else {
+                        match b {
+                            ReleaseType::Major => VersionBump::Major,
+                            ReleaseType::Minor => VersionBump::Minor,
+                            ReleaseType::Patch => VersionBump::Patch,
+                            _ => unreachable!(),
                         }
-                    })
+                    };
+
+                    let (amount, pre) = match &bump {
+                        VersionBump::PreRelease(pre) => (crate::Version::Patch, Some(pre.as_str())),
+                        VersionBump::Patch => (crate::Version::Patch, None),
+                        VersionBump::Minor => (crate::Version::Minor, None),
+                        VersionBump::Major => (crate::Version::Major, None),
+                    };
+
+                    let new_version = do_version_bump(&current_version, amount, pre).unwrap();
+                    let tag_name = package.tag(&new_version);
+
+                    PackagePlan {
+                        package,
+                        semver_checked: package.is_semver_checked(),
+                        current_version,
+                        new_version,
+                        tag_name,
+                        bump,
+                    }
                 })
             })
             .collect(),
@@ -161,12 +160,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // where appropriate. Remove packages that should not be released. Delete the comment block to
 // finalize the release plan, otherwise trying to apply the release plan will fail.
 //
-// This file contains each package that needs to be released. The order of the packages is not
-// important, the order will be re-calculated when applying the release plan.
+// This file contains each package that needs to be released. The order of the packages is
+// important, the packages will be released in the order they appear in the release plan.
+// This is done in case the tool gets the dependency graph wrong.
 //
-// Everything other than `bump` is ignored when applying the release plan. The extra fields
-// are only provided for reference. The fields will be updated when applying the release plan.
-// The release plan will then be added to the release PR and will be used to orchestrate the
+// Everything other than `package` and `bump` is ignored when applying the release plan. The extra
+// fields are only provided for reference. The fields will be updated when applying the release
+// plan. The release plan will then be added to the release PR and will be used to orchestrate the
 // actual release process.
 //
 // For each package, this plan contains the version bump that will be applied.
