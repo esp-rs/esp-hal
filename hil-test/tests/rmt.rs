@@ -76,6 +76,35 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
+struct TxDataIter {
+    remaining: usize,
+    i: u16,
+    write_end_marker: bool,
+}
+
+impl Iterator for TxDataIter {
+    type Item = PulseCode;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let code = match self.remaining {
+            0 => return None,
+            1 if self.write_end_marker => PulseCode::end_marker(),
+            2 if self.write_end_marker => PulseCode::new(Level::High, 3000, Level::Low, 500),
+            _ => PulseCode::new(
+                Level::High,
+                (100 + (self.i * 10) % 200) as u16,
+                Level::Low,
+                50,
+            ),
+        };
+
+        self.i += 1;
+        self.remaining -= 1;
+
+        Some(code)
+    }
+}
+
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
@@ -143,9 +172,11 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
 }
 
-// Run a test that just sends some data, without trying to recive it.
+// Run a test that just sends some data, without trying to receive it. This uses
+// an Iterator of PulseCode instead of a slice.
 #[must_use = "Tests should fail on errors"]
-fn do_rmt_single_shot<const TX_LEN: usize>(
+fn do_rmt_single_shot_iter(
+    tx_len: usize,
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
@@ -158,9 +189,12 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
         .with_memsize(tx_memsize);
     let (mut tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker);
-
-    tx_channel.transmit(&tx_data)?.wait()
+    let mut tx_data = TxDataIter {
+        remaining: tx_len,
+        i: 0,
+        write_end_marker,
+    };
+    tx_channel.transmit(&mut tx_data)?.wait()
 }
 
 #[cfg(test)]
@@ -215,24 +249,24 @@ mod tests {
     #[test]
     fn rmt_single_shot_wrap() {
         // Single RAM block (48 or 64 codes), requires wrapping
-        do_rmt_single_shot::<80>(1, true).unwrap();
+        do_rmt_single_shot_iter(80, 1, true).unwrap();
     }
 
     #[test]
     fn rmt_single_shot_extended() {
         // Two RAM blocks (96 or 128 codes), no wrapping
-        do_rmt_single_shot::<80>(2, true).unwrap();
+        do_rmt_single_shot_iter(80, 2, true).unwrap();
     }
 
     #[test]
     fn rmt_single_shot_extended_wrap() {
         // Two RAM blocks (96 or 128 codes), requires wrapping
-        do_rmt_single_shot::<150>(2, true).unwrap();
+        do_rmt_single_shot_iter(150, 2, true).unwrap();
     }
 
     #[test]
     fn rmt_single_shot_fails_without_end_marker() {
-        let result = do_rmt_single_shot::<20>(1, false);
+        let result = do_rmt_single_shot_iter(20, 1, false);
 
         assert!(matches!(result, Err(Error::EndMarkerMissing)));
     }
