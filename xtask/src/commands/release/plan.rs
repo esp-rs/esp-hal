@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Write, path::Path, process::Command};
 
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use cargo_semver_checks::ReleaseType;
 use clap::Args;
 use esp_metadata::Chip;
@@ -76,6 +76,19 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // Topological sort the packages into a release order.
     let sorted = topological_sort(&dep_graph);
     log::debug!("Sorted packages: {:?}", sorted);
+
+    for package in sorted.iter() {
+        ensure!(
+            package_tomls[&package].is_published(),
+            "Cannot release {package}: package is not published. The command \
+            would have released the following packages: {}",
+            sorted
+                .iter()
+                .map(|p| p.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
 
     // Gather semver bump requirements
     let mut update_amounts = vec![];
