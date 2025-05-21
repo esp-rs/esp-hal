@@ -102,7 +102,7 @@
 //!
 //! loop {
 //!     let transaction = channel.transmit(&data)?;
-//!     channel = transaction.wait()?;
+//!     transaction.wait()?;
 //!     delay.delay_millis(500);
 //! }
 //! # }
@@ -162,10 +162,9 @@
 //!     }
 //!
 //!     match transaction.wait() {
-//!         Ok(channel_res) => {
-//!             channel = channel_res;
+//!         Ok(count) => {
 //!             let mut total = 0usize;
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -177,7 +176,7 @@
 //!                 total += entry.length2() as usize;
 //!             }
 //!
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -207,9 +206,7 @@
 //!
 //!             println!();
 //!         }
-//!         Err((_err, channel_res)) => {
-//!             channel = channel_res;
-//!         }
+//!         Err(_err) => {}
 //!     }
 //!
 //!     delay.delay_millis(1500);
