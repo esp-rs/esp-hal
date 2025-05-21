@@ -1292,7 +1292,7 @@ fn configure_rx_channel<'d>(
     }
 
     let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Rx, memsize)?;
+    reserve_channel(raw.channel(), RmtState::RxIdle, memsize)?;
 
     let pin = pin.into();
 
@@ -1321,7 +1321,7 @@ fn configure_tx_channel<'d>(
     config: TxChannelConfig,
 ) -> Result<(), Error> {
     let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
+    reserve_channel(raw.channel(), RmtState::TxIdle, memsize)?;
 
     let pin = pin.into();
 
@@ -1352,20 +1352,25 @@ enum RmtState {
     // The channels is not in use, but one of the preceding channels is using its memory
     Reserved,
 
-    // The channel is configured for rx
-    Rx,
+    // The channel is configured for rx and currently idle.
+    RxIdle,
 
-    // The channel is configured for tx
-    Tx,
+    // The channel is configured for tx and currently idle.
+    TxIdle,
+
+    // The channel is configured for rx and currently performing an async transaction
+    RxAsync,
+
+    // The channel is configured for tx and currently performing an async transaction
+    TxAsync,
 }
 
 impl RmtState {
     #[allow(unused)]
     fn is_tx(&self) -> Option<bool> {
-        use RmtState::*;
         match self {
-            Rx => Some(false),
-            Tx => Some(true),
+            Self::RxIdle | Self::RxAsync => Some(false),
+            Self::TxIdle | Self::TxAsync => Some(true),
             _ => None,
         }
     }
@@ -1931,17 +1936,15 @@ where
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Note that STATE is only accessed from a single core and no ISR here, so
+        // Relaxed access is sufficient.
         let this = self.get_mut();
         let raw = this.raw;
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match raw.get_tx_status() {
-            Some(Event::Error) => {
-                raw.clear_tx_interrupts();
-
-                Poll::Ready(Err(Error::TransmissionError))
-            }
+        let result = match raw.get_tx_status() {
+            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
             Some(Event::End) => {
                 let result = if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
@@ -1949,8 +1952,6 @@ where
                 } else {
                     Ok(())
                 };
-
-                raw.clear_tx_interrupts();
 
                 Poll::Ready(result)
             }
@@ -1968,7 +1969,14 @@ where
                 Poll::Pending
             }
             _ => Poll::Pending,
+        };
+
+        if matches!(result, Poll::Ready(_)) {
+            raw.clear_tx_interrupts();
+            STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
         }
+
+        result
     }
 }
 
@@ -1979,14 +1987,19 @@ where
     D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
-        // FIXME: Disable this if the future already returned Poll::Ready
         let raw = self.raw;
 
-        raw.stop_tx();
-        raw.update();
+        // STATE should be TxIdle if the future was polled to completion
+        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::TxAsync as u8 {
+            raw.stop_tx();
+            raw.update();
 
-        // block until the channel is safe to use again
-        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            // block until the channel is safe to use again
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+
+            raw.clear_tx_interrupts();
+            STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
+        }
     }
 }
 
@@ -2040,6 +2053,8 @@ where
             WriterState::Done => false,
         };
 
+        STATE[raw.channel() as usize].store(RmtState::TxAsync as u8, Ordering::Relaxed);
+
         raw.clear_tx_interrupts();
         let mut events = Event::End | Event::Error;
         if wrap {
@@ -2073,13 +2088,21 @@ where
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let raw = &self.raw;
+        WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match self.raw.get_rx_status() {
+        let result = match raw.get_rx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
             Some(Event::End) => Poll::Ready(Ok(())),
             _ => Poll::Pending,
+        };
+
+        if matches!(result, Poll::Ready(_)) {
+            raw.clear_rx_interrupts();
+            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
         }
+
+        result
     }
 }
 
@@ -2090,11 +2113,17 @@ where
     fn drop(&mut self) {
         let raw = self.raw;
 
-        raw.stop_rx();
-        raw.update();
+        // STATE should be RxIdle if the future was polled to completion
+        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::RxAsync as u8 {
+            raw.stop_rx();
+            raw.update();
 
-        // block until the channel is safe to use again
-        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+            // block until the channel is safe to use again
+            while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+
+            raw.clear_rx_interrupts();
+            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+        }
     }
 }
 
@@ -2121,6 +2150,8 @@ where
         if data.len() > raw.memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
+
+        STATE[raw.channel() as usize].store(RmtState::RxAsync as u8, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
         raw.listen_rx_interrupt(Event::End | Event::Error);
