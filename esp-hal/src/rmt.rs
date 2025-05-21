@@ -2000,7 +2000,12 @@ impl AnyChannelAccess {
             let channel = ch_idx;
             Self::Tx(unsafe { DynChannelAccess::<Tx>::conjure(channel) })
         } else {
-            let channel = NUM_CHANNELS as u8 / 2 + ch_idx;
+            // FIXME: This should live somewhere in chip_specific::...
+            let channel = if cfg!(any(esp32, esp32s2)) {
+                ch_idx
+            } else {
+                NUM_CHANNELS as u8 / 2 + ch_idx
+            };
             Self::Rx(unsafe { DynChannelAccess::<Rx>::conjure(channel) })
         }
     }
