@@ -177,10 +177,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 // important, the packages will be released in the order they appear in the release plan.
 // This is done in case the tool gets the dependency graph wrong.
 //
-// Everything other than `package` and `bump` is ignored when applying the release plan. The extra
-// fields are only provided for reference. The fields will be updated when applying the release
-// plan. The release plan will then be added to the release PR and will be used to orchestrate the
-// actual release process.
+// This plan may also contain packages that do not need to be released. Please review them
+// in case the release was triggered by commits that only included non-relevant changes. These
+// packages can be removed from the plan.
+//
+// You don't need to change versions and tag names. The plan will be updated when applying the
+// release plan. The release plan will then be added to the release PR and will be used to
+// orchestrate the actual publishing process.
 //
 // For each package, this plan contains the version bump that will be applied.
 // The version bump is one of:
