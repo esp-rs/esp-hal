@@ -1631,16 +1631,22 @@ where
         let status = raw.get_rx_status();
         match status {
             Some(Event::End) => {
-                raw.stop_rx();
-                raw.clear_rx_interrupts();
-                raw.update();
+                if self.reader.state != ReaderState::Done {
+                    // Do not clear the interrupt flags here: Subsequent calls of wait() must still be
+                    // able to observe them if this is currently called via poll()
+                    raw.stop_rx();
+                    raw.update();
 
-                // read() does not wrap around, so we need to call it twice to handle the case
-                // where the current read offset is memsize / 2 (i.e. the second half of RMT RAM is
-                // read first).
-                let memsize = raw.memsize().codes();
-                self.reader.read(&mut self.data, raw, memsize / 2);
-                self.reader.read(&mut self.data, raw, memsize / 2);
+                    // read() does not wrap around, so we need to call it twice to handle the case
+                    // where the current read offset is memsize / 2 (i.e. the second half of RMT RAM is
+                    // read first).
+                    let memsize = raw.memsize().codes();
+                    self.reader.read(&mut self.data, raw, memsize / 2);
+                    self.reader.read(&mut self.data, raw, memsize / 2);
+
+                    // Ensure that no further data will be read if this is called repeatedly.
+                    self.reader.state = ReaderState::Done;
+                }
             }
             Some(Event::Threshold) if C::Raw::supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
@@ -1674,6 +1680,8 @@ where
                 _ => continue,
             }
         };
+
+        self.channel.raw().clear_rx_interrupts();
 
         // Disable Drop handler since the receiver is stopped already.
         let _ = ManuallyDrop::new(self);
@@ -1787,7 +1795,11 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         match raw.get_tx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
+            Some(Event::Error) => {
+                raw.clear_tx_interrupts();
+
+                Poll::Ready(Err(Error::TransmissionError))
+            }
             Some(Event::End) => {
                 let result = if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
@@ -1795,6 +1807,9 @@ where
                 } else {
                     Ok(())
                 };
+
+                raw.clear_tx_interrupts();
+
                 Poll::Ready(result)
             }
             Some(Event::Threshold) => {
