@@ -160,7 +160,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
 
     let (rx_res, tx_res) = embassy_futures::join::join(
         rx_channel.receive(&mut rcv_data),
-        tx_channel.transmit(&tx_data),
+        tx_channel.transmit(&tx_data).unwrap(),
     )
     .await;
 
@@ -216,6 +216,7 @@ mod tests {
         // 20 codes fit a single RAM block
         do_rmt_loopback_async::<20>(1, 1).await;
     }
+
     #[test]
     fn rmt_loopback_extended_ram() {
         // 80 codes require two RAM blocks
@@ -234,6 +235,11 @@ mod tests {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
         // wrapping.
         do_rmt_loopback::<80>(1, 2);
+    }
+
+    #[test]
+    async fn rmt_loopback_tx_wrap_async() {
+        do_rmt_loopback_async::<80>(1, 2).await;
     }
 
     // FIXME: This test can't work right now, because wrapping rx is not
