@@ -1365,9 +1365,9 @@ impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
         raw.update();
 
         let ptr = raw.channel_ram_start();
-        // FIXME: Remove the .take(), it's a no-op (why is it here??)
-        let len = self.data.len();
-        for (idx, entry) in self.data.iter_mut().take(len).enumerate() {
+        // SAFETY: RxChannel.receive() verifies that the length of self.data does not
+        // exceed the channel RAM size.
+        for (idx, entry) in self.data.iter_mut().enumerate() {
             *entry = unsafe { ptr.add(idx).read_volatile() };
         }
 
