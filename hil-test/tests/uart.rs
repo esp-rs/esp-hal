@@ -8,6 +8,7 @@
 
 use esp_hal::{
     Blocking,
+    delay::Delay,
     gpio::AnyPin,
     uart::{self, ClockSource, Uart},
 };
@@ -18,6 +19,8 @@ struct Context {
     uart1: Uart<'static, Blocking>,
     rx: AnyPin<'static>,
     tx: AnyPin<'static>,
+    rts: AnyPin<'static>,
+    delay: Delay,
 }
 
 #[cfg(test)]
@@ -34,6 +37,9 @@ mod tests {
         );
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        let rts = hil_test::unconnected_pin!(peripherals);
+
+        let delay = Delay::new();
 
         let uart0 = Uart::new(peripherals.UART0, uart::Config::default()).unwrap();
         let uart1 = Uart::new(peripherals.UART1, uart::Config::default()).unwrap();
@@ -43,6 +49,8 @@ mod tests {
             uart1,
             rx: rx.degrade(),
             tx: tx.degrade(),
+            rts: rts.degrade(),
+            delay: delay,
         }
     }
 
@@ -105,6 +113,35 @@ mod tests {
             uart.read(&mut byte).unwrap();
             assert_eq!(byte[0], 0x42);
         }
+    }
+
+    #[test]
+    fn test_hw_flow_control(ctx: Context) {
+        let (rts_input, rts_output) = unsafe { ctx.rts.split() };
+        let mut uart = ctx
+            .uart1
+            .with_tx(ctx.tx)
+            .with_rx(ctx.rx)
+            .with_rts(rts_output);
+
+        uart.apply_config(&uart::Config::default().with_hw_flow_ctrl(
+            esp_hal::uart::HwFlowControl {
+                cts: uart::CtsConfig::Disabled,
+                rts: uart::RtsConfig::Enabled(4),
+            },
+        ))
+        .unwrap();
+
+        let data: [u8; 10] = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9];
+
+        // This will make RTS pin go high, as we write more than the RTS threshold.
+        uart.write(&data).unwrap();
+        // Required, otherwise we'll run into a timing issue and won't be able to
+        // determine that the RTS is at a high level.
+        ctx.delay.delay_millis(1);
+
+        // RTS pin should go high when the threshold is exceeded.
+        assert_eq!(rts_input.is_input_high(), true);
     }
 
     #[test]
