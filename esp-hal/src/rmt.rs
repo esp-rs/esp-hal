@@ -1563,10 +1563,12 @@ enum AnyChannelAccess {
 
 impl AnyChannelAccess {
     #[inline]
-    fn conjure(channel: u8, is_tx: bool) -> Self {
+    fn conjure(ch_idx: u8, is_tx: bool) -> Self {
         if is_tx {
+            let channel = ch_idx;
             Self::Tx(unsafe { DynChannelAccess::<Tx>::conjure(channel) })
         } else {
+            let channel = NUM_CHANNELS as u8 / 2 + ch_idx;
             Self::Rx(unsafe { DynChannelAccess::<Rx>::conjure(channel) })
         }
     }
