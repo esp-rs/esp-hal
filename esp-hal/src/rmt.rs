@@ -1315,7 +1315,7 @@ where
     data: D,
 }
 
-impl<'ch, C, D> SingleShotTxTransaction<'ch, C, D>
+impl<C, D> SingleShotTxTransaction<'_, C, D>
 where
     C: TxChannel,
     D: Iterator,
@@ -1376,7 +1376,7 @@ where
         result
     }
 }
-impl<'ch, C, D> Drop for SingleShotTxTransaction<'ch, C, D>
+impl< C, D> Drop for SingleShotTxTransaction<'_, C, D>
 where
     C: TxChannel,
     D: Iterator,
@@ -1399,7 +1399,7 @@ pub struct ContinuousTxTransaction<'ch, C: TxChannel> {
     channel: &'ch mut C,
 }
 
-impl<'ch, C: TxChannel> ContinuousTxTransaction<'ch, C> {
+impl<C: TxChannel> ContinuousTxTransaction<'_, C> {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<(), Error> {
         let raw = &self.channel.raw();
@@ -1449,7 +1449,7 @@ impl<'ch, C: TxChannel> ContinuousTxTransaction<'ch, C> {
     }
 }
 
-impl<'ch, C: TxChannel> Drop for ContinuousTxTransaction<'ch, C> {
+impl<C: TxChannel> Drop for ContinuousTxTransaction<'_, C> {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not manually
         // stopped with `stop()` or `stop_next()`.
@@ -1478,10 +1478,10 @@ pub trait TxChannel: Sized {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<'ch, D>(
-        &'ch mut self,
+    fn transmit<D>(
+        &mut self,
         data: D,
-    ) -> Result<SingleShotTxTransaction<'ch, Self, <D as IntoIterator>::IntoIter>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Self, <D as IntoIterator>::IntoIter>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>;
@@ -1490,10 +1490,10 @@ pub trait TxChannel: Sized {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<'ch, D>(
-        &'ch mut self,
+    fn transmit_continuously<D>(
+        &mut self,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'ch, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>;
@@ -1501,11 +1501,11 @@ pub trait TxChannel: Sized {
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount<'ch, D>(
-        &'ch mut self,
+    fn transmit_continuously_with_loopcount<D>(
+        &mut self,
         loopcount: u16,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'ch, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>;
@@ -1522,10 +1522,10 @@ where
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further use.
-    fn transmit<'ch, D>(
-        &'ch mut self,
+    fn transmit<D>(
+        &mut self,
         data: D,
-    ) -> Result<SingleShotTxTransaction<'ch, Self, <D as IntoIterator>::IntoIter>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Self, <D as IntoIterator>::IntoIter>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>,
@@ -1560,10 +1560,10 @@ where
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<'ch, D>(
-        &'ch mut self,
+    fn transmit_continuously<D>(
+        &mut self,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'ch, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>,
@@ -1574,11 +1574,11 @@ where
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount<'ch, D>(
-        &'ch mut self,
+    fn transmit_continuously_with_loopcount<D>(
+        &mut self,
         loopcount: u16,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'ch, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<u32>,
@@ -1835,7 +1835,7 @@ pub trait TxChannelAsync {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    fn transmit<'ch, D>(&'ch mut self, data: D) -> Result<RmtTxFuture<'ch, Self::Raw, D::IntoIter>, Error>
+    fn transmit<D>(&mut self, data: D) -> Result<RmtTxFuture<'_, Self::Raw, D::IntoIter>, Error>
     where
         Self: Sized,
         D: IntoIterator,
@@ -1852,7 +1852,7 @@ where
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    fn transmit<'ch, D>(&'ch mut self, data: D) -> Result<RmtTxFuture<'ch, Self::Raw, D::IntoIter>, Error>
+    fn transmit<D>(&mut self, data: D) -> Result<RmtTxFuture<'_, Self::Raw, D::IntoIter>, Error>
     where
         Self: Sized,
         D: IntoIterator,
