@@ -2576,13 +2576,13 @@ mod chip_specific {
         fn get_rx_status(&self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
-            let ch = self.channel();
+            let ch_idx = ch_idx(self);
 
-            if reg.ch_rx_end(ch).bit() {
+            if reg.ch_rx_end(ch_idx).bit() {
                 Some(Event::End)
-            } else if reg.ch_rx_err(ch).bit() {
+            } else if reg.ch_rx_err(ch_idx).bit() {
                 Some(Event::Error)
-            } else if reg.ch_rx_thr_event(ch).bit() {
+            } else if reg.ch_rx_thr_event(ch_idx).bit() {
                 Some(Event::Threshold)
             } else {
                 None
