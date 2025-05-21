@@ -443,6 +443,11 @@ impl RmtWriter {
             }
         }
 
+        // // Write an extra end marker to detect underruns.
+        // // FIXME: Complete this
+        // unsafe { start.add(offset).write_volatile(PulseCode::empty()) }
+        // offset += 1;
+
         debug_assert!(offset <= memsize);
         self.written += offset - initial_offset;
         if offset == memsize {
