@@ -629,7 +629,7 @@ pub struct RxTx;
 /// A trait implemented by the `Rx` and `Tx` marker structs.
 ///
 /// For internal use by the driver.
-pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed {
+pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed + Unpin {
     #[doc(hidden)]
     fn is_tx() -> bool;
 }
@@ -653,7 +653,7 @@ impl Direction for Rx {
 }
 
 /// An identifier for one channel of the RMT peripherial.
-pub trait RawChannelAccess: Clone + Copy + core::fmt::Debug + crate::private::Sealed {
+pub trait RawChannelAccess: Clone + Copy + core::fmt::Debug + crate::private::Sealed + Unpin {
     // Tx or Rx
     #[doc(hidden)]
     type Dir: Direction;
@@ -683,7 +683,7 @@ impl<Dir: Direction, const CHANNEL: u8> crate::private::Sealed
 }
 impl<Dir: Direction> crate::private::Sealed for DynChannelAccess<Dir> {}
 
-impl<Dir, const CHANNEL: u8> ConstChannelAccess<Dir, CHANNEL>
+impl<Dir: Direction, const CHANNEL: u8> ConstChannelAccess<Dir, CHANNEL>
 where
     Dir: Direction,
     ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess,
@@ -1801,37 +1801,77 @@ where
 }
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
+
+// FIXME: This is essentially the same as SingleShotTxTransaction. Is it
+// possible to share most of the code?
+/// TODO: docs
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, Raw>
+pub struct RmtTxFuture<'a, Raw, D>
 where
     Raw: TxChannelInternal,
+    D: Iterator + Unpin,
+    D::Item: Borrow<PulseCode>,
 {
     raw: Raw,
     _phantom: PhantomData<&'a mut Raw>,
+
+    writer: RmtWriter,
+
+    // Remaining data that has not yet been written to channel RAM. May be empty.
+    data: D,
 }
 
-impl<Raw> core::future::Future for RmtTxFuture<'_, Raw>
+impl<Raw, D> core::future::Future for RmtTxFuture<'_, Raw, D>
 where
     Raw: TxChannelInternal,
+    D: Iterator + Unpin,
+    D::Item: Borrow<PulseCode>,
 {
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let this = self.get_mut();
+        let raw = this.raw;
 
-        match self.raw.get_tx_status() {
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match raw.get_tx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
+            Some(Event::End) => {
+                let result = if this.writer.state == WriterState::Active {
+                    // Unexpectedly done, even though we have data left.
+                    Err(Error::TransmissionError)
+                } else {
+                    Ok(())
+                };
+                Poll::Ready(result)
+            }
+            Some(Event::Threshold) => {
+                raw.reset_tx_threshold_set();
+
+                if this.writer.state == WriterState::Active {
+                    // re-fill TX RAM
+                    let memsize = raw.memsize().codes();
+                    this.writer.write(&mut this.data, raw, memsize / 2);
+                    // FIXME: Return if writer.state indicates an error (ensure
+                    // to stop transmission first)
+                }
+
+                Poll::Pending
+            }
             _ => Poll::Pending,
         }
     }
 }
 
-impl<Raw> Drop for RmtTxFuture<'_, Raw>
+impl<Raw, D> Drop for RmtTxFuture<'_, Raw, D>
 where
     Raw: TxChannelInternal,
+    D: Iterator + Unpin,
+    D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
+        // FIXME: Disable this if the future already returned Poll::Ready
         let raw = self.raw;
 
         raw.stop_tx();
@@ -1844,13 +1884,17 @@ where
 
 /// TX channel in async mode
 pub trait TxChannelAsync {
+    #[doc(hidden)]
+    type Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal;
+
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit<D>(&mut self, data: D) -> Result<(), Error>
+    fn transmit<D>(&mut self, data: D) -> Result<RmtTxFuture<'_, Self::Raw, D::IntoIter>, Error>
     where
         Self: Sized,
         D: IntoIterator,
+        D::IntoIter: Unpin,
         D::Item: Borrow<PulseCode>;
 }
 
@@ -1858,10 +1902,16 @@ impl<Raw> TxChannelAsync for Channel<Async, Raw>
 where
     Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
 {
-    async fn transmit<D>(&mut self, data: D) -> Result<(), Error>
+    type Raw = Raw;
+
+    fn transmit<D>(&mut self, data: D) -> Result<RmtTxFuture<'_, Self::Raw, D::IntoIter>, Error>
     where
         Self: Sized,
         D: IntoIterator,
+        // FIXME: Is being Unpin a significant restriction for the iterator?
+        // If so, we could use it in a pinned way by using pin-projection (e.g. via
+        // pin-project-lite) for the RmtTxFuture.
+        D::IntoIter: Unpin,
         D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
@@ -1875,22 +1925,27 @@ where
             return Err(Error::InvalidArgument);
         }
 
-        match writer.state {
-            WriterState::Active => return Err(Error::Overflow),
+        let wrap = match writer.state {
             WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
             WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
-            WriterState::Done => (),
+            WriterState::Active => true,
+            WriterState::Done => false,
         };
 
         raw.clear_tx_interrupts();
-        raw.listen_tx_interrupt(Event::End | Event::Error);
+        let mut events = Event::End | Event::Error;
+        if wrap {
+            events |= Event::Threshold
+        }
+        raw.listen_tx_interrupt(events);
         raw.start_send(false, 0);
 
-        (RmtTxFuture {
+        Ok(RmtTxFuture {
             raw,
             _phantom: PhantomData,
+            writer,
+            data,
         })
-        .await
     }
 }
 
