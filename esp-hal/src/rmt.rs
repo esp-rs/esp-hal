@@ -1635,8 +1635,12 @@ where
                 raw.clear_rx_interrupts();
                 raw.update();
 
+                // read() does not wrap around, so we need to call it twice to handle the case
+                // where the current read offset is memsize / 2 (i.e. the second half of RMT RAM is
+                // read first).
                 let memsize = raw.memsize().codes();
-                self.reader.read(&mut self.data, raw, memsize);
+                self.reader.read(&mut self.data, raw, memsize / 2);
+                self.reader.read(&mut self.data, raw, memsize / 2);
             }
             Some(Event::Threshold) if C::Raw::supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
