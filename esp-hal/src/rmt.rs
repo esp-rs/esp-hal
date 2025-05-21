@@ -2507,7 +2507,6 @@ mod chip_specific {
 
             let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
             on_tx(raw, event);
-            return;
         }
 
         for ch_idx in ChannelIndex::iter_all() {
@@ -2523,7 +2522,6 @@ mod chip_specific {
 
             let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
             on_rx(raw, event);
-            return;
         }
     }
 
@@ -2986,7 +2984,6 @@ mod chip_specific {
                 let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
                 on_rx(raw, event);
             }
-            return;
         }
     }
 
