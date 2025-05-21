@@ -7,7 +7,9 @@
 #![no_main]
 
 use esp_hal::{
+    Async,
     Blocking,
+    DriverMode,
     gpio::{Level, NoPin},
     rmt::{
         AnyRxChannel,
@@ -15,10 +17,8 @@ use esp_hal::{
         Error,
         PulseCode,
         Rmt,
-        RxChannel,
         RxChannelConfig,
         RxChannelCreator,
-        TxChannel,
         TxChannelConfig,
         TxChannelCreator,
     },
@@ -38,13 +38,33 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup(
+trait WithMode<'rmt, Dm: DriverMode> {
+    fn with_mode(self) -> Rmt<'rmt, Dm>;
+}
+
+impl<'rmt> WithMode<'rmt, Blocking> for Rmt<'rmt, Blocking> {
+    fn with_mode(self) -> Rmt<'rmt, Blocking> {
+        self
+    }
+}
+
+impl<'rmt> WithMode<'rmt, Async> for Rmt<'rmt, Blocking> {
+    fn with_mode(self) -> Rmt<'rmt, Async> {
+        self.into_async()
+    }
+}
+
+fn setup<Dm: DriverMode>(
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (AnyTxChannel<Blocking>, AnyRxChannel<Blocking>) {
+) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>)
+where
+    for<'rmt> Rmt<'rmt, Blocking>: WithMode<'rmt, Dm>,
+{
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+    let rmt = <Rmt<Blocking> as WithMode<'_, Dm>>::with_mode(rmt);
 
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -85,12 +105,14 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_first: bool) {
+    use esp_hal::rmt::{RxChannel, TxChannel};
+
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (tx_channel, rx_channel) = setup(tx_config, rx_config);
+    let (tx_channel, rx_channel) = setup::<Blocking>(tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
@@ -111,12 +133,43 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_
     assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
 }
 
+// Run a test where some data is sent from one channel and looped back to
+// another one for receive, and verify that the data matches.
+async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
+    use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
+
+    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let rx_config = RxChannelConfig::default()
+        .with_idle_threshold(1000)
+        .with_memsize(rx_memsize);
+
+    let (mut tx_channel, mut rx_channel) = setup::<Async>(tx_config, rx_config);
+
+    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
+
+    let (rx_res, tx_res) = embassy_futures::join::join(
+        rx_channel.receive(&mut rcv_data),
+        tx_channel.transmit(&tx_data),
+    )
+    .await;
+
+    assert!(tx_res.is_ok());
+    assert!(rx_res.is_ok());
+
+    // the last two pulse-codes are the ones which wait for the timeout so
+    // they can't be equal
+    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+}
+
 // Run a test that just sends some data, without trying to recive it.
 #[must_use = "Tests should fail on errors"]
 fn do_rmt_single_shot<const TX_LEN: usize>(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
+    use esp_hal::rmt::TxChannel;
+
     let tx_config = TxChannelConfig::default()
         .with_clk_divider(DIV)
         .with_memsize(tx_memsize);
@@ -130,7 +183,7 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 1)]
+#[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -143,6 +196,11 @@ mod tests {
         do_rmt_loopback::<20>(1, 1, false);
     }
 
+    #[test]
+    async fn rmt_loopback_simple_async() {
+        // 20 codes fit a single RAM block
+        do_rmt_loopback_async::<20>(1, 1).await;
+    }
     #[test]
     fn rmt_loopback_extended_ram() {
         // 80 codes require two RAM blocks
