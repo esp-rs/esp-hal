@@ -322,6 +322,10 @@ impl<'a> CargoToml<'a> {
         self.package
     }
 
+    /// Returns all dependencies of the package, that come from the repository.
+    ///
+    /// For example, for esp-println this will return [esp-build, esp-metadata]
+    /// (at the time of writing).
     pub fn repo_dependencies(&mut self) -> Vec<Package> {
         let mut dependencies = Vec::new();
         self.visit_dependencies(|_, _, table| {
