@@ -38,7 +38,7 @@ pub fn build_documentation(
 
     for package in packages {
         // Not all packages need documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
@@ -308,7 +308,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
     for package in packages {
         // Not all packages have documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
@@ -431,7 +431,7 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
 
     for package in Package::iter() {
         // Not all packages have documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 

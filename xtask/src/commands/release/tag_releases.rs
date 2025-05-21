@@ -31,7 +31,7 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         // If a package does not require documentation, this also means that it is not
         // published (maybe this function needs a better name), so we can skip tagging
         // it:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
