@@ -2407,9 +2407,6 @@ mod chip_specific {
                 if events.contains(Event::End) {
                     w.ch_rx_end(ch).bit(enable);
                 }
-                if events.contains(Event::Threshold) {
-                    w.ch_tx_thr_event(ch).bit(enable);
-                }
                 w
             });
         }
