@@ -197,6 +197,29 @@ fn do_rmt_single_shot_iter(
     tx_channel.transmit(&mut tx_data)?.wait()
 }
 
+#[must_use = "Tests should fail on errors"]
+async fn do_rmt_single_shot_iter_async(
+    tx_len: usize,
+    tx_memsize: u8,
+    write_end_marker: bool,
+) -> Result<(), Error> {
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+    let tx_config = TxChannelConfig::default()
+        .with_clk_divider(DIV)
+        .with_memsize(tx_memsize);
+    let (mut tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
+
+    let mut tx_data = TxDataIter {
+        remaining: tx_len,
+        i: 0,
+        write_end_marker,
+    };
+    tx_channel.transmit(&mut tx_data)?.await
+}
+
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
@@ -250,9 +273,21 @@ mod tests {
     }
 
     #[test]
+    async fn rmt_single_shot_simple_async() {
+        // 20 codes fit a single RAM block
+        do_rmt_single_shot_iter_async(20, 1, true).await.unwrap();
+    }
+
+    #[test]
     fn rmt_single_shot_wrap() {
         // Single RAM block (48 or 64 codes), requires wrapping
         do_rmt_single_shot_iter(80, 1, true).unwrap();
+    }
+
+    #[test]
+    async fn rmt_single_shot_wrap_async() {
+        // Single RAM block (48 or 64 codes), requires wrapping
+        do_rmt_single_shot_iter_async(80, 1, true).await.unwrap();
     }
 
     #[test]
