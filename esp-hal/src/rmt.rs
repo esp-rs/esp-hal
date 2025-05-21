@@ -462,6 +462,95 @@ impl RmtWriter {
     }
 }
 
+#[derive(Copy, Clone, PartialEq)]
+enum ReaderState {
+    // Ready to continue reading data from the hardware buffer
+    Active,
+
+    // Encountered a stop code
+    Done,
+
+    // Data exhausted, but no stop code encountered
+    Overflow,
+}
+
+/// docs
+struct RmtReader {
+    // Offset in RMT RAM section to continue reading from (number of u32!)
+    // u16 is sufficient to store this for all devices, and should be small enough such that
+    // size_of::<RmtReader>() == 2 * size_of::<u32>()
+    offset: u16,
+
+    // ...
+    total: usize,
+
+    // ...
+    state: ReaderState,
+}
+
+impl RmtReader {
+    fn new() -> Self {
+        Self {
+            offset: 0,
+            total: 0,
+            state: ReaderState::Active,
+        }
+    }
+
+    fn read<'a>(
+        &mut self,
+        data: &mut impl Iterator<Item = &'a mut u32>,
+        raw: impl RxChannelInternal,
+        count: usize,
+    ) {
+        if !matches!(self.state, ReaderState::Active) {
+            // Don't call next() on data again!
+            return;
+        }
+
+        let start = raw.channel_ram_start();
+        let memsize = raw.memsize().codes();
+        let mut offset = self.offset as usize;
+
+        // This is only used to read the entire RAM from its start, or to read
+        // either the first or second half. The code below may rely on this.
+        // In particular, this implies that the offset might only need to be wrapped at
+        // the end.
+        debug_assert!(count == memsize && offset == 0 || count == memsize / 2);
+        // Offset might take a different value only if there's not data; but in that
+        // case we already returned above.
+        debug_assert!(offset == 0 || offset == memsize / 2);
+
+        let initial_offset = offset;
+        while offset < initial_offset + count {
+            match data.next() {
+                Some(code) => {
+                    *code = unsafe { start.add(offset).read_volatile() };
+                    offset += 1;
+
+                    // FIXME: Maybe remove this for more efficiency?
+                    if code.is_end_marker() {
+                        self.state = ReaderState::Done;
+                        break;
+                    }
+                }
+                None => {
+                    self.state = ReaderState::Overflow;
+                    break;
+                }
+            }
+        }
+
+        debug_assert!(offset <= memsize);
+        self.total += offset - initial_offset;
+        if offset == memsize {
+            // Wrap around
+            offset = 0;
+        }
+        self.offset = offset as u16;
+    }
+}
+
 /// Marker for a channel capable of/configured for transmit operations
 #[derive(Clone, Copy, Debug)]
 pub struct Tx;
@@ -1539,31 +1628,55 @@ where
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'ch, 'a, Raw: RxChannelInternal> {
-    raw: Raw,
-    _phantom: PhantomData<&'ch mut Raw>,
-    data: &'a mut [u32],
-}
-
-impl<Raw> RxTransaction<'_, '_, Raw>
+pub struct RxTransaction<'ch, 'a, Raw, D>
 where
     Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut u32>,
+{
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
+
+    reader: RmtReader,
+
+    data: D,
+}
+
+impl<'a, Raw, D> RxTransaction<'_, 'a, Raw, D>
+where
+    Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut u32>,
 {
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.raw;
 
         let status = raw.get_rx_status();
-        if status == Some(Event::End) {
-            raw.stop_rx();
-            raw.clear_rx_interrupts();
-            raw.update();
+        match status {
+            Some(Event::End) => {
+                if self.reader.state != ReaderState::Done {
+                    // Do not clear the interrupt flags here: Subsequent calls of wait() must still
+                    // be able to observe them if this is currently called via
+                    // poll()
+                    raw.stop_rx();
+                    raw.update();
 
-            let ptr = raw.channel_ram_start();
-            // SAFETY: RxChannel.receive() verifies that the length of self.data does not
-            // exceed the channel RAM size.
-            for (idx, entry) in self.data.iter_mut().enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile() };
+                    // read() does not wrap around, so we need to call it twice to handle the case
+                    // where the current read offset is memsize / 2 (i.e. the second half of RMT RAM
+                    // is read first).
+                    let memsize = raw.memsize().codes();
+                    self.reader.read(&mut self.data, raw, memsize / 2);
+                    self.reader.read(&mut self.data, raw, memsize / 2);
+
+                    // Ensure that no further data will be read if this is called repeatedly.
+                    self.reader.state = ReaderState::Done;
+                }
             }
+            Some(Event::Threshold) if Raw::supports_rx_wrap() => {
+                raw.reset_rx_threshold_set();
+
+                let memsize = raw.memsize().codes();
+                self.reader.read(&mut self.data, raw, memsize / 2);
+            }
+            _ => (),
         }
 
         status
@@ -1582,14 +1695,16 @@ where
     }
 
     /// Wait for the transaction to complete
-    pub fn wait(mut self) -> Result<(), Error> {
+    pub fn wait(mut self) -> Result<usize, Error> {
         let result = loop {
             match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::ReceiverError),
-                Some(Event::End) => break Ok(()),
+                Some(Event::End) => break Ok(self.reader.total),
                 _ => continue,
             }
         };
+
+        self.raw.clear_rx_interrupts();
 
         // Disable Drop handler since the receiver is stopped already.
         let _ = ManuallyDrop::new(self);
@@ -1597,7 +1712,11 @@ where
     }
 }
 
-impl<Raw: RxChannelInternal> Drop for RxTransaction<'_, '_, Raw> {
+impl<'a, Raw, D> Drop for RxTransaction<'_, 'a, Raw, D>
+where
+    Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut u32>,
+{
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
         // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
@@ -1621,39 +1740,37 @@ pub trait RxChannel: Sized {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<'ch, 'a>(
+    fn receive<'ch, 'a, D>(
         &'ch mut self,
-        data: &'a mut [u32],
-    ) -> Result<RxTransaction<'ch, 'a, Self::Raw>, Error>;
+        data: D,
+    ) -> Result<RxTransaction<'ch, 'a, Self::Raw, D::IntoIter>, Error>
+    where
+        D: IntoIterator<Item = &'a mut u32>;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
 where
-    Raw: RxChannelInternal,
+    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
 {
     type Raw = Raw;
 
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<'ch, 'a>(
+    fn receive<'ch, 'a, D>(
         &'ch mut self,
-        data: &'a mut [u32],
-    ) -> Result<RxTransaction<'ch, 'a, Self::Raw>, Error>
+        data: D,
+    ) -> Result<RxTransaction<'ch, 'a, Raw, D::IntoIter>, Error>
     where
-        Self: Sized,
+        D: IntoIterator<Item = &'a mut u32>,
     {
-        if data.len() > self.raw.memsize().codes() {
-            return Err(Error::InvalidDataLength);
-        }
-
-        self.raw.start_receive();
+        self.raw.start_receive(true);
 
         Ok(RxTransaction {
             raw: self.raw,
             _phantom: PhantomData,
-            data,
+            reader: RmtReader::new(),
+            data: data.into_iter(),
         })
     }
 }
@@ -1694,7 +1811,11 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         match raw.get_tx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
+            Some(Event::Error) => {
+                raw.clear_tx_interrupts();
+
+                Poll::Ready(Err(Error::TransmissionError))
+            }
             Some(Event::End) => {
                 let result = if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
@@ -1702,6 +1823,9 @@ where
                 } else {
                     Ok(())
                 };
+
+                raw.clear_tx_interrupts();
+
                 Poll::Ready(result)
             }
             Some(Event::Threshold) => {
@@ -1874,7 +1998,7 @@ where
 
         raw.clear_rx_interrupts();
         raw.listen_rx_interrupt(Event::End | Event::Error);
-        raw.start_receive();
+        raw.start_receive(false);
 
         match (RmtRxFuture {
             raw,
@@ -2042,6 +2166,8 @@ pub trait RxChannelInternal: ChannelInternal {
 
     fn clear_rx_interrupts(&self);
 
+    fn supports_rx_wrap() -> bool;
+
     fn set_rx_wrap_mode(&self, wrap: bool);
 
     fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level);
@@ -2054,9 +2180,18 @@ pub trait RxChannelInternal: ChannelInternal {
 
     fn is_rx_done(&self) -> bool;
 
-    fn start_receive(&self) {
+    fn is_rx_threshold_set(&self) -> bool;
+
+    fn reset_rx_threshold_set(&self);
+
+    fn set_rx_threshold(&self, threshold: u8);
+
+    fn start_receive(&self, wrap: bool) {
         self.clear_rx_interrupts();
-        self.set_rx_wrap_mode(false);
+
+        self.set_rx_threshold((self.memsize().codes() / 2) as u8);
+        self.set_rx_wrap_mode(wrap);
+        self.update();
         self.start_rx();
         self.update();
     }
@@ -2431,6 +2566,10 @@ mod chip_specific {
             });
         }
 
+        fn supports_rx_wrap() -> bool {
+            true
+        }
+
         fn set_rx_wrap_mode(&self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self) as usize;
@@ -2492,6 +2631,33 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
             rmt.int_raw().read().ch_rx_end(ch_idx).bit()
+        }
+
+        fn is_rx_threshold_set(&self) -> bool {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = ch_idx(self);
+            rmt.int_raw().read().ch_rx_thr_event(ch_idx).bit()
+        }
+
+        fn reset_rx_threshold_set(&self) {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = ch_idx(self);
+            rmt.int_clr().write(|w| w.ch_rx_thr_event(ch_idx).set_bit());
+        }
+
+        fn set_rx_threshold(&self, threshold: u8) {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = ch_idx(self) as usize;
+            rmt.ch_rx_lim(ch_idx).modify(|_, w| unsafe {
+                cfg_if::cfg_if!(
+                    if #[cfg(any(esp32c6, esp32h2))] {
+                        w.rmt_rx_lim().bits(threshold as u16)
+                    } else {
+                        w.rx_lim().bits(threshold as u16)
+                    }
+                );
+                w
+            });
         }
 
         fn stop_rx(&self) {
@@ -2823,6 +2989,10 @@ mod chip_specific {
             });
         }
 
+        fn supports_rx_wrap() -> bool {
+            false
+        }
+
         fn set_rx_wrap_mode(&self, _wrap: bool) {
             // no-op
         }
@@ -2876,6 +3046,19 @@ mod chip_specific {
         fn is_rx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_rx_end(self.channel()).bit()
+        }
+
+        fn is_rx_threshold_set(&self) -> bool {
+            // no-op
+            false
+        }
+
+        fn reset_rx_threshold_set(&self) {
+            // no-op
+        }
+
+        fn set_rx_threshold(&self, _threshold: u8) {
+            // no-op
         }
 
         fn stop_rx(&self) {
