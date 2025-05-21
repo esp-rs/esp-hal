@@ -1313,7 +1313,7 @@ fn configure_rx_channel<'d>(
     }
 
     let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Rx, memsize)?;
+    reserve_channel(raw.channel(), RmtState::RxIdle, memsize)?;
 
     pin.apply_input_config(&InputConfig::default());
     pin.set_input_enable(true);
@@ -1340,7 +1340,7 @@ fn configure_tx_channel<'d>(
     config: TxChannelConfig,
 ) -> Result<(), Error> {
     let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
+    reserve_channel(raw.channel(), RmtState::TxIdle, memsize)?;
 
     pin.apply_output_config(&OutputConfig::default());
     pin.set_output_enable(true);
@@ -1382,11 +1382,17 @@ mod state {
         // The channels is not in use, but one of the preceding channels is using its memory
         Reserved,
 
-        // The channel is configured for rx
-        Rx,
+        // The channel is configured for rx and currently idle.
+        RxIdle,
 
-        // The channel is configured for tx
-        Tx,
+        // The channel is configured for tx and currently idle.
+        TxIdle,
+
+        // The channel is configured for rx and currently performing an async transaction
+        RxAsync,
+
+        // The channel is configured for tx and currently performing an async transaction
+        TxAsync,
     }
 
     impl RmtState {
@@ -1395,8 +1401,8 @@ mod state {
         #[inline]
         pub(super) fn is_tx(&self) -> Option<bool> {
             match self {
-                Self::Rx => Some(false),
-                Self::Tx => Some(true),
+                Self::RxIdle | Self::RxAsync => Some(false),
+                Self::TxIdle | Self::TxAsync => Some(true),
                 _ => None,
             }
         }
@@ -1945,17 +1951,15 @@ where
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        // Note that STATE is only accessed from a single core and no ISR here, so
+        // Relaxed access is sufficient.
         let this = self.get_mut();
         let raw = this.raw;
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match raw.get_tx_status() {
-            Some(Event::Error) => {
-                raw.clear_tx_interrupts();
-
-                Poll::Ready(Err(Error::TransmissionError))
-            }
+        let result = match raw.get_tx_status() {
+            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
             Some(Event::End) => {
                 let result = if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
@@ -1963,8 +1967,6 @@ where
                 } else {
                     Ok(())
                 };
-
-                raw.clear_tx_interrupts();
 
                 Poll::Ready(result)
             }
@@ -1982,7 +1984,14 @@ where
                 Poll::Pending
             }
             _ => Poll::Pending,
+        };
+
+        if matches!(result, Poll::Ready(_)) {
+            raw.clear_tx_interrupts();
+            RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
         }
+
+        result
     }
 }
 
@@ -1992,14 +2001,19 @@ where
     D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
-        // FIXME: Disable this if the future already returned Poll::Ready
         let raw = self.raw;
 
-        raw.stop_tx();
-        raw.update();
+        // STATE should be TxIdle if the future was polled to completion
+        if RmtState::load(raw, Ordering::Relaxed) == RmtState::TxAsync {
+            raw.stop_tx();
+            raw.update();
 
-        // block until the channel is safe to use again
-        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            // block until the channel is safe to use again
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+
+            raw.clear_tx_interrupts();
+            RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
+        }
     }
 }
 
@@ -2037,6 +2051,8 @@ impl Channel<Async, Tx> {
             WriterState::Done => false,
         };
 
+        RmtState::store(RmtState::TxAsync, raw, Ordering::Relaxed);
+
         raw.clear_tx_interrupts();
         let mut events = Event::End | Event::Error;
         if wrap {
@@ -2069,13 +2085,21 @@ where
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let raw = self.raw;
+        WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match self.raw.get_rx_status() {
+        let result = match raw.get_rx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
             Some(Event::End) => Poll::Ready(Ok(())),
             _ => Poll::Pending,
+        };
+
+        if matches!(result, Poll::Ready(_)) {
+            raw.clear_rx_interrupts();
+            RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
         }
+
+        result
     }
 }
 
@@ -2085,11 +2109,17 @@ where
     fn drop(&mut self) {
         let raw = self.raw;
 
-        raw.stop_rx();
-        raw.update();
+        // STATE should be RxIdle if the future was polled to completion
+        if RmtState::load(raw, Ordering::Relaxed) == RmtState::RxAsync {
+            raw.stop_rx();
+            raw.update();
 
-        // block until the channel is safe to use again
-        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+            // block until the channel is safe to use again
+            while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+
+            raw.clear_rx_interrupts();
+            RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
+        }
     }
 }
 
@@ -2109,6 +2139,8 @@ impl Channel<Async, Rx> {
         if data.len() > raw.memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
+
+        RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
         raw.listen_rx_interrupt(Event::End | Event::Error);
