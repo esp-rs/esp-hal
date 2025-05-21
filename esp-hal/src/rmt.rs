@@ -1862,10 +1862,19 @@ impl AnyChannelAccess {
 
 #[handler]
 fn async_interrupt_handler() {
-    for (raw, _event) in chip_specific::pending_interrupt_for_channel() {
-        match raw {
-            AnyChannelAccess::Tx(ref raw) => raw.unlisten_tx_interrupt(Event::End | Event::Error),
-            AnyChannelAccess::Rx(ref raw) => raw.unlisten_rx_interrupt(Event::End | Event::Error),
+    for (raw, event) in chip_specific::pending_interrupt_for_channel() {
+        match event {
+            Event::End | Event::Error => match raw {
+                AnyChannelAccess::Tx(ref raw) => {
+                    raw.unlisten_tx_interrupt(Event::End | Event::Error)
+                }
+                AnyChannelAccess::Rx(ref raw) => {
+                    raw.unlisten_rx_interrupt(Event::End | Event::Error)
+                }
+            },
+            Event::Threshold => {
+                // Just wake, but don't disable the interrupt
+            }
         }
         WAKER[raw.channel() as usize].wake();
     }
@@ -2088,6 +2097,10 @@ mod chip_specific {
                 (true, Event::End)
             } else if st.ch_rx_end(ch_idx).bit() {
                 (false, Event::End)
+            } else if st.ch_tx_thr_event(ch_idx).bit() {
+                (true, Event::Threshold)
+            } else if st.ch_rx_thr_event(ch_idx).bit() {
+                (false, Event::Threshold)
             } else {
                 return None;
             };
@@ -2527,6 +2540,8 @@ mod chip_specific {
                 (true, Event::End)
             } else if st.ch_rx_end(ch_num).bit() {
                 (false, Event::End)
+            } else if st.ch_tx_thr_event(ch_num).bit() {
+                (true, Event::Threshold)
             } else {
                 return None;
             };
