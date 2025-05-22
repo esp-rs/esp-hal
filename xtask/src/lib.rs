@@ -3,14 +3,17 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
-use crate::{cargo::CargoArgsBuilder, firmware::Metadata};
+use crate::{
+    cargo::{CargoArgsBuilder, CargoToml},
+    firmware::Metadata,
+};
 
 pub mod cargo;
 pub mod changelog;
@@ -385,23 +388,7 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 
 /// Parse the version from the specified package's Cargo manifest.
 pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
-    #[derive(Debug, serde::Deserialize)]
-    pub struct Manifest {
-        package: Package,
-    }
-
-    #[derive(Debug, serde::Deserialize)]
-    pub struct Package {
-        version: semver::Version,
-    }
-
-    let path = workspace.join(package.to_string()).join("Cargo.toml");
-    let path = windows_safe_path(&path);
-    let manifest =
-        fs::read_to_string(&path).with_context(|| format!("Could not read {}", path.display()))?;
-    let manifest: Manifest = basic_toml::from_str(&manifest)?;
-
-    Ok(manifest.package.version)
+    CargoToml::new(workspace, package).map(|toml| toml.package_version())
 }
 
 /// Make the path "Windows"-safe
