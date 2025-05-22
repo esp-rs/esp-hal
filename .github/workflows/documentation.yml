@@ -46,14 +46,14 @@ jobs:
           repository: esp-rs/esp-hal
       - name: Build xtask
         run: |
-          cargo build --release --package=xtask --features=deploy-docs
-          cp target/release/xtask ~/.cargo/bin/hal-xtask
+          cargo build --package=xtask --features=deploy-docs
+          cp target/debug/xtask ~/.cargo/bin/hal-xtask
 
       - name: Cache xtask for all jobs
         uses: actions/upload-artifact@v4
         with:
           name: xtask
-          path: target/release/xtask
+          path: target/debug/xtask
 
       - id: setup_manual
         name: Set up [manual run with specific packages]
@@ -63,6 +63,7 @@ jobs:
       - id: setup_pr
         name: Set up [pull request or all packages]
         if: ${{ github.event_name == 'pull_request' || github.event.inputs.packages == '' }}
+        # Release PRs will ignore the tag values and just check out the latest commit
         run: |
           output=$(hal-xtask release tag-releases)
           echo "packages=${output}" >> "$GITHUB_OUTPUT"
@@ -90,25 +91,34 @@ jobs:
       - name: rust-src
         run: rustup component add rust-src --toolchain nightly
 
+      # Checkout the tag we need to start building the docs
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        with:
+          repository: esp-rs/esp-hal
+          ref: ${{ matrix.packages.tag }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        with:
+          repository: esp-rs/esp-hal
+
       - name: Download xtask
         uses: actions/download-artifact@v4
         with:
           name: xtask
-          path: ~/.cargo/bin/hal-xtask
-
-      # Checkout the tag we need to start building the docs
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          repository: esp-rs/esp-hal
-          ref: ${{ matrix.packages.tag }}
+          path: ~/.cargo/bin/
 
       - name: Build documentation
         # For release PRs, we want to skip the generating documentation if the version is already
         # present in the manifest. This is meant to ensure only the released packages are built.
         # For manual run we don't do such filtering, as we want to build the documentation for
         # all packages specified by the user.
-        run: hal-xtask build documentation --packages=${{ matrix.packages.name }} ${{ fromJSON('["", "--skip-if-up-to-date"]')[ github.event_name == 'pull_request' ] }} --base-url /projects/rust/
+        run: |
+          chmod +x ~/.cargo/bin/xtask
+          ~/.cargo/bin/xtask build documentation --packages=${{ matrix.packages.name }} ${{ fromJSON('["", "--skip-if-up-to-date"]')[ github.event_name == 'pull_request' ] }} --base-url /projects/rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
