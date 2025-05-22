@@ -478,7 +478,11 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
 
     #[cfg(feature = "deploy-docs")]
     let manifest = match reqwest::blocking::get(manifest_url) {
-        Ok(resp) => resp.json::<Manifest>()?,
+        Ok(resp) if resp.status().is_success() => resp.json::<Manifest>()?,
+        Ok(_) => {
+            log::warn!("Unable to fetch package manifest: {}", resp.status());
+            Manifest::default()
+        }
         Err(err) => {
             log::warn!("Unable to fetch package manifest: {err}");
             Manifest::default()
