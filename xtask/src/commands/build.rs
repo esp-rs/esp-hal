@@ -41,6 +41,11 @@ pub struct BuildDocumentationArgs {
     /// Base URL of the deployed documentation.
     #[arg(long)]
     pub base_url: Option<String>,
+    /// Don't build the documentation for packages that are in the manifest.
+    ///
+    /// This option is meant for CI, to skip building packages for no reason.
+    #[arg(long)]
+    pub skip_if_up_to_date: bool,
     #[cfg(feature = "preview-docs")]
     #[arg(long)]
     pub serve: bool,
@@ -69,12 +74,20 @@ pub struct BuildPackageArgs {
 // Subcommand Actions
 
 pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
-    crate::documentation::build_documentation(
+    let anything_built = crate::documentation::build_documentation(
         workspace,
         &mut args.packages,
         &mut args.chips,
         args.base_url,
+        args.skip_if_up_to_date,
     )?;
+
+    if !anything_built {
+        // We don't deal with the preview-docs edge case because skip_if_up_to_date is
+        // intended to be set by CI only.
+        log::info!("No new documentation was built.");
+        return Ok(());
+    }
 
     crate::documentation::build_documentation_index(workspace, &mut args.packages)?;
 

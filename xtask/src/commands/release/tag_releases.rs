@@ -66,10 +66,12 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
         log::info!("IMPORTANT: Don't forget to push the tags to the correct remote!");
     }
 
-    log::info!(
-        "Documentation workflow input for these packages:\r\n\r\n {:#}",
-        serde_json::to_string(&created)?
-    );
+    let workflow_input = serde_json::to_string(&created)?;
+
+    log::info!("Documentation workflow input for these packages:\r\n\r\n{workflow_input}\r\n\r\n");
+
+    // Print to stdout for GitHub Actions
+    print!("{workflow_input}");
 
     Ok(())
 }
