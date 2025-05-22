@@ -213,9 +213,9 @@ Once merged, the packages will be ready to be published and tagged.
 
     // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
     let open_pr_url = format!(
-        "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={label}&body={body}",
+        "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}&body={body}",
         body = urlencoding::encode(&body),
-        label = "release-pr",
+        labels = "release-pr,skip-changelog",
     );
 
     if dry_run {
