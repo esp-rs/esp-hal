@@ -11,9 +11,10 @@ use crate::{
 
 #[derive(Debug, Args)]
 pub struct ApplyPlanArgs {
-    /// Only make code changes, do not commit or push.
+    /// Actually make git changes. Without this flag, the command will only
+    /// update code.
     #[arg(long)]
-    dry_run: bool,
+    no_dry_run: bool,
 }
 
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
@@ -23,7 +24,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     let plan_path = crate::windows_safe_path(&plan_path);
 
     let plan_source = std::fs::read_to_string(&plan_path)
-        .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
+        .with_context(|| format!("Failed to read release plan from {}. Run `cargo xrelease plan` to generate a release plan.", plan_path.display()))?;
 
     if plan_source.lines().any(|line| line.starts_with("//")) {
         bail!(
@@ -73,10 +74,27 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             plan_path.display()
         )
     })?;
-    std::fs::write(&plan_path, &plan_source)
-        .with_context(|| format!("Failed to write release plan to {}", plan_path.display()))?;
 
-    make_git_changes(args.dry_run, &plan_source, &plan)?;
+    if args.no_dry_run {
+        std::fs::write(&plan_path, &plan_source)
+            .with_context(|| format!("Failed to write release plan to {}", plan_path.display()))?;
+    } else {
+        println!(
+            "Dry run: would write the updated release plan to {}",
+            plan_path.display()
+        );
+    }
+
+    make_git_changes(!args.no_dry_run, &plan_source, &plan)?;
+
+    if !args.no_dry_run {
+        println!(
+            "Dry run completed. No permanent changes were made, but code has been updated. \
+            You can review the changes. If you are satisfied, clean the workspace with \
+            `git reset --hard` and run `cargo xrelease execute-plan --no-dry-run` to make \
+            the changes permanent."
+        );
+    }
 
     Ok(())
 }
@@ -139,7 +157,7 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
     // Push the branch
     let url = if dry_run {
         println!("Dry run: would push branch: {branch_name}");
-        String::from("<dry_run_url>")
+        String::from("https://github.com/esp-rs/esp-hal/")
     } else {
         // git push origin <branch_name>
         let message = Command::new("git")
@@ -204,9 +222,14 @@ Once merged, the packages will be ready to be published and tagged.
         label = "release-pr",
     );
 
-    if opener::open(&open_pr_url).is_err() {
-        println!("Open the following URL to create a pull request:");
+    if dry_run {
+        println!("Dry run: would open the following URL to create a pull request:");
         println!("{open_pr_url}");
+    } else {
+        if opener::open(&open_pr_url).is_err() {
+            println!("Open the following URL to create a pull request:");
+            println!("{open_pr_url}");
+        }
     }
 
     println!("Once you create and merge the pull request, check out current main.");
