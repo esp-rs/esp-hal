@@ -17,7 +17,7 @@ pub fn minimum_update(
     package: Package,
     chip: Chip,
 ) -> Result<ReleaseType, anyhow::Error> {
-    log::info!("Chip = {}", chip.to_string());
+    log::info!("Package = {}, Chip = {}", package, chip);
 
     let package_name = package.to_string();
     let package_path = crate::windows_safe_path(&workspace.join(&package_name));
@@ -82,6 +82,12 @@ pub(crate) fn build_doc_json(
     } else {
         vec!["unstable".to_string()]
     };
+
+    log::info!(
+        "Building doc json for {} with features: {:?}",
+        package,
+        features
+    );
 
     // always use `esp` toolchain so we don't have to deal with potentially
     // different versions of the doc-json

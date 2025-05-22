@@ -47,3 +47,4 @@ pretty_assertions = "1.2.0"
 deploy-docs  = ["dep:reqwest"]
 preview-docs = ["dep:opener", "dep:rocket"]
 semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types", "dep:flate2", "dep:temp-file" ]
+release = ["semver-checks"]

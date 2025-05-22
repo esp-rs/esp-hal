@@ -36,6 +36,14 @@ Usage: xtask build examples [OPTIONS] <CHIP> <PACKAGE>
 [...]
 ```
 
+## Releasing crates
+
+To start the release process, run `cargo xrelease plan` to prepare all crates, or `cargo xrelease plan <a space-separated list of crates>` to release a specific crate and its dependencies.
+
+For example, to release `esp-println`, run `cargo xrelease plan esp-println`.
+
+The release is a multi-step process. Each step in the process will tell you what to do next.
+
 ## Test/example metadata use
 
 Each test and example can specify metadata. This metadata is read, interpreted and used by the

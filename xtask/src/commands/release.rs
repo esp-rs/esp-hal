@@ -1,11 +1,15 @@
 use clap::Subcommand;
 
 pub mod bump_version;
+#[cfg(feature = "release")]
+pub mod plan;
 pub mod publish;
 pub mod semver_check;
 pub mod tag_releases;
 
 pub use bump_version::*;
+#[cfg(feature = "release")]
+pub use plan::*;
 pub use publish::*;
 pub use semver_check::*;
 pub use tag_releases::*;
@@ -15,6 +19,14 @@ pub use tag_releases::*;
 
 #[derive(Debug, Subcommand)]
 pub enum Release {
+    /// Create a release plan. This is the first step in the release process.
+    /// Accepts zero or more package names. If no package names are
+    /// specified, all packages are included.
+    ///
+    /// The result of this command is a json file that can be customized to
+    /// control what and how gets released.
+    #[cfg(feature = "release")]
+    Plan(PlanArgs),
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:

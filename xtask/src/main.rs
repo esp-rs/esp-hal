@@ -125,6 +125,8 @@ fn main() -> Result<()> {
             Release::BumpVersion(args) => bump_version(&workspace, args),
             Release::TagReleases(args) => tag_releases(&workspace, args),
             Release::Publish(args) => publish(&workspace, args),
+            #[cfg(feature = "release")]
+            Release::Plan(args) => plan(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
