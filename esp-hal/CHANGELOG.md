@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `frequency` and `timeout` setters for `I2C::Config`
 - RMT channel creator `steal` function (#3496)
 - Support for RMT extended memory (#3182)
 - Support for `rand_core` 0.9 (#3211)

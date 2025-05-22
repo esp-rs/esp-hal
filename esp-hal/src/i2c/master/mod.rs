@@ -518,7 +518,7 @@ impl Config {
 /// # const DEVICE_ADDR: u8 = 0x77;
 /// let mut i2c = I2c::new(
 ///     peripherals.I2C0,
-///     Config::default(),
+///     Config::default().with_frequency(400.khz()),
 /// )?
 /// .with_sda(peripherals.GPIO1)
 /// .with_scl(peripherals.GPIO2);
