@@ -46,14 +46,14 @@ jobs:
           repository: esp-rs/esp-hal
       - name: Build xtask
         run: |
-          cargo build --release --package=xtask --features=deploy-docs
-          cp target/release/xtask ~/.cargo/bin/hal-xtask
+          cargo build --package=xtask --features=deploy-docs
+          cp target/debug/xtask ~/.cargo/bin/hal-xtask
 
       - name: Cache xtask for all jobs
         uses: actions/upload-artifact@v4
         with:
           name: xtask
-          path: target/release/xtask
+          path: target/debug/xtask
 
       - id: setup_manual
         name: Set up [manual run with specific packages]
@@ -94,7 +94,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: xtask
-          path: ~/.cargo/bin/hal-xtask
+          path: hal-xtask
 
       # Checkout the tag we need to start building the docs
       - name: Checkout repository
@@ -108,7 +108,7 @@ jobs:
         # present in the manifest. This is meant to ensure only the released packages are built.
         # For manual run we don't do such filtering, as we want to build the documentation for
         # all packages specified by the user.
-        run: hal-xtask build documentation --packages=${{ matrix.packages.name }} ${{ fromJSON('["", "--skip-if-up-to-date"]')[ github.event_name == 'pull_request' ] }} --base-url /projects/rust/
+        run: ./hal-xtask build documentation --packages=${{ matrix.packages.name }} ${{ fromJSON('["", "--skip-if-up-to-date"]')[ github.event_name == 'pull_request' ] }} --base-url /projects/rust/
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
