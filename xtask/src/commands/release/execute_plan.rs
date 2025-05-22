@@ -31,7 +31,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let plan = serde_json::from_str::<Plan>(&plan_source)
+    let mut plan = serde_json::from_str::<Plan>(&plan_source)
         .with_context(|| format!("Failed to parse release plan from {}", plan_path.display()))?;
 
     ensure!(
@@ -42,7 +42,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     );
 
     // Make code changes
-    for step in plan.packages.iter() {
+    for step in plan.packages.iter_mut() {
         let mut package = CargoToml::new(workspace, step.package)?;
 
         if package.package_version() != step.current_version {
@@ -60,7 +60,21 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         }
 
         update_package(&mut package, &step.bump)?;
+
+        let new_version = package.package_version();
+        step.tag_name = package.package.tag(&new_version);
+        step.new_version = new_version;
     }
+
+    // Update release plan file
+    let plan_source = serde_json::to_string_pretty(&plan).with_context(|| {
+        format!(
+            "Failed to serialize release plan to {}",
+            plan_path.display()
+        )
+    })?;
+    std::fs::write(&plan_path, &plan_source)
+        .with_context(|| format!("Failed to write release plan to {}", plan_path.display()))?;
 
     make_git_changes(args.dry_run, &plan_source, &plan)?;
 
