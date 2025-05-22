@@ -768,7 +768,7 @@ pub(crate) mod utils {
     struct PsramCmd {
         cmd: u16,             // Command value
         cmd_bit_len: u16,     // Command byte length
-        addr: *const u32,     // Point to address value
+        addr: u32,            // Address value
         addr_bit_len: u16,    // Address byte length
         tx_data: *const u32,  // Point to send data buffer
         tx_data_bit_len: u16, // Send data byte length.
@@ -782,7 +782,7 @@ pub(crate) mod utils {
             Self {
                 cmd: Default::default(),
                 cmd_bit_len: Default::default(),
-                addr: core::ptr::null(),
+                addr: Default::default(),
                 addr_bit_len: Default::default(),
                 tx_data: core::ptr::null(),
                 tx_data_bit_len: Default::default(),
@@ -811,7 +811,7 @@ pub(crate) mod utils {
             }
         }
         ps_cmd.cmd = 0;
-        ps_cmd.addr = &addr;
+        ps_cmd.addr = addr;
         ps_cmd.addr_bit_len = 8;
         ps_cmd.tx_data = core::ptr::null();
         ps_cmd.tx_data_bit_len = 0;
@@ -819,7 +819,7 @@ pub(crate) mod utils {
         ps_cmd.rx_data_bit_len = 0;
         ps_cmd.dummy_bit_len = 0;
         let (backup_usr, backup_usr1, backup_usr2) = psram_cmd_config_spi1(&ps_cmd);
-        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdSpi);
+        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdQpi);
         psram_cmd_end_spi1(backup_usr, backup_usr1, backup_usr2);
     }
 
@@ -833,9 +833,9 @@ pub(crate) mod utils {
                 }
             }
 
-            spi.user().modify(|_, w| w.bits(backup_usr));
-            spi.user1().modify(|_, w| w.bits(backup_usr1));
-            spi.user2().modify(|_, w| w.bits(backup_usr2));
+            spi.user().write(|w| w.bits(backup_usr));
+            spi.user1().write(|w| w.bits(backup_usr1));
+            spi.user2().write(|w| w.bits(backup_usr2));
         }
     }
 
@@ -877,8 +877,7 @@ pub(crate) mod utils {
                 // Enable address
                 spi.user().modify(|_, w| w.usr_addr().set_bit());
                 // Set address
-                spi.addr()
-                    .modify(|_, w| w.bits(p_in_data.addr.read_volatile()));
+                spi.addr().modify(|_, w| w.bits(p_in_data.addr));
             } else {
                 spi.user().modify(|_, w| w.usr_addr().clear_bit());
                 spi.user1().modify(|_, w| w.usr_addr_bitlen().bits(0));
@@ -887,13 +886,13 @@ pub(crate) mod utils {
             let p_tx_val = p_in_data.tx_data;
             if p_in_data.tx_data_bit_len != 0 {
                 // Enable MOSI
-                spi.user().modify(|_, w| w.usr_mosi().clear_bit());
+                spi.user().modify(|_, w| w.usr_mosi().set_bit());
                 // Load send buffer
                 let len = p_in_data.tx_data_bit_len.div_ceil(32);
                 if !p_tx_val.is_null() {
                     for i in 0..len {
-                        spi.w(0)
-                            .modify(|_, w| w.bits(p_tx_val.offset(i as isize).read_volatile()));
+                        spi.w(i as usize)
+                            .write(|w| w.bits(p_tx_val.offset(i as isize).read_volatile()));
                     }
                 }
                 // Set data send buffer length.Max data length 64 bytes.
@@ -950,7 +949,7 @@ pub(crate) mod utils {
             let spi = SPI1::regs();
             // get cs1
             spi.pin().modify(|_, w| w.cs1_dis().clear_bit());
-            spi.pin().modify(|_, w| w.cs0_dis().clear_bit());
+            spi.pin().modify(|_, w| w.cs0_dis().set_bit());
 
             let mode_backup: u32 = (spi.user().read().bits() >> SPI_FWRITE_DUAL_S) & 0xf;
             let rd_mode_backup: u32 = spi.ctrl().read().bits()
@@ -966,7 +965,7 @@ pub(crate) mod utils {
 
             // Wait for SPI0 to idle
             loop {
-                if spi.ext2().read().bits() == 0 {
+                if SPI1::regs().ext2().read().bits() == 0 {
                     break;
                 }
             }
@@ -1002,12 +1001,13 @@ pub(crate) mod utils {
                 SPI_FWRITE_DUAL_S,
             );
 
-            spi.ctrl().modify(|_, w| w.fread_dio().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dual().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_quad().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_qio().clear_bit());
-
-            spi.ctrl().modify(|_, w| w.bits(rd_mode_backup));
+            spi.ctrl().modify(|_, w| {
+                w.fread_dio().clear_bit();
+                w.fread_dual().clear_bit();
+                w.fread_quad().clear_bit();
+                w.fread_qio().clear_bit()
+            });
+            spi.ctrl().modify(|r, w| w.bits(r.bits() | rd_mode_backup));
 
             // return cs to cs0
             spi.pin().modify(|_, w| w.cs1_dis().set_bit());
