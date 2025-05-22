@@ -220,8 +220,6 @@ pub(crate) mod utils {
         }
     }
 
-    const SPI_USR: u32 = 1 << 18;
-
     const PSRAM_INTERNAL_IO_28: u32 = 28;
     const PSRAM_INTERNAL_IO_29: u32 = 29;
     const SIG_GPIO_OUT_IDX: u32 = 256;
@@ -827,11 +825,7 @@ pub(crate) mod utils {
     fn psram_cmd_end_spi1(backup_usr: u32, backup_usr1: u32, backup_usr2: u32) {
         unsafe {
             let spi = SPI1::regs();
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
             spi.user().write(|w| w.bits(backup_usr));
             spi.user1().write(|w| w.bits(backup_usr1));
@@ -844,11 +838,7 @@ pub(crate) mod utils {
     fn psram_cmd_config_spi1(p_in_data: &PsramCmd) -> (u32, u32, u32) {
         unsafe {
             let spi = SPI1::regs();
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
             let backup_usr = spi.user().read().bits();
             let backup_usr1 = spi.user1().read().bits();
@@ -964,11 +954,7 @@ pub(crate) mod utils {
             }
 
             // Wait for SPI0 to idle
-            loop {
-                if SPI1::regs().ext2().read().bits() == 0 {
-                    break;
-                }
-            }
+            while SPI1::regs().ext2().read().bits() != 0 {}
 
             // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
             DPORT::regs()
@@ -977,11 +963,7 @@ pub(crate) mod utils {
 
             // Start send data
             spi.cmd().modify(|_, w| w.usr().set_bit());
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
             // DPORT_CLEAR_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
             DPORT::regs()
