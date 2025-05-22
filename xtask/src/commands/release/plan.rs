@@ -11,10 +11,16 @@ use crate::{
     Package,
     cargo::CargoToml,
     commands::{checker::min_package_update, do_version_bump},
+    git::current_branch,
 };
 
 #[derive(Debug, Args)]
 pub struct PlanArgs {
+    /// Allow making a release from the current (non-main) branch. The
+    /// branch is expected to exist in the upstream esp-hal repo.
+    #[arg(long)]
+    allow_non_main: bool,
+
     /// The packages to be released.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
@@ -29,7 +35,7 @@ enum VersionBump {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct PackagePlan {
+pub struct PackagePlan {
     package: Package,
     semver_checked: bool,
     current_version: semver::Version,
@@ -45,11 +51,14 @@ struct PackagePlan {
 /// The order of the packages in the plan is important, as it determines the
 /// order in which the packages are released.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct Plan {
-    packages: Vec<PackagePlan>,
+pub struct Plan {
+    pub base: String,
+    pub packages: Vec<PackagePlan>,
 }
 
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
+    let current_branch = ensure_main_branch(args.allow_non_main)?;
+
     // Recursively collect dependencies. A bit inefficient, but we don't need to
     // sort a lot.
     let mut packages_to_release = args
@@ -114,6 +123,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     // and their version increment.
 
     let plan = Plan {
+        base: current_branch,
         packages: update_amounts
             .into_iter()
             .filter_map(|(package, bump)| {
@@ -207,6 +217,21 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     );
 
     Ok(())
+}
+
+pub fn ensure_main_branch(allow_non_main: bool) -> Result<String> {
+    let current_branch = current_branch()?;
+
+    if allow_non_main {
+        println!("Release will be made from branch: {current_branch}");
+    } else {
+        ensure!(
+            current_branch == "main",
+            "You are not on the main branch. Please switch to the main branch before running this command."
+        );
+    }
+
+    Ok(current_branch)
 }
 
 fn package_changed_since_last_release(workspace: &Path, package: Package) -> bool {

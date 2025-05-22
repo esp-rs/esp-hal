@@ -17,6 +17,7 @@ pub mod changelog;
 pub mod commands;
 pub mod documentation;
 pub mod firmware;
+pub mod git;
 
 #[cfg(feature = "semver-checks")]
 pub mod semver_check;
