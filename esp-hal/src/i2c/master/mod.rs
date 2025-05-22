@@ -495,6 +495,20 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    /// Set the frequency of the I2C bus clock.
+    pub fn with_frequency(mut self, frequency: Rate) -> Self {
+        self.frequency = frequency;
+        self
+    }
+
+    /// Set the timeout period for the I2C bus.
+    pub fn with_timeout(mut self, timeout: BusTimeout) -> Self {
+        self.timeout = timeout;
+        self
+    }
+}
+
 /// I2C driver
 ///
 /// ### I2C initialization and communication with the device
