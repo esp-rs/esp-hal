@@ -121,6 +121,8 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
         branch_name = "release-branch",
     );
 
+    let upstream = get_remote_name_for("esp-rs/esp-hal")?;
+
     // Switch to the new branch
     if dry_run {
         println!("Dry run: would create a new branch: {branch_name}");
@@ -158,7 +160,7 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
         // git push origin <branch_name>
         let message = Command::new("git")
             .arg("push")
-            .arg("origin")
+            .arg(&upstream)
             .arg(&branch_name)
             .output()
             .context("Failed to push branch")?;
@@ -169,6 +171,8 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
                 String::from_utf8_lossy(&message.stderr)
             );
         }
+
+        log::info!("Pushed release branch: {upstream}/{branch_name}");
 
         // Extract the URL from the output
         extract_url_from_push(&String::from_utf8_lossy(&message.stderr)) // git outputs to stderr
@@ -233,6 +237,27 @@ Once merged, the packages will be ready to be published and tagged.
     // the packages.");
 
     Ok(())
+}
+
+fn get_remote_name_for(repo: &str) -> Result<String> {
+    let remotes = Command::new("git")
+        .arg("remote")
+        .arg("-v")
+        .output()
+        .context("Failed to get remote URL")?;
+
+    let remotes = String::from_utf8_lossy(&remotes.stdout);
+
+    for line in remotes.lines() {
+        if line.contains(repo) {
+            let parts: Vec<_> = line.split_whitespace().collect();
+            if parts.len() >= 2 {
+                return Ok(parts[0].to_string());
+            }
+        }
+    }
+
+    bail!("Failed to find remote name for {repo}");
 }
 
 fn extract_url_from_push(output: &str) -> String {
