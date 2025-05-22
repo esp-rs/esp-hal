@@ -43,9 +43,9 @@ fugit                    = "0.3.7"
 instability              = "0.3.7"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
-esp-build                = { version = "0.2.0", path = "../esp-build" }
+esp-build                = { version = "0.3.0", path = "../esp-build" }
 esp-config               = { version = "0.3.0", path = "../esp-config" }
-esp-metadata             = { version = "0.6.0", path = "../esp-metadata", default-features = false }
+esp-metadata             = { version = "0.7.0", path = "../esp-metadata", default-features = false }
 procmacros               = { version = "0.17.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
@@ -93,8 +93,8 @@ xtensa-lx-rt     = { version = "0.18.0", path = "../xtensa-lx-rt" }
 [build-dependencies]
 basic-toml   = "0.1.10"
 cfg-if       = "1.0.0"
-esp-build    = { version = "0.2.0", path = "../esp-build" }
-esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
+esp-build    = { version = "0.3.0", path = "../esp-build" }
+esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
 serde        = { version = "1.0.219", features = ["derive"] }
 
