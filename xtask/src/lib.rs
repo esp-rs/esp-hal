@@ -85,6 +85,12 @@ impl Package {
         )
     }
 
+    pub fn needs_build_std(&self) -> bool {
+        use Package::*;
+
+        !matches!(self, EspConfig | EspMetadata)
+    }
+
     /// Do the package's chip-specific cargo features affect the public API?
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;

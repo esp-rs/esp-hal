@@ -227,7 +227,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
 
     // Special case: `esp-metadata` requires `std`, and we get some really confusing
     // errors if we try to pass `-Zbuild-std=core`:
-    if package != Package::EspMetadata {
+    if package.needs_build_std() {
         builder = builder.arg("-Zbuild-std=alloc,core");
     }
 
