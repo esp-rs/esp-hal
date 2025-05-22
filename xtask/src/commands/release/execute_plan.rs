@@ -221,11 +221,9 @@ Once merged, the packages will be ready to be published and tagged.
     if dry_run {
         println!("Dry run: would open the following URL to create a pull request:");
         println!("{open_pr_url}");
-    } else {
-        if opener::open(&open_pr_url).is_err() {
-            println!("Open the following URL to create a pull request:");
-            println!("{open_pr_url}");
-        }
+    } else if opener::open(&open_pr_url).is_err() {
+        println!("Open the following URL to create a pull request:");
+        println!("{open_pr_url}");
     }
 
     println!("Once you create and merge the pull request, check out current main.");
