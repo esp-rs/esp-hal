@@ -60,9 +60,8 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             );
         }
 
-        update_package(&mut package, &step.bump)?;
+        let new_version = update_package(&mut package, &step.bump, !args.no_dry_run)?;
 
-        let new_version = package.package_version();
         step.tag_name = package.package.tag(&new_version);
         step.new_version = new_version;
     }
@@ -89,10 +88,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
     if !args.no_dry_run {
         println!(
-            "Dry run completed. No permanent changes were made, but code has been updated. \
-            You can review the changes. If you are satisfied, clean the workspace with \
-            `git reset --hard` and run `cargo xrelease execute-plan --no-dry-run` to make \
-            the changes permanent."
+            "Dry run completed. To make changes, run `cargo xrelease execute-plan --no-dry-run`."
         );
     }
 

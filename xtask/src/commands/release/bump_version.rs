@@ -54,19 +54,23 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
             }
         };
         let mut package = CargoToml::new(workspace, package)?;
-        update_package(&mut package, &version)?;
+        update_package(&mut package, &version, false)?;
     }
 
     Ok(())
 }
 
-pub fn update_package(package: &mut CargoToml<'_>, version: &VersionBump) -> Result<()> {
+pub fn update_package(
+    package: &mut CargoToml<'_>,
+    version: &VersionBump,
+    dry_run: bool,
+) -> Result<semver::Version> {
     check_crate_before_bumping(package)?;
-    let new_version = bump_crate_version(package, version)?;
-    finalize_changelog(package, &new_version)?;
-    finalize_placeholders(package, &new_version)?;
+    let new_version = bump_crate_version(package, version, dry_run)?;
+    finalize_changelog(package, &new_version, dry_run)?;
+    finalize_placeholders(package, &new_version, dry_run)?;
 
-    Ok(())
+    Ok(new_version)
 }
 
 fn check_crate_before_bumping(manifest: &mut CargoToml<'_>) -> Result<()> {
@@ -169,15 +173,23 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
 fn bump_crate_version(
     bumped_package: &mut CargoToml<'_>,
     amount: &VersionBump,
+    dry_run: bool,
 ) -> Result<semver::Version> {
     let prev_version = bumped_package.package_version();
 
     let version = do_version_bump(&prev_version, amount)
         .with_context(|| format!("Failed to bump version of {}", bumped_package.package))?;
 
-    bumped_package.set_version(&version);
-
-    bumped_package.save()?;
+    if dry_run {
+        log::info!(
+            "Dry run: would bump {} version to {version}",
+            bumped_package.package,
+        );
+    } else {
+        log::info!("Update {} to {version}", bumped_package.package);
+        bumped_package.set_version(&version);
+        bumped_package.save()?;
+    }
 
     let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
@@ -219,11 +231,18 @@ fn bump_crate_version(
         });
 
         if changed {
-            log::info!(
-                "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
-            );
-
-            dependent.save()?;
+            if dry_run {
+                log::info!(
+                    "  Dry run: would update {} in {}: ({prev_version} -> {version})",
+                    package_name,
+                    pkg,
+                );
+            } else {
+                log::info!(
+                    "  Bumping {package_name} version for package {pkg}: ({prev_version} -> {version})"
+                );
+                dependent.save()?;
+            }
         }
     }
 
@@ -280,7 +299,11 @@ pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Resul
     Ok(version)
 }
 
-fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: &semver::Version) -> Result<()> {
+fn finalize_changelog(
+    bumped_package: &CargoToml<'_>,
+    new_version: &semver::Version,
+    dry_run: bool,
+) -> Result<()> {
     let changelog_path = bumped_package
         .workspace
         .join(bumped_package.package.to_string())
@@ -303,9 +326,13 @@ fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: &semver::Vers
     let mut changelog = Changelog::parse(&changelog_str)
         .with_context(|| format!("Could not parse {}", changelog_path.display()))?;
 
-    changelog.finalize(bumped_package.package, new_version, jiff::Timestamp::now());
+    if dry_run {
+        log::info!("  Dry run: would update {}", changelog_path.display());
+    } else {
+        changelog.finalize(bumped_package.package, new_version, jiff::Timestamp::now());
 
-    std::fs::write(&changelog_path, changelog.to_string())?;
+        std::fs::write(&changelog_path, changelog.to_string())?;
+    }
 
     Ok(())
 }
@@ -313,6 +340,7 @@ fn finalize_changelog(bumped_package: &CargoToml<'_>, new_version: &semver::Vers
 fn finalize_placeholders(
     bumped_package: &CargoToml<'_>,
     new_version: &semver::Version,
+    dry_run: bool,
 ) -> Result<()> {
     const PLACEHOLDER: &str = "{{currentVersion}}";
 
@@ -342,9 +370,13 @@ fn finalize_placeholders(
             }
         };
         if content.contains(PLACEHOLDER) {
-            log::info!("  Replacing placeholder in {}", path.display());
-            let new_content = content.replace(PLACEHOLDER, &new_version.to_string());
-            fs::write(path, new_content).unwrap();
+            if dry_run {
+                log::info!("  Would replace version placeholders in {}", path.display());
+            } else {
+                log::info!("  Replacing placeholders in {}", path.display());
+                let new_content = content.replace(PLACEHOLDER, &new_version.to_string());
+                fs::write(path, new_content).unwrap();
+            }
         }
     });
 
