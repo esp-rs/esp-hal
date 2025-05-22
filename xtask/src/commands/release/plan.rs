@@ -227,7 +227,7 @@ pub fn ensure_main_branch(allow_non_main: bool) -> Result<String> {
     } else {
         ensure!(
             current_branch == "main",
-            "You are not on the main branch. Please switch to the main branch before running this command."
+            "You are not on the main branch. Please switch to the main branch before running this command again, or add `--allow-non-main`."
         );
     }
 
