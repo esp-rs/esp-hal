@@ -99,6 +99,7 @@ jobs:
           repository: esp-rs/esp-hal
           ref: ${{ matrix.packages.tag }}
 
+      # If running a release PR, we want to build docs for the latest commit on the released branch.
       - name: Checkout repository
         uses: actions/checkout@v4
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -132,30 +133,20 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
 
     steps:
+      # Check out the sources, the xtask reads package versions from the Cargo.toml files
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
 
-      - name: Prepare
-        run: mkdir docs && mkdir docs/esp-hal && mkdir docs/esp-wifi && mkdir docs/esp-lp-hal
-
-      - name: Download all docs
+      - name: Download all docs and xtask
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
 
-      - name: Download xtask
-        uses: actions/download-artifact@v4
-        with:
-          name: xtask
-          path: ~/.cargo/bin/
-
       # Create an index for _all_ packages. Per-package workflows don't upload the landing page.
       - name: Create index.html
         run: |
-          chmod +x ~/.cargo/bin/xtask
-          ~/.cargo/bin/xtask build documentation-index
+          chmod +x docs/xtask
+          docs/xtask build documentation-index
+          rm -rf docs/xtask
 
       - if: ${{ github.event.inputs.server == 'preview' || github.event_name == 'pull_request' }}
         name: Deploy to preview server
