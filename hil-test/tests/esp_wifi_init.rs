@@ -24,6 +24,8 @@ use esp_wifi::InitializationError;
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[embassy_executor::task]
 async fn try_init(
     signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,

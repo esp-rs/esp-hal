@@ -31,6 +31,8 @@ use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 /// Periodically print something.
 #[embassy_executor::task]
 async fn high_prio() {

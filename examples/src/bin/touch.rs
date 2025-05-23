@@ -28,6 +28,8 @@ use esp_hal::{
 };
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static TOUCH1: Mutex<RefCell<Option<TouchPad<GPIO4<'static>, Continuous, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 

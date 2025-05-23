@@ -9,6 +9,8 @@
 use esp_hal::rtc_cntl::Rtc;
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context<'a> {
     rtc: Rtc<'a>,
 }

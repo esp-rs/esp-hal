@@ -21,6 +21,8 @@ use esp_hal::{clock::CpuClock, peripherals::Peripherals, rng::Rng, timer::timg::
 use esp_wifi::ble::controller::BleConnector;
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 // Compile-time test to check that esp-wifi can be reinitialized.
 fn _esp_wifi_can_be_reinited() {
     let mut p = esp_hal::init(esp_hal::Config::default());

@@ -14,6 +14,8 @@ use esp_hal::{
 use hil_test as _;
 use nb::block;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context {
     twai: twai::Twai<'static, Blocking>,
 }

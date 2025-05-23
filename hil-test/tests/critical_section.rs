@@ -20,6 +20,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 fn test_access_at_priority(peripherals: Peripherals, priority: Priority) {
     static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
 

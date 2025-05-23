@@ -69,6 +69,8 @@ use hmac::{Hmac as HmacSw, Mac};
 use nb::block;
 use sha2::Sha256;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 type HmacSha256 = HmacSw<Sha256>;
 
 #[main]

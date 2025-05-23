@@ -28,6 +28,8 @@ use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 
 /// Waits for a message that contains a duration, then flashes a led for that

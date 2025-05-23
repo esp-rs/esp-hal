@@ -10,6 +10,8 @@ use embedded_hal::delay::DelayNs;
 use esp_hal::delay::Delay;
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context {
     delay: Delay,
 }

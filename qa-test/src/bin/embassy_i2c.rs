@@ -25,6 +25,8 @@ use esp_hal::{
 };
 use lis3dh_async::{Lis3dh, Range, SlaveAddr};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     let peripherals = esp_hal::init(esp_hal::Config::default());

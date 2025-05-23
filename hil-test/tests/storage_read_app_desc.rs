@@ -10,7 +10,6 @@
 use embedded_storage::ReadStorage;
 use esp_storage::FlashStorage;
 use hil_test as _;
-
 #[repr(C)]
 pub struct EspAppDesc {
     pub magic_word: u32,                       // Magic word ESP_APP_DESC_MAGIC_WORD

@@ -24,6 +24,8 @@ use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
 static mut EP_MEMORY: [u32; 1024] = [0; 1024];
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());

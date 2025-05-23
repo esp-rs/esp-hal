@@ -26,6 +26,8 @@ use esp_hal::{
 use hex_literal::hex;
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct TestParams<'a> {
     prime_fields: &'a [&'a [u8]],
     nb_loop_mul: usize,

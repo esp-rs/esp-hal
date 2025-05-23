@@ -30,6 +30,8 @@ use esp_hal::{
 };
 use ssd1306::{I2CDisplayInterface, Ssd1306, prelude::*};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());

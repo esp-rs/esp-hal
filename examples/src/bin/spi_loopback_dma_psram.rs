@@ -35,6 +35,8 @@ use esp_hal::{
 extern crate alloc;
 use log::*;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 macro_rules! dma_alloc_buffer {
     ($size:expr, $align:expr) => {{
         let layout = core::alloc::Layout::from_size_align($size, $align).unwrap();

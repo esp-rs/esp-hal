@@ -19,6 +19,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const BIGNUM_1: U512 = Uint::from_be_hex(
     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
     7dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",

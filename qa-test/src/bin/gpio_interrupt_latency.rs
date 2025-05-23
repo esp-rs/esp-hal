@@ -27,6 +27,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static SIGNAL: Signal<CriticalSectionRawMutex, ()> = Signal::new();
 
 #[esp_hal_embassy::main]

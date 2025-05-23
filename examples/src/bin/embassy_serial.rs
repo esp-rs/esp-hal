@@ -24,6 +24,8 @@ const READ_BUF_SIZE: usize = 64;
 // EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[embassy_executor::task]
 async fn writer(mut tx: UartTx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {
     use core::fmt::Write;
