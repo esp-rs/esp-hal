@@ -12,20 +12,20 @@ As previously stated, we use the [cargo-xtask] pattern for automation. Commands 
 
 ## Building Examples
 
-You can build all examples for a given device using the `build-examples` subcommand:
+You can build all examples for a given device using the `build examples` subcommand:
 
 ```shell
-cargo xtask build-examples esp-hal esp32
+cargo xtask build examples esp-hal esp32
 ```
 
-Note that we must specify which package to build the examples for, since this repository contains multiple packages.
+Note that we must specify which package to build the examples for, since this repository contains multiple packages (specifying esp-hal will build the examples in the examples package instead).
 
 ## Running Examples
 
-You can also build and then subsequently flash and run an example using the `run-example` subcommand. With a target device connected to your host system, run:
+You can also build and then subsequently flash and run an example using the `run example` subcommand. With a target device connected to your host system, run:
 
 ```shell
-cargo xtask run-example esp-hal esp32c6 hello_world
+cargo xtask run example esp-hal esp32c6 --example embassy_hello_world
 ```
 
 Again, note that we must specify which package to build the example from, plus which example to build and flash to the target device.
