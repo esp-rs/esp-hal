@@ -4,7 +4,7 @@
 // The S3 dev kit in the HIL-tester has octal PSRAM.
 //% CHIPS(octal): esp32s3
 //% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
-//% FEATURES: unstable psram esp-alloc/nightly
+//% FEATURES: unstable psram esp-storage esp-alloc/nightly
 
 #![no_std]
 #![no_main]
@@ -16,13 +16,18 @@ use hil_test as _;
 
 extern crate alloc;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
     use alloc::vec::Vec as AllocVec;
 
     use allocator_api2::vec::Vec;
+    use embedded_storage::*;
     use esp_alloc::{AnyMemory, ExternalMemory, InternalMemory};
+    use esp_bootloader_esp_idf::partitions;
+    use esp_storage::FlashStorage;
 
     #[init]
     fn init() {
@@ -132,5 +137,32 @@ mod tests {
         for i in 0..free {
             assert_eq!(vec[i], (i % 256) as u8);
         }
+    }
+
+    #[test]
+    fn test_with_accessing_flash_storage() {
+        let mut flash = FlashStorage::new();
+
+        let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];
+        let pt = partitions::read_partition_table(&mut flash, &mut pt_mem).unwrap();
+
+        // The app descriptor (if present) is contained in the first 256 bytes
+        // of an app image, right after the image header (24 bytes) and the first
+        // section header (8 bytes)
+        let mut app_desc = [0u8; 256];
+        pt.find_partition(partitions::PartitionType::App(
+            partitions::AppPartitionSubType::Factory,
+        ))
+        .unwrap()
+        .unwrap()
+        .as_embedded_storage(&mut flash)
+        .read(32, &mut app_desc)
+        .unwrap();
+
+        let app_desc_wanted = unsafe {
+            core::slice::from_raw_parts(core::ptr::addr_of!(crate::ESP_APP_DESC) as *const u8, 256)
+        };
+
+        assert_eq!(&app_desc_wanted, &app_desc);
     }
 }
