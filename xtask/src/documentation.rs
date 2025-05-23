@@ -28,16 +28,13 @@ pub fn build_documentation(
     packages: &mut [Package],
     chips: &mut [Chip],
     base_url: Option<String>,
-    skip_if_up_to_date: bool,
-) -> Result<bool> {
+) -> Result<()> {
     let output_path = workspace.join("docs");
 
     fs::create_dir_all(&output_path)
         .with_context(|| format!("Failed to create {}", output_path.display()))?;
 
     packages.sort();
-
-    let mut any_built = false;
 
     for package in packages {
         // Not all packages need documentation built:
@@ -67,15 +64,7 @@ pub fn build_documentation(
 
         // Update the package manifest to include the latest version:
         let version = crate::package_version(workspace, *package)?;
-        if skip_if_up_to_date && manifest.versions.contains(&version) {
-            log::info!(
-                "Skipping documentation for '{package}' version '{version}' as it is already up to date"
-            );
-            continue;
-        }
         manifest.versions.insert(version.clone());
-
-        any_built = true;
 
         // Build the documentation for the package:
         if chips.is_empty() {
@@ -96,7 +85,7 @@ pub fn build_documentation(
         patch_documentation_index_for_package(workspace, package, &version, &base_url)?;
     }
 
-    Ok(any_built)
+    Ok(())
 }
 
 fn build_documentation_for_package(
