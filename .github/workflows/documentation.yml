@@ -144,8 +144,8 @@ jobs:
       # Create an index for _all_ packages. Per-package workflows don't upload the landing page.
       - name: Create index.html
         run: |
-          chmod +x docs/xtask
-          docs/xtask build documentation-index
+          chmod +x docs/xtask/xtask
+          docs/xtask/xtask build documentation-index
           rm -rf docs/xtask
 
       - if: ${{ github.event.inputs.server == 'preview' || github.event_name == 'pull_request' }}
