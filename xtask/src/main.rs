@@ -99,6 +99,8 @@ fn main() -> Result<()> {
         // Build-related subcommands:
         Cli::Build(build) => match build {
             Build::Documentation(args) => build_documentation(&workspace, args),
+            #[cfg(feature = "deploy-docs")]
+            Build::DocumentationIndex => build_documentation_index(&workspace),
             Build::Examples(args) => examples(
                 &workspace,
                 args,
@@ -127,6 +129,8 @@ fn main() -> Result<()> {
             Release::Publish(args) => publish(&workspace, args),
             #[cfg(feature = "release")]
             Release::Plan(args) => plan(&workspace, args),
+            #[cfg(feature = "release")]
+            Release::ExecutePlan(args) => execute_plan(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),

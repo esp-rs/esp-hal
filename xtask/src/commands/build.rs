@@ -19,6 +19,9 @@ use crate::{
 pub enum Build {
     /// Build documentation for the specified chip.
     Documentation(BuildDocumentationArgs),
+    /// Build documentation index.
+    #[cfg(feature = "deploy-docs")]
+    DocumentationIndex,
     /// Build all examples for the specified chip.
     Examples(ExamplesArgs),
     /// Build the specified package with the given options.
@@ -105,6 +108,14 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
             .launch(),
         )?;
     }
+
+    Ok(())
+}
+
+#[cfg(feature = "deploy-docs")]
+pub fn build_documentation_index(workspace: &Path) -> Result<()> {
+    let mut packages = Package::iter().collect::<Vec<_>>();
+    crate::documentation::build_documentation_index(workspace, &mut packages)?;
 
     Ok(())
 }
