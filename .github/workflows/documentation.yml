@@ -112,13 +112,9 @@ jobs:
           path: ~/.cargo/bin/
 
       - name: Build documentation
-        # For release PRs, we want to skip the generating documentation if the version is already
-        # present in the manifest. This is meant to ensure only the released packages are built.
-        # For manual run we don't do such filtering, as we want to build the documentation for
-        # all packages specified by the user.
         run: |
           chmod +x ~/.cargo/bin/xtask
-          ~/.cargo/bin/xtask build documentation --packages=${{ matrix.packages.name }} --base-url https://docs.espressif.com/projects/rust/
+          ~/.cargo/bin/xtask build documentation --packages=${{ matrix.packages.name }} --base-url ${{ fromJSON('["https://preview-docs.espressif.com/projects/rust/", "https://docs.espressif.com/projects/rust/"]')[github.event.inputs.server == 'production'] }}
 
       # https://github.com/actions/deploy-pages/issues/303#issuecomment-1951207879
       - name: Remove problematic '.lock' files
