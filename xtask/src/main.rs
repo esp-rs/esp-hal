@@ -99,6 +99,7 @@ fn main() -> Result<()> {
         // Build-related subcommands:
         Cli::Build(build) => match build {
             Build::Documentation(args) => build_documentation(&workspace, args),
+            Build::DocumentationIndex => build_documentation_index(&workspace),
             Build::Examples(args) => examples(
                 &workspace,
                 args,
