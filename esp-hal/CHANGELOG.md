@@ -31,7 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-H2: Support for ADC calibration (#3414)
 - Added `UartInterrupt::RxTimeout` support (#3493)
 - UART: Added HW and SW flow control config option (#3435)
-- Add reference to [Trouble](https://github.com/embassy-rs/trouble/tree/main/examples/esp32) in wifi_embassy_ble example (#3539)
 
 ### Changed
 
