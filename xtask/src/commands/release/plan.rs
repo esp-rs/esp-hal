@@ -1,6 +1,6 @@
 use std::{collections::HashMap, io::Write, path::Path, process::Command};
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use cargo_semver_checks::ReleaseType;
 use clap::Args;
 use esp_metadata::Chip;
@@ -46,6 +46,25 @@ pub struct PackagePlan {
 pub struct Plan {
     pub base: String,
     pub packages: Vec<PackagePlan>,
+}
+
+impl Plan {
+    pub fn from_path(plan_path: &Path) -> Result<Self> {
+        let plan_source = std::fs::read_to_string(&plan_path)
+            .with_context(|| format!("Failed to read release plan from {}. Run `cargo xrelease plan` to generate a release plan.", plan_path.display()))?;
+
+        if plan_source.lines().any(|line| line.starts_with("//")) {
+            bail!(
+                "The release plan has not been finalized. Please open the plan and follow the instructions in it."
+            );
+        }
+
+        let plan = serde_json::from_str::<Plan>(&plan_source).with_context(|| {
+            format!("Failed to parse release plan from {}", plan_path.display())
+        })?;
+
+        Ok(plan)
+    }
 }
 
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {

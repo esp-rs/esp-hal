@@ -6,7 +6,7 @@ use clap::Args;
 use crate::{
     cargo::CargoToml,
     commands::{release::plan::Plan, update_package},
-    git::current_branch,
+    git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
 #[derive(Debug, Args)]
@@ -23,17 +23,8 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     let plan_path = workspace.join("release_plan.jsonc");
     let plan_path = crate::windows_safe_path(&plan_path);
 
-    let plan_source = std::fs::read_to_string(&plan_path)
-        .with_context(|| format!("Failed to read release plan from {}. Run `cargo xrelease plan` to generate a release plan.", plan_path.display()))?;
-
-    if plan_source.lines().any(|line| line.starts_with("//")) {
-        bail!(
-            "The release plan has not been finalized. Please open the plan and follow the instructions in it."
-        );
-    }
-
-    let mut plan = serde_json::from_str::<Plan>(&plan_source)
-        .with_context(|| format!("Failed to parse release plan from {}", plan_path.display()))?;
+    let mut plan = Plan::from_path(&plan_path)
+        .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
 
     ensure!(
         current_branch()? == plan.base,
@@ -91,24 +82,6 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
             "Dry run completed. To make changes, run `cargo xrelease execute-plan --no-dry-run`."
         );
     }
-
-    Ok(())
-}
-
-fn ensure_workspace_clean(workspace: &Path) -> Result<()> {
-    std::env::set_current_dir(workspace)
-        .with_context(|| format!("Failed to change directory to {}", workspace.display()))?;
-
-    let status = Command::new("git")
-        .arg("status")
-        .arg("--porcelain")
-        .output()
-        .context("Failed to check git status")?;
-
-    ensure!(
-        String::from_utf8_lossy(&status.stdout).trim().is_empty(),
-        "The workspace is not clean. Please commit or stash your changes before running this command."
-    );
 
     Ok(())
 }
@@ -198,9 +171,16 @@ The release plan used for this release:
 {release_plan_str}
 ```
 
-Please review the changes and merge them into the main branch.
-Once merged, the packages will be ready to be published and tagged.
-"#
+Please review the changes and merge them into the `{base_branch}` branch.
+
+After merging, please run the following command on the `{base_branch}` branch
+to tag and publish the packages:
+
+```
+cargo xrelease publish-plan --no-dry-run
+```
+"#,
+        base_branch = release_plan.base,
     );
 
     if release_plan.base != "main" {
@@ -232,32 +212,8 @@ Once merged, the packages will be ready to be published and tagged.
 
     println!("Once you create and merge the pull request, check out current main.");
     println!("Make sure you have the release_plan.jsonc file in the root of the workspace.");
-    // TODO: uncomment this once we have the `publish` command updated
-    // println!("Next, run `cargo xrelease publish` to tag the release and publish
-    // the packages.");
 
     Ok(())
-}
-
-fn get_remote_name_for(repo: &str) -> Result<String> {
-    let remotes = Command::new("git")
-        .arg("remote")
-        .arg("-v")
-        .output()
-        .context("Failed to get remote URL")?;
-
-    let remotes = String::from_utf8_lossy(&remotes.stdout);
-
-    for line in remotes.lines() {
-        if line.contains(repo) {
-            let parts: Vec<_> = line.split_whitespace().collect();
-            if parts.len() >= 2 {
-                return Ok(parts[0].to_string());
-            }
-        }
-    }
-
-    bail!("Failed to find remote name for {repo}");
 }
 
 fn extract_url_from_push(output: &str) -> String {
