@@ -21,6 +21,8 @@ use esp_hal::{
 };
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static mut COUNTER: u32 = 0;
 static mut T2_COUNTER: u32 = 0;
 static mut T3_COUNTER: u32 = 0;

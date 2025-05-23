@@ -23,6 +23,8 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());

@@ -20,6 +20,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[inline(never)]
 fn run_float_calc(x: f32) -> f32 {
     let result = core::hint::black_box(x) * 2.0;

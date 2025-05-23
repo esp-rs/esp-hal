@@ -16,6 +16,8 @@ use esp_hal::{
 };
 use log::{error, info};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const DATA_SIZE: usize = 1024 * 10;
 
 #[main]

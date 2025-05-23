@@ -23,6 +23,8 @@ use esp_hal::{
 use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
     use super::*;

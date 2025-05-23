@@ -29,6 +29,8 @@ cfg_if::cfg_if! {
     }
 }
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const BUFFER_SIZE: usize = 2000;
 
 #[derive(Clone)]

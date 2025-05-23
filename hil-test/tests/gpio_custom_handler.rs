@@ -37,6 +37,8 @@ use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
 use portable_atomic::{AtomicUsize, Ordering};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn GPIO() {
     // Prevents binding the default handler, but we need to clear the GPIO

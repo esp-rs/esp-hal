@@ -26,6 +26,8 @@ use esp_hal::{
 };
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     println!("Init!");

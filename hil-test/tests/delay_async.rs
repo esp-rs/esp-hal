@@ -21,6 +21,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context {
     peripherals: Peripherals,
 }

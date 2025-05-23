@@ -16,6 +16,8 @@ use hil_test as _;
 
 extern crate alloc;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
