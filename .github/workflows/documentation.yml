@@ -137,6 +137,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
 
       - name: Prepare
         run: mkdir docs && mkdir docs/esp-hal && mkdir docs/esp-wifi && mkdir docs/esp-lp-hal
@@ -145,6 +148,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: "docs/"
+
+      - name: Download xtask
+        uses: actions/download-artifact@v4
+        with:
+          name: xtask
+          path: ~/.cargo/bin/
+
+      # Create an index for _all_ packages. Per-package workflows don't upload the landing page.
+      - name: Create index.html
+        run: |
+          chmod +x ~/.cargo/bin/xtask
+          ~/.cargo/bin/xtask xtask build documentation-index
 
       - if: ${{ github.event.inputs.server == 'preview' || github.event_name == 'pull_request' }}
         name: Deploy to preview server
