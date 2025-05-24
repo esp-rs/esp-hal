@@ -14,6 +14,7 @@ pub use generate::{
     Error,
     Stability,
     generate_config,
+    generate_config_from_yaml_definition,
     validator::Validator,
     value::Value,
 };
