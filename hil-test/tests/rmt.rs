@@ -6,11 +6,22 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Debug;
-
 use esp_hal::{
+    Blocking,
     gpio::{Level, NoPin},
-    rmt::{Error, PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
+    rmt::{
+        AnyRxChannel,
+        AnyTxChannel,
+        Error,
+        PulseCode,
+        Rmt,
+        RxChannel,
+        RxChannelConfig,
+        RxChannelCreator,
+        TxChannel,
+        TxChannelConfig,
+        TxChannelCreator,
+    },
     time::Rate,
 };
 use hil_test as _;
@@ -28,19 +39,18 @@ cfg_if::cfg_if! {
 fn setup(
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (impl TxChannel + Debug, impl RxChannel + Debug) {
+) -> (AnyTxChannel<Blocking>, AnyRxChannel<Blocking>) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
-    let tx_channel = {
-        use esp_hal::rmt::TxChannelCreator;
-        rmt.channel0
-            .configure(tx, tx_config.with_clk_divider(DIV))
-            .unwrap()
-    };
+    let tx_channel = rmt
+        .channel0
+        .configure_tx(tx, tx_config.with_clk_divider(DIV))
+        .unwrap()
+        .degrade();
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
@@ -49,12 +59,10 @@ fn setup(
             let rx_channel_creator = rmt.channel2;
         }
     };
-    let rx_channel = {
-        use esp_hal::rmt::RxChannelCreator;
-        rx_channel_creator
-            .configure(rx, rx_config.with_clk_divider(DIV))
-            .unwrap()
-    };
+    let rx_channel = rx_channel_creator
+        .configure_rx(rx, rx_config.with_clk_divider(DIV))
+        .unwrap()
+        .degrade();
 
     (tx_channel, rx_channel)
 }
@@ -199,9 +207,9 @@ mod tests {
 
         let ch0 = rmt
             .channel0
-            .configure(NoPin, TxChannelConfig::default().with_memsize(2));
+            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2));
 
-        let ch1 = rmt.channel1.configure(NoPin, TxChannelConfig::default());
+        let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
         assert!(ch0.is_ok());
         assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
