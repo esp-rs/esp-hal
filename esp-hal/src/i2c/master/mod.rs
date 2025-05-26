@@ -155,58 +155,59 @@ impl BusTimeout {
     }
 }
 
-/// When the FSM remains unchanged for more than the 2^ the given amount of bus
-/// clock cycles a timeout will be triggered.
-///
-/// The default value is 0x10
-#[instability::unstable]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32, esp32s2)))]
-pub struct FsmTimeout {
-    value: u8,
-}
-
-#[cfg(not(any(esp32, esp32s2)))]
-impl FsmTimeout {
-    const FSM_TIMEOUT_MAX: u8 = 23;
-
-    const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
-
-    /// Creates a new timeout.
-    ///
-    /// The meaning of the value and the allowed range of values is different
-    /// for different chips.
-    #[instability::unstable]
-    pub const fn new_const<const VALUE: u8>() -> Self {
-        const {
-            core::assert!(VALUE <= Self::FSM_TIMEOUT_MAX, "Invalid timeout value");
-        }
-        Self { value: VALUE }
-    }
-
-    /// Creates a new timeout.
-    ///
-    /// The meaning of the value and the allowed range of values is different
-    /// for different chips.
-    #[instability::unstable]
-    pub fn new(value: u8) -> Result<Self, ConfigError> {
-        if value > Self::FSM_TIMEOUT_MAX {
-            return Err(ConfigError::TimeoutInvalid);
+cfg_if::cfg_if! {
+    if #[cfg(not(any(esp32, esp32s2)))] {
+        /// When the FSM remains unchanged for more than the 2^ the given amount of bus
+        /// clock cycles a timeout will be triggered.
+        ///
+        /// The default value is 0x10
+        #[instability::unstable]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        pub struct FsmTimeout {
+            value: u8,
         }
 
-        Ok(Self { value })
-    }
+        impl FsmTimeout {
+            const FSM_TIMEOUT_MAX: u8 = 23;
 
-    fn value(&self) -> u8 {
-        self.value
-    }
-}
+            const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
 
-#[cfg(not(any(esp32, esp32s2)))]
-impl Default for FsmTimeout {
-    fn default() -> Self {
-        Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
+            /// Creates a new timeout.
+            ///
+            /// The meaning of the value and the allowed range of values is different
+            /// for different chips.
+            #[instability::unstable]
+            pub const fn new_const<const VALUE: u8>() -> Self {
+                const {
+                    core::assert!(VALUE <= Self::FSM_TIMEOUT_MAX, "Invalid timeout value");
+                }
+                Self { value: VALUE }
+            }
+
+            /// Creates a new timeout.
+            ///
+            /// The meaning of the value and the allowed range of values is different
+            /// for different chips.
+            #[instability::unstable]
+            pub fn new(value: u8) -> Result<Self, ConfigError> {
+                if value > Self::FSM_TIMEOUT_MAX {
+                    return Err(ConfigError::TimeoutInvalid);
+                }
+
+                Ok(Self { value })
+            }
+
+            fn value(&self) -> u8 {
+                self.value
+            }
+        }
+
+        impl Default for FsmTimeout {
+            fn default() -> Self {
+                Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
+            }
+        }
     }
 }
 
@@ -1642,62 +1643,9 @@ impl Driver<'_> {
         let write_len = if start { bytes.len() + 1 } else { bytes.len() };
         // don't issue write if there is no data to write
         if write_len > 0 {
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32, esp32s2))] {
-                    // try to place END at the same index
-                    if write_len < 2 {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: write_len as u8,
-                            },
-                        )?;
-                    } else if start {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: (write_len as u8) - 1,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: 1,
-                            },
-                        )?;
-                    } else {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: (write_len as u8) - 2,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: 1,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Write {
-                                ack_exp: Ack::Ack,
-                                ack_check_en: true,
-                                length: 1,
-                            },
-                        )?;
-                    }
-                } else {
+            if cfg!(any(esp32, esp32s2)) {
+                // try to place END at the same index
+                if write_len < 2 {
                     add_cmd(
                         cmd_iterator,
                         Command::Write {
@@ -1706,7 +1654,58 @@ impl Driver<'_> {
                             length: write_len as u8,
                         },
                     )?;
+                } else if start {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: (write_len as u8) - 1,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: 1,
+                        },
+                    )?;
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: (write_len as u8) - 2,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: 1,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Write {
+                            ack_exp: Ack::Ack,
+                            ack_check_en: true,
+                            length: 1,
+                        },
+                    )?;
                 }
+            } else {
+                add_cmd(
+                    cmd_iterator,
+                    Command::Write {
+                        ack_exp: Ack::Ack,
+                        ack_check_en: true,
+                        length: write_len as u8,
+                    },
+                )?;
             }
         }
 
@@ -1771,56 +1770,9 @@ impl Driver<'_> {
         }
 
         if initial_len > 0 {
-            cfg_if::cfg_if! {
-                if #[cfg(any(esp32,esp32s2))] {
-                    // try to place END at the same index
-                    if initial_len < 2 || start {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: initial_len as u8,
-                            },
-                        )?;
-                    } else if !will_continue {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: (initial_len as u8) - 1,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: 1,
-                            },
-                        )?;
-                    } else {
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: (initial_len as u8) - 2,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: 1,
-                            },
-                        )?;
-                        add_cmd(
-                            cmd_iterator,
-                            Command::Read {
-                                ack_value: Ack::Ack,
-                                length: 1,
-                            },
-                        )?;
-                    }
-                } else {
+            if cfg!(any(esp32, esp32s2)) {
+                // try to place END at the same index
+                if initial_len < 2 || start {
                     add_cmd(
                         cmd_iterator,
                         Command::Read {
@@ -1828,7 +1780,52 @@ impl Driver<'_> {
                             length: initial_len as u8,
                         },
                     )?;
+                } else if !will_continue {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: (initial_len as u8) - 1,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: 1,
+                        },
+                    )?;
+                } else {
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: (initial_len as u8) - 2,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: 1,
+                        },
+                    )?;
+                    add_cmd(
+                        cmd_iterator,
+                        Command::Read {
+                            ack_value: Ack::Ack,
+                            length: 1,
+                        },
+                    )?;
                 }
+            } else {
+                add_cmd(
+                    cmd_iterator,
+                    Command::Read {
+                        ack_value: Ack::Ack,
+                        length: initial_len as u8,
+                    },
+                )?;
             }
         }
 
