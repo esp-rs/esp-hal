@@ -189,7 +189,6 @@ mod tests {
         assert_ne!(read_data, [0u8; 22])
     }
 
-    // This is still an issue on ESP32-S2
     #[test]
     async fn async_test_timeout_when_scl_kept_low(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
