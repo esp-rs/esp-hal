@@ -1884,9 +1884,7 @@ impl Driver<'_> {
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, self.info, self.state)
-            .await
-            .inspect_err(|_| self.reset())?;
+        I2cFuture::new(event, self.info, self.state).await?;
         self.check_all_commands_done().await
     }
 
@@ -1929,7 +1927,7 @@ impl Driver<'_> {
             return Ok(true);
         }
 
-        self.check_errors().inspect_err(|_| self.reset())?;
+        self.check_errors()?;
 
         Ok(false)
     }
@@ -2238,7 +2236,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors().inspect_err(|_| self.reset())?;
+                self.check_errors()?;
                 break;
             }
         }
@@ -2330,7 +2328,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors().inspect_err(|_| self.reset())?;
+                self.check_errors()?;
                 embassy_futures::yield_now().await;
                 break;
             }
