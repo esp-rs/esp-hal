@@ -121,7 +121,7 @@ pub enum BusTimeout {
     Maximum,
 
     /// Disable timeout control.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(esp32))]
     Disabled,
 
     /// Timeout in bus clock cycles.
@@ -141,7 +141,7 @@ impl BusTimeout {
                 }
             }
 
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(esp32))]
             BusTimeout::Disabled => 1,
 
             BusTimeout::BusCycles(cycles) => *cycles,
@@ -1539,8 +1539,8 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         let timeout = BusTimeout::BusCycles(match timeout {
-            BusTimeout::Maximum => 0xFF_FFFF,
             BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
+            other => other.cycles(),
         });
 
         configure_clock(
