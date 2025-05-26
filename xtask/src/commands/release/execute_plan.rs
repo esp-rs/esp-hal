@@ -173,7 +173,7 @@ The release plan used for this release:
 
 Please review the changes and merge them into the `{base_branch}` branch.
 
-After merging, please make sure you have this release plan is the repo root,
+After merging, please make sure you have this release plan in the repo root,
 then run the following command on the `{base_branch}` branch to tag and publish the packages:
 
 ```
