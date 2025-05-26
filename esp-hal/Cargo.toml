@@ -25,8 +25,8 @@ bitflags                 = "2.9.0"
 bytemuck                 = "1.22.0"
 cfg-if                   = "1.0.0"
 critical-section         = { version = "1.2.0", features = ["restore-state-u32"] }
-embedded-hal             = "1.0.0"
-embedded-hal-async       = "1.0.0"
+embedded-hal             = { version = "1.0.0", git = "https://github.com/rmsyn/embedded-hal", branch = "embedded-hal/mmc" }
+embedded-hal-async       = { version = "1.0.0", git = "https://github.com/rmsyn/embedded-hal", branch = "embedded-hal/mmc" }
 enumset                  = "1.1.6"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11.0", default-features = false }
