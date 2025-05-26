@@ -2628,7 +2628,6 @@ pub fn new<'d>(
         .copy_from_slice(crate::CONFIG.country_code.as_bytes());
     cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
-    #[allow(clippy::useless_transmute)]
     unsafe {
         let country = wifi_country_t {
             cc: cntry_code,
