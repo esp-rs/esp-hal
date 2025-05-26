@@ -21,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S2: Support for light-/deep-sleep (#3341)
 - Add DMA memcpy support to the S2 (#3352)
 - Some config options can now only be set when the `unstable` feature in enabled (#3365)
-- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Added `Flex::enable_output` (#3387)
 - Added `Flex::set_output_enable` (#3387)
 - Added `{Uart, UartRx}::read_ready` (#3423)
@@ -35,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 - Replaced `chrono::NaiveDateTime` on the RTC API by raw `u64` timestamps (#3200)
 - `esp_hal::i2s::master::AnyI2s` has been moved to `esp_hal::i2s::AnyI2s` (#3226)
 - `esp_hal::i2c::master::AnyI2c` has been moved to `esp_hal::i2c::AnyI2c` (#3226)

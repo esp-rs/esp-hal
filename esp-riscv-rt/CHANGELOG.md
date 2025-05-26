@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ### Fixed
 
