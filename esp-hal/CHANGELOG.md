@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose ADC asynchrounous functionalities where applicable (#3443)
 - Added `UartInterrupt::RxTimeout` support (#3493)
 - UART: Added HW and SW flow control config option (#3435)
+- Added `Sdio` support (#3503)
 
 ### Changed
 
