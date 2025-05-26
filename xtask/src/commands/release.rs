@@ -6,6 +6,8 @@ pub mod execute_plan;
 #[cfg(feature = "release")]
 pub mod plan;
 pub mod publish;
+#[cfg(feature = "release")]
+pub mod publish_plan;
 pub mod semver_check;
 pub mod tag_releases;
 
@@ -15,6 +17,8 @@ pub use execute_plan::*;
 #[cfg(feature = "release")]
 pub use plan::*;
 pub use publish::*;
+#[cfg(feature = "release")]
+pub use publish_plan::*;
 pub use semver_check::*;
 pub use tag_releases::*;
 
@@ -35,6 +39,14 @@ pub enum Release {
     /// and opens a pull request with the changes.
     #[cfg(feature = "release")]
     ExecutePlan(ApplyPlanArgs),
+    /// Attempt to publish the specified package.
+    ///
+    /// This command will double check based on the release plan that the
+    /// command is called on the right branch, and that the crate(s) to be
+    /// released have the right version. After publishing, the command tags
+    /// the release and pushes the tags.
+    #[cfg(feature = "release")]
+    PublishPlan(PublishPlanArgs),
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:
