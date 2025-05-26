@@ -237,6 +237,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UART: Added HW and SW flow control config option (#3435)
 - I2C master: `SoftwareTimeout` and `Config::with_software_timeout`. (#3577)
 - `esp_hal::time::{Instant, Duration}` now implement `Hash` (#3577)
+- Added `Sdio` support (#3503)
 
 ### Changed
 

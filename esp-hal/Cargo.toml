@@ -80,6 +80,7 @@ embassy-usb-synopsys-otg = { version = "0.3", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1", optional = true }
+embedded-hal-sdmmc       = { version = "0.1.0-alpha.2", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt                    = { version = "1.0.1", optional = true }
@@ -298,6 +299,7 @@ unstable = [
     "dep:rand_core-09",
     "dep:nb",
     "dep:ufmt-write",
+    "dep:embedded-hal-sdmmc",
 ]
 
 ## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
