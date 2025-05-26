@@ -14,6 +14,8 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::timer::timg::TimerGroup;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[embassy_executor::task]
 async fn run() {
     loop {

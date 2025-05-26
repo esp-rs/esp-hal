@@ -35,6 +35,8 @@ cfg_if::cfg_if! {
     }
 }
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context {
     test_gpio1: AnyPin<'static>,
     test_gpio2: AnyPin<'static>,

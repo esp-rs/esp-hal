@@ -21,6 +21,8 @@ use esp_hal::{
 use log::{error, info};
 extern crate alloc;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const DATA_SIZE: usize = 1024 * 10;
 const CHUNK_SIZE: usize = 4032; // size is aligned to 64 bytes
 

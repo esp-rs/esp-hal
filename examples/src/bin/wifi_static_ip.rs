@@ -31,6 +31,8 @@ use esp_wifi::{
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const STATIC_IP: &str = env!("STATIC_IP");

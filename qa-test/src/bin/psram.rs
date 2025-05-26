@@ -20,6 +20,8 @@ use esp_backtrace as _;
 use esp_hal::{main, psram};
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 fn init_psram_heap(start: *mut u8, size: usize) {
     unsafe {
         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(

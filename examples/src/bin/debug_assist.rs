@@ -15,6 +15,8 @@ use esp_backtrace as _;
 use esp_hal::{assist_debug::DebugAssist, handler, main};
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 
 #[main]
