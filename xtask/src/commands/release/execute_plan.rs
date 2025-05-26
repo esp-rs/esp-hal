@@ -173,8 +173,8 @@ The release plan used for this release:
 
 Please review the changes and merge them into the `{base_branch}` branch.
 
-After merging, please run the following command on the `{base_branch}` branch
-to tag and publish the packages:
+After merging, please make sure you have this release plan is the repo root,
+then run the following command on the `{base_branch}` branch to tag and publish the packages:
 
 ```
 cargo xrelease publish-plan --no-dry-run
@@ -210,8 +210,7 @@ cargo xrelease publish-plan --no-dry-run
         println!("{open_pr_url}");
     }
 
-    println!("Once you create and merge the pull request, check out current main.");
-    println!("Make sure you have the release_plan.jsonc file in the root of the workspace.");
+    println!("Create the release PR and follow the next steps laid out there.");
 
     Ok(())
 }
