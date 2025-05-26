@@ -20,9 +20,8 @@
 //!
 //! [embedded-hal]: embedded_hal
 
-use core::marker::PhantomData;
-#[cfg(not(esp32))]
 use core::{
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -670,17 +669,24 @@ pub enum Event {
     TxFifoWatermark,
 }
 
-#[cfg(not(esp32))]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct I2cFuture<'a> {
     events: EnumSet<Event>,
     info: &'a Info,
     state: &'a State,
+    #[cfg(any(esp32, esp32s2))]
+    timeout: Duration,
+    #[cfg(any(esp32, esp32s2))]
+    start: Instant,
 }
 
-#[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
-    pub fn new(events: EnumSet<Event>, info: &'a Info, state: &'a State) -> Self {
+    pub fn new(
+        events: EnumSet<Event>,
+        info: &'a Info,
+        state: &'a State,
+        _timeout: Duration,
+    ) -> Self {
         info.regs().int_ena().modify(|_, w| {
             for event in events {
                 match event {
@@ -707,6 +713,10 @@ impl<'a> I2cFuture<'a> {
             events,
             state,
             info,
+            #[cfg(any(esp32, esp32s2))]
+            timeout: _timeout,
+            #[cfg(any(esp32, esp32s2))]
+            start: Instant::now(),
         }
     }
 
@@ -715,7 +725,6 @@ impl<'a> I2cFuture<'a> {
     }
 }
 
-#[cfg(not(esp32))]
 impl core::future::Future for I2cFuture<'_> {
     type Output = Result<(), Error>;
 
@@ -733,10 +742,28 @@ impl core::future::Future for I2cFuture<'_> {
         } else if error.is_err() {
             Poll::Ready(error)
         } else {
-            Poll::Pending
+            cfg_if::cfg_if! {
+                if #[cfg(any(esp32, esp32s2))] {
+                    // TODO: it's more efficient to time out with embassy-time, but we can't
+                    // do that in esp-hal. Maybe we should provide an option to disable this
+                    // looping timeout check.
+                    if self.start.elapsed() > self.timeout {
+                        // If the timeout is reached, we return an error.
+                        Poll::Ready(Err(Error::Timeout))
+                    } else {
+                        ctx.waker().wake_by_ref();
+                        Poll::Pending
+                    }
+                } else {
+                    Poll::Pending
+                }
+            }
         }
     }
 }
+
+// TODO: on Drop, I2cFuture should reset the peripheral _and_ make sure we
+// release the bus.
 
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
@@ -1880,38 +1907,38 @@ impl Driver<'_> {
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
-    #[cfg(not(esp32))]
-    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
+    async fn wait_for_completion(&self, end_only: bool, timeout: Duration) -> Result<(), Error> {
+        // TODO: the timeout should depend on the bus frequency and the length of the
+        //       write operation.
+
         let event = if end_only {
             Event::EndDetect.into()
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, self.info, self.state).await?;
-        self.check_all_commands_done().await
-    }
-
-    #[cfg(esp32)]
-    async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        let start = Instant::now();
-
-        while !self.is_completed(end_only)? {
-            if Instant::now() - start > TIMEOUT {
-                return Err(Error::Timeout);
-            }
-            embassy_futures::yield_now().await;
-        }
-
+        I2cFuture::new(event, self.info, self.state, timeout).await?;
         self.check_all_commands_done().await
     }
 
     /// Waits for the completion of an I2C transaction.
-    fn wait_for_completion_blocking(&self, end_only: bool) -> Result<(), Error> {
-        let start = Instant::now();
+    fn wait_for_completion_blocking(
+        &self,
+        end_only: bool,
+        _timeout: Duration,
+    ) -> Result<(), Error> {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                let start = Instant::now();
 
-        while !self.is_completed(end_only)? {
-            if Instant::now() - start > TIMEOUT {
-                return Err(Error::Timeout);
+                while !self.is_completed(end_only)? {
+                    if Instant::now() - start > _timeout {
+                        return Err(Error::Timeout);
+                    }
+                }
+            } else {
+                // On other chips we have SCL_ST and MAIN_ST timeouts, so we don't
+                // need to add a software timeout here.
+                while !self.is_completed(end_only)? {}
             }
         }
 
@@ -2186,7 +2213,7 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion_blocking(true)?;
+        self.wait_for_completion_blocking(true, TIMEOUT)?;
 
         if stop {
             self.stop_operation_blocking()?;
@@ -2223,7 +2250,7 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion_blocking(true)?;
+        self.wait_for_completion_blocking(true, TIMEOUT)?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
@@ -2237,7 +2264,7 @@ impl Driver<'_> {
         let cmd_iterator = &mut self.regs().comd_iter();
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
-        self.wait_for_completion_blocking(false)?;
+        self.wait_for_completion_blocking(false, TIMEOUT)?;
 
         #[cfg(esp32)]
         loop {
@@ -2277,7 +2304,7 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion(true).await?;
+        self.wait_for_completion(true, TIMEOUT).await?;
 
         if stop {
             self.stop_operation().await?;
@@ -2314,7 +2341,7 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion(true).await?;
+        self.wait_for_completion(true, TIMEOUT).await?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
@@ -2329,7 +2356,7 @@ impl Driver<'_> {
         let cmd_iterator = &mut self.regs().comd_iter();
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
-        self.wait_for_completion(false).await?;
+        self.wait_for_completion(false, TIMEOUT).await?;
 
         #[cfg(esp32)]
         loop {
