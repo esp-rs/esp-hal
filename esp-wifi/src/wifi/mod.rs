@@ -1359,7 +1359,7 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
             chip_specific::g_misc_nvs = addr_of!(NVS_STRUCT) as u32;
         }
 
-        crate::flags::WIFI.fetch_add(1, Ordering::SeqCst);
+        crate::flags::WIFI.store(true, Ordering::SeqCst);
 
         Ok(())
     }
@@ -1401,6 +1401,7 @@ pub(crate) fn wifi_deinit() -> Result<(), crate::InitializationError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
+    crate::flags::WIFI.store(false, Ordering::Release);
     Ok(())
 }
 
@@ -2673,15 +2674,8 @@ pub struct WifiController<'d> {
 
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
-        if unwrap!(
-            crate::flags::WIFI.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |x| {
-                Some(x.saturating_sub(1))
-            })
-        ) == 0
-        {
-            if let Err(e) = crate::wifi::wifi_deinit() {
-                warn!("Failed to cleanly deinit wifi: {:?}", e);
-            }
+        if let Err(e) = crate::wifi::wifi_deinit() {
+            warn!("Failed to cleanly deinit wifi: {:?}", e);
         }
     }
 }
