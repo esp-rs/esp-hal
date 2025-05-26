@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
 - Update `defmt` to 1.0 (#3416)
 - The `log` feature has been replaced by `log-04`. (#3425)
-- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead
+- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
 
 ### Fixed
 
