@@ -48,6 +48,7 @@ _sidata = LOADADDR(.data);
 {
   . = ALIGN(4);
   *(.noinit .noinit.*)
+  *(.uninit .uninit.*)
   . = ALIGN(4);
 } > RWDATA
 
