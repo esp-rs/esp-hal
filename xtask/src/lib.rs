@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -314,10 +314,6 @@ pub fn execute_app(
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
         builder.add_arg("-Zbuild-std=core,alloc");
-    }
-
-    if subcommand == "test" && chip == Chip::Esp32c2 {
-        builder.add_arg("--").add_arg("--speed").add_arg("15000");
     }
 
     let args = builder.build();
