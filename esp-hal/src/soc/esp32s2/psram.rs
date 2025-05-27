@@ -215,23 +215,10 @@ pub(crate) mod utils {
         psram_gpio_config();
 
         if config.size.is_auto() {
+            psram_disable_qio_mode();
+
             // read chip id
             let mut dev_id = 0u32;
-            psram_exec_cmd(
-                CommandMode::PsramCmdSpi,
-                PSRAM_DEVICE_ID,
-                8, // command and command bit len
-                0,
-                24, // address and address bit len
-                0,  // dummy bit len
-                core::ptr::null(),
-                0, // tx data and tx bit len
-                &mut dev_id as *mut _ as *mut u8,
-                24,           // rx data and rx bit len
-                CS_PSRAM_SEL, // cs bit mask
-                false,
-            );
-            // treat the first read id as a dummy one
             psram_exec_cmd(
                 CommandMode::PsramCmdSpi,
                 PSRAM_DEVICE_ID,
@@ -321,6 +308,27 @@ pub(crate) mod utils {
         psram_exec_cmd(
             CommandMode::PsramCmdSpi,
             PSRAM_ENTER_QMODE,
+            8, // command and command bit len
+            0,
+            0, // address and address bit len
+            0, // dummy bit len
+            core::ptr::null(),
+            0, // tx data and tx bit len
+            core::ptr::null_mut(),
+            0,            // rx data and rx bit len
+            CS_PSRAM_SEL, // cs bit mask
+            false,        // whether is program/erase operation
+        );
+    }
+
+    /// Exit QPI mode
+    fn psram_disable_qio_mode() {
+        const PSRAM_EXIT_QMODE: u16 = 0xF5;
+        const CS_PSRAM_SEL: u8 = 1 << 1;
+
+        psram_exec_cmd(
+            CommandMode::PsramCmdQpi,
+            PSRAM_EXIT_QMODE,
             8, // command and command bit len
             0,
             0, // address and address bit len
