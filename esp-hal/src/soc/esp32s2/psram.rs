@@ -233,6 +233,21 @@ pub(crate) mod utils {
                 CS_PSRAM_SEL, // cs bit mask
                 false,
             );
+            // treat the first read id as a dummy one as the pre-condition
+            psram_exec_cmd(
+                CommandMode::PsramCmdSpi,
+                PSRAM_DEVICE_ID,
+                8, // command and command bit len
+                0,
+                24, // address and address bit len
+                0,  // dummy bit len
+                core::ptr::null(),
+                0, // tx data and tx bit len
+                &mut dev_id as *mut _ as *mut u8,
+                24,           // rx data and rx bit len
+                CS_PSRAM_SEL, // cs bit mask
+                false,
+            );
             info!("chip id = {:x}", dev_id);
 
             let size = if dev_id != 0xffffff {
