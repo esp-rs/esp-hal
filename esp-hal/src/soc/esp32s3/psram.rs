@@ -269,21 +269,25 @@ pub(crate) mod utils {
             );
             info!("chip id = {:x}", dev_id);
 
-            const PSRAM_ID_EID_S: u32 = 16;
-            const PSRAM_ID_EID_M: u32 = 0xff;
-            const PSRAM_EID_SIZE_M: u32 = 0x07;
-            const PSRAM_EID_SIZE_S: u32 = 5;
+            let size = if dev_id != 0xffffff {
+                const PSRAM_ID_EID_S: u32 = 16;
+                const PSRAM_ID_EID_M: u32 = 0xff;
+                const PSRAM_EID_SIZE_M: u32 = 0x07;
+                const PSRAM_EID_SIZE_S: u32 = 5;
 
-            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                & PSRAM_EID_SIZE_M;
+                let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                    & PSRAM_EID_SIZE_M;
 
-            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+                const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+                const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
-            let size = match size_id {
-                PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
-                PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
-                _ => 16 / 8 * 1024 * 1024,
+                match size_id {
+                    PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
+                    PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
+                    _ => 16 / 8 * 1024 * 1024,
+                }
+            } else {
+                0
             };
 
             info!("size is {}", size);
