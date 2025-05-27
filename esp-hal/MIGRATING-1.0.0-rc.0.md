@@ -57,3 +57,34 @@ esp_hal::interrupt::bind_interrupt(
 +   IsrCallback::new(software3_interrupt),
 );
 ```
+
+## RMT changes
+
+`PulseCode` used to be an extension trait implemented on `u32`. It is now a
+newtype struct, wrapping `u32`.
+RMT transmit and receive methods accept `impl Into<PulseCode>` and
+`impl From<PulseCode>`, respectively, and implementations for
+`PulseCode: From<u32>` and `u32: From<PulseCode>` are provided.
+
+Nevertheless, type annotations will require some changes:
+
+```diff
+ let rmt = Rmt::new(peripherals.RMT, freq).unrwap();
+ let tx_channel = rmt.channel0.configure_tx(peripherals.GPIO1, TxChannelConfig::default());
+ let rx_channel = rmt.channel2.configure_rx(peripherals.GPIO2, RxChannelConfig::default());
+
+-let mut tx_data: [u32; 20] = [PulseCode::new(Level::High, 42, Level::Low, 24); 20];
++let mut tx_data: [PulseCode; 20] = [PulseCode::new(Level::High, 42, Level::Low, 24); 20];
+
+-tx_data[tx_data.len() - 1] = PulseCode::empty();
++// `PulseCode::end_marker()` and `PulseCode::empty()` are equivalent,
++// but the former is more explicit about its meaning.
++tx_data[tx_data.len() - 1] = PulseCode::end_marker();
+
+-let mut rx_data: [u32; 20] = [PulseCode::empty(); 20];
++let mut rx_data: [PulseCode; 20] = [PulseCode::empty(); 20];
+
+let _ = tx_channel.transmit(&tx_data).wait().unwrap();
+
+let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
+```

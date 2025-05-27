@@ -53,7 +53,7 @@ async fn main(_spawner: Spawner) {
     let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 
     data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-    data[data.len() - 1] = PulseCode::empty();
+    data[data.len() - 1] = PulseCode::end_marker();
 
     loop {
         println!("transmit");
