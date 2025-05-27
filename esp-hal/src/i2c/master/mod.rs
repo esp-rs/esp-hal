@@ -50,7 +50,7 @@ use crate::{
     pac::i2c0::{COMD, RegisterBlock},
     peripherals::Interrupt,
     private,
-    system::{PeripheralClockControl, PeripheralGuard},
+    system::PeripheralGuard,
     time::{Duration, Instant, Rate},
 };
 
@@ -519,7 +519,6 @@ impl Default for Config {
 pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
-    config: Config,
     guard: PeripheralGuard,
     sda_pin: PinGuard,
     scl_pin: PinGuard,
@@ -567,16 +566,15 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
         let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
 
-        let i2c = I2c {
+        let mut i2c = I2c {
             i2c: i2c.degrade(),
             phantom: PhantomData,
-            config,
             guard,
             sda_pin,
             scl_pin,
         };
 
-        i2c.driver().setup(&i2c.config)?;
+        i2c.apply_config(&config)?;
 
         Ok(i2c)
     }
@@ -588,7 +586,6 @@ impl<'d> I2c<'d, Blocking> {
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            config: self.config,
             guard: self.guard,
             sda_pin: self.sda_pin,
             scl_pin: self.scl_pin,
@@ -748,7 +745,6 @@ impl<'d> I2c<'d, Async> {
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            config: self.config,
             guard: self.guard,
             sda_pin: self.sda_pin,
             scl_pin: self.scl_pin,
@@ -854,12 +850,7 @@ where
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::disable(self.driver().info.peripheral);
-        PeripheralClockControl::enable(self.driver().info.peripheral);
-        PeripheralClockControl::reset(self.driver().info.peripheral);
-
-        // We know the configuration is valid, we can ignore the result.
-        _ = self.driver().setup(&self.config);
+        self.driver().reset_fsm();
     }
 
     /// Connect a pin to the I2C SDA signal.
@@ -1048,7 +1039,6 @@ where
     /// passed in config is invalid.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().setup(config)?;
-        self.config = *config;
         Ok(())
     }
 }
@@ -1331,12 +1321,13 @@ impl Driver<'_> {
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
+
+            #[cfg(esp32s2)]
+            w.ref_always_on().set_bit();
+
             // Ensure that clock is enabled
             w.clk_en().set_bit()
         });
-
-        #[cfg(esp32s2)]
-        self.regs().ctr().modify(|_, w| w.ref_always_on().set_bit());
 
         // Configure filter
         // FIXME if we ever change this we need to adapt `set_frequency` for ESP32
@@ -1347,32 +1338,47 @@ impl Driver<'_> {
 
         // Configure additional timeouts
         #[cfg(not(any(esp32, esp32s2)))]
-        self.regs()
-            .scl_st_time_out()
-            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.regs()
-            .scl_main_st_time_out()
-            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
+        {
+            self.regs()
+                .scl_st_time_out()
+                .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
+            self.regs()
+                .scl_main_st_time_out()
+                .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
+        }
 
         self.update_config();
 
         // Reset entire peripheral (also resets fifo)
-        self.reset();
+        self.reset_fsm();
 
         Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)
-    fn reset(&self) {
-        // Reset the FSM
-        // (the option to reset the FSM is not available for the ESP32)
-        #[cfg(not(esp32))]
-        self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-        self.reset_before_transmission();
-    }
+    // This function implements esp-idf's `s_i2c_hw_fsm_reset`, without the
+    // clear_bus=true parts.
+    // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
+    fn reset_fsm(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                // Device has a working FSM reset mechanism
+                self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
+            } else {
+                // Even though C2 and C3 have a FSM reset bit, esp-idf does not
+                // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
-    fn reset_before_transmission(&self) {
+                // Save config registers
+                let registers = Registers::save(self.info);
+
+                // Do the reset
+                crate::system::PeripheralClockControl::reset(self.info.peripheral);
+
+                // Restore config registers
+                registers.restore(self.info);
+            }
+        }
+
         // Clear all I2C interrupts
         self.clear_all_interrupts();
 
@@ -2169,7 +2175,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.reset_before_transmission();
+        self.reset_fsm();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2206,7 +2212,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.reset_before_transmission();
+        self.reset_fsm();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2260,7 +2266,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.reset_before_transmission();
+        self.reset_fsm();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2297,7 +2303,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.reset_before_transmission();
+        self.reset_fsm();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2743,6 +2749,142 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
                 AcknowledgeCheckFailedReason::Data
             }
         }
+    }
+}
+
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
+struct Registers {
+    ctr: u32,
+    #[cfg(any(esp32, esp32s2))]
+    sda_filter_cfg: u32,
+    #[cfg(any(esp32, esp32s2))]
+    scl_filter_cfg: u32,
+
+    #[cfg(not(any(esp32, esp32s2)))]
+    filter_cfg: u32,
+    #[cfg(not(any(esp32, esp32s2)))]
+    scl_st_time_out: u32,
+    #[cfg(not(any(esp32, esp32s2)))]
+    scl_main_st_time_out: u32,
+    #[cfg(not(any(esp32, esp32s2)))]
+    clk_conf: u32,
+
+    scl_low_period: u32,
+    scl_high_period: u32,
+    sda_hold: u32,
+    sda_sample: u32,
+    scl_rstart_setup: u32,
+    scl_stop_setup: u32,
+    scl_start_hold: u32,
+    scl_stop_hold: u32,
+    timeout: u32,
+}
+
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
+impl Registers {
+    fn save(info: &Info) -> Self {
+        let ctr = info.regs().ctr().read().bits();
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                let sda_filter_cfg = info.regs().sda_filter_cfg().read().bits();
+                let scl_filter_cfg = info.regs().scl_filter_cfg().read().bits();
+            } else {
+                let filter_cfg = info.regs().filter_cfg().read().bits();
+                let scl_st_time_out = info.regs().scl_st_time_out().read().bits();
+                let scl_main_st_time_out = info.regs().scl_main_st_time_out().read().bits();
+                let clk_conf = info.regs().clk_conf().read().bits();
+            }
+        }
+
+        let scl_low_period = info.regs().scl_low_period().read().bits();
+        let scl_high_period = info.regs().scl_high_period().read().bits();
+        let sda_hold = info.regs().sda_hold().read().bits();
+        let sda_sample = info.regs().sda_sample().read().bits();
+        let scl_rstart_setup = info.regs().scl_rstart_setup().read().bits();
+        let scl_stop_setup = info.regs().scl_stop_setup().read().bits();
+        let scl_start_hold = info.regs().scl_start_hold().read().bits();
+        let scl_stop_hold = info.regs().scl_stop_hold().read().bits();
+        let timeout = info.regs().to().read().bits();
+
+        Registers {
+            ctr,
+            #[cfg(any(esp32, esp32s2))]
+            sda_filter_cfg,
+            #[cfg(any(esp32, esp32s2))]
+            scl_filter_cfg,
+            #[cfg(not(any(esp32, esp32s2)))]
+            filter_cfg,
+            #[cfg(not(any(esp32, esp32s2)))]
+            scl_st_time_out,
+            #[cfg(not(any(esp32, esp32s2)))]
+            scl_main_st_time_out,
+            #[cfg(not(any(esp32, esp32s2)))]
+            clk_conf,
+            scl_low_period,
+            scl_high_period,
+            sda_hold,
+            sda_sample,
+            scl_rstart_setup,
+            scl_stop_setup,
+            scl_start_hold,
+            scl_stop_hold,
+            timeout,
+        }
+    }
+
+    fn restore(self, info: &Info) {
+        info.regs().ctr().write(|w| unsafe { w.bits(self.ctr) });
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                info.regs().sda_filter_cfg().write(|w| unsafe {
+                    w.bits(self.sda_filter_cfg)
+                });
+                info.regs().scl_filter_cfg().write(|w| unsafe {
+                    w.bits(self.scl_filter_cfg)
+                });
+            } else {
+                info.regs().filter_cfg().write(|w| unsafe {
+                    w.bits(self.filter_cfg)
+                });
+                info.regs().scl_st_time_out().write(|w| unsafe {
+                    w.bits(self.scl_st_time_out)
+                });
+                info.regs().scl_main_st_time_out().write(|w| unsafe {
+                    w.bits(self.scl_main_st_time_out)
+                });
+                info.regs().clk_conf().write(|w| unsafe {
+                    w.bits(self.clk_conf)
+                });
+            }
+        }
+
+        info.regs()
+            .scl_low_period()
+            .write(|w| unsafe { w.bits(self.scl_low_period) });
+        info.regs()
+            .scl_high_period()
+            .write(|w| unsafe { w.bits(self.scl_high_period) });
+        info.regs()
+            .sda_hold()
+            .write(|w| unsafe { w.bits(self.sda_hold) });
+        info.regs()
+            .sda_sample()
+            .write(|w| unsafe { w.bits(self.sda_sample) });
+        info.regs()
+            .scl_rstart_setup()
+            .write(|w| unsafe { w.bits(self.scl_rstart_setup) });
+        info.regs()
+            .scl_stop_setup()
+            .write(|w| unsafe { w.bits(self.scl_stop_setup) });
+        info.regs()
+            .scl_start_hold()
+            .write(|w| unsafe { w.bits(self.scl_start_hold) });
+        info.regs()
+            .scl_stop_hold()
+            .write(|w| unsafe { w.bits(self.scl_stop_hold) });
+        info.regs().to().write(|w| unsafe { w.bits(self.timeout) });
     }
 }
 
