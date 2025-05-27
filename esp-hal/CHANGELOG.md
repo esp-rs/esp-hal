@@ -94,7 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPIO interrupt handling no longer causes infinite looping if a task at higher priority is awaiting on a pin event (#3408)
 - `esp_hal::gpio::Input::is_interrupt_set` can now return true (#3408)
 - `Uart::write_str` (both core::fmt and uWrite implementations) no longer stops writing when the internal buffer fills up (#3452)
-- Fixed I2C `Timeout` errors experienced during high CPU load (#3458)
+- Fixed I2C `Timeout` errors experienced during high CPU load (#3458, #3555)
 - Fix a problem where reading/writing flash didn't work when using PSRAM on ESP32 (#3524)
 
 ### Removed

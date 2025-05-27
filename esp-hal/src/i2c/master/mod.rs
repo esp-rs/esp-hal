@@ -1916,6 +1916,13 @@ impl Driver<'_> {
     }
 
     fn is_completed(&self, end_only: bool) -> Result<bool, Error> {
+        // Read errors _before_ checking for completion. This is important because we
+        // may be interrupted, which can cause an error to be detected, even if
+        // the transmission was successful.
+        // TODO: we should refactor `check_errors` to work on the already read interrupt
+        // bits.
+        let errors = self.check_errors();
+
         let interrupts = self.regs().int_raw().read();
 
         if (!end_only && interrupts.trans_complete().bit_is_set())
@@ -1927,9 +1934,7 @@ impl Driver<'_> {
             return Ok(true);
         }
 
-        self.check_errors()?;
-
-        Ok(false)
+        errors.map(|_| false)
     }
 
     fn all_commands_done(&self) -> bool {
