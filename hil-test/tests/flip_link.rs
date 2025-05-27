@@ -1,7 +1,7 @@
 //! Tests flip_link
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: unstable
+//% FEATURES: unstable defmt
 //% ENV: ESP_HAL_CONFIG_FLIP_LINK = true
 
 #![no_std]
