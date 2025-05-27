@@ -98,7 +98,7 @@
 //!
 //! let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 //! data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-//! data[data.len() - 1] = PulseCode::empty();
+//! data[data.len() - 1] = PulseCode::end_marker();
 //!
 //! loop {
 //!     let transaction = channel.transmit(&data)?;
@@ -144,7 +144,7 @@
     doc = "let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config)?;"
 )]
 //! let delay = Delay::new();
-//! let mut data: [u32; 48] = [PulseCode::empty(); 48];
+//! let mut data: [PulseCode; 48] = [PulseCode::end_marker(); 48];
 //!
 //! loop {
 //!     for x in data.iter_mut() {
@@ -272,64 +272,219 @@ pub enum Error {
     UnexpectedEndMarker,
 }
 
-///  Convenience trait to work with pulse codes.
-pub trait PulseCode: crate::private::Sealed {
-    /// Create a new instance
-    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self;
+///  Convenience newtype to work with pulse codes.
+// FIXME: Add More derives
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
+#[repr(transparent)]
+pub struct PulseCode(u32);
+
+const LEVEL2_SHIFT: usize = 16;
+const LEVEL1_SHIFT: usize = 0;
+
+impl PulseCode {
+    /// Create a new instance.
+    ///
+    /// SAFETY:
+    /// - `length1` and `length2` must be 15-bit wide, i.e. their MSB must be
+    ///   cleared.
+    #[inline]
+    const unsafe fn new_unchecked(
+        level1: Level,
+        length1: u16,
+        level2: Level,
+        length2: u16,
+    ) -> Self {
+        let mut code = 0;
+
+        if matches!(level2, Level::High) {
+            code |= 1 << (LEVEL2_SHIFT + 15);
+        }
+        code |= (length2 as u32) << LEVEL2_SHIFT;
+
+        if matches!(level1, Level::High) {
+            code |= 1 << (LEVEL1_SHIFT + 15);
+        }
+        code |= (length1 as u32) << LEVEL1_SHIFT;
+
+        Self(code)
+    }
+
+    /// Create a new instance.
+    ///
+    /// If `length1` or `length2` exceed the maximum representable range, they
+    /// will be clamped.
+    #[inline]
+    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        let length1 = if 0 != (length1 & 0x8000) {
+            0x7FFF
+        } else {
+            length1
+        };
+        let length2 = if 0 != (length2 & 0x8000) {
+            0x7FFF
+        } else {
+            length2
+        };
+        // SAFETY:
+        // - We just clamped length1 and length2 to the required intervals
+        unsafe { Self::new_unchecked(level1, length1, level2, length2) }
+    }
+
+    /// Create a new instance.
+    ///
+    /// If `length1` or `length2` exceed the maximum representable range, this
+    /// will return `None`.
+    #[inline]
+    pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
+        if 0 != (length1 & 0x8000) || 0 != (length2 & 0x8000) {
+            return None;
+        }
+
+        // SAFETY:
+        // - We just checked that length1 and length2 have their MSB cleared.
+        Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
+    }
 
     /// Create a new empty instance
-    fn empty() -> Self;
+    // FIXME: add level argument
+    #[inline]
+    pub const fn end_marker() -> Self {
+        Self(0)
+    }
 
     /// Set all levels and lengths to 0
-    fn reset(&mut self);
-
-    /// Logical output level in the first pulse code interval
-    fn level1(&self) -> Level;
-
-    /// Length of the first pulse code interval (in clock cycles)
-    fn length1(&self) -> u16;
+    #[inline]
+    pub fn reset(&mut self) {
+        self.0 = 0
+    }
 
     /// Logical output level in the second pulse code interval
-    fn level2(&self) -> Level;
+    #[inline]
+    pub const fn level2(&self) -> Level {
+        // Can't use Level::from(bool) since it is non-const
+        if 0 != (self.0 & (1 << (LEVEL2_SHIFT + 15))) {
+            Level::High
+        } else {
+            Level::Low
+        }
+    }
 
     /// Length of the second pulse code interval (in clock cycles)
-    fn length2(&self) -> u16;
+    #[inline]
+    pub const fn length2(&self) -> u16 {
+        ((self.0 >> LEVEL2_SHIFT) & 0x7FFF) as u16
+    }
+
+    /// Logical output level in the first pulse code interval
+    #[inline]
+    pub const fn level1(&self) -> Level {
+        // Can't use Level::from(bool) since it is non-const
+        if 0 != (self.0 & (1 << (LEVEL1_SHIFT + 15))) {
+            Level::High
+        } else {
+            Level::Low
+        }
+    }
+
+    /// Length of the first pulse code interval (in clock cycles)
+    #[inline]
+    pub const fn length1(&self) -> u16 {
+        ((self.0 >> LEVEL1_SHIFT) & 0x7FFF) as u16
+    }
+
+    /// Set level2
+    #[inline]
+    pub const fn with_level2(mut self, level: Level) -> Self {
+        if matches!(level, Level::High) {
+            self.0 |= 1 << (LEVEL2_SHIFT + 15);
+        } else {
+            self.0 &= !(1 << (LEVEL2_SHIFT + 15));
+        }
+        self
+    }
+
+    /// Set level1
+    #[inline]
+    pub const fn with_level1(mut self, level: Level) -> Self {
+        if matches!(level, Level::High) {
+            self.0 |= 1 << (LEVEL1_SHIFT + 15);
+        } else {
+            self.0 &= !(1 << (LEVEL1_SHIFT + 15));
+        }
+        self
+    }
+
+    /// Set length2
+    #[inline]
+    pub const fn with_length2(mut self, length: u16) -> Option<Self> {
+        if 0 != (length & 0x8000) {
+            None
+        } else {
+            self.0 &= !(0x7FFF << LEVEL2_SHIFT);
+            self.0 |= (length as u32) << LEVEL2_SHIFT;
+            Some(self)
+        }
+    }
+
+    /// Set length1
+    #[inline]
+    pub const fn with_length1(mut self, length: u16) -> Option<Self> {
+        if 0 != (length & 0x8000) {
+            None
+        } else {
+            self.0 &= !(0x7FFF << LEVEL1_SHIFT);
+            self.0 |= (length as u32) << LEVEL1_SHIFT;
+            Some(self)
+        }
+    }
+
+    /// Convert to u32
+    #[inline]
+    pub const fn as_u32(&self) -> u32 {
+        self.0
+    }
 
     /// Whether this pulse code contains an end marker
-    fn is_end_marker(&self) -> bool {
+    #[inline]
+    pub const fn is_end_marker(&self) -> bool {
         self.length1() == 0 || self.length2() == 0
     }
 }
 
-impl PulseCode for u32 {
-    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        let level1 = ((bool::from(level1) as u32) << 15) | (length1 as u32 & 0b111_1111_1111_1111);
-        let level2 = ((bool::from(level2) as u32) << 15) | (length2 as u32 & 0b111_1111_1111_1111);
-        level1 | (level2 << 16)
+impl core::fmt::Debug for PulseCode {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PulseCode")
+            .field("level1", &self.level1())
+            .field("length1", &self.length1())
+            .field("level2", &self.level2())
+            .field("length2", &self.length2())
+            .finish()
     }
+}
 
-    fn empty() -> Self {
-        0
+#[cfg(feature = "defmt")]
+impl defmt::Format for PulseCode {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "PulseCode({} {}, {} {})",
+            if self.level1().into() { 'H' } else { 'L' },
+            self.length1(),
+            if self.level2().into() { 'H' } else { 'L' },
+            self.length2(),
+        )
     }
+}
 
-    fn reset(&mut self) {
-        *self = 0
+impl From<u32> for PulseCode {
+    fn from(value: u32) -> Self {
+        Self(value)
     }
+}
 
-    fn level1(&self) -> Level {
-        (self & (1 << 15) != 0).into()
-    }
-
-    fn length1(&self) -> u16 {
-        (self & 0b111_1111_1111_1111) as u16
-    }
-
-    fn level2(&self) -> Level {
-        (self & (1 << 31) != 0).into()
-    }
-
-    fn length2(&self) -> u16 {
-        ((self >> 16) & 0b111_1111_1111_1111) as u16
+impl From<PulseCode> for u32 {
+    fn from(code: PulseCode) -> u32 {
+        code.as_u32()
     }
 }
 
@@ -380,9 +535,9 @@ enum WriterState {
 
 /// docs
 struct RmtWriter {
-    // Offset in RMT RAM section to start writing from (number of u32!)
+    // Offset in RMT RAM section to start writing from (number of PulseCode!)
     // u16 is sufficient to store this for all devices, and should be small enough such that
-    // size_of::<RmtWriter>() == 2 * size_of::<u32>()
+    // size_of::<RmtWriter>() == 2 * size_of::<PulseCode>()
     offset: u16,
 
     // ...
@@ -405,7 +560,7 @@ impl RmtWriter {
     // with underruns
     fn write(
         &mut self,
-        data: &mut impl Iterator<Item: Borrow<u32>>,
+        data: &mut impl Iterator<Item: Borrow<PulseCode>>,
         raw: impl TxChannelInternal,
         initial: bool,
     ) {
@@ -434,7 +589,7 @@ impl RmtWriter {
             memsize / 2
         };
 
-        let mut last_code = PulseCode::empty();
+        let mut last_code = PulseCode::end_marker();
         let mut written = 0;
         while let Some(code) = data.next() {
             last_code = *code.borrow();
@@ -462,7 +617,7 @@ impl RmtWriter {
         // Write an extra end marker to detect underruns.
         // Do not increment the offset afterwards since we want to overwrite it in the
         // next call
-        unsafe { start.add(offset).write_volatile(PulseCode::empty()) }
+        unsafe { start.add(offset).write_volatile(PulseCode::end_marker()) }
 
         self.written += written;
         self.offset = offset as u16;
@@ -483,9 +638,9 @@ enum ReaderState {
 
 /// docs
 struct RmtReader {
-    // Offset in RMT RAM section to continue reading from (number of u32!)
+    // Offset in RMT RAM section to continue reading from (number of PulseCode!)
     // u16 is sufficient to store this for all devices, and should be small enough such that
-    // size_of::<RmtReader>() == 2 * size_of::<u32>()
+    // size_of::<RmtReader>() == 2 * size_of::<PulseCode>()
     offset: u16,
 
     // ...
@@ -506,7 +661,7 @@ impl RmtReader {
 
     fn read<'a>(
         &mut self,
-        data: &mut impl Iterator<Item = &'a mut u32>,
+        data: &mut impl Iterator<Item = &'a mut PulseCode>,
         raw: impl RxChannelInternal,
         count: usize,
     ) {
@@ -1332,7 +1487,7 @@ pub struct SingleShotTxTransaction<'ch, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     raw: Raw,
     _phantom: PhantomData<&'ch mut Raw>,
@@ -1347,7 +1502,7 @@ impl<Raw, D> SingleShotTxTransaction<'_, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.raw;
@@ -1410,7 +1565,7 @@ impl<Raw, D> Drop for SingleShotTxTransaction<'_, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -1513,7 +1668,7 @@ pub trait TxChannel: Sized {
     ) -> Result<SingleShotTxTransaction<'_, Self::Raw, <D as IntoIterator>::IntoIter>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>;
+        D::Item: Borrow<PulseCode>;
 
     /// Start transmitting the given pulse code continuously.
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
@@ -1525,7 +1680,7 @@ pub trait TxChannel: Sized {
     ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>;
+        D::Item: Borrow<PulseCode>;
 
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
@@ -1537,7 +1692,7 @@ pub trait TxChannel: Sized {
     ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>;
+        D::Item: Borrow<PulseCode>;
 }
 
 impl<Raw> TxChannel for Channel<Blocking, Raw>
@@ -1555,7 +1710,7 @@ where
     ) -> Result<SingleShotTxTransaction<'_, Raw, <D as IntoIterator>::IntoIter>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>,
+        D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
@@ -1593,7 +1748,7 @@ where
     ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>,
+        D::Item: Borrow<PulseCode>,
     {
         self.transmit_continuously_with_loopcount(0, data)
     }
@@ -1608,7 +1763,7 @@ where
     ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         D: IntoIterator,
-        D::Item: Borrow<u32>,
+        D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
@@ -1640,7 +1795,7 @@ where
 pub struct RxTransaction<'ch, 'a, Raw, D>
 where
     Raw: RxChannelInternal,
-    D: Iterator<Item = &'a mut u32>,
+    D: Iterator<Item = &'a mut PulseCode>,
 {
     raw: Raw,
     _phantom: PhantomData<&'ch mut Raw>,
@@ -1653,7 +1808,7 @@ where
 impl<'a, Raw, D> RxTransaction<'_, 'a, Raw, D>
 where
     Raw: RxChannelInternal,
-    D: Iterator<Item = &'a mut u32>,
+    D: Iterator<Item = &'a mut PulseCode>,
 {
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.raw;
@@ -1725,7 +1880,7 @@ where
 impl<'a, Raw, D> Drop for RxTransaction<'_, 'a, Raw, D>
 where
     Raw: RxChannelInternal,
-    D: Iterator<Item = &'a mut u32>,
+    D: Iterator<Item = &'a mut PulseCode>,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -1755,7 +1910,7 @@ pub trait RxChannel: Sized {
         data: D,
     ) -> Result<RxTransaction<'ch, 'a, Self::Raw, D::IntoIter>, Error>
     where
-        D: IntoIterator<Item = &'a mut u32>;
+        D: IntoIterator<Item = &'a mut PulseCode>;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
@@ -1772,7 +1927,7 @@ where
         data: D,
     ) -> Result<RxTransaction<'ch, 'a, Raw, D::IntoIter>, Error>
     where
-        D: IntoIterator<Item = &'a mut u32>,
+        D: IntoIterator<Item = &'a mut PulseCode>,
     {
         self.raw.start_receive(true);
 
@@ -1795,7 +1950,7 @@ pub struct RmtTxFuture<'a, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator + Unpin,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     raw: Raw,
     _phantom: PhantomData<&'a mut Raw>,
@@ -1810,7 +1965,7 @@ impl<Raw, D> core::future::Future for RmtTxFuture<'_, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator + Unpin,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     type Output = Result<(), Error>;
 
@@ -1866,7 +2021,7 @@ impl<Raw, D> Drop for RmtTxFuture<'_, Raw, D>
 where
     Raw: TxChannelInternal,
     D: Iterator + Unpin,
-    D::Item: Borrow<u32>,
+    D::Item: Borrow<PulseCode>,
 {
     fn drop(&mut self) {
         let raw = self.raw;
@@ -1898,7 +2053,7 @@ pub trait TxChannelAsync {
         Self: Sized,
         D: IntoIterator,
         D::IntoIter: Unpin,
-        D::Item: Borrow<u32>;
+        D::Item: Borrow<PulseCode>;
 }
 
 impl<Raw> TxChannelAsync for Channel<Async, Raw>
@@ -1918,7 +2073,7 @@ where
         // If so, we could use it in a pinned way by using pin-projection (e.g. via
         // pin-project-lite) for the RmtTxFuture.
         D::IntoIter: Unpin,
-        D::Item: Borrow<u32>,
+        D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
@@ -2015,7 +2170,7 @@ pub trait RxChannelAsync {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
+    async fn receive<T: From<PulseCode> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized;
 }
@@ -2024,7 +2179,7 @@ impl<Raw> RxChannelAsync for Channel<Async, Raw>
 where
     Raw: RxChannelInternal,
 {
-    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
+    async fn receive<T: From<PulseCode> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
     {
@@ -2131,9 +2286,9 @@ pub trait ChannelInternal: RawChannelAccess {
     fn is_error(&self) -> bool;
 
     #[inline]
-    fn channel_ram_start(&self) -> *mut u32 {
+    fn channel_ram_start(&self) -> *mut PulseCode {
         unsafe {
-            (property!("rmt.ram_start") as *mut u32)
+            (property!("rmt.ram_start") as *mut PulseCode)
                 .add(usize::from(self.channel()) * property!("rmt.channel_ram_size"))
         }
     }
@@ -2991,7 +3146,7 @@ mod chip_specific {
             let ptr = self.channel_ram_start();
             for idx in 0..self.memsize().codes() {
                 unsafe {
-                    ptr.add(idx).write_volatile(0);
+                    ptr.add(idx).write_volatile(super::PulseCode::end_marker());
                 }
             }
         }
