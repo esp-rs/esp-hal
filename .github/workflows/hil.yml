@@ -9,7 +9,7 @@ on:
       repository:
         description: "Owner and repository to test"
         required: true
-        default: 'esp-rs/esp-hal'
+        default: "esp-rs/esp-hal"
       branch:
         description: "Branch, tag or SHA to checkout."
         required: true
@@ -115,10 +115,10 @@ jobs:
           buildtargets: ${{ matrix.target.soc }}
           default: true
           ldproxy: false
-          version: 1.85.0.0
+          version: 1.86.0.0
 
       - name: Build tests
-        run: cargo xtask build-tests ${{ matrix.target.soc }}
+        run: cargo xtask build tests ${{ matrix.target.soc }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -176,7 +176,7 @@ jobs:
 
           export PATH=$PATH:/home/espressif/.cargo/bin
           chmod +x xtask
-          ./xtask run-elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
+          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
 
       - name: Clean up
         if: always()

@@ -20,6 +20,8 @@ use static_cell::StaticCell;
 
 const MAX_BUFFER_SIZE: usize = 512;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[embassy_executor::task]
 async fn writer(
     mut tx: UsbSerialJtagTx<'static, Async>,

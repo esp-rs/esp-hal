@@ -6,10 +6,10 @@
 //! can be used to interact with different hardware timers, like the `TIMG` and
 //! SYSTIMER.
 #![cfg_attr(
-    not(feature = "esp32"),
+    systimer,
     doc = "See the [timg] and [systimer] modules for more information."
 )]
-#![cfg_attr(feature = "esp32", doc = "See the [timg] module for more information.")]
+#![cfg_attr(not(systimer), doc = "See the [timg] module for more information.")]
 //! ## Examples
 //!
 //! ### One-shot Timer

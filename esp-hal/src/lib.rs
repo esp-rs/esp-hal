@@ -576,14 +576,16 @@ pub struct Config {
     cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+    #[builder_lite(unstable)]
     watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(feature = "psram")]
+    #[builder_lite(unstable)]
     psram: psram::PsramConfig,
 }
 
@@ -665,7 +667,7 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(esp32)]
     crate::time::time_init();
 
-    crate::gpio::bind_default_interrupt_handler();
+    crate::gpio::interrupt::bind_default_interrupt_handler();
 
     #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);

@@ -50,7 +50,7 @@
 //!         PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
 //!             psram::psram_vaddr_start() as *mut u8,
 //!             psram::PSRAM_BYTES,
-//!             esp_alloc::MemoryCapability::Internal.into(),
+//!             esp_alloc::MemoryCapability::External.into(),
 //!         ));
 //!     }
 //! }
@@ -91,7 +91,7 @@
 //! you will need it for the `Box` and `Vec` types.
 //!
 //! ```toml
-//! allocator-api2 = { version = "0.2", default-features = false, features = ["alloc"] }
+//! allocator-api2 = { version = "0.3", default-features = false, features = ["alloc"] }
 //! ```
 //!
 //! With this, you can use the `Box` and `Vec` types from `allocator_api2`, with
@@ -107,6 +107,11 @@
 //! vec.push(0xabcd1234);
 //! assert_eq!(vec[0], 0xabcd1234);
 //! ```
+//!
+//! Note that if you use the nightly `allocator_api` feature, you can use the
+//! `Box` and `Vec` types from `alloc`. `allocator_api2` is still available as
+//! an option, but types from `allocator_api2` are not compatible with the
+//! standard library types.
 //!
 //! # Heap stats
 //!
@@ -130,8 +135,6 @@
 //! Total allocated: 46148
 //! Memory Layout:
 //! Internal | ████████████░░░░░░░░░░░░░░░░░░░░░░░ | Used: 35% (Used 46148 of 131068, free: 84920)
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
 //! ```
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
@@ -338,11 +341,6 @@ impl Display for HeapStats {
             if let Some(region) = region.as_ref() {
                 region.fmt(f)?;
                 writeln!(f)?;
-            } else {
-                // Display unused memory regions
-                write!(f, "Unused   | ")?;
-                write_bar(f, 0)?;
-                writeln!(f, " |")?;
             }
         }
         Ok(())
@@ -365,10 +363,6 @@ impl defmt::Format for HeapStats {
         for region in self.region_stats.iter() {
             if let Some(region) = region.as_ref() {
                 defmt::write!(fmt, "{}\n", region);
-            } else {
-                defmt::write!(fmt, "Unused   | ");
-                write_bar_defmt(fmt, 0);
-                defmt::write!(fmt, " |\n");
             }
         }
     }

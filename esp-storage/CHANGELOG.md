@@ -5,15 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
+
 
 ### Changed
 
 - Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- The `low-level` feature has been removed, the gated API is always available (#3425)
 
 ### Fixed
+
 
 ### Removed
 
@@ -24,19 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Bump MSRV to 1.84 (#2951)
-- Add support for 32MB flash
+- Add support for 32MB flash (#3163)
 
 ## 0.4.0 - 2024-11-20
 
 ### Added
 
 - Added trait MultiwriteNorFlash to FlashStorage (#2478)
-
-### Changed
-
-### Fixed
-
-### Removed
 
 ## 0.3.1 - 2024-10-10
 
@@ -47,3 +44,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2022-09-26
 
 [0.5.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-storage-v0.5.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.5.0...HEAD

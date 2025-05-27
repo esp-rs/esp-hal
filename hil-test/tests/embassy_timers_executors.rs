@@ -21,17 +21,9 @@ use esp_hal::{
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
-use hil_test as _;
+use hil_test::mk_static;
 
-#[cfg(not(feature = "esp32"))]
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
+esp_bootloader_esp_idf::esp_app_desc!();
 
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {

@@ -38,6 +38,8 @@ use smoltcp::{
     wire::{DhcpOption, IpAddress},
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const HOST_IP: &str = env!("HOST_IP");

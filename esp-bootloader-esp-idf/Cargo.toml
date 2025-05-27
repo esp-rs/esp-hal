@@ -1,6 +1,6 @@
 [package]
 name = "esp-bootloader-esp-idf"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.85.0"
 description = "Functionality related to the esp-idf bootloader"
@@ -15,7 +15,7 @@ default-target = "riscv32imac-unknown-none-elf"
 
 [lib]
 bench = false
-test  = false
+test  = true
 
 [dependencies]
 defmt = { version = "1.0.1", optional = true }

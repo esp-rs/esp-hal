@@ -52,8 +52,6 @@
 // MUST be the first module
 mod fmt;
 
-#[cfg(not(feature = "esp32"))]
-use esp_hal::timer::systimer::Alarm;
 use esp_hal::timer::{AnyTimer, timg::Timer as TimgTimer};
 pub use macros::embassy_main as main;
 
@@ -75,69 +73,87 @@ macro_rules! mk_static {
     }};
 }
 
-/// A trait to allow better UX for initializing the timers.
-///
-/// This trait is meant to be used only for the `init` function.
-/// Calling `timers()` multiple times may panic.
-pub trait TimerCollection {
-    /// Returns the timers as a slice.
-    fn timers(self) -> &'static mut [Timer];
+mod private {
+    pub trait Sealed {}
+
+    #[derive(Clone, Copy)]
+    pub struct Internal;
 }
 
-/// Helper trait to reduce boilerplate.
-///
-/// We can't blanket-implement for `Into<AnyTimer>` because of possible
-/// conflicting implementations.
-trait IntoAnyTimer: Into<AnyTimer<'static>> {}
-
-impl IntoAnyTimer for AnyTimer<'static> {}
-
-impl IntoAnyTimer for TimgTimer<'static> where Self: Into<AnyTimer<'static>> {}
-
-#[cfg(not(feature = "esp32"))]
-impl IntoAnyTimer for Alarm<'static> where Self: Into<AnyTimer<'static>> {}
-
-impl<T> TimerCollection for T
-where
-    T: IntoAnyTimer,
-{
-    fn timers(self) -> &'static mut [Timer] {
-        Timer::new(self.into()).timers()
-    }
+/// A timer or collection on timers that can be passed to [`init`].
+pub trait TimeBase: private::Sealed {
+    #[doc(hidden)]
+    fn timers(self, _: private::Internal) -> &'static mut [Timer];
 }
 
-impl TimerCollection for Timer {
-    fn timers(self) -> &'static mut [Timer] {
-        let timers = mk_static!([Timer; 1], [self]);
-        timers.timers()
-    }
-}
+macro_rules! impl_timebase {
+    ($timebase:path) => {
+        impl private::Sealed for $timebase {}
 
-impl TimerCollection for &'static mut [Timer] {
-    fn timers(self) -> &'static mut [Timer] {
-        self
-    }
-}
-
-impl<const N: usize> TimerCollection for &'static mut [Timer; N] {
-    fn timers(self) -> &'static mut [Timer] {
-        self.as_mut()
-    }
-}
-
-macro_rules! impl_array {
-    ($n:literal) => {
-        impl<T> TimerCollection for [T; $n]
-        where
-            T: IntoAnyTimer,
-        {
-            fn timers(self) -> &'static mut [Timer] {
-                mk_static!([Timer; $n], self.map(|t| Timer::new(t.into())))
+        impl TimeBase for $timebase {
+            fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+                mk_static!([Timer; 1], [Timer::new(self)])
             }
         }
     };
 }
 
+macro_rules! impl_timebase_array {
+    ($timebase:path, $n:literal) => {
+        impl private::Sealed for [$timebase; $n] {}
+
+        impl TimeBase for [$timebase; $n] {
+            fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+                mk_static!([Timer; $n], self.map(|t| Timer::new(t)))
+            }
+        }
+    };
+}
+
+macro_rules! impl_array {
+    ($n:literal) => {
+        impl private::Sealed for [Timer; $n] {}
+
+        impl TimeBase for [Timer; $n] {
+            fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+                mk_static!([Timer; $n], self)
+            }
+        }
+
+        impl_timebase_array!(AnyTimer<'static>, $n);
+        impl_timebase_array!(TimgTimer<'static>, $n);
+        #[cfg(systimer)]
+        impl_timebase_array!(esp_hal::timer::systimer::Alarm<'static>, $n);
+    };
+}
+
+impl private::Sealed for Timer {}
+impl TimeBase for Timer {
+    fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+        mk_static!([Timer; 1], [self])
+    }
+}
+
+impl_timebase!(AnyTimer<'static>);
+impl_timebase!(TimgTimer<'static>);
+#[cfg(systimer)]
+impl_timebase!(esp_hal::timer::systimer::Alarm<'static>);
+
+impl private::Sealed for &'static mut [Timer] {}
+impl TimeBase for &'static mut [Timer] {
+    fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+        self
+    }
+}
+
+impl<const N: usize> private::Sealed for &'static mut [Timer; N] {}
+impl<const N: usize> TimeBase for &'static mut [Timer; N] {
+    fn timers(self, _: private::Internal) -> &'static mut [Timer] {
+        self.as_mut()
+    }
+}
+
+impl_array!(1);
 impl_array!(2);
 impl_array!(3);
 impl_array!(4);
@@ -148,13 +164,13 @@ impl_array!(4);
 ///
 /// The time driver can be one of a number of different options:
 ///
-/// - A timg `Timer` instance
-/// - A systimer `Alarm` instance
-/// - An `AnyTimer` instance
-/// - A `OneShotTimer` instance
+/// - A single object of, or a 1-4 element array of the following:
+///   - `esp_hal::timer::timg::Timer`
+#[cfg_attr(systimer, doc = "  - `esp_hal::timer::systimer::Alarm`")]
+///   - `esp_hal::timer::AnyTimer`
+///   - `esp_hal::timer::OneShotTimer`
 /// - A mutable static slice of `OneShotTimer` instances
 /// - A mutable static array of `OneShotTimer` instances
-/// - A 2, 3, 4 element array of `AnyTimer` instances
 ///
 /// Note that if you use the `multiple-integrated` timer-queue flavour, then
 /// you need to pass as many timers as you start executors. In other cases,
@@ -172,7 +188,7 @@ impl_array!(4);
 /// // ... now you can spawn embassy tasks or use `Timer::after` etc.
 /// # }
 /// ```
-pub fn init(time_driver: impl TimerCollection) {
+pub fn init(time_driver: impl TimeBase) {
     #[cfg(all(feature = "executors", multi_core, low_power_wait))]
     unsafe {
         use esp_hal::interrupt::software::SoftwareInterrupt;
@@ -192,5 +208,5 @@ pub fn init(time_driver: impl TimerCollection) {
         );
     }
 
-    EmbassyTimer::init(time_driver.timers())
+    EmbassyTimer::init(time_driver.timers(private::Internal))
 }

@@ -1,8 +1,11 @@
-/// Low-level API
-///
-/// This gives you access to the underlying low level functionality.
-/// These operate on raw pointers and all functions here are unsafe.
-/// No pre-conditions are checked by any of these functions.
+//! # Low-level API
+//!
+//! ⚠️ This is a low-level API and should be used with caution. ⚠️
+//!
+//! This gives you access to the underlying low level functionality.
+//! These operate on raw pointers and all functions here are unsafe.
+//! No pre-conditions are checked by any of these functions.
+
 use crate::chip_specific;
 
 /// Low-level SPI NOR Flash read

@@ -12,6 +12,8 @@ mod tests {
     use esp_hal::usb_serial_jtag::UsbSerialJtag;
     use hil_test as _;
 
+    esp_bootloader_esp_idf::esp_app_desc!();
+
     #[test]
     fn creating_peripheral_does_not_break_debug_connection() {
         let peripherals = esp_hal::init(esp_hal::Config::default());

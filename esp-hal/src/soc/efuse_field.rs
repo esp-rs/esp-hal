@@ -1,109 +1,115 @@
+use core::{cmp, mem, slice};
+
 use bytemuck::AnyBitPattern;
 
 use crate::soc::efuse::{Efuse, EfuseBlock};
 
 /// The bit field for get access to efuse data
-#[derive(Clone, Copy)]
+#[allow(unused)]
+#[derive(Debug, Clone, Copy)]
 pub struct EfuseField {
-    blk: EfuseBlock,
-    bit_off: u16,
-    bit_len: u16,
+    pub(crate) block: EfuseBlock,
+    pub(crate) word: u32,
+    pub(crate) bit_start: u32,
+    pub(crate) bit_count: u32,
 }
 
 impl EfuseField {
-    pub(crate) const fn new(blk: EfuseBlock, bit_off: u16, bit_len: u16) -> Self {
+    pub(crate) const fn new(block: u32, word: u32, bit_start: u32, bit_count: u32) -> Self {
         Self {
-            blk,
-            bit_off,
-            bit_len,
+            block: EfuseBlock::from_repr(block).unwrap(),
+            word,
+            bit_start,
+            bit_count,
         }
     }
 }
 
 impl Efuse {
+    /// Reads chip's MAC address from the eFuse storage.
+    pub fn read_base_mac_address() -> [u8; 6] {
+        let mut mac_addr = [0u8; 6];
+
+        let mac0 = Self::read_field_le::<[u8; 4]>(crate::soc::efuse::MAC0);
+        let mac1 = Self::read_field_le::<[u8; 2]>(crate::soc::efuse::MAC1);
+
+        // MAC address is stored in big endian, so load the bytes in reverse:
+        mac_addr[0] = mac1[1];
+        mac_addr[1] = mac1[0];
+        mac_addr[2] = mac0[3];
+        mac_addr[3] = mac0[2];
+        mac_addr[4] = mac0[1];
+        mac_addr[5] = mac0[0];
+
+        mac_addr
+    }
+
     /// Read field value in a little-endian order
     #[inline(always)]
     pub fn read_field_le<T: AnyBitPattern>(field: EfuseField) -> T {
-        let mut output = core::mem::MaybeUninit::<T>::uninit();
-        // represent output value as a bytes slice
-        let mut bytes = unsafe {
-            core::slice::from_raw_parts_mut(
-                output.as_mut_ptr() as *mut u8,
-                core::mem::size_of::<T>(),
-            )
-        };
-        // get block address
-        let block_address = field.blk.address();
+        let EfuseField {
+            block,
+            bit_start,
+            bit_count,
+            ..
+        } = field;
 
-        let bit_off = field.bit_off as usize;
-        let bit_end = (field.bit_len as usize).min(bytes.len() * 8) + bit_off;
+        // Represent output value as a bytes slice:
+        let mut output = mem::MaybeUninit::<T>::uninit();
+        let mut bytes = unsafe {
+            slice::from_raw_parts_mut(output.as_mut_ptr() as *mut u8, mem::size_of::<T>())
+        };
+
+        let bit_off = bit_start as usize;
+        let bit_end = cmp::min(bit_count as usize, bytes.len() * 8) + bit_off;
 
         let mut last_word_off = bit_off / 32;
-        let mut last_word = unsafe { block_address.add(last_word_off).read_volatile() };
+        let mut last_word = unsafe { block.address().add(last_word_off).read_volatile() };
+
         let word_bit_off = bit_off % 32;
         let word_bit_ext = 32 - word_bit_off;
+
         let mut word_off = last_word_off;
-
         for bit_off in (bit_off..bit_end).step_by(32) {
-            let word_bit_len = 32.min(bit_end - bit_off);
-
             if word_off != last_word_off {
-                // read new word
+                // Read a new word:
                 last_word_off = word_off;
-                last_word = unsafe { block_address.add(last_word_off).read_volatile() };
+                last_word = unsafe { block.address().add(last_word_off).read_volatile() };
             }
 
             let mut word = last_word >> word_bit_off;
-
             word_off += 1;
 
+            let word_bit_len = cmp::min(bit_end - bit_off, 32);
             if word_bit_len > word_bit_ext {
-                // read the next word
+                // Read the next word:
                 last_word_off = word_off;
-                last_word = unsafe { block_address.add(last_word_off).read_volatile() };
-                // append bits from a beginning of the next word
+                last_word = unsafe { block.address().add(last_word_off).read_volatile() };
+                // Append bits from a beginning of the next word:
                 word |= last_word.wrapping_shl((32 - word_bit_off) as u32);
             };
 
             if word_bit_len < 32 {
-                // mask only needed bits of a word
+                // Mask only needed bits of a word:
                 word &= u32::MAX >> (32 - word_bit_len);
             }
 
-            // get data length in bytes (ceil)
+            // Represent word as a byte slice:
             let byte_len = word_bit_len.div_ceil(8);
-            // represent word as a byte slice
             let word_bytes =
-                unsafe { core::slice::from_raw_parts(&word as *const u32 as *const u8, byte_len) };
+                unsafe { slice::from_raw_parts(&word as *const u32 as *const u8, byte_len) };
 
-            // copy word bytes to output value bytes
+            // Copy word bytes to output value bytes:
             bytes[..byte_len].copy_from_slice(word_bytes);
 
-            // move read window forward
+            // Move read window forward:
             bytes = &mut bytes[byte_len..];
         }
 
-        // fill untouched bytes with zeros
+        // Fill untouched bytes with zeros:
         bytes.fill(0);
 
         unsafe { output.assume_init() }
-    }
-
-    /// Read field value in a big-endian order
-    #[inline(always)]
-    pub fn read_field_be<T: AnyBitPattern>(field: EfuseField) -> T {
-        // read value in a little-endian order
-        let mut output = Self::read_field_le::<T>(field);
-        // represent output value as a byte slice
-        let bytes = unsafe {
-            core::slice::from_raw_parts_mut(
-                &mut output as *mut T as *mut u8,
-                core::mem::size_of::<T>(),
-            )
-        };
-        // reverse byte order
-        bytes.reverse();
-        output
     }
 
     /// Read bit value.
@@ -112,7 +118,7 @@ impl Efuse {
     #[inline(always)]
     #[cfg_attr(not(feature = "unstable"), allow(unused))]
     pub fn read_bit(field: EfuseField) -> bool {
-        assert_eq!(field.bit_len, 1);
+        assert_eq!(field.bit_count, 1);
         Self::read_field_le::<u8>(field) != 0
     }
 }

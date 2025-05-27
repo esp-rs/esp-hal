@@ -188,3 +188,6 @@ jobs:
           changeLogPath: xtensa-lx-rt/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the xtensa-lx-rt/CHANGELOG.md file."
+
+      - name: Changelog format check
+        run: cargo xtask check-changelog

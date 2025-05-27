@@ -51,28 +51,15 @@ use crate::{
     peripherals::Interrupt,
     private,
     system::{PeripheralClockControl, PeripheralGuard},
-    time::Rate,
+    time::{Duration, Instant, Rate},
 };
 
-cfg_if::cfg_if! {
-    if #[cfg(esp32s2)] {
-        const I2C_LL_INTR_MASK: u32 = 0x1ffff;
-    } else {
-        const I2C_LL_INTR_MASK: u32 = 0x3ffff;
-    }
-}
-
-#[cfg(not(esp32c2))]
-const I2C_FIFO_SIZE: usize = 32;
-
-#[cfg(esp32c2)]
-const I2C_FIFO_SIZE: usize = 16;
+const I2C_LL_INTR_MASK: u32 = if cfg!(esp32s2) { 0x1ffff } else { 0x3ffff };
+const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
-
-// on ESP32 there is a chance to get trapped in `wait_for_completion` forever
-const MAX_ITERATIONS: u32 = 1_000_000;
+const TIMEOUT: Duration = Duration::from_millis(10);
 
 /// Representation of I2C address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -145,14 +132,15 @@ pub enum BusTimeout {
 impl BusTimeout {
     fn cycles(&self) -> u32 {
         match self {
-            #[cfg(esp32)]
-            BusTimeout::Maximum => 0xF_FFFF,
-
-            #[cfg(esp32s2)]
-            BusTimeout::Maximum => 0xFF_FFFF,
-
-            #[cfg(not(any(esp32, esp32s2)))]
-            BusTimeout::Maximum => 0x1F,
+            BusTimeout::Maximum => {
+                if cfg!(esp32) {
+                    0xF_FFFF
+                } else if cfg!(esp32s2) {
+                    0xFF_FFFF
+                } else {
+                    0x1F
+                }
+            }
 
             #[cfg(not(any(esp32, esp32s2)))]
             BusTimeout::Disabled => 1,
@@ -687,83 +675,45 @@ pub enum Event {
 #[cfg(not(esp32))]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct I2cFuture<'a> {
-    event: Event,
+    events: EnumSet<Event>,
     info: &'a Info,
     state: &'a State,
 }
 
 #[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
-    pub fn new(event: Event, info: &'a Info, state: &'a State) -> Self {
+    pub fn new(events: EnumSet<Event>, info: &'a Info, state: &'a State) -> Self {
         info.regs().int_ena().modify(|_, w| {
-            let w = match event {
-                Event::EndDetect => w.end_detect().set_bit(),
-                Event::TxComplete => w.trans_complete().set_bit(),
-                #[cfg(not(any(esp32, esp32s2)))]
-                Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
-            };
+            for event in events {
+                match event {
+                    Event::EndDetect => w.end_detect().set_bit(),
+                    Event::TxComplete => w.trans_complete().set_bit(),
+                    #[cfg(not(any(esp32, esp32s2)))]
+                    Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
+                };
+            }
 
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
             w.nack().set_bit();
             #[cfg(not(any(esp32, esp32s2)))]
-            w.scl_main_st_to().set_bit();
-            #[cfg(not(any(esp32, esp32s2)))]
-            w.scl_st_to().set_bit();
+            {
+                w.scl_main_st_to().set_bit();
+                w.scl_st_to().set_bit();
+            }
 
             w
         });
 
-        Self { event, state, info }
-    }
-
-    fn event_bit_is_clear(&self) -> bool {
-        let r = self.info.regs().int_ena().read();
-
-        match self.event {
-            Event::EndDetect => r.end_detect().bit_is_clear(),
-            Event::TxComplete => r.trans_complete().bit_is_clear(),
-            #[cfg(not(any(esp32, esp32s2)))]
-            Event::TxFifoWatermark => r.txfifo_wm().bit_is_clear(),
+        Self {
+            events,
+            state,
+            info,
         }
     }
 
-    fn check_error(&self) -> Result<(), Error> {
-        let r = self.info.regs().int_raw().read();
-
-        if r.arbitration_lost().bit_is_set() {
-            return Err(Error::ArbitrationLost);
-        }
-
-        if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
-        }
-
-        if r.nack().bit_is_set() {
-            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
-                self.info.regs(),
-            )));
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        if r.scl_st_to().bit_is_set() {
-            return Err(Error::Timeout);
-        }
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        if r.scl_main_st_to().bit_is_set() {
-            return Err(Error::Timeout);
-        }
-
-        #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set() && self.info.regs().sr().read().resp_rec().bit_is_clear()
-        {
-            return Err(Error::AcknowledgeCheckFailed(
-                AcknowledgeCheckFailedReason::Data,
-            ));
-        }
-
-        Ok(())
+    fn is_done(&self) -> bool {
+        !self.info.interrupts().is_disjoint(self.events)
     }
 }
 
@@ -774,14 +724,16 @@ impl core::future::Future for I2cFuture<'_> {
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         self.state.waker.register(ctx.waker());
 
-        let error = self.check_error();
-
-        if error.is_err() {
-            return Poll::Ready(error);
+        let error = Driver {
+            info: self.info,
+            state: self.state,
         }
+        .check_errors();
 
-        if self.event_bit_is_clear() {
+        if self.is_done() {
             Poll::Ready(Ok(()))
+        } else if error.is_err() {
+            Poll::Ready(error)
         } else {
             Poll::Pending
         }
@@ -1115,22 +1067,9 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
 }
 
 fn async_handler(info: &Info, state: &State) {
-    let regs = info.regs();
-    regs.int_ena().modify(|_, w| {
-        w.end_detect().clear_bit();
-        w.trans_complete().clear_bit();
-        w.arbitration_lost().clear_bit();
-        w.time_out().clear_bit();
-        #[cfg(not(esp32))]
-        w.scl_main_st_to().clear_bit();
-        #[cfg(not(esp32))]
-        w.scl_st_to().clear_bit();
-
-        #[cfg(not(any(esp32, esp32s2)))]
-        w.txfifo_wm().clear_bit();
-
-        w.nack().clear_bit()
-    });
+    // Disable all interrupts. The I2C Future will check events based on the
+    // interrupt status bits.
+    info.regs().int_ena().write(|w| unsafe { w.bits(0) });
 
     state.waker.wake();
 }
@@ -1427,15 +1366,15 @@ impl Driver<'_> {
     /// Resets the I2C controller (FIFO + FSM + command list)
     fn reset(&self) {
         // Reset the FSM
-        // (the option to reset the FSM is not available
-        // for the ESP32)
+        // (the option to reset the FSM is not available for the ESP32)
         #[cfg(not(esp32))]
         self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
+        self.reset_before_transmission();
+    }
 
+    fn reset_before_transmission(&self) {
         // Clear all I2C interrupts
-        self.regs()
-            .int_clr()
-            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
+        self.clear_all_interrupts();
 
         // Reset fifo
         self.reset_fifo();
@@ -1940,116 +1879,113 @@ impl Driver<'_> {
 
     #[cfg(not(esp32))]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        self.check_errors()?;
-
-        if end_only {
-            I2cFuture::new(Event::EndDetect, self.info, self.state).await?;
+        let event = if end_only {
+            Event::EndDetect.into()
         } else {
-            let res = embassy_futures::select::select(
-                I2cFuture::new(Event::TxComplete, self.info, self.state),
-                I2cFuture::new(Event::EndDetect, self.info, self.state),
-            )
-            .await;
-
-            match res {
-                embassy_futures::select::Either::First(res) => res?,
-                embassy_futures::select::Either::Second(res) => res?,
-            }
-        }
-        self.check_all_commands_done()?;
-
-        Ok(())
+            Event::TxComplete | Event::EndDetect
+        };
+        I2cFuture::new(event, self.info, self.state)
+            .await
+            .inspect_err(|_| self.reset())?;
+        self.check_all_commands_done().await
     }
 
     #[cfg(esp32)]
     async fn wait_for_completion(&self, end_only: bool) -> Result<(), Error> {
-        // for ESP32 we need a timeout here but wasting a timer seems unnecessary
-        // given the short time we spend here
+        let start = Instant::now();
 
-        let mut tout = MAX_ITERATIONS / 10; // adjust the timeout because we are yielding in the loop
-        loop {
-            let interrupts = self.regs().int_raw().read();
-
-            self.check_errors()?;
-
-            // Handle completion cases
-            // A full transmission was completed (either a STOP condition or END was
-            // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set())
-                || interrupts.end_detect().bit_is_set()
-            {
-                break;
-            }
-
-            tout -= 1;
-            if tout == 0 {
+        while !self.is_completed(end_only)? {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::Timeout);
             }
-
             embassy_futures::yield_now().await;
         }
-        self.check_all_commands_done()?;
-        Ok(())
+
+        self.check_all_commands_done().await
     }
 
     /// Waits for the completion of an I2C transaction.
     fn wait_for_completion_blocking(&self, end_only: bool) -> Result<(), Error> {
-        let mut tout = MAX_ITERATIONS;
-        loop {
-            let interrupts = self.regs().int_raw().read();
+        let start = Instant::now();
 
-            self.check_errors()?;
-
-            // Handle completion cases
-            // A full transmission was completed (either a STOP condition or END was
-            // processed)
-            if (!end_only && interrupts.trans_complete().bit_is_set())
-                || interrupts.end_detect().bit_is_set()
-            {
-                break;
-            }
-
-            tout -= 1;
-            if tout == 0 {
+        while !self.is_completed(end_only)? {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::Timeout);
             }
         }
-        self.check_all_commands_done()?;
+
+        self.check_all_commands_done_blocking()
+    }
+
+    fn is_completed(&self, end_only: bool) -> Result<bool, Error> {
+        let interrupts = self.regs().int_raw().read();
+
+        if (!end_only && interrupts.trans_complete().bit_is_set())
+            || interrupts.end_detect().bit_is_set()
+        {
+            // Handle completion cases
+            // A full transmission was completed (either a STOP condition or END was
+            // processed)
+            return Ok(true);
+        }
+
+        self.check_errors().inspect_err(|_| self.reset())?;
+
+        Ok(false)
+    }
+
+    fn all_commands_done(&self) -> bool {
+        for cmd_reg in self.regs().comd_iter() {
+            let cmd = cmd_reg.read();
+
+            // if there is a valid command which is not END, check if it's marked as done
+            if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
+                // Let's retry
+                return false;
+            }
+
+            // once we hit END or STOP we can break the loop
+            if cmd.opcode().is_end() || cmd.opcode().is_stop() {
+                break;
+            }
+        }
+        true
+    }
+
+    /// Checks whether all I2C commands have completed execution.
+    fn check_all_commands_done_blocking(&self) -> Result<(), Error> {
+        // NOTE: on esp32 executing the end command generates the end_detect interrupt
+        //       but does not seem to clear the done bit! So we don't check the done
+        //       status of an end command
+        // loop until commands are actually done
+
+        let start = Instant::now();
+
+        while !self.all_commands_done() {
+            if Instant::now() - start > TIMEOUT {
+                return Err(Error::ExecutionIncomplete);
+            }
+        }
+
         Ok(())
     }
 
     /// Checks whether all I2C commands have completed execution.
-    fn check_all_commands_done(&self) -> Result<(), Error> {
+    async fn check_all_commands_done(&self) -> Result<(), Error> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
-        let mut cnt = MAX_ITERATIONS;
         // loop until commands are actually done
-        loop {
-            let mut not_done = false;
-            for cmd_reg in self.regs().comd_iter() {
-                let cmd = cmd_reg.read();
 
-                // if there is a valid command which is not END, check if it's marked as done
-                if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
-                    not_done = true;
-                }
+        let start = Instant::now();
 
-                // once we hit END or STOP we can break the loop
-                if cmd.opcode().is_end() || cmd.opcode().is_stop() {
-                    break;
-                }
-            }
-
-            if !not_done {
-                break;
-            }
-
-            cnt -= 1;
-            if cnt == 0 {
+        while !self.all_commands_done() {
+            if Instant::now() - start > TIMEOUT {
                 return Err(Error::ExecutionIncomplete);
             }
+            embassy_futures::yield_now().await;
         }
+
         Ok(())
     }
 
@@ -2061,43 +1997,42 @@ impl Driver<'_> {
     /// by resetting the I2C peripheral to clear the error condition and then
     /// returns an appropriate error.
     fn check_errors(&self) -> Result<(), Error> {
-        let interrupts = self.regs().int_raw().read();
+        let r = self.regs().int_raw().read();
 
         // The ESP32 variant has a slightly different interrupt naming
         // scheme!
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // Handle error cases
-                let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::Timeout)
-                } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
-                } else if interrupts.arbitration_lost().bit_is_set() {
-                    Err(Error::ArbitrationLost)
-                } else {
-                    Ok(())
-                };
-            } else {
-                // Handle error cases
-                let retval = if interrupts.time_out().bit_is_set() {
-                    Err(Error::Timeout)
-                } else if interrupts.nack().bit_is_set() {
-                    Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(self.regs())))
-                } else if interrupts.arbitration_lost().bit_is_set() {
-                    Err(Error::ArbitrationLost)
-                } else if interrupts.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
-                    Err(Error::AcknowledgeCheckFailed(AcknowledgeCheckFailedReason::Data))
-                } else {
-                    Ok(())
-                };
+
+        // Handle error cases
+        if r.time_out().bit_is_set() {
+            return Err(Error::Timeout);
+        }
+        if r.nack().bit_is_set() {
+            return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
+                self.regs(),
+            )));
+        }
+        if r.arbitration_lost().bit_is_set() {
+            return Err(Error::ArbitrationLost);
+        }
+
+        #[cfg(not(any(esp32, esp32s2)))]
+        {
+            if r.scl_st_to().bit_is_set() {
+                return Err(Error::Timeout);
+            }
+            if r.scl_main_st_to().bit_is_set() {
+                return Err(Error::Timeout);
             }
         }
 
-        if retval.is_err() {
-            self.reset();
+        #[cfg(not(esp32))]
+        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
-        retval
+        Ok(())
     }
 
     /// Updates the configuration of the I2C peripheral.
@@ -2176,9 +2111,6 @@ impl Driver<'_> {
         bytes: &[u8],
         start: bool,
     ) -> Result<(), Error> {
-        address.validate()?;
-        self.reset_fifo();
-        self.reset_command_list();
         let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
@@ -2210,10 +2142,6 @@ impl Driver<'_> {
         start: bool,
         will_continue: bool,
     ) -> Result<(), Error> {
-        address.validate()?;
-        self.reset_fifo();
-        self.reset_command_list();
-
         let cmd_iterator = &mut self.regs().comd_iter();
 
         if start {
@@ -2243,7 +2171,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2280,7 +2208,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2310,7 +2238,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors()?;
+                self.check_errors().inspect_err(|_| self.reset())?;
                 break;
             }
         }
@@ -2334,7 +2262,7 @@ impl Driver<'_> {
         stop: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
         // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2371,7 +2299,7 @@ impl Driver<'_> {
         will_continue: bool,
     ) -> Result<(), Error> {
         address.validate()?;
-        self.clear_all_interrupts();
+        self.reset_before_transmission();
 
         // Short circuit for zero length reads as that would be an invalid operation
         // read lengths in the TRM (at least for ESP32-S3) are 1-255
@@ -2402,7 +2330,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors()?;
+                self.check_errors().inspect_err(|_| self.reset())?;
                 embassy_futures::yield_now().await;
                 break;
             }

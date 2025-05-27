@@ -10,7 +10,7 @@ license       = "MIT OR Apache-2.0"
 
 [lib]
 bench = false
-test  = false
+test  = true
 
 [dependencies]
 document-features = "0.2.11"

@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use clap::ValueEnum;
 use esp_metadata::Config;
 use kuchikiki::traits::*;
@@ -13,7 +13,7 @@ use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{cargo::CargoArgsBuilder, Chip, Package};
+use crate::{Chip, Package, cargo::CargoArgsBuilder};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -38,7 +38,7 @@ pub fn build_documentation(
 
     for package in packages {
         // Not all packages need documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
@@ -159,11 +159,7 @@ fn build_documentation_for_package(
             if package.chip_features_matter() {
                 version.to_string()
             } else {
-                format!(
-                    "{}/{}",
-                    version.to_string(),
-                    package.to_string().replace('-', "_")
-                )
+                format!("{}/{}", version, package.to_string().replace('-', "_"))
             }
         )
         .as_bytes(),
@@ -200,7 +196,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let mut features = vec![];
     if let Some(chip) = &chip {
         features.push(chip.to_string());
-        features.extend(package.feature_rules(Config::for_chip(&chip)));
+        features.extend(package.feature_rules(Config::for_chip(chip)));
     } else {
         features.extend(package.feature_rules(&Config::empty()));
     }
@@ -220,7 +216,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
 
     // Special case: `esp-metadata` requires `std`, and we get some really confusing
     // errors if we try to pass `-Zbuild-std=core`:
-    if package != Package::EspMetadata {
+    if package.needs_build_std() {
         builder = builder.arg("-Zbuild-std=alloc,core");
     }
 
@@ -312,14 +308,16 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
     for package in packages {
         // Not all packages have documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
         // If the chip features are not relevant, then there is no need to generate an
         // index for the given package's documentation:
         if !package.chip_features_matter() {
-            log::warn!("Package '{package}' does not have device-specific documentation, no need to generate an index");
+            log::warn!(
+                "Package '{package}' does not have device-specific documentation, no need to generate an index"
+            );
             continue;
         }
 
@@ -354,14 +352,12 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 .map(|path| {
                     let chip = path
                         .components()
-                        .last()
+                        .next_back()
                         .unwrap()
                         .as_os_str()
                         .to_string_lossy();
 
-                    let chip = Chip::from_str(&chip, true).unwrap();
-
-                    chip
+                    Chip::from_str(&chip, true).unwrap()
                 })
                 .collect::<Vec<_>>();
 
@@ -376,7 +372,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 minijinja::context! { metadata => meta },
             )?;
             let path = version_path.join("index.html");
-            fs::write(&path, html).context(format!("Failed to write index.html"))?;
+            fs::write(&path, html).context("Failed to write index.html")?;
             log::info!("Created {}", path.display());
         }
     }
@@ -388,7 +384,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     )
     .context("Failed to copy esp-rs.svg")?;
 
-    let meta = generate_documentation_meta_for_index(&workspace)?;
+    let meta = generate_documentation_meta_for_index(workspace)?;
 
     // Render the template to HTML and write it out to the desired path:
     let html = render_template(
@@ -397,7 +393,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
         minijinja::context! { metadata => meta },
     )?;
     let path = docs_path.join("index.html");
-    fs::write(&path, html).context(format!("Failed to write index.html"))?;
+    fs::write(&path, html).context("Failed to write index.html")?;
     log::info!("Created {}", path.display());
 
     Ok(())
@@ -435,7 +431,7 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
 
     for package in Package::iter() {
         // Not all packages have documentation built:
-        if !package.is_published() {
+        if !package.is_published(workspace) {
             continue;
         }
 
@@ -471,7 +467,11 @@ fn fetch_manifest(base_url: &Option<String>, package: &Package) -> Result<Manife
 
     #[cfg(feature = "deploy-docs")]
     let manifest = match reqwest::blocking::get(manifest_url) {
-        Ok(resp) => resp.json::<Manifest>()?,
+        Ok(resp) if resp.status().is_success() => resp.json::<Manifest>()?,
+        Ok(resp) => {
+            log::warn!("Unable to fetch package manifest: {}", resp.status());
+            Manifest::default()
+        }
         Err(err) => {
             log::warn!("Unable to fetch package manifest: {err}");
             Manifest::default()

@@ -32,6 +32,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
     esp_println::println!("Init!");

@@ -159,9 +159,13 @@ impl EmbassyTimer {
         });
 
         // Store the available timers
-        DRIVER
-            .available_timers
-            .with(|available_timers| *available_timers = Some(timers));
+        DRIVER.available_timers.with(|available_timers| {
+            assert!(
+                available_timers.is_none(),
+                "The timers have already been initialized."
+            );
+            *available_timers = Some(timers);
+        });
     }
 
     #[cfg(not(single_queue))]

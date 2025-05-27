@@ -1,6 +1,6 @@
 //! Uses DMA to copy memory to memory.
 
-//% FEATURES: esp-hal/log esp-hal/unstable
+//% FEATURES: esp-hal/unstable
 //% CHIPS: esp32s2 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
@@ -15,6 +15,8 @@ use esp_hal::{
     time::Duration,
 };
 use log::{error, info};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const DATA_SIZE: usize = 1024 * 10;
 

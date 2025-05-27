@@ -72,7 +72,7 @@ jobs:
       - uses: esp-rs/xtensa-toolchain@v1.5
         with:
           ldproxy: false
-          version: 1.85.0.0
+          version: 1.86.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -95,6 +95,10 @@ jobs:
       - name: Build and Check
         shell: bash
         run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
+
+      - name: Semver-Check
+        shell: bash
+        run: cargo +${{ matrix.device.toolchain }} xcheck semver-check --chips ${{ matrix.device.soc }} check
 
   extras:
     runs-on: macos-m1-self-hosted

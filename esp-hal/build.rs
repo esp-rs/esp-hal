@@ -5,11 +5,10 @@ use std::{
     fs::{self, File},
     io::{BufRead, Write},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
-use esp_build::assert_unique_used_features;
-use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
+use esp_build::assert_unique_features;
+use esp_config::{ConfigOption, DisplayHint, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -20,33 +19,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    // NOTE: update when adding new device support!
+    // Log and defmt are mutually exclusive features. The main technical reason is
+    // that allowing both would make the exact panicking behaviour a fragile
+    // implementation detail.
+    assert_unique_features!("log-04", "defmt");
+
     // Ensure that exactly one chip has been specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
+    let chip = Chip::from_cargo_feature()?;
 
-    // NOTE: update when adding new device support!
-    // Determine the name of the configured device:
-    let device_name = if cfg!(feature = "esp32") {
-        "esp32"
-    } else if cfg!(feature = "esp32c2") {
-        "esp32c2"
-    } else if cfg!(feature = "esp32c3") {
-        "esp32c3"
-    } else if cfg!(feature = "esp32c6") {
-        "esp32c6"
-    } else if cfg!(feature = "esp32h2") {
-        "esp32h2"
-    } else if cfg!(feature = "esp32s2") {
-        "esp32s2"
-    } else if cfg!(feature = "esp32s3") {
-        "esp32s3"
-    } else {
-        unreachable!() // We've confirmed exactly one known device was selected
-    };
-
-    let chip = Chip::from_str(device_name)?;
     if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
         panic!("
         Seems you are building for an unsupported or wrong target (e.g. the host environment).
@@ -71,87 +51,71 @@ fn main() -> Result<(), Box<dyn Error>> {
     let cfg = generate_config(
         "esp_hal",
         &[
-            ConfigOption {
-                name: "place-spi-master-driver-in-ram",
-                description: "Places the SPI master driver in RAM for better performance",
-                default_value: Value::Bool(false),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-            },
-            ConfigOption {
-                name: "place-switch-tables-in-ram",
-                description: "Places switch-tables, some lookup tables and constants related to \
+            ConfigOption::new(
+                "place-spi-master-driver-in-ram",
+                "Places the SPI master driver in RAM for better performance",
+                false,
+            ),
+            ConfigOption::new(
+                "place-switch-tables-in-ram",
+                "Places switch-tables, some lookup tables and constants related to \
                 interrupt handling into RAM - resulting in better performance but slightly more \
                 RAM consumption.",
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
-                active: true,
-            },
-            ConfigOption {
-                name: "place-anon-in-ram",
-                description: "Places anonymous symbols into RAM - resulting in better performance \
+                true,
+            )
+            .stable("1.0.0-beta.0"),
+            ConfigOption::new(
+                "place-anon-in-ram",
+                "Places anonymous symbols into RAM - resulting in better performance \
                 at the cost of significant more RAM consumption. Best to be combined with \
                 `place-switch-tables-in-ram`.",
-                default_value: Value::Bool(false),
-                constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
-                active: true,
-            },
+                false,
+            )
+            .stable("1.0.0-beta.0"),
             // Ideally, we should be able to set any clock frequency for any chip. However,
             // currently only the 32 and C2 implements any sort of configurability, and
             // the rest have a fixed clock frequeny.
-            ConfigOption {
-                name: "xtal-frequency",
-                description: "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
+            ConfigOption::new(
+                "xtal-frequency",
+                "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
                 automatically detect the frequency. `auto` may not be able to identify the clock \
                 frequency in some cases. Also, configuring a specific frequency may increase \
                 performance slightly.",
-                default_value: Value::String(match device_name {
-                    "esp32" | "esp32c2" => String::from("auto"),
+                match chip {
+                    Chip::Esp32 | Chip::Esp32c2 => "auto",
                     // The rest has only one option
-                    "esp32c3" | "esp32c6" | "esp32s2" | "esp32s3" => String::from("40"),
-                    "esp32h2" => String::from("32"),
-                    _ => unreachable!(),
-                }),
-                constraint: match device_name {
-                    "esp32" | "esp32c2" => Some(Validator::Enumeration(vec![
-                        String::from("auto"),
-                        String::from("26"),
-                        String::from("40"),
-                    ])),
-                    // The rest has only one option
-                    _ => None,
+                    Chip::Esp32c3 | Chip::Esp32c6 | Chip::Esp32s2 | Chip::Esp32s3 => "40",
+                    Chip::Esp32h2 => "32",
                 },
-                stability: Stability::Unstable,
-                active: ["esp32", "esp32s2"].contains(&device_name),
-            },
-            ConfigOption {
-                name: "spi-address-workaround",
-                description: "Enables a workaround for the issue where SPI in \
+            )
+            .constraint_by(match chip {
+                Chip::Esp32 | Chip::Esp32c2 => Some(Validator::Enumeration(vec![
+                    String::from("auto"),
+                    String::from("26"),
+                    String::from("40"),
+                ])),
+                // The rest has only one option
+                _ => None,
+            })
+            .active([Chip::Esp32, Chip::Esp32c2].contains(&chip)),
+            ConfigOption::new(
+                "spi-address-workaround",
+                "Enables a workaround for the issue where SPI in \
                 half-duplex mode incorrectly transmits the address on a single line if the \
                 data buffer is empty.",
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: device_name == "esp32",
-            },
-            ConfigOption {
-                name: "flip-link",
-                description: "Move the stack to start of RAM to get zero-cost stack overflow protection.",
-                default_value: Value::Bool(false),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: ["esp32c6", "esp32h2"].contains(&device_name),
-            },
+                true,
+            )
+            .active(chip == Chip::Esp32),
+            ConfigOption::new(
+                "flip-link",
+                "Move the stack to start of RAM to get zero-cost stack overflow protection.",
+                false,
+            )
+            .active([Chip::Esp32c6, Chip::Esp32h2].contains(&chip)),
             // TODO: automate "enum of single choice" handling - they don't need
             // to be presented to the user
-            ConfigOption {
-                name: "psram-mode",
-                description: "SPIRAM chip mode",
-                default_value: Value::String(String::from("quad")),
-                constraint: Some(Validator::Enumeration(
+            ConfigOption::new("psram-mode", "SPIRAM chip mode", "quad")
+                .constraint(Validator::Enumeration(
                     if config
                         .symbols()
                         .iter()
@@ -161,41 +125,35 @@ fn main() -> Result<(), Box<dyn Error>> {
                     } else {
                         vec![String::from("quad")]
                     },
-                )),
-                stability: Stability::Unstable,
-                active: config
-                    .symbols()
-                    .iter()
-                    .any(|s| s.eq_ignore_ascii_case("psram")),
-            },
+                ))
+                .active(
+                    config
+                        .symbols()
+                        .iter()
+                        .any(|s| s.eq_ignore_ascii_case("psram")),
+                ),
             // Rust's stack smashing protection configuration
-            ConfigOption {
-                name: "stack-guard-offset",
-                description: "The stack guard variable will be placed this many bytes from \
+            ConfigOption::new(
+                "stack-guard-offset",
+                "The stack guard variable will be placed this many bytes from \
                 the stack's end.",
-                default_value: Value::Integer(4096),
-                constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
-                active: true,
-            },
-            ConfigOption {
-                name: "stack-guard-value",
-                description: "The value to be written to the stack guard variable.",
-                default_value: Value::Integer(0xDEED_BAAD),
-                constraint: None,
-                stability: Stability::Stable("1.0.0-beta.0"),
-                active: true,
-            },
-            ConfigOption {
-                name: "impl-critical-section",
-                description: "Provide a `critical-section` implementation. Note that if disabled, \
+                4096,
+            )
+            .stable("1.0.0-beta.0"),
+            ConfigOption::new(
+                "stack-guard-value",
+                "The value to be written to the stack guard variable.",
+                0xDEED_BAAD,
+            )
+            .stable("1.0.0-beta.0")
+            .display_hint(DisplayHint::Hex),
+            ConfigOption::new(
+                "impl-critical-section",
+                "Provide a `critical-section` implementation. Note that if disabled, \
                 you will need to provide a `critical-section` implementation which is \
                 using `restore-state-u32`.",
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-            },
+                true,
+            ),
         ],
         cfg!(feature = "unstable"),
         true,
@@ -213,9 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if cfg!(feature = "esp32") || cfg!(feature = "esp32s2") || cfg!(feature = "esp32s3") {
-        // Xtensa devices:
-
+    if chip.is_xtensa() {
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
@@ -264,7 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{device_name}"), &out)?;
+    copy_dir_all(&config_symbols, &cfg, format!("ld/{chip}"), &out)?;
 
     Ok(())
 }
@@ -383,7 +339,7 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
 
 #[cfg(feature = "esp32")]
 fn generate_memory_extras() -> Vec<u8> {
-    let reserve_dram = if cfg!(feature = "bluetooth") {
+    let reserve_dram = if cfg!(feature = "__bluetooth") {
         "0x10000"
     } else {
         "0x0"

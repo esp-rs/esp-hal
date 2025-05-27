@@ -21,6 +21,8 @@ use esp_backtrace as _;
 use esp_hal::{delay::Delay, main, ram, rtc_cntl::Rtc, time::Duration};
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[ram(rtc_fast)]
 static mut SOME_INITED_DATA: [u8; 2] = [0xaa, 0xbb];
 

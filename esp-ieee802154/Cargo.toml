@@ -19,17 +19,23 @@ bench = false
 test  = false
 
 [dependencies]
-byte              = "0.2.7"
-critical-section  = "1.2.0"
-document-features = "0.2.11"
-esp-hal           = { version = "1.0.0-beta.0", path = "../esp-hal" }
-esp-wifi-sys      = "0.7.1"
-heapless          = "0.8.0"
-ieee802154        = "0.6.1"
 cfg-if            = "1.0.0"
+critical-section  = "1.2.0"
+esp-hal           = { version = "1.0.0-beta.0", path = "../esp-hal" }
+
+# ⚠️ Unstable dependencies that are part of the public API
+heapless          = "0.8.0"
+
+# Unstable dependencies that are not (strictly) part of the public API
+byte              = "0.2.7"
+document-features = "0.2.11"
 esp-config        = { version = "0.3.0", path = "../esp-config" }
-defmt             = { version = "1.0.1", optional = true }
-log               = { version = "0.4.27", optional = true }
+esp-wifi-sys      = "0.7.1"
+ieee802154        = "0.6.1"
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt                     = { version = "1.0.1", optional = true }
+log-04                    = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
 esp-config        = { version = "0.3.0", path = "../esp-config" }
@@ -38,6 +44,12 @@ esp-config        = { version = "0.3.0", path = "../esp-config" }
 [features]
 esp32c6 = ["esp-hal/esp32c6", "esp-wifi-sys/esp32c6"]
 esp32h2 = ["esp-hal/esp32h2", "esp-wifi-sys/esp32h2"]
+
+## Enables log messages from the esp-wifi blobs.
 sys-logs = ["esp-wifi-sys/sys-logs"]
-log = ["dep:log", "esp-wifi-sys/log"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04", "esp-wifi-sys/log"]
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt", "esp-wifi-sys/defmt"]

@@ -1,38 +1,11 @@
-use std::{error::Error as StdError, str::FromStr};
+use std::error::Error as StdError;
 
-use esp_build::assert_unique_used_features;
-use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
+use esp_config::{ConfigOption, Validator, Value, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn StdError>> {
-    // NOTE: update when adding new device support!
-    // Ensure that exactly one chip has been specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
-
-    // NOTE: update when adding new device support!
-    // Determine the name of the configured device:
-    let device_name = if cfg!(feature = "esp32") {
-        "esp32"
-    } else if cfg!(feature = "esp32c2") {
-        "esp32c2"
-    } else if cfg!(feature = "esp32c3") {
-        "esp32c3"
-    } else if cfg!(feature = "esp32c6") {
-        "esp32c6"
-    } else if cfg!(feature = "esp32h2") {
-        "esp32h2"
-    } else if cfg!(feature = "esp32s2") {
-        "esp32s2"
-    } else if cfg!(feature = "esp32s3") {
-        "esp32s3"
-    } else {
-        unreachable!() // We've confirmed exactly one known device was selected
-    };
-
     // Load the configuration file for the configured device:
-    let chip = Chip::from_str(device_name)?;
+    let chip = Chip::from_cargo_feature()?;
     let config = Config::for_chip(&chip);
 
     // Define all necessary configuration symbols for the configured device:
@@ -42,50 +15,44 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let crate_config = generate_config(
         "esp_hal_embassy",
         &[
-            ConfigOption {
-                name: "low-power-wait",
-                description: "Enables the lower-power wait if no tasks are ready to run on the \
+            ConfigOption::new(
+                "low-power-wait",
+                "Enables the lower-power wait if no tasks are ready to run on the \
                 thread-mode executor. This allows the MCU to use less power if the workload allows. \
                 Recommended for battery-powered systems. May impact analog performance.",
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-            },
-            ConfigOption {
-                name: "timer-queue",
-                description: "The flavour of the timer queue provided by this crate. Integrated \
+                true,
+            ),
+            ConfigOption::new(
+                "timer-queue",
+                "The flavour of the timer queue provided by this crate. Integrated \
                 queues require the `executors` feature to be enabled.</p><p>If you use \
                 embassy-executor, the `single-integrated` queue is recommended for ease of use, \
                 while the `multiple-integrated` queue is recommended for performance. The \
                 `multiple-integrated` option needs one timer per executor.</p><p>The `generic` \
                 queue allows using embassy-time without the embassy executors.",
-                default_value: Value::String(if cfg!(feature = "executors") {
-                    String::from("single-integrated")
+                if cfg!(feature = "executors") {
+                    "single-integrated"
                 } else {
-                    String::from("generic")
-                }),
-                constraint: Some(if cfg!(feature = "executors") {
-                    Validator::Enumeration(vec![
-                        String::from("generic"),
-                        String::from("single-integrated"),
-                        String::from("multiple-integrated"),
-                    ])
-                } else {
-                    Validator::Enumeration(vec![String::from("generic")])
-                }),
-                stability: Stability::Unstable,
-                active: cfg!(feature = "executors"),
-            },
-            ConfigOption {
-                name: "generic-queue-size",
-                description: "The capacity of the queue when the `generic` timer \
+                    "generic"
+                },
+            )
+            .constraint(if cfg!(feature = "executors") {
+                Validator::Enumeration(vec![
+                    String::from("generic"),
+                    String::from("single-integrated"),
+                    String::from("multiple-integrated"),
+                ])
+            } else {
+                Validator::Enumeration(vec![String::from("generic")])
+            })
+            .active(cfg!(feature = "executors")),
+            ConfigOption::new(
+                "generic-queue-size",
+                "The capacity of the queue when the `generic` timer \
                 queue flavour is selected.",
-                default_value: Value::Integer(64),
-                constraint: Some(Validator::PositiveInteger),
-                stability: Stability::Unstable,
-                active: true,
-            },
+                64,
+            )
+            .constraint(Validator::PositiveInteger),
         ],
         true,
         true,

@@ -54,7 +54,7 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 //!
-//! By default the power-saving mode is [PowerSaveMode::Minimum](crate::config::PowerSaveMode::Minimum) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
+//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
 //!
 //! In addition pay attention to these configuration keys:
 //! - `ESP_WIFI_RX_QUEUE_SIZE`
@@ -114,8 +114,6 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-#[cfg(not(feature = "esp32"))]
-use esp_hal::timer::systimer::Alarm;
 use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
 use hal::{
     Blocking,
@@ -253,10 +251,10 @@ const _: () = {
 type TimeBase = PeriodicTimer<'static, Blocking>;
 
 pub(crate) mod flags {
-    use portable_atomic::{AtomicBool, AtomicUsize};
+    use portable_atomic::AtomicBool;
 
     pub(crate) static ESP_WIFI_INITIALIZED: AtomicBool = AtomicBool::new(false);
-    pub(crate) static WIFI: AtomicUsize = AtomicUsize::new(0);
+    pub(crate) static WIFI: AtomicBool = AtomicBool::new(false);
     pub(crate) static BLE: AtomicBool = AtomicBool::new(false);
 }
 
@@ -269,7 +267,7 @@ pub struct EspWifiController<'d> {
 impl EspWifiController<'_> {
     /// Is the WiFi part of the radio running
     pub fn wifi(&self) -> bool {
-        crate::flags::WIFI.load(Ordering::Acquire) > 0
+        crate::flags::WIFI.load(Ordering::Acquire)
     }
 
     /// Is the BLE part of the radio running
@@ -318,8 +316,8 @@ pub trait EspWifiTimerSource: private::Sealed {
 impl private::Sealed for TimeBase {}
 impl private::Sealed for AnyTimer<'_> {}
 impl private::Sealed for TimgTimer<'_> {}
-#[cfg(not(feature = "esp32"))]
-impl private::Sealed for Alarm<'_> {}
+#[cfg(systimer)]
+impl private::Sealed for esp_hal::timer::systimer::Alarm<'_> {}
 
 impl<T> EspWifiTimerSource for T
 where
@@ -451,7 +449,7 @@ pub unsafe fn deinit_unchecked() -> Result<(), InitializationError> {
     if controller.wifi() {
         #[cfg(feature = "wifi")]
         crate::wifi::wifi_deinit()?;
-        crate::flags::WIFI.store(0, Ordering::Release);
+        crate::flags::WIFI.store(false, Ordering::Release);
     }
 
     if controller.ble() {

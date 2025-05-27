@@ -22,3 +22,6 @@ wokwi.toml
 
 # Ignore generated documentation
 docs/
+
+# Ignore the generated release plan
+release_plan.jsonc

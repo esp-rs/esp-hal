@@ -33,34 +33,10 @@ use esp_println::println;
 
 You can now `println!("Hello world")` as usual.
 
-# Features
-
-- There is one feature for each supported target: `esp32`, `esp32c2`,
-  `esp32c3`, `esp32c6`, `esp32h2`, `esp32s2`, and `esp32s3`.
-  - One of these features must be enabled.
-  - Only one of these features can be enabled at a time.
-- There is one feature for each supported communication method: `uart`, `jtag-serial` and `auto`.
-  - Only one of these features can be enabled at a time.
-- `no-op`: Don't print anything.
-- `log`: Enables logging using [`log` crate].
-- `colors`: Enable colored logging.
-  - Only effective when using the `log` feature.
-- `critical-section`: Enables critical sections.
-- `defmt-espflash`: This is intended to be used with [`espflash`], see `-L/--log-format` argument
-  of `flash` or `monitor` subcommands of `espflash` and `cargo-espflash`. Uses [rzCOBS] encoding
-  and adds framing.
-
-## Default Features
-
-By default, we use the `auto`, `critial-section` and `colors` features.
-Which means that it will auto-detect if it needs to print to the UART or JTAG-Serial, use critical sections and output
-messages will be colored.
-If we want to use a communication method that is not `auto`, the default
-one, we need to [disable the default features].
-
 ## Logging
 
-With the feature `log` activated you can initialize a simple logger like this
+With the feature `log-04` activated, and version 0.4 of the `log` crate added to your dependencies,
+you can initialize a simple logger like this:
 
 ```rust
 init_logger(log::LevelFilter::Info);
@@ -97,7 +73,6 @@ https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
 [`log` crate]: https://github.com/rust-lang/log
 [rzCOBS]: https://github.com/Dirbaio/rzcobs
 [`espflash`]: https://github.com/esp-rs/espflash
-[disable the default features]: https://doc.rust-lang.org/cargo/reference/features.html#the-default-feature
 [Implementing a Logger section log documentaion]: https://docs.rs/log/0.4.17/log/#implementing-a-logger
 [`defmt` book's setup instructions]: https://defmt.ferrous-systems.com/setup
 

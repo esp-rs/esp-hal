@@ -2,7 +2,7 @@
 //!
 //! If your module is octal PSRAM then you need to set `ESP_HAL_CONFIG_PSRAM_MODE` to `octal`.
 
-//% FEATURES: esp-hal/log esp-hal/psram aligned esp-hal/unstable
+//% FEATURES: esp-hal/psram aligned esp-hal/unstable
 //% CHIPS: esp32s3
 
 #![no_std]
@@ -20,6 +20,8 @@ use esp_hal::{
 };
 use log::{error, info};
 extern crate alloc;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const DATA_SIZE: usize = 1024 * 10;
 const CHUNK_SIZE: usize = 4032; // size is aligned to 64 bytes

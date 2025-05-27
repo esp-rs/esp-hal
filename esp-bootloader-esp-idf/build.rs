@@ -1,7 +1,7 @@
 use std::env;
 
 use chrono::{TimeZone, Utc};
-use esp_config::{ConfigOption, Stability, Validator, Value, generate_config};
+use esp_config::{ConfigOption, Validator, generate_config};
 
 fn main() {
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
@@ -19,40 +19,33 @@ fn main() {
     generate_config(
         "esp-bootloader-esp-idf",
         &[
-            ConfigOption {
-                name: "mmu_page_size",
-                description: "ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. \
+            ConfigOption::new(
+                "mmu_page_size",
+                "ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. \
                 This is currently only used to populate the app descriptor.",
-                default_value: Value::String(String::from("64k")),
-                constraint: Some(Validator::Enumeration(vec![
-                    String::from("8k"),
-                    String::from("16k"),
-                    String::from("32k"),
-                    String::from("64k"),
-                ])),
-                stability: Stability::Unstable,
-                active: true, // TODO we need to know the device here
-            },
-            ConfigOption {
-                name: "esp_idf_version",
-                description: "ESP-IDF version used in the application descriptor. Currently it's \
+                "64k",
+            )
+            .constraint(Validator::Enumeration(vec![
+                String::from("8k"),
+                String::from("16k"),
+                String::from("32k"),
+                String::from("64k"),
+            ])), // .active(true) TODO we need to know the device here
+            ConfigOption::new(
+                "esp_idf_version",
+                "ESP-IDF version used in the application descriptor. Currently it's \
                 not checked by the bootloader.",
-                default_value: Value::String(String::from("0.0.0")),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-            },
-            ConfigOption {
-                name: "partition-table-offset",
-                description: "The address of partition table (by default 0x8000). Allows you to \
+                "0.0.0",
+            ),
+            ConfigOption::new(
+                "partition-table-offset",
+                "The address of partition table (by default 0x8000). Allows you to \
                 move the partition table, it gives more space for the bootloader. Note that the \
-                bootloader and app will both need to be compiled with the same |
+                bootloader and app will both need to be compiled with the same \
                 PARTITION_TABLE_OFFSET value.",
-                default_value: Value::Integer(0x8000),
-                constraint: Some(Validator::PositiveInteger),
-                stability: Stability::Unstable,
-                active: true,
-            },
+                0x8000,
+            )
+            .constraint(Validator::PositiveInteger),
         ],
         true,
         true,

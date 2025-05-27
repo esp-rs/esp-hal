@@ -25,6 +25,8 @@ use esp_hal::{
     ram,
 };
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 #[main]

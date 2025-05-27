@@ -1,4 +1,4 @@
-# Migration Guide from v1.0.0-beta.0 to ?
+# Migration Guide from v1.0.0-beta.0 to {{currentVersion}}
 
 ## Peripheral singleton changes
 
@@ -145,6 +145,36 @@ Normally you only need to configure your pin once, after which changing modes ca
 + flex.set_input_enable(false); // optional
 + flex.set_level(initial_level); // optional
 + flex.set_output_enable(true);
+```
+
+### Interrupt handling changes
+
+The interrupt status bits are no longer cleared automatically. Depending on your use case, you will
+need to either do this yourself, or disable the pin's interrupt.
+
+If you want your interrupt to keep firing, clear the interrupt status. Keep in mind that
+this affects `is_interrupt_set`.
+
+```diff
+ #[handler]
+ pub fn interrupt_handler() {
+     critical_section::with(|cs| {
+         let pin = INPUT_PIN.borrow_ref_mut(cs).as_mut().unwrap();
++        pin.clear_interrupt();
+     });
+ }
+```
+
+If you want your interrupt to fire once per `listen` call, disable the interrupt.
+
+```diff
+ #[handler]
+ pub fn interrupt_handler() {
+     critical_section::with(|cs| {
+         let pin = INPUT_PIN.borrow_ref_mut(cs).as_mut().unwrap();
++        pin.unlisten();
+     });
+ }
 ```
 
 ## I2S driver now takes `DmaDescriptor`s later in construction
@@ -322,3 +352,15 @@ Some configuration options are now unstable and they require the `unstable` feat
 enabled. You can learn about a particular option in the [esp-hal documentation](https://docs.espressif.com/projects/rust/esp-hal/latest/).
 
 The `ESP_HAL_CONFIG_PLACE_SPI_DRIVER_IN_RAM` configuration option has been renamed to `ESP_HAL_CONFIG_PLACE_SPI_MASTER_DRIVER_IN_RAM`.
+
+## Changes related to cargo features
+
+The `log` feature has been replaced by `log-04`.
+The following dependencies are now gated behind the `unstable` feature and their
+invididual features are no longer available:
+- `digest`
+- `ufmt-write`
+
+The `usb_otg` and `bluetooth` features are now considered private and have been renamed accordingly.
+
+The `debug` feature has been removed. If you used it, enable `impl-register-debug` on the PAC of your device.

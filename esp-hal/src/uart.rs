@@ -219,6 +219,64 @@ pub enum StopBits {
     _2,
 }
 
+/// Software flow control settings.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum SwFlowControl {
+    #[default]
+    /// Disables software flow control.
+    Disabled,
+    /// Enables software flow control with configured parameters
+    Enabled {
+        /// Xon flow control byte.
+        xon_char: u8,
+        /// Xoff flow control byte.
+        xoff_char: u8,
+        /// If the software flow control is enabled and the data amount in
+        /// rxfifo is less than xon_thrd, an xon_char will be sent.
+        xon_threshold: u8,
+        /// If the software flow control is enabled and the data amount in
+        /// rxfifo is more than xoff_thrd, an xoff_char will be sent
+        xoff_threshold: u8,
+    },
+}
+
+/// Configuration for CTS (Clear To Send) flow control.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum CtsConfig {
+    /// Enable CTS flow control (TX).
+    Enabled,
+    #[default]
+    /// Disable CTS flow control (TX).
+    Disabled,
+}
+
+/// Configuration for RTS (Request To Send) flow control.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum RtsConfig {
+    /// Enable RTS flow control with a FIFO threshold (RX).
+    Enabled(u8),
+    #[default]
+    /// Disable RTS flow control.
+    Disabled,
+}
+
+/// Hardware flow control configuration.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub struct HwFlowControl {
+    /// CTS configuration.
+    pub cts: CtsConfig,
+    /// RTS configuration.
+    pub rts: RtsConfig,
+}
+
 /// Defines how strictly the requested baud rate must be met.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -252,6 +310,12 @@ pub struct Config {
     parity: Parity,
     /// Number of stop bits in each frame (1, 1.5, or 2 bits).
     stop_bits: StopBits,
+    /// Software flow control.
+    #[builder_lite(unstable)]
+    sw_flow_ctrl: SwFlowControl,
+    /// Hardware flow control.
+    #[builder_lite(unstable)]
+    hw_flow_ctrl: HwFlowControl,
     /// Clock source used by the UART peripheral.
     #[builder_lite(unstable)]
     clock_source: ClockSource,
@@ -271,6 +335,8 @@ impl Default for Config {
             data_bits: Default::default(),
             parity: Default::default(),
             stop_bits: Default::default(),
+            sw_flow_ctrl: Default::default(),
+            hw_flow_ctrl: Default::default(),
             clock_source: Default::default(),
         }
     }
@@ -342,12 +408,12 @@ pub struct AtCmdConfig {
     /// Optional idle time after the AT command detection ends, in clock
     /// cycles.
     post_idle_count: Option<u16>,
-    /// Optional timeout between characters in the AT command, in clock
+    /// Optional timeout between bytes in the AT command, in clock
     /// cycles.
     gap_timeout: Option<u16>,
-    /// The character that triggers the AT command detection.
+    /// The byte (character) that triggers the AT command detection.
     cmd_char: u8,
-    /// Optional number of characters to detect as part of the AT command.
+    /// Optional number of bytes to detect as part of the AT command.
     char_num: u8,
 }
 
@@ -450,7 +516,7 @@ pub struct UartRx<'d, Dm: DriverMode> {
 #[non_exhaustive]
 pub enum ConfigError {
     /// The requested baud rate is not achievable.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     UnachievableBaudrate,
 
@@ -745,6 +811,14 @@ where
     #[instability::unstable]
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.uart.info().write(data)
+    }
+
+    fn write_all(&mut self, mut data: &[u8]) -> Result<(), TxError> {
+        while !data.is_empty() {
+            let bytes_written = self.write(data)?;
+            data = &data[bytes_written..];
+        }
+        Ok(())
     }
 
     /// Flush the transmit buffer.
@@ -1135,7 +1209,7 @@ where
     ///
     /// This function clears and disables the `receive FIFO full` interrupt,
     /// `receive FIFO overflow`, `receive FIFO timeout`, and `AT command
-    /// character detection` interrupts.
+    /// byte detection` interrupts.
     fn disable_rx_interrupts(&self) {
         self.regs().int_clr().write(|w| {
             w.rxfifo_full().clear_bit_by_one();
@@ -1385,7 +1459,7 @@ impl<'d> Uart<'d, Async> {
 #[instability::unstable]
 pub enum UartInterrupt {
     /// Indicates that the received has detected the configured
-    /// [`Uart::set_at_cmd`] character.
+    /// [`Uart::set_at_cmd`] byte.
     AtCmd,
 
     /// The transmitter has finished sending out all data from the FIFO.
@@ -1394,6 +1468,10 @@ pub enum UartInterrupt {
     /// The receiver has received more data than what
     /// [`RxConfig::fifo_full_threshold`] specifies.
     RxFifoFull,
+
+    /// The receiver has not received any data for the time
+    /// [`RxConfig::with_timeout`] specifies.
+    RxTimeout,
 }
 
 impl<'d, Dm> Uart<'d, Dm>
@@ -1737,8 +1815,7 @@ where
 
     #[inline]
     fn write_str(&mut self, s: &str) -> Result<(), Self::Error> {
-        self.write(s.as_bytes())?;
-        Ok(())
+        self.write_all(s.as_bytes())
     }
 }
 
@@ -1758,8 +1835,7 @@ where
 {
     #[inline]
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        self.write(s.as_bytes()).map_err(|_| core::fmt::Error)?;
-        Ok(())
+        self.write_all(s.as_bytes()).map_err(|_| core::fmt::Error)
     }
 }
 
@@ -2438,6 +2514,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().bit(enable),
                     UartInterrupt::TxDone => w.tx_done().bit(enable),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().bit(enable),
+                    UartInterrupt::RxTimeout => w.rxfifo_tout().bit(enable),
                 };
             }
             w
@@ -2459,6 +2536,9 @@ impl Info {
         if ints.rxfifo_full().bit_is_set() {
             res.insert(UartInterrupt::RxFifoFull);
         }
+        if ints.rxfifo_tout().bit_is_set() {
+            res.insert(UartInterrupt::RxTimeout);
+        }
 
         res
     }
@@ -2472,6 +2552,7 @@ impl Info {
                     UartInterrupt::AtCmd => w.at_cmd_char_det().clear_bit_by_one(),
                     UartInterrupt::TxDone => w.tx_done().clear_bit_by_one(),
                     UartInterrupt::RxFifoFull => w.rxfifo_full().clear_bit_by_one(),
+                    UartInterrupt::RxTimeout => w.rxfifo_tout().clear_bit_by_one(),
                 };
             }
             w
@@ -2498,6 +2579,7 @@ impl Info {
         self.change_data_bits(config.data_bits);
         self.change_parity(config.parity);
         self.change_stop_bits(config.stop_bits);
+        self.change_flow_control(config.sw_flow_ctrl, config.hw_flow_ctrl);
 
         Ok(())
     }
@@ -2834,6 +2916,87 @@ impl Info {
         self.regs()
             .conf0()
             .modify(|_, w| unsafe { w.stop_bit_num().bits(stop_bits as u8 + 1) });
+    }
+
+    fn change_flow_control(&self, sw_flow_ctrl: SwFlowControl, hw_flow_ctrl: HwFlowControl) {
+        // set SW flow control
+        match sw_flow_ctrl {
+            SwFlowControl::Enabled {
+                xon_char,
+                xoff_char,
+                xon_threshold,
+                xoff_threshold,
+            } => {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c6, esp32h2))] {
+                        self.regs().swfc_conf0().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold)});
+                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
+                    } else if #[cfg(esp32)]{
+                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold).xoff_threshold().bits(xoff_threshold) });
+                        self.regs().swfc_conf().modify(|_, w| unsafe { w.xon_char().bits(xon_char).xoff_char().bits(xoff_char) });
+                    } else {
+                        self.regs().flow_conf().modify(|_, w| w.xonoff_del().set_bit().sw_flow_con_en().set_bit());
+                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_threshold().bits(xon_threshold as u16) });
+                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_threshold().bits(xoff_threshold as u16) });
+                        self.regs().swfc_conf1().modify(|_, w| unsafe { w.xon_char().bits(xon_char) });
+                        self.regs().swfc_conf0().modify(|_, w| unsafe { w.xoff_char().bits(xoff_char) });
+                    }
+                }
+            }
+            SwFlowControl::Disabled => {
+                cfg_if::cfg_if! {
+                    if #[cfg(any(esp32c6, esp32h2))] {
+                        let reg = self.regs().swfc_conf0();
+                    } else {
+                        let reg = self.regs().flow_conf();
+                    }
+                }
+
+                reg.modify(|_, w| w.sw_flow_con_en().clear_bit());
+                reg.modify(|_, w| w.xonoff_del().clear_bit());
+            }
+        }
+
+        self.regs().conf0().modify(|_, w| {
+            w.tx_flow_en()
+                .bit(matches!(hw_flow_ctrl.cts, CtsConfig::Enabled))
+        });
+
+        match hw_flow_ctrl.rts {
+            RtsConfig::Enabled(threshold) => self.configure_rts_flow_ctrl(true, Some(threshold)),
+            RtsConfig::Disabled => self.configure_rts_flow_ctrl(false, None),
+        }
+
+        #[cfg(any(esp32c6, esp32h2))]
+        sync_regs(self.regs());
+    }
+
+    fn configure_rts_flow_ctrl(&self, enable: bool, threshold: Option<u8>) {
+        if let Some(threshold) = threshold {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    self.regs().conf1().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
+                } else if #[cfg(any(esp32c6, esp32h2))] {
+                    self.regs().hwfc_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold) });
+                } else {
+                    self.regs().mem_conf().modify(|_, w| unsafe { w.rx_flow_thrhd().bits(threshold as u16) });
+                }
+            }
+        }
+
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                self.regs().hwfc_conf().modify(|_, w| {
+                    w.rx_flow_en().bit(enable)
+                });
+            } else {
+                self.regs().conf1().modify(|_, w| {
+                    w.rx_flow_en().bit(enable)
+                });
+            }
+        }
     }
 
     fn rxfifo_reset(&self) {

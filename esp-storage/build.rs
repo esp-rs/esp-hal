@@ -1,8 +1,8 @@
 fn main() -> Result<(), String> {
     // Ensure that only a single chip is specified
-    esp_build::assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
+    if !cfg!(feature = "emulation") {
+        let _ = esp_metadata::Chip::from_cargo_feature().map_err(|e| format!("{e:?}"))?;
+    }
 
     if cfg!(feature = "esp32") {
         match std::env::var("OPT_LEVEL") {
