@@ -364,9 +364,8 @@ enum WriterState {
 
     // Data exhausted, but no stop code encountered
     DoneNoEnd,
-
     // Data not exhausted, but encountered a stop code
-    DoneEarly,
+    // DoneEarly,
 }
 
 /// docs
@@ -392,11 +391,13 @@ impl RmtWriter {
         }
     }
 
+    // TODO: better check that hw ptr matches expectation when done! that also helps
+    // with underruns
     fn write(
         &mut self,
         data: &mut impl Iterator<Item: Borrow<u32>>,
         raw: &impl RawChannelAccess<Dir = Tx>,
-        count: usize,
+        initial: bool,
     ) {
         if !matches!(self.state, WriterState::Active) {
             // Don't call next() on data again!
@@ -407,47 +408,53 @@ impl RmtWriter {
         let memsize = raw.memsize().codes();
         let mut offset = self.offset as usize;
 
+        // FIXME: debug_assert that the current hw read addr is in the part of RAM that
+        // we don't overwrite
+
         // This is only used to fill the entire RAM from its start, or to refill
         // either the first or second half. The code below may rely on this.
         // In particular, this implies that the offset might only need to be wrapped at
         // the end.
-        debug_assert!(count == memsize && offset == 0 || count == memsize / 2);
-        // Offset might take a different value only if there's not data; but in that
-        // case we already returned above.
-        debug_assert!(offset == 0 || offset == memsize / 2);
+        debug_assert!(!initial || offset == 0);
 
-        let initial_offset = offset;
-        while offset < initial_offset + count {
-            match data.next() {
-                Some(code) => {
-                    let code = *code.borrow();
+        let count = if initial {
+            // Leave space for extra end marker
+            memsize - 1
+        } else {
+            memsize / 2
+        };
 
-                    unsafe { start.add(offset).write_volatile(code) }
-                    offset += 1;
+        let mut last_code = PulseCode::empty();
+        let mut written = 0;
+        while let Some(code) = data.next() {
+            last_code = *code.borrow();
 
-                    // FIXME: Maybe remove this for more efficiency?
-                    if code.is_end_marker() {
-                        self.state = if data.next().is_some() {
-                            WriterState::DoneEarly
-                        } else {
-                            WriterState::Done
-                        };
-                        break;
-                    }
-                }
-                None => {
-                    self.state = WriterState::DoneNoEnd;
-                    break;
-                }
+            unsafe { start.add(offset).write_volatile(last_code) }
+            offset += 1;
+            written += 1;
+            if offset == memsize {
+                offset = 0;
+            }
+
+            if written == count {
+                break;
             }
         }
 
-        debug_assert!(offset <= memsize);
-        self.written += offset - initial_offset;
-        if offset == memsize {
-            // Wrap around
-            offset = 0;
+        if written < count {
+            self.state = if !last_code.is_end_marker() {
+                WriterState::DoneNoEnd
+            } else {
+                WriterState::Done
+            };
         }
+
+        // Write an extra end marker to detect underruns.
+        // Do not increment the offset afterwards since we want to overwrite it in the
+        // next call
+        unsafe { start.add(offset).write_volatile(PulseCode::empty()) }
+
+        self.written += written;
         self.offset = offset as u16;
     }
 }
@@ -1339,8 +1346,7 @@ where
 
             if self.writer.state == WriterState::Active {
                 // re-fill TX RAM
-                let memsize = raw.memsize().codes();
-                self.writer.write(&mut self.data, raw, memsize / 2);
+                self.writer.write(&mut self.data, raw, false);
                 // FIXME: Return if writer.state indicates an error (ensure
                 // to stop transmission first)
             }
@@ -1543,10 +1549,9 @@ where
     {
         let raw = &self.raw;
 
-        let memsize = raw.memsize();
         let mut data = data.into_iter();
         let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, memsize.codes());
+        writer.write(&mut data, raw, true);
 
         if writer.written == 0 {
             return Err(Error::InvalidArgument);
@@ -1554,7 +1559,7 @@ where
 
         match writer.state {
             WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
-            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
             _ => (),
         };
 
@@ -1596,10 +1601,9 @@ where
     {
         let raw = &self.raw;
 
-        let memsize = raw.memsize();
         let mut data = data.into_iter();
         let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, memsize.codes());
+        writer.write(&mut data, raw, true);
 
         if writer.written == 0 {
             return Err(Error::InvalidArgument);
@@ -1608,7 +1612,7 @@ where
         match writer.state {
             WriterState::Active => return Err(Error::Overflow),
             WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
-            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
             WriterState::Done => (),
         };
 
@@ -1827,8 +1831,7 @@ where
 
                 if this.writer.state == WriterState::Active {
                     // re-fill TX RAM
-                    let memsize = raw.memsize().codes();
-                    this.writer.write(&mut this.data, raw, memsize / 2);
+                    this.writer.write(&mut this.data, raw, false);
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
@@ -1911,10 +1914,9 @@ where
     {
         let raw = &mut self.raw;
 
-        let memsize = raw.memsize();
         let mut data = data.into_iter();
         let mut writer = RmtWriter::new();
-        writer.write(&mut data, raw, memsize.codes());
+        writer.write(&mut data, raw, true);
 
         if writer.written == 0 {
             return Err(Error::InvalidArgument);
@@ -1922,7 +1924,7 @@ where
 
         let wrap = match writer.state {
             WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
-            WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
+            // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
             WriterState::Active => true,
             WriterState::Done => false,
         };
