@@ -1884,9 +1884,7 @@ impl Driver<'_> {
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, self.info, self.state)
-            .await
-            .inspect_err(|_| self.reset())?;
+        I2cFuture::new(event, self.info, self.state).await?;
         self.check_all_commands_done().await
     }
 
@@ -1918,6 +1916,13 @@ impl Driver<'_> {
     }
 
     fn is_completed(&self, end_only: bool) -> Result<bool, Error> {
+        // Read errors _before_ checking for completion. This is important because we
+        // may be interrupted, which can cause an error to be detected, even if
+        // the transmission was successful.
+        // TODO: we should refactor `check_errors` to work on the already read interrupt
+        // bits.
+        let errors = self.check_errors();
+
         let interrupts = self.regs().int_raw().read();
 
         if (!end_only && interrupts.trans_complete().bit_is_set())
@@ -1929,9 +1934,7 @@ impl Driver<'_> {
             return Ok(true);
         }
 
-        self.check_errors().inspect_err(|_| self.reset())?;
-
-        Ok(false)
+        errors.map(|_| false)
     }
 
     fn all_commands_done(&self) -> bool {
@@ -2238,7 +2241,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors().inspect_err(|_| self.reset())?;
+                self.check_errors()?;
                 break;
             }
         }
@@ -2330,7 +2333,7 @@ impl Driver<'_> {
             // wait for STOP - apparently on ESP32 we otherwise miss the ACK error for an
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
-                self.check_errors().inspect_err(|_| self.reset())?;
+                self.check_errors()?;
                 embassy_futures::yield_now().await;
                 break;
             }
