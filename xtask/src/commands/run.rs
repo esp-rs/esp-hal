@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result, bail, ensure};
+use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
@@ -95,10 +95,6 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
 
         let mut command = Command::new("probe-rs");
         command.arg("run").arg(elf_path);
-
-        if args.chip == Chip::Esp32c2 {
-            command.arg("--speed").arg("15000");
-        };
 
         command.arg("--verify");
 
