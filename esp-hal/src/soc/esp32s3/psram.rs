@@ -251,6 +251,8 @@ pub(crate) mod utils {
         psram_set_cs_timing();
 
         if config.size.is_auto() {
+            psram_disable_qio_mode_spi1();
+
             // read chip id
             let mut dev_id = 0u32;
             psram_exec_cmd(
@@ -711,6 +713,28 @@ pub(crate) mod utils {
                 }
             }
         }
+    }
+
+    /// Exit QPI mode
+    #[ram]
+    fn psram_disable_qio_mode_spi1() {
+        const PSRAM_EXIT_QMODE: u16 = 0xF5;
+        const CS_PSRAM_SEL: u8 = 1 << 1;
+
+        psram_exec_cmd(
+            CommandMode::PsramCmdQpi,
+            PSRAM_EXIT_QMODE,
+            8, // command and command bit len
+            0,
+            0, // address and address bit len
+            0, // dummy bit len
+            core::ptr::null(),
+            0, // tx data and tx bit len
+            core::ptr::null_mut(),
+            0,            // rx data and rx bit len
+            CS_PSRAM_SEL, // cs bit mask
+            false,        // whether is program/erase operation
+        );
     }
 
     /// Enter QPI mode
