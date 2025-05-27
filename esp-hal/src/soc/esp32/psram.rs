@@ -105,19 +105,30 @@ pub(crate) fn init_psram(config: PsramConfig) {
                 ptr.add(i).write_volatile(0x7f);
             }
 
-            let mut success = true;
+            let mut success_end_of_4mb = true;
             let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
             for i in 0..(36 * 1024) {
                 if ptr.add(i).read_volatile() != 0x7f {
-                    success = false;
+                    success_end_of_4mb = false;
                     break;
                 }
             }
 
-            if success {
+            let mut success_start_of_psram = true;
+            let ptr = EXTMEM_ORIGIN as *mut u8;
+            for i in 0..(36 * 1024) {
+                if ptr.add(i).read_volatile() != 0x7f {
+                    success_start_of_psram = false;
+                    break;
+                }
+            }
+
+            if success_end_of_4mb {
                 4 * 1024 * 1024
-            } else {
+            } else if success_start_of_psram {
                 2 * 1024 * 1024
+            } else {
+                0
             }
         };
 
