@@ -1393,7 +1393,6 @@ impl Driver<'_> {
 
     /// Resets the I2C peripheral's command registers
     fn reset_command_list(&self) {
-        // Confirm that all commands that were configured were actually executed
         for cmd in self.regs().comd_iter() {
             cmd.reset();
         }
@@ -2761,7 +2760,6 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 
 #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
 struct Registers {
-    ctr: u32,
     #[cfg(any(esp32, esp32s2))]
     sda_filter_cfg: u32,
     #[cfg(any(esp32, esp32s2))]
@@ -2790,8 +2788,6 @@ struct Registers {
 #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))]
 impl Registers {
     fn save(info: &Info) -> Self {
-        let ctr = info.regs().ctr().read().bits();
-
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
                 let sda_filter_cfg = info.regs().sda_filter_cfg().read().bits();
@@ -2815,7 +2811,6 @@ impl Registers {
         let timeout = info.regs().to().read().bits();
 
         Registers {
-            ctr,
             #[cfg(any(esp32, esp32s2))]
             sda_filter_cfg,
             #[cfg(any(esp32, esp32s2))]
@@ -2841,7 +2836,22 @@ impl Registers {
     }
 
     fn restore(self, info: &Info) {
-        info.regs().ctr().write(|w| unsafe { w.bits(self.ctr) });
+        info.regs().ctr().write(|w| {
+            // Set I2C controller to master mode
+            w.ms_mode().set_bit();
+            // Use open drain output for SDA and SCL
+            w.sda_force_out().set_bit();
+            w.scl_force_out().set_bit();
+            // Use Most Significant Bit first for sending and receiving data
+            w.tx_lsb_first().clear_bit();
+            w.rx_lsb_first().clear_bit();
+
+            #[cfg(esp32s2)]
+            w.ref_always_on().set_bit();
+
+            // Ensure that clock is enabled
+            w.clk_en().set_bit()
+        });
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32s2))] {
