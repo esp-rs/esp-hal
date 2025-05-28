@@ -666,9 +666,9 @@ impl RmtReader {
         }
     }
 
-    fn read<'a>(
+    fn read<'a, T: From<PulseCode> + 'static>(
         &mut self,
-        data: &mut impl Iterator<Item = &'a mut PulseCode>,
+        data: &mut impl Iterator<Item = &'a mut T>,
         raw: impl RxChannelInternal,
         count: usize,
     ) {
@@ -693,8 +693,9 @@ impl RmtReader {
         let initial_offset = offset;
         while offset < initial_offset + count {
             match data.next() {
-                Some(code) => {
-                    *code = unsafe { start.add(offset).read_volatile() };
+                Some(value) => {
+                    let code = unsafe { start.add(offset).read_volatile() };
+                    *value = code.into();
                     offset += 1;
 
                     // FIXME: Maybe remove this for more efficiency?
@@ -1817,9 +1818,10 @@ impl Channel<Blocking, Tx> {
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'ch, 'a, D>
+pub struct RxTransaction<'ch, 'a, D, T>
 where
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'ch mut DynChannelAccess<Rx>>,
@@ -1829,9 +1831,10 @@ where
     data: D,
 }
 
-impl<'a, D> RxTransaction<'_, 'a, D>
+impl<'a, D, T> RxTransaction<'_, 'a, D, T>
 where
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
@@ -1901,9 +1904,10 @@ where
     }
 }
 
-impl<'a, D> Drop for RxTransaction<'_, 'a, D>
+impl<'a, D, T> Drop for RxTransaction<'_, 'a, D, T>
 where
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -1925,12 +1929,13 @@ impl Channel<Blocking, Rx> {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<'ch, 'a, D>(
+    pub fn receive<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, D::IntoIter>, Error>
+    ) -> Result<RxTransaction<'ch, 'a, D::IntoIter, T>, Error>
     where
-        D: IntoIterator<Item = &'a mut PulseCode>,
+        D: IntoIterator<Item = &'a mut T>,
+        T: From<PulseCode> + 'static,
     {
         self.raw.start_receive(true);
 
