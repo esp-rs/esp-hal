@@ -219,18 +219,38 @@ cargo xrelease publish-plan --no-dry-run
     let pr_url_base = comparison_url(&release_plan.base, &url, &branch_name)?;
 
     // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
-    let open_pr_url = format!(
+    let mut open_pr_url = format!(
         "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}&body={body}",
         body = urlencoding::encode(&body),
         labels = "release-pr,skip-changelog",
     );
 
+    // https://stackoverflow.com/a/64565317
+    if open_pr_url.len() > 8201 {
+        println!();
+        println!("PR description begins here.");
+        println!();
+        eprintln!("{body}");
+        println!();
+
+        println!("The PR description is too long to be included in the URL.");
+        println!("Please copy the above text as the PR description.");
+        println!();
+
+        open_pr_url = format!(
+            "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}",
+            labels = "release-pr,skip-changelog",
+        );
+    }
+
     if dry_run {
         println!("Dry run: would open the following URL to create a pull request:");
         println!("{open_pr_url}");
-    } else if opener::open(&open_pr_url).is_err() {
-        println!("Open the following URL to create a pull request:");
-        println!("{open_pr_url}");
+    } else {
+        if opener::open(&open_pr_url).is_err() {
+            println!("Open the following URL to create a pull request:");
+            println!("{open_pr_url}");
+        }
     }
 
     println!("Create the release PR and follow the next steps laid out there.");
