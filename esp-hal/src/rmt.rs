@@ -979,6 +979,33 @@ macro_rules! declare_channels {
 
 const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 
+// FIXME: Use something like this everywhere so that the compiler can elide all bounds checks in
+// register accesses.
+// Enum of valid channel indices: For the given chip, tx/rx channels for all of these indices
+// exist. (Note that channel index == channel number for esp32 and esp32s2, but not for other
+// chips.)
+//
+// This type is useful to inform the compiler of possible values of an u8 (i.e. we use this as
+// homemade refinement type of u8) which allows it to elide bounds checks in register/field
+// accessors of the PAC even when using DynChannelAccess.
+// #[repr(u8)]
+// enum ChannelIdx {
+//     Ch0 = 0,
+//     Ch1 = 1,
+//     #[cfg(any(esp32, esp32s2, esp32s3))]
+//     Ch2 = 2,
+//     #[cfg(any(esp32, esp32s2, esp32s3))]
+//     Ch3 = 3,
+//     #[cfg(any(esp32, esp32s2))]
+//     Ch4 = 4,
+//     #[cfg(any(esp32, esp32s2))]
+//     Ch5 = 5,
+//     #[cfg(any(esp32, esp32s2))]
+//     Ch6 = 6,
+//     #[cfg(any(esp32, esp32s2))]
+//     Ch7 = 7,
+// }
+
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         declare_channels!(
