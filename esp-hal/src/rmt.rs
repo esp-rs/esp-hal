@@ -1479,26 +1479,31 @@ fn configure_tx_channel<'pin, const CH_IDX: u8>(
     Ok(())
 }
 
+// Allow implementing RmtState::is_tx via simple bit tests
+// TODO: Check that the compiler actually optimizes this accordingly.
+const RX_STATE_BASE: u8 = 0x40;
+const TX_STATE_BASE: u8 = 0x80;
+
 #[derive(Copy, Clone)]
 #[repr(u8)]
 enum RmtState {
     // The channel is not configured for either rx or tx, and its memory is available
-    Unconfigured,
+    Unconfigured = 0,
 
     // The channels is not in use, but one of the preceding channels is using its memory
-    Reserved,
+    Reserved     = 1,
 
     // The channel is configured for rx and currently idle.
-    RxIdle,
+    RxIdle       = RX_STATE_BASE,
 
     // The channel is configured for tx and currently idle.
-    TxIdle,
+    TxIdle       = TX_STATE_BASE,
 
     // The channel is configured for rx and currently performing an async transaction
-    RxAsync,
+    RxAsync      = RX_STATE_BASE + 1,
 
     // The channel is configured for tx and currently performing an async transaction
-    TxAsync,
+    TxAsync      = TX_STATE_BASE + 1,
 }
 
 impl RmtState {
