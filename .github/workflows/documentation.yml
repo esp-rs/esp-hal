@@ -58,7 +58,9 @@ jobs:
       - id: setup_manual
         name: Set up [manual run with specific packages]
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.packages != '' }}
-        run: echo "packages=${{ github.event.inputs.packages }}" >> "$GITHUB_OUTPUT"
+        run: |
+          input='${{ github.event.inputs.packages }}'
+          echo "packages=${input}" >> "$GITHUB_OUTPUT"
 
       - id: setup_pr
         name: Set up [pull request or all packages]
