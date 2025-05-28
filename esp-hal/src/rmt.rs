@@ -2055,13 +2055,19 @@ where
         D: IntoIterator<Item = &'a mut T>,
         T: From<PulseCode> + 'static,
     {
-        self.raw.start_receive(true);
+        let raw = self.raw;
+
+        let data = data.into_iter();
+        let reader = RmtReader::new();
+
+        raw.clear_rx_interrupts();
+        raw.start_receive(true);
 
         Ok(RxTransaction {
-            raw: self.raw,
+            raw,
             _phantom: PhantomData,
-            reader: RmtReader::new(),
-            data: data.into_iter(),
+            reader,
+            data,
         })
     }
 }
@@ -2487,8 +2493,6 @@ pub trait RxChannelInternal: ChannelInternal {
     fn set_rx_threshold(&self, threshold: u8);
 
     fn start_receive(&self, wrap: bool) {
-        self.clear_rx_interrupts();
-
         self.set_rx_threshold((self.memsize().codes() / 2) as u8);
         self.set_rx_wrap_mode(wrap);
         self.update();
