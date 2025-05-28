@@ -217,6 +217,11 @@ impl<'a> CargoToml<'a> {
         let manifest = std::fs::read_to_string(&manifest_path)
             .with_context(|| format!("Could not read {}", manifest_path.display()))?;
 
+        Self::from_str(workspace, package, &manifest)
+    }
+
+    pub fn from_str(workspace: &'a Path, package: Package, manifest: &str) -> Result<Self> {
+        // Parse the manifest string into a mutable TOML document.
         Ok(Self {
             workspace,
             package,
@@ -348,5 +353,97 @@ impl<'a> CargoToml<'a> {
             }
         });
         dependencies
+    }
+
+    pub(crate) fn change_version_of_dependency(
+        &mut self,
+        package_name: &str,
+        version: &semver::Version,
+    ) -> bool {
+        let mut changed = false;
+
+        self.visit_dependencies(|_, _, table| {
+            // Update dependencies which specify a version:
+            match &mut table[&package_name] {
+                Item::Table(table) if table.contains_key("version") => {
+                    table["version"] = toml_edit::value(version.to_string());
+                    changed = true;
+                }
+                Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
+                    table["version"] = version.to_string().into();
+                    changed = true;
+                }
+                Item::None => {
+                    // Maybe we have a renamed package (alias = { package = "foo" })?
+                    let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
+                        if let Value::InlineTable(table) = p {
+                            if let Some(Value::String(name)) = &table.get("package") {
+                                if name.value() == &package_name {
+                                    // Return the actual key of this dependency, e.g.:
+                                    // `procmacros = { package = "esp-hal-procmacros" }`
+                                    //  ^^^^^^^^^^
+                                    return Some(k.last().unwrap().get().to_string());
+                                }
+                            }
+                        }
+
+                        None
+                    });
+
+                    if let Some(dependency_name) = update_renamed_dep {
+                        table[&dependency_name]["version"] = version.to_string().into();
+                        changed = true;
+                    }
+                }
+                _ => {}
+            }
+        });
+
+        changed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bump_version() {
+        let manifest = r#"
+            [package]
+            name = "test-package"
+            version = "0.1.0"
+
+            [dependencies]
+            esp-hal-procmacros = { version = "0.1.0" }
+
+            [dev-dependencies]
+            procmacros = { package = "esp-hal-procmacros", version = "0.1.0" }
+            "#;
+
+        let mut cargo_toml =
+            CargoToml::from_str(Path::new("."), Package::EspAlloc, manifest).unwrap();
+
+        let changed = cargo_toml.change_version_of_dependency(
+            "esp-hal-procmacros",
+            &semver::Version::parse("0.2.0").unwrap(),
+        );
+
+        assert!(changed);
+
+        pretty_assertions::assert_eq!(
+            r#"
+            [package]
+            name = "test-package"
+            version = "0.1.0"
+
+            [dependencies]
+            esp-hal-procmacros = { version = "0.2.0" }
+
+            [dev-dependencies]
+            procmacros = { package = "esp-hal-procmacros", version = "0.2.0" }
+            "#,
+            cargo_toml.manifest.to_string()
+        );
     }
 }
