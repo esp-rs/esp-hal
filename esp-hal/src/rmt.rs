@@ -664,7 +664,7 @@ impl RmtReader {
         &mut self,
         data: &mut impl Iterator<Item = &'a mut T>,
         raw: &impl RawChannelAccess<Dir = Rx>,
-        count: usize,
+        final_: bool,
     ) {
         if !matches!(self.state, ReaderState::Active) {
             // Don't call next() on data again!
@@ -673,45 +673,44 @@ impl RmtReader {
 
         let start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
-        let mut offset = self.offset as usize;
+        let end = unsafe { start.add(memsize) };
 
         // This is only used to read the entire RAM from its start, or to read
         // either the first or second half. The code below may rely on this.
         // In particular, this implies that the offset might only need to be wrapped at
         // the end.
-        debug_assert!(count == memsize && offset == 0 || count == memsize / 2);
-        // Offset might take a different value only if there's not data; but in that
-        // case we already returned above.
-        debug_assert!(offset == 0 || offset == memsize / 2);
+        debug_assert!(!final_ && self.offset as usize == memsize / 2 || self.offset == 0);
 
-        let initial_offset = offset;
-        while offset < initial_offset + count {
-            match data.next() {
-                Some(value) => {
-                    let code = unsafe { start.add(offset).read_volatile() };
-                    *value = code.into();
-                    offset += 1;
+        let count = if final_ { memsize } else { memsize / 2 };
 
-                    // FIXME: Maybe remove this for more efficiency?
-                    if code.is_end_marker() {
-                        self.state = ReaderState::Done;
-                        break;
-                    }
-                }
-                None => {
-                    self.state = ReaderState::Overflow;
+        let mut ptr = unsafe { start.add(self.offset as usize) };
+        let mut read = 0;
+        while read < count {
+            if let Some(value) = data.next() {
+                let code = unsafe { ptr.read_volatile() };
+                *value = code.into();
+                ptr = unsafe { ptr.add(1) };
+
+                read += 1;
+
+                if code.is_end_marker() {
+                    self.state = ReaderState::Done;
                     break;
                 }
+            } else {
+                self.state = ReaderState::Overflow;
+                break;
             }
         }
 
-        debug_assert!(offset <= memsize);
-        self.total += offset - initial_offset;
-        if offset == memsize {
+        if ptr == end {
             // Wrap around
-            offset = 0;
+            ptr = start;
         }
-        self.offset = offset as u16;
+        debug_assert!(ptr.addr() >= start.addr() && ptr.addr() < end.addr());
+
+        self.total += read;
+        self.offset = unsafe { ptr.offset_from(start) } as u16;
     }
 }
 
@@ -1967,13 +1966,7 @@ where
                     raw.stop_rx();
                     raw.update();
 
-                    // read() does not wrap around, so we need to call it twice to handle the case
-                    // where the current read offset is memsize / 2 (i.e. the second half of RMT RAM
-                    // is read first).
-                    // FIXME: This probably isn't correct: We must not read beyond the HW pointer.
-                    let memsize = raw.memsize().codes();
-                    self.reader.read(&mut self.data, raw, memsize / 2);
-                    self.reader.read(&mut self.data, raw, memsize / 2);
+                    self.reader.read(&mut self.data, raw, true);
 
                     // Ensure that no further data will be read if this is called repeatedly.
                     self.reader.state = ReaderState::Done;
@@ -1982,8 +1975,7 @@ where
             Some(Event::Threshold) if C::Raw::supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
 
-                let memsize = raw.memsize().codes();
-                self.reader.read(&mut self.data, raw, memsize / 2);
+                self.reader.read(&mut self.data, raw, false);
             }
             _ => (),
         }
@@ -2376,8 +2368,7 @@ where
                 raw.clear_rx_interrupts();
                 raw.update();
 
-                let memsize = raw.memsize().codes();
-                reader.read(&mut data, raw, memsize);
+                reader.read(&mut data, raw, true);
 
                 Ok(())
             }
