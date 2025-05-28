@@ -36,6 +36,7 @@ fn _async_driver_is_compatible_with_blocking_ehal() {
 
 const DUT_ADDRESS: u8 = 0x77;
 const NON_EXISTENT_ADDRESS: u8 = 0x6b;
+const READ_DATA_COMMAND: &[u8] = &[0xaa];
 
 #[embassy_executor::task]
 async fn waiting_blocking_task() {
@@ -115,7 +116,7 @@ mod tests {
 
         // do the real read which should succeed
         ctx.i2c
-            .write_read(DUT_ADDRESS, &[0xaa], &mut read_data)
+            .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
             .ok();
 
         assert_ne!(read_data, [0u8; 22])
@@ -129,7 +130,10 @@ mod tests {
         ctx.i2c
             .transaction(
                 DUT_ADDRESS,
-                &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
+                &mut [
+                    Operation::Write(READ_DATA_COMMAND),
+                    Operation::Read(&mut read_data),
+                ],
             )
             .ok();
 
@@ -166,7 +170,7 @@ mod tests {
             .ok();
 
         // do the real read which should succeed
-        i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data)
+        i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
             .await
             .ok();
 
@@ -181,7 +185,10 @@ mod tests {
         // do the real read which should succeed
         i2c.transaction_async(
             DUT_ADDRESS,
-            &mut [Operation::Write(&[0xaa]), Operation::Read(&mut read_data)],
+            &mut [
+                Operation::Write(READ_DATA_COMMAND),
+                Operation::Read(&mut read_data),
+            ],
         )
         .await
         .ok();
@@ -199,7 +206,7 @@ mod tests {
 
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
-        i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data)
+        i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
             .await
             .ok();
     }
@@ -218,7 +225,7 @@ mod tests {
         for i in 0..100 {
             let mut read_data = [0u8; 22];
             let result = embassy_futures::join::join(
-                i2c.write_read_async(DUT_ADDRESS, &[0xaa], &mut read_data),
+                i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data),
                 async {
                     for _ in 0..4 {
                         spawner.must_spawn(waiting_blocking_task());
