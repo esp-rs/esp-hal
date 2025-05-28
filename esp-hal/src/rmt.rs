@@ -2719,6 +2719,8 @@ mod chip_specific {
             self.update();
         }
 
+        // Ensure that this is always inlined in (un)listen_tx_interrupt
+        #[inline]
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_ena().modify(|_, w| {
@@ -2874,6 +2876,8 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
+        // Ensure that this is always inlined in (un)listen_rx_interrupt
+        #[inline]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
@@ -3146,6 +3150,8 @@ mod chip_specific {
             }
         }
 
+        // Ensure that this is always inlined in (un)listen_tx_interrupt
+        #[inline]
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -3271,6 +3277,8 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
+        // Ensure that this is always inlined in (un)listen_rx_interrupt
+        #[inline]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
