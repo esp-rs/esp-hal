@@ -95,7 +95,8 @@ fn generate_tx_data<const TX_LEN: usize>(scale: u16, write_end_marker: bool) -> 
     });
 
     if write_end_marker {
-        tx_data[TX_LEN - 2] = PulseCode::new(Level::High, scale * 3000, Level::Low, scale * 500);
+        // Must not scale this, because that would mess up idle_threshold detection!
+        tx_data[TX_LEN - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
         tx_data[TX_LEN - 1] = PulseCode::end_marker();
     }
 
@@ -127,12 +128,37 @@ impl Iterator for TxDataIter {
     }
 }
 
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode]) {
+    assert_eq!(tx.len(), rx.len(), "tx and rx len mismatch");
+
+    let mut errors: usize = 0;
+    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        if code_tx != code_rx {
+            if idx >= tx.len() - 2 {
+                // the last two pulse-codes are the ones which wait for the timeout so they can't
+                // be equal
+                #[cfg(feature = "defmt")]
+                defmt::info!("rx code mismatch at index {}: {:?} (tx) != {:?} (rx)", idx, code_tx, code_rx);
+            } else {
+                #[cfg(feature = "defmt")]
+                defmt::error!("rx code mismatch at index {}: {:?} (tx) != {:?} (rx)", idx, code_tx, code_rx);
+                errors += 1;
+            }
+        }
+    }
+
+    assert!(errors == 0, "rx/tx code mismatch at {}/{} indices", errors, tx.len() - 2);
+}
+
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     use esp_hal::rmt::{RxChannel, TxChannel};
 
-    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let tx_config = TxChannelConfig::default()
+        .with_idle_output_level(Level::Low)
+        .with_idle_output(true)
+        .with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
@@ -156,9 +182,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     tx_transaction.wait().unwrap();
     rx_transaction.wait().unwrap();
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data);
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -166,14 +190,17 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
 
-    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let tx_config = TxChannelConfig::default()
+        .with_idle_output_level(Level::Low)
+        .with_idle_output(true)
+        .with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
     let (mut tx_channel, mut rx_channel) = setup::<Async>(tx_config, rx_config);
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(4, true);
+    let tx_data: [_; TX_LEN] = generate_tx_data(1, true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
 
     let (rx_res, tx_res) = embassy_futures::join::join(
@@ -184,9 +211,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     assert!(tx_res.is_ok());
     assert!(rx_res.is_ok());
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data);
 }
 
 // Run a test that just sends some data, without trying to receive it. This uses an Iterator of
