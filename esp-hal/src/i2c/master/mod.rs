@@ -1331,6 +1331,8 @@ impl Driver<'_> {
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
+            #[cfg(not(esp32))]
+            w.arbitration_en().clear_bit();
             // Ensure that clock is enabled
             w.clk_en().set_bit()
         });
