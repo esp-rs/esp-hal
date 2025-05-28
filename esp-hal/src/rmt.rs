@@ -555,7 +555,7 @@ impl RmtWriter {
         raw: &impl RawChannelAccess<Dir = Tx>,
         initial: bool,
     ) {
-        if !matches!(self.state, WriterState::Active) {
+        if self.state != WriterState::Active {
             // Don't call next() on data again!
             return;
         }
@@ -667,7 +667,7 @@ impl RmtReader {
         raw: &impl RawChannelAccess<Dir = Rx>,
         final_: bool,
     ) {
-        if !matches!(self.state, ReaderState::Active) {
+        if self.state != ReaderState::Active {
             // Don't call next() on data again!
             return;
         }
@@ -675,42 +675,57 @@ impl RmtReader {
         let start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
         let end = unsafe { start.add(memsize) };
+        let initial_offset = self.offset as usize;
 
         // This is only used to read the entire RAM from its start, or to read
         // either the first or second half. The code below may rely on this.
         // In particular, this implies that the offset might only need to be wrapped at
         // the end.
-        debug_assert!(!final_ && self.offset as usize == memsize / 2 || self.offset == 0);
+        debug_assert!(initial_offset == memsize / 2 || initial_offset == 0);
 
+        // Read in up to 2 chunks
         let count = if final_ { memsize } else { memsize / 2 };
+        let mut count0 = count.min(memsize - initial_offset);
+        let mut count1 = count - count0;
 
-        let mut ptr = unsafe { start.add(self.offset as usize) };
-        let mut read = 0;
-        while read < count {
-            if let Some(value) = data.next() {
-                let code = unsafe { ptr.read_volatile() };
-                *value = code.into();
-                ptr = unsafe { ptr.add(1) };
+        let mut ptr = unsafe { start.add(initial_offset) };
+        'outer: loop {
+            while count0 > 0 {
+                if let Some(value) = data.next() {
+                    let code = unsafe { ptr.read_volatile() };
+                    *value = code.into();
+                    ptr = unsafe { ptr.add(1) };
+                    debug_assert!(ptr.addr() <= end.addr());
 
-                read += 1;
+                    count0 -= 1;
 
-                if code.is_end_marker() {
-                    self.state = ReaderState::Done;
-                    break;
+                    if code.is_end_marker() {
+                        self.state = ReaderState::Done;
+                        break 'outer;
+                    }
+                } else {
+                    self.state = ReaderState::Overflow;
+                    break 'outer;
                 }
-            } else {
-                self.state = ReaderState::Overflow;
+            }
+
+            if count1 == 0 {
                 break;
             }
+
+            count0 = count1;
+            count1 = 0;
+            ptr = start;
         }
 
         if ptr == end {
             // Wrap around
             ptr = start;
         }
+
         debug_assert!(ptr.addr() >= start.addr() && ptr.addr() < end.addr());
 
-        self.total += read;
+        self.total += count - count0 - count1;
         self.offset = unsafe { ptr.offset_from(start) } as u16;
     }
 }
