@@ -196,41 +196,7 @@ fn bump_crate_version(
         let mut dependent = CargoToml::new(bumped_package.workspace, pkg)
             .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
 
-        let mut changed = false;
-
-        dependent.visit_dependencies(|_, _, table| {
-            // Update dependencies which specify a version:
-            match &mut table[&package_name] {
-                Item::Table(table) if table.contains_key("version") => {
-                    table["version"] = toml_edit::value(version.to_string());
-                    changed = true;
-                }
-                Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
-                    table["version"] = version.to_string().into();
-                    changed = true;
-                }
-                Item::None => {
-                    // Maybe we have a renamed package (alias = { package = "foo" })?
-                    let update_renamed_dep = table.get_values().iter().any(|(_, p)| {
-                        if let Value::InlineTable(table) = p {
-                            if let Some(Value::String(name)) = &table.get("package") {
-                                return name.value() == &package_name;
-                            }
-                        }
-
-                        false
-                    });
-
-                    if update_renamed_dep {
-                        table[&package_name]["version"] = version.to_string().into();
-                        changed = true;
-                    }
-                }
-                _ => {}
-            }
-        });
-
-        if changed {
+        if dependent.change_version_of_dependency(&package_name, &version) {
             if dry_run {
                 log::info!(
                     "  Dry run: would update {} in {}: ({prev_version} -> {version})",

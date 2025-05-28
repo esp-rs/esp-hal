@@ -2,10 +2,12 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
+use esp_metadata::Chip;
+use strum::IntoEnumIterator;
 
 use crate::{
     cargo::CargoToml,
-    commands::{release::plan::Plan, update_package},
+    commands::{checker::generate_baseline, release::plan::Plan, update_package},
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -55,6 +57,27 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
         step.tag_name = package.package.tag(&new_version);
         step.new_version = new_version;
+
+        if step.package.is_semver_checked() {
+            if args.no_dry_run {
+                generate_baseline(
+                    workspace,
+                    vec![step.package],
+                    if step.package.chip_features_matter() {
+                        Chip::iter()
+                            .filter(|c| step.package.validate_package_chip(c).is_ok())
+                            .collect::<Vec<_>>()
+                    } else {
+                        vec![Chip::Esp32c6]
+                    },
+                )?;
+            } else {
+                println!(
+                    "Dry run: would create semver baseline for package {}",
+                    step.package
+                );
+            }
+        }
     }
 
     // Update release plan file
@@ -196,18 +219,38 @@ cargo xrelease publish-plan --no-dry-run
     let pr_url_base = comparison_url(&release_plan.base, &url, &branch_name)?;
 
     // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
-    let open_pr_url = format!(
+    let mut open_pr_url = format!(
         "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}&body={body}",
         body = urlencoding::encode(&body),
         labels = "release-pr,skip-changelog",
     );
 
+    // https://stackoverflow.com/a/64565317
+    if open_pr_url.len() > 8201 {
+        println!();
+        println!("PR description begins here.");
+        println!();
+        eprintln!("{body}");
+        println!();
+
+        println!("The PR description is too long to be included in the URL.");
+        println!("Please copy the above text as the PR description.");
+        println!();
+
+        open_pr_url = format!(
+            "{pr_url_base}?quick_pull=1&title=Prepare+release&labels={labels}",
+            labels = "release-pr,skip-changelog",
+        );
+    }
+
     if dry_run {
         println!("Dry run: would open the following URL to create a pull request:");
         println!("{open_pr_url}");
-    } else if opener::open(&open_pr_url).is_err() {
-        println!("Open the following URL to create a pull request:");
-        println!("{open_pr_url}");
+    } else {
+        if opener::open(&open_pr_url).is_err() {
+            println!("Open the following URL to create a pull request:");
+            println!("{open_pr_url}");
+        }
     }
 
     println!("Create the release PR and follow the next steps laid out there.");
