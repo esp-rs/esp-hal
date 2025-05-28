@@ -2,10 +2,12 @@ use std::{path::Path, process::Command};
 
 use anyhow::{Context, Result, bail, ensure};
 use clap::Args;
+use esp_metadata::Chip;
+use strum::IntoEnumIterator;
 
 use crate::{
     cargo::CargoToml,
-    commands::{release::plan::Plan, update_package},
+    commands::{checker::generate_baseline, release::plan::Plan, update_package},
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
@@ -55,6 +57,27 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
         step.tag_name = package.package.tag(&new_version);
         step.new_version = new_version;
+
+        if step.package.is_semver_checked() {
+            if args.no_dry_run {
+                generate_baseline(
+                    workspace,
+                    vec![step.package],
+                    if step.package.chip_features_matter() {
+                        Chip::iter()
+                            .filter(|c| step.package.validate_package_chip(c).is_ok())
+                            .collect::<Vec<_>>()
+                    } else {
+                        vec![Chip::Esp32c6]
+                    },
+                )?;
+            } else {
+                println!(
+                    "Dry run: would create semver baseline for package {}",
+                    step.package
+                );
+            }
+        }
     }
 
     // Update release plan file
