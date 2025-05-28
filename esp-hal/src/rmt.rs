@@ -1966,16 +1966,14 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         let result = match raw.get_tx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
+            Some(Event::Error) => Err(Error::TransmissionError),
             Some(Event::End) => {
-                let result = if this.writer.state == WriterState::Active {
+                if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
                     Err(Error::UnexpectedEndMarker)
                 } else {
                     Ok(())
-                };
-
-                Poll::Ready(result)
+                }
             }
             Some(Event::Threshold) => {
                 raw.reset_tx_threshold_set();
@@ -1990,18 +1988,16 @@ where
                     raw.listen_tx_interrupt(Event::Threshold);
                 }
 
-                Poll::Pending
+                return Poll::Pending;
             }
-            _ => Poll::Pending,
+            _ => return Poll::Pending,
         };
 
-        if matches!(result, Poll::Ready(_)) {
-            raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
-            raw.clear_tx_interrupts();
-            STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
-        }
+        raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
+        raw.clear_tx_interrupts();
+        STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
 
-        result
+        Poll::Ready(result)
     }
 }
 
