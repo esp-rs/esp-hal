@@ -567,7 +567,7 @@ impl RmtWriter {
 
         let start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
-        let mut offset = self.offset as usize;
+        let end = unsafe { start.add(memsize) };
 
         // FIXME: debug_assert that the current hw read addr is in the part of RAM that
         // we don't overwrite
@@ -576,7 +576,7 @@ impl RmtWriter {
         // either the first or second half. The code below may rely on this.
         // In particular, this implies that the offset might only need to be wrapped at
         // the end.
-        debug_assert!(!initial || offset == 0);
+        debug_assert!(!initial || self.offset == 0);
 
         let count = if initial {
             // Leave space for extra end marker
@@ -585,38 +585,49 @@ impl RmtWriter {
             memsize / 2
         };
 
+        // FIXME: Modify this such that there's always a valid stop code in RAM, i.e.
+        // either first write the next one, or overwrite the previous one last!
         let mut last_code = PulseCode::end_marker();
+        let mut ptr = unsafe { start.add(self.offset as usize) };
         let mut written = 0;
-        while let Some(code) = data.next() {
-            last_code = *code.borrow();
+        while written < count {
+            if let Some(code) = data.next() {
+                last_code = *code.borrow();
 
-            unsafe { start.add(offset).write_volatile(last_code) }
-            offset += 1;
-            written += 1;
-            if offset == memsize {
-                offset = 0;
-            }
+                unsafe { ptr.write_volatile(last_code) }
+                ptr = unsafe { ptr.add(1) };
+                if ptr == end {
+                    ptr = start;
+                }
 
-            if written == count {
+                written += 1;
+            } else {
+                self.state = if last_code.is_end_marker() {
+                    WriterState::Done
+                } else {
+                    WriterState::DoneNoEnd
+                };
                 break;
             }
         }
 
-        if written < count {
-            self.state = if !last_code.is_end_marker() {
-                WriterState::DoneNoEnd
-            } else {
-                WriterState::Done
-            };
-        }
-
         // Write an extra end marker to detect underruns.
-        // Do not increment the offset afterwards since we want to overwrite it in the
-        // next call
-        unsafe { start.add(offset).write_volatile(PulseCode::end_marker()) }
+        // Do not increment the offset or written afterwards since we want to overwrite
+        // it in the next call
+        unsafe { ptr.write_volatile(PulseCode::end_marker()) }
 
         self.written += written;
-        self.offset = offset as u16;
+        debug_assert!(ptr.addr() >= start.addr() && ptr.addr() < end.addr());
+        self.offset = unsafe { ptr.offset_from(start) } as u16;
+
+        // When we're done, the pointer can point anywhere depending on the data length.
+        // Otherwise, it should point at the last entry of either half of the channel
+        // RAM.
+        debug_assert!(
+            self.state != WriterState::Active
+                || self.offset as usize == memsize / 2 - 1
+                || self.offset as usize == memsize - 1
+        );
     }
 }
 
@@ -1952,7 +1963,7 @@ where
             Some(Event::End) => {
                 let result = if this.writer.state == WriterState::Active {
                     // Unexpectedly done, even though we have data left.
-                    Err(Error::TransmissionError)
+                    Err(Error::UnexpectedEndMarker)
                 } else {
                     Ok(())
                 };
@@ -1968,8 +1979,8 @@ where
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
-                if this.writer.state == WriterState::Done {
-                    raw.unlisten_tx_interrupt(Event::Threshold);
+                if this.writer.state == WriterState::Active {
+                    raw.listen_tx_interrupt(Event::Threshold);
                 }
 
                 Poll::Pending
@@ -2065,7 +2076,7 @@ where
         raw.clear_tx_interrupts();
         let mut events = Event::End | Event::Error;
         if wrap {
-            events |= Event::Threshold
+            events |= Event::Threshold;
         }
         raw.listen_tx_interrupt(events);
         raw.start_send(false, 0);
@@ -2222,9 +2233,14 @@ fn async_interrupt_handler() {
                     raw.unlisten_rx_interrupt(Event::End | Event::Error)
                 }
             },
-            Event::Threshold => {
+            Event::Threshold => match raw {
                 // Just wake, but don't disable the interrupt
-            }
+                // AnyChannelAccess::Tx(ref raw) => raw.reset_tx_threshold_set(),
+                // AnyChannelAccess::Rx(ref raw) => raw.reset_rx_threshold_set(),
+                // The RmtTxFuture will wnable the interrupt again if required
+                AnyChannelAccess::Tx(ref raw) => raw.unlisten_tx_interrupt(Event::Threshold),
+                AnyChannelAccess::Rx(ref raw) => raw.unlisten_rx_interrupt(Event::Threshold),
+            },
         }
         WAKER[raw.channel() as usize].wake();
     }
@@ -2881,6 +2897,8 @@ mod chip_specific {
 
         (0..NUM_CHANNELS as u8).filter_map(move |ch_num| {
             let (is_tx, event) = if st.ch_err(ch_num).bit() {
+                // FIXME: Is it really necessary to determine tx/rx here?
+                // Ultimately, we just need to signal the waker, so it doesn't really matter.
                 if let Some(is_tx) =
                     unsafe { RmtState::load_unchecked(ch_num, Ordering::Relaxed) }.is_tx()
                 {
