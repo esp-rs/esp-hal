@@ -1512,6 +1512,9 @@ enum RmtState {
     // The channel is configured for rx and currently performing an async transaction
     RxAsync      = RX_STATE_BASE + 1,
 
+    // The channel is configured for rx and currently performing a blocking transaction
+    RxBlocking   = RX_STATE_BASE + 2,
+
     // The channel is configured for tx and currently performing an async transaction
     TxAsync      = TX_STATE_BASE + 1,
 }
@@ -1520,7 +1523,7 @@ impl RmtState {
     #[allow(unused)]
     fn is_tx(&self) -> Option<bool> {
         match self {
-            Self::RxIdle | Self::RxAsync => Some(false),
+            Self::RxIdle | Self::RxAsync | Self::RxBlocking => Some(false),
             Self::TxIdle | Self::TxAsync => Some(true),
             _ => None,
         }
@@ -2014,7 +2017,10 @@ where
             }
         };
 
-        self.raw.clear_rx_interrupts();
+        let raw = self.raw;
+
+        raw.clear_rx_interrupts();
+        STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
 
         // Disable Drop handler since the receiver is stopped already.
         let _ = ManuallyDrop::new(self);
@@ -2035,10 +2041,17 @@ where
         // safe (i.e. start from a state where the hardware is stopped).
         let raw = self.raw;
 
-        raw.stop_rx();
-        raw.update();
+        // STATE should be RxIdle if the transaction was polled to completion
+        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::RxAsync as u8 {
+            raw.stop_rx();
+            raw.update();
 
-        while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+            // block until the channel is safe to use again
+            while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+
+            raw.clear_rx_interrupts();
+            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+        }
     }
 }
 
@@ -2081,6 +2094,8 @@ where
 
         let data = data.into_iter();
         let reader = RmtReader::new();
+
+        STATE[raw.channel() as usize].store(RmtState::RxBlocking as u8, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
         raw.start_receive(true);
