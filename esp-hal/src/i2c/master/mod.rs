@@ -869,7 +869,7 @@ where
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        Self::connect_pin(sda, input, output, &mut self.sda_pin);
+        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
 
         self
     }
@@ -881,32 +881,9 @@ where
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        Self::connect_pin(scl, input, output, &mut self.scl_pin);
+        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
 
         self
-    }
-
-    fn connect_pin(
-        pin: impl PeripheralOutput<'d>,
-        input: InputSignal,
-        output: OutputSignal,
-        guard: &mut PinGuard,
-    ) {
-        let pin = pin.into();
-        // avoid the pin going low during configuration
-        pin.set_output_high(true);
-
-        pin.apply_output_config(
-            &OutputConfig::default()
-                .with_drive_mode(DriveMode::OpenDrain)
-                .with_pull(Pull::Up),
-        );
-        pin.set_output_enable(true);
-        pin.set_input_enable(true);
-
-        input.connect_to(&pin);
-
-        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
     }
 
     /// Writes bytes to slave with given `address`
@@ -1319,9 +1296,29 @@ impl Driver<'_> {
         self.info.regs()
     }
 
-    /// Configures the I2C peripheral with the specified frequency, clocks, and
-    /// optional timeout.
-    fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+    fn connect_pin(
+        pin: crate::gpio::interconnect::OutputSignal<'_>,
+        input: InputSignal,
+        output: OutputSignal,
+        guard: &mut PinGuard,
+    ) {
+        // avoid the pin going low during configuration
+        pin.set_output_high(true);
+
+        pin.apply_output_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
+        pin.set_output_enable(true);
+        pin.set_input_enable(true);
+
+        input.connect_to(&pin);
+
+        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
+    }
+
+    fn init_master(&self) {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
