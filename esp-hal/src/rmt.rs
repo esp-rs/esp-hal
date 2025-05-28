@@ -1733,6 +1733,7 @@ where
             return Err(Error::InvalidArgument);
         }
 
+        #[allow(clippy::single_match)]
         match writer.state {
             WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
             // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
