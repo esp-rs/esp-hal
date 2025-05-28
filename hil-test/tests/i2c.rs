@@ -112,12 +112,12 @@ mod tests {
         // state
         ctx.i2c
             .write_read(NON_EXISTENT_ADDRESS, &[0xaa], &mut read_data)
-            .ok();
+            .expect_err("Expected error for non-existent address");
 
         // do the real read which should succeed
         ctx.i2c
             .write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
-            .ok();
+            .unwrap();
 
         assert_ne!(read_data, [0u8; 22])
     }
@@ -135,7 +135,7 @@ mod tests {
                     Operation::Read(&mut read_data),
                 ],
             )
-            .ok();
+            .unwrap();
 
         assert_ne!(read_data, [0u8; 22])
     }
@@ -167,12 +167,12 @@ mod tests {
         // state
         i2c.write_read_async(NON_EXISTENT_ADDRESS, &[0xaa], &mut read_data)
             .await
-            .ok();
+            .expect_err("Expected error for non-existent address");
 
         // do the real read which should succeed
         i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
             .await
-            .ok();
+            .unwrap();
 
         assert_ne!(read_data, [0u8; 22])
     }
@@ -191,7 +191,7 @@ mod tests {
             ],
         )
         .await
-        .ok();
+        .unwrap();
 
         assert_ne!(read_data, [0u8; 22])
     }
@@ -207,7 +207,7 @@ mod tests {
         let mut read_data = [0u8; 22];
         // will run into an error but it should return at least
         i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
-            .ok();
+            .expect_err("Expected timeout error");
     }
 
     // This is still an issue on ESP32-S2
@@ -222,7 +222,7 @@ mod tests {
         // will run into an error but it should return at least
         i2c.write_read_async(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
             .await
-            .ok();
+            .expect_err("Expected timeout error");
     }
 
     #[test]
