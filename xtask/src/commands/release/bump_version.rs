@@ -211,18 +211,22 @@ fn bump_crate_version(
                 }
                 Item::None => {
                     // Maybe we have a renamed package (alias = { package = "foo" })?
-                    let update_renamed_dep = table.get_values().iter().any(|(_, p)| {
+                    let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
                         if let Value::InlineTable(table) = p {
                             if let Some(Value::String(name)) = &table.get("package") {
-                                return name.value() == &package_name;
+                                if name.value() == &package_name {
+                                    // `procmacros = { package = "esp-hal-procmacros" }`
+                                    //  ^^^^^^^^^^
+                                    return Some(k.last().unwrap().get().to_string());
+                                }
                             }
                         }
 
-                        false
+                        None
                     });
 
-                    if update_renamed_dep {
-                        table[&package_name]["version"] = version.to_string().into();
+                    if let Some(dependency_name) = update_renamed_dep {
+                        table[&dependency_name]["version"] = version.to_string().into();
                         changed = true;
                     }
                 }
