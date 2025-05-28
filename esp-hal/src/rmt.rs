@@ -656,9 +656,9 @@ impl RmtReader {
         }
     }
 
-    fn read<'a>(
+    fn read<'a, T: From<PulseCode> + 'static>(
         &mut self,
-        data: &mut impl Iterator<Item = &'a mut PulseCode>,
+        data: &mut impl Iterator<Item = &'a mut T>,
         raw: &impl RawChannelAccess<Dir = Rx>,
         count: usize,
     ) {
@@ -683,8 +683,9 @@ impl RmtReader {
         let initial_offset = offset;
         while offset < initial_offset + count {
             match data.next() {
-                Some(code) => {
-                    *code = unsafe { start.add(offset).read_volatile() };
+                Some(value) => {
+                    let code = unsafe { start.add(offset).read_volatile() };
+                    *value = code.into();
                     offset += 1;
 
                     // FIXME: Maybe remove this for more efficiency?
@@ -1808,10 +1809,11 @@ where
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'ch, 'a, C, D>
+pub struct RxTransaction<'ch, 'a, C, D, T>
 where
     C: RxChannel,
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     channel: &'ch mut C,
 
@@ -1820,10 +1822,11 @@ where
     data: D,
 }
 
-impl<'a, C, D> RxTransaction<'_, 'a, C, D>
+impl<'a, C, D, T> RxTransaction<'_, 'a, C, D, T>
 where
     C: RxChannel,
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw();
@@ -1890,10 +1893,11 @@ where
     }
 }
 
-impl<'a, C, D> Drop for RxTransaction<'_, 'a, C, D>
+impl<'a, C, D, T> Drop for RxTransaction<'_, 'a, C, D, T>
 where
     C: RxChannel,
-    D: Iterator<Item = &'a mut PulseCode>,
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'static,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -1923,12 +1927,13 @@ pub trait RxChannel: Sized {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<'ch, 'a, D>(
+    fn receive<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter>, Error>
+    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter, T>, Error>
     where
-        D: IntoIterator<Item = &'a mut PulseCode>;
+        D: IntoIterator<Item = &'a mut T>,
+        T: From<PulseCode> + 'static;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
@@ -1944,12 +1949,13 @@ where
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    fn receive<'ch, 'a, D>(
+    fn receive<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter>, Error>
+    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter, T>, Error>
     where
-        D: IntoIterator<Item = &'a mut PulseCode>
+        D: IntoIterator<Item = &'a mut T>,
+        T: From<PulseCode> + 'static,
     {
         self.raw.start_receive(true);
 
