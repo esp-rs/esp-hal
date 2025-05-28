@@ -67,6 +67,7 @@ pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
     }
 
     let workflow_input = serde_json::to_string(&created)?;
+    let workflow_input = workflow_input.replace("\"", "'");
 
     log::info!("Documentation workflow input for these packages:\r\n\r\n{workflow_input}\r\n\r\n");
 
