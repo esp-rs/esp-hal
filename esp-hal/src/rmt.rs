@@ -898,13 +898,15 @@ where
     }
 }
 
-impl<Dm, Dir, const CHANNEL: u8> Channel<Dm, ConstChannelAccess<Dir, CHANNEL>>
+// Note that this is intentionally implemented even if Raw is DynChannelAccess
+// already for convenience!
+impl<Dm, Dir, Raw> Channel<Dm, Raw>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
-    ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess<Dir = Dir>,
+    Raw: RawChannelAccess<Dir = Dir>,
 {
-    /// Consume the channel and return a type-erase version
+    /// Consume the channel and return a type-erased version
     pub fn degrade(self) -> Channel<Dm, DynChannelAccess<Dir>> {
         use core::mem::ManuallyDrop;
         // Disable Drop handler on self
