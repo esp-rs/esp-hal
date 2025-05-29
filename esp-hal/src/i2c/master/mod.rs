@@ -1462,164 +1462,12 @@ impl Driver<'_> {
     /// SDA indefinitely. This function forces the slave to release the
     /// bus by sending 9 clock pulses.
     fn clear_bus_blocking(&self) {
-        const BUS_CLEAR_BITS: u8 = 9;
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                use crate::gpio::AnyPin;
-
-                // The chip is lacking hardware support for this, so we
-                // implement it in software.
-                let (Some(sda), Some(scl)) = (
-                    self.config.sda_pin.pin_number(),
-                    self.config.scl_pin.pin_number(),
-                ) else {
-                    // If we don't have the pins, we can't clear the bus.
-                    return;
-                };
-
-                let scl = unsafe { AnyPin::steal(scl) };
-                let sda = unsafe { AnyPin::steal(sda) };
-
-                self.info.scl_output.disconnect_from(&scl);
-                self.info.sda_output.disconnect_from(&sda);
-
-                // We'll assume the pins are properly set up for I2C.
-                // We'll also assume that no alternate function exists
-                // for I2C, which is true for ESP32.
-
-                const SCL_DELAY: u32 = 5; // use standard 100kHz data rate
-                scl.set_output_high(false);
-                sda.set_output_high(true);
-                crate::rom::ets_delay_us(SCL_DELAY);
-
-                for _ in 0..BUS_CLEAR_BITS {
-                    if !sda.is_input_high() {
-                        break;
-                    }
-
-                    scl.set_output_high(true);
-                    crate::rom::ets_delay_us(SCL_DELAY);
-                    scl.set_output_high(false);
-                    crate::rom::ets_delay_us(SCL_DELAY);
-                }
-
-                // Send STOP
-                scl.set_output_high(true);
-                sda.set_output_high(false);
-                crate::rom::ets_delay_us(SCL_DELAY);
-                sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
-
-                self.info.sda_output.connect_to(&sda);
-                self.info.scl_output.connect_to(&scl);
-            } else {
-                self.regs().scl_sp_conf().modify(|_, w| {
-                    unsafe { w.scl_rst_slv_num().bits(BUS_CLEAR_BITS) };
-                    w.scl_rst_slv_en().set_bit()
-                });
-                self.update_registers();
-                let now = Instant::now();
-                while self.regs().scl_sp_conf().read().scl_rst_slv_en().bit_is_set() {
-                    // Wait for the bus to be released
-                    if now.elapsed() > Duration::from_millis(50) {
-                        // If it takes too long, we give up, as the SCL might be tied low, too,
-                        // in which case we'd never exit this loop.
-                        self.regs().scl_sp_conf().modify(|_, w| {
-                            unsafe { w.scl_rst_slv_num().bits(0) };
-                            w.scl_rst_slv_en().clear_bit()
-                        });
-                        break;
-                    }
-                }
-                self.update_registers();
-            }
-        }
+        let mut future = ClearBusFuture::new(*self);
+        while future.poll_completion().is_pending() {}
     }
 
     async fn clear_bus(&self) {
-        const BUS_CLEAR_BITS: u8 = 9;
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                use crate::gpio::AnyPin;
-
-                async fn async_delay_us(us: u32) {
-                    let now = Instant::now();
-                    while now.elapsed() < Duration::from_micros(us as u64) {
-                        embassy_futures::yield_now().await;
-                    }
-                }
-
-                // The chip is lacking hardware support for this, so we
-                // implement it in software.
-                let (Some(sda), Some(scl)) = (
-                    self.config.sda_pin.pin_number(),
-                    self.config.scl_pin.pin_number(),
-                ) else {
-                    // If we don't have the pins, we can't clear the bus.
-                    return;
-                };
-
-                let scl = unsafe { AnyPin::steal(scl) };
-                let sda = unsafe { AnyPin::steal(sda) };
-
-                self.info.scl_output.disconnect_from(&scl);
-                self.info.sda_output.disconnect_from(&sda);
-
-                // We'll assume the pins are properly set up for I2C.
-                // We'll also assume that no alternate function exists
-                // for I2C, which is true for ESP32.
-
-                const SCL_DELAY: u32 = 5; // use standard 100kHz data rate
-                scl.set_output_high(false);
-                sda.set_output_high(true);
-                async_delay_us(SCL_DELAY).await;
-
-                for _ in 0..BUS_CLEAR_BITS {
-                    if !sda.is_input_high() {
-                        break;
-                    }
-
-                    scl.set_output_high(true);
-                    async_delay_us(SCL_DELAY).await;
-                    scl.set_output_high(false);
-                    async_delay_us(SCL_DELAY).await;
-                }
-
-                // Send STOP
-                scl.set_output_high(true);
-                sda.set_output_high(false);
-                async_delay_us(SCL_DELAY).await;
-                sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
-
-                self.info.sda_output.connect_to(&sda);
-                self.info.scl_output.connect_to(&scl);
-            } else {
-                self.regs().scl_sp_conf().modify(|_, w| {
-                    unsafe { w.scl_rst_slv_num().bits(BUS_CLEAR_BITS) };
-                    w.scl_rst_slv_en().set_bit()
-                });
-                self.update_registers();
-                let now = Instant::now();
-
-                // If it takes too long, we give up, as the SCL might be tied low, too,
-                // in which case we'd never exit this loop. We also want to make the clearing
-                // cancellable.
-                let _drop_guard = OnDrop::new(|| {
-                    self.regs().scl_sp_conf().modify(|_, w| {
-                        unsafe { w.scl_rst_slv_num().bits(0) };
-                        w.scl_rst_slv_en().clear_bit()
-                    });
-                });
-
-                while self.regs().scl_sp_conf().read().scl_rst_slv_en().bit_is_set() {
-                    // Wait for the bus to be released
-                    if now.elapsed() > Duration::from_millis(50) {
-                        break;
-                    }
-                    embassy_futures::yield_now().await;
-                }
-                self.update_registers();
-            }
-        }
+        ClearBusFuture::new(*self).await;
     }
 
     /// Resets the I2C peripheral's command registers.
@@ -2822,6 +2670,215 @@ fn calculate_chunk_size(remaining: usize) -> usize {
         I2C_CHUNK_SIZE
     } else {
         I2C_CHUNK_SIZE - 2
+    }
+}
+
+#[cfg(not(esp32))]
+mod bus_clear {
+    use super::*;
+
+    pub struct ClearBusFuture<'a> {
+        driver: Driver<'a>,
+        started: Instant,
+    }
+
+    impl<'a> ClearBusFuture<'a> {
+        // Number of SCL pulses to clear the bus
+        const BUS_CLEAR_BITS: u8 = 9;
+
+        pub fn new(driver: Driver<'a>) -> Self {
+            driver.regs().scl_sp_conf().modify(|_, w| {
+                unsafe { w.scl_rst_slv_num().bits(Self::BUS_CLEAR_BITS) };
+                w.scl_rst_slv_en().set_bit()
+            });
+            driver.update_registers();
+
+            Self {
+                driver,
+                started: Instant::now(),
+            }
+        }
+
+        pub fn poll_completion(&mut self) -> Poll<()> {
+            if self
+                .driver
+                .regs()
+                .scl_sp_conf()
+                .read()
+                .scl_rst_slv_en()
+                .bit_is_set()
+                && self.started.elapsed() < Duration::from_millis(50)
+            {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    impl Drop for ClearBusFuture<'_> {
+        fn drop(&mut self) {
+            self.driver.regs().scl_sp_conf().modify(|_, w| {
+                unsafe { w.scl_rst_slv_num().bits(0) };
+                w.scl_rst_slv_en().clear_bit()
+            });
+            self.driver.update_registers();
+        }
+    }
+}
+
+#[cfg(esp32)]
+mod bus_clear {
+    use super::*;
+    use crate::gpio::AnyPin;
+
+    /// State of the bus clearing operation.
+    ///
+    /// Pins are changed on the start of the state, and a wait is scheduled
+    /// for the end of the state. At the end of the wait, the state is
+    /// updated to the next state.
+    enum State {
+        Idle,
+        SendStop,
+
+        // Number of SCL pulses left to send, and the last SCL level.
+        //
+        // Our job is to send 9 high->low SCL transitions, followed by a STOP condition.
+        SendClock(u8, bool),
+    }
+
+    pub struct ClearBusFuture<'a> {
+        driver: Driver<'a>,
+        wait: Instant,
+        state: State,
+        sda: Option<AnyPin<'static>>,
+        scl: Option<AnyPin<'static>>,
+    }
+
+    impl<'a> ClearBusFuture<'a> {
+        // Number of SCL pulses to clear the bus
+        const BUS_CLEAR_BITS: u8 = 9;
+        // use standard 100kHz data rate
+        const SCL_DELAY: Duration = Duration::from_micros(5);
+
+        pub fn new(driver: Driver<'a>) -> Self {
+            // The chip is lacking hardware support for this, so we
+            // implement it in software.
+            let sda = driver
+                .config
+                .sda_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+            let scl = driver
+                .config
+                .scl_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+
+            let (Some(sda), Some(scl)) = (sda, scl) else {
+                // If we don't have the pins, we can't clear the bus.
+                return Self {
+                    driver,
+                    wait: Instant::now(),
+                    state: State::Idle,
+                    sda: None,
+                    scl: None,
+                };
+            };
+
+            driver.info.scl_output.disconnect_from(&scl);
+            driver.info.sda_output.disconnect_from(&sda);
+
+            sda.set_output_high(true);
+            scl.set_output_high(false);
+
+            // Starting from (9, false), becase:
+            // - we start with SCL low
+            // - a complete SCL cycle consists of a high period and a low period
+            // - we decrement the remaining counter at the beginning of a cycle, which gives
+            //   us 9 complete SCL cycles.
+            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
+
+            Self {
+                driver,
+                wait: Instant::now() + Self::SCL_DELAY,
+                state,
+                sda: Some(sda),
+                scl: Some(scl),
+            }
+        }
+    }
+
+    impl ClearBusFuture<'_> {
+        pub fn poll_completion(&mut self) -> Poll<()> {
+            let now = Instant::now();
+
+            match self.state {
+                State::Idle => return Poll::Ready(()),
+                _ if now < self.wait => {
+                    // Still waiting for the end of the SCL pulse
+                }
+                State::SendStop => {
+                    if let Some(sda) = self.sda.as_ref() {
+                        sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
+                    }
+                    self.state = State::Idle;
+                    return Poll::Ready(());
+                }
+                State::SendClock(0, false) => {
+                    if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
+                        // Set up for STOP condition
+                        sda.set_output_high(false);
+                        scl.set_output_high(true);
+                    }
+                    self.state = State::SendStop;
+                    self.wait = now + Self::SCL_DELAY;
+                }
+                State::SendClock(n, false) => {
+                    if let Some(scl) = self.scl.as_ref() {
+                        scl.set_output_high(true);
+                    }
+                    self.state = State::SendClock(n - 1, true);
+                    self.wait = now + Self::SCL_DELAY;
+                }
+                State::SendClock(n, true) => {
+                    if let Some(scl) = self.scl.as_ref() {
+                        scl.set_output_high(false);
+                    }
+                    self.state = State::SendClock(n, false);
+                    self.wait = now + Self::SCL_DELAY;
+                }
+            }
+
+            Poll::Pending
+        }
+    }
+
+    impl Drop for ClearBusFuture<'_> {
+        fn drop(&mut self) {
+            if let (Some(sda), Some(scl)) = (self.sda.take(), self.scl.take()) {
+                // Make sure _we_ release the bus.
+                scl.set_output_high(true);
+                sda.set_output_high(true);
+
+                self.driver.info.sda_output.connect_to(&sda);
+                self.driver.info.scl_output.connect_to(&scl);
+            }
+        }
+    }
+}
+
+use bus_clear::ClearBusFuture;
+
+impl Future for ClearBusFuture<'_> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let pending = self.poll_completion();
+        if pending.is_pending() {
+            ctx.waker().wake_by_ref();
+        }
+        pending
     }
 }
 
