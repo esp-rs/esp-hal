@@ -1370,6 +1370,10 @@ impl Driver<'_> {
     // This function implements esp-idf's `s_i2c_hw_fsm_reset`, without the
     // clear_bus=true parts.
     // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
+    //
+    // Make sure you don't call this function in the middle of a transaction. If the
+    // first command in the command list is not a START, the hardware will hang
+    // with no timeouts.
     fn reset_fsm(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32c6, esp32h2))] {
@@ -1479,7 +1483,7 @@ impl Driver<'_> {
         }
     }
 
-    /// Resets the I2C peripheral's command registers
+    /// Resets the I2C peripheral's command registers.
     fn reset_command_list(&self) {
         for cmd in self.regs().comd_iter() {
             cmd.reset();
@@ -2767,6 +2771,9 @@ pub trait Instance: crate::private::Sealed + super::IntoAnyI2c {
 }
 
 /// Adds a command to the I2C command sequence.
+///
+/// Make sure the first command after a FSM reset is a START, otherwise
+/// the hardware will hang with no timeouts.
 fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where
     I: Iterator<Item = &'a COMD>,
