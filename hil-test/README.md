@@ -101,7 +101,7 @@ Our self-hosted runners have the following setup:
 - ESP32 (`esp32-jtag`):
   - Devkit: `ESP32-DevKitC-V4` connected via UART.
     - `GPIO32` and `GPIO33` are I2C pins.
-    - `GPIO26` and `GPIO27` are connected.
+    - `GPIO2` and `GPIO4` are connected.
   - Probe: `ESP-Prog` connected with the [following connections][connection_esp32]
   - RPi: Raspbian 12 configured with the following [setup]
 
