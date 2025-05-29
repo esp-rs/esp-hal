@@ -1411,6 +1411,7 @@ impl Driver<'_> {
     /// SDA indefinitely. This function forces the slave to release the
     /// bus by sending 9 clock pulses.
     fn clear_bus(&self) {
+        const BUS_CLEAR_BITS: u8 = 9;
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
                 use crate::gpio::AnyPin;
@@ -1440,7 +1441,7 @@ impl Driver<'_> {
                 sda.set_output_high(true);
                 crate::rom::ets_delay_us(SCL_DELAY);
 
-                for _ in 0..9 {
+                for _ in 0..BUS_CLEAR_BITS {
                     if !sda.is_input_high() {
                         break;
                     }
@@ -1461,7 +1462,7 @@ impl Driver<'_> {
                 self.info.scl_output.connect_to(&scl);
             } else {
                 self.regs().scl_sp_conf().modify(|_, w| {
-                    unsafe { w.scl_rst_slv_num().bits(9) };
+                    unsafe { w.scl_rst_slv_num().bits(BUS_CLEAR_BITS) };
                     w.scl_rst_slv_en().set_bit()
                 });
                 self.update_registers();
