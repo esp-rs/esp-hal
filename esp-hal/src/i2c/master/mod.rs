@@ -850,6 +850,10 @@ where
     }
 
     fn internal_recover(&self) {
+        if self.driver().regs().sr().read().bus_busy().bit_is_set() {
+            // Send clock pulses to make sure the slave releases the bus.
+            self.driver().clear_bus();
+        }
         self.driver().reset_fsm();
     }
 
@@ -1383,8 +1387,8 @@ impl Driver<'_> {
                 // assume that the config is valid and we can ignore the result.
                 self.setup(&self.config.config).ok();
             }
-            }
         }
+    }
 
     fn reset_before_transmission(&self) {
         // Clear all I2C interrupts
@@ -1395,6 +1399,84 @@ impl Driver<'_> {
 
         // Reset the command list
         self.reset_command_list();
+    }
+
+    /// Implements s_i2c_master_clear_bus
+    ///
+    /// If a transaction ended incorrectly for some reason, the slave may drive
+    /// SDA indefinitely. This function forces the slave to release the
+    /// bus by sending 9 clock pulses.
+    fn clear_bus(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                use crate::gpio::AnyPin;
+
+                // The chip is lacking hardware support for this, so we
+                // implement it in software.
+                let (Some(sda), Some(scl)) = (
+                    self.config.sda_pin.pin_number(),
+                    self.config.scl_pin.pin_number(),
+                ) else {
+                    // If we don't have the pins, we can't clear the bus.
+                    return;
+                };
+
+                let scl = unsafe { AnyPin::steal(scl) };
+                let sda = unsafe { AnyPin::steal(sda) };
+
+                self.info.scl_output.disconnect_from(&scl);
+                self.info.sda_output.disconnect_from(&sda);
+
+                // We'll assume the pins are properly set up for I2C.
+                // We'll also assume that no alternate function exists
+                // for I2C, which is true for ESP32.
+
+                const SCL_DELAY: u32 = 5; // use standard 100kHz data rate
+                scl.set_output_high(false);
+                sda.set_output_high(true);
+                crate::rom::ets_delay_us(SCL_DELAY);
+
+                for _ in 0..9 {
+                    if !sda.is_input_high() {
+                        break;
+                    }
+
+                    scl.set_output_high(true);
+                    crate::rom::ets_delay_us(SCL_DELAY);
+                    scl.set_output_high(false);
+                    crate::rom::ets_delay_us(SCL_DELAY);
+                }
+
+                // Send STOP
+                scl.set_output_high(true);
+                sda.set_output_high(false);
+                crate::rom::ets_delay_us(SCL_DELAY);
+                sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
+
+                self.info.sda_output.connect_to(&sda);
+                self.info.scl_output.connect_to(&scl);
+            } else {
+                self.regs().scl_sp_conf().modify(|_, w| {
+                    unsafe { w.scl_rst_slv_num().bits(9) };
+                    w.scl_rst_slv_en().set_bit()
+                });
+                self.update_registers();
+                let now = Instant::now();
+                while self.regs().scl_sp_conf().read().scl_rst_slv_en().bit_is_set() {
+                    // Wait for the bus to be released
+                    if now.elapsed() > Duration::from_millis(50) {
+                        // If it takes too long, we give up, as the SCL might be tied low, too,
+                        // in which case we'd never exit this loop.
+                        self.regs().scl_sp_conf().modify(|_, w| {
+                            unsafe { w.scl_rst_slv_num().bits(0) };
+                            w.scl_rst_slv_en().clear_bit()
+                        });
+                        break;
+                    }
+                }
+                self.update_registers();
+            }
+        }
     }
 
     /// Resets the I2C peripheral's command registers

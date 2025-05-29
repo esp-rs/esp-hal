@@ -113,6 +113,15 @@ impl PinGuard {
             signal,
         }
     }
+
+    #[cfg(esp32)]
+    pub(crate) fn pin_number(&self) -> Option<u8> {
+        if self.pin == u8::MAX {
+            None
+        } else {
+            Some(self.pin)
+        }
+    }
 }
 
 impl Drop for PinGuard {
