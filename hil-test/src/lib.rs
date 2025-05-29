@@ -54,7 +54,7 @@ macro_rules! common_test_pins {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
             } else if #[cfg(esp32)] {
-                ($peripherals.GPIO26, $peripherals.GPIO27)
+                ($peripherals.GPIO2, $peripherals.GPIO4)
             } else {
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
