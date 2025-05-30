@@ -107,7 +107,10 @@ default = []
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
 __bluetooth = []
+# Reserves FROM_CPU_INTR3 for multi-core MCUs.
 __esp_hal_embassy = []
+# Reserves FROM_CPU_INTR2 for RISC-V MCUs.
+__esp_wifi_builtin_scheduler = []
 __usb_otg = [
     "dep:embassy-usb-driver",
     "dep:embassy-usb-synopsys-otg",
