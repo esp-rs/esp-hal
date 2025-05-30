@@ -58,7 +58,6 @@ const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
-const TIMEOUT: Duration = Duration::from_millis(10);
 const CLEAR_BUS_TIMEOUT_MS: Duration = Duration::from_millis(50);
 
 /// Representation of I2C address.
@@ -153,6 +152,34 @@ impl BusTimeout {
     fn is_set(&self) -> bool {
         matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
+}
+
+/// Software timeout for I2C operations.
+///
+/// This timeout is used to limit the duration of I2C operations in software.
+/// Note that using this in conjunction with `async` operations will cause the
+/// task to be woken up continuously until the operation completes or the
+/// timeout is reached. You should prefer using an asynchronous
+/// timeout mechanism (like [`embassy_time::with_timeout`]) for better
+/// efficiency.
+///
+/// [`embassy_time::with_timeout`]: https://docs.rs/embassy-time/0.4.0/embassy_time/fn.with_timeout.html
+#[instability::unstable]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum SoftwareTimeout {
+    /// No software timeout is set.
+    None,
+
+    /// Define a fixed timeout for I2C operations.
+    Transaction(Duration),
+
+    /// Define a data length dependent timeout for I2C operations.
+    ///
+    /// The applied timeout is calculated as `data_length * duration_per_byte`.
+    /// In [`I2c::transaction`] and [`I2c::transaction_async`], the timeout is
+    /// applied separately for each operation.
+    PerByte(Duration),
 }
 
 /// When the FSM remains unchanged for more than the 2^ the given amount of bus
@@ -471,6 +498,10 @@ pub struct Config {
     /// I2C SCL timeout period.
     timeout: BusTimeout,
 
+    /// Software timeout.
+    #[builder_lite(unstable)]
+    software_timeout: SoftwareTimeout,
+
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
     #[cfg(not(any(esp32, esp32s2)))]
     #[builder_lite(unstable)]
@@ -487,6 +518,7 @@ impl Default for Config {
         Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
+            software_timeout: SoftwareTimeout::PerByte(Duration::from_millis(1)),
             #[cfg(not(any(esp32, esp32s2)))]
             scl_st_timeout: Default::default(),
             #[cfg(not(any(esp32, esp32s2)))]
@@ -682,15 +714,12 @@ pub enum Event {
 struct I2cFuture<'a> {
     events: EnumSet<Event>,
     driver: Driver<'a>,
-    #[cfg(any(esp32, esp32s2))]
-    timeout: Duration,
-    #[cfg(any(esp32, esp32s2))]
-    start: Instant,
+    deadline: Option<Instant>,
     finished: bool,
 }
 
 impl<'a> I2cFuture<'a> {
-    pub fn new(events: EnumSet<Event>, driver: Driver<'a>, timeout: Duration) -> Self {
+    pub fn new(events: EnumSet<Event>, driver: Driver<'a>, deadline: Option<Instant>) -> Self {
         driver.regs().int_ena().modify(|_, w| {
             for event in events {
                 match event {
@@ -713,17 +742,18 @@ impl<'a> I2cFuture<'a> {
             w
         });
 
-        Self::new_blocking(events, driver, timeout)
+        Self::new_blocking(events, driver, deadline)
     }
 
-    pub fn new_blocking(events: EnumSet<Event>, driver: Driver<'a>, _timeout: Duration) -> Self {
+    pub fn new_blocking(
+        events: EnumSet<Event>,
+        driver: Driver<'a>,
+        deadline: Option<Instant>,
+    ) -> Self {
         Self {
             events,
             driver,
-            #[cfg(any(esp32, esp32s2))]
-            timeout: _timeout,
-            #[cfg(any(esp32, esp32s2))]
-            start: Instant::now(),
+            deadline,
             finished: false,
         }
     }
@@ -745,10 +775,11 @@ impl<'a> I2cFuture<'a> {
             // TODO: it's more efficient to time out with embassy-time, but we can't
             // do that in esp-hal. Maybe we should provide an option to disable this
             // looping timeout check.
-            #[cfg(any(esp32, esp32s2))]
-            if self.start.elapsed() > self.timeout {
-                // If the timeout is reached, we return an error.
-                return Poll::Ready(Err(Error::Timeout));
+            if let Some(deadline) = self.deadline {
+                if Instant::now() > deadline {
+                    // If the deadline is reached, we return an error.
+                    return Poll::Ready(Err(Error::Timeout));
+                }
             }
 
             Poll::Pending
@@ -764,8 +795,7 @@ impl core::future::Future for I2cFuture<'_> {
 
         let result = self.poll_completion();
 
-        #[cfg(any(esp32, esp32s2))]
-        if result.is_pending() {
+        if result.is_pending() && self.deadline.is_some() {
             ctx.waker().wake_by_ref();
         }
 
@@ -1983,7 +2013,11 @@ impl Driver<'_> {
             .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
     }
 
-    async fn wait_for_completion(&self, end_only: bool, timeout: Duration) -> Result<(), Error> {
+    async fn wait_for_completion(
+        &self,
+        end_only: bool,
+        deadline: Option<Instant>,
+    ) -> Result<(), Error> {
         // TODO: the timeout should depend on the bus frequency and the length of the
         //       write operation, or it should be user-configurable.
 
@@ -1992,23 +2026,27 @@ impl Driver<'_> {
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, *self, timeout).await?;
-        self.check_all_commands_done().await
+        I2cFuture::new(event, *self, deadline).await?;
+        self.check_all_commands_done(deadline).await
     }
 
     /// Waits for the completion of an I2C transaction.
-    fn wait_for_completion_blocking(&self, end_only: bool, timeout: Duration) -> Result<(), Error> {
+    fn wait_for_completion_blocking(
+        &self,
+        end_only: bool,
+        deadline: Option<Instant>,
+    ) -> Result<(), Error> {
         let event = if end_only {
             Event::EndDetect.into()
         } else {
             Event::TxComplete | Event::EndDetect
         };
 
-        let mut future = I2cFuture::new_blocking(event, *self, timeout);
+        let mut future = I2cFuture::new_blocking(event, *self, deadline);
         loop {
             if let Poll::Ready(result) = future.poll_completion() {
                 result?;
-                return self.check_all_commands_done_blocking();
+                return self.check_all_commands_done_blocking(deadline);
             }
         }
     }
@@ -2032,17 +2070,17 @@ impl Driver<'_> {
     }
 
     /// Checks whether all I2C commands have completed execution.
-    fn check_all_commands_done_blocking(&self) -> Result<(), Error> {
+    fn check_all_commands_done_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
         // loop until commands are actually done
 
-        let start = Instant::now();
-
         while !self.all_commands_done() {
-            if Instant::now() - start > TIMEOUT {
-                return Err(Error::ExecutionIncomplete);
+            if let Some(deadline) = deadline {
+                if Instant::now() > deadline {
+                    return Err(Error::ExecutionIncomplete);
+                }
             }
         }
 
@@ -2050,17 +2088,17 @@ impl Driver<'_> {
     }
 
     /// Checks whether all I2C commands have completed execution.
-    async fn check_all_commands_done(&self) -> Result<(), Error> {
+    async fn check_all_commands_done(&self, deadline: Option<Instant>) -> Result<(), Error> {
         // NOTE: on esp32 executing the end command generates the end_detect interrupt
         //       but does not seem to clear the done bit! So we don't check the done
         //       status of an end command
         // loop until commands are actually done
 
-        let start = Instant::now();
-
         while !self.all_commands_done() {
-            if Instant::now() - start > TIMEOUT {
-                return Err(Error::ExecutionIncomplete);
+            if let Some(deadline) = deadline {
+                if Instant::now() > deadline {
+                    return Err(Error::ExecutionIncomplete);
+                }
             }
             embassy_futures::yield_now().await;
         }
@@ -2248,6 +2286,7 @@ impl Driver<'_> {
         bytes: &[u8],
         start: bool,
         stop: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         address.validate()?;
         self.reset_before_transmission();
@@ -2259,10 +2298,10 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion_blocking(true, TIMEOUT)?;
+        self.wait_for_completion_blocking(true, deadline)?;
 
         if stop {
-            self.stop_operation_blocking()?;
+            self.stop_operation_blocking(deadline)?;
         }
 
         Ok(())
@@ -2285,6 +2324,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
         will_continue: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         address.validate()?;
         self.reset_before_transmission();
@@ -2296,21 +2336,21 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion_blocking(true, TIMEOUT)?;
+        self.wait_for_completion_blocking(true, deadline)?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
-            self.stop_operation_blocking()?;
+            self.stop_operation_blocking(deadline)?;
         }
         Ok(())
     }
 
     /// Perform a single STOP
-    fn stop_operation_blocking(&self) -> Result<(), Error> {
+    fn stop_operation_blocking(&self, deadline: Option<Instant>) -> Result<(), Error> {
         let cmd_iterator = &mut self.regs().comd_iter();
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
-        self.wait_for_completion_blocking(false, TIMEOUT)?;
+        self.wait_for_completion_blocking(false, deadline)?;
 
         #[cfg(esp32)]
         loop {
@@ -2319,6 +2359,12 @@ impl Driver<'_> {
             if self.regs().sr().read().scl_state_last() == 0b110 {
                 self.check_errors()?;
                 break;
+            }
+
+            if let Some(deadline) = deadline {
+                if Instant::now() > deadline {
+                    return Err(Error::Timeout);
+                }
             }
         }
 
@@ -2339,6 +2385,7 @@ impl Driver<'_> {
         bytes: &[u8],
         start: bool,
         stop: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         address.validate()?;
         self.reset_before_transmission();
@@ -2350,10 +2397,10 @@ impl Driver<'_> {
         }
 
         self.start_write_operation(address, bytes, start)?;
-        self.wait_for_completion(true, TIMEOUT).await?;
+        self.wait_for_completion(true, deadline).await?;
 
         if stop {
-            self.stop_operation().await?;
+            self.stop_operation(deadline).await?;
         }
 
         Ok(())
@@ -2376,6 +2423,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
         will_continue: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         address.validate()?;
         self.reset_before_transmission();
@@ -2387,22 +2435,22 @@ impl Driver<'_> {
         }
 
         self.start_read_operation(address, buffer, start, will_continue)?;
-        self.wait_for_completion(true, TIMEOUT).await?;
+        self.wait_for_completion(true, deadline).await?;
         self.read_all_from_fifo(buffer)?;
 
         if stop {
-            self.stop_operation().await?;
+            self.stop_operation(deadline).await?;
         }
 
         Ok(())
     }
 
     /// Perform a single STOP
-    async fn stop_operation(&self) -> Result<(), Error> {
+    async fn stop_operation(&self, deadline: Option<Instant>) -> Result<(), Error> {
         let cmd_iterator = &mut self.regs().comd_iter();
         add_cmd(cmd_iterator, Command::Stop)?;
         self.start_transmission();
-        self.wait_for_completion(false, TIMEOUT).await?;
+        self.wait_for_completion(false, deadline).await?;
 
         #[cfg(esp32)]
         loop {
@@ -2410,9 +2458,16 @@ impl Driver<'_> {
             // empty write
             if self.regs().sr().read().scl_state_last() == 0b110 {
                 self.check_errors()?;
-                embassy_futures::yield_now().await;
                 break;
             }
+
+            if let Some(deadline) = deadline {
+                if Instant::now() > deadline {
+                    return Err(Error::Timeout);
+                }
+            }
+
+            embassy_futures::yield_now().await;
         }
 
         Ok(())
@@ -2425,6 +2480,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
         will_continue: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         let chunk_count = VariableChunkIterMut::new(buffer).count();
         for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
@@ -2434,6 +2490,7 @@ impl Driver<'_> {
                 start && idx == 0,
                 stop && idx == chunk_count - 1,
                 will_continue || idx < chunk_count - 1,
+                deadline,
             )?;
         }
 
@@ -2446,9 +2503,10 @@ impl Driver<'_> {
         buffer: &[u8],
         start: bool,
         stop: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         if buffer.is_empty() {
-            return self.write_operation_blocking(address, &[], start, stop);
+            return self.write_operation_blocking(address, &[], start, stop, deadline);
         }
 
         let chunk_count = VariableChunkIter::new(buffer).count();
@@ -2458,6 +2516,7 @@ impl Driver<'_> {
                 chunk,
                 start && idx == 0,
                 stop && idx == chunk_count - 1,
+                deadline,
             )?;
         }
 
@@ -2471,6 +2530,7 @@ impl Driver<'_> {
         start: bool,
         stop: bool,
         will_continue: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         let chunk_count = VariableChunkIterMut::new(buffer).count();
         for (idx, chunk) in VariableChunkIterMut::new(buffer).enumerate() {
@@ -2480,6 +2540,7 @@ impl Driver<'_> {
                 start && idx == 0,
                 stop && idx == chunk_count - 1,
                 will_continue || idx < chunk_count - 1,
+                deadline,
             )
             .await?;
         }
@@ -2493,9 +2554,12 @@ impl Driver<'_> {
         buffer: &[u8],
         start: bool,
         stop: bool,
+        deadline: Option<Instant>,
     ) -> Result<(), Error> {
         if buffer.is_empty() {
-            return self.write_operation(address, &[], start, stop).await;
+            return self
+                .write_operation(address, &[], start, stop, deadline)
+                .await;
         }
 
         let chunk_count = VariableChunkIter::new(buffer).count();
@@ -2505,6 +2569,7 @@ impl Driver<'_> {
                 chunk,
                 start && idx == 0,
                 stop && idx == chunk_count - 1,
+                deadline,
             )
             .await?;
         }
@@ -2520,6 +2585,12 @@ impl Driver<'_> {
         address.validate()?;
         self.ensure_idle_blocking();
 
+        let mut deadline = None;
+
+        if let SoftwareTimeout::Transaction(timeout) = self.config.config.software_timeout {
+            deadline = Some(Instant::now() + timeout);
+        }
+
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -2531,6 +2602,9 @@ impl Driver<'_> {
             let kind = op.kind();
             match op {
                 Operation::Write(buffer) => {
+                    if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
+                        deadline = Some(Instant::now() + timeout * buffer.len() as u32);
+                    }
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -2539,9 +2613,13 @@ impl Driver<'_> {
                         buffer,
                         !matches!(last_op, Some(OpKind::Write)),
                         next_op.is_none(),
+                        deadline,
                     )?;
                 }
                 Operation::Read(buffer) => {
+                    if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
+                        deadline = Some(Instant::now() + timeout * buffer.len() as u32);
+                    }
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -2552,6 +2630,7 @@ impl Driver<'_> {
                         !matches!(last_op, Some(OpKind::Read)),
                         next_op.is_none(),
                         matches!(next_op, Some(OpKind::Read)),
+                        deadline,
                     )?;
                 }
             }
@@ -2570,6 +2649,12 @@ impl Driver<'_> {
         address.validate()?;
         self.ensure_idle().await;
 
+        let mut deadline = None;
+
+        if let SoftwareTimeout::Transaction(timeout) = self.config.config.software_timeout {
+            deadline = Some(Instant::now() + timeout);
+        }
+
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
         let mut op_iter = operations
@@ -2581,6 +2666,9 @@ impl Driver<'_> {
             let kind = op.kind();
             match op {
                 Operation::Write(buffer) => {
+                    if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
+                        deadline = Some(Instant::now() + timeout * buffer.len() as u32);
+                    }
                     // execute a write operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -2589,10 +2677,14 @@ impl Driver<'_> {
                         buffer,
                         !matches!(last_op, Some(OpKind::Write)),
                         next_op.is_none(),
+                        deadline,
                     )
                     .await?;
                 }
                 Operation::Read(buffer) => {
+                    if let SoftwareTimeout::PerByte(timeout) = self.config.config.software_timeout {
+                        deadline = Some(Instant::now() + timeout * buffer.len() as u32);
+                    }
                     // execute a read operation:
                     // - issue START/RSTART if op is different from previous
                     // - issue STOP if op is the last one
@@ -2603,6 +2695,7 @@ impl Driver<'_> {
                         !matches!(last_op, Some(OpKind::Read)),
                         next_op.is_none(),
                         matches!(next_op, Some(OpKind::Read)),
+                        deadline,
                     )
                     .await?;
                 }
