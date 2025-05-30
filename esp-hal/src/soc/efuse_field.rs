@@ -8,9 +8,13 @@ use crate::soc::efuse::{Efuse, EfuseBlock};
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]
 pub struct EfuseField {
+    /// The block
     pub(crate) block: EfuseBlock,
+    /// Word number - this is just informational
     pub(crate) word: u32,
+    /// Starting bit in the efuse block
     pub(crate) bit_start: u32,
+    /// Number of bits
     pub(crate) bit_count: u32,
 }
 
