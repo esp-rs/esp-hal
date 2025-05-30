@@ -1420,6 +1420,9 @@ mod state {
 
         // The channel is configured for tx and currently performing an async transaction
         TxAsync      = TX_STATE_BASE + 1,
+
+        // The channel is configured for tx and currently performing a blocking transaction
+        TxBlocking   = TX_STATE_BASE + 2,
     }
 
     impl RmtState {
@@ -1630,6 +1633,8 @@ where
             }
         };
 
+        RmtState::store(RmtState::TxIdle, self.raw, Ordering::Relaxed);
+
         // Disable the Drop handler since the transaction is properly stopped
         // already.
         let _ = ManuallyDrop::new(self);
@@ -1653,6 +1658,8 @@ where
         raw.update();
 
         while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+
+        RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
     }
 }
 
@@ -1761,6 +1768,9 @@ impl Channel<Blocking, Tx> {
             _ => (),
         };
 
+        RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
+
+        raw.clear_tx_interrupts();
         raw.start_send(false, 0);
 
         Ok(SingleShotTxTransaction {
