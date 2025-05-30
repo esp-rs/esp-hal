@@ -17,11 +17,13 @@ use embedded_hal::mmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
+mod pins;
 mod slc;
 mod slchost;
 
-pub use slc::*;
-pub use slchost::*;
+pub use pins::Pins;
+pub use slc::{AnySlc, SlcInfo, SlcInstance};
+pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
 
 /// SDIO peripheral instance.
 pub trait PeripheralInstance: crate::private::Sealed {
@@ -33,30 +35,79 @@ pub trait PeripheralInstance: crate::private::Sealed {
     fn info(&self) -> &'static Self::Info;
 }
 
+/// Represents the transmission modes for the SDIO peripheral.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Mode {
+    /// SPI transmission mode.
+    ///
+    /// Uses the following I/O signals:
+    ///
+    /// - `SCLK`
+    /// - `MOSI`
+    /// - `MISO`
+    /// - `IRQ`
+    /// - `#CS`
+    Spi,
+    /// SD 1-bit transmission mode.
+    ///
+    /// Uses the following I/O signals:
+    ///
+    /// - `CLK`
+    /// - `CMD`
+    /// - `DAT0`
+    /// - `IRQ`
+    Sd1bit,
+    /// SD 4-bit transmission mode.
+    ///
+    /// Uses the following I/O signals:
+    ///
+    /// - `CLK`
+    /// - `CMD`
+    /// - `DAT0`
+    /// - `DAT1`
+    /// - `DAT2`
+    /// - `DAT3`
+    Sd4bit,
+}
+
 /// Represents the SDIO 2.0 peripheral for the microcontroller.
 #[derive(Debug)]
 pub struct Sdio<'d> {
     slc: AnySlc<'d>,
     slchost: AnySlchost<'d>,
+    pins: Pins<'d>,
 }
 
 impl<'d> Sdio<'d> {
     /// Creates a new [Sdio].
     ///
     /// # Example
+    #[doc = crate::before_snippet!()]
+    /// ```rust, no_run
+    /// use esp_hal::sdio::{Mode, Pins, Sdio};
     ///
-    /// ```rust,no_run
-    /// use esp_hal::sdio::Sdio;
+    /// let pins = Pins::new(
+    ///     Mode::Sd4bit,
+    ///     peripherals.GPIO19, // CLK/SCLK
+    ///     peripherals.GPIO18, // CMD/MOSI
+    ///     peripherals.GPIO20, // DAT0/MISO
+    ///     peripherals.GPIO21, // DAT1/IRQ
+    ///     peripherals.GPIO22, // DAT2
+    ///     peripherals.GPIO23, // DAT3/#CS
+    /// );
     ///
-    /// use crate::peripheral::Peripherals;
-    ///
-    /// let dp = Peripheral::take().unwrap();
-    /// let _sdio = Sdio::new(dp.slc, dp.slchost);
+    /// let _sdio = Sdio::new(peripherals.slc, peripherals.slchost, pins);
     /// ```
-    pub fn new(slc: impl SlcInstance + 'd, slchost: impl SlchostInstance + 'd) -> Self {
+    pub fn new(
+        slc: impl SlcInstance + 'd,
+        slchost: impl SlchostInstance + 'd,
+        pins: Pins<'d>,
+    ) -> Self {
         Self {
             slc: slc.degrade(),
             slchost: slchost.degrade(),
+            pins,
         }
     }
 
@@ -68,6 +119,16 @@ impl<'d> Sdio<'d> {
     /// Gets a static reference to the SLCHOST information.
     pub fn slchost(&self) -> &'static SlchostInfo {
         self.slchost.info()
+    }
+
+    /// Gets a reference to the [Pins] information.
+    pub const fn pins(&self) -> &Pins<'_> {
+        &self.pins
+    }
+
+    /// Gets the bus mode of the SDIO peripheral.
+    pub const fn bus_mode(&self) -> Mode {
+        self.pins.mode()
     }
 }
 
