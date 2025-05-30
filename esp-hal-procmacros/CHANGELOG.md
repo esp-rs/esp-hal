@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Using the `#handler` macro with a priority of `None` will fail at compile time (#3304)
-- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ### Fixed
 

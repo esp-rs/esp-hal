@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The scheduler now runs at interrupt priority 1 on Xtensa chips, too. (#3164)
 - `esp-now` and `sniffer` are available via `Interfaces` (#3283)
 - Remove the `heapless` dependency (including from the public API) (#3317)
-- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 - Update `defmt` to 1.0 (#3416)
 - The `log` feature has been replaced by `log-04`. (#3425)
 

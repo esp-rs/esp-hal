@@ -111,9 +111,6 @@ pub fn generate_config_internal<'a>(
     // other file changed.
     writeln!(stdout, "cargo:rerun-if-changed=build.rs").ok();
 
-    #[cfg(not(test))]
-    env_change_work_around(&mut stdout);
-
     // Ensure that the prefix is `SCREAMING_SNAKE_CASE`:
     let prefix = format!("{}_CONFIG_", screaming_snake_case(crate_name));
 
@@ -156,43 +153,6 @@ fn config_json(config: &[(String, &ConfigOption, Value)], pretty: bool) -> Strin
         serde_json::to_string_pretty(&to_write).unwrap()
     } else {
         serde_json::to_string(&to_write).unwrap()
-    }
-}
-
-// A work-around for https://github.com/rust-lang/cargo/issues/10358
-// This can be removed when https://github.com/rust-lang/cargo/pull/14058 is merged.
-// Unlikely to work on projects in workspaces
-#[cfg(not(test))]
-fn env_change_work_around(mut stdout: impl Write) {
-    let mut out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-
-    // We clean out_dir by removing all trailing directories, until it ends with
-    // target
-    while !out_dir.ends_with("target") {
-        if !out_dir.pop() {
-            return; // We ran out of directories...
-        }
-    }
-    out_dir.pop();
-
-    let dotcargo = out_dir.join(".cargo/");
-    if dotcargo.exists() {
-        if dotcargo.join("config.toml").exists() {
-            writeln!(
-                stdout,
-                "cargo:rerun-if-changed={}",
-                dotcargo.join("config.toml").display()
-            )
-            .ok();
-        }
-        if dotcargo.join("config").exists() {
-            writeln!(
-                stdout,
-                "cargo:rerun-if-changed={}",
-                dotcargo.join("config").display()
-            )
-            .ok();
-        }
     }
 }
 
