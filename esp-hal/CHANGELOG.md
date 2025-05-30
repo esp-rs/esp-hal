@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose ADC asynchrounous functionalities where applicable (#3443)
 - Added `UartInterrupt::RxTimeout` support (#3493)
 - UART: Added HW and SW flow control config option (#3435)
+- I2C master: `SoftwareTimeout` and `Config::with_software_timeout`. (#3577)
+- `esp_hal::time::{Instant, Duration}` now implement `Hash` (#3577)
 
 ### Changed
 
@@ -101,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix a problem where reading/writing flash didn't work when using PSRAM on ESP32 (#3524)
 - Fixed `esp_hal::time::Instant::duration_since_epoch` (#3582)
 - Improve PSRAM size detection for the case when no PSRAM is present or unusable (#3554)
+- ESP32-S2: I2C operations will now time out if the SCL line is kept low. This timeout is controlled by `Config::software_timeout` (#3571, #3577)
+- Asynchronous I2C operations are now cancelled if the Future is dropped (#3572)
+- The I2C driver will clear the bus after an error, if necessary (#3570)
 
 ### Removed
 
