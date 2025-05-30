@@ -41,6 +41,11 @@ fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let (start, size) = psram::psram_raw_parts(&peripherals.PSRAM);
+
+    if size == 0 {
+        panic!("No PSRAM detected");
+    }
+
     init_psram_heap(start, size);
 
     println!("Going to access PSRAM");

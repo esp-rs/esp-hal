@@ -85,6 +85,8 @@ pub(crate) fn init_psram(config: PsramConfig) {
     utils::psram_init(&config);
 
     if config.size.is_auto() {
+        const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
+
         // Reading the device-id turned out to not work as expected (some bits flipped
         // for unknown reason)
         //
@@ -92,33 +94,24 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // probe if we can access top of PSRAM - if not we assume it's 2m
         //
         // This currently doesn't work as expected because of https://github.com/esp-rs/esp-hal/issues/2182
-        utils::s_mapping(EXTMEM_ORIGIN as u32, 4 * 1024 * 1024);
+        utils::s_mapping(EXTMEM_ORIGIN as u32, MAX_MEM_SIZE as u32);
 
         let guessed_size = unsafe {
-            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
-            for i in 0..(36 * 1024) {
-                ptr.add(i).write_volatile(0x7f);
-            }
-
             let ptr = EXTMEM_ORIGIN as *mut u8;
-            for i in 0..(36 * 1024) {
+            for i in (1023..MAX_MEM_SIZE).step_by(1024) {
                 ptr.add(i).write_volatile(0x7f);
             }
 
-            let mut success = true;
-            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
-            for i in 0..(36 * 1024) {
-                if ptr.add(i).read_volatile() != 0x7f {
-                    success = false;
+            let mut last_correctly_read = 0;
+            for i in (1023..MAX_MEM_SIZE).step_by(1024) {
+                if ptr.add(i).read_volatile() == 0x7f {
+                    last_correctly_read = i;
+                } else {
                     break;
                 }
             }
 
-            if success {
-                4 * 1024 * 1024
-            } else {
-                2 * 1024 * 1024
-            }
+            last_correctly_read + 1
         };
 
         info!("Assuming {} bytes of PSRAM", guessed_size);
