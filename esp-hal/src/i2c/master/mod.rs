@@ -59,6 +59,7 @@ const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
 const TIMEOUT: Duration = Duration::from_millis(10);
+const CLEAR_BUS_TIMEOUT_MS: Duration = Duration::from_millis(50);
 
 /// Representation of I2C address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1463,11 +1464,24 @@ impl Driver<'_> {
     /// bus by sending 9 clock pulses.
     fn clear_bus_blocking(&self) {
         let mut future = ClearBusFuture::new(*self);
-        while future.poll_completion().is_pending() {}
+        let start = Instant::now();
+        while future.poll_completion().is_pending() {
+            if start.elapsed() > CLEAR_BUS_TIMEOUT_MS {
+                break;
+            }
+        }
     }
 
     async fn clear_bus(&self) {
-        ClearBusFuture::new(*self).await;
+        let clear_bus = ClearBusFuture::new(*self);
+        let start = Instant::now();
+
+        embassy_futures::select::select(clear_bus, async {
+            while start.elapsed() < CLEAR_BUS_TIMEOUT_MS {
+                embassy_futures::yield_now().await;
+            }
+        })
+        .await;
     }
 
     /// Resets the I2C peripheral's command registers.
@@ -2679,7 +2693,6 @@ mod bus_clear {
 
     pub struct ClearBusFuture<'a> {
         driver: Driver<'a>,
-        started: Instant,
     }
 
     impl<'a> ClearBusFuture<'a> {
@@ -2693,10 +2706,7 @@ mod bus_clear {
             });
             driver.update_registers();
 
-            Self {
-                driver,
-                started: Instant::now(),
-            }
+            Self { driver }
         }
 
         pub fn poll_completion(&mut self) -> Poll<()> {
@@ -2707,7 +2717,6 @@ mod bus_clear {
                 .read()
                 .scl_rst_slv_en()
                 .bit_is_set()
-                && self.started.elapsed() < Duration::from_millis(50)
             {
                 Poll::Pending
             } else {
