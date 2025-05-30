@@ -20,10 +20,12 @@ use embedded_hal::mmc::{
 mod pins;
 mod slc;
 mod slchost;
+mod state;
 
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
+pub use state::State;
 
 /// SDIO peripheral instance.
 pub trait PeripheralInstance: crate::private::Sealed {
@@ -77,6 +79,7 @@ pub struct Sdio<'d> {
     slc: AnySlc<'d>,
     slchost: AnySlchost<'d>,
     pins: Pins<'d>,
+    state: State,
 }
 
 impl<'d> Sdio<'d> {
@@ -108,6 +111,7 @@ impl<'d> Sdio<'d> {
             slc: slc.degrade(),
             slchost: slchost.degrade(),
             pins,
+            state: State::new(),
         }
     }
 
@@ -130,6 +134,18 @@ impl<'d> Sdio<'d> {
     pub const fn bus_mode(&self) -> Mode {
         self.pins.mode()
     }
+
+    /// Gets the current [State] of the SDIO peripheral.
+    pub const fn state(&self) -> State {
+        self.state
+    }
+
+    /// Transitions the SDIO peripheral to the requested [State].
+    pub(crate) fn state_transition(&mut self, state: State) -> Result<(), Error> {
+        self.state
+            .valid_transition(state)
+            .map(|_| self.state = state)
+    }
 }
 
 /// Represents the error variants for SDIO peripherals.
@@ -143,6 +159,13 @@ pub enum Error {
     Crc,
     /// The function and/or type is unimplemented.
     Unimplemented,
+    /// Indicates an invalid state transition.
+    InvalidTransition {
+        /// Represents the current state.
+        from: State,
+        /// Represents the transition state.
+        to: State,
+    },
 }
 
 impl Error {
@@ -174,6 +197,12 @@ impl Error {
     pub const fn unimplemented() -> Self {
         Self::Unimplemented
     }
+
+    /// Creates an invalid state transition [Error].
+    #[inline]
+    pub const fn invalid_transition(from: State, to: State) -> Self {
+        Self::InvalidTransition { from, to }
+    }
 }
 
 impl Default for Error {
@@ -189,6 +218,9 @@ impl core::fmt::Display for Error {
             Self::IllegalCommand => write!(f, "illegal command"),
             Self::Crc => write!(f, "CRC"),
             Self::Unimplemented => write!(f, "unimplemented"),
+            Self::InvalidTransition { from, to } => {
+                write!(f, "invalid state transition, from: {from}, to: {to}")
+            }
         }
     }
 }
@@ -210,14 +242,10 @@ impl<'d> MmcCommon for Sdio<'d> {
         Err(Error::unimplemented())
     }
 
-<<<<<<< Updated upstream
-    fn init(&mut self) -> Result<(), Self::Error> {
-=======
     fn init(&mut self) -> Result<(), Error> {
         // TODO: perform peripheral configuration
         self.state_transition(State::Standby)?;
 
->>>>>>> Stashed changes
         Err(Error::unimplemented())
     }
 
