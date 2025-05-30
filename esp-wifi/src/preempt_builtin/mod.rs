@@ -8,12 +8,13 @@ use core::{ffi::c_void, mem::MaybeUninit};
 use allocator_api2::boxed::Box;
 use arch_specific::*;
 pub(crate) use timer::setup_timer;
-use timer::{disable_multitasking, disable_timer, setup_multitasking};
+use timer::{disable_multitasking, setup_multitasking};
 
 use crate::{
     compat::malloc::InternalMemory,
     hal::{sync::Locked, trapframe::TrapFrame},
     preempt::Scheduler,
+    preempt_builtin::timer::disable_timebase,
 };
 
 struct Context {
@@ -128,11 +129,9 @@ impl Scheduler for BuiltinScheduler {
     }
 
     fn disable(&self) {
-        disable_timer();
+        disable_timebase();
         disable_multitasking();
         delete_all_tasks();
-
-        timer::TIMER.with(|timer| timer.take());
     }
 
     fn yield_task(&self) {

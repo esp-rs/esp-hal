@@ -110,7 +110,7 @@ esp-alloc = ["dep:esp-alloc"]
 sys-logs = ["esp-wifi-sys/sys-logs"]
 
 ## Use builtin scheduler
-builtin-scheduler = []
+builtin-scheduler = ["esp-hal/__esp_wifi_builtin_scheduler"]
 
 #! ### Wireless Feature Flags
 

@@ -180,11 +180,13 @@ pub struct SoftwareInterruptControl<'d> {
     pub software_interrupt0: SoftwareInterrupt<'d, 0>,
     /// Software interrupt 1.
     pub software_interrupt1: SoftwareInterrupt<'d, 1>,
-    /// Software interrupt 2.
+    /// Software interrupt 2. Not available when using esp-wifi's builtin
+    /// scheduler on RISC-V architectures.
+    #[cfg(not(all(feature = "__esp_wifi_builtin_scheduler", riscv)))]
     pub software_interrupt2: SoftwareInterrupt<'d, 2>,
     #[cfg(not(all(feature = "__esp_hal_embassy", multi_core)))]
-    /// Software interrupt 3. Only available when not using `esp-hal-embassy`,
-    /// or on single-core systems.
+    /// Software interrupt 3. Not available when using `esp-hal-embassy`,
+    /// on multi-core systems.
     pub software_interrupt3: SoftwareInterrupt<'d, 3>,
 }
 
@@ -198,6 +200,7 @@ impl<'d> SoftwareInterruptControl<'d> {
             software_interrupt1: SoftwareInterrupt {
                 _lifetime: PhantomData,
             },
+            #[cfg(not(all(feature = "__esp_wifi_builtin_scheduler", riscv)))]
             software_interrupt2: SoftwareInterrupt {
                 _lifetime: PhantomData,
             },
