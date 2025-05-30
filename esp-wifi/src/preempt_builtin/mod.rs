@@ -7,8 +7,8 @@ use core::{ffi::c_void, mem::MaybeUninit};
 
 use allocator_api2::boxed::Box;
 use arch_specific::*;
-use timer::{disable_multitasking, setup_multitasking};
-pub(crate) use timer::{disable_timer, setup_timer};
+pub(crate) use timer::setup_timer;
+use timer::{disable_multitasking, disable_timer, setup_multitasking};
 
 use crate::{
     compat::malloc::InternalMemory,
@@ -128,6 +128,7 @@ impl Scheduler for BuiltinScheduler {
     }
 
     fn disable(&self) {
+        disable_timer();
         disable_multitasking();
         delete_all_tasks();
 
