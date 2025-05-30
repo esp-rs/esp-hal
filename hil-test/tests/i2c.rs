@@ -6,6 +6,7 @@
 #![no_std]
 #![no_main]
 
+use embassy_futures::select::select;
 use embassy_time::{Duration, Ticker};
 use esp_hal::{
     Async,
@@ -181,6 +182,42 @@ mod tests {
     async fn async_test_read_cali_with_transactions(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
         let mut read_data = [0u8; 22];
+
+        // do the real read which should succeed
+        i2c.transaction_async(
+            DUT_ADDRESS,
+            &mut [
+                Operation::Write(READ_DATA_COMMAND),
+                Operation::Read(&mut read_data),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_ne!(read_data, [0u8; 22])
+    }
+    #[test]
+    async fn async_cancellation(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+        let mut read_data = [0u8; 22];
+
+        // Start a transaction that will be cancelled.
+        select(
+            i2c.transaction_async(
+                DUT_ADDRESS,
+                &mut [
+                    Operation::Write(READ_DATA_COMMAND),
+                    Operation::Read(&mut read_data),
+                ],
+            ),
+            async {
+                // Let the transaction run for a tiny bit.
+                for _ in 0..10 {
+                    embassy_futures::yield_now().await;
+                }
+            },
+        )
+        .await;
 
         // do the real read which should succeed
         i2c.transaction_async(
