@@ -50,7 +50,7 @@ use crate::{
     pac::i2c0::{COMD, RegisterBlock},
     peripherals::Interrupt,
     private,
-    system::{PeripheralClockControl, PeripheralGuard},
+    system::PeripheralGuard,
     time::{Duration, Instant, Rate},
 };
 
@@ -519,8 +519,14 @@ impl Default for Config {
 pub struct I2c<'d, Dm: DriverMode> {
     i2c: AnyI2c<'d>,
     phantom: PhantomData<Dm>,
-    config: Config,
     guard: PeripheralGuard,
+    config: DriverConfig,
+}
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+struct DriverConfig {
+    config: Config,
     sda_pin: PinGuard,
     scl_pin: PinGuard,
 }
@@ -567,16 +573,18 @@ impl<'d> I2c<'d, Blocking> {
         let sda_pin = PinGuard::new_unconnected(i2c.info().sda_output);
         let scl_pin = PinGuard::new_unconnected(i2c.info().scl_output);
 
-        let i2c = I2c {
+        let mut i2c = I2c {
             i2c: i2c.degrade(),
             phantom: PhantomData,
-            config,
             guard,
-            sda_pin,
-            scl_pin,
+            config: DriverConfig {
+                config,
+                sda_pin,
+                scl_pin,
+            },
         };
 
-        i2c.driver().setup(&i2c.config)?;
+        i2c.apply_config(&config)?;
 
         Ok(i2c)
     }
@@ -588,10 +596,8 @@ impl<'d> I2c<'d, Blocking> {
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            config: self.config,
             guard: self.guard,
-            sda_pin: self.sda_pin,
-            scl_pin: self.scl_pin,
+            config: self.config,
         }
     }
 
@@ -676,14 +682,13 @@ pub enum Event {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct I2cFuture<'a> {
     events: EnumSet<Event>,
-    info: &'a Info,
-    state: &'a State,
+    driver: Driver<'a>,
 }
 
 #[cfg(not(esp32))]
 impl<'a> I2cFuture<'a> {
-    pub fn new(events: EnumSet<Event>, info: &'a Info, state: &'a State) -> Self {
-        info.regs().int_ena().modify(|_, w| {
+    pub fn new(events: EnumSet<Event>, driver: Driver<'a>) -> Self {
+        driver.regs().int_ena().modify(|_, w| {
             for event in events {
                 match event {
                     Event::EndDetect => w.end_detect().set_bit(),
@@ -705,15 +710,11 @@ impl<'a> I2cFuture<'a> {
             w
         });
 
-        Self {
-            events,
-            state,
-            info,
-        }
+        Self { events, driver }
     }
 
     fn is_done(&self) -> bool {
-        !self.info.interrupts().is_disjoint(self.events)
+        !self.driver.info.interrupts().is_disjoint(self.events)
     }
 }
 
@@ -722,13 +723,9 @@ impl core::future::Future for I2cFuture<'_> {
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.state.waker.register(ctx.waker());
+        self.driver.state.waker.register(ctx.waker());
 
-        let error = Driver {
-            info: self.info,
-            state: self.state,
-        }
-        .check_errors();
+        let error = self.driver.check_errors();
 
         if self.is_done() {
             Poll::Ready(Ok(()))
@@ -748,10 +745,8 @@ impl<'d> I2c<'d, Async> {
         I2c {
             i2c: self.i2c,
             phantom: PhantomData,
-            config: self.config,
             guard: self.guard,
-            sda_pin: self.sda_pin,
-            scl_pin: self.scl_pin,
+            config: self.config,
         }
     }
 
@@ -850,16 +845,16 @@ where
         Driver {
             info: self.i2c.info(),
             state: self.i2c.state(),
+            config: &self.config,
         }
     }
 
     fn internal_recover(&self) {
-        PeripheralClockControl::disable(self.driver().info.peripheral);
-        PeripheralClockControl::enable(self.driver().info.peripheral);
-        PeripheralClockControl::reset(self.driver().info.peripheral);
-
-        // We know the configuration is valid, we can ignore the result.
-        _ = self.driver().setup(&self.config);
+        if self.driver().regs().sr().read().bus_busy().bit_is_set() {
+            // Send clock pulses to make sure the slave releases the bus.
+            self.driver().clear_bus();
+        }
+        self.driver().reset_fsm();
     }
 
     /// Connect a pin to the I2C SDA signal.
@@ -869,7 +864,7 @@ where
         let info = self.driver().info;
         let input = info.sda_input;
         let output = info.sda_output;
-        Self::connect_pin(sda, input, output, &mut self.sda_pin);
+        Driver::connect_pin(sda.into(), input, output, &mut self.config.sda_pin);
 
         self
     }
@@ -881,32 +876,9 @@ where
         let info = self.driver().info;
         let input = info.scl_input;
         let output = info.scl_output;
-        Self::connect_pin(scl, input, output, &mut self.scl_pin);
+        Driver::connect_pin(scl.into(), input, output, &mut self.config.scl_pin);
 
         self
-    }
-
-    fn connect_pin(
-        pin: impl PeripheralOutput<'d>,
-        input: InputSignal,
-        output: OutputSignal,
-        guard: &mut PinGuard,
-    ) {
-        let pin = pin.into();
-        // avoid the pin going low during configuration
-        pin.set_output_high(true);
-
-        pin.apply_output_config(
-            &OutputConfig::default()
-                .with_drive_mode(DriveMode::OpenDrain)
-                .with_pull(Pull::Up),
-        );
-        pin.set_output_enable(true);
-        pin.set_input_enable(true);
-
-        input.connect_to(&pin);
-
-        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
     }
 
     /// Writes bytes to slave with given `address`
@@ -1047,8 +1019,9 @@ where
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.config.config = *config;
         self.driver().setup(config)?;
-        self.config = *config;
+        self.driver().reset_fsm();
         Ok(())
     }
 }
@@ -1309,9 +1282,11 @@ impl PartialEq for Info {
 unsafe impl Sync for Info {}
 
 #[allow(dead_code)] // Some versions don't need `state`
+#[derive(Clone, Copy)]
 struct Driver<'a> {
     info: &'a Info,
     state: &'a State,
+    config: &'a DriverConfig,
 }
 
 impl Driver<'_> {
@@ -1319,9 +1294,29 @@ impl Driver<'_> {
         self.info.regs()
     }
 
-    /// Configures the I2C peripheral with the specified frequency, clocks, and
-    /// optional timeout.
-    fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+    fn connect_pin(
+        pin: crate::gpio::interconnect::OutputSignal<'_>,
+        input: InputSignal,
+        output: OutputSignal,
+        guard: &mut PinGuard,
+    ) {
+        // avoid the pin going low during configuration
+        pin.set_output_high(true);
+
+        pin.apply_output_config(
+            &OutputConfig::default()
+                .with_drive_mode(DriveMode::OpenDrain)
+                .with_pull(Pull::Up),
+        );
+        pin.set_output_enable(true);
+        pin.set_input_enable(true);
+
+        input.connect_to(&pin);
+
+        *guard = interconnect::OutputSignal::connect_with_guard(pin, output);
+    }
+
+    fn init_master(&self) {
         self.regs().ctr().write(|w| {
             // Set I2C controller to master mode
             w.ms_mode().set_bit();
@@ -1331,47 +1326,72 @@ impl Driver<'_> {
             // Use Most Significant Bit first for sending and receiving data
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
+
             #[cfg(not(esp32))]
             w.arbitration_en().clear_bit();
+
+            #[cfg(esp32s2)]
+            w.ref_always_on().set_bit();
+
             // Ensure that clock is enabled
             w.clk_en().set_bit()
         });
+    }
 
-        #[cfg(esp32s2)]
-        self.regs().ctr().modify(|_, w| w.ref_always_on().set_bit());
+    /// Configures the I2C peripheral with the specified frequency, clocks, and
+    /// optional timeout.
+    fn setup(&self, config: &Config) -> Result<(), ConfigError> {
+        self.init_master();
 
         // Configure filter
         // FIXME if we ever change this we need to adapt `set_frequency` for ESP32
         set_filter(self.regs(), Some(7), Some(7));
 
         // Configure frequency
-        self.set_frequency(config, config.timeout)?;
+        self.set_frequency(config)?;
 
         // Configure additional timeouts
         #[cfg(not(any(esp32, esp32s2)))]
-        self.regs()
-            .scl_st_time_out()
-            .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
-        #[cfg(not(any(esp32, esp32s2)))]
-        self.regs()
-            .scl_main_st_time_out()
-            .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
+        {
+            self.regs()
+                .scl_st_time_out()
+                .write(|w| unsafe { w.scl_st_to().bits(config.scl_st_timeout.value()) });
+            self.regs()
+                .scl_main_st_time_out()
+                .write(|w| unsafe { w.scl_main_st_to().bits(config.scl_main_st_timeout.value()) });
+        }
 
-        self.update_config();
-
-        // Reset entire peripheral (also resets fifo)
-        self.reset();
+        self.update_registers();
 
         Ok(())
     }
 
     /// Resets the I2C controller (FIFO + FSM + command list)
-    fn reset(&self) {
-        // Reset the FSM
-        // (the option to reset the FSM is not available for the ESP32)
-        #[cfg(not(esp32))]
-        self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
-        self.reset_before_transmission();
+    // This function implements esp-idf's `s_i2c_hw_fsm_reset`, without the
+    // clear_bus=true parts.
+    // https://github.com/espressif/esp-idf/blob/27d68f57e6bdd3842cd263585c2c352698a9eda2/components/esp_driver_i2c/i2c_master.c#L115
+    //
+    // Make sure you don't call this function in the middle of a transaction. If the
+    // first command in the command list is not a START, the hardware will hang
+    // with no timeouts.
+    fn reset_fsm(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                // Device has a working FSM reset mechanism
+                self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
+            } else {
+                // Even though C2 and C3 have a FSM reset bit, esp-idf does not
+                // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
+
+                // Do the reset
+                crate::system::PeripheralClockControl::disable(self.info.peripheral);
+                crate::system::PeripheralClockControl::enable(self.info.peripheral);
+
+                // Restore configuration. This operation has succeeded once, so we can
+                // assume that the config is valid and we can ignore the result.
+                self.setup(&self.config.config).ok();
+            }
+        }
     }
 
     fn reset_before_transmission(&self) {
@@ -1385,9 +1405,87 @@ impl Driver<'_> {
         self.reset_command_list();
     }
 
-    /// Resets the I2C peripheral's command registers
+    /// Implements s_i2c_master_clear_bus
+    ///
+    /// If a transaction ended incorrectly for some reason, the slave may drive
+    /// SDA indefinitely. This function forces the slave to release the
+    /// bus by sending 9 clock pulses.
+    fn clear_bus(&self) {
+        const BUS_CLEAR_BITS: u8 = 9;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                use crate::gpio::AnyPin;
+
+                // The chip is lacking hardware support for this, so we
+                // implement it in software.
+                let (Some(sda), Some(scl)) = (
+                    self.config.sda_pin.pin_number(),
+                    self.config.scl_pin.pin_number(),
+                ) else {
+                    // If we don't have the pins, we can't clear the bus.
+                    return;
+                };
+
+                let scl = unsafe { AnyPin::steal(scl) };
+                let sda = unsafe { AnyPin::steal(sda) };
+
+                self.info.scl_output.disconnect_from(&scl);
+                self.info.sda_output.disconnect_from(&sda);
+
+                // We'll assume the pins are properly set up for I2C.
+                // We'll also assume that no alternate function exists
+                // for I2C, which is true for ESP32.
+
+                const SCL_DELAY: u32 = 5; // use standard 100kHz data rate
+                scl.set_output_high(false);
+                sda.set_output_high(true);
+                crate::rom::ets_delay_us(SCL_DELAY);
+
+                for _ in 0..BUS_CLEAR_BITS {
+                    if !sda.is_input_high() {
+                        break;
+                    }
+
+                    scl.set_output_high(true);
+                    crate::rom::ets_delay_us(SCL_DELAY);
+                    scl.set_output_high(false);
+                    crate::rom::ets_delay_us(SCL_DELAY);
+                }
+
+                // Send STOP
+                scl.set_output_high(true);
+                sda.set_output_high(false);
+                crate::rom::ets_delay_us(SCL_DELAY);
+                sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
+
+                self.info.sda_output.connect_to(&sda);
+                self.info.scl_output.connect_to(&scl);
+            } else {
+                self.regs().scl_sp_conf().modify(|_, w| {
+                    unsafe { w.scl_rst_slv_num().bits(BUS_CLEAR_BITS) };
+                    w.scl_rst_slv_en().set_bit()
+                });
+                self.update_registers();
+                let now = Instant::now();
+                while self.regs().scl_sp_conf().read().scl_rst_slv_en().bit_is_set() {
+                    // Wait for the bus to be released
+                    if now.elapsed() > Duration::from_millis(50) {
+                        // If it takes too long, we give up, as the SCL might be tied low, too,
+                        // in which case we'd never exit this loop.
+                        self.regs().scl_sp_conf().modify(|_, w| {
+                            unsafe { w.scl_rst_slv_num().bits(0) };
+                            w.scl_rst_slv_en().clear_bit()
+                        });
+                        break;
+                    }
+                }
+                self.update_registers();
+            }
+        }
+    }
+
+    /// Resets the I2C peripheral's command registers.
     fn reset_command_list(&self) {
-        // Confirm that all commands that were configured were actually executed
         for cmd in self.regs().comd_iter() {
             cmd.reset();
         }
@@ -1397,7 +1495,9 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
+        let timeout = clock_config.timeout;
+
         let clocks = Clocks::get();
         let source_clk = clocks.i2c_clock.as_hz();
         let bus_freq = clock_config.frequency.as_hz();
@@ -1475,7 +1575,9 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
+        let timeout = clock_config.timeout;
+
         let clocks = Clocks::get();
         let source_clk = clocks.apb_clock.as_hz();
         let bus_freq = clock_config.frequency.as_hz();
@@ -1533,7 +1635,9 @@ impl Driver<'_> {
     /// Sets the frequency of the I2C interface by calculating and applying the
     /// associated timings - corresponds to i2c_ll_cal_bus_clk and
     /// i2c_ll_set_bus_timing in ESP-IDF
-    fn set_frequency(&self, clock_config: &Config, timeout: BusTimeout) -> Result<(), ConfigError> {
+    fn set_frequency(&self, clock_config: &Config) -> Result<(), ConfigError> {
+        let timeout = clock_config.timeout;
+
         let clocks = Clocks::get();
         let source_clk = clocks.xtal_clock.as_hz();
         let bus_freq = clock_config.frequency.as_hz();
@@ -1706,7 +1810,7 @@ impl Driver<'_> {
             }
         }
 
-        self.update_config();
+        self.update_registers();
 
         if start {
             // Load address and R/W bit into FIFO
@@ -1840,7 +1944,7 @@ impl Driver<'_> {
             )?;
         }
 
-        self.update_config();
+        self.update_registers();
 
         if start {
             // Load address and R/W bit into FIFO
@@ -1886,7 +1990,7 @@ impl Driver<'_> {
         } else {
             Event::TxComplete | Event::EndDetect
         };
-        I2cFuture::new(event, self.info, self.state).await?;
+        I2cFuture::new(event, *self).await?;
         self.check_all_commands_done().await
     }
 
@@ -2049,10 +2153,10 @@ impl Driver<'_> {
     /// the software-configured settings with the peripheral's internal
     /// registers, ensuring that the hardware behaves according to the
     /// current configuration.
-    fn update_config(&self) {
+    fn update_registers(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C2, C3, C6, H2 and S3 variant)
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+        #[cfg(not(any(esp32, esp32s2)))]
         self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
@@ -2085,7 +2189,7 @@ impl Driver<'_> {
             w.txfifo_wm().clear_bit_by_one()
         });
 
-        self.update_config();
+        self.update_registers();
     }
 
     /// Resets the transmit and receive FIFO buffers
@@ -2668,6 +2772,9 @@ pub trait Instance: crate::private::Sealed + super::IntoAnyI2c {
 }
 
 /// Adds a command to the I2C command sequence.
+///
+/// Make sure the first command after a FSM reset is a START, otherwise
+/// the hardware will hang with no timeouts.
 fn add_cmd<'a, I>(cmd_iterator: &mut I, command: Command) -> Result<(), Error>
 where
     I: Iterator<Item = &'a COMD>,
