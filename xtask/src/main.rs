@@ -281,9 +281,15 @@ fn lint_package(
 }
 
 fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    fn write_summary(message: &str) {
+        if let Some(summary_file) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+            std::fs::write(summary_file, message).unwrap();
+        }
+    }
+
     println!("::add-matcher::.github/rust-matchers.json");
 
-    let mut failure = false;
+    let mut failed = Vec::new();
     let started_at = Instant::now();
 
     // Clippy and docs checks
@@ -298,7 +304,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             fix: false,
         },
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Lint"))
     .ok();
     println!("::endgroup");
 
@@ -313,7 +319,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             debug: true,
         },
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Doc Test"))
     .ok();
     println!("::endgroup");
 
@@ -327,7 +333,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             ..Default::default()
         },
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Build Docs"))
     .ok();
     println!("::endgroup");
 
@@ -352,7 +358,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 args.chip.target()
             ))),
         )
-        .inspect_err(|_| failure = true)
+        .inspect_err(|_| failed.push("Build LP-HAL Examples"))
         .and_then(|_| {
             let from_dir = PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
@@ -384,7 +390,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 ..Default::default()
             },
         )
-        .inspect_err(|_| failure = true)
+        .inspect_err(|_| failed.push("Build LP-HAL docs"))
         .ok();
         println!("::endgroup");
     }
@@ -401,7 +407,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             no_default_features: true,
         },
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Build HAL"))
     .ok();
     println!("::endgroup");
 
@@ -417,7 +423,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Build examples"))
     .ok();
     println!("::endgroup");
 
@@ -433,14 +439,21 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )
-    .inspect_err(|_| failure = true)
+    .inspect_err(|_| failed.push("Build qa-test"))
     .ok();
     println!("::endgroup");
 
     let completed_at = Instant::now();
     log::info!("CI checks completed in {:?}", completed_at - started_at);
 
-    if failure {
+    if !failed.is_empty() {
+        let mut summary = String::new();
+        summary.push_str("# Summary of failed CI checks\n");
+        for failed_check in failed {
+            summary.push_str(&format!("* {failed_check}\n"));
+        }
+        println!("{summary}");
+        write_summary(&summary);
         bail!("CI checks failed");
     }
 
