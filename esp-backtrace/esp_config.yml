@@ -1,0 +1,7 @@
+crate: esp-backtrace
+
+options:
+- name: backtrace_frames
+  description: The maximum number of frames that will be printed in a backtrace.
+  default:
+    - value: 10

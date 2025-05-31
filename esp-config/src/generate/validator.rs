@@ -6,6 +6,7 @@ use super::{Error, snake_case, value::Value};
 
 /// Configuration value validation functions.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "validator", content = "value", rename_all = "snake_case")]
 pub enum Validator {
     /// Only allow negative integers, i.e. any values less than 0.
     NegativeInteger,
@@ -15,8 +16,9 @@ pub enum Validator {
     /// Only allow positive integers, i.e. any values greater than to 0.
     PositiveInteger,
     /// Ensure that an integer value falls within the specified range.
-    IntegerInRange(Range<i128>),
+    IntegerInRange(Range<i64>),
     /// String-Enumeration. Only allows one of the given Strings.
+    #[serde()]
     Enumeration(Vec<String>),
 }
 
@@ -140,7 +142,7 @@ pub(crate) fn positive_integer(value: &Value) -> Result<(), Error> {
     Ok(())
 }
 
-pub(crate) fn integer_in_range(range: &Range<i128>, value: &Value) -> Result<(), Error> {
+pub(crate) fn integer_in_range(range: &Range<i64>, value: &Value) -> Result<(), Error> {
     if !value.is_integer() || !range.contains(&value.as_integer()) {
         Err(Error::validation(format!(
             "Value '{value}' does not fall within range '{range:?}'"
