@@ -100,6 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed I2C `Timeout` errors experienced during high CPU load (#3458, #3555)
 - Fix a problem where reading/writing flash didn't work when using PSRAM on ESP32 (#3524)
 - Fixed `esp_hal::time::Instant::duration_since_epoch` (#3582)
+- Improve PSRAM size detection for the case when no PSRAM is present or unusable (#3554)
 
 ### Removed
 

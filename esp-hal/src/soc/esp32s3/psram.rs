@@ -251,6 +251,8 @@ pub(crate) mod utils {
         psram_set_cs_timing();
 
         if config.size.is_auto() {
+            psram_disable_qio_mode_spi1();
+
             // read chip id
             let mut dev_id = 0u32;
             psram_exec_cmd(
@@ -269,21 +271,25 @@ pub(crate) mod utils {
             );
             info!("chip id = {:x}", dev_id);
 
-            const PSRAM_ID_EID_S: u32 = 16;
-            const PSRAM_ID_EID_M: u32 = 0xff;
-            const PSRAM_EID_SIZE_M: u32 = 0x07;
-            const PSRAM_EID_SIZE_S: u32 = 5;
+            let size = if dev_id != 0xffffff {
+                const PSRAM_ID_EID_S: u32 = 16;
+                const PSRAM_ID_EID_M: u32 = 0xff;
+                const PSRAM_EID_SIZE_M: u32 = 0x07;
+                const PSRAM_EID_SIZE_S: u32 = 5;
 
-            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                & PSRAM_EID_SIZE_M;
+                let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                    & PSRAM_EID_SIZE_M;
 
-            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+                const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+                const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
-            let size = match size_id {
-                PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
-                PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
-                _ => 16 / 8 * 1024 * 1024,
+                match size_id {
+                    PSRAM_EID_SIZE_64MBITS => 64 / 8 * 1024 * 1024,
+                    PSRAM_EID_SIZE_32MBITS => 32 / 8 * 1024 * 1024,
+                    _ => 16 / 8 * 1024 * 1024,
+                }
+            } else {
+                0
             };
 
             info!("size is {}", size);
@@ -707,6 +713,28 @@ pub(crate) mod utils {
                 }
             }
         }
+    }
+
+    /// Exit QPI mode
+    #[ram]
+    fn psram_disable_qio_mode_spi1() {
+        const PSRAM_EXIT_QMODE: u16 = 0xF5;
+        const CS_PSRAM_SEL: u8 = 1 << 1;
+
+        psram_exec_cmd(
+            CommandMode::PsramCmdQpi,
+            PSRAM_EXIT_QMODE,
+            8, // command and command bit len
+            0,
+            0, // address and address bit len
+            0, // dummy bit len
+            core::ptr::null(),
+            0, // tx data and tx bit len
+            core::ptr::null_mut(),
+            0,            // rx data and rx bit len
+            CS_PSRAM_SEL, // cs bit mask
+            false,        // whether is program/erase operation
+        );
     }
 
     /// Enter QPI mode
