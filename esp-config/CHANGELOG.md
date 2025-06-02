@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `generate_config` now takes a slice of `ConfigOption`s instead of tuples. (#3362)
-- Bump Rust edition to 2024, bump MSRV to 1.85. (#3391)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 - `ConfigOption` favors `String` over `&str` (#3455)
 - Removed the `Custom` validator (#3455)
 
