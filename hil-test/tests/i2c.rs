@@ -196,6 +196,7 @@ mod tests {
 
         assert_ne!(read_data, [0u8; 22])
     }
+
     #[test]
     async fn async_cancellation(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();

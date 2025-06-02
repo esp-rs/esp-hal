@@ -777,6 +777,7 @@ impl Drop for I2cFuture<'_> {
     fn drop(&mut self) {
         if !self.finished {
             self.driver.reset_fsm();
+            self.driver.clear_bus_blocking();
         }
     }
 }
@@ -2700,13 +2701,17 @@ mod bus_clear {
         const BUS_CLEAR_BITS: u8 = 9;
 
         pub fn new(driver: Driver<'a>) -> Self {
-            driver.regs().scl_sp_conf().modify(|_, w| {
-                unsafe { w.scl_rst_slv_num().bits(Self::BUS_CLEAR_BITS) };
-                w.scl_rst_slv_en().set_bit()
-            });
-            driver.update_registers();
+            let mut this = Self { driver };
+            this.configure(Self::BUS_CLEAR_BITS);
+            this
+        }
 
-            Self { driver }
+        fn configure(&mut self, bits: u8) {
+            self.driver.regs().scl_sp_conf().modify(|_, w| {
+                unsafe { w.scl_rst_slv_num().bits(bits) };
+                w.scl_rst_slv_en().bit(bits > 0)
+            });
+            self.driver.update_registers();
         }
 
         pub fn poll_completion(&mut self) -> Poll<()> {
@@ -2727,11 +2732,9 @@ mod bus_clear {
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
-            self.driver.regs().scl_sp_conf().modify(|_, w| {
-                unsafe { w.scl_rst_slv_num().bits(0) };
-                w.scl_rst_slv_en().clear_bit()
-            });
-            self.driver.update_registers();
+            self.configure(0);
+            // We don't care about errors during bus clearing
+            self.driver.clear_all_interrupts();
         }
     }
 }
@@ -2872,6 +2875,10 @@ mod bus_clear {
 
                 self.driver.info.sda_output.connect_to(&sda);
                 self.driver.info.scl_output.connect_to(&scl);
+
+                // We don't care about errors during bus clearing. There shouldn't be any,
+                // anyway.
+                self.driver.clear_all_interrupts();
             }
         }
     }
