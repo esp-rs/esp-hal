@@ -233,21 +233,6 @@ pub(crate) mod utils {
                 CS_PSRAM_SEL, // cs bit mask
                 false,
             );
-            // treat the first read id as a dummy one as the pre-condition
-            psram_exec_cmd(
-                CommandMode::PsramCmdSpi,
-                PSRAM_DEVICE_ID,
-                8, // command and command bit len
-                0,
-                24, // address and address bit len
-                0,  // dummy bit len
-                core::ptr::null(),
-                0, // tx data and tx bit len
-                &mut dev_id as *mut _ as *mut u8,
-                24,           // rx data and rx bit len
-                CS_PSRAM_SEL, // cs bit mask
-                false,
-            );
             info!("chip id = {:x}", dev_id);
 
             let size = if dev_id != 0xffffff {
@@ -256,16 +241,16 @@ pub(crate) mod utils {
                 const PSRAM_EID_SIZE_M: u32 = 0x07;
                 const PSRAM_EID_SIZE_S: u32 = 5;
 
-                let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                let size_id = (((dev_id >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
                     & PSRAM_EID_SIZE_M;
 
                 const PSRAM_EID_SIZE_32MBITS: u32 = 1;
                 const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
                 match size_id {
-                    PSRAM_EID_SIZE_64MBITS => 16 / 8 * 1024 * 1024,
-                    PSRAM_EID_SIZE_32MBITS => 16 / 8 * 1024 * 1024,
-                    _ => 16 / 8 * 1024 * 1024,
+                    PSRAM_EID_SIZE_64MBITS => 8 * 1024 * 1024,
+                    PSRAM_EID_SIZE_32MBITS => 4 * 1024 * 1024,
+                    _ => 2 * 1024 * 1024,
                 }
             } else {
                 0
