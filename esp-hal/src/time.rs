@@ -180,7 +180,7 @@ impl Instant {
     /// Returns the elapsed `Duration` since boot.
     #[inline]
     pub fn duration_since_epoch(&self) -> Duration {
-        Self::EPOCH.elapsed()
+        *self - Self::EPOCH
     }
 
     /// Returns the elapsed `Duration` since this `Instant` was created.
