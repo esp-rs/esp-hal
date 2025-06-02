@@ -59,6 +59,7 @@ const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
 const TIMEOUT: Duration = Duration::from_millis(10);
+const CLEAR_BUS_TIMEOUT_MS: Duration = Duration::from_millis(50);
 
 /// Representation of I2C address.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -685,6 +686,7 @@ struct I2cFuture<'a> {
     timeout: Duration,
     #[cfg(any(esp32, esp32s2))]
     start: Instant,
+    finished: bool,
 }
 
 impl<'a> I2cFuture<'a> {
@@ -722,6 +724,7 @@ impl<'a> I2cFuture<'a> {
             timeout: _timeout,
             #[cfg(any(esp32, esp32s2))]
             start: Instant::now(),
+            finished: false,
         }
     }
 
@@ -729,12 +732,14 @@ impl<'a> I2cFuture<'a> {
         !self.driver.info.interrupts().is_disjoint(self.events)
     }
 
-    fn poll_completion(&self) -> Poll<Result<(), Error>> {
+    fn poll_completion(&mut self) -> Poll<Result<(), Error>> {
         let error = self.driver.check_errors();
 
         if self.is_done() {
+            self.finished = true;
             Poll::Ready(Ok(()))
         } else if error.is_err() {
+            self.finished = true;
             Poll::Ready(error)
         } else {
             // TODO: it's more efficient to time out with embassy-time, but we can't
@@ -754,7 +759,7 @@ impl<'a> I2cFuture<'a> {
 impl core::future::Future for I2cFuture<'_> {
     type Output = Result<(), Error>;
 
-    fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         self.driver.state.waker.register(ctx.waker());
 
         let result = self.poll_completion();
@@ -768,8 +773,14 @@ impl core::future::Future for I2cFuture<'_> {
     }
 }
 
-// TODO: on Drop, I2cFuture should reset the peripheral _and_ make sure we
-// release the bus.
+impl Drop for I2cFuture<'_> {
+    fn drop(&mut self) {
+        if !self.finished {
+            self.driver.reset_fsm();
+            self.driver.clear_bus_blocking();
+        }
+    }
+}
 
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
@@ -790,10 +801,8 @@ impl<'d> I2c<'d, Async> {
         address: A,
         buffer: &[u8],
     ) -> Result<(), Error> {
-        self.driver()
-            .write(address.into(), buffer, true, true)
+        self.transaction_async(address, &mut [Operation::Write(buffer)])
             .await
-            .inspect_err(|_| self.internal_recover())
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
@@ -807,10 +816,8 @@ impl<'d> I2c<'d, Async> {
         address: A,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.driver()
-            .read(address.into(), buffer, true, true, false)
+        self.transaction_async(address, &mut [Operation::Read(buffer)])
             .await
-            .inspect_err(|_| self.internal_recover())
     }
 
     /// Writes bytes to slave with given `address` and then reads enough
@@ -826,10 +833,11 @@ impl<'d> I2c<'d, Async> {
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.driver()
-            .write_read(address.into(), write_buffer, read_buffer)
-            .await
-            .inspect_err(|_| self.internal_recover())
+        self.transaction_async(
+            address,
+            &mut [Operation::Write(write_buffer), Operation::Read(read_buffer)],
+        )
+        .await
     }
 
     /// Execute the provided operations on the I2C bus as a single
@@ -886,7 +894,7 @@ where
     fn internal_recover(&self) {
         if self.driver().regs().sr().read().bus_busy().bit_is_set() {
             // Send clock pulses to make sure the slave releases the bus.
-            self.driver().clear_bus();
+            self.driver().clear_bus_blocking();
         }
         self.driver().reset_fsm();
     }
@@ -929,9 +937,7 @@ where
     /// # }
     /// ```
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
-        self.driver()
-            .write_blocking(address.into(), buffer, true, true)
-            .inspect_err(|_| self.internal_recover())
+        self.transaction(address, &mut [Operation::Write(buffer)])
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
@@ -957,9 +963,7 @@ where
         address: A,
         buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.driver()
-            .read_blocking(address.into(), buffer, true, true, false)
-            .inspect_err(|_| self.internal_recover())
+        self.transaction(address, &mut [Operation::Read(buffer)])
     }
 
     /// Writes bytes to slave with given `address` and then reads enough bytes
@@ -987,9 +991,10 @@ where
         write_buffer: &[u8],
         read_buffer: &mut [u8],
     ) -> Result<(), Error> {
-        self.driver()
-            .write_read_blocking(address.into(), write_buffer, read_buffer)
-            .inspect_err(|_| self.internal_recover())
+        self.transaction(
+            address,
+            &mut [Operation::Write(write_buffer), Operation::Read(read_buffer)],
+        )
     }
 
     /// Execute the provided operations on the I2C bus.
@@ -1428,6 +1433,20 @@ impl Driver<'_> {
         }
     }
 
+    fn ensure_idle_blocking(&self) {
+        if self.regs().sr().read().bus_busy().bit_is_set() {
+            // If the bus is busy, we need to clear it.
+            self.clear_bus_blocking();
+        }
+    }
+
+    async fn ensure_idle(&self) {
+        if self.regs().sr().read().bus_busy().bit_is_set() {
+            // If the bus is busy, we need to clear it.
+            self.clear_bus().await;
+        }
+    }
+
     fn reset_before_transmission(&self) {
         // Clear all I2C interrupts
         self.clear_all_interrupts();
@@ -1444,78 +1463,26 @@ impl Driver<'_> {
     /// If a transaction ended incorrectly for some reason, the slave may drive
     /// SDA indefinitely. This function forces the slave to release the
     /// bus by sending 9 clock pulses.
-    fn clear_bus(&self) {
-        const BUS_CLEAR_BITS: u8 = 9;
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                use crate::gpio::AnyPin;
-
-                // The chip is lacking hardware support for this, so we
-                // implement it in software.
-                let (Some(sda), Some(scl)) = (
-                    self.config.sda_pin.pin_number(),
-                    self.config.scl_pin.pin_number(),
-                ) else {
-                    // If we don't have the pins, we can't clear the bus.
-                    return;
-                };
-
-                let scl = unsafe { AnyPin::steal(scl) };
-                let sda = unsafe { AnyPin::steal(sda) };
-
-                self.info.scl_output.disconnect_from(&scl);
-                self.info.sda_output.disconnect_from(&sda);
-
-                // We'll assume the pins are properly set up for I2C.
-                // We'll also assume that no alternate function exists
-                // for I2C, which is true for ESP32.
-
-                const SCL_DELAY: u32 = 5; // use standard 100kHz data rate
-                scl.set_output_high(false);
-                sda.set_output_high(true);
-                crate::rom::ets_delay_us(SCL_DELAY);
-
-                for _ in 0..BUS_CLEAR_BITS {
-                    if !sda.is_input_high() {
-                        break;
-                    }
-
-                    scl.set_output_high(true);
-                    crate::rom::ets_delay_us(SCL_DELAY);
-                    scl.set_output_high(false);
-                    crate::rom::ets_delay_us(SCL_DELAY);
-                }
-
-                // Send STOP
-                scl.set_output_high(true);
-                sda.set_output_high(false);
-                crate::rom::ets_delay_us(SCL_DELAY);
-                sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
-
-                self.info.sda_output.connect_to(&sda);
-                self.info.scl_output.connect_to(&scl);
-            } else {
-                self.regs().scl_sp_conf().modify(|_, w| {
-                    unsafe { w.scl_rst_slv_num().bits(BUS_CLEAR_BITS) };
-                    w.scl_rst_slv_en().set_bit()
-                });
-                self.update_registers();
-                let now = Instant::now();
-                while self.regs().scl_sp_conf().read().scl_rst_slv_en().bit_is_set() {
-                    // Wait for the bus to be released
-                    if now.elapsed() > Duration::from_millis(50) {
-                        // If it takes too long, we give up, as the SCL might be tied low, too,
-                        // in which case we'd never exit this loop.
-                        self.regs().scl_sp_conf().modify(|_, w| {
-                            unsafe { w.scl_rst_slv_num().bits(0) };
-                            w.scl_rst_slv_en().clear_bit()
-                        });
-                        break;
-                    }
-                }
-                self.update_registers();
+    fn clear_bus_blocking(&self) {
+        let mut future = ClearBusFuture::new(*self);
+        let start = Instant::now();
+        while future.poll_completion().is_pending() {
+            if start.elapsed() > CLEAR_BUS_TIMEOUT_MS {
+                break;
             }
         }
+    }
+
+    async fn clear_bus(&self) {
+        let clear_bus = ClearBusFuture::new(*self);
+        let start = Instant::now();
+
+        embassy_futures::select::select(clear_bus, async {
+            while start.elapsed() < CLEAR_BUS_TIMEOUT_MS {
+                embassy_futures::yield_now().await;
+            }
+        })
+        .await;
     }
 
     /// Resets the I2C peripheral's command registers.
@@ -2038,7 +2005,7 @@ impl Driver<'_> {
             Event::TxComplete | Event::EndDetect
         };
 
-        let future = I2cFuture::new_blocking(event, *self, timeout);
+        let mut future = I2cFuture::new_blocking(event, *self, timeout);
         loop {
             if let Poll::Ready(result) = future.poll_completion() {
                 result?;
@@ -2546,39 +2513,13 @@ impl Driver<'_> {
         Ok(())
     }
 
-    async fn write_read(
-        &self,
-        address: I2cAddress,
-        write_buffer: &[u8],
-        read_buffer: &mut [u8],
-    ) -> Result<(), Error> {
-        self.write(address, write_buffer, true, read_buffer.is_empty())
-            .await?;
-
-        self.read(address, read_buffer, true, true, false).await?;
-
-        Ok(())
-    }
-
-    fn write_read_blocking(
-        &self,
-        address: I2cAddress,
-        write_buffer: &[u8],
-        read_buffer: &mut [u8],
-    ) -> Result<(), Error> {
-        self.write_blocking(address, write_buffer, true, read_buffer.is_empty())?;
-
-        self.read_blocking(address, read_buffer, true, true, false)?;
-
-        Ok(())
-    }
-
     fn transaction_impl<'a>(
         &self,
         address: I2cAddress,
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         address.validate()?;
+        self.ensure_idle_blocking();
 
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
@@ -2628,6 +2569,7 @@ impl Driver<'_> {
         operations: impl Iterator<Item = Operation<'a>>,
     ) -> Result<(), Error> {
         address.validate()?;
+        self.ensure_idle().await;
 
         let mut last_op: Option<OpKind> = None;
         // filter out 0 length read operations
@@ -2743,6 +2685,216 @@ fn calculate_chunk_size(remaining: usize) -> usize {
         I2C_CHUNK_SIZE
     } else {
         I2C_CHUNK_SIZE - 2
+    }
+}
+
+#[cfg(not(esp32))]
+mod bus_clear {
+    use super::*;
+
+    pub struct ClearBusFuture<'a> {
+        driver: Driver<'a>,
+    }
+
+    impl<'a> ClearBusFuture<'a> {
+        // Number of SCL pulses to clear the bus
+        const BUS_CLEAR_BITS: u8 = 9;
+
+        pub fn new(driver: Driver<'a>) -> Self {
+            let mut this = Self { driver };
+            this.configure(Self::BUS_CLEAR_BITS);
+            this
+        }
+
+        fn configure(&mut self, bits: u8) {
+            self.driver.regs().scl_sp_conf().modify(|_, w| {
+                unsafe { w.scl_rst_slv_num().bits(bits) };
+                w.scl_rst_slv_en().bit(bits > 0)
+            });
+            self.driver.update_registers();
+        }
+
+        pub fn poll_completion(&mut self) -> Poll<()> {
+            if self
+                .driver
+                .regs()
+                .scl_sp_conf()
+                .read()
+                .scl_rst_slv_en()
+                .bit_is_set()
+            {
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+
+    impl Drop for ClearBusFuture<'_> {
+        fn drop(&mut self) {
+            self.configure(0);
+            // We don't care about errors during bus clearing
+            self.driver.clear_all_interrupts();
+        }
+    }
+}
+
+#[cfg(esp32)]
+mod bus_clear {
+    use super::*;
+    use crate::gpio::AnyPin;
+
+    /// State of the bus clearing operation.
+    ///
+    /// Pins are changed on the start of the state, and a wait is scheduled
+    /// for the end of the state. At the end of the wait, the state is
+    /// updated to the next state.
+    enum State {
+        Idle,
+        SendStop,
+
+        // Number of SCL pulses left to send, and the last SCL level.
+        //
+        // Our job is to send 9 high->low SCL transitions, followed by a STOP condition.
+        SendClock(u8, bool),
+    }
+
+    pub struct ClearBusFuture<'a> {
+        driver: Driver<'a>,
+        wait: Instant,
+        state: State,
+        sda: Option<AnyPin<'static>>,
+        scl: Option<AnyPin<'static>>,
+    }
+
+    impl<'a> ClearBusFuture<'a> {
+        // Number of SCL pulses to clear the bus
+        const BUS_CLEAR_BITS: u8 = 9;
+        // use standard 100kHz data rate
+        const SCL_DELAY: Duration = Duration::from_micros(5);
+
+        pub fn new(driver: Driver<'a>) -> Self {
+            // The chip is lacking hardware support for this, so we
+            // implement it in software.
+            let sda = driver
+                .config
+                .sda_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+            let scl = driver
+                .config
+                .scl_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+
+            let (Some(sda), Some(scl)) = (sda, scl) else {
+                // If we don't have the pins, we can't clear the bus.
+                return Self {
+                    driver,
+                    wait: Instant::now(),
+                    state: State::Idle,
+                    sda: None,
+                    scl: None,
+                };
+            };
+
+            driver.info.scl_output.disconnect_from(&scl);
+            driver.info.sda_output.disconnect_from(&sda);
+
+            sda.set_output_high(true);
+            scl.set_output_high(false);
+
+            // Starting from (9, false), becase:
+            // - we start with SCL low
+            // - a complete SCL cycle consists of a high period and a low period
+            // - we decrement the remaining counter at the beginning of a cycle, which gives
+            //   us 9 complete SCL cycles.
+            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
+
+            Self {
+                driver,
+                wait: Instant::now() + Self::SCL_DELAY,
+                state,
+                sda: Some(sda),
+                scl: Some(scl),
+            }
+        }
+    }
+
+    impl ClearBusFuture<'_> {
+        pub fn poll_completion(&mut self) -> Poll<()> {
+            let now = Instant::now();
+
+            match self.state {
+                State::Idle => return Poll::Ready(()),
+                _ if now < self.wait => {
+                    // Still waiting for the end of the SCL pulse
+                }
+                State::SendStop => {
+                    if let Some(sda) = self.sda.as_ref() {
+                        sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
+                    }
+                    self.state = State::Idle;
+                    return Poll::Ready(());
+                }
+                State::SendClock(0, false) => {
+                    if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
+                        // Set up for STOP condition
+                        sda.set_output_high(false);
+                        scl.set_output_high(true);
+                    }
+                    self.state = State::SendStop;
+                    self.wait = now + Self::SCL_DELAY;
+                }
+                State::SendClock(n, false) => {
+                    if let Some(scl) = self.scl.as_ref() {
+                        scl.set_output_high(true);
+                    }
+                    self.state = State::SendClock(n - 1, true);
+                    self.wait = now + Self::SCL_DELAY;
+                }
+                State::SendClock(n, true) => {
+                    if let Some(scl) = self.scl.as_ref() {
+                        scl.set_output_high(false);
+                    }
+                    self.state = State::SendClock(n, false);
+                    self.wait = now + Self::SCL_DELAY;
+                }
+            }
+
+            Poll::Pending
+        }
+    }
+
+    impl Drop for ClearBusFuture<'_> {
+        fn drop(&mut self) {
+            if let (Some(sda), Some(scl)) = (self.sda.take(), self.scl.take()) {
+                // Make sure _we_ release the bus.
+                scl.set_output_high(true);
+                sda.set_output_high(true);
+
+                self.driver.info.sda_output.connect_to(&sda);
+                self.driver.info.scl_output.connect_to(&scl);
+
+                // We don't care about errors during bus clearing. There shouldn't be any,
+                // anyway.
+                self.driver.clear_all_interrupts();
+            }
+        }
+    }
+}
+
+use bus_clear::ClearBusFuture;
+
+impl Future for ClearBusFuture<'_> {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let pending = self.poll_completion();
+        if pending.is_pending() {
+            ctx.waker().wake_by_ref();
+        }
+        pending
     }
 }
 
