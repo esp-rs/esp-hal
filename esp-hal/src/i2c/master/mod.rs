@@ -121,7 +121,7 @@ pub enum BusTimeout {
     Maximum,
 
     /// Disable timeout control.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(esp32))]
     Disabled,
 
     /// Timeout in bus clock cycles.
@@ -141,7 +141,7 @@ impl BusTimeout {
                 }
             }
 
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(esp32))]
             BusTimeout::Disabled => 1,
 
             BusTimeout::BusCycles(cycles) => *cycles,
@@ -1226,20 +1226,17 @@ fn configure_clock(
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-        // The ESP32 variant does not have an enable flag for the
-        // timeout mechanism
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
+                // The ESP32 variant does not have an enable flag for the timeout mechanism
                 register_block
                     .to()
                     .write(|w| w.time_out().bits(timeout.cycles()));
             } else {
-                register_block
-                    .to()
-                    .write(|w| w.time_out_en().bit(timeout.is_set())
-                    .time_out_value()
-                    .bits(timeout.cycles() as _)
-                );
+                register_block.to().write(|w| {
+                    w.time_out_en().bit(timeout.is_set());
+                    w.time_out_value().bits(timeout.cycles() as _)
+                });
             }
         }
     }
@@ -1567,10 +1564,13 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = BusTimeout::BusCycles(match timeout {
-            BusTimeout::Maximum => 0xF_FFFF,
-            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
-        });
+        let timeout = match timeout {
+            BusTimeout::BusCycles(cycles) => BusTimeout::BusCycles(check_timeout(
+                cycles * 2 * half_cycle,
+                BusTimeout::Maximum.cycles(),
+            )?),
+            other => other,
+        };
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1666,10 +1666,13 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
-        let timeout = BusTimeout::BusCycles(match timeout {
-            BusTimeout::Maximum => 0xFF_FFFF,
-            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
-        });
+        let timeout = match timeout {
+            BusTimeout::BusCycles(cycles) => BusTimeout::BusCycles(check_timeout(
+                cycles * 2 * half_cycle,
+                BusTimeout::Maximum.cycles(),
+            )?),
+            other => other,
+        };
 
         configure_clock(
             self.regs(),
@@ -1741,8 +1744,6 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold - 1;
 
         let timeout = match timeout {
-            BusTimeout::Maximum => BusTimeout::BusCycles(0x1F),
-            BusTimeout::Disabled => BusTimeout::Disabled,
             BusTimeout::BusCycles(cycles) => {
                 let to_peri = (cycles * 2 * half_cycle).max(1);
                 let log2 = to_peri.ilog2();
@@ -1750,6 +1751,7 @@ impl Driver<'_> {
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
                 BusTimeout::BusCycles(check_timeout(raw, 0x1F)?)
             }
+            other => other,
         };
 
         configure_clock(
