@@ -10,6 +10,11 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
+rustdoc-args   = ["--cfg", "docsrs"]
+
 [lib]
 bench = false
 test  = false
