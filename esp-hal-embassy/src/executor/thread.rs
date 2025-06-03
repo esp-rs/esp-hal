@@ -116,6 +116,10 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     }
 
     #[cfg(all(xtensa, low_power_wait))]
+    // This function must be in RAM. Loading parts of it from flash can cause a race
+    // that results in the core not waking up. Placing `wait_impl` in RAM ensures that
+    // it is shorter than the interrupt handler that would clear the interrupt source.
+    #[macros::ram]
     fn wait_impl(cpu: usize) {
         // Manual critical section implementation that only masks interrupts handlers.
         // We must not acquire the cross-core on dual-core systems because that would
