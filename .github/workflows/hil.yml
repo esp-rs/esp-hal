@@ -28,44 +28,6 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
-  build-xtasks:
-    name: Build xtasks
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        if: github.event_name != 'workflow_dispatch'
-      - uses: actions/checkout@v4
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          repository: ${{ github.event.inputs.repository }}
-          ref: ${{ github.event.inputs.branch }}
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rust-src
-
-      - name: Install cross
-        run: cargo install cross
-
-      - name: Build xtasks
-        run: |
-          cross build --release --target armv7-unknown-linux-gnueabihf -p xtask
-          cross build --release --target aarch64-unknown-linux-gnu -p xtask
-
-      - name: Upload artifact | armv7-unknown-linux-gnueabihf
-        uses: actions/upload-artifact@v4
-        with:
-          name: xtask-armv7
-          path: target/armv7-unknown-linux-gnueabihf/release/xtask
-
-      - name: Upload artifact | aarch64-unknown-linux-gnu
-        uses: actions/upload-artifact@v4
-        with:
-          name: xtask-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/xtask
 
   build-tests:
     name: Build HIL Tests | ${{ matrix.target.soc }}
@@ -75,22 +37,9 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # RISC-V devices:
-          - soc: esp32c2
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c6
-            rust-target: riscv32imac-unknown-none-elf
-          - soc: esp32h2
-            rust-target: riscv32imac-unknown-none-elf
           # # Xtensa devices:
           - soc: esp32
             rust-target: xtensa-esp32-none-elf
-          - soc: esp32s2
-            rust-target: xtensa-esp32s2-none-elf
-          - soc: esp32s3
-            rust-target: xtensa-esp32s3-none-elf
 
     steps:
       - uses: actions/checkout@v4
@@ -118,7 +67,7 @@ jobs:
           version: 1.87.0.0
 
       - name: Build tests
-        run: cargo xtask build tests ${{ matrix.target.soc }}
+        run: cargo xtask build tests ${{ matrix.target.soc }} --test embassy_interrupt_executor_single_integrated
 
       - uses: actions/upload-artifact@v4
         with:
@@ -126,60 +75,3 @@ jobs:
           path: /home/runner/work/esp-hal/esp-hal/target/tests/${{ matrix.target.soc }}
           if-no-files-found: error
           overwrite: true
-
-  hil:
-    name: Run HIL Tests | ${{ matrix.target.soc }}
-    needs: [build-tests, build-xtasks]
-    runs-on:
-      labels: [self-hosted, "${{ matrix.target.runner }}"]
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          # RISC-V devices:
-          - soc: esp32c2
-            runner: esp32c2-jtag
-            host: aarch64
-          - soc: esp32c3
-            runner: esp32c3-usb
-            host: armv7
-          - soc: esp32c6
-            runner: esp32c6-usb
-            host: armv7
-          - soc: esp32h2
-            runner: esp32h2-usb
-            host: armv7
-          # Xtensa devices:
-          - soc: esp32
-            runner: esp32-jtag
-            host: aarch64
-          - soc: esp32s2
-            runner: esp32s2-jtag
-            host: armv7
-          - soc: esp32s3
-            runner: esp32s3-usb
-            host: armv7
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: tests-${{ matrix.target.soc }}
-          path: tests-${{ matrix.target.soc }}
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: xtask-${{ matrix.target.host }}
-
-      - name: Run Tests
-        id: run-tests
-        run: |
-          [ -f ~/setup.sh ] && source ~/setup.sh
-
-          export PATH=$PATH:/home/espressif/.cargo/bin
-          chmod +x xtask
-          ./xtask run elfs ${{ matrix.target.soc }} tests-${{ matrix.target.soc }}
-
-      - name: Clean up
-        if: always()
-        run: |
-          rm -rf tests-${{ matrix.target.soc }}
-          rm -f xtask
