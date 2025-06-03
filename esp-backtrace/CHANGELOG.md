@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.16.0] - 2025-06-03
+
+### Added
+
 - The length of the stack trace can now be configured using `ESP_BACKTRACE_CONFIG_BACKTRACE_FRAMES` (#3271)
 - `Backtrace` and `BacktraceFrame` types. (#3280)
 
@@ -22,9 +36,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stack traces no longer stop at recursive functions (#3270)
 - ESP32/S2/S3: Fixed an issue where the backtrace wasn't correctly captured in some cases (#3272)
-
-### Removed
-
 
 ## [0.15.1] - 2025-02-24
 
@@ -76,4 +87,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Only prints float registers on targets which have them. (#1690)
 
 [0.15.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-backtrace-v0.15.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...HEAD
+[v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...esp-backtrace-v0.16.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...HEAD

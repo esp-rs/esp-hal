@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal"
-version       = "1.0.0-beta.0"
+version       = "1.0.0-beta.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Bare-metal HAL for Espressif devices"
@@ -43,10 +43,10 @@ fugit                    = "0.3.7"
 instability              = "0.3.7"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
-esp-build                = { version = "0.2.0", path = "../esp-build" }
-esp-config               = { version = "0.3.0", path = "../esp-config" }
-esp-metadata             = { version = "0.6.0", path = "../esp-metadata", default-features = false }
-procmacros               = { version = "0.17.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-build                = { version = "0.3.0", path = "../esp-build" }
+esp-config               = { version = "0.4.0", path = "../esp-config" }
+esp-metadata             = { version = "0.7.0", path = "../esp-metadata", default-features = false }
+procmacros               = { version = "0.18.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
@@ -84,18 +84,18 @@ esp32s3 = { version = "0.32.0", features = ["critical-section", "rt"], optional 
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }
-esp-riscv-rt     = { version = "0.10.0", path = "../esp-riscv-rt" }
+esp-riscv-rt     = { version = "0.11.0", path = "../esp-riscv-rt" }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.10.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.18.0", path = "../xtensa-lx-rt" }
+xtensa-lx        = { version = "0.11.0", path = "../xtensa-lx" }
+xtensa-lx-rt     = { version = "0.19.0", path = "../xtensa-lx-rt" }
 
 [build-dependencies]
 basic-toml   = "0.1.10"
 cfg-if       = "1.0.0"
-esp-build    = { version = "0.2.0", path = "../esp-build" }
-esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
-esp-config   = { version = "0.3.0", path = "../esp-config", features = ["build"] }
+esp-build    = { version = "0.3.0", path = "../esp-build" }
+esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
+esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
 serde        = { version = "1.0.219", features = ["derive"] }
 
 [dev-dependencies]

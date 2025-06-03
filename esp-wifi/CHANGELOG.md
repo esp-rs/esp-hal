@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.14.0] - 2025-06-03
+
+### Added
+
 - It's possible to use partial RF calibration, it's possible to use the None-calibration-schema after deep-sleep (#3383)
 
 ### Changed
@@ -27,9 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enterprise WPA fixed for ESP32-S2 (#3406)
 - COEX on ESP32 is now working (#3403)
 - Correctly de-init wifi if the WifiController is dropped (#3550)
-
-### Removed
-
 
 ## [0.13.0] - 2025-02-24
 
@@ -242,4 +253,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release supporting WiFi on ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6, supporting BLE on WiFi on ESP32, ESP32-S3, ESP32-C3, ESP32-C2, ESP32-C6 (#1582)
 
 [0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...HEAD
+[v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...HEAD

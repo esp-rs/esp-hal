@@ -1,6 +1,6 @@
 [package]
 name          = "esp-config"
-version       = "0.3.1"
+version       = "0.4.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Configure projects using esp-hal and related packages"

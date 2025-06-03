@@ -1,4 +1,4 @@
-# Migration Guide from v1.0.0-beta.0 to {{currentVersion}}
+# Migration Guide from v1.0.0-beta.0 to 1.0.0-beta.1
 
 ## Peripheral singleton changes
 
