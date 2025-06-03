@@ -2128,13 +2128,7 @@ impl Driver<'_> {
     fn check_errors(&self) -> Result<(), Error> {
         let r = self.regs().int_raw().read();
 
-        // The ESP32 variant has a slightly different interrupt naming
-        // scheme!
-
         // Handle error cases
-        if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
-        }
         if r.nack().bit_is_set() {
             return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
                 self.regs(),
@@ -2142,6 +2136,13 @@ impl Driver<'_> {
         }
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
+        }
+
+        #[cfg(not(esp32))]
+        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -2153,12 +2154,8 @@ impl Driver<'_> {
                 return Err(Error::Timeout);
             }
         }
-
-        #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
-            return Err(Error::AcknowledgeCheckFailed(
-                AcknowledgeCheckFailedReason::Data,
-            ));
+        if r.time_out().bit_is_set() {
+            return Err(Error::Timeout);
         }
 
         Ok(())
