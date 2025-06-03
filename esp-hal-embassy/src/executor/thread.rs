@@ -23,7 +23,7 @@ pub(crate) fn pend_thread_mode(_core: usize) {
     #[cfg(low_power_wait)]
     {
         // Signal that there is work to be done.
-        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::Relaxed);
+        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::Release);
 
         // If we are pending a task on the current core, we're done. Otherwise, we
         // need to make sure the other core wakes up.

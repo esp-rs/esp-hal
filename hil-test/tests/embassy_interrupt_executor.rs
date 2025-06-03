@@ -12,6 +12,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(asm_experimental_arch)]
 
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::interrupt::{
@@ -138,5 +139,7 @@ mod test {
             signal.signal(());
             response.wait().await;
         }
+
+        core::mem::drop(_guard);
     }
 }
