@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.8.0] - 2025-06-03
+
+### Added
+
 - `allocator_api2` to support allocator APIs on stable Rust. (#3318, #3487)
 - `AnyMemory`, `InternalMemory`, `ExternalMemory` allocators. (#3318)
 - Removed the `Unused` section for `stats()` to make the output cleaner (#3486)
@@ -17,12 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 - Update `defmt` to 1.0 (#3416)
-
-### Fixed
-
-
-### Removed
-
 
 ## [0.7.0] - 2025-02-24
 
@@ -61,4 +69,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2022-07-25
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-alloc-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.7.0...esp-alloc-v0.8.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-alloc-v0.8.0...HEAD

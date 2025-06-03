@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.8.0] - 2025-06-03
+
+### Added
+
 - Re-added the `multiple-integrated` timer queue flavour (#3166)
 
 ### Changed
@@ -23,9 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a panic on very long wakeup times (#3433)
-
-### Removed
-
 
 ## [0.7.0] - 2025-02-24
 
@@ -109,4 +120,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2024-06-04
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-embassy-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.7.0...esp-hal-embassy-v0.8.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.0...HEAD

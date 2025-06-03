@@ -12,11 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
-- The `low-level` feature has been removed, the gated API is always available (#3425)
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.6.0] - 2025-06-03
+
+### Changed
+
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
+- The `low-level` feature has been removed, the gated API is always available (#3425)
 
 ### Removed
 
@@ -44,4 +52,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2022-09-26
 
 [0.5.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-storage-v0.5.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.5.0...HEAD
+[v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.5.0...esp-storage-v0.6.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.6.0...HEAD

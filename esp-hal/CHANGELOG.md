@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.0.0-beta.1] - 2025-06-03
+
+### Added
+
 - RMT channel creator `steal` function (#3496)
 - Support for RMT extended memory (#3182)
 - Support for `rand_core` 0.9 (#3211)
@@ -1248,4 +1262,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.23.0]: https://github.com/esp-rs/esp-hal/compare/v0.22.0...v0.23.0
 [0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0...v0.23.1
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...esp-hal-v1.0.0-beta.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...HEAD
+[v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...esp-hal-v1.0.0-beta.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...HEAD
