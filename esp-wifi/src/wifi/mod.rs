@@ -2828,10 +2828,19 @@ impl WifiController<'_> {
     /// - This API should be called after station connected to AP.
     /// - Use this API only in STA or AP-STA mode.
     /// </div>
+    ///
+    /// # Errors
+    /// This function returns [WifiError::Unsupported] if the STA side isn't
+    /// running. For example, when configured for AP only.
     pub fn rssi(&self) -> Result<i32, WifiError> {
-        let mut rssi: i32 = 0;
-        esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
-        Ok(rssi)
+        if self.mode()?.is_sta() {
+            let mut rssi: i32 = 0;
+            // Will return ESP_FAIL -1 if called in AP mode.
+            esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
+            Ok(rssi)
+        } else {
+            Err(WifiError::Unsupported)
+        }
     }
 
     /// Get the supported capabilities of the controller.
