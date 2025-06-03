@@ -12,13 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.11.0] - 2025-06-03
+
+### Changed
+
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ## [0.10.0] - 2025-02-24
 
@@ -93,4 +98,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2023-01-26
 
 [0.10.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-riscv-rt-v0.10.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.10.0...HEAD
+[v0.11.0]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.10.0...esp-riscv-rt-v0.11.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-riscv-rt-v0.11.0...HEAD

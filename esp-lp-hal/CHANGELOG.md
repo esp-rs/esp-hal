@@ -12,11 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Fix gpio `input_state` and `output_state` for the ESP32-S3 and ESP32-S2 (#3191)
-- Bump Rust edition to 2024, bump MSRV to 1.86. (#2951, #3391, #3560)
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.2.0] - 2025-06-03
+
+### Changed
+
+- Fix gpio `input_state` and `output_state` for the ESP32-S3 and ESP32-S2 (#3191)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#2951, #3391, #3560)
 
 ### Removed
 
@@ -45,3 +53,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove 2nd level generics from GPIO pin (#1526)
 - GPIO Input/Output types have been converted to unit structs (#1754)
 
+[v0.2.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-lp-hal-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-lp-hal-v0.2.0...HEAD

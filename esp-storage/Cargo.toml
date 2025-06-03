@@ -1,6 +1,6 @@
 [package]
 name          = "esp-storage"
-version       = "0.5.0"
+version       = "0.6.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
@@ -28,8 +28,8 @@ critical-section = { version = "1.2.0", optional = true }
 document-features = "0.2.11"
 
 [build-dependencies]
-esp-build    = { version = "0.2.0", path = "../esp-build" }
-esp-metadata = { version = "0.6.0", path = "../esp-metadata" }
+esp-build    = { version = "0.3.0", path = "../esp-build" }
+esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
 [features]
 default = ["critical-section"]

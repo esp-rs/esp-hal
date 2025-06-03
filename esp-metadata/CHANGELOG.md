@@ -9,18 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Add ability to define memory regions, have DRAM defined there (#3300)
-- Provide macros to get the start/end of a memory region, make it possible to use the macros in a no-std project (#3300)
 
 ### Changed
 
-- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.7.0] - 2025-06-03
+
+### Added
+
+- Add ability to define memory regions, have DRAM defined there (#3300)
+- Provide macros to get the start/end of a memory region, make it possible to use the macros in a no-std project (#3300)
+
+### Changed
+
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ## [0.6.0] - 2025-02-24
 
@@ -58,4 +66,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial release (#2518)
 
 [0.6.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-metadata-v0.6.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.6.0...HEAD
+[v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.6.0...esp-metadata-v0.7.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.7.0...HEAD
