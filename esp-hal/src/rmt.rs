@@ -2158,7 +2158,7 @@ where
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
-    type Output = Result<(), Error>;
+    type Output = Result<usize, Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -2175,7 +2175,7 @@ where
 
                 this.reader.read(&mut this.data, raw, true);
 
-                Ok(())
+                Ok(this.reader.total)
             }
             Some(Event::Threshold) => {
                 unreachable!("wrapping async rx currently not implemented");
