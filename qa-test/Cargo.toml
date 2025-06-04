@@ -12,7 +12,7 @@ embassy-time       = "0.4.0"
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.1"
 embedded-graphics  = "0.8.1"
-embedded-hal-async = { version = "1.0.0", git = "https://github.com/rmsyn/embedded-hal", branch = "embedded-hal/mmc" }
+embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc" }
 esp-backtrace      = { path = "../esp-backtrace", features = ["panic-handler", "println"] }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
