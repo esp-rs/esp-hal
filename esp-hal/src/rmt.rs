@@ -1985,6 +1985,9 @@ where
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
+                if this.writer.state == WriterState::Done {
+                    raw.unlisten_tx_interrupt(Event::Threshold);
+                }
 
                 Poll::Pending
             }
@@ -1992,6 +1995,7 @@ where
         };
 
         if matches!(result, Poll::Ready(_)) {
+            raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
             raw.clear_tx_interrupts();
             RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
         }
@@ -2010,6 +2014,7 @@ where
 
         // STATE should be TxIdle if the future was polled to completion
         if RmtState::load(raw, Ordering::Relaxed) == RmtState::TxAsync {
+            raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
             raw.stop_tx();
             raw.update();
 
