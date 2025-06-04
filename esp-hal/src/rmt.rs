@@ -2308,7 +2308,7 @@ where
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
-    type Output = Result<(), Error>;
+    type Output = Result<usize, Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
@@ -2324,7 +2324,7 @@ where
 
                 this.reader.read(&mut this.data, raw, true);
 
-                Ok(())
+                Ok(this.reader.total)
             }
             Some(Event::Threshold) => {
                 unreachable!("wrapping async rx currently not implemented");
