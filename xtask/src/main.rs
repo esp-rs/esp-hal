@@ -4,14 +4,14 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
-    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
+    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -275,7 +275,12 @@ fn lint_package(
 
     let cargo_args = builder.build();
 
-    xtask::cargo::run_with_env(&cargo_args, &path, [("CI", "1")], false)?;
+    xtask::cargo::run_with_env(
+        &cargo_args,
+        &path,
+        [("CI", "1"), ("DEFMT_LOG", "trace")],
+        false,
+    )?;
 
     Ok(())
 }
