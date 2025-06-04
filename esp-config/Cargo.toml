@@ -17,7 +17,7 @@ document-features = "0.2.11"
 serde = { version = "1.0.197", features = ["derive"], optional = true }
 serde_yml     = { version =  "0.0.12", optional = true }
 evalexpr = { version = "12.0.2", optional = true }
-esp-metadata = { version = "0.6.0", path = "../esp-metadata", default-features = true, optional = true }
+esp-metadata = { version = "0.7.0", path = "../esp-metadata", default-features = true, optional = true }
 
 [dev-dependencies]
 temp-env = "0.3.6"
