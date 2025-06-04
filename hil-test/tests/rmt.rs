@@ -310,7 +310,7 @@ async fn do_rmt_single_shot_iter_async(
         remaining: tx_len,
         i: 0,
         write_end_marker,
-        scale: 4,
+        scale: 1,
     };
     tx_channel.transmit(&mut tx_data)?.await
 }
