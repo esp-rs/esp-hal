@@ -29,8 +29,9 @@
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
 //! use esp_hal::i2c::master::I2c;
+//! # use esp_hal::{i2c::master::Config, time::Rate};
 //!
-//! # let config = esp_hal::i2c::master::Config::default();
+//! # let config = Config::default();
 //!
 //! // You need to configure the driver during initialization:
 //! let mut i2c = I2c::new(peripherals.I2C0, config)?
@@ -38,7 +39,8 @@
 //!     .with_scl(peripherals.GPIO3);
 //!
 //! // You can change the configuration later:
-//! i2c.apply_config(&config)?;
+//! let new_config = config.with_frequency(Rate::from_khz(400));
+//! i2c.apply_config(&new_config)?;
 //! # Ok(()) }
 //! ```
 //! 
@@ -83,7 +85,7 @@
 //! # let write_buffer = [0xAA];
 //! # let mut read_buffer = [0u8; 22];
 //!
-//! // You can change the configuration later:
+//! // Reconfigure the driver to use async mode.
 //! let mut i2c = i2c.into_async();
 //!
 //! i2c.write_async(DEVICE_ADDR, &write_buffer).await?;
@@ -98,6 +100,10 @@
 //!     ],
 //! )
 //! .await?;
+//!
+//! // You should still be able to use the blocking methods, if you need to:
+//! i2c.write(DEVICE_ADDR, &write_buffer)?;
+//!
 //! # Ok(()) }
 //! ```
 //! 
