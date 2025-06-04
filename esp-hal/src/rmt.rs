@@ -741,39 +741,121 @@ pub struct Rx;
 #[derive(Debug)]
 pub struct RxTx;
 
+impl crate::private::Sealed for Tx {}
+impl crate::private::Sealed for Rx {}
+#[cfg(any(esp32, esp32s2))]
+impl crate::private::Sealed for RxTx {}
+
+/// Marker for a channel that is not currently configured.
+#[derive(Debug)]
+pub struct Unconfigured<Dir> {
+    _dir: PhantomData<Dir>,
+}
+
 /// FIXME: docs
-pub trait Direction: core::fmt::Debug + Unpin {
+pub trait Direction: Capability {}
+
+/// FIXME: Docs
+pub trait Capability: core::fmt::Debug + Unpin + crate::private::Sealed {
     #[doc(hidden)]
-    const IS_TX: bool;
+    const SUPPORTS_TX: bool;
 
     #[doc(hidden)]
     fn is_tx() -> bool {
-        Self::IS_TX
+        Self::SUPPORTS_TX
     }
 }
 
-impl Direction for Tx {
-    const IS_TX: bool = true;
+impl Direction for Tx {}
+impl Direction for Rx {}
+
+impl Capability for Tx {
+    const SUPPORTS_TX: bool = true;
+}
+impl Capability for Rx {
+    const SUPPORTS_TX: bool = false;
+}
+#[cfg(any(esp32, esp32s2))]
+impl Capability for RxTx {
+    const SUPPORTS_TX: bool = true;
 }
 
-impl Direction for Rx {
-    const IS_TX: bool = false;
+// struct ChannelInfo<Cap, const CH_IDX: usize>
+
+/// A sealed marker trait that indicates whether a channel with the given
+/// `Capability` can be configured for a `Direction`.
+///
+/// In other words, this links the `Capability` and `Direction` marker structs in the obvious
+/// way.
+pub trait Supports<Dir: Direction>: Capability + crate::private::Sealed {}
+
+impl Supports<Tx> for Tx {}
+impl Supports<Rx> for Rx {}
+#[cfg(any(esp32, esp32s2))]
+impl Supports<Tx> for RxTx {}
+#[cfg(any(esp32, esp32s2))]
+impl Supports<Rx> for RxTx {}
+
+/// FIXME: Docs
+pub trait Configure<Dir>: RawChannelAccess<Dir: Capability> {
+    /// FIXME: Docs
+    type Configured: RawChannelAccess<Dir=Dir>;
+
+    #[doc(hidden)]
+    fn configure(self) -> Self::Configured;
+}
+
+impl<Cap, Dir, const CH_IDX: u8> Configure<Dir> for ConstChannelAccess<Cap, CH_IDX>
+where
+    Cap: Capability + Supports<Dir>,
+    Dir: Direction,
+{
+    type Configured = ConstChannelAccess<Dir, CH_IDX>;
+
+    fn configure(self) -> Self::Configured {
+        ConstChannelAccess {
+            _direction: PhantomData,
+        }
+    }
+}
+
+impl<Cap, Dir> Configure<Dir> for DynChannelAccess<Cap>
+where
+    Cap: Capability + Supports<Dir>,
+    Dir: Direction,
+{
+    type Configured = DynChannelAccess<Dir>;
+
+    fn configure(self) -> Self::Configured {
+        DynChannelAccess {
+            ch_idx: self.ch_idx,
+            _direction: PhantomData,
+        }
+    }
 }
 
 /// docs
 pub trait RawChannelAccess: crate::private::Sealed + Unpin {
     // Tx or Rx or Unconfigured
-    #[doc(hidden)]
-    type Dir: Direction;
-
-    #[doc(hidden)]
-    #[inline]
-    fn channel(&self) -> u8 {
-        chip_specific::channel_for_idx::<Self::Dir>(self.ch_idx())
-    }
+    /// docs
+    type Dir;
 
     #[doc(hidden)]
     fn ch_idx(&self) -> u8;
+}
+
+trait RawChannelAccessExt {
+    fn channel(&self) -> u8;
+}
+
+impl<Raw: ?Sized> RawChannelAccessExt for Raw
+where
+    Raw: RawChannelAccess<Dir: Capability>
+{
+    #[inline]
+    fn channel(&self) -> u8 {
+        chip_specific::channel_for_idx::<Raw::Dir>(self.ch_idx())
+    }
 }
 
 /// docs
@@ -791,10 +873,10 @@ pub struct DynChannelAccess<Dir> {
     _direction: PhantomData<Dir>,
 }
 
-impl<Dir: Direction, const CH_IDX: u8> crate::private::Sealed for ConstChannelAccess<Dir, CH_IDX> {}
-impl<Dir: Direction> crate::private::Sealed for DynChannelAccess<Dir> {}
+impl<Dir, const CH_IDX: u8> crate::private::Sealed for ConstChannelAccess<Dir, CH_IDX> {}
+impl<Dir> crate::private::Sealed for DynChannelAccess<Dir> {}
 
-impl<Dir: Direction, const CH_IDX: u8> ConstChannelAccess<Dir, CH_IDX>
+impl<Dir, const CH_IDX: u8> ConstChannelAccess<Dir, CH_IDX>
 where
     ConstChannelAccess<Dir, CH_IDX>: RawChannelAccess,
 {
@@ -805,7 +887,7 @@ where
     }
 }
 
-impl<Dir: Direction> DynChannelAccess<Dir> {
+impl<Dir> DynChannelAccess<Dir> {
     unsafe fn conjure(ch_idx: ChannelIndex) -> Self {
         Self {
             ch_idx,
@@ -814,7 +896,7 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
     }
 }
 
-impl<const CH_IDX: u8, Dir: Direction> RawChannelAccess for ConstChannelAccess<Dir, CH_IDX> {
+impl<const CH_IDX: u8, Dir: Unpin> RawChannelAccess for ConstChannelAccess<Dir, CH_IDX> {
     type Dir = Dir;
 
     #[inline]
@@ -823,7 +905,7 @@ impl<const CH_IDX: u8, Dir: Direction> RawChannelAccess for ConstChannelAccess<D
     }
 }
 
-impl<Dir: Direction> RawChannelAccess for DynChannelAccess<Dir> {
+impl<Dir: Unpin> RawChannelAccess for DynChannelAccess<Dir> {
     type Dir = Dir;
 
     #[inline]
@@ -832,17 +914,10 @@ impl<Dir: Direction> RawChannelAccess for DynChannelAccess<Dir> {
     }
 }
 
-// FIXME: Function to degrade Channels to their type-erased variants
 /// docs
 pub type AnyTxChannel<Dm> = Channel<Dm, DynChannelAccess<Tx>>;
 /// docs
 pub type AnyRxChannel<Dm> = Channel<Dm, DynChannelAccess<Rx>>;
-
-// FIXME: Consider removing ChannelCreator in favor of Channel<Unconfigured,
-// ...> -> This might not be possible, because ChannelCreator: 'rmt whereas
-//    Channel: 'rmt + 'pin
-// pub type ChannelCreator<const CHANNEL: u8> = Channel<Unconfigured,
-// ConstChannelAccess<Unconfigured, CHANNEL>>;
 
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
@@ -978,12 +1053,12 @@ macro_rules! declare_channels {
                     // Otherwise, one could move the channel out of this struct
                     // (since the struct doesn't implement Drop), drop the Rmt struct,
                     // and use it beyond the lifetime of Rmt.peripheral
-                    pub [<channel $num>]: ChannelCreator<Dm, $idx, $cap>,
+                    pub [<channel $num>]: ChannelCreator<Dm, ConstChannelAccess<$cap, $idx>>,
                 ], [
                     $($field_init)*
                     [<channel $num>]: $crate::rmt::ChannelCreator {
+                        raw: unsafe { ConstChannelAccess::conjure() },
                         _mode: ::core::marker::PhantomData,
-                        _capabilities: ::core::marker::PhantomData,
                         _guard: $crate::system::GenericPeripheralGuard::new(),
                     },
                 ])
@@ -1208,31 +1283,65 @@ cfg_if::cfg_if! {
 }
 
 /// RMT Channel Creator
-pub struct ChannelCreator<Dm, const CH_IDX: u8, Cap>
+pub struct ChannelCreator<Dm, Raw>
 where
     Dm: crate::DriverMode,
+    Raw: RawChannelAccess<Dir: Capability>,
 {
+    raw: Raw,
     _mode: PhantomData<Dm>,
-    _capabilities: PhantomData<Cap>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, const CH_IDX: u8, Cap> ChannelCreator<Dm, CH_IDX, Cap>
+impl<Dm, Raw> ChannelCreator<Dm, Raw>
+where
+    Dm: crate::DriverMode,
+    Raw: RawChannelAccess<Dir: Capability>,
+{
+    /// FIXME: Docs
+    pub fn degrade(self) -> ChannelCreator<Dm, DynChannelAccess<Raw::Dir>> {
+        // FIXME: Share code with Channel::degrade?
+        use core::mem::ManuallyDrop;
+        // Disable Drop handler on self
+        let old = ManuallyDrop::new(self);
+        ChannelCreator {
+            raw: DynChannelAccess {
+                ch_idx: unsafe { ChannelIndex::from_u8_unchecked(old.raw.ch_idx()) },
+                _direction: PhantomData,
+            },
+            _mode: PhantomData,
+            // FIXME: Don't clone, but move old._guard
+            _guard: old._guard.clone(),
+        }
+    }
+}
+
+impl<Dm, Dir: Capability, const CH_IDX: u8> ChannelCreator<Dm, ConstChannelAccess<Dir, CH_IDX>>
 where
     Dm: crate::DriverMode,
 {
     // FIXME: This interface isn't great. Come up with a safe alternative that uses
-    // STATE tracking.
+    // STATE tracking, and verifies that the RMT is configured for the expected
+    // DriverMode.
     /// Unsafely steal a channel creator instance.
     ///
     /// # Safety
     ///
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
-    pub unsafe fn steal() -> ChannelCreator<Dm, CH_IDX, Cap> {
+    pub unsafe fn steal() -> ChannelCreator<Dm, ConstChannelAccess<Dir, CH_IDX>> {
+        assert!(CH_IDX < CHANNEL_INDEX_COUNT);
+
+        let raw = unsafe { ConstChannelAccess::conjure() };
+
+        // panic if the channel is currently running a transaction, or if another
+        // channel is using its memory
+        let state = STATE[raw.channel() as usize].load(Ordering::Relaxed);
+        assert!(state == RmtState::Unconfigured as u8 || state == RmtState::TxIdle as u8 || state == RmtState::RxIdle as u8);
+
         ChannelCreator {
+            raw,
             _mode: PhantomData,
-            _capabilities: PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
@@ -1264,16 +1373,19 @@ pub trait RxChannelCreator<Dm: crate::DriverMode> {
     ) -> Result<Channel<Dm, Self::Raw>, Error>;
 }
 
+trait AnyTxChannelAccess: RawChannelAccess<Dir = Tx> {}
+trait AnyRxChannelAccess: RawChannelAccess<Dir = Rx> {}
+
 // TODO:
 // - RxTx devices: always allow reconfigure + unconfigure
 // - Rx/Tx devices: allow Unconfigure and reconfigure with the same direction
 
-#[cfg(not(any(esp32, esp32s2)))]
-impl<Dm, const CH_IDX: u8> TxChannelCreator<Dm> for ChannelCreator<Dm, CH_IDX, Tx>
+impl<Dm, Raw> TxChannelCreator<Dm> for ChannelCreator<Dm, Raw>
 where
     Dm: crate::DriverMode,
+    Raw: Configure<Tx>,
 {
-    type Raw = ConstChannelAccess<Tx, CH_IDX>;
+    type Raw = <Raw as Configure<Tx>>::Configured;
 
     /// Configure the TX channel
     fn configure_tx<'pin>(
@@ -1281,18 +1393,18 @@ where
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
     ) -> Result<Channel<Dm, Self::Raw>, Error> {
-        let raw = unsafe { ConstChannelAccess::conjure() };
+        let raw = self.raw.configure();
         configure_tx_channel(&raw, pin, config)?;
         Ok(Channel::new(raw))
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
-impl<Dm, const CH_IDX: u8> RxChannelCreator<Dm> for ChannelCreator<Dm, CH_IDX, Rx>
+impl<Dm, Raw> RxChannelCreator<Dm> for ChannelCreator<Dm, Raw>
 where
     Dm: crate::DriverMode,
+    Raw: Configure<Rx>,
 {
-    type Raw = ConstChannelAccess<Rx, CH_IDX>;
+    type Raw = <Raw as Configure<Rx>>::Configured;
 
     /// Configure the RX channel
     fn configure_rx<'pin>(
@@ -1300,45 +1412,7 @@ where
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
     ) -> Result<Channel<Dm, Self::Raw>, Error> {
-        let raw = unsafe { ConstChannelAccess::conjure() };
-        configure_rx_channel(&raw, pin, config)?;
-        Ok(Channel::new(raw))
-    }
-}
-
-#[cfg(any(esp32, esp32s2))]
-impl<Dm, const CH_IDX: u8> TxChannelCreator<Dm> for ChannelCreator<Dm, CH_IDX, RxTx>
-where
-    Dm: crate::DriverMode,
-{
-    type Raw = ConstChannelAccess<Tx, CH_IDX>;
-
-    /// Configure the TX channel
-    fn configure_tx<'pin>(
-        self,
-        pin: impl PeripheralOutput<'pin>,
-        config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error> {
-        let raw = unsafe { ConstChannelAccess::conjure() };
-        configure_tx_channel(&raw, pin, config)?;
-        Ok(Channel::new(raw))
-    }
-}
-
-#[cfg(any(esp32, esp32s2))]
-impl<Dm, const CH_IDX: u8> RxChannelCreator<Dm> for ChannelCreator<Dm, CH_IDX, RxTx>
-where
-    Dm: crate::DriverMode,
-{
-    type Raw = ConstChannelAccess<Rx, CH_IDX>;
-
-    /// Configure the RX channel
-    fn configure_rx<'pin>(
-        self,
-        pin: impl PeripheralInput<'pin>,
-        config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error> {
-        let raw = unsafe { ConstChannelAccess::conjure() };
+        let raw = self.raw.configure();
         configure_rx_channel(&raw, pin, config)?;
         Ok(Channel::new(raw))
     }
@@ -1426,8 +1500,8 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
     Ok(())
 }
 
-fn configure_rx_channel<'pin, const CH_IDX: u8>(
-    raw: &ConstChannelAccess<Rx, CH_IDX>,
+fn configure_rx_channel<'pin>(
+    raw: &impl RawChannelAccess<Dir = Rx>,
     pin: impl PeripheralInput<'pin>,
     config: RxChannelConfig,
 ) -> Result<(), Error> {
@@ -1465,8 +1539,8 @@ fn configure_rx_channel<'pin, const CH_IDX: u8>(
     Ok(())
 }
 
-fn configure_tx_channel<'pin, const CH_IDX: u8>(
-    raw: &ConstChannelAccess<Tx, CH_IDX>,
+fn configure_tx_channel<'pin>(
+    raw: &impl RawChannelAccess<Dir = Tx>,
     pin: impl PeripheralOutput<'pin>,
     config: TxChannelConfig,
 ) -> Result<(), Error> {
@@ -1581,6 +1655,13 @@ where
             _guard: GenericPeripheralGuard::new(),
         }
     }
+
+    // FIXME: Implement, regain full Capabilitis of Raw!
+    // fn unconfigure(self) -> ChannelCreator<Dm, Raw> {
+    //     // requires ChannelCreator to take a RawChannelAccess such that type-erased channels can
+    //     // also be unconfigured
+    //     todo!("implement, then do the same on drop")
+    // }
 
     /// Get size of this channel's hardware buffer (number of `PulseCode`s).
     pub fn buffer_size(&self) -> usize {
@@ -1817,7 +1898,7 @@ pub trait TxChannel: Sized {
     // Currently required such that `impl TxChannel` is all that is needed to use
     // `*TxTransaction`.
     #[doc(hidden)]
-    fn raw(&self) -> &(impl RawChannelAccess<Dir = Tx> + TxChannelInternal);
+    fn raw(&self) -> &impl TxChannelInternal;
 
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
@@ -1858,9 +1939,9 @@ pub trait TxChannel: Sized {
 
 impl<Raw> TxChannel for Channel<Blocking, Raw>
 where
-    Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
+    Raw: TxChannelInternal,
 {
-    fn raw(&self) -> &(impl RawChannelAccess<Dir = Tx> + TxChannelInternal) {
+    fn raw(&self) -> &impl TxChannelInternal {
         &self.raw
     }
 
@@ -2069,7 +2150,7 @@ pub trait RxChannel: Sized {
     // Currently required such that `impl RxChannel` is all that is needed to use
     // `RxTransaction`.
     #[doc(hidden)]
-    type Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal;
+    type Raw: RxChannelInternal;
 
     #[doc(hidden)]
     fn raw(&self) -> &Self::Raw;
@@ -2089,7 +2170,7 @@ pub trait RxChannel: Sized {
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
 where
-    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
+    Raw: RxChannelInternal,
 {
     type Raw = Raw;
 
@@ -2134,7 +2215,7 @@ where
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct RmtTxFuture<'ch, Raw, D>
 where
-    Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
+    Raw: TxChannelInternal,
     D: Iterator + Unpin,
     D::Item: Borrow<PulseCode>,
 {
@@ -2148,7 +2229,7 @@ where
 
 impl<Raw, D> core::future::Future for RmtTxFuture<'_, Raw, D>
 where
-    Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
+    Raw: TxChannelInternal,
     D: Iterator + Unpin,
     D::Item: Borrow<PulseCode>,
 {
@@ -2200,7 +2281,7 @@ where
 
 impl<Raw, D> Drop for RmtTxFuture<'_, Raw, D>
 where
-    Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
+    Raw: TxChannelInternal,
     D: Iterator + Unpin,
     D::Item: Borrow<PulseCode>,
 {
@@ -2224,7 +2305,7 @@ where
 /// TX channel in async mode
 pub trait TxChannelAsync {
     #[doc(hidden)]
-    type Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal;
+    type Raw: TxChannelInternal;
 
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
@@ -2239,7 +2320,7 @@ pub trait TxChannelAsync {
 
 impl<Raw> TxChannelAsync for Channel<Async, Raw>
 where
-    Raw: RawChannelAccess<Dir = Tx> + TxChannelInternal,
+    Raw: TxChannelInternal,
 {
     type Raw = Raw;
 
@@ -2291,7 +2372,7 @@ where
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct RmtRxFuture<'ch, 'a, Raw, D, T>
 where
-    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
@@ -2304,7 +2385,7 @@ where
 
 impl<'a, Raw, D, T> core::future::Future for RmtRxFuture<'_, 'a, Raw, D, T>
 where
-    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
@@ -2342,7 +2423,7 @@ where
 
 impl<'a, Raw, D, T> Drop for RmtRxFuture<'_, 'a, Raw, D, T>
 where
-    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
@@ -2366,7 +2447,7 @@ where
 /// RX channel in async mode
 pub trait RxChannelAsync {
     #[doc(hidden)]
-    type Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal;
+    type Raw: RxChannelInternal;
 
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
@@ -2381,7 +2462,7 @@ pub trait RxChannelAsync {
 
 impl<Raw> RxChannelAsync for Channel<Async, Raw>
 where
-    Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
+    Raw: RxChannelInternal,
 {
     type Raw = Raw;
 
@@ -2445,7 +2526,7 @@ pub enum Event {
 }
 
 #[doc(hidden)]
-pub trait ChannelInternal: RawChannelAccess {
+pub trait ChannelInternal: RawChannelAccess<Dir: Direction> {
     fn update(&self);
 
     fn set_divider(&self, divider: u8);
@@ -2466,7 +2547,7 @@ pub trait ChannelInternal: RawChannelAccess {
 }
 
 #[doc(hidden)]
-pub trait TxChannelInternal: ChannelInternal {
+pub trait TxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Tx> {
     fn output_signal(&self) -> crate::gpio::OutputSignal {
         OUTPUT_SIGNALS[self.channel() as usize]
     }
@@ -2527,7 +2608,7 @@ pub trait TxChannelInternal: ChannelInternal {
 }
 
 #[doc(hidden)]
-pub trait RxChannelInternal: ChannelInternal {
+pub trait RxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Rx> {
     fn input_signal(&self) -> crate::gpio::InputSignal {
         INPUT_SIGNALS[self.channel() as usize]
     }
@@ -2586,6 +2667,7 @@ mod chip_specific {
     use enumset::EnumSet;
 
     use super::{
+        Capability,
         ChannelIndex,
         ChannelInternal,
         Direction,
@@ -2596,6 +2678,7 @@ mod chip_specific {
         MemSize,
         NUM_CHANNELS,
         RawChannelAccess,
+        RawChannelAccessExt,
         Rx,
         RxChannelInternal,
         Tx,
@@ -2691,8 +2774,8 @@ mod chip_specific {
     }
 
     #[inline]
-    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
-        if Dir::IS_TX {
+    pub(super) const fn channel_for_idx<Dir: Capability>(idx: u8) -> u8 {
+        if Dir::SUPPORTS_TX {
             idx
         } else {
             idx + NUM_CHANNELS as u8 / 2
@@ -3103,6 +3186,7 @@ mod chip_specific {
         MemSize,
         NUM_CHANNELS,
         RawChannelAccess,
+        RawChannelAccessExt,
         RmtState,
         Rx,
         RxChannelInternal,
@@ -3173,7 +3257,7 @@ mod chip_specific {
 
     #[inline]
     #[allow(clippy::extra_unused_type_parameters)]
-    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
+    pub(super) const fn channel_for_idx<Dir: Capability>(idx: u8) -> u8 {
         idx
     }
 
