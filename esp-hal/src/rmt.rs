@@ -811,7 +811,7 @@ pub trait Configure<Dir>: RawChannelAccess<Dir: Capability> {
     type Configured: RawChannelAccess<Dir = Dir>;
 
     #[doc(hidden)]
-    fn configure(self) -> Self::Configured;
+    fn configure(&self) -> Self::Configured;
 }
 
 impl<Cap, Dir, const CH_IDX: u8> Configure<Dir> for ConstChannelAccess<Cap, CH_IDX>
@@ -821,7 +821,7 @@ where
 {
     type Configured = ConstChannelAccess<Dir, CH_IDX>;
 
-    fn configure(self) -> Self::Configured {
+    fn configure(&self) -> Self::Configured {
         ConstChannelAccess {
             _direction: PhantomData,
         }
@@ -835,7 +835,7 @@ where
 {
     type Configured = DynChannelAccess<Dir>;
 
-    fn configure(self) -> Self::Configured {
+    fn configure(&self) -> Self::Configured {
         DynChannelAccess {
             ch_idx: self.ch_idx,
             _direction: PhantomData,
@@ -1362,7 +1362,7 @@ where
 }
 
 /// FIXME: docs
-pub trait TxChannelCreator<Dm: crate::DriverMode> {
+pub trait TxChannelCreator<Dm: crate::DriverMode>: Sized {
     /// FIXME: docs
     type Raw: TxChannelInternal;
 
@@ -1371,11 +1371,11 @@ pub trait TxChannelCreator<Dm: crate::DriverMode> {
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error>;
+    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)>;
 }
 
 /// FIXME: docs
-pub trait RxChannelCreator<Dm: crate::DriverMode> {
+pub trait RxChannelCreator<Dm: crate::DriverMode>: Sized {
     /// FIXME: docs
     type Raw: RxChannelInternal;
 
@@ -1384,7 +1384,7 @@ pub trait RxChannelCreator<Dm: crate::DriverMode> {
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error>;
+    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)>;
 }
 
 trait AnyTxChannelAccess: RawChannelAccess<Dir = Tx> {}
@@ -1406,9 +1406,11 @@ where
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)> {
         let raw = self.raw.configure();
-        configure_tx_channel(&raw, pin, config)?;
+        if let Err(e) = configure_tx_channel(&raw, pin, config) {
+            return Err((e, self));
+        };
         Ok(Channel::new(raw))
     }
 }
@@ -1425,9 +1427,11 @@ where
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)> {
         let raw = self.raw.configure();
-        configure_rx_channel(&raw, pin, config)?;
+        if let Err(e) = configure_rx_channel(&raw, pin, config) {
+            return Err((e, self));
+        };
         Ok(Channel::new(raw))
     }
 }
