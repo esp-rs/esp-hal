@@ -1293,6 +1293,7 @@ cfg_if::cfg_if! {
 }
 
 /// RMT Channel Creator
+#[derive(Debug)]
 pub struct ChannelCreator<Dm, Raw>
 where
     Dm: crate::DriverMode,
