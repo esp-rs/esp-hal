@@ -633,7 +633,7 @@ pub(crate) const BTDM_ASYNC_WAKEUP_REQ_COEX: i32 = 1;
 /// *************************************************************************
 #[cfg(coex)]
 pub(crate) fn async_wakeup_request(event: i32) -> bool {
-    trace!("async_wakeup_request {event}");
+    trace!("async_wakeup_request {}", event);
 
     unsafe extern "C" {
         fn btdm_in_wakeup_requesting_set(set: bool);
@@ -643,7 +643,7 @@ pub(crate) fn async_wakeup_request(event: i32) -> bool {
         fn btdm_wakeup_request();
     }
 
-    let request_lock = match event {
+    match event {
         e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => {
             unsafe {
                 btdm_in_wakeup_requesting_set(true);
@@ -664,9 +664,8 @@ pub(crate) fn async_wakeup_request(event: i32) -> bool {
                 false
             }
         }
-        _ => return false,
-    };
-    request_lock
+        _ => false,
+    }
 }
 
 /// **************************************************************************
@@ -684,7 +683,7 @@ pub(crate) fn async_wakeup_request(event: i32) -> bool {
 /// *************************************************************************
 #[cfg(coex)]
 pub(crate) fn async_wakeup_request_end(event: i32) {
-    trace!("async_wakeup_request_end {event}");
+    trace!("async_wakeup_request_end {}", event);
 
     let request_lock = match event {
         e if e == BTDM_ASYNC_WAKEUP_REQ_HCI => true,

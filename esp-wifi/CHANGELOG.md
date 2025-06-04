@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix a compilation error for ESP32 + coex + ble + defmt (#3596)
 
 ### Removed
 

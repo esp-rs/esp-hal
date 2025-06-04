@@ -146,10 +146,10 @@ impl Package {
                     features.push("smoltcp/proto-ipv4".to_owned());
                     features.push("smoltcp/proto-ipv6".to_owned());
                 }
-                if config.contains("ble") {
+                if config.contains("bt") {
                     features.push("ble".to_owned());
                 }
-                if config.contains("coex") {
+                if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
             }
