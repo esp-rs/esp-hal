@@ -71,6 +71,7 @@ where
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
+        .map_err(|(e, _c)| e)
         .unwrap()
         .degrade();
 
@@ -83,6 +84,7 @@ where
     };
     let rx_channel = rx_channel_creator
         .configure_rx(rx, rx_config.with_clk_divider(DIV))
+        .map_err(|(e, _c)| e)
         .unwrap();
 
     (tx_channel, rx_channel)
@@ -404,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn rmt_overlapping_ram_fails() {
+    fn rmt_overlapping_ram_fail_and_release() {
         use esp_hal::rmt::TxChannelCreator;
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -419,27 +421,14 @@ mod tests {
         let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
         assert!(ch0.is_ok());
-        assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
-    }
 
-    #[test]
-    fn rmt_overlapping_ram_release() {
-        use esp_hal::rmt::TxChannelCreator;
-
-        let peripherals = esp_hal::init(esp_hal::Config::default());
-
-        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
-
-        let ch0 = rmt
-            .channel0
-            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2));
-
-        assert!(ch0.is_ok());
+        let (err, ch1) = ch1.expect_err("channel configuration unexpectly suceeded");
+        assert_eq!(err, Error::MemoryBlockNotAvailable);
 
         // After dropping channel 0, the memory that it reserved should become available again
         // such that channel 1 configuration succeeds.
         core::mem::drop(ch0);
-        let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
+        let ch1 = ch1.configure_tx(NoPin, TxChannelConfig::default());
 
         assert!(ch1.is_ok());
     }
