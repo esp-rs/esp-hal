@@ -1403,6 +1403,7 @@ impl crate::interrupt::InterruptConfigurable for Rmt<'_, Blocking> {
 // If this is not possible (because a preceding channel is using the RAM, or
 // because subsequent channels are in use so that we can't reserve the RAM),
 // restore all state and return with an error.
+// FIXME: Pass channel as ChannelIndex to avoid bounds checks
 fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(), Error> {
     if memsize.blocks() == 0 || memsize.blocks() > NUM_CHANNELS as u8 - channel {
         return Err(Error::InvalidMemsize);
@@ -1410,18 +1411,21 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
 
     let mut next_state = state;
     for cur_channel in channel..channel + memsize.blocks() {
-        if STATE[cur_channel as usize]
-            .compare_exchange(
-                RmtState::Unconfigured as u8,
-                next_state as u8,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
-            .is_err()
+        if RmtState::compare_exchange(
+            cur_channel,
+            RmtState::Unconfigured,
+            next_state,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        )
+        .is_err()
         {
-            for i in (channel..cur_channel).rev() {
-                STATE[i as usize].store(RmtState::Unconfigured as u8, Ordering::Release);
-            }
+            RmtState::store_range_rev(
+                RmtState::Unconfigured,
+                channel,
+                cur_channel,
+                Ordering::Relaxed,
+            );
 
             return Err(Error::MemoryBlockNotAvailable);
         }
@@ -1501,65 +1505,107 @@ fn configure_tx_channel<'d>(
     Ok(())
 }
 
-// Allow implementing RmtState::is_tx via simple bit tests
-// TODO: Check that the compiler actually optimizes this accordingly.
-const RX_STATE_BASE: u8 = 0x40;
-const TX_STATE_BASE: u8 = 0x80;
+mod state {
+    use super::*;
 
-#[derive(Copy, Clone)]
-#[repr(u8)]
-enum RmtState {
-    // The channel is not configured for either rx or tx, and its memory is available
-    Unconfigured = 0,
+    // This must only holds value of RmtState. However, we need atomic access, thus
+    // represent as AtomicU8.
+    static STATE: [AtomicU8; NUM_CHANNELS] =
+        [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
 
-    // The channels is not in use, but one of the preceding channels is using its memory
-    Reserved     = 1,
+    // Allow implementing RmtState::is_tx via simple bit tests
+    // TODO: Check that the compiler actually optimizes this accordingly.
+    const RX_STATE_BASE: u8 = 0x40;
+    const TX_STATE_BASE: u8 = 0x80;
 
-    // The channel is configured for rx and currently idle.
-    RxIdle       = RX_STATE_BASE,
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub(super) enum RmtState {
+        // The channel is not configured for either rx or tx, and its memory is available
+        Unconfigured = 0,
 
-    // The channel is configured for tx and currently idle.
-    TxIdle       = TX_STATE_BASE,
+        // The channels is not in use, but one of the preceding channels is using its memory
+        Reserved     = 1,
 
-    // The channel is configured for rx and currently performing an async transaction
-    RxAsync      = RX_STATE_BASE + 1,
+        // The channel is configured for rx and currently idle.
+        RxIdle       = RX_STATE_BASE,
 
-    // The channel is configured for rx and currently performing a blocking transaction
-    RxBlocking   = RX_STATE_BASE + 2,
+        // The channel is configured for tx and currently idle.
+        TxIdle       = TX_STATE_BASE,
 
-    // The channel is configured for tx and currently performing an async transaction
-    TxAsync      = TX_STATE_BASE + 1,
+        // The channel is configured for rx and currently performing an async transaction
+        RxAsync      = RX_STATE_BASE + 1,
 
-    // The channel is configured for tx and currently performing a blocking transaction
-    TxBlocking   = TX_STATE_BASE + 2,
-}
+        // The channel is configured for rx and currently performing a blocking transaction
+        RxBlocking   = RX_STATE_BASE + 2,
 
-impl RmtState {
-    #[allow(unused)]
-    fn is_tx(&self) -> Option<bool> {
-        match self {
-            Self::RxIdle | Self::RxAsync | Self::RxBlocking => Some(false),
-            Self::TxIdle | Self::TxAsync => Some(true),
-            _ => None,
+        // The channel is configured for tx and currently performing an async transaction
+        TxAsync      = TX_STATE_BASE + 1,
+
+        // The channel is configured for tx and currently performing a blocking transaction
+        TxBlocking   = TX_STATE_BASE + 2,
+    }
+
+    impl RmtState {
+        #[allow(unused)]
+        pub(super) fn is_tx(&self) -> Option<bool> {
+            match self {
+                Self::RxIdle | Self::RxAsync | Self::RxBlocking => Some(false),
+                Self::TxIdle | Self::TxAsync => Some(true),
+                _ => None,
+            }
+        }
+
+        // Safety: Must only be called with valid values of the RmtState discrimiant
+        #[allow(unused)]
+        unsafe fn from_u8_unchecked(value: u8) -> Self {
+            unsafe { core::mem::transmute::<_, Self>(value) }
+        }
+
+        #[allow(unused)]
+        pub(super) fn load_by_idx(channel: u8, ordering: Ordering) -> Self {
+            unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
+        }
+
+        #[inline]
+        // FIXME: Pass start, end as ChannelIndex to avoid bounds checks
+        pub(super) fn store_range_rev(self, start: u8, end: u8, ordering: Ordering) {
+            for ch_num in (start as usize..end as usize).rev() {
+                STATE[ch_num].store(self as u8, ordering);
+            }
+        }
+
+        #[inline]
+        pub(super) fn store(self, raw: impl RawChannelAccess<Dir: Capability>, ordering: Ordering) {
+            STATE[raw.channel() as usize].store(self as u8, ordering);
+        }
+
+        #[inline]
+        pub(super) fn load(
+            raw: impl RawChannelAccess<Dir: Capability>,
+            ordering: Ordering,
+        ) -> Self {
+            Self::load_by_idx(raw.channel(), ordering)
+        }
+
+        #[inline]
+        pub(super) fn compare_exchange(
+            ch_num: u8,
+            current: Self,
+            new: Self,
+            success: Ordering,
+            failure: Ordering,
+        ) -> Result<Self, Self> {
+            STATE[ch_num as usize]
+                .compare_exchange(current as u8, new as u8, success, failure)
+                .map(|prev| unsafe { Self::from_u8_unchecked(prev) })
+                .map_err(|prev| unsafe { Self::from_u8_unchecked(prev) })
         }
     }
-
-    // Safety: Must only be called with valid values of the RmtState discrimiant
-    #[allow(unused)]
-    unsafe fn from_u8_unchecked(value: u8) -> Self {
-        unsafe { core::mem::transmute::<_, Self>(value) }
-    }
-
-    #[allow(unused)]
-    unsafe fn load_unchecked(channel: u8, ordering: Ordering) -> Self {
-        unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
-    }
 }
 
-// This must only holds value of RmtState. However, we need atomic access, thus
-// represent as AtomicU8.
-static STATE: [AtomicU8; NUM_CHANNELS] =
-    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+use state::RmtState;
+
 
 /// RMT Channel
 #[derive(Debug)]
@@ -1630,14 +1676,15 @@ where
         // interfere with others.
         self.raw.set_memsize(MemSize::from_blocks(0));
 
-        for s in STATE[usize::from(self.raw.channel())..][..usize::from(memsize.blocks())]
-            .iter()
-            .rev()
-        {
-            // Existence of this `Channel` struct implies exclusive access to these hardware
-            // channels, thus simply store the new state.
-            s.store(RmtState::Unconfigured as u8, Ordering::Release);
-        }
+        // Existence of this `Channel` struct implies exclusive access to these hardware
+        // channels, thus simply store the new state.
+        // FIXME: Check whether this elides bounds checks
+        RmtState::store_range_rev(
+            RmtState::Unconfigured,
+            self.raw.channel(),
+            self.raw.channel() + memsize.blocks(),
+            Ordering::Release,
+        );
     }
 }
 
@@ -1717,7 +1764,7 @@ where
             }
         };
 
-        STATE[self.raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::TxIdle, self.raw, Ordering::Relaxed);
 
         // Disable the Drop handler since the transaction is properly stopped
         // already.
@@ -1744,7 +1791,7 @@ where
 
         while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
 
-        STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
     }
 }
 
@@ -1889,7 +1936,7 @@ where
             _ => (),
         };
 
-        STATE[raw.channel() as usize].store(RmtState::TxBlocking as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
 
         raw.clear_tx_interrupts();
         raw.start_send(false, 0);
@@ -2016,7 +2063,7 @@ where
         let raw = self.raw;
 
         raw.clear_rx_interrupts();
-        STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
 
         // Disable Drop handler since the receiver is stopped already.
         let _ = ManuallyDrop::new(self);
@@ -2038,7 +2085,7 @@ where
         let raw = self.raw;
 
         // STATE should be RxIdle if the transaction was polled to completion
-        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::RxAsync as u8 {
+        if RmtState::load(raw, Ordering::Relaxed) == RmtState::RxBlocking {
             raw.stop_rx();
             raw.update();
 
@@ -2046,7 +2093,7 @@ where
             while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
 
             raw.clear_rx_interrupts();
-            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+            RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
         }
     }
 }
@@ -2087,7 +2134,7 @@ where
         let data = data.into_iter();
         let reader = RmtReader::new();
 
-        STATE[raw.channel() as usize].store(RmtState::RxBlocking as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::RxBlocking, raw, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
         raw.start_receive(true);
@@ -2168,7 +2215,7 @@ where
 
         raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
         raw.clear_tx_interrupts();
-        STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
 
         Poll::Ready(result)
     }
@@ -2184,7 +2231,7 @@ where
         let raw = self.raw;
 
         // STATE should be TxIdle if the future was polled to completion
-        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::TxAsync as u8 {
+        if RmtState::load(raw, Ordering::Relaxed) == RmtState::TxAsync {
             raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
             raw.stop_tx();
             raw.update();
@@ -2193,7 +2240,7 @@ where
             while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
 
             raw.clear_tx_interrupts();
-            STATE[raw.channel() as usize].store(RmtState::TxIdle as u8, Ordering::Relaxed);
+            RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
         }
     }
 }
@@ -2247,7 +2294,7 @@ where
             WriterState::Done => false,
         };
 
-        STATE[raw.channel() as usize].store(RmtState::TxAsync as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::TxAsync, raw, Ordering::Relaxed);
 
         raw.clear_tx_interrupts();
         let mut events = Event::End | Event::Error;
@@ -2314,7 +2361,7 @@ where
 
         raw.unlisten_rx_interrupt(Event::Error | Event::End | Event::Threshold);
         raw.clear_rx_interrupts();
-        STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
 
         Poll::Ready(result)
     }
@@ -2330,7 +2377,7 @@ where
         let raw = self.raw;
 
         // STATE should be RxIdle if the future was polled to completion
-        if STATE[raw.channel() as usize].load(Ordering::Relaxed) == RmtState::RxAsync as u8 {
+        if RmtState::load(raw, Ordering::Relaxed) == RmtState::RxAsync {
             raw.stop_rx();
             raw.update();
 
@@ -2338,7 +2385,7 @@ where
             while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
 
             raw.clear_rx_interrupts();
-            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
+            RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
         }
     }
 }
@@ -2377,7 +2424,7 @@ where
         let data = data.into_iter();
         let reader = RmtReader::new();
 
-        STATE[raw.channel() as usize].store(RmtState::RxAsync as u8, Ordering::Relaxed);
+        RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
         raw.listen_rx_interrupt(Event::End | Event::Error);
@@ -3083,8 +3130,7 @@ mod chip_specific {
             let (is_tx, event) = if st.ch_err(ch_idx as u8).bit() {
                 // FIXME: Is it really necessary to determine tx/rx here?
                 // Ultimately, we just need to signal the waker, so it doesn't really matter.
-                if let Some(is_tx) =
-                    unsafe { RmtState::load_unchecked(ch_idx as u8, Ordering::Relaxed) }.is_tx()
+                if let Some(is_tx) = RmtState::load_by_idx(ch_idx as u8, Ordering::Relaxed).is_tx()
                 {
                     (is_tx, Event::Error)
                 } else {
