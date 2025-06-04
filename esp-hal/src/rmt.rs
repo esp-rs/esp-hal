@@ -1591,6 +1591,11 @@ where
             _guard: GenericPeripheralGuard::new(),
         }
     }
+
+    /// Get size of this channel's hardware buffer (number of `PulseCode`s).
+    pub fn buffer_size(&self) -> usize {
+        self.raw.memsize().codes()
+    }
 }
 
 // Note that this is intentionally implemented even if Raw is DynChannelAccess
