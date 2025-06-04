@@ -5,15 +5,15 @@
 //! The peripheral can be used to transfer data over the SDIO bus in `Slave`
 //! mode.
 
-use embedded_hal::mmc::{
+use embedded_hal_sdmmc::{
     CardMode,
     CardType,
+    Common,
+    Device,
     FifoStatus,
-    MmcCommon,
-    MmcDevice,
     Reset,
-    command::MmcCommand,
-    response::MmcResponse,
+    command::Command,
+    response::Response,
     tuning::{TuningMode, TuningWidth},
 };
 
@@ -227,7 +227,7 @@ impl core::fmt::Display for Error {
 
 impl core::error::Error for Error {}
 
-impl<'d> MmcCommon for Sdio<'d> {
+impl Common for Sdio<'_> {
     type Error = Error;
 
     fn card_type(&self) -> CardType {
@@ -292,12 +292,12 @@ impl<'d> MmcCommon for Sdio<'d> {
     fn clear_all_response_interrupt(&mut self) {}
 }
 
-impl<'d> MmcDevice for Sdio<'d> {
-    fn read_command<C: MmcCommand>(&mut self) -> Result<C, Error> {
+impl Device for Sdio<'_> {
+    fn read_command<C: Command>(&mut self) -> Result<C, Error> {
         Err(Error::unimplemented())
     }
 
-    fn write_response<R: MmcResponse>(&mut self, _response: &R) -> Result<(), Error> {
+    fn write_response<R: Response>(&mut self, _response: &R) -> Result<(), Error> {
         Err(Error::unimplemented())
     }
 }

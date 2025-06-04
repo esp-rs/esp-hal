@@ -31,4 +31,4 @@ impl PeripheralInstance for AnySlc<'_> {
 /// A peripheral singleton compatible with the SDIO SLC driver.
 pub trait SlcInstance: PeripheralInstance + IntoAnySlc {}
 
-impl<'d> SlcInstance for AnySlc<'d> {}
+impl SlcInstance for AnySlc<'_> {}
