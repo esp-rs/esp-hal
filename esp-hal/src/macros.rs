@@ -31,7 +31,7 @@ macro_rules! before_snippet {
 #       Self{}
 #   }
 # }
-# fn example() -> Result<(), ExampleError> {
+# async fn example() -> Result<(), ExampleError> {
 #   let mut peripherals = esp_hal::init(esp_hal::Config::default());
 "#
     };
