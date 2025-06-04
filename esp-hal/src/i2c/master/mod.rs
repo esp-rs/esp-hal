@@ -763,13 +763,15 @@ impl<'a> I2cFuture<'a> {
     }
 
     fn poll_completion(&mut self) -> Poll<Result<(), Error>> {
-        let error = self.driver.check_errors();
-
+        // Grab the current time before doing anything. This will ensure that a long
+        // interruption still allows the peripheral sufficient time to complete the
+        // operation (i.e. it ensures that the deadline is "at least", not "at most").
         let now = if self.deadline.is_some() {
             Instant::now()
         } else {
             Instant::EPOCH
         };
+        let error = self.driver.check_errors();
 
         if self.is_done() {
             self.finished = true;
