@@ -1545,6 +1545,11 @@ where
     // type-erased channels can     // also be unconfigured
     //     todo!("implement, then do the same on drop")
     // }
+
+    /// Get size of this channel's hardware buffer (number of `PulseCode`s).
+    pub fn buffer_size(&self) -> usize {
+        self.raw.memsize().codes()
+    }
 }
 
 impl<Dm, Dir> Drop for Channel<Dm, Dir>
