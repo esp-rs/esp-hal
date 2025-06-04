@@ -244,7 +244,7 @@ pub mod i2c;
 pub mod peripherals;
 #[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
-#[cfg(any(feature = "esp32", feature = "esp32c6"))]
+#[cfg(all(feature = "unstable", any(feature = "esp32", feature = "esp32c6")))]
 pub mod sdio;
 #[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
 pub mod spi;

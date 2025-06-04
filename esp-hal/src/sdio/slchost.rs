@@ -31,4 +31,4 @@ impl PeripheralInstance for AnySlchost<'_> {
 /// A peripheral singleton compatible with the SDIO SLCHOST driver.
 pub trait SlchostInstance: PeripheralInstance + IntoAnySlchost {}
 
-impl<'d> SlchostInstance for AnySlchost<'d> {}
+impl SlchostInstance for AnySlchost<'_> {}
