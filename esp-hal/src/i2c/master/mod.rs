@@ -121,7 +121,7 @@ pub enum BusTimeout {
     Maximum,
 
     /// Disable timeout control.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(not(esp32))]
     Disabled,
 
     /// Timeout in bus clock cycles.
@@ -129,7 +129,15 @@ pub enum BusTimeout {
 }
 
 impl BusTimeout {
-    fn cycles(&self) -> u32 {
+    fn try_from_raw(v: u32) -> Result<BusTimeout, ConfigError> {
+        if v <= BusTimeout::Maximum.cycles() {
+            Ok(BusTimeout::BusCycles(v))
+        } else {
+            Err(ConfigError::TimeoutInvalid)
+        }
+    }
+
+    fn cycles(self) -> u32 {
         match self {
             BusTimeout::Maximum => {
                 if cfg!(esp32) {
@@ -141,15 +149,15 @@ impl BusTimeout {
                 }
             }
 
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(not(esp32))]
             BusTimeout::Disabled => 1,
 
-            BusTimeout::BusCycles(cycles) => *cycles,
+            BusTimeout::BusCycles(cycles) => cycles,
         }
     }
 
     #[cfg(not(esp32))]
-    fn is_set(&self) -> bool {
+    fn is_set(self) -> bool {
         matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
 }
@@ -763,13 +771,15 @@ impl<'a> I2cFuture<'a> {
     }
 
     fn poll_completion(&mut self) -> Poll<Result<(), Error>> {
-        let error = self.driver.check_errors();
-
+        // Grab the current time before doing anything. This will ensure that a long
+        // interruption still allows the peripheral sufficient time to complete the
+        // operation (i.e. it ensures that the deadline is "at least", not "at most").
         let now = if self.deadline.is_some() {
             Instant::now()
         } else {
             Instant::EPOCH
         };
+        let error = self.driver.check_errors();
 
         if self.is_done() {
             self.finished = true;
@@ -1226,20 +1236,17 @@ fn configure_clock(
             .scl_stop_hold()
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
-        // The ESP32 variant does not have an enable flag for the
-        // timeout mechanism
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
+                // The ESP32 variant does not have an enable flag for the timeout mechanism
                 register_block
                     .to()
                     .write(|w| w.time_out().bits(timeout.cycles()));
             } else {
-                register_block
-                    .to()
-                    .write(|w| w.time_out_en().bit(timeout.is_set())
-                    .time_out_value()
-                    .bits(timeout.cycles() as _)
-                );
+                register_block.to().write(|w| {
+                    w.time_out_en().bit(timeout.is_set());
+                    w.time_out_value().bits(timeout.cycles() as _)
+                });
             }
         }
     }
@@ -1567,10 +1574,10 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = BusTimeout::BusCycles(match timeout {
-            BusTimeout::Maximum => 0xF_FFFF,
-            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xF_FFFF)?,
-        });
+        let timeout = match timeout {
+            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
+            other => other,
+        };
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1666,10 +1673,10 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
-        let timeout = BusTimeout::BusCycles(match timeout {
-            BusTimeout::Maximum => 0xFF_FFFF,
-            BusTimeout::BusCycles(cycles) => check_timeout(cycles * 2 * half_cycle, 0xFF_FFFF)?,
-        });
+        let timeout = match timeout {
+            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
+            other => other,
+        };
 
         configure_clock(
             self.regs(),
@@ -1741,15 +1748,14 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold - 1;
 
         let timeout = match timeout {
-            BusTimeout::Maximum => BusTimeout::BusCycles(0x1F),
-            BusTimeout::Disabled => BusTimeout::Disabled,
             BusTimeout::BusCycles(cycles) => {
                 let to_peri = (cycles * 2 * half_cycle).max(1);
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                BusTimeout::BusCycles(check_timeout(raw, 0x1F)?)
+                BusTimeout::try_from_raw(raw)?
             }
+            other => other,
         };
 
         configure_clock(
@@ -2128,13 +2134,7 @@ impl Driver<'_> {
     fn check_errors(&self) -> Result<(), Error> {
         let r = self.regs().int_raw().read();
 
-        // The ESP32 variant has a slightly different interrupt naming
-        // scheme!
-
         // Handle error cases
-        if r.time_out().bit_is_set() {
-            return Err(Error::Timeout);
-        }
         if r.nack().bit_is_set() {
             return Err(Error::AcknowledgeCheckFailed(estimate_ack_failed_reason(
                 self.regs(),
@@ -2142,6 +2142,13 @@ impl Driver<'_> {
         }
         if r.arbitration_lost().bit_is_set() {
             return Err(Error::ArbitrationLost);
+        }
+
+        #[cfg(not(esp32))]
+        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
+            return Err(Error::AcknowledgeCheckFailed(
+                AcknowledgeCheckFailedReason::Data,
+            ));
         }
 
         #[cfg(not(any(esp32, esp32s2)))]
@@ -2153,12 +2160,8 @@ impl Driver<'_> {
                 return Err(Error::Timeout);
             }
         }
-
-        #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
-            return Err(Error::AcknowledgeCheckFailed(
-                AcknowledgeCheckFailedReason::Data,
-            ));
+        if r.time_out().bit_is_set() {
+            return Err(Error::Timeout);
         }
 
         Ok(())
@@ -2657,14 +2660,6 @@ impl Driver<'_> {
         }
 
         Ok(())
-    }
-}
-
-fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
-    if v <= max {
-        Ok(v)
-    } else {
-        Err(ConfigError::TimeoutInvalid)
     }
 }
 
