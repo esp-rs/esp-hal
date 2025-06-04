@@ -2177,8 +2177,19 @@ where
 
                 Ok(this.reader.total)
             }
-            Some(Event::Threshold) => {
-                unreachable!("wrapping async rx currently not implemented");
+            Some(Event::Threshold) if raw.supports_rx_wrap() => {
+                raw.reset_rx_threshold_set();
+
+                if this.reader.state == ReaderState::Active {
+                    this.reader.read(&mut this.data, raw, false);
+                    // FIXME: Return if reader.state indicates an error (ensure
+                    // to stop rx first)
+                }
+                if this.reader.state == ReaderState::Active {
+                    raw.listen_rx_interrupt(Event::Threshold);
+                }
+
+                return Poll::Pending;
             }
             _ => return Poll::Pending,
         };
@@ -2234,8 +2245,8 @@ impl Channel<Async, Rx> {
         RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
         raw.clear_rx_interrupts();
-        raw.listen_rx_interrupt(Event::End | Event::Error);
-        raw.start_receive(false);
+        raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
+        raw.start_receive(true);
 
         RmtRxFuture {
             raw,

@@ -303,6 +303,12 @@ mod tests {
         do_rmt_loopback::<80>(2, 2);
     }
 
+    #[test]
+    async fn rmt_loopback_extended_ram_async() {
+        // 80 codes require two RAM blocks
+        do_rmt_loopback_async::<80>(2, 2).await;
+    }
+
     // FIXME: This test currently fails on esp32 with an rmt::Error::ReceiverError,
     // which should imply a receiver overrun, which is unexpected (the buffer
     // should hold 2 * 64 codes, which is sufficient).
@@ -327,6 +333,25 @@ mod tests {
         // 80 codes require two RAM blocks; thus an rx channel with only 1 block
         // requires wrapping
         do_rmt_loopback::<80>(2, 1);
+    }
+
+    #[test]
+    async fn rmt_loopback_rx_wrap_async() {
+        // 80 codes require two RAM blocks; thus an rx channel with only 1 block
+        // requires wrapping
+        do_rmt_loopback_async::<80>(2, 1).await;
+    }
+
+    #[test]
+    fn rmt_loopback_rx_tx_wrap() {
+        // 80 codes require two RAM blocks; thus both the rx and tx channel will wrap
+        do_rmt_loopback::<80>(1, 1);
+    }
+
+    #[test]
+    async fn rmt_loopback_rx_tx_wrap_async() {
+        // 80 codes require two RAM blocks; thus both the rx and tx channel will wrap
+        do_rmt_loopback_async::<80>(1, 1).await;
     }
 
     #[test]
