@@ -3254,6 +3254,7 @@ mod chip_specific {
     use portable_atomic::Ordering;
 
     use super::{
+        Capability,
         ChannelIndex,
         ChannelInternal,
         Direction,
