@@ -261,9 +261,6 @@ impl Drop for EspWifiController<'_> {
 
         shutdown_radio_isr();
 
-        #[cfg(feature = "builtin-scheduler")]
-        preempt_builtin::disable_timer();
-
         // This shuts down the task switcher and timer tick interrupt.
         preempt::disable();
     }
