@@ -129,7 +129,15 @@ pub enum BusTimeout {
 }
 
 impl BusTimeout {
-    fn cycles(&self) -> u32 {
+    fn try_from_raw(v: u32) -> Result<BusTimeout, ConfigError> {
+        if v <= BusTimeout::Maximum.cycles() {
+            Ok(BusTimeout::BusCycles(v))
+        } else {
+            Err(ConfigError::TimeoutInvalid)
+        }
+    }
+
+    fn cycles(self) -> u32 {
         match self {
             BusTimeout::Maximum => {
                 if cfg!(esp32) {
@@ -144,12 +152,12 @@ impl BusTimeout {
             #[cfg(not(esp32))]
             BusTimeout::Disabled => 1,
 
-            BusTimeout::BusCycles(cycles) => *cycles,
+            BusTimeout::BusCycles(cycles) => cycles,
         }
     }
 
     #[cfg(not(esp32))]
-    fn is_set(&self) -> bool {
+    fn is_set(self) -> bool {
         matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
 }
@@ -1567,10 +1575,7 @@ impl Driver<'_> {
         let setup = half_cycle;
         let hold = half_cycle;
         let timeout = match timeout {
-            BusTimeout::BusCycles(cycles) => BusTimeout::BusCycles(check_timeout(
-                cycles * 2 * half_cycle,
-                BusTimeout::Maximum.cycles(),
-            )?),
+            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
             other => other,
         };
 
@@ -1669,10 +1674,7 @@ impl Driver<'_> {
         let scl_stop_hold_time = hold;
 
         let timeout = match timeout {
-            BusTimeout::BusCycles(cycles) => BusTimeout::BusCycles(check_timeout(
-                cycles * 2 * half_cycle,
-                BusTimeout::Maximum.cycles(),
-            )?),
+            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
             other => other,
         };
 
@@ -1751,7 +1753,7 @@ impl Driver<'_> {
                 let log2 = to_peri.ilog2();
                 // Round up so that we don't shorten timeouts.
                 let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                BusTimeout::BusCycles(check_timeout(raw, 0x1F)?)
+                BusTimeout::try_from_raw(raw)?
             }
             other => other,
         };
@@ -2658,14 +2660,6 @@ impl Driver<'_> {
         }
 
         Ok(())
-    }
-}
-
-fn check_timeout(v: u32, max: u32) -> Result<u32, ConfigError> {
-    if v <= max {
-        Ok(v)
-    } else {
-        Err(ConfigError::TimeoutInvalid)
     }
 }
 
