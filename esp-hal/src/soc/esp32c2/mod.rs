@@ -13,14 +13,6 @@ pub mod gpio;
 pub mod peripherals;
 pub(crate) mod regi2c;
 
-/// The name of the chip ("esp32c2") as `&str`
-#[macro_export]
-macro_rules! chip {
-    () => {
-        "esp32c2"
-    };
-}
-
 /// A link to the Technical Reference Manual (TRM) for the chip.
 #[doc(hidden)]
 #[macro_export]
