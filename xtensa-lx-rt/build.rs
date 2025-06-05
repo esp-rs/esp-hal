@@ -105,22 +105,29 @@ fn handle_esp32() -> Result<()> {
             })
     }
 
-    // Based on the build target, determine which chip to use.
-    let target = std::env::var("TARGET");
-    let target = target.as_deref().unwrap_or("unspecified target");
-    let Some(chip) = Chip::TARGET_TO_CHIP
-        .iter()
-        .copied()
-        .find_map(|(t, chip)| (t == target).then_some(chip))
-    else {
-        panic!(
-            "Unsupported target: {target}. Expected one of: {}",
-            Chip::TARGET_TO_CHIP
-                .iter()
-                .map(|(t, _)| t.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+    // Do not check target when building documentation
+    let chip = if std::env::var("RUSTDOCFLAGS").is_err() {
+        // Based on the build target, determine which chip to use.
+        let target = std::env::var("TARGET");
+        let target = target.as_deref().unwrap_or("unspecified target");
+        let Some(chip) = Chip::TARGET_TO_CHIP
+            .iter()
+            .copied()
+            .find_map(|(t, chip)| (t == target).then_some(chip))
+        else {
+            panic!(
+                "Unsupported target: {target}. Expected one of: {}",
+                Chip::TARGET_TO_CHIP
+                    .iter()
+                    .map(|(t, _)| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        };
+        chip
+    } else {
+        // For documentation purposes, we use ESP32
+        Chip::Esp32
     };
 
     let isa_toml = fs::read_to_string(format!("config/{chip}.toml"))?;
