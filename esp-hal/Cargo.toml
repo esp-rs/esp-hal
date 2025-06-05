@@ -124,7 +124,6 @@ __usb_otg = [
 esp32   = [
     "dep:esp32",
     "procmacros/rtc-slow",
-    "xtensa-lx-rt/esp32",
 ]
 # Target the ESP32-C2.
 esp32c2 = [
@@ -154,7 +153,6 @@ esp32s2 = [
     "portable-atomic/unsafe-assume-single-core",
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
-    "xtensa-lx-rt/esp32s2",
     "__usb_otg",
 ]
 # Target the ESP32-S3.
@@ -162,7 +160,6 @@ esp32s3 = [
     "dep:esp32s3",
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
-    "xtensa-lx-rt/esp32s3",
     "__usb_otg",
 ]
 

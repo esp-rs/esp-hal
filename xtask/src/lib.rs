@@ -81,7 +81,6 @@ impl Package {
                 | EspPrintln
                 | EspStorage
                 | EspWifi
-                | XtensaLxRt
         )
     }
 
