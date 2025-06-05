@@ -2125,11 +2125,6 @@ impl Driver<'_> {
 
     /// Reads from RX FIFO into the given buffer.
     fn read_all_from_fifo(&self, buffer: &mut [u8]) -> Result<(), Error> {
-        // we don't support single I2C reads larger than the FIFO
-        if buffer.len() > I2C_FIFO_SIZE {
-            return Err(Error::FifoExceeded);
-        }
-
         if self.regs().sr().read().rxfifo_cnt().bits() < buffer.len() as u8 {
             return Err(Error::ExecutionIncomplete);
         }
@@ -2138,6 +2133,10 @@ impl Driver<'_> {
         for byte in buffer.iter_mut() {
             *byte = read_fifo(self.regs());
         }
+
+        // The RX FIFO should be empty now. If it is not, it means we queued up reading
+        // more data than we read, which is an error.
+        debug_assert!(self.regs().sr().read().rxfifo_cnt().bits() == 0);
 
         Ok(())
     }
@@ -2382,6 +2381,11 @@ impl Driver<'_> {
         stop: bool,
         deadline: Deadline,
     ) -> Result<Option<Instant>, Error> {
+        // We don't support single I2C reads larger than the FIFO. This should be
+        // enforced by `VariableChunkIterMut` used in `Driver::read` and
+        // `Driver::read_async`.
+        debug_assert!(buffer.len() <= I2C_FIFO_SIZE);
+
         let cmd_iterator = &mut self.regs().comd_iter();
 
         self.setup_read(address, buffer, start, will_continue, cmd_iterator)?;
