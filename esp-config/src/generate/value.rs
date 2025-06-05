@@ -94,9 +94,9 @@ impl Value {
             },
             Value::Integer(_) => {
                 let inner = match s.as_bytes() {
-                    [b'0', b'x', ..] => i64::from_str_radix(&s[2..], 16),
-                    [b'0', b'o', ..] => i64::from_str_radix(&s[2..], 8),
-                    [b'0', b'b', ..] => i64::from_str_radix(&s[2..], 2),
+                    [b'0', b'x', ..] => i128::from_str_radix(&s[2..], 16),
+                    [b'0', b'o', ..] => i128::from_str_radix(&s[2..], 8),
+                    [b'0', b'b', ..] => i128::from_str_radix(&s[2..], 2),
                     _ => s.parse(),
                 }
                 .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
@@ -117,8 +117,8 @@ impl Value {
         }
     }
 
-    /// Convert the value to an [i64].
-    pub fn as_integer(&self) -> i64 {
+    /// Convert the value to an [i128].
+    pub fn as_integer(&self) -> i128 {
         match self {
             Value::Integer(value) => *value as _,
             _ => panic!("attempted to convert non-integer value to an integer"),
