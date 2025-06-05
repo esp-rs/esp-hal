@@ -2,6 +2,7 @@ use core::str::FromStr;
 use std::sync::OnceLock;
 
 use anyhow::{Result, bail};
+use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
 macro_rules! include_toml {
@@ -300,6 +301,45 @@ impl Config {
                 memory.end
             );
         }
+    }
+
+    pub fn generate_metadata(&self) {
+        let out_dir = std::env::var_os("OUT_DIR").unwrap();
+        let out_dir = std::path::Path::new(&out_dir);
+        let out_file = out_dir.join("_generated.rs").to_string_lossy().to_string();
+
+        let mut g = TokenStream::new();
+
+        let chip_name = self.name();
+        g.extend(quote::quote! {
+            /// The name of the chip as `&str`
+            #[macro_export]
+            macro_rules! chip {
+                () => { #chip_name };
+            }
+        });
+
+        let region_branches = self.memory().iter().map(|region| {
+            let name = region.name.to_uppercase();
+            let start = region.start as usize;
+            let end = region.end as usize;
+
+            quote::quote! {
+                ( #name ) => {
+                    #start .. #end
+                };
+            }
+        });
+
+        g.extend(quote::quote! {
+            /// Macro to get the address range of the given memory region.
+            #[macro_export]
+            macro_rules! memory_range {
+                #(#region_branches)*
+            }
+        });
+
+        std::fs::write(&out_file, g.to_string()).unwrap();
     }
 }
 
