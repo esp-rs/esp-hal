@@ -80,7 +80,7 @@ options:
     description: "Country code. See
                  [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)"
     default:
-      - value: 'CN'
+      - value: '"CN"'
 
   - name: country_code_operating_class
     description: 'If not 0: Operating Class table number. See

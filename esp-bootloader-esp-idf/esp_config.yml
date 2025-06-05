@@ -4,7 +4,7 @@ options:
 - name: mmu_page_size
   description: ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. This is currently only used to populate the app descriptor.
   default:
-    - value: "64k"
+    - value: '"64k"'
   constraints:
   - type:
       validator: enumeration
@@ -17,7 +17,7 @@ options:
 - name: esp_idf_version
   description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
   default:
-    - value: "0.0.0"
+    - value: '"0.0.0"'
 
 - name: partition-table-offset
   description: "The address of partition table (by default 0x8000). Allows you to
@@ -25,4 +25,4 @@ options:
     bootloader and app will both need to be compiled with the same
     PARTITION_TABLE_OFFSET value."
   default:
-    - value: 0x8000
+    - value: 32768

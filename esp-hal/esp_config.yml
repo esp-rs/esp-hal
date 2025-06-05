@@ -32,11 +32,11 @@ options:
                performance slightly."
   default:
     - if: 'chip == "esp32" || chip == "esp32c2"'
-      value: 'auto'
+      value: '"auto"'
     - if: 'chip == "esp32c3" || chip == "esp32c6" || chip == "esp32s2" || chip == "esp32s3"'
-      value: '40'
+      value: '"40"'
     - if: 'chip == "esp32h2"'
-      value: '32'
+      value: '"32"'
   constraints:
     - if: 'chip == "esp32" || chip == "esp32c2"'
       type:
@@ -73,7 +73,7 @@ options:
 - name: psram-mode
   description: SPIRAM chip mode
   default:
-    - value: 'quad'
+    - value: '"quad"'
   constraints:
     - if: 'feature("octal_psram")'
       type:

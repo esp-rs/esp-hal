@@ -5,15 +5,78 @@ use serde::{Deserialize, Serialize};
 use super::Error;
 
 /// Supported configuration value types.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     /// Booleans.
     Bool(bool),
     /// Integers.
-    Integer(i64),
+    Integer(i128),
     /// Strings.
     String(String),
+}
+
+impl Serialize for Value {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Value::String(s) => serializer.serialize_str(&format!("\"{}\"", s)),
+            Value::Integer(n) => serializer.serialize_str(&format!("{}", n)),
+            Value::Bool(b) => serializer.serialize_str(&format!("{}", b)),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ValueVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for ValueVisitor {
+            type Value = String;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a String representing the Value")
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(v)
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(v.to_string())
+            }
+        }
+
+        let str_repr = deserializer.deserialize_string(ValueVisitor)?;
+        let str_repr = str_repr.as_str();
+
+        if let Some(remaining) = str_repr.strip_prefix("\"") {
+            let s = &remaining[..remaining.len() - 1];
+            return Ok(Value::String(s.to_string()));
+        }
+
+        if str_repr == "true" {
+            return Ok(Value::Bool(true));
+        }
+
+        if str_repr == "false" {
+            return Ok(Value::Bool(false));
+        }
+
+        Ok(Value::Integer(str_repr.parse().map_err(
+            |e: core::num::ParseIntError| serde::de::Error::custom(e.to_string()),
+        )?))
+    }
 }
 
 // TODO: Do we want to handle negative values for non-decimal values?
@@ -117,5 +180,24 @@ impl From<&str> for Value {
 impl From<String> for Value {
     fn from(value: String) -> Self {
         Value::String(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn deserialization_number() {
+        let yml = "128";
+        let value: Value = serde_yml::from_str(yml).unwrap();
+        assert_eq!(value, Value::Integer(128));
+    }
+
+    #[test]
+    fn deserialization_string() {
+        let yml = "'\"Hello\"'";
+        let value: Value = serde_yml::from_str(yml).unwrap();
+        assert_eq!(value, Value::String("Hello".to_string()));
     }
 }
