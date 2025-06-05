@@ -802,7 +802,6 @@ impl crate::interrupt::InterruptConfigurable for I2c<'_, Blocking> {
     }
 }
 
-#[cfg_attr(esp32, allow(dead_code))]
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
