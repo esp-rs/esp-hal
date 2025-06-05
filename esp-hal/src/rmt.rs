@@ -567,6 +567,8 @@ impl RmtWriter {
 
         let start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
+        // FIXME: Somehow tell the compiler that this is > 0 without having panicking code here!
+        assert!(memsize > 0);
         let end = unsafe { start.add(memsize) };
 
         // FIXME: debug_assert that the current hw read addr is in the part of RAM that
