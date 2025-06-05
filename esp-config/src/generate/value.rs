@@ -101,7 +101,7 @@ impl Value {
                 }
                 .map_err(|_| Error::parse(format!("Expected valid intger value, found: '{s}'")))?;
 
-                Value::Integer(inner as _)
+                Value::Integer(inner)
             }
             Value::String(_) => Value::String(s.into()),
         };
@@ -120,7 +120,7 @@ impl Value {
     /// Convert the value to an [i128].
     pub fn as_integer(&self) -> i128 {
         match self {
-            Value::Integer(value) => *value as _,
+            Value::Integer(value) => *value,
             _ => panic!("attempted to convert non-integer value to an integer"),
         }
     }
@@ -165,9 +165,9 @@ impl From<bool> for Value {
     }
 }
 
-impl From<i64> for Value {
-    fn from(value: i64) -> Self {
-        Value::Integer(value as _)
+impl From<i128> for Value {
+    fn from(value: i128) -> Self {
+        Value::Integer(value)
     }
 }
 
