@@ -15,10 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed a potential lockup issue (#3589)
 
 ### Removed
 
+
+## [v0.8.1] - 2025-06-05
+
+### Fixed
+
+- Fixed a potential lockup issue (#3589)
 
 ## [v0.8.0] - 2025-06-03
 
@@ -122,4 +127,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-embassy-v0.7.0
 [v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.7.0...esp-hal-embassy-v0.8.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.0...HEAD
+[v0.8.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.0...esp-hal-embassy-v0.8.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.1...HEAD
