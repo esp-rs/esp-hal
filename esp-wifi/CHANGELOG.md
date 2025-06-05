@@ -9,17 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- It's now possible to obtain the RSSI of the currently connected AP, by using `WifiController::rssi(&self)` (#3593)
 
 ### Changed
 
 
 ### Fixed
 
-- Fix a compilation error for ESP32 + coex + ble + defmt (#3596)
 
 ### Removed
 
+
+## [v0.14.1] - 2025-06-05
+
+### Added
+
+- It's now possible to obtain the RSSI of the currently connected AP, by using `WifiController::rssi(&self)` (#3593)
+
+### Fixed
+
+- Fix a compilation error for ESP32 + coex + ble + defmt (#3596)
 
 ## [v0.14.0] - 2025-06-03
 
@@ -256,4 +264,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...HEAD
+[v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...HEAD

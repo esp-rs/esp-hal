@@ -1,6 +1,6 @@
 [package]
 name          = "esp-hal-embassy"
-version       = "0.8.0"
+version       = "0.8.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Embassy support for esp-hal"
