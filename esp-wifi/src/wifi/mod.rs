@@ -107,6 +107,7 @@ use crate::binary::{
         esp_wifi_set_mode,
         esp_wifi_set_protocol,
         esp_wifi_set_tx_done_cb,
+        esp_wifi_sta_get_rssi,
         esp_wifi_start,
         esp_wifi_stop,
         g_wifi_default_wpa_crypto_funcs,
@@ -2817,6 +2818,29 @@ impl WifiController<'_> {
     /// Disconnect WiFi station from the AP.
     pub fn disconnect(&mut self) -> Result<(), WifiError> {
         self.disconnect_impl()
+    }
+
+    /// Get the rssi information of AP to which the device is associated with.
+    /// The value is obtained from the last beacon.
+    ///
+    /// <div class="warning">
+    ///
+    /// - This API should be called after station connected to AP.
+    /// - Use this API only in STA or AP-STA mode.
+    /// </div>
+    ///
+    /// # Errors
+    /// This function returns [WifiError::Unsupported] if the STA side isn't
+    /// running. For example, when configured for AP only.
+    pub fn rssi(&self) -> Result<i32, WifiError> {
+        if self.mode()?.is_sta() {
+            let mut rssi: i32 = 0;
+            // Will return ESP_FAIL -1 if called in AP mode.
+            esp_wifi_result!(unsafe { esp_wifi_sta_get_rssi(&mut rssi) })?;
+            Ok(rssi)
+        } else {
+            Err(WifiError::Unsupported)
+        }
     }
 
     /// Get the supported capabilities of the controller.

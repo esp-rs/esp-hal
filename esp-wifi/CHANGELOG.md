@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- It's now possible to obtain the RSSI of the currently connected AP, by using `WifiController::rssi(&self)` (#3593)
 
 ### Changed
 
