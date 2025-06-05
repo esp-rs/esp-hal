@@ -346,7 +346,7 @@ pub fn evaluate_yaml_config(
     features: Vec<String>,
     is_tooling: bool,
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
-    let config: Config = serde_yml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
+    let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
     let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
     if let Some(config) = chip {
