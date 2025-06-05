@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- The `esp32`, `esp32s2` and `esp32s3` features have been removed. (#3598)
 
 ## [v0.19.0] - 2025-06-03
 

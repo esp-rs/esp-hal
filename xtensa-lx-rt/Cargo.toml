@@ -35,13 +35,5 @@ toml            = "0.8.20"
 ## Save and restore float registers for exceptions
 float-save-restore = []
 
-#! ### Chip Support Feature Flags
-## Target the ESP32
-esp32   = []
-## Target the ESP32-S2
-esp32s2 = []
-## Target the ESP32-S3
-esp32s3 = []
-
 [lints.rust]
 unexpected_cfgs = "allow"
