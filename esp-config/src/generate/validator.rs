@@ -6,6 +6,7 @@ use super::{Error, snake_case, value::Value};
 
 /// Configuration value validation functions.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(tag = "validator", content = "value", rename_all = "snake_case")]
 pub enum Validator {
     /// Only allow negative integers, i.e. any values less than 0.
     NegativeInteger,
@@ -17,6 +18,7 @@ pub enum Validator {
     /// Ensure that an integer value falls within the specified range.
     IntegerInRange(Range<i128>),
     /// String-Enumeration. Only allows one of the given Strings.
+    #[serde()]
     Enumeration(Vec<String>),
 }
 

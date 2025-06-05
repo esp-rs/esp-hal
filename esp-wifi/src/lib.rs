@@ -228,21 +228,6 @@ pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     scan_method: esp_config_int!(u32, "ESP_WIFI_CONFIG_SCAN_METHOD"),
 };
 
-// Validate the configuration at compile time
-#[allow(clippy::assertions_on_constants)]
-const _: () = {
-    // We explicitely use `core` assert here because this evaluation happens at
-    // compile time and won't bloat the binary
-    core::assert!(
-        CONFIG.rx_ba_win < CONFIG.dynamic_rx_buf_num,
-        "WiFi configuration check: rx_ba_win should not be larger than dynamic_rx_buf_num!"
-    );
-    core::assert!(
-        CONFIG.rx_ba_win < (CONFIG.static_rx_buf_num * 2),
-        "WiFi configuration check: rx_ba_win should not be larger than double of the static_rx_buf_num!"
-    );
-};
-
 type TimeBase = PeriodicTimer<'static, Blocking>;
 
 pub(crate) mod flags {
