@@ -190,14 +190,14 @@ mod test {
     #[test]
     fn deserialization_number() {
         let yml = "128";
-        let value: Value = serde_yml::from_str(yml).unwrap();
+        let value: Value = serde_yaml::from_str(yml).unwrap();
         assert_eq!(value, Value::Integer(128));
     }
 
     #[test]
     fn deserialization_string() {
         let yml = "'\"Hello\"'";
-        let value: Value = serde_yml::from_str(yml).unwrap();
+        let value: Value = serde_yaml::from_str(yml).unwrap();
         assert_eq!(value, Value::String("Hello".to_string()));
     }
 }

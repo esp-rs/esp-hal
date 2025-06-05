@@ -15,7 +15,7 @@ test  = true
 [dependencies]
 document-features = "0.2.11"
 serde = { version = "1.0.197", features = ["derive"], optional = true }
-serde_yml     = { version =  "0.0.12", optional = true }
+serde_yaml     = { version =  "0.9", optional = true }
 evalexpr = { version = "12.0.2", optional = true }
 esp-metadata = { version = "0.7.0", path = "../esp-metadata", default-features = true, optional = true }
 
@@ -25,4 +25,4 @@ pretty_assertions = "1.4.1"
 
 [features]
 ## Enable the generation and parsing of a config
-build = ["dep:serde", "dep:serde_yml", "dep:evalexpr", "dep:esp-metadata"]
+build = ["dep:serde", "dep:serde_yaml", "dep:evalexpr", "dep:esp-metadata"]
