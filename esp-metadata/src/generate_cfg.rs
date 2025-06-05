@@ -289,17 +289,6 @@ impl Config {
         // Define env-vars for all memory regions
         for memory in self.memory() {
             println!("cargo:rustc-cfg=has_{}_region", memory.name.to_lowercase());
-
-            println!(
-                "cargo::rustc-env=ESP_METADATA_REGION_{}_START={}",
-                memory.name.to_uppercase(),
-                memory.start
-            );
-            println!(
-                "cargo::rustc-env=ESP_METADATA_REGION_{}_END={}",
-                memory.name.to_uppercase(),
-                memory.end
-            );
         }
     }
 
