@@ -2,23 +2,116 @@
 //!
 //! ## Overview
 //!
-//! In this mode, the I2C acts as master and initiates the I2C communication by
-//! generating a START condition. Note that only one master is allowed to occupy
-//! the bus to access one slave at the same time.
+//! This driver implements the I2C Master mode. In this mode, the MCU initiates
+//! and controls the I2C communication with one or more slave devices. Slave
+//! devices are identified by their unique I2C addresses.
 //!
 //! ## Configuration
 //!
-//! Each I2C Master controller is individually configurable, and the usual
-//! setting such as frequency, timeout, and SDA/SCL pins can easily be
-//! configured.
+//! The driver can be configured using the [`Config`] struct. To create a
+//! configuration, you can use the [`Config::default()`] method, and then modify
+//! the individual settings as needed, by calling `with_*` methods on the
+//! [`Config`] struct.
 //!
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! use esp_hal::{i2c::master::Config, time::Rate};
+//!
+//! let config = Config::default().with_frequency(Rate::from_khz(100));
+//! # Ok(()) }
+//! ```
+//! 
+//! You will then need to pass the configuration to [`I2c::new`], and you can
+//! also change the configuration later by calling [`I2c::apply_config`].
+//!
+//! You will also need to specify the SDA and SCL pins when you create the
+//! driver instance.
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! use esp_hal::i2c::master::I2c;
+//! # use esp_hal::{i2c::master::Config, time::Rate};
+//!
+//! # let config = Config::default();
+//!
+//! // You need to configure the driver during initialization:
+//! let mut i2c = I2c::new(peripherals.I2C0, config)?
+//!     .with_sda(peripherals.GPIO2)
+//!     .with_scl(peripherals.GPIO3);
+//!
+//! // You can change the configuration later:
+//! let new_config = config.with_frequency(Rate::from_khz(400));
+//! i2c.apply_config(&new_config)?;
+//! # Ok(()) }
+//! ```
+//! 
 //! ## Usage
 //!
-//! The I2C driver implements a number of third-party traits, with the
-//! intention of making the HAL inter-compatible with various device drivers
-//! from the community, including the [embedded-hal].
+//! The master communicates with slave devices using I2C transactions. A
+//! transaction can be a write, a read, or a combination of both. The
+//! [`I2c`] driver provides methods for performing these transactions:
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::i2c::master::{I2c, Config, Operation};
+//! # let config = Config::default();
+//! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
 //!
-//! [embedded-hal]: embedded_hal
+//! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
+//! // address does not contain the `R/W` bit!
+//! const DEVICE_ADDR: u8 = 0x77;
+//! let write_buffer = [0xAA];
+//! let mut read_buffer = [0u8; 22];
+//!
+//! i2c.write(DEVICE_ADDR, &write_buffer)?;
+//! i2c.write_read(DEVICE_ADDR, &write_buffer, &mut read_buffer)?;
+//! i2c.read(DEVICE_ADDR, &mut read_buffer)?;
+//! i2c.transaction(
+//!     DEVICE_ADDR,
+//!     &mut [
+//!         Operation::Write(&write_buffer),
+//!         Operation::Read(&mut read_buffer),
+//!     ],
+//! )?;
+//! # Ok(()) }
+//! ```
+//! If you configure the driver to `async` mode, the driver also provides
+//! asynchronous versions of these methods:
+//! ```rust, no_run
+#![doc = crate::before_snippet!()]
+//! # use esp_hal::i2c::master::{I2c, Config, Operation};
+//! # let config = Config::default();
+//! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
+//!
+//! # const DEVICE_ADDR: u8 = 0x77;
+//! # let write_buffer = [0xAA];
+//! # let mut read_buffer = [0u8; 22];
+//!
+//! // Reconfigure the driver to use async mode.
+//! let mut i2c = i2c.into_async();
+//!
+//! i2c.write_async(DEVICE_ADDR, &write_buffer).await?;
+//! i2c.write_read_async(DEVICE_ADDR, &write_buffer, &mut read_buffer)
+//!     .await?;
+//! i2c.read_async(DEVICE_ADDR, &mut read_buffer).await?;
+//! i2c.transaction_async(
+//!     DEVICE_ADDR,
+//!     &mut [
+//!         Operation::Write(&write_buffer),
+//!         Operation::Read(&mut read_buffer),
+//!     ],
+//! )
+//! .await?;
+//!
+//! // You should still be able to use the blocking methods, if you need to:
+//! i2c.write(DEVICE_ADDR, &write_buffer)?;
+//!
+//! # Ok(()) }
+//! ```
+//! 
+//! The I2C driver also implements [embedded-hal] and [embedded-hal-async]
+//! traits, so you can use it with any crate that supports these traits.
+//!
+//! [embedded-hal]: embedded_hal::i2c
+//! [embedded-hal-async]: embedded_hal_async::i2c
 
 use core::{
     marker::PhantomData,
@@ -501,21 +594,31 @@ impl From<Ack> for u32 {
 #[non_exhaustive]
 pub struct Config {
     /// The I2C clock frequency.
+    ///
+    /// Default value: 100 kHz.
     frequency: Rate,
 
     /// I2C SCL timeout period.
+    ///
+    /// Default value: 10 bus clock cycles.
     timeout: BusTimeout,
 
     /// Software timeout.
+    ///
+    /// Default value: 1 ms per byte.
     #[builder_lite(unstable)]
     software_timeout: SoftwareTimeout,
 
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
+    ///
+    /// Default value: 16.
     #[cfg(not(any(esp32, esp32s2)))]
     #[builder_lite(unstable)]
     scl_st_timeout: FsmTimeout,
 
     /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM.
+    ///
+    /// Default value: 16.
     #[cfg(not(any(esp32, esp32s2)))]
     #[builder_lite(unstable)]
     scl_main_st_timeout: FsmTimeout,
