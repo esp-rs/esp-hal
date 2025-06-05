@@ -17,9 +17,9 @@ options:
                queue allows using embassy-time without the embassy executors."
   default:
     - if: 'cargo_feature("executors") || is_tooling()'
-      value: single-integrated
+      value: '"single-integrated"'
     - if: '!cargo_feature("executors") && !is_tooling()'
-      value: generic
+      value: '"generic"'
   constraints:
     - if: 'cargo_feature("executors") || is_tooling()'
       type:
