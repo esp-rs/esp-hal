@@ -572,22 +572,6 @@ enum Ack {
     Nack = 1,
 }
 
-impl From<u32> for Ack {
-    fn from(ack: u32) -> Self {
-        match ack {
-            0 => Ack::Ack,
-            1 => Ack::Nack,
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl From<Ack> for u32 {
-    fn from(ack: Ack) -> u32 {
-        ack as u32
-    }
-}
-
 /// I2C driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
