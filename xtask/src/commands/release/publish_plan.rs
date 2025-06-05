@@ -1,6 +1,6 @@
 use std::{path::Path, process::Command};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
 
 use crate::{
@@ -63,11 +63,12 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
 
     // Actually publish the packages.
     for (step, toml) in plan.packages.iter().zip(tomls.iter()) {
-        let mut publish_args = if step.package.has_chip_features() {
-            vec!["--no-verify"]
-        } else {
-            vec![]
-        };
+        let mut publish_args =
+            if step.package.has_chip_features() || step.package.has_inline_assembly(workspace) {
+                vec!["--no-verify"]
+            } else {
+                vec![]
+            };
 
         if !args.no_dry_run {
             publish_args.push("--dry-run");

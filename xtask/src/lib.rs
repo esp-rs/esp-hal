@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -83,6 +83,28 @@ impl Package {
                 | EspWifi
                 | XtensaLxRt
         )
+    }
+
+    /// Does the package have inline assembly?
+    pub fn has_inline_assembly(&self, workspace: &Path) -> bool {
+        // feature(asm_experimental_arch) is enabled in all crates that use Xtensa
+        // assembly, which covers crates that use assembly AND are used for both
+        // architectures (e.g. esp-backtrace).
+        // But RISC-V doesn't need this feature, so we can either scrape the crate
+        // source, or check in a list of packages.
+        if matches!(self, Package::EspRiscvRt | Package::EspLpHal) {
+            return true;
+        }
+
+        let lib_rs_path = workspace.join(self.to_string()).join("src").join("lib.rs");
+        let Ok(source) = std::fs::read_to_string(&lib_rs_path) else {
+            return false;
+        };
+
+        source
+            .lines()
+            .filter(|line| line.starts_with("#!["))
+            .any(|line| line.contains("asm_experimental_arch"))
     }
 
     pub fn needs_build_std(&self) -> bool {
