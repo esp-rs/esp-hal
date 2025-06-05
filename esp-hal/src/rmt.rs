@@ -561,6 +561,8 @@ impl RmtWriter {
 
     // TODO: better check that hw ptr matches expectation when done! that also helps
     // with underruns
+    // FIXME: degrade, then no inline
+    #[inline(never)]
     fn write(
         &mut self,
         data: &mut impl Iterator<Item: Borrow<PulseCode>>,
@@ -2582,6 +2584,11 @@ where
     }
 }
 
+#[inline(never)]
+fn wake(ch_num: u8) {
+    WAKER[ch_num as usize].wake();
+}
+
 // #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
@@ -2593,7 +2600,7 @@ fn async_interrupt_handler() {
         };
         raw.unlisten_tx_interrupt(events_to_unlisten);
 
-        WAKER[raw.channel() as usize].wake();
+        wake(raw.channel());
     }
 
     fn on_rx(raw: &impl RawChannelAccess<Dir = Rx>, event: Event) {
@@ -2604,7 +2611,7 @@ fn async_interrupt_handler() {
         };
         raw.unlisten_rx_interrupt(events_to_unlisten);
 
-        WAKER[raw.channel() as usize].wake();
+        wake(raw.channel());
     }
 
     chip_specific::handle_channel_interrupts(on_tx, on_rx);
