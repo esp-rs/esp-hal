@@ -35,10 +35,6 @@ pub(crate) mod constants {
     /// Clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 96_000_000;
 
-    /// Start address of the RMT (Remote Control) peripheral's RAM.
-    pub const RMT_RAM_START: usize = 0x60007400;
-    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
-    pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// Clock source for the RMT peripheral (false = default source).
     pub const RMT_CLOCK_SRC: bool = false;
     /// Frequency of the RMT clock source, in Hertz.

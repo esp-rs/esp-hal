@@ -186,13 +186,37 @@ pub struct MemoryRegion {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
-    pub name: String,
-    pub arch: Arch,
-    pub cores: usize,
-    pub trm: String,
-    pub peripherals: Vec<String>,
-    pub symbols: Vec<String>,
-    pub memory: Vec<MemoryRegion>,
+    name: String,
+    arch: Arch,
+    cores: usize,
+    trm: String,
+    peripherals: Vec<String>,
+    symbols: Vec<String>,
+    memory: Vec<MemoryRegion>,
+    #[serde(default)]
+    rmt: Option<RmtProperties>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct RmtProperties {
+    ram_start: u32,
+    channel_ram_size: u32,
+}
+
+impl RmtProperties {
+    fn properties(&self) -> impl Iterator<Item = (&str, TokenStream)> {
+        [
+            ("ram_start", number(self.ram_start)),
+            ("channel_ram_size", number(self.channel_ram_size)),
+        ]
+        .into_iter()
+    }
+}
+
+// Output a Display-able value as a TokenStream, intended to generate numbers
+// without the type suffix.
+fn number(n: impl std::fmt::Display) -> TokenStream {
+    TokenStream::from_str(&format!("{n}")).unwrap()
 }
 
 /// Device configuration file format.
@@ -226,6 +250,7 @@ impl Config {
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
+                rmt: None,
             },
         }
     }
@@ -302,11 +327,6 @@ impl Config {
     }
 
     pub fn generate_metadata(&self) {
-        // Output a number as a TokenStream, without the type suffix.
-        fn number(n: usize) -> TokenStream {
-            TokenStream::from_str(&format!("{n}")).unwrap()
-        }
-
         let out_dir = std::env::var_os("OUT_DIR").unwrap();
         let out_dir = std::path::Path::new(&out_dir);
         let out_file = out_dir.join("_generated.rs").to_string_lossy().to_string();
@@ -328,6 +348,20 @@ impl Config {
         let cores = number(self.device.cores);
         let trm = &self.device.trm;
 
+        let peripheral_properties = std::iter::once(
+            self.device.rmt.iter().map(|rmt| ("rmt", rmt.properties())),
+        )
+        .flat_map(|groups| {
+            groups.flat_map(move |(group, group_properties)| {
+                group_properties.map(move |(name, value)| {
+                    let name = format!("{group}.{name}");
+                    quote::quote! {
+                        (#name) => { #value };
+                    }
+                })
+            })
+        });
+
         // Not public API, can use a private macro:
         g.extend(quote::quote! {
             /// A link to the Technical Reference Manual (TRM) for the chip.
@@ -339,6 +373,7 @@ impl Config {
                 ("cores") => { #cores };
                 ("cores", str) => { stringify!(#cores) };
                 ("trm") => { #trm };
+                #(#peripheral_properties)*
             }
         });
 

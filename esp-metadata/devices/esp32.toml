@@ -79,3 +79,7 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
+
+[device.rmt]
+ram_start = 0x3ff56800
+channel_ram_size = 64
