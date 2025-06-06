@@ -1,7 +1,8 @@
 [device]
 name  = "esp32c6"
 arch  = "riscv"
-cores = "single_core"
+cores = 1
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:

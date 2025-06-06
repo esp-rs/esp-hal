@@ -25,13 +25,6 @@ pub mod gpio;
 pub mod peripherals;
 pub(crate) mod regi2c;
 
-/// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! trm_link {
-    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf" };
-}
-
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;

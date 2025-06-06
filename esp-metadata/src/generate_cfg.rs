@@ -188,7 +188,8 @@ pub struct MemoryRegion {
 struct Device {
     pub name: String,
     pub arch: Arch,
-    pub cores: Cores,
+    pub cores: usize,
+    pub trm: String,
     pub peripherals: Vec<String>,
     pub symbols: Vec<String>,
     pub memory: Vec<MemoryRegion>,
@@ -220,7 +221,8 @@ impl Config {
             device: Device {
                 name: "".to_owned(),
                 arch: Arch::RiscV,
-                cores: Cores::Single,
+                cores: 1,
+                trm: "".to_owned(),
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
@@ -240,7 +242,11 @@ impl Config {
 
     /// The core count of the device.
     pub fn cores(&self) -> Cores {
-        self.device.cores
+        if self.device.cores > 1 {
+            Cores::Multi
+        } else {
+            Cores::Single
+        }
     }
 
     /// The peripherals of the device.
@@ -266,7 +272,10 @@ impl Config {
         [
             self.device.name.as_str(),
             self.device.arch.as_ref(),
-            self.device.cores.as_ref(),
+            match self.cores() {
+                Cores::Single => "single_core",
+                Cores::Multi => "multi_core",
+            },
         ]
         .into_iter()
         .chain(self.device.peripherals.iter().map(|s| s.as_str()))
@@ -293,6 +302,11 @@ impl Config {
     }
 
     pub fn generate_metadata(&self) {
+        // Output a number as a TokenStream, without the type suffix.
+        fn number(n: usize) -> TokenStream {
+            TokenStream::from_str(&format!("{n}")).unwrap()
+        }
+
         let out_dir = std::env::var_os("OUT_DIR").unwrap();
         let out_dir = std::path::Path::new(&out_dir);
         let out_file = out_dir.join("_generated.rs").to_string_lossy().to_string();
@@ -300,6 +314,7 @@ impl Config {
         let mut g = TokenStream::new();
 
         let chip_name = self.name();
+        // Public API, can't use a private macro:
         g.extend(quote::quote! {
             /// The name of the chip as `&str`
             #[macro_export]
@@ -308,10 +323,29 @@ impl Config {
             }
         });
 
+        // Translate the chip properties into a macro that can be used in esp-hal:
+        let arch = self.device.arch.as_ref();
+        let cores = number(self.device.cores);
+        let trm = &self.device.trm;
+
+        // Not public API, can use a private macro:
+        g.extend(quote::quote! {
+            /// A link to the Technical Reference Manual (TRM) for the chip.
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! property {
+                ("chip") => { #chip_name };
+                ("arch") => { #arch };
+                ("cores") => { #cores };
+                ("cores", str) => { stringify!(#cores) };
+                ("trm") => { #trm };
+            }
+        });
+
         let region_branches = self.memory().iter().map(|region| {
             let name = region.name.to_uppercase();
-            let start = region.start as usize;
-            let end = region.end as usize;
+            let start = number(region.start as usize);
+            let end = number(region.end as usize);
 
             quote::quote! {
                 ( #name ) => {
