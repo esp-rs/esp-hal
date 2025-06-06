@@ -123,9 +123,11 @@ pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
     // first pass - just look for cfg-gated items
     //
     // the string to match depends on the rustfmt-json version!
-    // later version emit `#[<cfg>(...` instead
+    // later version emit `#[<cfg>(...` instead of `#[cfg(..`
     let cfg_gates = vec![
+        "#[<cfg>(any(doc, feature = \"unstable\"))]",
         "#[cfg(any(doc, feature = \"unstable\"))]",
+        "#[<cfg>(feature = \"unstable\")]",
         "#[cfg(feature = \"unstable\")]",
     ];
 
@@ -135,7 +137,26 @@ pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
             .iter()
             .any(|attr| cfg_gates.contains(&attr.as_str()))
         {
+            // remove the item itself
             to_remove.push(id.clone());
+
+            // remove sub-items - shouldn't be needed but shouldn't hurt
+            match &item.inner {
+                ItemEnum::Module(module) => {
+                    to_remove.extend(&module.items);
+                }
+                ItemEnum::Struct(s) => {
+                    to_remove.extend(&s.impls);
+                }
+                ItemEnum::Enum(e) => {
+                    to_remove.extend(&e.impls);
+                    to_remove.extend(&e.variants);
+                }
+                ItemEnum::Impl(i) => {
+                    to_remove.extend(&i.items);
+                }
+                _ => (),
+            }
         }
     }
 
