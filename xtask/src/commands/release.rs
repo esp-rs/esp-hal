@@ -10,6 +10,7 @@ pub mod publish;
 pub mod publish_plan;
 pub mod semver_check;
 pub mod tag_releases;
+pub mod post_release;
 
 pub use bump_version::*;
 #[cfg(feature = "release")]
@@ -21,6 +22,9 @@ pub use publish::*;
 pub use publish_plan::*;
 pub use semver_check::*;
 pub use tag_releases::*;
+pub use post_release::*;
+
+pub const PLACEHOLDER: &str = "{{currentVersion}}";
 
 // ----------------------------------------------------------------------------
 // Subcommands
@@ -63,4 +67,6 @@ pub enum Release {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
+    /// Rollover migrations etc post release.
+    PostRelease(PostReleaseArgs),
 }
