@@ -326,6 +326,13 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
 
         // Each path we iterate over should be the directory for a given version of
         // the package's documentation: (except latest)
+        if !package_docs_path.exists() {
+            log::warn!(
+                "Package documentation path does not exist: '{}', skipping",
+                package_docs_path.display()
+            );
+            continue;
+        }
         for version_path in fs::read_dir(package_docs_path)? {
             let version_path = version_path?.path();
             if version_path.is_file() {
