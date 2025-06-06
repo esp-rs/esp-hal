@@ -241,7 +241,6 @@ use crate::{
     },
     handler,
     peripherals::{Interrupt, RMT},
-    soc::constants,
     system::{self, GenericPeripheralGuard},
     time::Rate,
 };
@@ -329,7 +328,7 @@ impl PulseCode for u32 {
 
 #[inline]
 fn channel_ram_start(ch_num: impl Into<usize>) -> *mut u32 {
-    (constants::RMT_RAM_START + ch_num.into() * constants::RMT_CHANNEL_RAM_SIZE * 4) as *mut u32
+    (property!("rmt.ram_start") + ch_num.into() * property!("rmt.channel_ram_size") * 4) as *mut u32
 }
 
 /// Channel configuration for TX channels
@@ -632,7 +631,7 @@ where
     /// Wait for the transaction to complete
     pub fn wait(mut self) -> Result<C, (Error, C)> {
         let memsize =
-            constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize;
+            property!("rmt.channel_ram_size") * <C as TxChannelInternal>::memsize() as usize;
 
         while !self.remaining_data.is_empty() {
             // wait for TX-THR
@@ -724,7 +723,8 @@ where
         <C as TxChannelInternal>::update();
 
         let ptr = channel_ram_start(C::CHANNEL);
-        for idx in 0..constants::RMT_CHANNEL_RAM_SIZE * <C as TxChannelInternal>::memsize() as usize
+        for idx in
+            0..property!("rmt.channel_ram_size") * <C as TxChannelInternal>::memsize() as usize
         {
             unsafe {
                 ptr.add(idx).write_volatile(0);
@@ -1234,7 +1234,7 @@ pub trait TxChannel: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > property!("rmt.channel_ram_size") * Self::memsize() as usize {
             return Err(Error::Overflow);
         }
 
@@ -1292,7 +1292,7 @@ pub trait RxChannel: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > property!("rmt.channel_ram_size") * Self::memsize() as usize {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1373,7 +1373,7 @@ pub trait TxChannelAsync: TxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > property!("rmt.channel_ram_size") * Self::memsize() as usize {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1435,7 +1435,7 @@ pub trait RxChannelAsync: RxChannelInternal {
     where
         Self: Sized,
     {
-        if data.len() > constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize {
+        if data.len() > property!("rmt.channel_ram_size") * Self::memsize() as usize {
             return Err(Error::InvalidDataLength);
         }
 
@@ -1603,7 +1603,7 @@ pub trait TxChannelInternal {
         }
 
         let ptr = channel_ram_start(Self::CHANNEL);
-        let memsize = constants::RMT_CHANNEL_RAM_SIZE * Self::memsize() as usize;
+        let memsize = property!("rmt.channel_ram_size") * Self::memsize() as usize;
         for (idx, entry) in data.iter().take(memsize).enumerate() {
             unsafe {
                 ptr.add(idx).write_volatile(*entry);

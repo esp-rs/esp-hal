@@ -28,10 +28,6 @@ pub(crate) mod constants {
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for I2S operations.
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
-    /// The starting address of the Remote Control (RMT) module's RAM.
-    pub const RMT_RAM_START: usize = 0x3ff56800;
-    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
-    pub const RMT_CHANNEL_RAM_SIZE: usize = 64;
     /// A reference clock tick of 1 MHz.
     pub const REF_TICK: Rate = Rate::from_mhz(1);
 }
