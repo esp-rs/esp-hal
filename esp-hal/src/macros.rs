@@ -41,12 +41,12 @@ macro_rules! before_snippet {
 #[macro_export]
 macro_rules! trm_markdown_link {
     () => {
-        concat!("[Technical Reference Manual](", $crate::trm_link!(), ")")
+        concat!("[Technical Reference Manual](", property!("trm"), ")")
     };
     ($anchor:literal) => {
         concat!(
             "[Technical Reference Manual](",
-            $crate::trm_link!(),
+            property!("trm"),
             "#",
             $anchor,
             ")"

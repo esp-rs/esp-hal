@@ -13,13 +13,6 @@ pub mod gpio;
 pub mod peripherals;
 pub(crate) mod regi2c;
 
-/// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! trm_link {
-    () => { "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf" };
-}
-
 #[allow(unused)]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x600c2000;
