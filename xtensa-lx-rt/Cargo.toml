@@ -10,9 +10,6 @@ license       = "MIT OR Apache-2.0"
 keywords      = ["lx", "peripheral", "register", "xtensa"]
 categories    = ["embedded", "hardware-support", "no-std"]
 
-[package.metadata.docs.rs]
-features = ["esp32"]
-
 [lib]
 bench = false
 test  = false
