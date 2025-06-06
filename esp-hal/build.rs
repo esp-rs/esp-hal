@@ -41,6 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
+    config.generate_metadata();
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:

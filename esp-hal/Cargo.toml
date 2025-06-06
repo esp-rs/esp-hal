@@ -45,7 +45,6 @@ strum                    = { version = "0.27.1", default-features = false, featu
 
 esp-build                = { version = "0.3.0", path = "../esp-build" }
 esp-config               = { version = "0.4.0", path = "../esp-config" }
-esp-metadata             = { version = "0.7.0", path = "../esp-metadata", default-features = false }
 procmacros               = { version = "0.18.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.

@@ -25,21 +25,6 @@ pub mod gpio;
 pub mod peripherals;
 pub(crate) mod regi2c;
 
-/// The name of the chip ("esp32s3") as `&str`
-#[macro_export]
-macro_rules! chip {
-    () => {
-        "esp32s3"
-    };
-}
-
-/// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! trm_link {
-    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf" };
-}
-
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;
@@ -49,10 +34,6 @@ pub(crate) mod constants {
     /// The default clock source for I2S operations.
     pub const I2S_DEFAULT_CLK_SRC: u8 = 2;
 
-    /// The starting address of the Remote Control (RMT) module's RAM.
-    pub const RMT_RAM_START: usize = 0x60016800;
-    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
-    pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// RMT Clock source value.
     pub const RMT_CLOCK_SRC: u8 = 1;
     /// RMT Clock source frequency.

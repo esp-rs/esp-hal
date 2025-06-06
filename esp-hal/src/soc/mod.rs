@@ -38,14 +38,6 @@ pub(crate) fn psram_range() -> Range<usize> {
     }
 }
 
-/// The lower bound of the system's DRAM (Data RAM) address space.
-const SOC_DRAM_LOW: usize = esp_metadata::memory_region_start!("DRAM");
-
-/// The upper bound of the system's DRAM (Data RAM) address space.
-const SOC_DRAM_HIGH: usize = esp_metadata::memory_region_end!("DRAM");
-
-const DRAM: Range<usize> = SOC_DRAM_LOW..SOC_DRAM_HIGH;
-
 #[cfg(feature = "psram")]
 pub struct MappedPsram {
     memory_range: Range<usize>,
@@ -113,12 +105,12 @@ impl self::efuse::Efuse {
 
 #[allow(unused)]
 pub(crate) fn is_valid_ram_address(address: usize) -> bool {
-    addr_in_range(address, DRAM)
+    addr_in_range(address, memory_range!("DRAM"))
 }
 
 #[allow(unused)]
 pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
-    slice_in_range(slice, DRAM)
+    slice_in_range(slice, memory_range!("DRAM"))
 }
 
 #[allow(unused)]
