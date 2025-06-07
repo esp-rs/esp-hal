@@ -77,7 +77,7 @@ async fn main(_spawner: Spawner) {
     )
     .into_async();
 
-    let i2s_tx = i2s
+    let mut i2s_tx = i2s
         .i2s_tx
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
