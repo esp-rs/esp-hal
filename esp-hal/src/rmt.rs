@@ -193,7 +193,7 @@
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
-    borrow::Borrow,
+    borrow::{Borrow, BorrowMut},
     default::Default,
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -2253,22 +2253,23 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 // FIXME: This is essentially the same as SingleShotTxTransaction. Is it
 // possible to share most of the code?
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, E>
+struct RmtTxFuture<'a, D, E>
 where
+    D: BorrowMut<E>,
     E: Encoder,
 {
     raw: DynChannelAccess<Tx>,
-    _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
+    _phantom: PhantomData<(&'a mut DynChannelAccess<Tx>, &'a mut E)>,
 
     writer: RmtWriterOuter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    // FIXME: Maybe store by reference &'a mut encoder?
-    data: E,
+    data: D,
 }
 
-impl<E> Future for RmtTxFuture<'_, E>
+impl<D, E> Future for RmtTxFuture<'_, D, E>
 where
+    D: BorrowMut<E> + Unpin,
     E: Encoder + Unpin,
 {
     type Output = Result<(), Error>;
@@ -2313,7 +2314,7 @@ where
 
                 if this.writer.state == WriterState::Active {
                     // re-fill TX RAM
-                    this.writer.write(&mut this.data, raw, false);
+                    this.writer.write(this.data.borrow_mut(), raw, false);
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
@@ -2342,8 +2343,9 @@ where
     }
 }
 
-impl<E> Drop for RmtTxFuture<'_, E>
+impl<D, E> Drop for RmtTxFuture<'_, D, E>
 where
+    D: BorrowMut<E>,
     E: Encoder,
 {
     fn drop(&mut self) {
@@ -2378,16 +2380,14 @@ impl Channel<Async, Tx> {
 
         // FIXME: copy over the modified validation code from the blocking code
 
-        let mut data = SliceEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture {
             raw,
             _phantom: PhantomData,
-            writer,
-            data,
+            writer: RmtWriterOuter::new(),
+            data: SliceEncoder::new(data),
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2413,28 +2413,26 @@ impl Channel<Async, Tx> {
 
     /// FIXME: Docs
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_iter<D>(&mut self, data: D) -> impl Future<Output = Result<(), Error>>
+    pub fn transmit_iter<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         D: IntoIterator,
         // FIXME: Is being Unpin a significant restriction for the iterator?
         // If so, we could use it in a pinned way by using pin-projection (e.g. via
         // pin-project-lite) for the RmtTxFuture.
-        D::IntoIter: Unpin,
+        D::IntoIter: Unpin + 'a,
         D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
-        let mut data = IterEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture {
             raw,
             _phantom: PhantomData,
-            writer,
-            data,
+            writer: RmtWriterOuter::new(),
+            data: IterEncoder::new(data),
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2460,22 +2458,21 @@ impl Channel<Async, Tx> {
 
     /// FIXME: Docs
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_enc<E>(&mut self, mut data: E) -> impl Future<Output = Result<(), Error>>
+    pub fn transmit_enc<'a, E>(&'a mut self, data: &'a mut E) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         E: Encoder + Unpin,
     {
         let raw = self.raw;
 
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture::<'_, &mut E, E> {
             raw,
             _phantom: PhantomData,
-            writer,
+            writer: RmtWriterOuter::new(),
             data,
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
