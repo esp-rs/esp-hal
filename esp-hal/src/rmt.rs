@@ -712,7 +712,7 @@ impl RmtWriterOuter {
     fn write(
         &mut self,
         data: &mut impl Encoder,
-        raw: &impl RawChannelAccess<Dir = Tx>,
+        raw: impl RawChannelAccess<Dir = Tx>,
         initial: bool,
     ) {
         // ...which calls the inner funciton with a type-erased DynChannelAccess, such that it is
@@ -864,7 +864,7 @@ impl RmtReader {
     fn read<'a, T: From<PulseCode> + 'static>(
         &mut self,
         data: &mut impl Iterator<Item = &'a mut T>,
-        raw: &impl RawChannelAccess<Dir = Rx>,
+        raw: impl RawChannelAccess<Dir = Rx>,
         final_: bool,
     ) {
         if self.state != ReaderState::Active {
@@ -931,14 +931,14 @@ impl RmtReader {
 }
 
 /// Marker for a channel capable of/configured for transmit operations
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Tx;
 /// Marker for a channel capable of/configured for receive operations
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Rx;
 /// Marker for a channel capable of transmit and receive operations
 #[cfg(any(esp32, esp32s2))]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct RxTx;
 
 impl crate::private::Sealed for Tx {}
@@ -956,7 +956,7 @@ pub struct Unconfigured<Dir> {
 pub trait Direction: Capability {}
 
 /// FIXME: Docs
-pub trait Capability: core::fmt::Debug + Unpin + crate::private::Sealed {
+pub trait Capability: Clone + Copy + core::fmt::Debug + Unpin + crate::private::Sealed {
     #[doc(hidden)]
     const SUPPORTS_TX: bool;
 
@@ -1035,10 +1035,10 @@ where
 }
 
 /// docs
-pub trait RawChannelAccess: crate::private::Sealed + Unpin {
+pub trait RawChannelAccess: Clone + Copy + crate::private::Sealed + Unpin {
     // Tx or Rx or Unconfigured
     /// docs
-    type Dir;
+    type Dir: Copy + Clone;
 
     #[doc(hidden)]
     fn ch_idx(&self) -> u8;
@@ -1069,23 +1069,36 @@ where
 /// docs
 ///
 /// This is a ZST.
-#[derive(Debug)]
-pub struct ConstChannelAccess<Dir, const CH_IDX: u8> {
+#[derive(Clone, Copy, Debug)]
+pub struct ConstChannelAccess<Dir, const CH_IDX: u8>
+where
+    Dir: Copy + Clone
+{
     _direction: PhantomData<Dir>,
 }
 
 /// Type-erased equivalent of ConstChannelAccess.
-#[derive(Debug)]
-pub struct DynChannelAccess<Dir> {
+#[derive(Clone, Copy, Debug)]
+pub struct DynChannelAccess<Dir>
+where
+    Dir: Copy + Clone
+{
     ch_idx: ChannelIndex,
     _direction: PhantomData<Dir>,
 }
 
-impl<Dir, const CH_IDX: u8> crate::private::Sealed for ConstChannelAccess<Dir, CH_IDX> {}
-impl<Dir> crate::private::Sealed for DynChannelAccess<Dir> {}
+impl<Dir, const CH_IDX: u8> crate::private::Sealed for ConstChannelAccess<Dir, CH_IDX>
+where
+    Dir: Copy + Clone
+{}
+impl<Dir> crate::private::Sealed for DynChannelAccess<Dir>
+where
+    Dir: Copy + Clone
+{}
 
 impl<Dir, const CH_IDX: u8> ConstChannelAccess<Dir, CH_IDX>
 where
+    Dir: Copy + Clone,
     ConstChannelAccess<Dir, CH_IDX>: RawChannelAccess,
 {
     unsafe fn conjure() -> Self {
@@ -1095,7 +1108,10 @@ where
     }
 }
 
-impl<Dir> DynChannelAccess<Dir> {
+impl<Dir> DynChannelAccess<Dir>
+where
+    Dir: Copy + Clone,
+{
     unsafe fn conjure(ch_idx: ChannelIndex) -> Self {
         Self {
             ch_idx,
@@ -1104,7 +1120,10 @@ impl<Dir> DynChannelAccess<Dir> {
     }
 }
 
-impl<const CH_IDX: u8, Dir: Unpin> RawChannelAccess for ConstChannelAccess<Dir, CH_IDX> {
+impl<const CH_IDX: u8, Dir: Unpin> RawChannelAccess for ConstChannelAccess<Dir, CH_IDX>
+where
+    Dir: Copy + Clone,
+{
     type Dir = Dir;
 
     #[inline]
@@ -1113,7 +1132,10 @@ impl<const CH_IDX: u8, Dir: Unpin> RawChannelAccess for ConstChannelAccess<Dir, 
     }
 }
 
-impl<Dir: Unpin> RawChannelAccess for DynChannelAccess<Dir> {
+impl<Dir: Unpin> RawChannelAccess for DynChannelAccess<Dir>
+where
+    Dir: Copy + Clone,
+{
     type Dir = Dir;
 
     #[inline]
@@ -1546,7 +1568,7 @@ where
         // panic if the channel is currently running a transaction, or if another
         // channel is using its memory
         assert!(matches!(
-            RmtState::load(&raw, Ordering::Relaxed),
+            RmtState::load(raw, Ordering::Relaxed),
             RmtState::Unconfigured | RmtState::TxIdle | RmtState::RxIdle
         ));
 
@@ -1853,12 +1875,12 @@ mod state {
         }
 
         #[inline]
-        pub(super) fn store(self, raw: &impl RawChannelAccess<Dir: Capability>, ordering: Ordering) {
+        pub(super) fn store(self, raw: impl RawChannelAccess<Dir: Capability>, ordering: Ordering) {
             STATE[raw.channel() as usize].store(self as u8, ordering);
         }
 
         #[inline]
-        pub(super) fn load(raw: &impl RawChannelAccess<Dir: Capability>, ordering: Ordering) -> Self {
+        pub(super) fn load(raw: impl RawChannelAccess<Dir: Capability>, ordering: Ordering) -> Self {
             Self::load_by_idx(raw.channel(), ordering)
         }
 
@@ -1975,13 +1997,13 @@ where
 // ----------------------------------------------------------
 
 /// An in-progress transaction for a single shot TX transaction.
-pub struct SingleShotTxTransaction<'ch, C, E>
+pub struct SingleShotTxTransaction<'ch, Raw, E>
 where
-    C: TxChannel,
+    Raw: TxChannelInternal,
     E: Encoder,
 {
-    // FIXME: Like RmtTxFuture, only store raw (then also remove fn raw() from TxChannel)
-    channel: &'ch mut C,
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
 
     writer: RmtWriterOuter,
 
@@ -1990,13 +2012,13 @@ where
     data: E,
 }
 
-impl<C, E> SingleShotTxTransaction<'_, C, E>
+impl<Raw, E> SingleShotTxTransaction<'_, Raw, E>
 where
-    C: TxChannel,
+    Raw: TxChannelInternal,
     E: Encoder,
 {
     fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw();
+        let raw = self.raw;
 
         let status = raw.get_tx_status();
         if status == Some(Event::Threshold) {
@@ -2045,7 +2067,7 @@ where
             }
         };
 
-        RmtState::store(RmtState::TxIdle, self.channel.raw(), Ordering::Relaxed);
+        RmtState::store(RmtState::TxIdle, self.raw, Ordering::Relaxed);
 
         // Disable the Drop handler since the transaction is properly stopped
         // already.
@@ -2053,9 +2075,9 @@ where
         result
     }
 }
-impl<C, E> Drop for SingleShotTxTransaction<'_, C, E>
+impl<Raw, E> Drop for SingleShotTxTransaction<'_, Raw, E>
 where
-    C: TxChannel,
+    Raw: TxChannelInternal,
     E: Encoder,
 {
     fn drop(&mut self) {
@@ -2063,7 +2085,7 @@ where
         // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
         // block in the meantime, such that subsequent uses of the channel are
         // safe (i.e. start from a state where the hardware is stopped).
-        let raw = self.channel.raw();
+        let raw = self.raw;
         raw.stop_tx();
 
         while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
@@ -2073,14 +2095,15 @@ where
 }
 
 /// An in-progress continuous TX transaction
-pub struct ContinuousTxTransaction<'ch, C: TxChannel> {
-    channel: &'ch mut C,
+pub struct ContinuousTxTransaction<'ch, Raw: TxChannelInternal> {
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
 }
 
-impl<C: TxChannel> ContinuousTxTransaction<'_, C> {
+impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<(), Error> {
-        let raw = &self.channel.raw();
+        let raw = self.raw;
 
         raw.set_tx_continuous(false);
         raw.update();
@@ -2100,7 +2123,7 @@ impl<C: TxChannel> ContinuousTxTransaction<'_, C> {
 
     /// Stop transaction as soon as possible.
     pub fn stop(self) -> Result<(), Error> {
-        let raw = &self.channel.raw();
+        let raw = self.raw;
 
         raw.set_tx_continuous(false);
         raw.update();
@@ -2123,18 +2146,18 @@ impl<C: TxChannel> ContinuousTxTransaction<'_, C> {
 
     /// Check if the `loopcount` interrupt bit is set
     pub fn is_loopcount_interrupt_set(&self) -> bool {
-        self.channel.raw().is_tx_loopcount_interrupt_set()
+        self.raw.is_tx_loopcount_interrupt_set()
     }
 }
 
-impl<C: TxChannel> Drop for ContinuousTxTransaction<'_, C> {
+impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not manually
         // stopped with `stop()` or `stop_next()`.
         // Thus, attempt to stop it as quickly as possible and block in the meantime,
         // such that subsequent uses of the channel are safe (i.e. start from a
         // state where the hardware is stopped).
-        let raw = self.channel.raw();
+        let raw = self.raw;
 
         raw.set_tx_continuous(false);
         raw.update();
@@ -2153,14 +2176,12 @@ where
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
     pub fn bench<'d>(&mut self, data: &'d [PulseCode]) -> usize {
-        let raw = &self.raw;
-
         let mut data = SliceEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
+        writer.write(&mut data, self.raw, true);
 
         while writer.state == WriterState::Active {
-            writer.write(&mut data, raw, false);
+            writer.write(&mut data, self.raw, false);
         }
 
         writer.written
@@ -2172,14 +2193,12 @@ where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>
     {
-        let raw = &self.raw;
-
         let mut data = IterEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
+        writer.write(&mut data, self.raw, true);
 
         while writer.state == WriterState::Active {
-            writer.write(&mut data, raw, false);
+            writer.write(&mut data, self.raw, false);
         }
 
         writer.written
@@ -2187,13 +2206,11 @@ where
 
     /// FIXME: docs
     pub fn bench_enc<E: Encoder>(&mut self, mut data: E) -> usize {
-        let raw = &self.raw;
-
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
+        writer.write(&mut data, self.raw, true);
 
         while writer.state == WriterState::Active {
-            writer.write(&mut data, raw, false);
+            writer.write(&mut data, self.raw, false);
         }
 
         writer.written
@@ -2202,10 +2219,8 @@ where
 
 /// Channel in TX mode
 pub trait TxChannel: Sized {
-    // Currently required such that `impl TxChannel` is all that is needed to use
-    // `*TxTransaction`.
-    #[doc(hidden)]
-    fn raw(&self) -> &impl TxChannelInternal;
+    /// FIXME: Docs
+    type Raw: TxChannelInternal;
 
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
@@ -2214,13 +2229,14 @@ pub trait TxChannel: Sized {
     fn transmit<'d>(
         &mut self,
         data: &'d [PulseCode],
-    ) -> Result<SingleShotTxTransaction<'_, Self, SliceEncoder<'d>>, Error>;
+        // FIXME: Opaque return type
+    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, SliceEncoder<'d>>, Error>;
 
     /// FIXME: docs
     fn transmit_iter<D>(
         &mut self,
         data: D,
-    ) -> Result<SingleShotTxTransaction<'_, Self, IterEncoder<<D as IntoIterator>::IntoIter>>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, IterEncoder<<D as IntoIterator>::IntoIter>>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>;
@@ -2229,7 +2245,7 @@ pub trait TxChannel: Sized {
     fn transmit_enc<E>(
         &mut self,
         data: E,
-    ) -> Result<SingleShotTxTransaction<'_, Self, E>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, E>, Error>
     where
         E: Encoder;
 
@@ -2240,7 +2256,7 @@ pub trait TxChannel: Sized {
     fn transmit_continuously<D>(
         &mut self,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>;
@@ -2252,7 +2268,7 @@ pub trait TxChannel: Sized {
         &mut self,
         loopcount: u16,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>;
@@ -2262,15 +2278,13 @@ impl<Raw> TxChannel for Channel<Blocking, Raw>
 where
     Raw: TxChannelInternal,
 {
-    fn raw(&self) -> &impl TxChannelInternal {
-        &self.raw
-    }
+    type Raw = Raw;
 
     fn transmit<'d>(
         &mut self,
         data: &'d [PulseCode],
-    ) -> Result<SingleShotTxTransaction<'_, Self, SliceEncoder<'d>>, Error> {
-        let raw = &self.raw;
+    ) -> Result<SingleShotTxTransaction<'_, Raw, SliceEncoder<'d>>, Error> {
+        let raw = self.raw;
 
         // FIXME: For slices, verify more things beforehand (non-empty, has end marker)
 
@@ -2290,11 +2304,7 @@ where
         raw.clear_tx_interrupts();
         raw.start_send(false, 0);
 
-        Ok(SingleShotTxTransaction {
-            channel: self,
-            writer,
-            data,
-        })
+        Ok(SingleShotTxTransaction {raw, _phantom: PhantomData, writer, data})
     }
 
     /// Start transmitting the given pulse code sequence.
@@ -2303,12 +2313,12 @@ where
     fn transmit_iter<D>(
         &mut self,
         data: D,
-    ) -> Result<SingleShotTxTransaction<'_, Self, IterEncoder<<D as IntoIterator>::IntoIter>>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Raw, IterEncoder<<D as IntoIterator>::IntoIter>>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>,
     {
-        let raw = &self.raw;
+        let raw = self.raw;
 
         let mut data = IterEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
@@ -2326,21 +2336,17 @@ where
         raw.clear_tx_interrupts();
         raw.start_send(false, 0);
 
-        Ok(SingleShotTxTransaction {
-            channel: self,
-            writer,
-            data,
-        })
+        Ok(SingleShotTxTransaction {raw, _phantom: PhantomData, writer, data})
     }
 
     fn transmit_enc<E>(
         &mut self,
         mut data: E,
-    ) -> Result<SingleShotTxTransaction<'_, Self, E>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, Raw, E>, Error>
     where
         E: Encoder
     {
-        let raw = &self.raw;
+        let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, raw, true);
@@ -2357,11 +2363,7 @@ where
         raw.clear_tx_interrupts();
         raw.start_send(false, 0);
 
-        Ok(SingleShotTxTransaction {
-            channel: self,
-            writer,
-            data,
-        })
+        Ok(SingleShotTxTransaction {raw, _phantom: PhantomData, writer, data})
     }
 
     /// Start transmitting the given pulse code continuously.
@@ -2371,7 +2373,7 @@ where
     fn transmit_continuously<D>(
         &mut self,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>,
@@ -2386,12 +2388,12 @@ where
         &mut self,
         loopcount: u16,
         data: D,
-    ) -> Result<ContinuousTxTransaction<'_, Self>, Error>
+    ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
     where
         D: IntoIterator,
         D::Item: Borrow<PulseCode>,
     {
-        let raw = &self.raw;
+        let raw = self.raw;
 
         let mut data = IterEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
@@ -2407,32 +2409,33 @@ where
 
         raw.start_send(true, loopcount);
 
-        Ok(ContinuousTxTransaction { channel: self })
+        Ok(ContinuousTxTransaction { raw, _phantom: PhantomData })
     }
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'ch, 'a, C, D, T>
+pub struct RxTransaction<'ch, 'a, Raw, D, T>
 where
-    C: RxChannel,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T>,
     T: From<PulseCode> + 'static,
 {
-    channel: &'ch mut C,
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
 
     reader: RmtReader,
 
     data: D,
 }
 
-impl<'a, C, D, T> RxTransaction<'_, 'a, C, D, T>
+impl<'a, Raw, D, T> RxTransaction<'_, 'a, Raw, D, T>
 where
-    C: RxChannel,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T>,
     T: From<PulseCode> + 'static,
 {
     fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.channel.raw();
+        let raw = self.raw;
 
         let status = raw.get_rx_status();
         match status {
@@ -2450,7 +2453,7 @@ where
                     self.reader.state = ReaderState::Done;
                 }
             }
-            Some(Event::Threshold) if C::Raw::supports_rx_wrap() => {
+            Some(Event::Threshold) if Raw::supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
 
                 self.reader.read(&mut self.data, raw, false);
@@ -2483,7 +2486,7 @@ where
             }
         };
 
-        let raw = self.channel.raw();
+        let raw = self.raw;
 
         raw.clear_rx_interrupts();
         RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
@@ -2494,9 +2497,9 @@ where
     }
 }
 
-impl<'a, C, D, T> Drop for RxTransaction<'_, 'a, C, D, T>
+impl<'a, Raw, D, T> Drop for RxTransaction<'_, 'a, Raw, D, T>
 where
-    C: RxChannel,
+    Raw: RxChannelInternal,
     D: Iterator<Item = &'a mut T>,
     T: From<PulseCode> + 'static,
 {
@@ -2505,7 +2508,7 @@ where
         // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
         // block in the meantime, such that subsequent uses of the channel are
         // safe (i.e. start from a state where the hardware is stopped).
-        let raw = self.channel.raw();
+        let raw = self.raw;
 
         // STATE should be RxIdle if the transaction was polled to completion
         if RmtState::load(raw, Ordering::Relaxed) == RmtState::RxBlocking {
@@ -2523,13 +2526,8 @@ where
 
 /// Channel is RX mode
 pub trait RxChannel: Sized {
-    // Currently required such that `impl RxChannel` is all that is needed to use
-    // `RxTransaction`.
-    #[doc(hidden)]
+    /// FIXME: docs
     type Raw: RxChannelInternal;
-
-    #[doc(hidden)]
-    fn raw(&self) -> &Self::Raw;
 
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
@@ -2538,7 +2536,7 @@ pub trait RxChannel: Sized {
     fn receive<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter, T>, Error>
+    ) -> Result<RxTransaction<'ch, 'a, Self::Raw, D::IntoIter, T>, Error>
     where
         D: IntoIterator<Item = &'a mut T>,
         T: From<PulseCode> + 'static;
@@ -2550,22 +2548,18 @@ where
 {
     type Raw = Raw;
 
-    fn raw(&self) -> &Raw {
-        &self.raw
-    }
-
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     fn receive<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, Self, D::IntoIter, T>, Error>
+    ) -> Result<RxTransaction<'ch, 'a, Raw, D::IntoIter, T>, Error>
     where
         D: IntoIterator<Item = &'a mut T>,
         T: From<PulseCode> + 'static,
     {
-        let raw = &self.raw;
+        let raw = self.raw;
 
         let data = data.into_iter();
         let reader = RmtReader::new();
@@ -2575,11 +2569,7 @@ where
         raw.clear_rx_interrupts();
         raw.start_receive(true);
 
-        Ok(RxTransaction {
-            channel: self,
-            reader,
-            data,
-        })
+        Ok(RxTransaction {raw, _phantom: PhantomData, reader, data})
     }
 }
 
@@ -2593,7 +2583,8 @@ where
     Raw: TxChannelInternal,
     E: Encoder,
 {
-    raw: &'ch mut Raw,
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
 
     writer: RmtWriterOuter,
 
@@ -2613,7 +2604,7 @@ where
         // Note that STATE is only accessed from a single core and no ISR here, so
         // Relaxed access is sufficient.
         let this = self.get_mut();
-        let raw: &mut Raw = this.raw;
+        let raw = this.raw;
 
         match this.writer.state {
             WriterState::Empty => {
@@ -2683,7 +2674,7 @@ where
     E: Encoder,
 {
     fn drop(&mut self) {
-        let raw: &mut Raw = self.raw;
+        let raw = self.raw;
 
         // STATE should be TxIdle if the future was polled to completion
         if RmtState::load(raw, Ordering::Relaxed) == RmtState::TxAsync {
@@ -2704,7 +2695,7 @@ pub trait TxChannelAsync {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit(&mut self, data: &[PulseCode]) -> Result<(), Error>
+    async fn transmit<'a>(&'a mut self, data: &'a [PulseCode]) -> Result<(), Error>
     where
         Self: Sized;
 
@@ -2727,11 +2718,12 @@ impl<Raw> TxChannelAsync for Channel<Async, Raw>
 where
     Raw: TxChannelInternal,
 {
-    fn transmit(&mut self, data: &[PulseCode]) -> impl Future<Output = Result<(), Error>>
+    // fn transmit(&mut self, data: &[PulseCode]) -> impl Future<Output = Result<(), Error>>
+    fn transmit<'a>(&'a mut self, data: &'a [PulseCode]) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized
     {
-        let raw = &mut self.raw;
+        let raw = self.raw;
 
         // FIXME: copy over the modified validation code from the blocking code
 
@@ -2739,7 +2731,7 @@ where
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, raw, true);
         
-        let fut = RmtTxFuture { raw, writer, data };
+        let fut = RmtTxFuture { raw, _phantom: PhantomData, writer, data };
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2773,13 +2765,13 @@ where
         D::IntoIter: Unpin,
         D::Item: Borrow<PulseCode>,
     {
-        let raw = &mut self.raw;
+        let raw = self.raw;
 
         let mut data = IterEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, raw, true);
         
-        let fut = RmtTxFuture { raw, writer, data };
+        let fut = RmtTxFuture { raw, _phantom: PhantomData, writer, data };
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2808,12 +2800,12 @@ where
         Self: Sized,
         E: Encoder + Unpin,
     {
-        let raw = &mut self.raw;
+        let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, raw, true);
         
-        let fut = RmtTxFuture { raw, writer, data };
+        let fut = RmtTxFuture { raw, _phantom: PhantomData, writer, data };
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2845,7 +2837,8 @@ where
     D: Iterator<Item = &'a mut T> + Unpin,
     T: From<PulseCode> + 'static,
 {
-    raw: &'ch mut Raw,
+    raw: Raw,
+    _phantom: PhantomData<&'ch mut Raw>,
 
     reader: RmtReader,
 
@@ -2862,7 +2855,7 @@ where
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
-        let raw: &mut Raw = this.raw;
+        let raw = this.raw;
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
@@ -2908,7 +2901,7 @@ where
     T: From<PulseCode> + 'static,
 {
     fn drop(&mut self) {
-        let raw: &mut Raw = self.raw;
+        let raw = self.raw;
 
         // STATE should be RxIdle if the future was polled to completion
         if RmtState::load(raw, Ordering::Relaxed) == RmtState::RxAsync {
@@ -2929,7 +2922,7 @@ pub trait RxChannelAsync {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<'a, D, T>(&mut self, data: D) -> Result<usize, Error>
+    async fn receive<'a, D, T>(&'a mut self, data: D) -> Result<usize, Error>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
@@ -2941,14 +2934,14 @@ impl<Raw> RxChannelAsync for Channel<Async, Raw>
 where
     Raw: RxChannelInternal,
 {
-    fn receive<'a, D, T>(&mut self, data: D) -> impl Future<Output = Result<usize, Error>>
+    fn receive<'a, D, T>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
         D::IntoIter: Unpin,
         T: From<PulseCode> + 'static,
     {
-        let raw = &mut self.raw;
+        let raw = self.raw;
 
         let data = data.into_iter();
         let reader = RmtReader::new();
@@ -2959,7 +2952,7 @@ where
         raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
         raw.start_receive(true);
 
-        RmtRxFuture { raw, reader, data }
+        RmtRxFuture { raw, _phantom: PhantomData, reader, data }
     }
 }
 
