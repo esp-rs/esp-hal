@@ -217,7 +217,7 @@
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
-    borrow::Borrow,
+    borrow::{Borrow, BorrowMut},
     default::Default,
     marker::PhantomData,
     mem::ManuallyDrop,
@@ -2521,24 +2521,25 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 // FIXME: This is essentially the same as SingleShotTxTransaction. Is it
 // possible to share most of the code?
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, Raw, E>
+struct RmtTxFuture<'a, Raw, D, E>
 where
     Raw: TxChannelInternal,
+    D: BorrowMut<E>,
     E: Encoder,
 {
     raw: Raw,
-    _phantom: PhantomData<&'a mut Raw>,
+    _phantom: PhantomData<(&'a mut Raw, E)>,
 
     writer: RmtWriterOuter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    // FIXME: Maybe store by reference &'a mut encoder?
-    data: E,
+    data: D,
 }
 
-impl<Raw, E> Future for RmtTxFuture<'_, Raw, E>
+impl<Raw, D, E> Future for RmtTxFuture<'_, Raw, D, E>
 where
     Raw: TxChannelInternal,
+    D: BorrowMut<E> + Unpin,
     E: Encoder + Unpin,
 {
     type Output = Result<(), Error>;
@@ -2582,7 +2583,7 @@ where
 
                 if this.writer.state == WriterState::Active {
                     // re-fill TX RAM
-                    this.writer.write(&mut this.data, raw, false);
+                    this.writer.write(this.data.borrow_mut(), raw, false);
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
@@ -2611,9 +2612,10 @@ where
     }
 }
 
-impl<Raw, E> Drop for RmtTxFuture<'_, Raw, E>
+impl<Raw, D, E> Drop for RmtTxFuture<'_, Raw, D, E>
 where
     Raw: TxChannelInternal,
+    D: BorrowMut<E>,
     E: Encoder,
 {
     fn drop(&mut self) {
@@ -2652,7 +2654,7 @@ pub trait TxChannelAsync {
         D::Item: Borrow<PulseCode>;
 
     /// FIXME: docs
-    async fn transmit_enc<E>(&mut self, data: E) -> Result<(), Error>
+    async fn transmit_enc<'a, E>(&'a mut self, data: &'a mut E) -> Result<(), Error>
     where
         Self: Sized,
         E: Encoder + Unpin;
@@ -2670,16 +2672,14 @@ where
 
         // FIXME: copy over the modified validation code from the blocking code
 
-        let mut data = SliceEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture {
             raw,
             _phantom: PhantomData,
-            writer,
-            data,
+            writer: RmtWriterOuter::new(),
+            data: SliceEncoder::new(data),
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2715,16 +2715,14 @@ where
     {
         let raw = self.raw;
 
-        let mut data = IterEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture {
             raw,
             _phantom: PhantomData,
-            writer,
-            data,
+            writer: RmtWriterOuter::new(),
+            data: IterEncoder::new(data),
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2748,22 +2746,21 @@ where
         fut
     }
 
-    fn transmit_enc<E>(&mut self, mut data: E) -> impl Future<Output = Result<(), Error>>
+    fn transmit_enc<'a, E>(&'a mut self, data: &'a mut E) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         E: Encoder + Unpin,
     {
         let raw = self.raw;
 
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        let fut = RmtTxFuture {
+        let mut fut = RmtTxFuture::<_, &mut E, E> {
             raw,
             _phantom: PhantomData,
-            writer,
+            writer: RmtWriterOuter::new(),
             data,
         };
+
+        fut.writer.write(fut.data.borrow_mut(), raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
