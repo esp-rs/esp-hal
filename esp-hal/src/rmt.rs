@@ -736,6 +736,7 @@ impl RmtWriterOuter {
         // that it is only monomorphized for different `data` types: There
         // should be no significant benefit from statically knowing the channel
         // number here.
+        #[inline(never)]
         fn inner(
             this: &mut RmtWriterOuter,
             data: &mut impl Encoder,
