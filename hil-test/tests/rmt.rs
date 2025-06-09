@@ -506,12 +506,30 @@ mod tests {
     async fn rmt_pin_reconfigure() {
         use esp_hal::rmt::{TxChannelCreator, TxChannelAsync};
 
-        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
         let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
 
+        let mut ch0 ={
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap().into_async();
+            let mut ch0 = rmt
+                .channel0
+                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(1, true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+
+            ch0
+        };
+
+        let _input = Input::new(tx.reborrow(), Default::default());
+
         {
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap().into_async();
+
+            // FIXME: Allow reborrow of ChannelCreator!
             let mut ch0 = rmt
                 .channel0
                 .configure_tx(tx.reborrow(), TxChannelConfig::default())
@@ -522,18 +540,7 @@ mod tests {
             ch0.transmit(&tx_data).await.unwrap();
         }
 
-        let _input = Input::new(tx.reborrow(), Default::default());
-
-        {
-            // FIXME: Allow reborrow of ChannelCreator!
-            // let mut ch0 = rmt
-            //     .channel0
-            //     .configure_tx(tx.reborrow(), TxChannelConfig::default())
-            //     .unwrap();
-            //
-            // let tx_data: [_; 10] = generate_tx_data(1, true);
-            //
-            // ch0.transmit(&tx_data).await.unwrap();
-        }
+        let tx_data: [_; 10] = generate_tx_data(1, true);
+        ch0.transmit(&tx_data).await.unwrap();
     }
 }
