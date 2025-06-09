@@ -98,7 +98,10 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    make_git_changes(!args.no_dry_run, &plan_source, &plan)?;
+    let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
+
+    open_pull_request(&branch, !args.no_dry_run, &plan_source, &plan)
+        .with_context(|| "Failed to open pull request")?;
 
     if !args.no_dry_run {
         println!(
@@ -109,12 +112,16 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     Ok(())
 }
 
-fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) -> Result<()> {
+pub(crate) struct Branch {
+    pub name: String,
+    pub upstream: String,
+}
+
+pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -> Result<Branch> {
     // Find an available branch name
     let branch_name = format!(
         "{branch_name}-{}",
         jiff::Timestamp::now().strftime("%Y-%m-%d"),
-        branch_name = "release-branch",
     );
 
     let upstream = get_remote_name_for("esp-rs/esp-hal")?;
@@ -140,10 +147,11 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
+        Command::new("git").arg("add").arg(".").status().context("Failed to stage changes")?;
         Command::new("git")
             .arg("commit")
-            .arg("-am")
-            .arg("Finalize crates for release")
+            .arg("-m")
+            .arg(commit)
             .status()
             .context("Failed to commit changes")?;
     }
@@ -174,6 +182,18 @@ fn make_git_changes(dry_run: bool, release_plan_str: &str, release_plan: &Plan) 
         extract_url_from_push(&String::from_utf8_lossy(&message.stderr)) // git outputs to stderr
     };
 
+    Ok(Branch {
+        name: branch_name,
+        upstream: url,
+    })
+}
+
+fn open_pull_request(
+    branch: &Branch,
+    dry_run: bool,
+    release_plan_str: &str,
+    release_plan: &Plan,
+) -> Result<()> {
     // Open a pull request
 
     let packages_to_release = release_plan
@@ -216,7 +236,7 @@ cargo xrelease publish-plan --no-dry-run
     // TODO: don't forget to update the PR text once we have the `publish` command
     // updated.
 
-    let pr_url_base = comparison_url(&release_plan.base, &url, &branch_name)?;
+    let pr_url_base = comparison_url(&release_plan.base, &branch.upstream, &branch.name)?;
 
     // Query string options are documented at: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/using-query-parameters-to-create-a-pull-request
     let mut open_pr_url = format!(
@@ -254,7 +274,6 @@ cargo xrelease publish-plan --no-dry-run
     }
 
     println!("Create the release PR and follow the next steps laid out there.");
-
     Ok(())
 }
 
@@ -268,7 +287,7 @@ fn extract_url_from_push(output: &str) -> String {
         .to_string()
 }
 
-fn comparison_url(base: &str, url: &str, branch_name: &str) -> Result<String> {
+pub(crate) fn comparison_url(base: &str, url: &str, branch_name: &str) -> Result<String> {
     let url = if url.starts_with("https://github.com/esp-rs/") {
         format!("https://github.com/esp-rs/esp-hal/compare/{base}...{branch_name}")
     } else {

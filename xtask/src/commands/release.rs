@@ -5,12 +5,13 @@ pub mod bump_version;
 pub mod execute_plan;
 #[cfg(feature = "release")]
 pub mod plan;
+#[cfg(feature = "release")]
+pub mod post_release;
 pub mod publish;
 #[cfg(feature = "release")]
 pub mod publish_plan;
 pub mod semver_check;
 pub mod tag_releases;
-pub mod post_release;
 
 pub use bump_version::*;
 #[cfg(feature = "release")]
@@ -22,6 +23,7 @@ pub use publish::*;
 pub use publish_plan::*;
 pub use semver_check::*;
 pub use tag_releases::*;
+#[cfg(feature = "release")]
 pub use post_release::*;
 
 pub const PLACEHOLDER: &str = "{{currentVersion}}";
@@ -51,6 +53,10 @@ pub enum Release {
     /// the release and pushes the tags.
     #[cfg(feature = "release")]
     PublishPlan(PublishPlanArgs),
+    /// Rollover migrations steps post release.
+    /// - Create new migration guides for packages that have a migration guide
+    #[cfg(feature = "release")]
+    PostRelease,
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:
@@ -67,6 +73,4 @@ pub enum Release {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
-    /// Rollover migrations etc post release.
-    PostRelease(PostReleaseArgs),
 }

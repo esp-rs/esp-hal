@@ -1,28 +1,28 @@
 use std::fs;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use semver::Version;
-use strum::IntoEnumIterator;
-
-use crate::Package;
+use super::execute_plan::make_git_changes;
 use super::PLACEHOLDER;
+use super::Plan;
+use crate::commands::comparison_url;
 
-#[derive(Debug, Clone, clap::Args)]
-pub struct PostReleaseArgs {
-    /// Package to run the post release step on.
-    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Package::iter())]
-    packages: Vec<Package>,
-    /// Actually execute post-release actions.
-    #[arg(long)]
-    no_dry_run: bool,
-}
+pub fn post_release(workspace: &std::path::Path) -> Result<()> {
+    // Read the release plan
+    let plan_path = workspace.join("release_plan.jsonc");
+    let plan_path = crate::windows_safe_path(&plan_path);
 
-pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Result<()> {
-    for package in args
-        .packages
-        .iter()
-        .filter(|p| p.has_migration_guide(workspace))
-    {
+    let plan = Plan::from_path(&plan_path)
+        .with_context(|| format!("Failed to read release plan from {}", plan_path.display()))?;
+
+    // Process packages from the plan that have migration guides
+    for package_plan in plan.packages.iter() {
+        let package = package_plan.package;
+
+        if !package.has_migration_guide(workspace) {
+            continue;
+        }
+
         // Get the package's directory path
         let package_path = workspace.join(package.to_string());
         let cargo_toml_path = package_path.join("Cargo.toml");
@@ -51,23 +51,30 @@ pub fn post_release(workspace: &std::path::Path, args: PostReleaseArgs) -> Resul
         if !migration_file_path.exists() {
             // Create the title content
             let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
-
-            if args.no_dry_run {
-                fs::write(&migration_file_path, title)?;
-                log::info!("Created migration guide: {}", migration_file_path.display());
-            } else {
-                log::info!(
-                    "Would create migration guide: {}",
-                    migration_file_path.display()
-                );
-                continue;
-            }
+            fs::write(&migration_file_path, title)?;
+            log::info!("Created migration guide: {}", migration_file_path.display());
         } else {
             log::info!(
                 "Migration guide already exists: {}",
                 migration_file_path.display()
             );
         }
+    }
+
+    let branch = make_git_changes(false, "post-release-branch", "Post release rollover")?;
+
+    println!("Post-release migration guides created successfully.");
+
+    let pr_url_base = comparison_url(&plan.base, &branch.upstream, &branch.name)?;
+
+    let open_pr_url = format!(
+        "{pr_url_base}?quick_pull=1&title=Post+release+rollover&labels={labels}",
+        labels = "skip-changelog",
+    );
+
+    if opener::open(&open_pr_url).is_err() {
+        println!("Open the following URL to create a pull request:");
+        println!("{open_pr_url}");
     }
 
     Ok(())
