@@ -200,27 +200,6 @@ struct Device {
     peri_config: PeriConfig,
 }
 
-#[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
-struct PeriConfig {
-    #[serde(default)]
-    i2c_master: Option<I2cMasterProperties>,
-    #[serde(default)]
-    rmt: Option<RmtProperties>,
-}
-
-impl PeriConfig {
-    fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
-        /// Returns an iterator over the properties of a given peripheral.
-        fn peri_properties(
-            props: &Option<impl DriverConfig>,
-        ) -> impl Iterator<Item = (&str, Value)> {
-            props.iter().flat_map(|p| p.properties())
-        }
-
-        peri_properties(&self.i2c_master).chain(peri_properties(&self.rmt))
-    }
-}
-
 /// Represents a value in the driver configuration.
 enum Value {
     /// A numeric value. The generated macro will not include a type suffix
@@ -231,27 +210,27 @@ enum Value {
     Boolean(bool),
 }
 
-trait DriverConfig {
-    fn properties(&self) -> impl Iterator<Item = (&str, Value)>;
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Value::Number(value)
+    }
+}
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Boolean(value)
+    }
 }
 
-/// Define DriverConfig implementations.
-macro_rules! impl_driver {
-    // Generates a tuple where the value is a Number
-    (@property number, $self:ident, $group:literal, $name:ident) => {
-        (concat!($group, ".", stringify!($name)), Value::Number($self.$name))
-    };
-    (@property bool, $self:ident, $group:literal, $name:ident) => {
-        (concat!($group, ".", stringify!($name)), Value::Boolean($self.$name))
-    };
-
+/// Define driver configuration structs, and a PeriConfig struct
+/// that contains all of them.
+macro_rules! driver_configs {
     // Type of the struct fields.
     (@ty number) => { u32 };
     (@ty bool) => { bool };
 
     // Creates a single struct
     (@one
-        $struct:tt($group:literal) {
+        $struct:tt($group:ident) {
             $($(#[$meta:meta])? $name:ident: $kind:ident),* $(,)?
         }
     ) => {
@@ -259,40 +238,64 @@ macro_rules! impl_driver {
         struct $struct {
             $(
                 $(#[$meta])?
-                $name: impl_driver!(@ty $kind),
+                $name: driver_configs!(@ty $kind),
             )*
         }
 
-        impl DriverConfig for $struct {
+        impl $struct {
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
-                [
-                    $(impl_driver!(@property $kind, self, $group, $name)),*
-                ].into_iter()
+                [$( // for each property, generate a tuple
+                    (
+                        /* name: */ concat!(stringify!($group), ".", stringify!($name)),
+                        /* value: */ Value::from(self.$name),
+                    ),
+                )*].into_iter()
             }
         }
     };
 
     // Repeat pattern for multiple structs
     ($(
-        $struct:tt($group:literal) {
+        $struct:tt($group:ident) {
             $($tokens:tt)*
         }
     )+) => {
+        // Implement the config group and DriverConfig trait for each group
         $(
-            impl_driver!(@one $struct($group) {
+            driver_configs!(@one $struct($group) {
                 $($tokens)*
             });
         )+
+
+        // Generate a single PeriConfig struct that contains all the groups. Each of the
+        // groups is optional to support devices that may not have all peripherals.
+        #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
+        struct PeriConfig {
+            $(
+                // Each group is an optional struct.
+                #[serde(default)]
+                $group: Option<$struct>,
+            )+
+        }
+
+        impl PeriConfig {
+            /// Returns an iterator over all properties of all peripherals.
+            fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+                // Chain all properties from each group.
+                std::iter::empty()
+                    $(.chain(self.$group.iter().flat_map(|p| p.properties())))*
+            }
+        }
     };
 }
 
-impl_driver! {
-    RmtProperties("rmt") {
+driver_configs! {
+    RmtProperties(rmt) {
         ram_start: number,
         channel_ram_size: number,
     }
 
-    I2cMasterProperties("i2c_master") {
+    I2cMasterProperties(i2c_master) {
         #[serde(default)]
         has_fsm_timeouts: bool,
         #[serde(default)]
