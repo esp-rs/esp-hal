@@ -438,3 +438,36 @@ pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Ver
 pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
+
+pub fn update_chip_support_table(workspace: &Path) -> Result<()> {
+    let mut output = String::new();
+    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
+
+    let mut in_support_table = false;
+    let mut generate_support_table = true;
+    for line in readme.lines() {
+        let mut copy_line = true;
+        if line.trim() == "<!-- start chip support table -->" {
+            in_support_table = true;
+        } else if line.trim() == "<!-- end chip support table -->" {
+            in_support_table = false;
+        } else {
+            copy_line = !in_support_table;
+        }
+        if !copy_line {
+            continue;
+        }
+        output.push_str(line);
+        output.push('\n');
+
+        if in_support_table && generate_support_table {
+            esp_metadata::generate_chip_support_status(&mut output)?;
+
+            generate_support_table = false;
+        }
+    }
+
+    std::fs::write(workspace.join("esp-hal").join("README.md"), output)?;
+
+    Ok(())
+}
