@@ -133,6 +133,8 @@ fn main() -> Result<()> {
             Release::ExecutePlan(args) => execute_plan(&workspace, args),
             #[cfg(feature = "release")]
             Release::PublishPlan(args) => publish_plan(&workspace, args),
+            #[cfg(feature = "release")]
+            Release::PostRelease => post_release(&workspace),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),

@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
-use crate::{Package, Version, cargo::CargoToml, changelog::Changelog};
+use crate::{cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER, Package, Version};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VersionBump {
@@ -308,8 +308,6 @@ fn finalize_placeholders(
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
-    const PLACEHOLDER: &str = "{{currentVersion}}";
-
     let skip_paths = [bumped_package.package_path().join("target")];
 
     fn walk_dir(dir: &Path, skip_paths: &[PathBuf], callback: &mut impl FnMut(&Path)) {

@@ -106,6 +106,26 @@ impl Package {
             .any(|line| line.contains("asm_experimental_arch"))
     }
 
+    pub fn has_migration_guide(&self, workspace: &Path) -> bool {
+        let package_path = workspace.join(self.to_string());
+
+        // Check if the package directory exists
+        let Ok(entries) = std::fs::read_dir(&package_path) else {
+            return false;
+        };
+
+        // Look for files matching the pattern "MIGRATING-*.md"
+        for entry in entries.flatten() {
+            if let Some(file_name) = entry.file_name().to_str() {
+                if file_name.starts_with("MIGRATING-") && file_name.ends_with(".md") {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
 
