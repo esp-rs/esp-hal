@@ -190,26 +190,113 @@ struct Device {
     arch: Arch,
     cores: usize,
     trm: String,
+
     peripherals: Vec<String>,
     symbols: Vec<String>,
     memory: Vec<MemoryRegion>,
+
+    // Peripheral driver configuration:
+    #[serde(flatten)]
+    peri_config: PeriConfig,
+}
+
+#[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
+struct PeriConfig {
+    #[serde(default)]
+    i2c_master: Option<I2cMasterProperties>,
     #[serde(default)]
     rmt: Option<RmtProperties>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-struct RmtProperties {
-    ram_start: u32,
-    channel_ram_size: u32,
+impl PeriConfig {
+    fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+        /// Returns an iterator over the properties of a given peripheral.
+        fn peri_properties(
+            props: &Option<impl DriverConfig>,
+        ) -> impl Iterator<Item = (&str, Value)> {
+            props.iter().flat_map(|p| p.properties())
+        }
+
+        peri_properties(&self.i2c_master).chain(peri_properties(&self.rmt))
+    }
 }
 
-impl RmtProperties {
-    fn properties(&self) -> impl Iterator<Item = (&str, TokenStream)> {
-        [
-            ("ram_start", number(self.ram_start)),
-            ("channel_ram_size", number(self.channel_ram_size)),
-        ]
-        .into_iter()
+/// Represents a value in the driver configuration.
+enum Value {
+    /// A numeric value. The generated macro will not include a type suffix
+    /// (i.e. will not be generated as `0u32`).
+    // TODO: may add a (`name`, str) macro variant in the future if strings are needed.
+    Number(u32),
+    /// A boolean value. If true, the value is included in the cfg symbols.
+    Boolean(bool),
+}
+
+trait DriverConfig {
+    fn properties(&self) -> impl Iterator<Item = (&str, Value)>;
+}
+
+/// Define DriverConfig implementations.
+macro_rules! impl_driver {
+    // Generates a tuple where the value is a Number
+    (@property number, $self:ident, $group:literal, $name:ident) => {
+        (concat!($group, ".", stringify!($name)), Value::Number($self.$name))
+    };
+    (@property bool, $self:ident, $group:literal, $name:ident) => {
+        (concat!($group, ".", stringify!($name)), Value::Boolean($self.$name))
+    };
+
+    // Type of the struct fields.
+    (@ty number) => { u32 };
+    (@ty bool) => { bool };
+
+    // Creates a single struct
+    (@one
+        $struct:tt($group:literal) {
+            $($(#[$meta:meta])? $name:ident: $kind:ident),* $(,)?
+        }
+    ) => {
+        #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+        struct $struct {
+            $(
+                $(#[$meta])?
+                $name: impl_driver!(@ty $kind),
+            )*
+        }
+
+        impl DriverConfig for $struct {
+            fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+                [
+                    $(impl_driver!(@property $kind, self, $group, $name)),*
+                ].into_iter()
+            }
+        }
+    };
+
+    // Repeat pattern for multiple structs
+    ($(
+        $struct:tt($group:literal) {
+            $($tokens:tt)*
+        }
+    )+) => {
+        $(
+            impl_driver!(@one $struct($group) {
+                $($tokens)*
+            });
+        )+
+    };
+}
+
+impl_driver! {
+    RmtProperties("rmt") {
+        ram_start: number,
+        channel_ram_size: number,
+    }
+
+    I2cMasterProperties("i2c_master") {
+        #[serde(default)]
+        has_fsm_timeouts: bool,
+        #[serde(default)]
+        has_hw_bus_clear: bool,
     }
 }
 
@@ -250,7 +337,7 @@ impl Config {
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
-                rmt: None,
+                peri_config: PeriConfig::default(),
             },
         }
     }
@@ -305,6 +392,15 @@ impl Config {
         .into_iter()
         .chain(self.device.peripherals.iter().map(|s| s.as_str()))
         .chain(self.device.symbols.iter().map(|s| s.as_str()))
+        .chain(
+            self.device
+                .peri_config
+                .properties()
+                .filter_map(|(name, value)| match value {
+                    Value::Boolean(true) => Some(name),
+                    _ => None,
+                }),
+        )
     }
 
     /// Does the configuration contain `item`?
@@ -317,7 +413,7 @@ impl Config {
         define_all_possible_symbols();
         // Define all necessary configuration symbols for the configured device:
         for symbol in self.all() {
-            println!("cargo:rustc-cfg={symbol}");
+            println!("cargo:rustc-cfg={}", symbol.replace('.', "_"));
         }
 
         // Define env-vars for all memory regions
@@ -348,19 +444,21 @@ impl Config {
         let cores = number(self.device.cores);
         let trm = &self.device.trm;
 
-        let peripheral_properties = std::iter::once(
-            self.device.rmt.iter().map(|rmt| ("rmt", rmt.properties())),
-        )
-        .flat_map(|groups| {
-            groups.flat_map(move |(group, group_properties)| {
-                group_properties.map(move |(name, value)| {
-                    let name = format!("{group}.{name}");
-                    quote::quote! {
-                        (#name) => { #value };
+        let peripheral_properties =
+            self.device
+                .peri_config
+                .properties()
+                .flat_map(|(name, value)| match value {
+                    Value::Number(value) => {
+                        let value = number(value); // ensure no numeric suffix is added
+                        quote::quote! {
+                            (#name) => { #value };
+                        }
                     }
-                })
-            })
-        });
+                    Value::Boolean(value) => quote::quote! {
+                        (#name) => { #value };
+                    },
+                });
 
         // Not public API, can use a private macro:
         g.extend(quote::quote! {
@@ -413,7 +511,7 @@ fn define_all_possible_symbols() {
         let config = Config::for_chip(&chip);
         for symbol in config.all() {
             // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-            println!("cargo:rustc-check-cfg=cfg({})", symbol);
+            println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
         }
     }
 }
