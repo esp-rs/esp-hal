@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a typo in the ESP32-C3 memory linker script, causing ICACHE to not be defined (#3613)
 
 ### Removed
 
