@@ -12,6 +12,7 @@ use embedded_hal_sdmmc::{
     Device,
     FifoStatus,
     Reset,
+    SdBusWidth as BusWidth,
     command::Command,
     response::Response,
     tuning::{TuningMode, TuningWidth},
@@ -133,6 +134,14 @@ impl<'d> Sdio<'d> {
     /// Gets the bus mode of the SDIO peripheral.
     pub const fn bus_mode(&self) -> Mode {
         self.pins.mode()
+    }
+
+    /// Gets the bus width of the SDIO peripheral.
+    pub const fn bus_width(&self) -> BusWidth {
+        match self.bus_mode() {
+            Mode::Spi | Mode::Sd1bit => BusWidth::_1bit,
+            Mode::Sd4bit => BusWidth::_4bit,
+        }
     }
 
     /// Gets the current [State] of the SDIO peripheral.
