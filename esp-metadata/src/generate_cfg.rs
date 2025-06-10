@@ -1,5 +1,5 @@
 use core::str::FromStr;
-use std::sync::OnceLock;
+use std::{fmt::Write, sync::OnceLock};
 
 use anyhow::{Result, bail};
 use proc_macro2::TokenStream;
@@ -221,9 +221,50 @@ impl From<bool> for Value {
     }
 }
 
+#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+enum SupportStatus {
+    NotSupported,
+    #[default] // Just the common option to reduce visual noise of "declare only" drivers.
+    Partial,
+    Supported,
+}
+
+impl SupportStatus {
+    fn icon(self) -> &'static str {
+        match self {
+            SupportStatus::NotSupported => "❌",
+            SupportStatus::Partial => "⚒️",
+            SupportStatus::Supported => "✔️",
+        }
+    }
+
+    fn status(self) -> &'static str {
+        match self {
+            SupportStatus::NotSupported => "Not supported",
+            SupportStatus::Partial => "Partial support",
+            SupportStatus::Supported => "Supported",
+        }
+    }
+}
+
+struct SupportItem {
+    name: &'static str,
+    config_group: &'static str,
+    symbols: &'static [&'static str],
+}
+
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
+    // Generates a tuple where the value is a Number
+    (@property number, $self:ident, $group:literal, $name:ident) => {
+        (concat!($group, ".", stringify!($name)), Value::Number($self.$name))
+    };
+    (@property bool, $self:ident, $group:literal, $name:ident) => {
+        (concat!($group, ".", stringify!($name)), Value::Boolean($self.$name))
+    };
+
     // Type of the struct fields.
     (@ty number) => { u32 };
     (@ty bool) => { bool };
@@ -231,23 +272,32 @@ macro_rules! driver_configs {
     // Creates a single struct
     (@one
         $struct:tt($group:ident) {
-            $($(#[$meta:meta])? $name:ident: $kind:ident),* $(,)?
+            $($(#[$meta:meta])? $config:ident: $kind:ident),* $(,)?
         }
     ) => {
         #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
         struct $struct {
+            #[serde(default)]
+            status: SupportStatus,
+            // If empty, the driver supports a single instance only.
+            #[serde(default)]
+            instances: Vec<String>,
             $(
                 $(#[$meta])?
-                $name: driver_configs!(@ty $kind),
+                $config: driver_configs!(@ty $kind),
             )*
         }
 
         impl $struct {
+            fn support_status(&self) -> SupportStatus {
+                self.status
+            }
+
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
                 [$( // for each property, generate a tuple
                     (
-                        /* name: */ concat!(stringify!($group), ".", stringify!($name)),
-                        /* value: */ Value::from(self.$name),
+                        /* name: */ concat!(stringify!($group), ".", stringify!($config)),
+                        /* value: */ Value::from(self.$config),
                     ),
                 )*].into_iter()
             }
@@ -256,52 +306,365 @@ macro_rules! driver_configs {
 
     // Repeat pattern for multiple structs
     ($(
-        $struct:tt($group:ident) {
-            $($tokens:tt)*
+        $struct:tt {
+            // This name will be emitted as a cfg symbol, to activate a driver.
+            driver: $driver:ident,
+            // Driver name, used in the generated documentation.
+            name: $name:literal,
+            // The list of peripheral symbols that this driver supports. For now this is used to
+            // double-check the configuration.
+            // TODO: remove once the metadata encodes which instances are supported.
+            peripherals: $symbols:expr,
+            properties: {
+                $($tokens:tt)*
+            }
         }
-    )+) => {
-        // Implement the config group and DriverConfig trait for each group
+    ),+ $(,)?) => {
+        // Implement the config driver and DriverConfig trait for each driver
         $(
-            driver_configs!(@one $struct($group) {
+            driver_configs!(@one $struct($driver) {
                 $($tokens)*
             });
         )+
 
-        // Generate a single PeriConfig struct that contains all the groups. Each of the
-        // groups is optional to support devices that may not have all peripherals.
+        // Generate a single PeriConfig struct that contains all the drivers. Each of the
+        // drivers is optional to support devices that may not have all peripherals.
         #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
         struct PeriConfig {
             $(
-                // Each group is an optional struct.
+                // Each driver is an optional struct.
                 #[serde(default)]
-                $group: Option<$struct>,
+                $driver: Option<$struct>,
             )+
         }
 
         impl PeriConfig {
+            fn drivers() -> &'static [SupportItem] {
+                &[
+                    $(
+                        SupportItem {
+                            name: $name,
+                            config_group: stringify!($driver),
+                            symbols: $symbols,
+                        },
+                    )+
+                ]
+            }
+
+            /// Returns an iterator over all driver names, that are
+            /// available on the selected device.
+            fn driver_names(&self) -> impl Iterator<Item = &str> {
+                // Chain all driver names from each driver.
+                std::iter::empty()
+                    $(.chain(self.$driver.as_ref().and_then(|d| {
+                        if !matches!(d.status, SupportStatus::NotSupported) {
+                            Some(stringify!($driver))
+                        } else {
+                            None
+                        }
+                    } )))*
+            }
+
             /// Returns an iterator over all properties of all peripherals.
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
-                // Chain all properties from each group.
+                // Chain all properties from each driver.
                 std::iter::empty()
-                    $(.chain(self.$group.iter().flat_map(|p| p.properties())))*
+                    $(.chain(self.$driver.iter().flat_map(|p| p.properties())))*
+            }
+
+            /// Returns the support status of a peripheral by its name.
+            fn support_status(&self, peripheral: &str) -> Option<SupportStatus> {
+                // Find the driver by name and return its support status.
+                match peripheral {
+                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status()),)*
+                    _ => None, // If the peripheral is not found, return None.
+                }
             }
         }
     };
 }
 
-driver_configs! {
-    RmtProperties(rmt) {
-        ram_start: number,
-        channel_ram_size: number,
-    }
-
-    I2cMasterProperties(i2c_master) {
-        #[serde(default)]
-        has_fsm_timeouts: bool,
-        #[serde(default)]
-        has_hw_bus_clear: bool,
-    }
-}
+// TODO: sort this similar to how the product portfolio is organized
+driver_configs![
+    AdcProperties {
+        driver: adc,
+        name: "ADC",
+        peripherals: &["adc1", "adc2"],
+        properties: {}
+    },
+    AesProperties {
+        driver: aes,
+        name: "AES",
+        peripherals: &["aes"],
+        properties: {}
+    },
+    AssistDebugProperties {
+        driver: assist_debug,
+        name: "ASSIST_DEBUG",
+        peripherals: &["assist_debug"],
+        properties: {}
+    },
+    DacProperties {
+        driver: dac,
+        name: "DAC",
+        peripherals: &["dac"],
+        properties: {}
+    },
+    DmaProperties {
+        driver: dma,
+        name: "DMA",
+        peripherals: &["pdma", "gdma"],
+        properties: {}
+    },
+    DsProperties {
+        driver: ds,
+        name: "DS",
+        peripherals: &["ds"],
+        properties: {}
+    },
+    EccProperties {
+        driver: ecc,
+        name: "ECC",
+        peripherals: &["ecc"],
+        properties: {}
+    },
+    EthernetProperties {
+        driver: ethernet,
+        name: "Ethernet",
+        peripherals: &["emac"],
+        properties: {}
+    },
+    EtmProperties {
+        driver: etm,
+        name: "ETM",
+        peripherals: &["soc_etm"],
+        properties: {}
+    },
+    GpioProperties {
+        driver: gpio,
+        name: "GPIO",
+        peripherals: &["gpio"],
+        properties: {}
+    },
+    HmacProperties {
+        driver: hmac,
+        name: "HMAC",
+        peripherals: &["hmac"],
+        properties: {}
+    },
+    I2cMasterProperties {
+        driver: i2c_master,
+        name: "I2C master",
+        peripherals: &["i2c0", "i2c1"],
+        properties: {
+            #[serde(default)]
+            has_fsm_timeouts: bool,
+            #[serde(default)]
+            has_hw_bus_clear: bool,
+        }
+    },
+    I2cSlaveProperties {
+        driver: i2c_slave,
+        name: "I2C slave",
+        peripherals: &["i2c0", "i2c1"],
+        properties: {}
+    },
+    I2sProperties {
+        driver: i2s,
+        name: "I2S",
+        peripherals: &["i2s0", "i2s1"],
+        properties: {}
+    },
+    InterruptProperties {
+        driver: interrupts,
+        name: "Interrupts",
+        peripherals: &[],
+        properties: {}
+    },
+    IoMuxProperties {
+        driver: io_mux,
+        name: "IOMUX",
+        peripherals: &["io_mux"],
+        properties: {}
+    },
+    CameraProperties {
+        driver: camera,
+        name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
+        peripherals: &[],
+        properties: {}
+    },
+    RgbProperties {
+        driver: rgb_display,
+        name: "RGB display", // LCD_CAM, ESP32 I2S, S2 SPI
+        peripherals: &[],
+        properties: {}
+    },
+    LedcProperties {
+        driver: ledc,
+        name: "LEDC",
+        peripherals: &["ledc"],
+        properties: {}
+    },
+    McpwmProperties {
+        driver: mcpwm,
+        name: "MCPWM",
+        peripherals: &["mcpwm0", "mcpwm1"],
+        properties: {}
+    },
+    ParlIoProperties {
+        driver: parl_io,
+        name: "PARL_IO",
+        peripherals: &["parl_io"],
+        properties: {}
+    },
+    PcntProperties {
+        driver: pcnt,
+        name: "PCNT",
+        peripherals: &["pcnt"],
+        properties: {}
+    },
+    PsramProperties {
+        driver: psram,
+        name: "PSRAM",
+        peripherals: &["psram"],
+        properties: {}
+    },
+    RmtProperties {
+        driver: rmt,
+        name: "RMT",
+        peripherals: &["rmt"],
+        properties: {
+            ram_start: number,
+            channel_ram_size: number,
+        }
+    },
+    RngProperties {
+        driver: rng,
+        name: "RNG",
+        peripherals: &["rng"],
+        properties: {}
+    },
+    RsaProperties {
+        driver: rsa,
+        name: "RSA",
+        peripherals: &["rsa"],
+        properties: {}
+    },
+    SdHostProperties {
+        driver: sd_host,
+        name: "SDIO host",
+        peripherals: &["sdhost"],
+        properties: {}
+    },
+    SdSlaveProperties {
+        driver: sd_slave,
+        name: "SDIO slave",
+        peripherals: &["slchost"],
+        properties: {}
+    },
+    SleepProperties {
+        driver: sleep,
+        name: "Light/deep sleep",
+        peripherals: &[],
+        properties: {}
+    },
+    ShaProperties {
+        driver: sha,
+        name: "SHA",
+        peripherals: &["sha"],
+        properties: {}
+    },
+    SpiMasterProperties {
+        driver: spi_master,
+        name: "SPI master",
+        peripherals: &["spi2", "spi3"],
+        properties: {}
+    },
+    SpiSlaveProperties {
+        driver: spi_slave,
+        name: "SPI slave",
+        peripherals: &["spi2", "spi3"],
+        properties: {}
+    },
+    SysTimerProperties {
+        driver: systimer,
+        name: "SYSTIMER",
+        peripherals: &["systimer"],
+        properties: {}
+    },
+    TempProperties {
+        driver: temp_sensor,
+        name: "Temperature sensor",
+        peripherals: &[],
+        properties: {}
+    },
+    TimersProperties {
+        driver: timers,
+        name: "Timers",
+        peripherals: &["timg0", "timg1"],
+        properties: {}
+    },
+    TouchProperties {
+        driver: touch,
+        name: "Touch",
+        peripherals: &["touch"],
+        properties: {}
+    },
+    TwaiProperties {
+        driver: twai,
+        name: "TWAI",
+        peripherals: &["twai0", "twai1"],
+        properties: {}
+    },
+    UartProperties {
+        driver: uart,
+        name: "UART",
+        peripherals: &["uart0", "uart1", "uart2"],
+        properties: {}
+    },
+    UlpFsmProperties {
+        driver: ulp_fsm,
+        name: "ULP (FSM)",
+        peripherals: &["ulp_supported"],
+        properties: {}
+    },
+    UlpRiscvProperties {
+        driver: ulp_riscv,
+        name: "ULP (RISC-V)",
+        peripherals: &["ulp_riscv_core", "lp_core"],
+        properties: {}
+    },
+    UsbOtgProperties {
+        driver: usb_otg,
+        name: "USB OTG FS",
+        peripherals: &["usb0"],
+        properties: {}
+    },
+    UsbSerialJtagProperties {
+        driver: usb_serial_jtag,
+        name: "USB Serial/JTAG",
+        peripherals: &["usb_device"],
+        properties: {}
+    },
+    WifiProperties {
+        driver: wifi,
+        name: "WIFI",
+        peripherals: &["wifi"],
+        properties: {}
+    },
+    BluetoothProperties {
+        driver: bt,
+        name: "Bluetooth",
+        peripherals: &["bt"],
+        properties: {}
+    },
+    IeeeProperties {
+        driver: ieee802154,
+        name: "IEEE 802.15.4",
+        peripherals: &["ieee802154"],
+        properties: {}
+    },
+];
 
 // Output a Display-able value as a TokenStream, intended to generate numbers
 // without the type suffix.
@@ -395,6 +758,7 @@ impl Config {
         .into_iter()
         .chain(self.device.peripherals.iter().map(|s| s.as_str()))
         .chain(self.device.symbols.iter().map(|s| s.as_str()))
+        .chain(self.device.peri_config.driver_names())
         .chain(
             self.device
                 .peri_config
@@ -518,4 +882,98 @@ fn define_all_possible_symbols() {
             println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
         }
     }
+}
+
+pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
+    let nothing = "";
+
+    // Calculate the width of the first column.
+    let driver_col_width = std::iter::once("Driver")
+        .chain(PeriConfig::drivers().iter().map(|i| i.name))
+        .map(|c| c.len())
+        .max()
+        .unwrap();
+
+    // Header
+    write!(output, "| {:width$} |", "Driver", width = driver_col_width)?;
+    for chip in Chip::iter() {
+        write!(output, " {} |", chip.pretty_name())?;
+    }
+    writeln!(output)?;
+
+    // Header separator
+    write!(output, "| {nothing:-<width$} |", width = driver_col_width)?;
+    for chip in Chip::iter() {
+        write!(
+            output,
+            ":{nothing:-<width$}:|",
+            width = chip.pretty_name().len()
+        )?;
+    }
+    writeln!(output)?;
+
+    // Driver support status
+    for SupportItem {
+        name,
+        symbols,
+        config_group,
+    } in PeriConfig::drivers()
+    {
+        write!(output, "| {name:width$} |", width = driver_col_width)?;
+        for chip in Chip::iter() {
+            let config = Config::for_chip(&chip);
+
+            let status = config
+                .device
+                .peri_config
+                .support_status(config_group)
+                .inspect(|status| {
+                    // TODO: this is good for double-checking, but it should probably go the
+                    // other way around. Driver config should define what peripheral symbols exist.
+                    assert!(
+                        matches!(status, SupportStatus::NotSupported)
+                            || symbols.is_empty()
+                            || symbols.iter().any(|p| config.contains(p)),
+                        "{} has configuration for {} but no compatible symbols have been defined",
+                        chip.pretty_name(),
+                        config_group
+                    );
+                })
+                .or_else(|| {
+                    // If the driver is not supported by the chip, we return None.
+                    if symbols.iter().any(|p| config.contains(p)) {
+                        Some(SupportStatus::NotSupported)
+                    } else {
+                        None
+                    }
+                });
+            let status_icon = match status {
+                None => " ",
+                Some(status) => status.icon(),
+            };
+            // VSCode displays emojis just a bit wider than 2 characters, making this
+            // approximation a bit too wide but good enough.
+            let support_cell_width = chip.pretty_name().len() - status.is_some() as usize;
+            write!(
+                output,
+                " {status_icon:width$} |",
+                width = support_cell_width
+            )?;
+        }
+        writeln!(output)?;
+    }
+
+    writeln!(output)?;
+
+    // Print legend
+    writeln!(output, " * Empty cell: not available")?;
+    for s in [
+        SupportStatus::NotSupported,
+        SupportStatus::Partial,
+        SupportStatus::Supported,
+    ] {
+        writeln!(output, " * {}: {}", s.icon(), s.status())?;
+    }
+
+    Ok(())
 }

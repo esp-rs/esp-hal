@@ -1,3 +1,10 @@
+# ESP32-S3 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32s3"
 arch  = "xtensa"
@@ -36,6 +43,7 @@ peripherals = [
     "rtc_cntl",
     "rtc_i2c",
     "rtc_io",
+    "sdhost",
     "sens",
     "sensitive",
     "sha",
@@ -92,17 +100,69 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
-
-    # Other capabilities
-    "psram_dma",
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+
 [device.rmt]
+status = "partial"
 ram_start = 0x60016800
 channel_ram_size = 48
 
-[device.i2c_master]
-has_fsm_timeouts = true
-has_hw_bus_clear = true
+[device.spi_master]
+status = "supported"
+
+[device.uart]
+status = "supported"
+
+[device.touch]
+status = "not_supported"
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.ds]
+[device.rsa]
+[device.hmac]
+[device.sha]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.camera]
+[device.rgb_display]
+[device.ledc]
+[device.mcpwm]
+[device.pcnt]
+[device.sd_host]
+[device.spi_slave]
+[device.twai]
+[device.usb_otg]
+[device.usb_serial_jtag]
+
+## Miscellaneous
+[device.adc]
+[device.assist_debug]
+[device.dma]
+[device.interrupts]
+[device.io_mux]
+[device.psram]
+[device.sleep]
+[device.systimer]
+[device.temp_sensor]
+[device.timers]
+[device.ulp_fsm]
+[device.ulp_riscv]
+
+## Radio
+[device.wifi]
+[device.bt]

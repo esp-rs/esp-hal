@@ -40,6 +40,8 @@ enum Cli {
     SemverCheck(SemverCheckArgs),
     /// Check the changelog for packages.
     CheckChangelog(CheckChangelogArgs),
+    /// Re-generate the chip support table in the esp-hal README.
+    UpdateChipSupportTable,
 }
 
 #[derive(Debug, Args)]
@@ -142,6 +144,12 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
+        Cli::UpdateChipSupportTable => {
+            // Re-generate the chip support table in the esp-hal README.
+            // This is a no-op if the table is already up-to-date.
+            xtask::update_chip_support_table(&workspace)?;
+            Ok(())
+        }
     }
 }
 

@@ -1,3 +1,10 @@
+# ESP32-S2 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32s2"
 arch  = "xtensa"
@@ -57,6 +64,7 @@ symbols = [
     "phy",
     "wifi",
     "psram",
+    "psram_dma",
     "ulp_riscv_core",
     "timg_timer1",
     "large_intr_status",
@@ -75,13 +83,64 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
-
-    # Other capabilities
-    "psram_dma",
 ]
 
 memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
 
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+
 [device.rmt]
+status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
+
+[device.spi_master]
+status = "supported"
+
+[device.uart]
+status = "supported"
+
+[device.rgb_display]
+status = "not_supported"
+
+[device.touch]
+status = "not_supported"
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.ds]
+[device.rsa]
+[device.hmac]
+[device.sha]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.ledc]
+[device.spi_slave]
+[device.pcnt]
+[device.twai]
+[device.usb_otg]
+
+## Miscellaneous
+[device.adc]
+[device.dac]
+[device.dma]
+[device.interrupts]
+[device.io_mux]
+[device.psram]
+[device.sleep]
+[device.systimer]
+[device.timers]
+[device.temp_sensor]
+[device.ulp_fsm]
+[device.ulp_riscv]
+
+## Radio
+[device.wifi]
