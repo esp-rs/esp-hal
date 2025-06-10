@@ -493,6 +493,7 @@ impl Config {
         g.extend(quote::quote! {
             /// Macro to get the address range of the given memory region.
             #[macro_export]
+            #[doc(hidden)]
             macro_rules! memory_range {
                 #(#region_branches)*
             }
