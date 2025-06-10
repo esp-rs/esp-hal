@@ -2208,7 +2208,7 @@ where
 {
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
-    pub fn bench<'d>(&mut self, data: &'d [PulseCode]) -> usize {
+    pub fn bench(&mut self, data: &[PulseCode]) -> usize {
         let mut data = SliceEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, self.raw, true);
