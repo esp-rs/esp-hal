@@ -1360,8 +1360,6 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
             chip_specific::g_misc_nvs = addr_of!(NVS_STRUCT) as u32;
         }
 
-        crate::flags::WIFI.store(true, Ordering::SeqCst);
-
         Ok(())
     }
 }
@@ -1398,11 +1396,10 @@ pub(crate) unsafe extern "C" fn coex_init() -> i32 {
     0
 }
 
-pub(crate) fn wifi_deinit() -> Result<(), crate::InitializationError> {
+fn wifi_deinit() -> Result<(), crate::InitializationError> {
     esp_wifi_result!(unsafe { esp_wifi_stop() })?;
     esp_wifi_result!(unsafe { esp_wifi_deinit_internal() })?;
     esp_wifi_result!(unsafe { esp_supplicant_deinit() })?;
-    crate::flags::WIFI.store(false, Ordering::Release);
     Ok(())
 }
 
@@ -2613,7 +2610,7 @@ pub struct Interfaces<'d> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn new<'d>(
-    inited: &'d EspWifiController<'d>,
+    _inited: &'d EspWifiController<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if crate::is_interrupts_disabled() {
@@ -2624,30 +2621,25 @@ pub fn new<'d>(
         _phantom: Default::default(),
     };
 
-    if !inited.wifi() {
-        crate::wifi::wifi_init()?;
+    crate::wifi::wifi_init()?;
 
-        let mut cntry_code = [0u8; 3];
-        cntry_code[..crate::CONFIG.country_code.len()]
-            .copy_from_slice(crate::CONFIG.country_code.as_bytes());
-        cntry_code[2] = crate::CONFIG.country_code_operating_class;
+    let mut cntry_code = [0u8; 3];
+    cntry_code[..crate::CONFIG.country_code.len()]
+        .copy_from_slice(crate::CONFIG.country_code.as_bytes());
+    cntry_code[2] = crate::CONFIG.country_code_operating_class;
 
-        #[allow(clippy::useless_transmute)]
-        unsafe {
-            let country = wifi_country_t {
-                // FIXME once we bumped the MSRV accordingly (see https://github.com/esp-rs/esp-hal/pull/3027#discussion_r1944718266)
-                #[allow(clippy::useless_transmute)]
-                cc: core::mem::transmute::<[u8; 3], [core::ffi::c_char; 3]>(cntry_code),
-                schan: 1,
-                nchan: 13,
-                max_tx_power: 20,
-                policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-            };
-            esp_wifi_result!(esp_wifi_set_country(&country))?;
-        }
-
-        controller.set_power_saving(PowerSaveMode::default())?;
+    unsafe {
+        let country = wifi_country_t {
+            cc: cntry_code,
+            schan: 1,
+            nchan: 13,
+            max_tx_power: 20,
+            policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+        };
+        esp_wifi_result!(esp_wifi_set_country(&country))?;
     }
+
+    controller.set_power_saving(PowerSaveMode::default())?;
 
     Ok((
         controller,
