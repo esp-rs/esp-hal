@@ -65,7 +65,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     // keep the defaults aligned with `esp_wifi_sys::include::*` e.g.
     // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
     println!("cargo:rerun-if-changed=./esp_config.yml");
-    let cfg_yaml = std::fs::read_to_string("./esp_config.yml").unwrap();
+    let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
+        .expect("Failed to read esp_config.yml for esp-wifi");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
 
     Ok(())
