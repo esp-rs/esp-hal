@@ -18,11 +18,13 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
+mod interrupt;
 mod pins;
 mod slc;
 mod slchost;
 mod state;
 
+pub use interrupt::HostInterrupt;
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
