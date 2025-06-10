@@ -1149,9 +1149,9 @@ impl<Dir: Capability> RawChannelAccess for DynChannelAccess<Dir> {
 }
 
 /// docs
-pub type AnyTxChannel<Dm> = Channel<Dm, DynChannelAccess<Tx>>;
+pub type AnyTxChannel<'ch, Dm> = Channel<'ch, Dm, DynChannelAccess<Tx>>;
 /// docs
-pub type AnyRxChannel<Dm> = Channel<Dm, DynChannelAccess<Rx>>;
+pub type AnyRxChannel<'ch, Dm> = Channel<'ch, Dm, DynChannelAccess<Rx>>;
 
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
@@ -1282,17 +1282,12 @@ macro_rules! declare_channels {
                 ($($($ch),+)?) -> ([
                     $($field_decl)*
                     #[doc = concat!("RMT Channel ", $num)]
-                    // FIXME: This should probably carry the 'rmt lifetime, i.e.
-                    // ChannelCreator<'rmt, $num, $cap>
-                    // Otherwise, one could move the channel out of this struct
-                    // (since the struct doesn't implement Drop), drop the Rmt struct,
-                    // and use it beyond the lifetime of Rmt.peripheral
-                    pub [<channel $num>]: ChannelCreator<Dm, ConstChannelAccess<$cap, $idx>>,
+                    pub [<channel $num>]: ChannelCreator<'rmt, Dm, ConstChannelAccess<$cap, $idx>>,
                 ], [
                     $($field_init)*
                     [<channel $num>]: $crate::rmt::ChannelCreator {
                         raw: unsafe { ConstChannelAccess::conjure() },
-                        _mode: ::core::marker::PhantomData,
+                        _rmt: ::core::marker::PhantomData,
                         _guard: $crate::system::GenericPeripheralGuard::new(),
                     },
                 ])
@@ -1518,23 +1513,23 @@ cfg_if::cfg_if! {
 
 /// RMT Channel Creator
 #[derive(Debug)]
-pub struct ChannelCreator<Dm, Raw>
+pub struct ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: RawChannelAccess<Dir: Capability>,
 {
     raw: Raw,
-    _mode: PhantomData<Dm>,
+    _rmt: PhantomData<Rmt<'rmt, Dm>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, Raw> ChannelCreator<Dm, Raw>
+impl<'rmt, Dm, Raw> ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: RawChannelAccess<Dir: Capability>,
 {
     /// FIXME: Docs
-    pub fn degrade(self) -> ChannelCreator<Dm, DynChannelAccess<Raw::Dir>> {
+    pub fn degrade(self) -> ChannelCreator<'rmt, Dm, DynChannelAccess<Raw::Dir>> {
         // FIXME: Share code with Channel::degrade?
         use core::mem::ManuallyDrop;
         // Disable Drop handler on self
@@ -1544,14 +1539,24 @@ where
                 ch_idx: unsafe { ChannelIndex::from_u8_unchecked(old.raw.ch_idx()) },
                 _direction: PhantomData,
             },
-            _mode: PhantomData,
+            _rmt: PhantomData,
             // FIXME: Don't clone, but move old._guard
             _guard: old._guard.clone(),
         }
     }
+
+    /// FIXME: Docs
+    pub fn reborrow(&mut self) -> ChannelCreator<'_, Dm, Raw> {
+        ChannelCreator {
+            raw: self.raw,
+            _rmt: PhantomData,
+            _guard: self._guard.clone(),
+        }
+    }
 }
 
-impl<Dm, Dir: Capability, const CH_IDX: u8> ChannelCreator<Dm, ConstChannelAccess<Dir, CH_IDX>>
+impl<'rmt, Dm, Dir: Capability, const CH_IDX: u8>
+    ChannelCreator<'rmt, Dm, ConstChannelAccess<Dir, CH_IDX>>
 where
     Dm: crate::DriverMode,
 {
@@ -1564,7 +1569,7 @@ where
     ///
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
-    pub unsafe fn steal() -> ChannelCreator<Dm, ConstChannelAccess<Dir, CH_IDX>> {
+    pub unsafe fn steal() -> ChannelCreator<'rmt, Dm, ConstChannelAccess<Dir, CH_IDX>> {
         assert!(CH_IDX < CHANNEL_INDEX_COUNT);
 
         let raw = unsafe { ConstChannelAccess::conjure() };
@@ -1578,7 +1583,7 @@ where
 
         ChannelCreator {
             raw,
-            _mode: PhantomData,
+            _rmt: PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
@@ -1594,7 +1599,9 @@ pub trait TxChannelCreator<Dm: crate::DriverMode>: Sized {
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)>;
+    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    where
+        Self: 'pin;
 }
 
 /// FIXME: docs
@@ -1607,17 +1614,21 @@ pub trait RxChannelCreator<Dm: crate::DriverMode>: Sized {
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)>;
+    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    where
+        Self: 'pin;
 }
 
-trait AnyTxChannelAccess: RawChannelAccess<Dir = Tx> {}
-trait AnyRxChannelAccess: RawChannelAccess<Dir = Rx> {}
+/// FIXME: docs
+pub trait AnyTxChannelAccess: RawChannelAccess<Dir = Tx> {}
+/// FIXME: docs
+pub trait AnyRxChannelAccess: RawChannelAccess<Dir = Rx> {}
 
 // TODO:
 // - RxTx devices: always allow reconfigure + unconfigure
 // - Rx/Tx devices: allow Unconfigure and reconfigure with the same direction
 
-impl<Dm, Raw> TxChannelCreator<Dm> for ChannelCreator<Dm, Raw>
+impl<'rmt, Dm, Raw> TxChannelCreator<Dm> for ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: Configure<Tx>,
@@ -1629,7 +1640,10 @@ where
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)> {
+    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    where
+        Self: 'pin,
+    {
         let raw = self.raw.configure();
         if let Err(e) = configure_tx_channel(&raw, pin, config) {
             return Err((e, self));
@@ -1638,7 +1652,7 @@ where
     }
 }
 
-impl<Dm, Raw> RxChannelCreator<Dm> for ChannelCreator<Dm, Raw>
+impl<'rmt, Dm, Raw> RxChannelCreator<Dm> for ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: Configure<Rx>,
@@ -1650,7 +1664,10 @@ where
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, (Error, Self)> {
+    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    where
+        Self: 'pin,
+    {
         let raw = self.raw.configure();
         if let Err(e) = configure_rx_channel(&raw, pin, config) {
             return Err((e, self));
@@ -1920,17 +1937,17 @@ type RmtPeripheralGuard = GenericPeripheralGuard<{ system::Peripheral::Rmt as u8
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Channel<Dm, Raw>
+pub struct Channel<'ch, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: ChannelInternal,
 {
     raw: Raw,
-    _mode: PhantomData<Dm>,
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
     _guard: RmtPeripheralGuard,
 }
 
-impl<Dm, Raw> Channel<Dm, Raw>
+impl<Dm, Raw> Channel<'_, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: ChannelInternal,
@@ -1938,13 +1955,13 @@ where
     fn new(raw: Raw) -> Self {
         Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
 
     // FIXME: Implement, regain full Capabilitis of Raw!
-    // fn unconfigure(self) -> ChannelCreator<Dm, Raw> {
+    // fn unconfigure(self) -> ChannelCreator<'rmt, Dm, Raw> {
     //     // requires ChannelCreator to take a RawChannelAccess such that
     // type-erased channels can     // also be unconfigured
     //     todo!("implement, then do the same on drop")
@@ -1958,14 +1975,14 @@ where
 
 // Note that this is intentionally implemented even if Raw is DynChannelAccess
 // already for convenience!
-impl<Dm, Dir, Raw> Channel<Dm, Raw>
+impl<'ch, Dm, Dir, Raw> Channel<'ch, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
     Raw: RawChannelAccess<Dir = Dir>,
 {
     /// Consume the channel and return a type-erased version
-    pub fn degrade(self) -> Channel<Dm, DynChannelAccess<Dir>> {
+    pub fn degrade(self) -> Channel<'ch, Dm, DynChannelAccess<Dir>> {
         use core::mem::ManuallyDrop;
         // Disable Drop handler on self
         let old = ManuallyDrop::new(self);
@@ -1974,14 +1991,14 @@ where
                 ch_idx: unsafe { ChannelIndex::from_u8_unchecked(old.raw.ch_idx()) },
                 _direction: PhantomData,
             },
-            _mode: PhantomData,
+            _rmt: PhantomData,
             // FIXME: Don't clone, but move old._guard
             _guard: old._guard.clone(),
         }
     }
 }
 
-impl<Dm, Raw> Drop for Channel<Dm, Raw>
+impl<Dm, Raw> Drop for Channel<'_, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: ChannelInternal,
@@ -2244,7 +2261,7 @@ impl defmt::Format for BenchmarkResult {
     }
 }
 
-impl<Dm, Raw> Channel<Dm, Raw>
+impl<Dm, Raw> Channel<'_, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: TxChannelInternal,
@@ -2395,7 +2412,7 @@ pub trait TxChannel: Sized {
         D::Item: Borrow<PulseCode>;
 }
 
-impl<Raw> TxChannel for Channel<Blocking, Raw>
+impl<Raw> TxChannel for Channel<'_, Blocking, Raw>
 where
     Raw: TxChannelInternal,
 {
@@ -2661,7 +2678,7 @@ pub trait RxChannel: Sized {
         T: From<PulseCode> + 'static;
 }
 
-impl<Raw> RxChannel for Channel<Blocking, Raw>
+impl<Raw> RxChannel for Channel<'_, Blocking, Raw>
 where
     Raw: RxChannelInternal,
 {
@@ -2837,7 +2854,7 @@ pub trait TxChannelAsync {
         E: Encoder + Unpin;
 }
 
-impl<Raw> TxChannelAsync for Channel<Async, Raw>
+impl<Raw> TxChannelAsync for Channel<'_, Async, Raw>
 where
     Raw: TxChannelInternal,
 {
@@ -3062,7 +3079,7 @@ pub trait RxChannelAsync {
         T: From<PulseCode> + 'static;
 }
 
-impl<Raw> RxChannelAsync for Channel<Async, Raw>
+impl<Raw> RxChannelAsync for Channel<'_, Async, Raw>
 where
     Raw: RxChannelInternal,
 {
