@@ -393,7 +393,7 @@ pub fn evaluate_yaml_config(
                 "ignore_feature_gates".into(),
                 evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
                     if let evalexpr::Value::Empty = arg {
-                        Ok(evalexpr::Value::Boolean(is_tooling))
+                        Ok(evalexpr::Value::Boolean(ignore_feature_gates))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
                             "Bad argument: {:?}",
