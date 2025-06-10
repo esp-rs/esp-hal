@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{bail, ensure, Context as _, Result};
+use anyhow::{Context as _, Result, bail, ensure};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
@@ -117,49 +117,33 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn run_example(args: ExamplesArgs, examples: Vec<Metadata>, package_path: &Path) -> Result<()> {
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&args.chip)?;
-
-    // Filter the examples down to only the binary we're interested in, assuming it
-    // actually supports the specified chip:
-    let mut found_one = false;
-    for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
-        found_one = true;
-        crate::execute_app(
-            package_path,
-            args.chip,
-            target,
-            example,
-            CargoAction::Run,
-            1,
-            args.debug,
-        )?;
-    }
-
-    ensure!(
-        found_one,
-        "Example not found or unsupported for {}",
-        args.chip
-    );
-
-    Ok(())
-}
-
 pub fn run_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
     package_path: &Path,
 ) -> Result<()> {
+    let mut examples = examples;
+
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&args.chip)?;
 
-    // Filter the examples down to only the binaries we're interested in
-    let mut examples: Vec<Metadata> = examples
-        .iter()
-        .filter(|ex| ex.supports_chip(args.chip))
-        .cloned()
-        .collect();
+    let single_example = args.example.is_some();
+
+    // Filter the examples down to only the binaries supported by the given chip
+    examples.retain(|ex| ex.supports_chip(args.chip));
+
+    // User requested to run exactly one example
+    if single_example {
+        // Filter the examples down to only the binary we're interested in
+        examples.retain(|ex| ex.matches(&args.example));
+
+        ensure!(
+            examples.len() == 1,
+            "Example not found or unsupported for {}",
+            args.chip
+        );
+    }
+
     examples.sort_by_key(|ex| ex.tag());
 
     let console = console::Term::stdout();
