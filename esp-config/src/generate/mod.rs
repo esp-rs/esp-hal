@@ -344,7 +344,7 @@ pub fn evaluate_yaml_config(
     yaml: &str,
     chip: Option<esp_metadata::Config>,
     features: Vec<String>,
-    is_tooling: bool,
+    ignore_feature_gates: bool,
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
     let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
@@ -390,7 +390,7 @@ pub fn evaluate_yaml_config(
 
         eval_ctx
             .set_function(
-                "is_tooling".into(),
+                "ignore_feature_gates".into(),
                 evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
                     if let evalexpr::Value::Empty = arg {
                         Ok(evalexpr::Value::Boolean(is_tooling))

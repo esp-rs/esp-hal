@@ -16,19 +16,19 @@ options:
                `multiple-integrated` option needs one timer per executor.</p><p>The `generic`
                queue allows using embassy-time without the embassy executors."
   default:
-    - if: 'cargo_feature("executors") || is_tooling()'
+    - if: 'cargo_feature("executors") || ignore_feature_gates()'
       value: '"single-integrated"'
-    - if: '!cargo_feature("executors") && !is_tooling()'
+    - if: '!cargo_feature("executors") && ignore_feature_gates()'
       value: '"generic"'
   constraints:
-    - if: 'cargo_feature("executors") || is_tooling()'
+    - if: 'cargo_feature("executors") || ignore_feature_gates()'
       type:
         validator: enumeration
         value:
         - 'generic'
         - 'single-integrated'
         - 'multiple-integrated'
-    - if: '!cargo_feature("executors") && !is_tooling()'
+    - if: '!cargo_feature("executors") && !ignore_feature_gates()'
       type:
         validator: enumeration
         value:
