@@ -220,28 +220,37 @@ pub enum BusTimeout {
 }
 
 impl BusTimeout {
-    fn try_from_raw(v: u32) -> Result<BusTimeout, ConfigError> {
-        if v <= BusTimeout::Maximum.cycles() {
-            Ok(BusTimeout::BusCycles(v))
-        } else {
-            Err(ConfigError::TimeoutInvalid)
-        }
-    }
-
-    fn cycles(self) -> u32 {
+    /// Returns the timeout in APB cycles, or `None` if the timeout is disabled.
+    ///
+    /// Newer devices only support power-of-two timeouts, so we'll have to take
+    /// the logarithm of the timeout value. This may cause considerably
+    /// longer (at most ~double) timeouts than configured. We may provide an
+    /// `ApbCycles` variant in the future to allow specifying the timeout in
+    /// APB cycles directly.
+    fn apb_cycles(self, half_bus_cycle: u32) -> Result<Option<u32>, ConfigError> {
         match self {
-            BusTimeout::Maximum => property!("i2c_master.max_bus_timeout"),
+            BusTimeout::Maximum => Ok(Some(property!("i2c_master.max_bus_timeout"))),
 
             #[cfg(i2c_master_has_bus_timeout_enable)]
-            BusTimeout::Disabled => 1,
+            BusTimeout::Disabled => Ok(None),
 
-            BusTimeout::BusCycles(cycles) => cycles,
+            BusTimeout::BusCycles(cycles) => {
+                let raw = if cfg!(i2c_master_bus_timeout_is_exponential) {
+                    let to_peri = (cycles * 2 * half_bus_cycle).max(1);
+                    let log2 = to_peri.ilog2();
+                    // If not a power of 2, round up so that we don't shorten timeouts.
+                    if to_peri != 1 << log2 { log2 + 1 } else { log2 }
+                } else {
+                    cycles * 2 * half_bus_cycle
+                };
+
+                if raw <= property!("i2c_master.max_bus_timeout") {
+                    Ok(Some(raw))
+                } else {
+                    Err(ConfigError::TimeoutInvalid)
+                }
+            }
         }
-    }
-
-    #[cfg(i2c_master_has_bus_timeout_enable)]
-    fn is_set(self) -> bool {
-        matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
 }
 
@@ -1260,7 +1269,7 @@ fn configure_clock(
     scl_stop_setup_time: u32,
     scl_start_hold_time: u32,
     scl_stop_hold_time: u32,
-    timeout: BusTimeout,
+    timeout: Option<u32>,
 ) -> Result<(), ConfigError> {
     unsafe {
         // divider
@@ -1313,13 +1322,13 @@ fn configure_clock(
         cfg_if::cfg_if! {
             if #[cfg(i2c_master_has_bus_timeout_enable)] {
                 register_block.to().write(|w| {
-                    w.time_out_en().bit(timeout.is_set());
-                    w.time_out_value().bits(timeout.cycles() as _)
+                    w.time_out_en().bit(timeout.is_some());
+                    w.time_out_value().bits(timeout.unwrap_or(1) as _)
                 });
             } else {
                 register_block
                     .to()
-                    .write(|w| w.time_out().bits(timeout.cycles()));
+                    .write(|w| w.time_out().bits(timeout.unwrap_or(1)));
             }
         }
     }
@@ -1647,10 +1656,6 @@ impl Driver<'_> {
         let sda_sample = scl_high / 2;
         let setup = half_cycle;
         let hold = half_cycle;
-        let timeout = match timeout {
-            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
-            other => other,
-        };
 
         // SCL period. According to the TRM, we should always subtract 1 to SCL low
         // period
@@ -1703,7 +1708,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout,
+            timeout.apb_cycles(half_cycle)?,
         )?;
 
         Ok(())
@@ -1746,11 +1751,6 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold;
 
-        let timeout = match timeout {
-            BusTimeout::BusCycles(cycles) => BusTimeout::try_from_raw(cycles * 2 * half_cycle)?,
-            other => other,
-        };
-
         configure_clock(
             self.regs(),
             0,
@@ -1763,7 +1763,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout,
+            timeout.apb_cycles(half_cycle)?,
         )?;
 
         Ok(())
@@ -1820,17 +1820,6 @@ impl Driver<'_> {
         let scl_start_hold_time = hold - 1;
         let scl_stop_hold_time = hold - 1;
 
-        let timeout = match timeout {
-            BusTimeout::BusCycles(cycles) => {
-                let to_peri = (cycles * 2 * half_cycle).max(1);
-                let log2 = to_peri.ilog2();
-                // Round up so that we don't shorten timeouts.
-                let raw = if to_peri != 1 << log2 { log2 + 1 } else { log2 };
-                BusTimeout::try_from_raw(raw)?
-            }
-            other => other,
-        };
-
         configure_clock(
             self.regs(),
             clkm_div,
@@ -1843,7 +1832,7 @@ impl Driver<'_> {
             scl_stop_setup_time,
             scl_start_hold_time,
             scl_stop_hold_time,
-            timeout,
+            timeout.apb_cycles(half_cycle)?,
         )?;
 
         Ok(())
