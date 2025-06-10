@@ -2110,9 +2110,11 @@ where
         // block in the meantime, such that subsequent uses of the channel are
         // safe (i.e. start from a state where the hardware is stopped).
         let raw = self.raw;
-        raw.stop_tx();
+        let immediate = raw.stop_tx();
 
-        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+        if !immediate {
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+        }
 
         RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
     }
@@ -2153,13 +2155,18 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
         raw.update();
 
         // FIXME: Check TRM on whether this requires an update() call.
-        raw.stop_tx();
+        let immediate = raw.stop_tx();
 
-        let result = loop {
-            match raw.get_tx_status() {
-                Some(Event::Error) => break Err(Error::TransmissionError),
-                Some(Event::End) => break Ok(()),
-                _ => continue,
+        let result = if immediate {
+            Ok(())
+        } else {
+            loop {
+                match raw.get_tx_status() {
+                    // FIXME: Is it really possible for an error to happen here?
+                    Some(Event::Error) => break Err(Error::TransmissionError),
+                    Some(Event::End) => break Ok(()),
+                    _ => continue,
+                }
             }
         };
 
@@ -2186,9 +2193,11 @@ impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
         raw.set_tx_continuous(false);
         raw.update();
 
-        raw.stop_tx();
+        let immediate = raw.stop_tx();
 
-        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+        if !immediate {
+            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+        }
     }
 }
 
@@ -2540,7 +2549,9 @@ where
             raw.update();
 
             // block until the channel is safe to use again
-            while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+            // -> Actually, stop_rx() appears to be immediate and does not update state flags, so
+            // this would lock up!
+            // while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
 
             raw.clear_rx_interrupts();
             RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
@@ -2674,8 +2685,10 @@ where
                         raw.listen_tx_interrupt(Event::Threshold);
                     }
                     WriterState::DoneNoEnd => {
-                        // Return in next call to poll() on Event::End
-                        raw.stop_tx();
+                        // We have written an extra end marker, so will stop automatically after
+                        // all data has been transmitted. If we stop tx manually here, this will
+                        // prevent the end interrupt from triggering, and we will lock up polling.
+                        // raw.stop_tx();
                     }
                     _ => (),
                 }
@@ -2705,10 +2718,12 @@ where
         // STATE should be TxIdle if the future was polled to completion
         if RmtState::load(raw, Ordering::Relaxed) == RmtState::TxAsync {
             raw.unlisten_tx_interrupt(Event::Error | Event::End | Event::Threshold);
-            raw.stop_tx();
+            let immediate = raw.stop_tx();
 
             // block until the channel is safe to use again
-            while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
 
             raw.clear_tx_interrupts();
             RmtState::store(RmtState::TxIdle, raw, Ordering::Relaxed);
@@ -2945,7 +2960,9 @@ where
             raw.update();
 
             // block until the channel is safe to use again
-            while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
+            // -> Actually, stop_rx() appears to be immediate and does not update state flags, so
+            // this would lock up!
+            // while !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {}
 
             raw.clear_rx_interrupts();
             RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
@@ -3101,7 +3118,8 @@ pub trait TxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Tx> {
         self.update();
     }
 
-    fn stop_tx(&self);
+    // Return whether stopping was immediate, or needs to wait for tx end
+    fn stop_tx(&self) -> bool;
 
     fn set_tx_interrupt(&self, event: EnumSet<Event>, enable: bool);
 
@@ -3491,11 +3509,12 @@ mod chip_specific {
             rmt.int_raw().read().ch_tx_loop(self.channel()).bit()
         }
 
-        fn stop_tx(&self) {
+        fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_conf0(self.channel().into())
                 .modify(|_, w| w.tx_stop().set_bit());
             self.update();
+            true
         }
 
         // Ensure that this is always inlined in (un)listen_tx_interrupt
@@ -3932,20 +3951,22 @@ mod chip_specific {
         }
 
         #[cfg(esp32s2)]
-        fn stop_tx(&self) {
+        fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.chconf1(self.ch_idx() as usize)
                 .modify(|_, w| w.tx_stop().set_bit());
+            true
         }
 
         #[cfg(esp32)]
-        fn stop_tx(&self) {
+        fn stop_tx(&self) -> bool {
             let ptr = self.channel_ram_start();
             for idx in 0..self.memsize().codes() {
                 unsafe {
                     ptr.add(idx).write_volatile(super::PulseCode::end_marker());
                 }
             }
+            false
         }
 
         // Ensure that this is always inlined in (un)listen_tx_interrupt
