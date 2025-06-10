@@ -107,11 +107,13 @@ status = "supported"
 [device.uart]
 status = "supported"
 
+[device.ds]
+status = "not_supported"
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
 [device.aes]
-[device.ds]
 [device.ecc]
 [device.rsa]
 [device.sha]

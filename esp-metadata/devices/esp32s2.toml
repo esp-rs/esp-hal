@@ -104,17 +104,22 @@ status = "supported"
 [device.uart]
 status = "supported"
 
-[device.rgb_display]
+[device.rgb_display] # via SPI and I2S
+status = "not_supported"
+
+[device.camera] # via I2S
 status = "not_supported"
 
 [device.touch]
+status = "not_supported"
+
+[device.ds]
 status = "not_supported"
 
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
 [device.aes]
-[device.ds]
 [device.rsa]
 [device.hmac]
 [device.sha]
