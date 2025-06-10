@@ -189,9 +189,9 @@ mod test {
 
     #[test]
     fn deserialization_number() {
-        let yml = "128";
-        let value: Value = serde_yaml::from_str(yml).unwrap();
-        assert_eq!(value, Value::Integer(128));
+        assert_eq!(serde_yaml::from_str::<Value>("128").unwrap(), Value::Integer(128));
+        assert_eq!(serde_yaml::from_str::<Value>(&format!("{}",i128::MAX)).unwrap(), Value::Integer(i128::MAX));
+        assert_eq!(serde_yaml::from_str::<Value>(&format!("{}",i128::MIN)).unwrap(), Value::Integer(i128::MIN));
     }
 
     #[test]
