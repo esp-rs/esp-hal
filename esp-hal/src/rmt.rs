@@ -1064,7 +1064,7 @@ trait RawChannelAccessExt {
     fn channel(&self) -> u8;
 }
 
-impl<Raw: ?Sized> RawChannelAccessExt for Raw
+impl<Raw> RawChannelAccessExt for Raw
 where
     Raw: RawChannelAccess<Dir: Capability>
 {
