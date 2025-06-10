@@ -289,7 +289,7 @@ pub fn generate_config_from_yaml_definition(
         }
 
         fn float_as_int(float: &Self::Float) -> Self::Int {
-            I128(*float as i128)
+            I128(float.trunc() as i128)
         }
     }
 
