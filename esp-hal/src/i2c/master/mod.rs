@@ -3079,39 +3079,36 @@ where
     Ok(())
 }
 
-#[cfg(not(esp32s2))]
+#[cfg(any(esp32, esp32s2))]
+const I2C0_AHB_BASE: usize = 0x6001301c;
+
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    register_block.data().read().fifo_rdata().bits()
+    cfg_if::cfg_if! {
+        if #[cfg(esp32s2)] {
+            // Apparently the ESO can read just fine using DPORT,
+            // so use this workaround on S2 only.
+            let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
+            let fifo_ptr = (I2C0_AHB_BASE + peri_offset) as *mut u32;
+            unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
+        } else {
+            register_block.data().read().fifo_rdata().bits()
+        }
+    }
 }
 
-#[cfg(not(esp32))]
 fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    register_block
-        .data()
-        .write(|w| unsafe { w.fifo_rdata().bits(data) });
-}
-
-#[cfg(esp32s2)]
-fn read_fifo(register_block: &RegisterBlock) -> u8 {
-    let base_addr = register_block.scl_low_period().as_ptr();
-    let fifo_ptr = (if base_addr as u32 == 0x3f413000 {
-        0x6001301c
-    } else {
-        0x6002701c
-    }) as *mut u32;
-    unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
-}
-
-#[cfg(esp32)]
-fn write_fifo(register_block: &RegisterBlock, data: u8) {
-    let base_addr = register_block.scl_low_period().as_ptr();
-    let fifo_ptr = (if base_addr as u32 == 0x3FF53000 {
-        0x6001301c
-    } else {
-        0x6002701c
-    }) as *mut u32;
-    unsafe {
-        fifo_ptr.write_volatile(data as u32);
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32, esp32s2))] {
+            let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
+            let fifo_ptr = (I2C0_AHB_BASE + peri_offset) as *mut u32;
+            unsafe {
+                fifo_ptr.write_volatile(data as u32);
+            }
+        } else {
+            register_block
+                .data()
+                .write(|w| unsafe { w.fifo_rdata().bits(data) });
+        }
     }
 }
 
