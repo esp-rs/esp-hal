@@ -3079,16 +3079,13 @@ where
     Ok(())
 }
 
-#[cfg(any(esp32, esp32s2))]
-const I2C0_AHB_BASE: usize = 0x6001301c;
-
 fn read_fifo(register_block: &RegisterBlock) -> u8 {
     cfg_if::cfg_if! {
         if #[cfg(esp32s2)] {
             // Apparently the ESO can read just fine using DPORT,
             // so use this workaround on S2 only.
             let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
-            let fifo_ptr = (I2C0_AHB_BASE + peri_offset) as *mut u32;
+            let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
             unsafe { (fifo_ptr.read_volatile() & 0xff) as u8 }
         } else {
             register_block.data().read().fifo_rdata().bits()
@@ -3100,7 +3097,7 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s2))] {
             let peri_offset = register_block as *const _ as usize - crate::peripherals::I2C0::ptr() as usize;
-            let fifo_ptr = (I2C0_AHB_BASE + peri_offset) as *mut u32;
+            let fifo_ptr = (property!("i2c_master.i2c0_data_register_ahb_address") + peri_offset) as *mut u32;
             unsafe {
                 fifo_ptr.write_volatile(data as u32);
             }
