@@ -617,17 +617,20 @@ impl<'a> Encoder for SliceEncoder<'a> {
             .data
             .len()
             .min(unsafe { writer.end.offset_from(writer.ptr) } as usize);
+        if count > 0 {
+            let mut ptr = writer.ptr;
 
-        let mut ptr = writer.ptr;
+            for code in &self.data[..count] {
+                unsafe { ptr.write_volatile(*code) }
+                ptr = unsafe { ptr.add(1) };
+            }
 
-        for i in 0..count {
-            unsafe { ptr.write_volatile(self.data[i]) }
-            ptr = unsafe { ptr.add(1) };
+            debug_assert!(writer.ptr <= writer.end);
+
+            writer.ptr = ptr;
+            writer.last_code = self.data[count - 1];
+            self.data = &self.data[count..];
         }
-
-        writer.ptr = ptr;
-        writer.last_code = self.data[count - 1];
-        self.data = &self.data[count..];
 
         self.data.is_empty()
     }
@@ -804,6 +807,8 @@ impl RmtWriterOuter {
                     } else if written == 0 && this.written == 0 {
                         WriterState::Empty
                     } else {
+                        // - written > 0 and no end marker, or
+                        // - written == 0 but previously written some data
                         WriterState::DoneNoEnd
                     };
 
@@ -829,6 +834,8 @@ impl RmtWriterOuter {
             // Do not increment the offset or written afterwards since we want to overwrite
             // it in the next call
             debug_assert!(internal.ptr.addr() < ram_end.addr());
+            // FIXME: Maybe, this can be moved to the RmtWriterInner/RmtSlot and
+            // SliceEncoder to only write it if really needed?
             unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
 
             this.offset = unsafe { internal.ptr.offset_from(ram_start) } as u16;
