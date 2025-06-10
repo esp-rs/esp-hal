@@ -44,6 +44,71 @@ For all supported data types, there are helper macros that emit `const` code for
 
 In addition to environment variables, for boolean types rust `cfg`'s are emitted in snake case _without_ the prefix.
 
+## Defining Configuration Options
+
+Config options should be defined declaratively in a file called `esp_config.yml`.
+
+Such a file looks like this:
+```yaml
+crate: esp-bootloader-esp-idf
+
+options:
+- name: mmu_page_size
+  description: ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. This is currently only used to populate the app descriptor.
+  default:
+    - value: '"64k"'
+  stability: !Stable stable-since-version
+  constraints:
+  - if: true
+    type:
+      validator: enumeration
+      value:
+      - 8k
+      - 16k
+      - 32k
+      - 64k
+
+- name: esp_idf_version
+  description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
+  default:
+    - if: 'chip == "esp32c6"'
+      value: '"esp32c6"'
+    - if: 'chip == "esp32"'
+      value: '"other"'
+  active: true
+
+- name: partition-table-offset
+  description: "The address of partition table (by default 0x8000). Allows you to \
+    move the partition table, it gives more space for the bootloader. Note that the \
+    bootloader and app will both need to be compiled with the same \
+    PARTITION_TABLE_OFFSET value."
+  default:
+    - if: true
+      value: 32768
+  stability: Unstable
+  active: 'chip == "esp32c6"'
+
+checks:
+  - 'ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET >= 32768'
+```
+
+`if` and `active` are [evalexpr](https://crates.io/crates/evalexpr) expressions returning a boolean.
+
+The expression supports these custom functions:
+|Function|Description|
+|---|---|
+|feature(String)|`true` is the given chip feature is present|
+|cargo_feature(String)|`true` if the given Cargo feature is active|
+|ignore_feature_gates()|Usually `false` but tooling will set this to `true` to hint that the expression is evaluated by e.g. a TUI|
+
+`ignore_feature_gates()` is useful to enable otherwise disabled functionality - e.g. to offer all possible options regardless of any active / non-active features.
+
+The `chip` variable is populated with the name of the targeted chip (if the crate is using chip specific features).
+
+`checks` is a list of checks which needs to pass for a valid configuration. You can access the currently configured values to check them.
+
+For more examples see the various `esp_config.yml` files in this repository.
+
 ## Minimum Supported Rust Version (MSRV)
 
 This crate is guaranteed to compile when using the latest stable Rust version at the time of the crate's release. It _might_ compile with older versions, but that may change in any new release, including patches.
