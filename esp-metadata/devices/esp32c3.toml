@@ -85,6 +85,14 @@ status = "supported"
 status = "supported"
 has_fsm_timeouts = true
 has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+has_conf_update = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
 
 [device.rmt]
 status = "partial"

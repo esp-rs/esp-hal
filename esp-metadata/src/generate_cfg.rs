@@ -461,6 +461,25 @@ driver_configs![
             has_fsm_timeouts: bool,
             #[serde(default)]
             has_hw_bus_clear: bool,
+            #[serde(default)]
+            has_bus_timeout_enable: bool,
+            #[serde(default)]
+            separate_filter_config_registers: bool,
+            #[serde(default)]
+            can_estimate_nack_reason: bool,
+            #[serde(default)]
+            has_conf_update: bool,
+            #[serde(default)]
+            has_reliable_fsm_reset: bool,
+            #[serde(default)]
+            has_arbitration_en: bool,
+            #[serde(default)]
+            has_tx_fifo_watermark: bool,
+            #[serde(default)]
+            bus_timeout_is_exponential: bool,
+            max_bus_timeout: number,
+            ll_intr_mask: number,
+            fifo_size: number,
         }
     },
     I2cSlaveProperties {
@@ -820,6 +839,7 @@ impl Config {
                         let value = number(value); // ensure no numeric suffix is added
                         quote::quote! {
                             (#name) => { #value };
+                            (#name, str) => { stringify!(#value) };
                         }
                     }
                     Value::Boolean(value) => quote::quote! {

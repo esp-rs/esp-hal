@@ -146,9 +146,7 @@ use crate::{
     time::{Duration, Instant, Rate},
 };
 
-const I2C_LL_INTR_MASK: u32 = if cfg!(esp32s2) { 0x1ffff } else { 0x3ffff };
-const I2C_FIFO_SIZE: usize = if cfg!(esp32c2) { 16 } else { 32 };
-
+const I2C_FIFO_SIZE: usize = property!("i2c_master.fifo_size");
 // Chunk writes/reads by this size
 const I2C_CHUNK_SIZE: usize = I2C_FIFO_SIZE - 1;
 const CLEAR_BUS_TIMEOUT_MS: Duration = Duration::from_millis(50);
@@ -201,7 +199,7 @@ impl From<u8> for I2cAddress {
 /// Default value is `BusCycles(10)`.
 #[doc = ""]
 #[cfg_attr(
-    not(esp32),
+    i2c_master_bus_timeout_is_exponential,
     doc = "Note that the effective timeout may be longer than the value configured here."
 )]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
@@ -214,7 +212,7 @@ pub enum BusTimeout {
     Maximum,
 
     /// Disable timeout control.
-    #[cfg(not(esp32))]
+    #[cfg(i2c_master_has_bus_timeout_enable)]
     Disabled,
 
     /// Timeout in bus clock cycles.
@@ -232,24 +230,16 @@ impl BusTimeout {
 
     fn cycles(self) -> u32 {
         match self {
-            BusTimeout::Maximum => {
-                if cfg!(esp32) {
-                    0xF_FFFF
-                } else if cfg!(esp32s2) {
-                    0xFF_FFFF
-                } else {
-                    0x1F
-                }
-            }
+            BusTimeout::Maximum => property!("i2c_master.max_bus_timeout"),
 
-            #[cfg(not(esp32))]
+            #[cfg(i2c_master_has_bus_timeout_enable)]
             BusTimeout::Disabled => 1,
 
             BusTimeout::BusCycles(cycles) => cycles,
         }
     }
 
-    #[cfg(not(esp32))]
+    #[cfg(i2c_master_has_bus_timeout_enable)]
     fn is_set(self) -> bool {
         matches!(self, BusTimeout::BusCycles(_) | BusTimeout::Maximum)
     }
@@ -544,8 +534,7 @@ enum Command {
         /// Enables checking the ACK value received against the ack_exp value.
         ack_check_en: bool,
         /// Length of data (in bytes) to be written. The maximum length is
-        #[cfg_attr(esp32c2, doc = "16")]
-        #[cfg_attr(not(esp32c2), doc = "32")]
+        #[doc = property!("i2c_master.fifo_size", str)]
         /// , while the minimum is 1.
         length: u8,
     },
@@ -554,8 +543,7 @@ enum Command {
         /// been received.
         ack_value: Ack,
         /// Length of data (in bytes) to be written. The maximum length is
-        #[cfg_attr(esp32c2, doc = "16")]
-        #[cfg_attr(not(esp32c2), doc = "32")]
+        #[doc = property!("i2c_master.fifo_size", str)]
         /// , while the minimum is 1.
         length: u8,
     },
@@ -800,7 +788,7 @@ pub enum Event {
 
     /// Triggered when the TX FIFO watermark check is enabled and the TX fifo
     /// falls below the configured watermark.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(i2c_master_has_tx_fifo_watermark)]
     TxFifoWatermark,
 }
 
@@ -819,7 +807,7 @@ impl<'a> I2cFuture<'a> {
                 match event {
                     Event::EndDetect => w.end_detect().set_bit(),
                     Event::TxComplete => w.trans_complete().set_bit(),
-                    #[cfg(not(any(esp32, esp32s2)))]
+                    #[cfg(i2c_master_has_tx_fifo_watermark)]
                     Event::TxFifoWatermark => w.txfifo_wm().set_bit(),
                 };
             }
@@ -827,7 +815,7 @@ impl<'a> I2cFuture<'a> {
             w.arbitration_lost().set_bit();
             w.time_out().set_bit();
             w.nack().set_bit();
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(i2c_master_has_fsm_timeouts)]
             {
                 w.scl_main_st_to().set_bit();
                 w.scl_st_to().set_bit();
@@ -1230,7 +1218,7 @@ fn set_filter(
     scl_threshold: Option<u8>,
 ) {
     cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2))] {
+        if #[cfg(i2c_master_separate_filter_config_registers)] {
             register_block.sda_filter_cfg().modify(|_, w| {
                 if let Some(threshold) = sda_threshold {
                     unsafe { w.sda_filter_thres().bits(threshold) };
@@ -1323,16 +1311,15 @@ fn configure_clock(
             .write(|w| w.time().bits(scl_stop_hold_time as u16));
 
         cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // The ESP32 variant does not have an enable flag for the timeout mechanism
-                register_block
-                    .to()
-                    .write(|w| w.time_out().bits(timeout.cycles()));
-            } else {
+            if #[cfg(i2c_master_has_bus_timeout_enable)] {
                 register_block.to().write(|w| {
                     w.time_out_en().bit(timeout.is_set());
                     w.time_out_value().bits(timeout.cycles() as _)
                 });
+            } else {
+                register_block
+                    .to()
+                    .write(|w| w.time_out().bits(timeout.cycles()));
             }
         }
     }
@@ -1386,7 +1373,7 @@ impl Info {
                 match interrupt {
                     Event::EndDetect => w.end_detect().bit(enable),
                     Event::TxComplete => w.trans_complete().bit(enable),
-                    #[cfg(not(any(esp32, esp32s2)))]
+                    #[cfg(i2c_master_has_tx_fifo_watermark)]
                     Event::TxFifoWatermark => w.txfifo_wm().bit(enable),
                 };
             }
@@ -1406,7 +1393,7 @@ impl Info {
         if ints.trans_complete().bit_is_set() {
             res.insert(Event::TxComplete);
         }
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(i2c_master_has_tx_fifo_watermark)]
         if ints.txfifo_wm().bit_is_set() {
             res.insert(Event::TxFifoWatermark);
         }
@@ -1422,7 +1409,7 @@ impl Info {
                 match interrupt {
                     Event::EndDetect => w.end_detect().clear_bit_by_one(),
                     Event::TxComplete => w.trans_complete().clear_bit_by_one(),
-                    #[cfg(not(any(esp32, esp32s2)))]
+                    #[cfg(i2c_master_has_tx_fifo_watermark)]
                     Event::TxFifoWatermark => w.txfifo_wm().clear_bit_by_one(),
                 };
             }
@@ -1516,7 +1503,7 @@ impl Driver<'_> {
             w.tx_lsb_first().clear_bit();
             w.rx_lsb_first().clear_bit();
 
-            #[cfg(not(esp32))]
+            #[cfg(i2c_master_has_arbitration_en)]
             w.arbitration_en().clear_bit();
 
             #[cfg(esp32s2)]
@@ -1565,7 +1552,7 @@ impl Driver<'_> {
     // with no timeouts.
     fn reset_fsm(&self) {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(i2c_master_has_reliable_fsm_reset)] {
                 // Device has a working FSM reset mechanism
                 self.regs().ctr().modify(|_, w| w.fsm_rst().set_bit());
             } else {
@@ -2128,7 +2115,7 @@ impl Driver<'_> {
     fn clear_all_interrupts(&self) {
         self.regs()
             .int_clr()
-            .write(|w| unsafe { w.bits(I2C_LL_INTR_MASK) });
+            .write(|w| unsafe { w.bits(property!("i2c_master.ll_intr_mask")) });
     }
 
     async fn wait_for_completion(&self, deadline: Option<Instant>) -> Result<(), Error> {
@@ -2264,7 +2251,7 @@ impl Driver<'_> {
     fn update_registers(&self) {
         // Ensure that the configuration of the peripheral is correctly propagated
         // (only necessary for C2, C3, C6, H2 and S3 variant)
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(i2c_master_has_conf_update)]
         self.regs().ctr().modify(|_, w| w.conf_upgate().set_bit());
     }
 
@@ -3132,15 +3119,15 @@ fn write_fifo(register_block: &RegisterBlock, data: u8) {
 // When in doubt it's better to return `Unknown` than to return a wrong reason.
 fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeCheckFailedReason {
     cfg_if::cfg_if! {
-        if #[cfg(any(esp32, esp32s2, esp32c2, esp32c3))] {
-            AcknowledgeCheckFailedReason::Unknown
-        } else {
+        if #[cfg(i2c_master_can_estimate_nack_reason)] {
             // this is based on observations rather than documented behavior
             if _register_block.fifo_st().read().txfifo_raddr().bits() <= 1 {
                 AcknowledgeCheckFailedReason::Address
             } else {
                 AcknowledgeCheckFailedReason::Data
             }
+        } else {
+            AcknowledgeCheckFailedReason::Unknown
         }
     }
 }

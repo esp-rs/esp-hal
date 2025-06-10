@@ -92,6 +92,12 @@ status = "supported"
 
 [device.i2c_master]
 status = "supported"
+ll_intr_mask = 0x1ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0xFFFFFF
+separate_filter_config_registers = true
+has_arbitration_en = true
 
 [device.rmt]
 status = "partial"

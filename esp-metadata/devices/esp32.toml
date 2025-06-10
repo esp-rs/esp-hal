@@ -93,6 +93,10 @@ status = "supported"
 
 [device.i2c_master]
 status = "supported"
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+max_bus_timeout = 0xFFFFF
+separate_filter_config_registers = true
 
 [device.i2c_slave]
 status = "not_supported"
