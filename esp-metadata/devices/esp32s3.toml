@@ -1,7 +1,8 @@
 [device]
 name  = "esp32s3"
 arch  = "xtensa"
-cores = "multi_core"
+cores = 2
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -97,3 +98,11 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
+
+[device.rmt]
+ram_start = 0x60016800
+channel_ram_size = 48
+
+[device.i2c_master]
+has_fsm_timeouts = true
+has_hw_bus_clear = true

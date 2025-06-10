@@ -1,7 +1,8 @@
 [device]
 name  = "esp32"
 arch  = "xtensa"
-cores = "multi_core"
+cores = 2
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -78,3 +79,7 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
+
+[device.rmt]
+ram_start = 0x3ff56800
+channel_ram_size = 64

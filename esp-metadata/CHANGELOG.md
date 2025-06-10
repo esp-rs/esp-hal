@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `Config::generate_metadata` to generate code for firmware crates. (#3604)
 
 ### Changed
 
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- Removed the firmware-side component of the crate. (#3604)
 
 ## [v0.7.0] - 2025-06-03
 

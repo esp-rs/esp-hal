@@ -2,6 +2,7 @@ use core::str::FromStr;
 use std::sync::OnceLock;
 
 use anyhow::{Result, bail};
+use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
 macro_rules! include_toml {
@@ -185,12 +186,127 @@ pub struct MemoryRegion {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
-    pub name: String,
-    pub arch: Arch,
-    pub cores: Cores,
-    pub peripherals: Vec<String>,
-    pub symbols: Vec<String>,
-    pub memory: Vec<MemoryRegion>,
+    name: String,
+    arch: Arch,
+    cores: usize,
+    trm: String,
+
+    peripherals: Vec<String>,
+    symbols: Vec<String>,
+    memory: Vec<MemoryRegion>,
+
+    // Peripheral driver configuration:
+    #[serde(flatten)]
+    peri_config: PeriConfig,
+}
+
+/// Represents a value in the driver configuration.
+enum Value {
+    /// A numeric value. The generated macro will not include a type suffix
+    /// (i.e. will not be generated as `0u32`).
+    // TODO: may add a (`name`, str) macro variant in the future if strings are needed.
+    Number(u32),
+    /// A boolean value. If true, the value is included in the cfg symbols.
+    Boolean(bool),
+}
+
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Value::Number(value)
+    }
+}
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Value::Boolean(value)
+    }
+}
+
+/// Define driver configuration structs, and a PeriConfig struct
+/// that contains all of them.
+macro_rules! driver_configs {
+    // Type of the struct fields.
+    (@ty number) => { u32 };
+    (@ty bool) => { bool };
+
+    // Creates a single struct
+    (@one
+        $struct:tt($group:ident) {
+            $($(#[$meta:meta])? $name:ident: $kind:ident),* $(,)?
+        }
+    ) => {
+        #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+        struct $struct {
+            $(
+                $(#[$meta])?
+                $name: driver_configs!(@ty $kind),
+            )*
+        }
+
+        impl $struct {
+            fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+                [$( // for each property, generate a tuple
+                    (
+                        /* name: */ concat!(stringify!($group), ".", stringify!($name)),
+                        /* value: */ Value::from(self.$name),
+                    ),
+                )*].into_iter()
+            }
+        }
+    };
+
+    // Repeat pattern for multiple structs
+    ($(
+        $struct:tt($group:ident) {
+            $($tokens:tt)*
+        }
+    )+) => {
+        // Implement the config group and DriverConfig trait for each group
+        $(
+            driver_configs!(@one $struct($group) {
+                $($tokens)*
+            });
+        )+
+
+        // Generate a single PeriConfig struct that contains all the groups. Each of the
+        // groups is optional to support devices that may not have all peripherals.
+        #[derive(Default, Debug, Clone, serde::Deserialize, serde::Serialize)]
+        struct PeriConfig {
+            $(
+                // Each group is an optional struct.
+                #[serde(default)]
+                $group: Option<$struct>,
+            )+
+        }
+
+        impl PeriConfig {
+            /// Returns an iterator over all properties of all peripherals.
+            fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+                // Chain all properties from each group.
+                std::iter::empty()
+                    $(.chain(self.$group.iter().flat_map(|p| p.properties())))*
+            }
+        }
+    };
+}
+
+driver_configs! {
+    RmtProperties(rmt) {
+        ram_start: number,
+        channel_ram_size: number,
+    }
+
+    I2cMasterProperties(i2c_master) {
+        #[serde(default)]
+        has_fsm_timeouts: bool,
+        #[serde(default)]
+        has_hw_bus_clear: bool,
+    }
+}
+
+// Output a Display-able value as a TokenStream, intended to generate numbers
+// without the type suffix.
+fn number(n: impl std::fmt::Display) -> TokenStream {
+    TokenStream::from_str(&format!("{n}")).unwrap()
 }
 
 /// Device configuration file format.
@@ -219,10 +335,12 @@ impl Config {
             device: Device {
                 name: "".to_owned(),
                 arch: Arch::RiscV,
-                cores: Cores::Single,
+                cores: 1,
+                trm: "".to_owned(),
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
+                peri_config: PeriConfig::default(),
             },
         }
     }
@@ -239,7 +357,11 @@ impl Config {
 
     /// The core count of the device.
     pub fn cores(&self) -> Cores {
-        self.device.cores
+        if self.device.cores > 1 {
+            Cores::Multi
+        } else {
+            Cores::Single
+        }
     }
 
     /// The peripherals of the device.
@@ -265,11 +387,23 @@ impl Config {
         [
             self.device.name.as_str(),
             self.device.arch.as_ref(),
-            self.device.cores.as_ref(),
+            match self.cores() {
+                Cores::Single => "single_core",
+                Cores::Multi => "multi_core",
+            },
         ]
         .into_iter()
         .chain(self.device.peripherals.iter().map(|s| s.as_str()))
         .chain(self.device.symbols.iter().map(|s| s.as_str()))
+        .chain(
+            self.device
+                .peri_config
+                .properties()
+                .filter_map(|(name, value)| match value {
+                    Value::Boolean(true) => Some(name),
+                    _ => None,
+                }),
+        )
     }
 
     /// Does the configuration contain `item`?
@@ -282,24 +416,90 @@ impl Config {
         define_all_possible_symbols();
         // Define all necessary configuration symbols for the configured device:
         for symbol in self.all() {
-            println!("cargo:rustc-cfg={symbol}");
+            println!("cargo:rustc-cfg={}", symbol.replace('.', "_"));
         }
 
         // Define env-vars for all memory regions
         for memory in self.memory() {
             println!("cargo:rustc-cfg=has_{}_region", memory.name.to_lowercase());
-
-            println!(
-                "cargo::rustc-env=ESP_METADATA_REGION_{}_START={}",
-                memory.name.to_uppercase(),
-                memory.start
-            );
-            println!(
-                "cargo::rustc-env=ESP_METADATA_REGION_{}_END={}",
-                memory.name.to_uppercase(),
-                memory.end
-            );
         }
+    }
+
+    pub fn generate_metadata(&self) {
+        let out_dir = std::env::var_os("OUT_DIR").unwrap();
+        let out_dir = std::path::Path::new(&out_dir);
+        let out_file = out_dir.join("_generated.rs").to_string_lossy().to_string();
+
+        let mut g = TokenStream::new();
+
+        let chip_name = self.name();
+        // Public API, can't use a private macro:
+        g.extend(quote::quote! {
+            /// The name of the chip as `&str`
+            #[macro_export]
+            macro_rules! chip {
+                () => { #chip_name };
+            }
+        });
+
+        // Translate the chip properties into a macro that can be used in esp-hal:
+        let arch = self.device.arch.as_ref();
+        let cores = number(self.device.cores);
+        let trm = &self.device.trm;
+
+        let peripheral_properties =
+            self.device
+                .peri_config
+                .properties()
+                .flat_map(|(name, value)| match value {
+                    Value::Number(value) => {
+                        let value = number(value); // ensure no numeric suffix is added
+                        quote::quote! {
+                            (#name) => { #value };
+                        }
+                    }
+                    Value::Boolean(value) => quote::quote! {
+                        (#name) => { #value };
+                    },
+                });
+
+        // Not public API, can use a private macro:
+        g.extend(quote::quote! {
+            /// A link to the Technical Reference Manual (TRM) for the chip.
+            #[doc(hidden)]
+            #[macro_export]
+            macro_rules! property {
+                ("chip") => { #chip_name };
+                ("arch") => { #arch };
+                ("cores") => { #cores };
+                ("cores", str) => { stringify!(#cores) };
+                ("trm") => { #trm };
+                #(#peripheral_properties)*
+            }
+        });
+
+        let region_branches = self.memory().iter().map(|region| {
+            let name = region.name.to_uppercase();
+            let start = number(region.start as usize);
+            let end = number(region.end as usize);
+
+            quote::quote! {
+                ( #name ) => {
+                    #start .. #end
+                };
+            }
+        });
+
+        g.extend(quote::quote! {
+            /// Macro to get the address range of the given memory region.
+            #[macro_export]
+            #[doc(hidden)]
+            macro_rules! memory_range {
+                #(#region_branches)*
+            }
+        });
+
+        std::fs::write(&out_file, g.to_string()).unwrap();
     }
 }
 
@@ -315,7 +515,7 @@ fn define_all_possible_symbols() {
         let config = Config::for_chip(&chip);
         for symbol in config.all() {
             // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-            println!("cargo:rustc-check-cfg=cfg({})", symbol);
+            println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
         }
     }
 }

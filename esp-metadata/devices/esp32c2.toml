@@ -1,7 +1,8 @@
 [device]
 name  = "esp32c2"
 arch  = "riscv"
-cores = "single_core"
+cores = 1
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -54,3 +55,7 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
+
+[device.i2c_master]
+has_fsm_timeouts = true
+has_hw_bus_clear = true

@@ -290,12 +290,12 @@ pub enum SoftwareTimeout {
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(i2c_master_has_fsm_timeouts)]
 pub struct FsmTimeout {
     value: u8,
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(i2c_master_has_fsm_timeouts)]
 impl FsmTimeout {
     const FSM_TIMEOUT_MAX: u8 = 23;
 
@@ -331,7 +331,7 @@ impl FsmTimeout {
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(i2c_master_has_fsm_timeouts)]
 impl Default for FsmTimeout {
     fn default() -> Self {
         Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
@@ -596,14 +596,14 @@ pub struct Config {
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
     ///
     /// Default value: 16.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(i2c_master_has_fsm_timeouts)]
     #[builder_lite(unstable)]
     scl_st_timeout: FsmTimeout,
 
     /// Sets the threshold for the unchanged duration of the SCL_MAIN_FSM.
     ///
     /// Default value: 16.
-    #[cfg(not(any(esp32, esp32s2)))]
+    #[cfg(i2c_master_has_fsm_timeouts)]
     #[builder_lite(unstable)]
     scl_main_st_timeout: FsmTimeout,
 }
@@ -614,9 +614,9 @@ impl Default for Config {
             frequency: Rate::from_khz(100),
             timeout: BusTimeout::BusCycles(10),
             software_timeout: SoftwareTimeout::PerByte(Duration::from_millis(1)),
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(i2c_master_has_fsm_timeouts)]
             scl_st_timeout: Default::default(),
-            #[cfg(not(any(esp32, esp32s2)))]
+            #[cfg(i2c_master_has_fsm_timeouts)]
             scl_main_st_timeout: Default::default(),
         }
     }
@@ -1540,7 +1540,7 @@ impl Driver<'_> {
         self.set_frequency(config)?;
 
         // Configure additional timeouts
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(i2c_master_has_fsm_timeouts)]
         {
             self.regs()
                 .scl_st_time_out()
@@ -2236,7 +2236,7 @@ impl Driver<'_> {
             ));
         }
 
-        #[cfg(not(any(esp32, esp32s2)))]
+        #[cfg(i2c_master_has_fsm_timeouts)]
         {
             if r.scl_st_to().bit_is_set() {
                 return Err(Error::Timeout);
@@ -2817,7 +2817,7 @@ fn calculate_chunk_size(remaining: usize) -> usize {
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(i2c_master_has_hw_bus_clear)]
 mod bus_clear {
     use super::*;
 
@@ -2868,7 +2868,7 @@ mod bus_clear {
     }
 }
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(not(i2c_master_has_hw_bus_clear))]
 mod bus_clear {
     use super::*;
     use crate::gpio::AnyPin;
