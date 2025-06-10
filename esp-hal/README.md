@@ -57,7 +57,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | ASSIST_DEBUG       |       | ⚒️      | ⚒️      | ⚒️      | ⚒️      |          | ⚒️      |
 | DAC                | ⚒️   |          |          |          |          | ⚒️      |          |
 | DMA                | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| DS                 |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
+| DS                 |       |          | ❌       | ❌       | ❌       | ❌       | ❌       |
 | ECC                |       | ⚒️      |          | ⚒️      | ⚒️      |          |          |
 | Ethernet           | ❌    |          |          |          |          |          |          |
 | ETM                |       |          |          | ⚒️      | ⚒️      |          |          |
@@ -68,7 +68,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | I2S                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
-| Camera interface   | ❌    |          |          |          |          |          | ⚒️      |
+| Camera interface   | ❌    |          |          |          |          | ❌       | ⚒️      |
 | RGB display        | ⚒️   |          |          |          |          | ❌       | ⚒️      |
 | LEDC               | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | MCPWM              | ⚒️   |          |          | ⚒️      | ⚒️      |          | ⚒️      |
