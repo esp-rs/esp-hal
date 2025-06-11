@@ -92,6 +92,7 @@ status = "supported"
 
 [device.i2c_master]
 status = "supported"
+instances = [{ name = "i2c0" }, { name = "i2c1" }]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
