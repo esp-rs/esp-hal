@@ -895,14 +895,14 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
         .unwrap();
 
     // Header
-    write!(output, "| {:width$} |", "Driver", width = driver_col_width)?;
+    write!(output, "| {:driver_col_width$} |", "Driver")?;
     for chip in Chip::iter() {
         write!(output, " {} |", chip.pretty_name())?;
     }
     writeln!(output)?;
 
     // Header separator
-    write!(output, "| {nothing:-<width$} |", width = driver_col_width)?;
+    write!(output, "| {nothing:-<driver_col_width$} |")?;
     for chip in Chip::iter() {
         write!(
             output,
@@ -919,7 +919,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
         config_group,
     } in PeriConfig::drivers()
     {
-        write!(output, "| {name:width$} |", width = driver_col_width)?;
+        write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
 
@@ -954,11 +954,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
             // VSCode displays emojis just a bit wider than 2 characters, making this
             // approximation a bit too wide but good enough.
             let support_cell_width = chip.pretty_name().len() - status.is_some() as usize;
-            write!(
-                output,
-                " {status_icon:width$} |",
-                width = support_cell_width
-            )?;
+            write!(output, " {status_icon:support_cell_width$} |")?;
         }
         writeln!(output)?;
     }
