@@ -208,7 +208,7 @@ pub use esp_riscv_rt::{self, riscv};
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
-#[cfg(efuse)]
+#[cfg(soc_has_efuse)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::efuse;
@@ -226,20 +226,20 @@ pub use self::soc::psram;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::ulp_core;
 
-#[cfg(any(dport, hp_sys, pcr, system))]
+#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
-#[cfg(gpio)]
+#[cfg(soc_has_gpio)]
 pub mod gpio;
-#[cfg(any(i2c0, i2c1))]
+#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
 pub mod i2c;
 pub mod peripheral;
-#[cfg(all(feature = "unstable", any(hmac, sha)))]
+#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
-#[cfg(any(spi0, spi1, spi2, spi3))]
+#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
 pub mod spi;
 pub mod system;
 pub mod time;
-#[cfg(any(uart0, uart1, uart2))]
+#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
 pub mod uart;
 
 mod macros;
@@ -300,7 +300,7 @@ unstable_module! {
     pub mod asynch;
     pub mod config;
     pub mod debugger;
-    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
+    #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
     pub mod rom;
     #[doc(hidden)]
@@ -310,55 +310,55 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(any(lp_clkrst, rtc_cntl))]
+    #[cfg(any(soc_has_lp_clkrst, soc_has_rtc_cntl))]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(soc_etm)]
+    #[cfg(soc_has_soc_etm)]
     pub mod etm;
-    #[cfg(usb0)]
+    #[cfg(soc_has_usb0)]
     pub mod otg_fs;
 }
 
 unstable_driver! {
-    #[cfg(aes)]
+    #[cfg(soc_has_aes)]
     pub mod aes;
-    #[cfg(assist_debug)]
+    #[cfg(soc_has_assist_debug)]
     pub mod assist_debug;
     pub mod delay;
-    #[cfg(ecc)]
+    #[cfg(soc_has_ecc)]
     pub mod ecc;
-    #[cfg(hmac)]
+    #[cfg(soc_has_hmac)]
     pub mod hmac;
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub mod i2s;
-    #[cfg(lcd_cam)]
+    #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
-    #[cfg(ledc)]
+    #[cfg(soc_has_ledc)]
     pub mod ledc;
-    #[cfg(any(mcpwm0, mcpwm1))]
+    #[cfg(any(soc_has_mcpwm0, soc_has_mcpwm1))]
     pub mod mcpwm;
-    #[cfg(parl_io)]
+    #[cfg(soc_has_parl_io)]
     pub mod parl_io;
-    #[cfg(pcnt)]
+    #[cfg(soc_has_pcnt)]
     pub mod pcnt;
-    #[cfg(rmt)]
+    #[cfg(soc_has_rmt)]
     pub mod rmt;
-    #[cfg(rng)]
+    #[cfg(soc_has_rng)]
     pub mod rng;
-    #[cfg(rsa)]
+    #[cfg(soc_has_rsa)]
     pub mod rsa;
-    #[cfg(sha)]
+    #[cfg(soc_has_sha)]
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
-    #[cfg(trace0)]
+    #[cfg(soc_has_trace0)]
     pub mod trace;
     #[cfg(tsens)]
     pub mod tsens;
-    #[cfg(any(twai0, twai1))]
+    #[cfg(any(soc_has_twai0, soc_has_twai1))]
     pub mod twai;
-    #[cfg(usb_device)]
+    #[cfg(soc_has_usb_device)]
     pub mod usb_serial_jtag;
 }
 

@@ -136,17 +136,21 @@ macro_rules! impl_pdma_channel {
 impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI2, SPI2_DMA, [Spi2]);
 impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI3, SPI3_DMA, [Spi3]);
 
+#[cfg(soc_has_i2s0)]
 impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S0, I2S0, [I2s0]);
-#[cfg(i2s1)]
+#[cfg(soc_has_i2s1)]
 impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S1, I2S1, [I2s1]);
 
 // Specific peripherals use specific channels. Note that this may be overly
 // restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
 // peripherals), but for the current set of restrictions this is sufficient.
+#[cfg(soc_has_spi2)]
 crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);
+#[cfg(soc_has_spi3)]
 crate::dma::impl_dma_eligible!([DMA_SPI3] SPI3 => Spi3);
+#[cfg(soc_has_i2s0)]
 crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);
-#[cfg(i2s1)]
+#[cfg(soc_has_i2s1)]
 crate::dma::impl_dma_eligible!([DMA_I2S1] I2S1 => I2s1);
 #[cfg(esp32s2)]
 use crate::peripherals::DMA_CRYPTO;

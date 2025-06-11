@@ -317,7 +317,7 @@ pub trait PwmPeripheral: crate::private::Sealed {
     fn peripheral() -> system::Peripheral;
 }
 
-#[cfg(mcpwm0)]
+#[cfg(soc_has_mcpwm0)]
 impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
     fn block() -> *const RegisterBlock {
         Self::regs()
@@ -340,7 +340,7 @@ impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
     }
 }
 
-#[cfg(mcpwm1)]
+#[cfg(soc_has_mcpwm1)]
 impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
     fn block() -> *const RegisterBlock {
         Self::regs()
