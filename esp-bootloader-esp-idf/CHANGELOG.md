@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a problem with calculating the otadata checksum, a workaround exists (enabling the `std` feature) (#3629)
 
 ### Removed
 
