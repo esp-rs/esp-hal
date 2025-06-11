@@ -35,9 +35,8 @@ use esp_hal::{
     dma_buffers,
     main,
     spi::{
-        DataMode,
         Mode,
-        master::{Address, Command, Config, Spi},
+        master::{Address, Command, Config, DataMode, Spi},
     },
     time::Rate,
 };

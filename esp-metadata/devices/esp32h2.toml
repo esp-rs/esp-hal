@@ -113,6 +113,7 @@ channel_ram_size = 48
 
 [device.spi_master]
 status = "supported"
+instances = [{ name = "spi2" }]
 
 [device.timergroup]
 instances = [{ name = "timg0" }, { name = "timg1" }]

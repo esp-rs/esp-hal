@@ -11,8 +11,6 @@
 
 use embedded_hal::spi::SpiBus;
 use embedded_hal_async::spi::SpiBus as SpiBusAsync;
-#[cfg(feature = "unstable")]
-use esp_hal::peripherals::SPI2;
 use esp_hal::{
     Blocking,
     gpio::Input,
@@ -29,6 +27,8 @@ cfg_if::cfg_if! {
             dma::{DmaDescriptor, DmaRxBuf, DmaTxBuf},
             dma_buffers,
             gpio::{Level, NoPin},
+            peripherals::SPI2,
+            spi::master::{Address, Command, DataMode},
         };
         #[cfg(pcnt)]
         use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
@@ -844,9 +844,9 @@ mod tests {
 
         let mut buffer = [0u8; 4];
         spi.half_duplex_read(
-            esp_hal::spi::DataMode::Dual,
-            esp_hal::spi::master::Command::_8Bit(0x92, esp_hal::spi::DataMode::SingleTwoDataLines),
-            esp_hal::spi::master::Address::_32Bit(0x000000_00, esp_hal::spi::DataMode::Dual),
+            DataMode::Dual,
+            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
+            Address::_32Bit(0x000000_00, DataMode::Dual),
             0,
             &mut buffer,
         )
@@ -868,9 +868,9 @@ mod tests {
 
         let mut buffer = [0u8; 4];
         spi.half_duplex_read(
-            esp_hal::spi::DataMode::Dual,
-            esp_hal::spi::master::Command::_8Bit(0x92, esp_hal::spi::DataMode::SingleTwoDataLines),
-            esp_hal::spi::master::Address::_32Bit(0x000000_00, esp_hal::spi::DataMode::Dual),
+            DataMode::Dual,
+            Command::_8Bit(0x92, DataMode::SingleTwoDataLines),
+            Address::_32Bit(0x000000_00, DataMode::Dual),
             0,
             &mut buffer,
         )

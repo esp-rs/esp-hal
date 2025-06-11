@@ -1663,8 +1663,9 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///
 /// ```rust,no_run
 #[doc = crate::before_snippet!()]
-/// use esp_hal::spi::AnySpi;
-/// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
+/// use esp_hal::spi::master::{
+///     AnySpi, Spi, SpiDma, Config, Instance as SpiInstance
+/// };
 /// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::Blocking;
 ///

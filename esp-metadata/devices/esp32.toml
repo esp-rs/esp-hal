@@ -107,6 +107,7 @@ channel_ram_size = 64
 
 [device.spi_master]
 status = "supported"
+instances = [{ name = "spi2" }, { name = "spi3" }]
 
 [device.timergroup]
 timg_has_timer1 = true
