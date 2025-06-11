@@ -16,9 +16,11 @@ options:
                `multiple-integrated` option needs one timer per executor.</p><p>The `generic`
                queue allows using embassy-time without the embassy executors."
   default:
-    - if: 'cargo_feature("executors") || ignore_feature_gates()'
+    - if: 'ignore_feature_gates()'
       value: '"single-integrated"'
-    - if: '!cargo_feature("executors") && ignore_feature_gates()'
+    - if: 'cargo_feature("executors")'
+      value: '"single-integrated"'
+    - if: 'true'
       value: '"generic"'
   constraints:
     - if: 'cargo_feature("executors") || ignore_feature_gates()'
@@ -28,13 +30,13 @@ options:
         - 'generic'
         - 'single-integrated'
         - 'multiple-integrated'
-    - if: '!cargo_feature("executors") && !ignore_feature_gates()'
+    - if: 'true'
       type:
         validator: enumeration
         value:
         - 'generic'
   stability: Unstable
-  active: 'cargo_feature("executors")'
+  active: 'cargo_feature("executors") || ignore_feature_gates()'
 
 - name: generic-queue-size
   description: The capacity of the queue when the `generic` timer queue flavour is selected.

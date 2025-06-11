@@ -422,7 +422,7 @@ pub fn evaluate_yaml_config(
 
         let constraint = {
             let mut active_constraint = None;
-            if let Some(constraints) = option.constraints {
+            if let Some(constraints) = &option.constraints {
                 for constraint in constraints {
                     if evalexpr::eval_with_context(&constraint.if_, &eval_ctx)
                         .map_err(|err| {
@@ -439,22 +439,25 @@ pub fn evaluate_yaml_config(
                             ))
                         })?
                     {
-                        if active_constraint.is_some() {
-                            panic!(
-                                "More than one constraints active for crate {}, option {}",
-                                config.krate, option.name
-                            );
-                        }
-                        active_constraint = Some(constraint.type_)
+                        active_constraint = Some(constraint.type_.clone());
+                        break;
                     }
                 }
             };
+
+            if option.constraints.is_some() && active_constraint.is_none() {
+                panic!(
+                    "No constraint active for crate {}, option {}",
+                    config.krate, option.name
+                );
+            }
+
             active_constraint
         };
 
         let default_value = {
             let mut default_value = None;
-            for value in option.default {
+            for value in option.default.clone() {
                 if evalexpr::eval_with_context(&value.if_, &eval_ctx)
                     .map_err(|err| {
                         Error::Parse(format!(
@@ -470,15 +473,18 @@ pub fn evaluate_yaml_config(
                         ))
                     })?
                 {
-                    if default_value.is_some() {
-                        panic!(
-                            "More than one default values active for crate {}, option {}",
-                            config.krate, option.name
-                        );
-                    }
-                    default_value = Some(value.value)
+                    default_value = Some(value.value);
+                    break;
                 }
             }
+
+            if default_value.is_none() {
+                panic!(
+                    "No default value active for crate {}, option {}",
+                    config.krate, option.name
+                );
+            }
+
             default_value
         };
 
@@ -1229,6 +1235,99 @@ options:
                         display_hint: DisplayHint::None,
                     },
             ],
+            options
+        );
+    }
+
+    #[test]
+    fn deserialization_fallback_default() {
+        let yml = r#"
+crate: esp-bootloader-esp-idf
+
+options:
+- name: esp_idf_version
+  description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
+  default:
+    - if: 'chip == "esp32c6"'
+      value: '"esp32c6"'
+    - if: 'chip == "esp32"'
+      value: '"other"'
+    - value: '"default"'
+  active: true
+"#;
+
+        let (cfg, options) = evaluate_yaml_config(
+            yml,
+            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c3).clone()),
+            vec![],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!("esp-bootloader-esp-idf", cfg.krate);
+
+        assert_eq!(
+            vec![
+                    ConfigOption {
+                        name: "esp_idf_version".to_string(),
+                        description: "ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.".to_string(),
+                        default_value: Value::String("default".to_string()),
+                        constraint: None,
+                        stability: Stability::Unstable,
+                        active: true,
+                        display_hint: DisplayHint::None,
+                    },
+            ],
+            options
+        );
+    }
+
+    #[test]
+    fn deserialization_fallback_contraint() {
+        let yml = r#"
+crate: esp-bootloader-esp-idf
+
+options:
+- name: option
+  description: Desc
+  default:
+    - value: 100
+  constraints:
+    - if: 'chip == "esp32c6"'
+      type:
+        validator: integer_in_range
+        value:
+          start: 0
+          end: 100
+    - if: true
+      type:
+        validator: integer_in_range
+        value:
+          start: 0
+          end: 50
+  active: true
+"#;
+
+        let (cfg, options) = evaluate_yaml_config(
+            yml,
+            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32).clone()),
+            vec![],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!("esp-bootloader-esp-idf", cfg.krate);
+
+        assert_eq!(
+            vec![ConfigOption {
+                name: "option".to_string(),
+                description: "Desc".to_string(),
+                default_value: Value::Integer(100),
+                constraint: Some(Validator::IntegerInRange(0..50)),
+                stability: Stability::Unstable,
+                active: true,
+                display_hint: DisplayHint::None,
+            },],
             options
         );
     }

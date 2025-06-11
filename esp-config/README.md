@@ -105,7 +105,11 @@ The expression supports these custom functions:
 
 The `chip` variable is populated with the name of the targeted chip (if the crate is using chip specific features).
 
-`checks` is a list of checks which needs to pass for a valid configuration. You can access the currently configured values to check them.
+The conditions for `default` and `constraints` are evaluated in order and the first match is taken no matter if there is more.
+This way you could have a catch-all condition as the last item by just specifying `true`.
+
+`checks` is a list of checks which needs to pass for a valid configuration and is checked after all config values for the current config are applied.
+You can access the currently configured values to check them.
 
 For more examples see the various `esp_config.yml` files in this repository.
 
