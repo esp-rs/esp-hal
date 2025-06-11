@@ -25,6 +25,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(timers_timg0)]
     fn test_feeding_timg0_wdt() {
         let peripherals = esp_hal::init(
             Config::default().with_watchdog(
@@ -44,7 +45,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(timg1)]
+    #[cfg(timers_timg1)]
     fn test_feeding_timg1_wdt() {
         let peripherals = esp_hal::init(
             Config::default().with_watchdog(
@@ -64,6 +65,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(timers_timg0)]
     fn test_feeding_timg0_wdt_max_clock() {
         let peripherals = esp_hal::init(
             Config::default()

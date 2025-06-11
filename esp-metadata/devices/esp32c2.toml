@@ -80,6 +80,9 @@ bus_timeout_is_exponential = true
 [device.spi_master]
 status = "supported"
 
+[device.timers]
+instances = [{ name = "timg0" }]
+
 [device.uart]
 status = "supported"
 
@@ -103,7 +106,6 @@ status = "supported"
 [device.io_mux]
 [device.temp_sensor]
 [device.sleep]
-[device.timers]
 [device.systimer]
 
 ## Radio

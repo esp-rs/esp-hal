@@ -257,6 +257,20 @@ impl SupportStatus {
     }
 }
 
+/// An empty configuration, used when a driver just wants to declare that
+/// it supports a peripheral, but does not have any configuration options.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+struct EmptyInstanceConfig {}
+
+/// A peripheral instance for which a driver is implemented.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+struct PeriInstance<I> {
+    /// The name of the instance
+    name: String,
+    #[serde(flatten)]
+    instance_config: I,
+}
+
 struct SupportItem {
     name: &'static str,
     config_group: &'static str,
@@ -276,9 +290,10 @@ macro_rules! driver_configs {
         struct $struct {
             #[serde(default)]
             status: SupportStatus,
-            // If empty, the driver supports a single instance only.
+            /// The list of peripherals for which this driver is implemented.
+            /// If empty, the driver supports a single instance only.
             #[serde(default)]
-            instances: Vec<String>,
+            instances: Vec<PeriInstance<EmptyInstanceConfig>>,
             $(
                 $(#[$meta])?
                 $config: $ty,
@@ -360,6 +375,14 @@ macro_rules! driver_configs {
                             None
                         }
                     } )))*
+            }
+
+            fn driver_instances(&self) -> impl Iterator<Item = String> {
+                // Chain all driver instances from each driver.
+                std::iter::empty()
+                    $(.chain(self.$driver.iter().flat_map(|d| {
+                        d.instances.iter().map(|i| format!("{}.{}", stringify!($driver), i.name.as_str()))
+                    })))*
             }
 
             /// Returns an iterator over all properties of all peripherals.
@@ -619,8 +642,11 @@ driver_configs![
     TimersProperties {
         driver: timers,
         name: "Timers",
-        peripherals: &["timg0", "timg1"],
-        properties: {}
+        peripherals: &[],
+        properties: {
+            #[serde(default)]
+            timg_has_timer1: bool,
+        }
     },
     TouchProperties {
         driver: touch,
@@ -767,25 +793,31 @@ impl Config {
     }
 
     /// All configuration values for the device.
-    pub fn all(&self) -> impl Iterator<Item = &str> + '_ {
+    pub fn all(&self) -> impl Iterator<Item = String> + '_ {
         [
-            self.device.name.as_str(),
-            self.device.arch.as_ref(),
+            self.device.name.clone(),
+            self.device.arch.to_string(),
             match self.cores() {
-                Cores::Single => "single_core",
-                Cores::Multi => "multi_core",
+                Cores::Single => String::from("single_core"),
+                Cores::Multi => String::from("multi_core"),
             },
         ]
         .into_iter()
-        .chain(self.device.peripherals.iter().map(|s| s.as_str()))
-        .chain(self.device.symbols.iter().map(|s| s.as_str()))
-        .chain(self.device.peri_config.driver_names())
+        .chain(self.device.peripherals.iter().cloned())
+        .chain(self.device.symbols.iter().cloned())
+        .chain(
+            self.device
+                .peri_config
+                .driver_names()
+                .map(|name| name.to_string()),
+        )
+        .chain(self.device.peri_config.driver_instances())
         .chain(
             self.device
                 .peri_config
                 .properties()
                 .filter_map(|(name, value)| match value {
-                    Value::Boolean(true) => Some(name),
+                    Value::Boolean(true) => Some(name.to_string()),
                     _ => None,
                 }),
         )

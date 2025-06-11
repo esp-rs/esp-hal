@@ -129,6 +129,7 @@ impl Peripheral {
         Peripheral::UsbDevice,
         #[cfg(systimer)]
         Peripheral::Systimer,
+        #[cfg(timg0)]
         Peripheral::Timg0,
         #[cfg(esp32c6)] // used by some wifi calibration steps.
         // TODO: We should probably automatically enable this when needed.
