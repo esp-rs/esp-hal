@@ -42,7 +42,6 @@ defmt                     = { version = "1.0.1", optional = true }
 log-04                    = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-build    = { version = "0.3.0", path = "../esp-build" }
 esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
 esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
