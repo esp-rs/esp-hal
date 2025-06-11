@@ -85,7 +85,6 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // Execute the specified action:
     match action {
         CargoAction::Build(out_path) => build_examples(args, examples, &package_path, &out_path),
-        CargoAction::Run if args.example.is_some() => run_example(args, examples, &package_path),
         CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
