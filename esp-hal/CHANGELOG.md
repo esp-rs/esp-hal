@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `AnyI2c` has been moved from `esp_hal::i2c` to `esp_hal::i2c::master` (#3627)
 
 ### Fixed
 

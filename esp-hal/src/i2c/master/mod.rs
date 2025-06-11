@@ -137,7 +137,6 @@ use crate::{
         Pull,
         interconnect::{self, PeripheralOutput},
     },
-    i2c::{AnyI2c, AnyI2cInner},
     interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
     peripherals::Interrupt,
@@ -3012,7 +3011,7 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance: crate::private::Sealed + super::IntoAnyI2c {
+pub trait Instance: crate::private::Sealed + IntoAnyI2c {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -3144,16 +3143,27 @@ macro_rules! instance {
     };
 }
 
-#[cfg(i2c0)]
+#[cfg(i2c_master_i2c0)]
 instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
-#[cfg(i2c1)]
+#[cfg(i2c_master_i2c1)]
 instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
+
+crate::any_peripheral! {
+    /// Any I2C peripheral.
+    pub peripheral AnyI2c<'d> {
+        #[cfg(i2c_master_i2c0)]
+        I2c0(crate::peripherals::I2C0<'d>),
+        #[cfg(i2c_master_i2c1)]
+        I2c1(crate::peripherals::I2C1<'d>),
+    }
+}
 
 impl Instance for AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
+            #[cfg(i2c_master_i2c0)]
             AnyI2cInner::I2c0(i2c) => i2c,
-            #[cfg(i2c1)]
+            #[cfg(i2c_master_i2c1)]
             AnyI2cInner::I2c1(i2c) => i2c,
         } {
             fn parts(&self) -> (&Info, &State);

@@ -14,13 +14,3 @@ pub mod master;
 crate::unstable_module! {
     pub mod lp_i2c;
 }
-
-crate::any_peripheral! {
-    /// Any I2C peripheral.
-    pub peripheral AnyI2c<'d> {
-        #[cfg(i2c0)]
-        I2c0(crate::peripherals::I2C0<'d>),
-        #[cfg(i2c1)]
-        I2c1(crate::peripherals::I2C1<'d>),
-    }
-}
