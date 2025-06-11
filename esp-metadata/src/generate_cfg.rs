@@ -202,6 +202,7 @@ struct Device {
 
 /// Represents a value in the driver configuration.
 enum Value {
+    Unset,
     /// A numeric value. The generated macro will not include a type suffix
     /// (i.e. will not be generated as `0u32`).
     // TODO: may add a (`name`, str) macro variant in the future if strings are needed.
@@ -213,6 +214,14 @@ enum Value {
 impl From<u32> for Value {
     fn from(value: u32) -> Self {
         Value::Number(value)
+    }
+}
+impl From<Option<u32>> for Value {
+    fn from(value: Option<u32>) -> Self {
+        match value {
+            Some(v) => Value::Number(v),
+            None => Value::Unset,
+        }
     }
 }
 impl From<bool> for Value {
@@ -257,22 +266,10 @@ struct SupportItem {
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
-    // Generates a tuple where the value is a Number
-    (@property number, $self:ident, $group:literal, $name:ident) => {
-        (concat!($group, ".", stringify!($name)), Value::Number($self.$name))
-    };
-    (@property bool, $self:ident, $group:literal, $name:ident) => {
-        (concat!($group, ".", stringify!($name)), Value::Boolean($self.$name))
-    };
-
-    // Type of the struct fields.
-    (@ty number) => { u32 };
-    (@ty bool) => { bool };
-
     // Creates a single struct
     (@one
         $struct:tt($group:ident) {
-            $($(#[$meta:meta])? $config:ident: $kind:ident),* $(,)?
+            $($(#[$meta:meta])? $config:ident: $ty:ty),* $(,)?
         }
     ) => {
         #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -284,7 +281,7 @@ macro_rules! driver_configs {
             instances: Vec<String>,
             $(
                 $(#[$meta])?
-                $config: driver_configs!(@ty $kind),
+                $config: $ty,
             )*
         }
 
@@ -461,6 +458,27 @@ driver_configs![
             has_fsm_timeouts: bool,
             #[serde(default)]
             has_hw_bus_clear: bool,
+            #[serde(default)]
+            has_bus_timeout_enable: bool,
+            #[serde(default)]
+            separate_filter_config_registers: bool,
+            #[serde(default)]
+            can_estimate_nack_reason: bool,
+            #[serde(default)]
+            has_conf_update: bool,
+            #[serde(default)]
+            has_reliable_fsm_reset: bool,
+            #[serde(default)]
+            has_arbitration_en: bool,
+            #[serde(default)]
+            has_tx_fifo_watermark: bool,
+            #[serde(default)]
+            bus_timeout_is_exponential: bool,
+            #[serde(default)]
+            i2c0_data_register_ahb_address: Option<u32>,
+            max_bus_timeout: u32,
+            ll_intr_mask: u32,
+            fifo_size: u32,
         }
     },
     I2cSlaveProperties {
@@ -534,8 +552,8 @@ driver_configs![
         name: "RMT",
         peripherals: &["rmt"],
         properties: {
-            ram_start: number,
-            channel_ram_size: number,
+            ram_start: u32,
+            channel_ram_size: u32,
         }
     },
     RngProperties {
@@ -816,10 +834,12 @@ impl Config {
                 .peri_config
                 .properties()
                 .flat_map(|(name, value)| match value {
+                    Value::Unset => quote::quote! {},
                     Value::Number(value) => {
                         let value = number(value); // ensure no numeric suffix is added
                         quote::quote! {
                             (#name) => { #value };
+                            (#name, str) => { stringify!(#value) };
                         }
                     }
                     Value::Boolean(value) => quote::quote! {
