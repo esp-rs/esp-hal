@@ -10,6 +10,6 @@ impl Crc32 {
             fn esp_rom_crc32_le(crc: u32, buf: *const u8, len: u32) -> u32;
         }
 
-        unsafe { esp_rom_crc32_le(0, data.as_ptr(), data.len() as u32) }
+        unsafe { esp_rom_crc32_le(u32::MAX, data.as_ptr(), data.len() as u32) }
     }
 }
