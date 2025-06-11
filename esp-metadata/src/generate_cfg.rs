@@ -1,7 +1,7 @@
 use core::str::FromStr;
 use std::{fmt::Write, sync::OnceLock};
 
-use anyhow::{Result, bail};
+use anyhow::{Result, bail, ensure};
 use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
@@ -728,7 +728,7 @@ pub struct Config {
 impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
-        match chip {
+        let config = match chip {
             Chip::Esp32 => include_toml!(Config, "../devices/esp32.toml"),
             Chip::Esp32c2 => include_toml!(Config, "../devices/esp32c2.toml"),
             Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
@@ -736,7 +736,11 @@ impl Config {
             Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
             Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
             Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
-        }
+        };
+
+        config.validate().expect("Invalid device configuration");
+
+        config
     }
 
     /// Create an empty configuration
@@ -753,6 +757,19 @@ impl Config {
                 peri_config: PeriConfig::default(),
             },
         }
+    }
+
+    fn validate(&self) -> Result<()> {
+        for instance in self.device.peri_config.driver_instances() {
+            let (driver, peri) = instance.split_once('.').unwrap();
+            ensure!(
+                self.device.peripherals.iter().any(|p| p == peri),
+                "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
+                self.device.name
+            );
+        }
+
+        Ok(())
     }
 
     /// The name of the device.
