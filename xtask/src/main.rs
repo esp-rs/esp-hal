@@ -430,6 +430,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     println!("::group::Build examples");
 
     // The `ota_example` expects a file named `examples/target/ota_image` - it doesn't care about the contents however
+    std::fs::create_dir_all("./examples/target")?;
     std::fs::write("./examples/target/ota_image", "DUMMY")?;
 
     examples(
