@@ -69,7 +69,7 @@
 use core::marker::PhantomData;
 
 use super::Error;
-#[cfg(timers_timg1)]
+#[cfg(timergroup_timg1)]
 use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
@@ -108,7 +108,7 @@ where
     /// Timer 0
     pub timer0: Timer<'d>,
     /// Timer 1
-    #[cfg(timers_timg_has_timer1)]
+    #[cfg(timergroup_timg_has_timer1)]
     pub timer1: Timer<'d>,
     /// Watchdog timer
     pub wdt: Wdt<T>,
@@ -125,7 +125,7 @@ pub trait TimerGroupInstance {
     fn wdt_interrupt() -> Interrupt;
 }
 
-#[cfg(timers_timg0)]
+#[cfg(timergroup_timg0)]
 impl TimerGroupInstance for TIMG0<'_> {
     fn id() -> u8 {
         0
@@ -187,7 +187,7 @@ impl TimerGroupInstance for TIMG0<'_> {
     }
 }
 
-#[cfg(timers_timg1)]
+#[cfg(timergroup_timg1)]
 impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
     fn id() -> u8 {
         1
@@ -263,7 +263,7 @@ where
                 register_block: T::register_block(),
                 _lifetime: PhantomData,
             },
-            #[cfg(timers_timg_has_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             timer1: Timer {
                 timer: 1,
                 tg: T::id(),
@@ -326,9 +326,9 @@ impl super::Timer for Timer<'_> {
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match (self.timer_group(), self.timer_number()) {
             (0, 0) => asynch::timg0_timer0_handler,
-            #[cfg(timers_timg_has_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => asynch::timg0_timer1_handler,
-            #[cfg(timers_timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => asynch::timg1_timer0_handler,
             #[cfg(all(timers_timg_has_timer1, timers_timg1))]
             (1, 1) => asynch::timg1_timer1_handler,
@@ -339,9 +339,9 @@ impl super::Timer for Timer<'_> {
     fn peripheral_interrupt(&self) -> Interrupt {
         match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timers_timg_has_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => Interrupt::TG0_T1_LEVEL,
-            #[cfg(timers_timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => Interrupt::TG1_T0_LEVEL,
             #[cfg(all(timers_timg_has_timer1, timers_timg1))]
             (1, 1) => Interrupt::TG1_T1_LEVEL,
@@ -399,9 +399,9 @@ impl Timer<'_> {
     pub(crate) fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timers_timg_has_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => Interrupt::TG0_T1_LEVEL,
-            #[cfg(timers_timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => Interrupt::TG1_T0_LEVEL,
             #[cfg(all(timers_timg_has_timer1, timers_timg1))]
             (1, 1) => Interrupt::TG1_T1_LEVEL,
@@ -561,7 +561,7 @@ impl Timer<'_> {
                     .t(self.timer as usize)
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
-            } else if #[cfg(timers_timg_has_timer1)] {
+            } else if #[cfg(timergroup_timg_has_timer1)] {
                 lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
                     self.register_block()
                         .int_ena()
@@ -860,7 +860,7 @@ mod asynch {
         });
     }
 
-    #[cfg(timers_timg1)]
+    #[cfg(timergroup_timg1)]
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
         handle_irq(Timer {
@@ -871,7 +871,7 @@ mod asynch {
         });
     }
 
-    #[cfg(timers_timg_has_timer1)]
+    #[cfg(timergroup_timg_has_timer1)]
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
         handle_irq(Timer {

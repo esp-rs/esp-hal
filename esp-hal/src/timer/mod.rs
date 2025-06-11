@@ -60,7 +60,7 @@ use crate::{
 
 #[cfg(systimer)]
 pub mod systimer;
-#[cfg(timers)]
+#[cfg(timergroup)]
 pub mod timg;
 
 /// Timer errors.
@@ -416,7 +416,7 @@ where
 crate::any_peripheral! {
     /// Any Timer peripheral.
     pub peripheral AnyTimer<'d> {
-        #[cfg(timers)]
+        #[cfg(timergroup)]
         TimgTimer(timg::Timer<'d>),
         #[cfg(systimer)]
         SystimerAlarm(systimer::Alarm<'d>),

@@ -640,7 +640,7 @@ driver_configs![
         properties: {}
     },
     TimersProperties {
-        driver: timers,
+        driver: timergroup,
         name: "Timers",
         peripherals: &[],
         properties: {
