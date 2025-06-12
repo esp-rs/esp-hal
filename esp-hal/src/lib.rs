@@ -308,7 +308,7 @@ unstable_module! {
     // Drivers needed for initialization or they are tightly coupled to something else.
     #[cfg(any(adc1, adc2, dac))]
     pub mod analog;
-    #[cfg(any(systimer, timg0, timg1))]
+    #[cfg(any(systimer, timergroup))]
     pub mod timer;
     #[cfg(any(lp_clkrst, rtc_cntl))]
     pub mod rtc_cntl;
@@ -325,7 +325,6 @@ unstable_driver! {
     pub mod aes;
     #[cfg(assist_debug)]
     pub mod assist_debug;
-    #[cfg(any(xtensa, all(riscv, systimer)))]
     pub mod delay;
     #[cfg(ecc)]
     pub mod ecc;
@@ -634,6 +633,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
+            #[cfg(timergroup_timg0)]
             match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
@@ -645,7 +645,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
@@ -664,9 +664,10 @@ pub fn init(config: Config) -> Peripherals {
 
             rtc.rwdt.disable();
 
+            #[cfg(timergroup_timg0)]
             crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
 
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
         }
     }

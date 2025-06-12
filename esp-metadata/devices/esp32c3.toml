@@ -100,6 +100,9 @@ channel_ram_size = 48
 [device.spi_master]
 status = "supported"
 
+[device.timergroup]
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
 [device.uart]
 status = "supported"
 
@@ -129,7 +132,6 @@ status = "not_supported"
 [device.interrupts]
 [device.io_mux]
 [device.temp_sensor]
-[device.timers]
 [device.sleep]
 [device.systimer]
 

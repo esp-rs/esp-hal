@@ -168,7 +168,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {
-            config_symbols.push(key);
+            config_symbols.push(key.to_string());
         }
     }
 
@@ -230,7 +230,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 
 fn copy_dir_all(
-    config_symbols: &[&str],
+    config_symbols: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -260,7 +260,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &[&str],
+    config: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -279,7 +279,7 @@ fn preprocess_file(
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.contains(&condition);
+            let should_take = should_take && config.iter().any(|c| c.as_str() == condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {

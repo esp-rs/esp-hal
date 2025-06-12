@@ -79,7 +79,6 @@ symbols = [
     "psram_dma",
     "octal_psram",
     "ulp_riscv_core",
-    "timg_timer1",
     "very_large_intr_status",
     "gpio_bank_1",
     "spi_octal",
@@ -127,6 +126,10 @@ channel_ram_size = 48
 [device.spi_master]
 status = "supported"
 
+[device.timergroup]
+timg_has_timer1 = true
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
 [device.uart]
 status = "supported"
 
@@ -168,7 +171,6 @@ status = "not_supported"
 [device.sleep]
 [device.systimer]
 [device.temp_sensor]
-[device.timers]
 [device.ulp_fsm]
 [device.ulp_riscv]
 
