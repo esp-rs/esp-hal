@@ -66,8 +66,6 @@ symbols = [
     "dac",
     "pdma",
     "phy",
-    "bt",
-    "wifi",
     "psram",
     "timg_timer1",
     "touch",

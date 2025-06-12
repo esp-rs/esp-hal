@@ -59,8 +59,6 @@ symbols = [
     "assist_debug_region_monitor",
     "gdma",
     "phy",
-    "bt",
-    "wifi",
     "tsens",
 
     # ROM capabilities

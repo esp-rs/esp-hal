@@ -668,7 +668,10 @@ driver_configs![
         driver: wifi,
         name: "WIFI",
         peripherals: &["wifi"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_wifi6: bool,
+        }
     },
     BluetoothProperties {
         driver: bt,

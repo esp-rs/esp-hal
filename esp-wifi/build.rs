@@ -27,16 +27,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         "#
     );
-    assert!(
-        !cfg!(feature = "coex") || (config.contains("wifi") && config.contains("bt")),
-        r#"
-
-        COEX is not supported on this target.
-
-        See https://github.com/esp-rs/esp-wifi/issues/92.
-
-        "#
-    );
 
     if let Ok(level) = std::env::var("OPT_LEVEL") {
         if level != "2" && level != "3" && level != "s" {
@@ -51,6 +41,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(coex)");
     #[cfg(feature = "coex")]
     {
+        assert!(
+            config.contains("wifi") && config.contains("bt"),
+            r#"
+
+            WiFi/Bluetooth coexistence is not supported on this target.
+
+            "#
+        );
+
         #[cfg(all(feature = "wifi", feature = "ble"))]
         println!("cargo:rustc-cfg=coex");
 

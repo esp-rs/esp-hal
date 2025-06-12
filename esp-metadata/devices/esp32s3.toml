@@ -75,8 +75,6 @@ symbols = [
     "assist_debug_region_monitor",
     "gdma",
     "phy",
-    "bt",
-    "wifi",
     "psram",
     "psram_dma",
     "octal_psram",

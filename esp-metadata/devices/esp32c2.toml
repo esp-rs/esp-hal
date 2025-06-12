@@ -46,8 +46,6 @@ symbols = [
     "assist_debug_sp_monitor",
     "gdma",
     "phy",
-    "bt",
-    "wifi",
 
     # ROM capabilities
     "rom_crc_le",
