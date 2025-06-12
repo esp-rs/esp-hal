@@ -77,7 +77,6 @@ symbols = [
     "gdma",
     "plic",
     "phy",
-    "bt",
     "ieee802154",
 
     # ROM capabilities

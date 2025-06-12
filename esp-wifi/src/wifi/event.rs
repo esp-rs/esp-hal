@@ -132,7 +132,7 @@ impl_wifi_event!(ApWpsRgTimeout);
 impl_wifi_event!(ApWpsRgPin, wifi_event_ap_wps_rg_pin_t);
 impl_wifi_event!(ApWpsRgPbcOverlap);
 cfg_if::cfg_if! {
-    if #[cfg(wifi6)] {
+    if #[cfg(wifi_has_wifi6)] {
         impl_wifi_event!(ItwtSetup, wifi_event_sta_itwt_setup_t);
         impl_wifi_event!(ItwtTeardown, wifi_event_sta_itwt_teardown_t);
         impl_wifi_event!(ItwtProbe, wifi_event_sta_itwt_probe_t);

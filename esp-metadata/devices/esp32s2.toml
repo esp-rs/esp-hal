@@ -62,7 +62,6 @@ symbols = [
     "dac",
     "pdma",
     "phy",
-    "wifi",
     "psram",
     "psram_dma",
     "ulp_riscv_core",
