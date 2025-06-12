@@ -464,7 +464,10 @@ driver_configs![
         driver: gpio,
         name: "GPIO",
         peripherals: &["gpio"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_bank_1: bool,
+        }
     },
     HmacProperties {
         driver: hmac,
@@ -955,8 +958,15 @@ fn define_all_possible_symbols() {
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
         for symbol in config.all() {
+            let symbol_name = symbol
+                .split('=')
+                .next()
+                .expect("The first split can't fail");
             // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-            println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
+            println!(
+                "cargo:rustc-check-cfg=cfg({})",
+                symbol_name.replace('.', "_")
+            );
         }
     }
 }

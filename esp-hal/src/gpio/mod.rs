@@ -466,7 +466,7 @@ pub trait TouchPin: Pin {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GpioBank {
     _0,
-    #[cfg(gpio_bank_1)]
+    #[cfg(gpio_has_bank_1)]
     _1,
 }
 
@@ -480,7 +480,7 @@ impl GpioBank {
     fn offset(self) -> u8 {
         match self {
             Self::_0 => 0,
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => 32,
         }
     }
@@ -498,7 +498,7 @@ impl GpioBank {
             Self::_0 => GPIO::regs()
                 .enable_w1tc()
                 .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs()
                 .enable1_w1tc()
                 .write(|w| unsafe { w.bits(word) }),
@@ -510,7 +510,7 @@ impl GpioBank {
             Self::_0 => GPIO::regs()
                 .enable_w1ts()
                 .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs()
                 .enable1_w1ts()
                 .write(|w| unsafe { w.bits(word) }),
@@ -520,7 +520,7 @@ impl GpioBank {
     fn read_input(self) -> u32 {
         match self {
             Self::_0 => GPIO::regs().in_().read().bits(),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().in1().read().bits(),
         }
     }
@@ -528,7 +528,7 @@ impl GpioBank {
     fn read_output(self) -> u32 {
         match self {
             Self::_0 => GPIO::regs().out().read().bits(),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().out1().read().bits(),
         }
     }
@@ -536,7 +536,7 @@ impl GpioBank {
     fn read_interrupt_status(self) -> u32 {
         match self {
             Self::_0 => GPIO::regs().status().read().bits(),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().status1().read().bits(),
         }
     }
@@ -546,7 +546,7 @@ impl GpioBank {
             Self::_0 => GPIO::regs()
                 .status_w1tc()
                 .write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs()
                 .status1_w1tc()
                 .write(|w| unsafe { w.bits(word) }),
@@ -564,7 +564,7 @@ impl GpioBank {
     fn write_output_set(self, word: u32) {
         match self {
             Self::_0 => GPIO::regs().out_w1ts().write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().out1_w1ts().write(|w| unsafe { w.bits(word) }),
         };
     }
@@ -572,7 +572,7 @@ impl GpioBank {
     fn write_output_clear(self, word: u32) {
         match self {
             Self::_0 => GPIO::regs().out_w1tc().write(|w| unsafe { w.bits(word) }),
-            #[cfg(gpio_bank_1)]
+            #[cfg(gpio_has_bank_1)]
             Self::_1 => GPIO::regs().out1_w1tc().write(|w| unsafe { w.bits(word) }),
         };
     }
@@ -1777,7 +1777,7 @@ impl private::Sealed for AnyPin<'_> {}
 
 impl<'lt> AnyPin<'lt> {
     fn bank(&self) -> GpioBank {
-        #[cfg(gpio_bank_1)]
+        #[cfg(gpio_has_bank_1)]
         if self.number() >= 32 {
             return GpioBank::_1;
         }

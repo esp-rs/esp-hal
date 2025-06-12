@@ -69,7 +69,6 @@ symbols = [
     "psram",
     "touch",
     "large_intr_status",
-    "gpio_bank_1",
 
     # ROM capabilities
     "rom_crc_le",
@@ -87,6 +86,7 @@ memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
 
 [device.gpio]
 status = "supported"
+has_bank_1 = true
 
 [device.i2c_master]
 status = "supported"
