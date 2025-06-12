@@ -3902,7 +3902,6 @@ mod chip_specific {
         MemSize,
         NUM_CHANNELS,
         RawChannelAccess,
-        RawChannelAccessExt,
         RmtState,
         Rx,
         RxChannelInternal,
