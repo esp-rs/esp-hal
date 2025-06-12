@@ -23,6 +23,12 @@ fn main() -> Result<(), Box<dyn StdError>> {
                 true,
             ),
             ConfigOption::new(
+                "low-power-wait-stats",
+                "Enables statistics for the low-power wait feature. \
+                Needs the `low-power-wait` config option to be enabled.",
+                false,
+            ),
+            ConfigOption::new(
                 "timer-queue",
                 "The flavour of the timer queue provided by this crate. Integrated \
                 queues require the `executors` feature to be enabled.</p><p>If you use \

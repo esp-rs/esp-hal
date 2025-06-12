@@ -3,15 +3,20 @@
 use core::marker::PhantomData;
 
 use embassy_executor::Spawner;
+#[cfg(all(low_power_wait, low_power_wait_stats))]
+use embassy_time::Instant;
 #[cfg(all(low_power_wait, multi_core))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
 use esp_hal::{interrupt::Priority, system::Cpu};
 #[cfg(low_power_wait)]
-use portable_atomic::{AtomicBool, Ordering};
+use portable_atomic::{AtomicBool, AtomicU64, Ordering};
 
 use super::InnerExecutor;
 
 pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
+
+#[cfg(all(low_power_wait, low_power_wait_stats))]
+static SLEEP_TICKS: AtomicU64 = AtomicU64::new(0);
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
@@ -110,8 +115,15 @@ This will use software-interrupt 3 which isn't available for anything else to wa
         loop {
             unsafe { self.inner.inner.poll() };
 
+            #[cfg(all(low_power_wait, low_power_wait_stats))]
+            let before = Instant::now().as_ticks();
             #[cfg(low_power_wait)]
             Self::wait_impl(cpu);
+            #[cfg(all(low_power_wait, low_power_wait_stats))]
+            {
+                let after = Instant::now().as_ticks();
+                SLEEP_TICKS.fetch_add(after - before, Ordering::Relaxed);
+            }
         }
     }
 
@@ -178,5 +190,40 @@ This will use software-interrupt 3 which isn't available for anything else to wa
 impl Default for Executor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(all(low_power_wait, low_power_wait_stats))]
+mod low_power_wait_stats {
+    use embassy_time::Instant;
+    use portable_atomic::Ordering;
+    pub struct ThreadLowPowerWaitStats {
+        pub previous_tick: u64,
+        pub previous_sleep_tick: u64,
+    }
+
+    impl ThreadLowPowerWaitStats {
+        pub fn new() -> Self {
+            Self {
+                previous_tick: Instant::now().as_ticks(),
+                previous_sleep_tick: super::SLEEP_TICKS.load(Ordering::Relaxed),
+            }
+        }
+
+        pub fn get_usage(&mut self) -> f32 {
+            let current_tick = Instant::now().as_ticks();
+            let current_sleep_tick = super::SLEEP_TICKS.load(Ordering::Relaxed);
+
+            // Calculate the ratio of time spent sleeping to total time since last report,
+            // the inverse of which is the time spent busy
+            let sleep_tick_difference = (current_sleep_tick - self.previous_sleep_tick) as f32;
+            let tick_difference = (current_tick - self.previous_tick) as f32;
+            let usage = 1f32 - sleep_tick_difference / tick_difference;
+
+            self.previous_tick = current_tick;
+            self.previous_sleep_tick = current_sleep_tick;
+
+            usage * 100.0
+        }
     }
 }
