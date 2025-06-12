@@ -454,12 +454,14 @@ impl PulseCode {
 
 impl core::fmt::Debug for PulseCode {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("PulseCode")
-            .field("level1", &self.level1())
-            .field("length1", &self.length1())
-            .field("level2", &self.level2())
-            .field("length2", &self.length2())
-            .finish()
+        write!(
+            f,
+            "PulseCode({} {}, {} {})",
+            if self.level1().into() { 'H' } else { 'L' },
+            self.length1(),
+            if self.level2().into() { 'H' } else { 'L' },
+            self.length2(),
+        )
     }
 }
 
