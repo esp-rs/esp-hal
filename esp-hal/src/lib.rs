@@ -325,7 +325,6 @@ unstable_driver! {
     pub mod aes;
     #[cfg(assist_debug)]
     pub mod assist_debug;
-    #[cfg(any(xtensa, all(riscv, systimer)))]
     pub mod delay;
     #[cfg(ecc)]
     pub mod ecc;
