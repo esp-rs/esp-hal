@@ -40,9 +40,12 @@ peripherals = [
     "xts_aes",
 ]
 
+virtual_peripherals = [
+    "adc1",
+]
+
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc1",
     "assist_debug_sp_monitor",
     "gdma",
     "phy",
@@ -60,6 +63,12 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
+
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+]
 
 [device.gpio]
 status = "supported"
@@ -106,7 +115,6 @@ status = "supported"
 
 ## Miscellaneous
 [device.assist_debug]
-[device.adc]
 [device.dma]
 [device.io_mux]
 [device.temp_sensor]

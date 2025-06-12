@@ -192,6 +192,8 @@ struct Device {
     trm: String,
 
     peripherals: Vec<String>,
+    // For now, this is only used to double-check the configuration.
+    virtual_peripherals: Vec<String>,
     symbols: Vec<String>,
     memory: Vec<MemoryRegion>,
 
@@ -409,7 +411,7 @@ driver_configs![
     AdcProperties {
         driver: adc,
         name: "ADC",
-        peripherals: &["adc1", "adc2"],
+        peripherals: &[],
         properties: {}
     },
     AesProperties {
@@ -757,6 +759,7 @@ impl Config {
                 cores: 1,
                 trm: "".to_owned(),
                 peripherals: Vec::new(),
+                virtual_peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
                 peri_config: PeriConfig::default(),
@@ -768,7 +771,8 @@ impl Config {
         for instance in self.device.peri_config.driver_instances() {
             let (driver, peri) = instance.split_once('.').unwrap();
             ensure!(
-                self.device.peripherals.iter().any(|p| p == peri),
+                self.device.peripherals.iter().any(|p| p == peri)
+                    || self.device.virtual_peripherals.iter().any(|p| p == peri),
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );

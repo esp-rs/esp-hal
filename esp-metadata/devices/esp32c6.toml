@@ -77,9 +77,12 @@ peripherals = [
     "usb_device",
 ]
 
+virtual_peripherals = [
+    "adc1",
+]
+
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc1",
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
@@ -103,6 +106,12 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
+
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+]
 
 [device.gpio]
 status = "supported"
@@ -171,7 +180,6 @@ has_wifi6 = true
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.adc]
 [device.assist_debug]
 [device.dma]
 [device.etm]

@@ -51,10 +51,13 @@ peripherals = [
     "xts_aes",
 ]
 
-symbols = [
-    # Additional peripherals defined by us (the developers):
+virtual_peripherals = [
     "adc1",
     "adc2",
+]
+
+symbols = [
+    # Additional peripherals defined by us (the developers):
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
@@ -75,6 +78,12 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
 
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
 
 [device.gpio]
 status = "supported"
@@ -132,7 +141,6 @@ status = "not_supported"
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.adc]
 [device.assist_debug]
 [device.dma]
 [device.io_mux]
