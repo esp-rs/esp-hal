@@ -230,7 +230,7 @@ pub fn clear(_core: Cpu, which: CpuInterrupt) {
 }
 
 /// Get status of peripheral interrupts
-#[cfg(large_intr_status)]
+#[cfg(interrupts_status_registers = "3")]
 pub fn status(core: Cpu) -> InterruptStatus {
     unsafe {
         match core {
@@ -268,7 +268,7 @@ pub fn status(core: Cpu) -> InterruptStatus {
 }
 
 /// Get status of peripheral interrupts
-#[cfg(very_large_intr_status)]
+#[cfg(interrupts_status_registers = "4")]
 pub fn status(core: Cpu) -> InterruptStatus {
     unsafe {
         match core {
