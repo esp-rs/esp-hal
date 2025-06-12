@@ -386,6 +386,7 @@ impl PulseCode {
     /// Total length of the pulse code (in clock cycles)
     #[inline]
     pub const fn length(&self) -> u16 {
+        // Can't overflow because lengthX is only 15 bit wide
         self.length1() + self.length2()
     }
 
@@ -852,9 +853,6 @@ impl Encoder for BytesEncoder<'_> {
 #[derive(Copy, Clone, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum WriterState {
-    // The provided data was empty
-    Empty,
-
     // Ready to continue writing data to the hardware buffer
     Active,
 
@@ -866,13 +864,16 @@ enum WriterState {
 
     // ...
     DoneNeedEndMarker,
+
+    // The provided data was empty
+    Empty,
 }
 
 /// docs
 struct RmtWriterOuter {
     // Offset in RMT RAM section to start writing from (number of PulseCode!)
     // u16 is sufficient to store this for all devices, and should be small enough such that
-    // size_of::<RmtWriterOuter>() == 2 * size_of::<u32>()
+    // size_of::<RmtWriterOuter>() == 3 * size_of::<u32>()
     offset: u16,
 
     // ...
@@ -956,6 +957,10 @@ impl<E: Encoder> EncoderExt for E {
     unsafe fn write(this: *mut (), writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
         let this = unsafe { &mut *(this as *mut E) };
 
+        if writer.state != WriterState::Active {
+            return;
+        }
+
         let memsize = raw.memsize().codes();
         let offset = usize::from(writer.offset);
         let ram_start = raw.channel_ram_start();
@@ -965,17 +970,6 @@ impl<E: Encoder> EncoderExt for E {
         // - offset = 2n - 1 -> 0 = 2n - ((2n - 1) + 1)
         let start_offset = memsize - (offset + 1);
         let start0 = unsafe { ram_start.add(start_offset) };
-
-        // Don't call next() on data again if done!
-        if writer.state == WriterState::DoneNeedEndMarker {
-            // Write last_code and an end marker
-            writer.state = WriterState::DoneNoEnd;
-            unsafe { ram_start.add(offset).write_volatile(writer.last_code) };
-            unsafe { start0.write_volatile(PulseCode::end_marker()) };
-            return;
-        } else if writer.state != WriterState::Active {
-            return;
-        }
 
         unsafe { ram_start.add(offset).write_volatile(writer.last_code) };
 
@@ -1010,38 +1004,44 @@ impl<E: Encoder> EncoderExt for E {
         // Do not increment the offset or written afterwards since we want to overwrite
         // it in the next call
 
-        if done.is_break() {
-            let has_end = writer.last_code.is_end_marker();
-            // Encoder explicitly stated that it's done
-            if writer.written == 0 {
-                writer.state = WriterState::Empty;
-            } else if internal.ptr < internal.end {
-                writer.state = if has_end { WriterState::Done } else { WriterState::DoneNoEnd };
-                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-            } else if writer.last_code.is_end_marker() {
-                writer.state = WriterState::Done;
-            } else {
-                // Will write last_code and an end marker in the next call
-                internal.ptr = unsafe { internal.ptr.sub(1) };
-                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-                writer.state = WriterState::DoneNeedEndMarker;
-            }
-        } else if internal.ptr < internal.end {
+        // if done.is_break() {
+        //     let has_end = writer.last_code.is_end_marker();
+        //     // Encoder explicitly stated that it's done
+        //     if writer.written == 0 {
+        //         writer.state = WriterState::Empty;
+        //     } else if internal.ptr < internal.end {
+        //         writer.state = if has_end { WriterState::Done } else { WriterState::DoneNoEnd };
+        //         unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+        //     } else if writer.last_code.is_end_marker() {
+        //         writer.state = WriterState::Done;
+        //     } else {
+        //         // Will write last_code and an end marker in the next call
+        //         internal.ptr = unsafe { internal.ptr.sub(1) };
+        //         unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+        //         writer.state = WriterState::DoneNeedEndMarker;
+        //     }
+        // } else
+        // if writer.last_code.is_end_marker() {
+        //     writer.state == WriterState::Done;
+        // } else
+        if internal.ptr < internal.end {
             // Encoder exhausted
-            writer.state = if writer.written > 0 { WriterState::Done } else { WriterState::Empty };
-            if !writer.last_code.is_end_marker() {
-                writer.state = WriterState::DoneNoEnd;
-            }
+            writer.state = if writer.written == 0 {
+                WriterState::Empty
+            } else if !writer.last_code.is_end_marker() {
+                WriterState::DoneNoEnd
+            } else {
+                WriterState::Done
+            };
             // There might already be an end marker, but since we have space
             // left in the buffer, just write another one without bothering
             // to ensure that tx will stop.
-            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
         } else {
             // Not done
             debug_assert!(internal.ptr > internal.start);
             internal.ptr = unsafe { internal.ptr.sub(1) };
-            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
         };
+        unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
 
         writer.offset = unsafe { internal.ptr.offset_from(ram_start) } as u16;
 
@@ -1060,9 +1060,9 @@ impl<E: Encoder> EncoderExt for E {
 }
 
 impl RmtWriterOuter {
-    fn new(raw: impl ChannelInternal) -> Self {
+    fn new(memsize: MemSize) -> Self {
         Self {
-            offset: raw.memsize().codes() as u16 - 1,
+            offset: memsize.codes() as u16 - 1,
             written: 0,
             state: WriterState::Active,
             last_code: PulseCode::end_marker(),
@@ -2468,7 +2468,7 @@ impl Drop for ContinuousTxTransaction<'_> {
 /// Docs
 #[derive(Clone, Debug, Default)]
 pub struct BenchmarkResult {
-    written: u64,
+    written: usize,
     duration_nanos: u64,
     iterations: u64,
     code_duration_nanos: u64,
@@ -2493,8 +2493,8 @@ impl core::fmt::Display for BenchmarkResult {
         write!(
             f,
             "\tEncoding time / code: {}ns ~ {} cycles",
-            duration / self.written,
-            duration * cpu_clock.as_mhz() as u64 / (1000 * self.written),
+            duration.checked_div(self.written as u64).unwrap_or(0),
+            (duration * cpu_clock.as_mhz() as u64).checked_div(1000 * self.written as u64).unwrap_or(0),
         )?;
 
         Ok(())
@@ -2521,10 +2521,57 @@ impl defmt::Format for BenchmarkResult {
         defmt::write!(
             fmt,
             "\tEncoding time / code: {}ns ~ {} cycles\n",
-            duration / self.written,
-            duration * cpu_clock.as_mhz() as u64 / (1000 * self.written),
+            duration.checked_div(self.written as u64).unwrap_or(0),
+            (duration * cpu_clock.as_mhz() as u64).checked_div(1000 * self.written as u64).unwrap_or(0),
         );
         defmt::write!(fmt, "}}");
+    }
+}
+
+enum PerfEvent {
+    Cycle = 0,
+    Instruction = 1,
+    LoadHazard = 2,
+    JumpHazard = 3,
+    IdleCycle = 4,
+    Load = 5,
+    Store = 6,
+    JumpUncond = 7,
+    Branch = 8,
+    BranchTaken = 9,
+    InstructionCompressed = 10,
+}
+
+// FIXME: Wrapper to use in benchmarks
+// FIXME: Test!
+// FIXME: Propose to add upstream with virtual peripheral?
+macro_rules! start_perfcount {
+    (event) => {
+        // FIXME: Support event bitfield
+        let ev = event as u32;
+        // FIXME: Check if register name constants mpcer, mpcmr, mpccr are defined somewhere
+        core::arch::asm!(
+            "csrw 0x7E0, {0}", // configure performance counter event(s)
+            "csrw 0x7E2, x0", // reset count
+            "csrs 0x7E1, 0b11", // enable (set bit 0) and enable saturating mode (set bit 1)
+            in(reg) ev,
+        );
+    }
+}
+
+macro_rules! end_perfcount {
+    () => {
+        {
+            let cycles: u32;
+            unsafe {
+                core::arch::asm!(
+                    "csrw 0x7E1, x0", // disable
+                    "csrrr {0}, 0x7E2", // read count to out register
+                    out(reg) cycles
+                );
+            }
+            cycles
+        }
     }
 }
 
@@ -2532,9 +2579,36 @@ impl<Dm> Channel<'_, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
+    #[inline]
+    fn drop_caches(drop_caches: bool) {
+        if drop_caches {
+            esp_rom_sys::rom::invalidate_all_caches();
+        }
+        if false {
+            // This seems to cause problems...
+            let sys = crate::peripherals::SYSTEM::regs();
+            sys.cache_control().modify(|_, w| {
+                w.icache_reset().set_bit();
+                w.dcache_reset().set_bit()
+            });
+            // necessary?
+            sys.cache_control().modify(|_, w| {
+                w.icache_reset().clear_bit();
+                w.dcache_reset().clear_bit()
+            });
+        }
+    }
+
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
-    pub fn bench<T>(&mut self, data: &[T]) -> BenchmarkResult
+    /// FIXME: Add a flag to optionally flush icache+dcache in between calls to encoder.write
+    /// FIXME: Use CSR performance counters!
+    #[inline(never)]
+    pub fn bench<T>(
+        &mut self,
+        data: &[T],
+        drop_caches: bool,
+    ) -> BenchmarkResult
     where
         T: Into<PulseCode> + Copy,
     {
@@ -2543,20 +2617,25 @@ where
         for code in data {
             let code = (*code).into();
             total += 1;
-            // FIXME: What about the final stop code?
             if code.is_end_marker() {
+                // It's possible that only length2 == 0 and length1 != 0 is part of the signal.
+                // However, it is likely that this is a longer code indicating the end. Thus, it
+                // would very likely skew the result to add its length here.
+                // total_length += code.length1() as u32;
                 break;
             }
-            total_length += code.length() as u64;
+            total_length += code.length() as u32;
         }
 
-        self.bench_inner(move || SliceEncoder::new(data), total_length, total)
+        self.bench_inner(move || SliceEncoder::new(data), total_length, total, drop_caches)
     }
 
     /// FIXME: docs
+    #[inline(never)]
     pub fn bench_iter<I, F>(
         &mut self,
-        mut get_data: F
+        mut get_data: F,
+        drop_caches: bool,
     ) -> BenchmarkResult
     where
         I: IntoIterator<Item=PulseCode>,
@@ -2567,20 +2646,21 @@ where
         let mut total_length = 0;
         for code in get_data() {
             total += 1;
-            // FIXME: What about the final stop code?
             if code.is_end_marker() {
                 break;
             }
-            total_length += code.length() as u64;
+            total_length += code.length() as u32;
         }
 
-        self.bench_inner(move || EncoderExtRef::new(&mut IterEncoder::new(get_data())), total_length, total)
+        self.bench_inner(move || IterEncoder::new(get_data()), total_length, total, drop_caches)
     }
 
     /// FIXME: docs
+    #[inline(never)]
     pub fn bench_enc<E, F>(
         &mut self,
-        mut get_data: F
+        mut get_data: F,
+        drop_caches: bool,
     ) -> BenchmarkResult
     where
         E: Encoder + Clone,
@@ -2597,13 +2677,13 @@ where
 
         let mut encoder = get_data();
         let mut encoder = EncoderExtRef::new(&mut encoder);
-        let mut writer = RmtWriterOuter::new(raw);
+        let mut writer = RmtWriterOuter::new(raw.memsize());
 
         let mut sum_codes = |writer: &RmtWriterOuter| {
             // -1 to not count the artifial end markers
             while read < writer.written - 1 {
                 let code = unsafe { ptr.read_volatile() };
-                code_length += code.length() as u64;
+                code_length += code.length() as u32;
                 ptr = unsafe { ptr.add(1) };
                 read += 1;
                 if ptr == ram_end {
@@ -2617,14 +2697,67 @@ where
             sum_codes(&writer);
         }
 
-        self.bench_inner(get_data, code_length, writer.written)
+        self.bench_inner(get_data, code_length, writer.written, drop_caches)
     }
 
+    /// FIXME: Docs
+    #[inline(never)]
+    pub fn bench_base(&mut self, count: usize, drop_caches: bool) -> BenchmarkResult {
+        let raw = self.raw;
+
+        let mut iterations = 0;
+        let start = Instant::now();
+
+        let ram_start = raw.channel_ram_start();
+        let memsize = raw.memsize().codes();
+
+        let code = PulseCode::end_marker();
+
+        loop {
+            let mut cur_count = count;
+            while cur_count > 0 {
+                let mut ptr = ram_start;
+                let n = cur_count.min(memsize);
+                let end = unsafe { ptr.add(n) };
+
+                while ptr < end {
+                    unsafe { ptr.write_volatile(code) };
+                    ptr = unsafe { ptr.add(1) };
+                }
+
+                // FIXME: Exclude this from the timing measurement!
+                Self::drop_caches(drop_caches);
+
+                cur_count -= n;
+                ptr = ram_start;
+            }
+
+            iterations += 1;
+
+            // Target >= 5ms
+            if start.elapsed().as_micros() > 5_000 {
+                break;
+            }
+        }
+        let duration = start.elapsed();
+
+        BenchmarkResult {
+            written: count as usize,
+            duration_nanos: duration.as_micros() * 1000,
+            iterations,
+            code_duration_nanos: 0,
+        }
+    }
+
+    // FIXME: Come up with an interface where this function isn't monomorphized on E but takes an
+    // EncoderExtRef.
+    #[inline(never)]
     fn bench_inner<'a, E, F>(
         &mut self,
         mut get_data: F,
-        total_length: u64,
-        total: usize
+        total_length: u32,
+        total: usize,
+        drop_caches: bool,
     ) -> BenchmarkResult
     where
         E: Encoder,
@@ -2632,9 +2765,8 @@ where
     {
         let raw = self.raw;
 
-        let clock = chip_specific::get_clock().as_hz() as u64;
-        let div = raw.divider() as u64;
-        let code_duration_nanos = total_length * div * 1_000_000_000 / clock;
+        let div = raw.divider() as u32;
+        let code_duration_nanos = (total_length as u64) * (div * chip_specific::get_clock_period_100picos()) as u64;
 
         let mut iterations = 0;
         let start = Instant::now();
@@ -2642,10 +2774,12 @@ where
         loop {
             let mut encoder = get_data();
             let mut encoder = EncoderExtRef::new(&mut encoder);
-            writer = RmtWriterOuter::new(raw);
+            writer = RmtWriterOuter::new(raw.memsize());
 
             while !writer.is_done() {
                 encoder.write(&mut writer, raw.degrade());
+
+                Self::drop_caches(drop_caches);
             }
             assert!(writer.written == total);
             iterations += 1;
@@ -2658,7 +2792,7 @@ where
         let duration = start.elapsed();
 
         BenchmarkResult {
-            written: writer.written as u64,
+            written: writer.written,
             duration_nanos: duration.as_micros() * 1000,
             iterations,
             code_duration_nanos,
@@ -2703,8 +2837,9 @@ impl Channel<'_, Blocking, Tx> {
         C: ChannelRef<Tx>,
     {
         let raw = channel.raw();
+        let memsize = raw.memsize();
 
-        let mut writer = RmtWriterOuter::new(raw);
+        let mut writer = RmtWriterOuter::new(memsize);
         data.write(&mut writer, raw.degrade());
 
         if writer.state == WriterState::Empty {
@@ -2714,7 +2849,7 @@ impl Channel<'_, Blocking, Tx> {
         RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
 
         raw.clear_tx_interrupts();
-        raw.start_send(false, None);
+        raw.start_send(false, None, memsize);
 
         Ok(SingleShotTxTransaction {
             channel,
@@ -2747,8 +2882,9 @@ impl Channel<'_, Blocking, Tx> {
         mut data: EncoderExtRef<'_>,
     ) -> Result<ContinuousTxTransaction<'_>, Error> {
         let raw = self.raw;
+        let memsize = raw.memsize();
 
-        let mut writer = RmtWriterOuter::new(raw);
+        let mut writer = RmtWriterOuter::new(memsize);
         data.write(&mut writer, raw.degrade());
 
         match writer.state {
@@ -2763,7 +2899,7 @@ impl Channel<'_, Blocking, Tx> {
             }
         };
 
-        raw.start_send(true, loopcount);
+        raw.start_send(true, loopcount, memsize);
 
         Ok(ContinuousTxTransaction { raw: self.raw, _phantom: PhantomData })
     }
@@ -3028,7 +3164,7 @@ impl Channel<'_, Async, Tx> {
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
-    fn transmit_inner(&mut self, data: EncoderExtRef<'_>) -> impl Future<Output = Result<(), Error>>
+    fn transmit_inner(&mut self, mut data: EncoderExtRef<'_>) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         // FIXME: Is being Unpin a significant restriction for the iterator?
@@ -3036,33 +3172,27 @@ impl Channel<'_, Async, Tx> {
         // pin-project-lite) for the RmtTxFuture.
     {
         let raw = self.raw;
+        let memsize = raw.memsize();
 
-        let mut fut = RmtTxFuture {
-            raw,
-            _phantom: PhantomData,
-            writer: RmtWriterOuter::new(raw),
-            data,
-        };
+        let mut writer = RmtWriterOuter::new(memsize);
 
-        fut.data.write(&mut fut.writer, raw.degrade());
+        data.write(&mut writer, raw);
 
         // Error cases; the future will return the error on the first call to poll()
-        if fut.writer.state == WriterState::Empty {
-            return fut;
+        if writer.state != WriterState::Empty {
+            RmtState::store(RmtState::TxAsync, raw, Ordering::Relaxed);
+
+            raw.clear_tx_interrupts();
+            let mut events = Event::End | Event::Error;
+            if !writer.is_done() {
+                // Needs wrapping
+                events |= Event::Threshold;
+            }
+            raw.listen_tx_interrupt(events);
+            raw.start_send(false, None, memsize);
         }
 
-        RmtState::store(RmtState::TxAsync, fut.raw, Ordering::Relaxed);
-
-        fut.raw.clear_tx_interrupts();
-        let mut events = Event::End | Event::Error;
-        if !fut.writer.is_done() {
-            // Needs wrapping
-            events |= Event::Threshold;
-        }
-        fut.raw.listen_tx_interrupt(events);
-        fut.raw.start_send(false, None);
-
-        fut
+        RmtTxFuture { raw, _phantom: PhantomData, writer, data }
     }
 }
 
@@ -3290,10 +3420,10 @@ pub trait TxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Tx> + 'sta
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
     #[inline]
-    fn start_send(&self, continuous: bool, repeat: Option<NonZeroU16>) {
+    fn start_send(&self, continuous: bool, repeat: Option<NonZeroU16>, memsize: MemSize) {
         self.clear_tx_interrupts();
 
-        self.set_tx_threshold((self.memsize().codes() / 2) as u8);
+        self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(continuous);
         self.set_generate_repeat_interrupt(repeat.map_or(0, |r| r.get()));
         self.set_tx_wrap_mode(true);
@@ -3444,7 +3574,7 @@ mod chip_specific {
         Ok(())
     }
 
-    pub fn get_clock() -> Rate {
+    pub fn get_clock_period_100picos() -> u32 {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         let div: u8;
@@ -3455,8 +3585,10 @@ mod chip_specific {
 
             div = r.sclk_div_num().bits();
 
-            assert_eq!(0, r.sclk_div_a().bits());
-            assert_eq!(0, r.sclk_div_b().bits());
+            // Fractional dividers are currently not supported by the driver, but this code will
+            // need to be adapted when support is added.
+            debug_assert_eq!(0, r.sclk_div_a().bits());
+            debug_assert_eq!(0, r.sclk_div_b().bits());
         }
 
         #[cfg(soc_has_pcr)]
@@ -3466,11 +3598,14 @@ mod chip_specific {
 
             div = r.sclk_div_num().bits();
 
-            assert_eq!(0, r.sclk_div_a().bits());
-            assert_eq!(0, r.sclk_div_b().bits());
+            // Fractional dividers are currently not supported by the driver, but this code will
+            // need to be adapted when support is added.
+            debug_assert_eq!(0, r.sclk_div_a().bits());
+            debug_assert_eq!(0, r.sclk_div_b().bits());
         }
 
-        Rate::from_hz(src_clock.as_hz() / (div as u32 + 1))
+        // since div is derived from a u8, this can't overflow u32
+        10_000_000 * (div as u32 + 1) / src_clock.as_khz()
     }
 
     #[allow(unused)]
@@ -3948,8 +4083,8 @@ mod chip_specific {
         Ok(())
     }
 
-    pub fn get_clock() -> Rate {
-        Rate::from_mhz(80)
+    pub fn get_clock_period_100picos() -> u32 {
+        125
     }
 
     #[allow(unused)]

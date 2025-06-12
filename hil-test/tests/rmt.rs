@@ -109,6 +109,8 @@ impl Iterator for TxDataIter {
     }
 }
 
+// Run tests with a large buffer like `DEFMT_RTT_BUFFER_SIZE=32768 xtask run ...` to avoid
+// truncated output when running this with defmt!
 fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx_memsize: usize) {
     // Only checks the buffers; the rx buffer might still contain garbage after a
     // certain index.
@@ -122,31 +124,24 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
         expected_rx_len = expected_rx_len.min(rx_memsize)
     };
 
-    if let Some(rx_count) = rx_count {
-        assert_eq!(
-            rx_count, expected_rx_len,
-            "unexpected rx count {} != {}",
-            rx_count, expected_rx_len,
-        );
-    }
-
     let mut errors: usize = 0;
-    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).take(expected_rx_len).enumerate() {
-        if idx == tx.len() - 2 {
-            if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
-                // The second-to-last pulse-code is the one which exceeds the idle threshold and
-                // should be received as stop code.
-                #[cfg(feature = "defmt")]
-                defmt::error!(
-                    "rx code not a stop code at index {}: {:?} (tx) -> {:?} (rx)",
-                    idx,
-                    code_tx,
-                    code_rx
-                );
-                errors += 1;
-            }
-        } else {
-            if code_tx != code_rx {
+    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        if idx < expected_rx_len {
+            if idx == tx.len() - 2 {
+                if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
+                    // The second-to-last pulse-code is the one which exceeds the idle threshold and
+                    // should be received as stop code.
+                    #[cfg(feature = "defmt")]
+                    defmt::error!(
+                        "rx code not a stop code at index {}: {:?} (tx) -> {:?} (rx)",
+                        idx,
+                        code_tx,
+                        code_rx
+                    );
+                    errors += 1;
+                    continue;
+                }
+            } else if code_tx != code_rx {
                 #[cfg(feature = "defmt")]
                 defmt::error!(
                     "rx code mismatch at index {}: {:?} (tx) != {:?} (rx)",
@@ -155,8 +150,23 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
                     code_rx
                 );
                 errors += 1;
+                continue;
             }
         }
+
+        #[cfg(feature = "defmt")]
+        defmt::info!(
+            "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
+            idx, code_tx, code_rx
+        );
+    }
+
+    if let Some(rx_count) = rx_count {
+        assert_eq!(
+            rx_count, expected_rx_len,
+            "unexpected rx count {} != {}",
+            rx_count, expected_rx_len,
+        );
     }
 
     // The driver shouldn't have touched the rx buffer beyond expected_rx_len, and
@@ -168,8 +178,8 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
         "rx buffer unexpectedly overwritten beyond rx end"
     );
 
-    assert!(
-        errors == 0,
+    assert_eq!(
+        errors, 0,
         "rx/tx code mismatch at {}/{} indices (First: tx={:?}, rx={:?})",
         errors,
         tx.len() - 2,
@@ -405,6 +415,7 @@ mod tests {
 
     #[test]
     fn rmt_single_shot_extended_wrap() {
+        // TODO: add similar loopback test
         // Two RAM blocks (96 or 128 codes), requires wrapping
         let mut tx_data = TxDataIter::new(150, true);
         let enc = IterEncoder::new(&mut tx_data);
@@ -623,5 +634,11 @@ mod tests {
         // intended and useful when e.g. creating the Rmt in the main task and
         // then sending several channels to different places.
         let _ = ch0;
+    }
+
+    #[test]
+    fn test_immediate_panic() {
+        // semihosting::eprintln!("The message ......");
+        // assert!(false, "The message");
     }
 }

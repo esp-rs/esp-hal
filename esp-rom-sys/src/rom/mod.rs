@@ -61,6 +61,32 @@ pub fn software_reset() -> ! {
     unsafe { software_reset() }
 }
 
+/// Invalidate all caches, e.g. for benchmarking
+#[cfg(any(esp32c3, esp32c2, esp32c6, esp32h2))]
+#[inline(always)]
+pub fn invalidate_all_caches() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_ICache_All();
+    }
+
+    unsafe { Cache_Invalidate_ICache_All() }
+}
+
+#[cfg(esp32s2)]
+#[inline(always)]
+pub fn invalidate_all_caches() {
+    unsafe extern "C" {
+        fn Cache_Invalidate_ICache_All();
+    }
+
+    unsafe extern "C" {
+        fn Cache_Invalidate_DCache_All();
+    }
+
+    unsafe { Cache_Invalidate_ICache_All() }
+    unsafe { Cache_Invalidate_DCache_All() }
+}
+
 /// Set App cpu Entry code, code can be called in PRO CPU.
 #[cfg(esp32s3)]
 #[inline(always)]
