@@ -2594,7 +2594,7 @@ where
 
         let status = raw.get_rx_status();
         match status {
-            Some(Event::End) => {
+            Some(Event::End) | Some(Event::Error) => {
                 if self.reader.state != ReaderState::Done {
                     // Do not clear the interrupt flags here: Subsequent calls of wait() must still
                     // be able to observe them if this is currently called via
@@ -2602,6 +2602,7 @@ where
                     raw.stop_rx();
                     raw.update();
 
+                    // TODO: Read at most up to the HW pointer!
                     self.reader.read(&mut self.data, raw, true);
 
                     // Ensure that no further data will be read if this is called repeatedly.
@@ -3035,11 +3036,11 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         let result = match raw.get_rx_status() {
-            Some(Event::Error) => Err(Error::ReceiverError),
-            Some(Event::End) => {
+            Some(Event::End) | Some(Event::Error) => {
                 raw.stop_rx();
                 raw.update();
 
+                // TODO: Read at most up to the HW pointer!
                 this.reader.read(&mut this.data, raw, true);
 
                 Ok(this.reader.total)
