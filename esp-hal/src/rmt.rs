@@ -232,6 +232,7 @@ use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::Clocks,
     gpio::{
         InputConfig,
         Level,
@@ -241,7 +242,7 @@ use crate::{
     handler,
     peripherals::{Interrupt, RMT},
     system::{self, GenericPeripheralGuard},
-    time::Rate,
+    time::{Instant, Rate},
 };
 
 /// Errors
@@ -593,6 +594,7 @@ pub trait Encoder {
 }
 
 /// FIXME: Docs
+#[derive(Clone)]
 pub struct SliceEncoder<'a> {
     data: &'a [PulseCode],
 }
@@ -633,6 +635,16 @@ where
     D::Item: Borrow<PulseCode>,
 {
     data: D
+}
+
+impl<D> Clone for IterEncoder<D>
+where
+    D: Iterator + Clone,
+    D::Item: Borrow<PulseCode>,
+{
+    fn clone(&self) -> Self {
+        Self { data: self.data.clone() }
+    }
 }
 
 impl<D> IterEncoder<D>
@@ -2201,6 +2213,64 @@ impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
     }
 }
 
+/// Docs
+#[derive(Clone, Debug)]
+pub struct BenchmarkResult {
+    written: u64,
+    duration_nanos: u64,
+    iterations: u64,
+    code_duration_nanos: u64,
+}
+
+impl core::fmt::Display for BenchmarkResult {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let duration = self.duration_nanos / self.iterations;
+        let cpu_clock = Clocks::get().cpu_clock;
+        writeln!(f, "RMT BenchmarkResult:")?;
+        writeln!(f, "\tIterations: {}", self.iterations)?;
+        writeln!(f, "\tCodes written: {}", self.written)?;
+        writeln!(
+            f,
+            "\tEncoding time: {}us ({}% of {}us tx time)",
+            duration / 1000,
+            (100 * duration).checked_div(self.code_duration_nanos).unwrap_or(0),
+            self.code_duration_nanos / 1000,
+        )?;
+        write!(
+            f,
+            "\tEncoding time / code: {}ns ~ {} cycles",
+            duration / self.written,
+            duration * cpu_clock.as_mhz() as u64 / (1000 * self.written),
+        )?;
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for BenchmarkResult {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        let duration = self.duration_nanos / self.iterations;
+        let cpu_clock = Clocks::get().cpu_clock;
+        defmt::write!(fmt, "RMT BenchmarkResult\n");
+        defmt::write!(fmt, "\tIterations: {}\n", self.iterations);
+        defmt::write!(fmt, "\tCodes written: {}\n", self.written);
+        defmt::write!(
+            fmt,
+            "\tEncoding time: {}us ({}% of {}us tx time)\n",
+            duration / 1000,
+            (100 * duration).checked_div(self.code_duration_nanos).unwrap_or(0),
+            self.code_duration_nanos / 1000,
+        );
+        defmt::write!(
+            fmt,
+            "\tEncoding time / code: {}ns ~ {} cycles",
+            duration / self.written,
+            duration * cpu_clock.as_mhz() as u64 / (1000 * self.written),
+        );
+    }
+}
+
 impl<Dm, Raw> Channel<'_, Dm, Raw>
 where
     Dm: crate::DriverMode,
@@ -2208,45 +2278,87 @@ where
 {
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
-    pub fn bench(&mut self, data: &[PulseCode]) -> usize {
-        let mut data = SliceEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, self.raw, true);
-
-        while writer.state == WriterState::Active {
-            writer.write(&mut data, self.raw, false);
-        }
-
-        writer.written
+    pub fn bench(&mut self, data: &[PulseCode]) -> BenchmarkResult {
+        self.bench_enc(SliceEncoder::new(data))
     }
 
     /// FIXME: docs
-    pub fn bench_iter<D>(&mut self, data: D) -> usize
+    pub fn bench_iter<D>(&mut self, data: D) -> BenchmarkResult
     where
         D: IntoIterator,
+        D::IntoIter: Clone,
         D::Item: Borrow<PulseCode>
     {
-        let mut data = IterEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, self.raw, true);
-
-        while writer.state == WriterState::Active {
-            writer.write(&mut data, self.raw, false);
-        }
-
-        writer.written
+        self.bench_enc(IterEncoder::new(data))
     }
 
     /// FIXME: docs
-    pub fn bench_enc<E: Encoder>(&mut self, mut data: E) -> usize {
+    pub fn bench_enc<E>(&mut self, data: E) -> BenchmarkResult
+    where
+        E: Encoder + Clone,
+    {
+        let start = Instant::now();
+
+        let ram_start = self.raw.channel_ram_start();
+        let mut ptr = ram_start;
+        let memsize = self.raw.memsize().codes();
+        let ram_end = unsafe { ram_start.add(memsize) };
+        let mut code_length = 0;
+        let mut read = 0;
+
+        let mut encoder = data.clone();
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, self.raw, true);
+
+        let mut sum_codes = |writer: &RmtWriterOuter| {
+            while read < writer.written {
+                let code = unsafe { ptr.read_volatile() };
+                code_length += code.length1() as u64 + code.length2() as u64;
+                ptr = unsafe { ptr.add(1) };
+                read += 1;
+                if ptr == ram_end {
+                    ptr = ram_start;
+                }
+            }
+        };
+
+        writer.write(&mut encoder, self.raw, true);
+        sum_codes(&writer);
 
         while writer.state == WriterState::Active {
-            writer.write(&mut data, self.raw, false);
+            writer.write(&mut encoder, self.raw, false);
+            sum_codes(&writer);
         }
 
-        writer.written
+        let duration = start.elapsed();
+        let total = writer.written;
+        let clock = chip_specific::get_clock().as_hz() as u64;
+        let div = self.raw.divider() as u64;
+        let code_duration_nanos = code_length * div * 1_000_000_000 / clock;
+
+        // Target >= 5ms (we underestimate the number of iterations, since the loop
+        // above does extra work)
+        let iterations = u64::checked_div(5_000, duration.as_micros()).unwrap_or(1).clamp(1, 100);
+
+        let start = Instant::now();
+        let mut writer = RmtWriterOuter::new();
+        for _ in 0..iterations {
+            let mut encoder = data.clone();
+            writer = RmtWriterOuter::new();
+            writer.write(&mut encoder, self.raw, true);
+
+            while writer.state == WriterState::Active {
+                writer.write(&mut encoder, self.raw, false);
+            }
+            assert!(writer.written == total);
+        }
+        let duration = start.elapsed();
+
+        BenchmarkResult{
+            written: writer.written as u64,
+            duration_nanos: duration.as_micros() * 1000,
+            iterations,
+            code_duration_nanos,
+        }
     }
 }
 
@@ -3055,6 +3167,8 @@ pub enum Event {
 pub trait ChannelInternal: RawChannelAccess<Dir: Direction> {
     fn update(&self);
 
+    fn divider(&self) -> u8;
+
     fn set_divider(&self, divider: u8);
 
     fn memsize(&self) -> MemSize;
@@ -3262,6 +3376,35 @@ mod chip_specific {
         Ok(())
     }
 
+    pub fn get_clock() -> Rate {
+        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+
+        let div: u8;
+
+        #[cfg(not(pcr))]
+        {
+            let r = RMT::regs().sys_conf().read();
+
+            div = r.sclk_div_num().bits();
+
+            assert_eq!(0, r.sclk_div_a().bits());
+            assert_eq!(0, r.sclk_div_b().bits());
+        }
+
+        #[cfg(pcr)]
+        {
+            use crate::peripherals::PCR;
+            let r = PCR::regs().rmt_sclk_conf().read();
+
+            div = r.sclk_div_num().bits();
+
+            assert_eq!(0, r.sclk_div_a().bits());
+            assert_eq!(0, r.sclk_div_b().bits());
+        }
+
+        Rate::from_hz(src_clock.as_hz() / (div as u32 + 1))
+    }
+
     #[allow(unused)]
     pub(super) fn handle_channel_interrupts(
         on_tx: fn(&DynChannelAccess<Tx>, Event),
@@ -3325,6 +3468,17 @@ mod chip_specific {
             } else {
                 rmt.ch_rx_conf1(ch_idx)
                     .modify(|_, w| w.conf_update().set_bit());
+            }
+        }
+
+        fn divider(&self) -> u8 {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx() as usize;
+
+            if A::Dir::is_tx() {
+                rmt.ch_tx_conf0(ch_idx).read().div_cnt().bits()
+            } else {
+                rmt.ch_rx_conf0(ch_idx).read().div_cnt().bits()
             }
         }
 
@@ -3744,6 +3898,10 @@ mod chip_specific {
         Ok(())
     }
 
+    pub fn get_clock() -> Rate {
+        Rate::from_mhz(80)
+    }
+
     #[allow(unused)]
     pub(super) fn handle_channel_interrupts(
         on_tx: fn(&DynChannelAccess<Tx>, Event),
@@ -3796,6 +3954,11 @@ mod chip_specific {
     {
         fn update(&self) {
             // no-op
+        }
+
+        fn divider(&self) -> u8 {
+            let rmt = crate::peripherals::RMT::regs();
+            rmt.chconf0(self.ch_idx() as usize).read().div_cnt().bits()
         }
 
         fn set_divider(&self, divider: u8) {
