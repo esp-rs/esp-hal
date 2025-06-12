@@ -1,7 +1,7 @@
 //! RMT Loopback Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable defmt
+//% FEATURES: unstable
 
 #![no_std]
 #![no_main]
@@ -107,7 +107,57 @@ impl Iterator for TxDataIter {
     }
 }
 
+const BUF_SIZE: usize = 8192;
+
+struct Buffer {
+    msg: [u8; BUF_SIZE],
+    len: usize,
+}
+
+impl Buffer {
+    fn new() -> Self {
+        Self {
+            msg: [0; BUF_SIZE],
+            len: 0,
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        unsafe { str::from_utf8_unchecked(&self.msg[..self.len]) }
+    }
+
+    fn flush(&mut self) {
+        semihosting::print!("{}", self.as_str());
+        self.len = 0;
+    }
+}
+
+impl Drop for Buffer {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+
+impl core::fmt::Write for Buffer {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        if s.len() > self.msg.len() {
+            return Err(core::fmt::Error);
+        }
+
+        if s.len() > self.msg.len() - self.len {
+            self.flush();
+        }
+
+        (&mut self.msg[self.len..self.len + s.len()]).copy_from_slice(s.as_bytes());
+
+        self.len += s.len();
+
+        Ok(())
+    }
+}
+
 fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx_memsize: usize) {
+    use core::fmt::Write;
     // Only checks the buffers; the rx buffer might still contain garbage after a
     // certain index.
     assert_eq!(tx.len(), rx.len(), "tx and rx len mismatch");
@@ -120,17 +170,18 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
         expected_rx_len = expected_rx_len.min(rx_memsize)
     };
 
-    if let Some(rx_count) = rx_count {
-        assert_eq!(
-            rx_count, expected_rx_len,
-            "unexpected rx count {} != {}",
-            rx_count, expected_rx_len,
-        );
-    }
+    let mut msg = Buffer::new();
 
     let mut errors: usize = 0;
-    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).take(expected_rx_len).enumerate() {
-        if idx == tx.len() - 2 {
+    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        let _ = writeln!(
+            &mut msg,
+            "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
+            idx, code_tx, code_rx
+        );
+        if idx >= expected_rx_len {
+            continue;
+        } else if idx == tx.len() - 2 {
             if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
                 // The second-to-last pulse-code is the one which exceeds the idle threshold and
                 // should be received as stop code.
@@ -155,6 +206,16 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
                 errors += 1;
             }
         }
+    }
+
+    msg.flush();
+
+    if let Some(rx_count) = rx_count {
+        assert_eq!(
+            rx_count, expected_rx_len,
+            "unexpected rx count {} != {}",
+            rx_count, expected_rx_len,
+        );
     }
 
     // The driver shouldn't have touched the rx buffer beyond expected_rx_len, and
@@ -419,6 +480,7 @@ mod tests {
 
     #[test]
     fn rmt_single_shot_extended_wrap() {
+        // TODO: add similar loopback test
         // Two RAM blocks (96 or 128 codes), requires wrapping
         do_rmt_single_shot_iter(150, 2, true).unwrap();
     }
