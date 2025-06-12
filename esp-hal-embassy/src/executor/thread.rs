@@ -194,15 +194,21 @@ impl Default for Executor {
 }
 
 #[cfg(all(low_power_wait, low_power_wait_stats))]
-mod low_power_wait_stats {
+pub mod thread_low_power_wait_stats {
     use embassy_time::Instant;
     use portable_atomic::Ordering;
+
+    /// Statistics for the thread low power wait usage.
     pub struct ThreadLowPowerWaitStats {
-        pub previous_tick: u64,
-        pub previous_sleep_tick: u64,
+        previous_tick: u64,
+        previous_sleep_tick: u64,
     }
 
     impl ThreadLowPowerWaitStats {
+        /// Create a new instance of `ThreadLowPowerWaitStats`.
+        /// This initializes the previous tick and sleep tick values
+        /// to the current time and the current sleep tick count.
+        /// Run get_usage() to get the current usage percentage periodically.
         pub fn new() -> Self {
             Self {
                 previous_tick: Instant::now().as_ticks(),
@@ -210,6 +216,7 @@ mod low_power_wait_stats {
             }
         }
 
+        /// Get the current usage percentage of the thread low power wait.
         pub fn get_usage(&mut self) -> f32 {
             let current_tick = Instant::now().as_ticks();
             let current_sleep_tick = super::SLEEP_TICKS.load(Ordering::Relaxed);
