@@ -78,6 +78,10 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.interrupts]
+status = "partial"
+status_registers = 2
+
 [device.spi_master]
 status = "supported"
 instances = [{ name = "spi2" }]
@@ -104,7 +108,6 @@ status = "supported"
 [device.assist_debug]
 [device.adc]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.temp_sensor]
 [device.sleep]

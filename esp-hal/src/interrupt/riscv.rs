@@ -301,13 +301,13 @@ pub fn disable(_core: Cpu, interrupt: Interrupt) {
 #[inline]
 pub fn status(_core: Cpu) -> InterruptStatus {
     cfg_if::cfg_if! {
-        if #[cfg(large_intr_status)] {
+        if #[cfg(interrupts_status_registers = "3")] {
             InterruptStatus::from(
                 INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
                 INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
                 INTERRUPT_CORE0::regs().int_status_reg_2().read().bits(),
             )
-        } else if #[cfg(very_large_intr_status)] {
+        } else if #[cfg(interrupts_status_registers = "4")] {
             InterruptStatus::from(
                 INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
                 INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),

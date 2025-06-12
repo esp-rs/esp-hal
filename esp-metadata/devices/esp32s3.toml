@@ -79,7 +79,6 @@ symbols = [
     "psram_dma",
     "octal_psram",
     "ulp_riscv_core",
-    "very_large_intr_status",
     "spi_octal",
 
     # ROM capabilities
@@ -118,6 +117,10 @@ has_conf_update = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+
+[device.interrupts]
+status = "partial"
+status_registers = 4
 
 [device.rmt]
 status = "partial"
@@ -167,7 +170,6 @@ status = "not_supported"
 [device.adc]
 [device.assist_debug]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.sleep]

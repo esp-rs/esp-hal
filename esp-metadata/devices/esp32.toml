@@ -68,7 +68,6 @@ symbols = [
     "phy",
     "psram",
     "touch",
-    "large_intr_status",
 
     # ROM capabilities
     "rom_crc_le",
@@ -99,6 +98,10 @@ i2c0_data_register_ahb_address = 0x6001301c
 
 [device.i2c_slave]
 status = "not_supported"
+
+[device.interrupts]
+status = "partial"
+status_registers = 3
 
 [device.rmt]
 status = "partial"
@@ -146,7 +149,6 @@ status = "not_supported"
 [device.adc]
 [device.dac]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]

@@ -65,7 +65,6 @@ symbols = [
     "psram",
     "psram_dma",
     "ulp_riscv_core",
-    "large_intr_status",
     "spi_octal",
 
     # ROM capabilities
@@ -98,6 +97,10 @@ max_bus_timeout = 0xFFFFFF
 separate_filter_config_registers = true
 has_arbitration_en = true
 i2c0_data_register_ahb_address = 0x6001301c
+
+[device.interrupts]
+status = "partial"
+status_registers = 3
 
 [device.rmt]
 status = "partial"
@@ -148,7 +151,6 @@ status = "not_supported"
 [device.adc]
 [device.dac]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.sleep]

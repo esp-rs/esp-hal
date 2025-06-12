@@ -83,7 +83,6 @@ symbols = [
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
-    "large_intr_status",
     "plic",
     "phy",
     "lp_core",
@@ -123,6 +122,10 @@ has_reliable_fsm_reset = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+
+[device.interrupts]
+status = "partial"
+status_registers = 3
 
 [device.rmt]
 status = "partial"
@@ -172,7 +175,6 @@ has_wifi6 = true
 [device.assist_debug]
 [device.dma]
 [device.etm]
-[device.interrupts]
 [device.io_mux]
 [device.sleep]
 [device.temp_sensor]

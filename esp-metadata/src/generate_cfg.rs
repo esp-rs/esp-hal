@@ -1,5 +1,5 @@
 use core::str::FromStr;
-use std::{fmt::Write, sync::OnceLock};
+use std::{collections::HashMap, fmt::Write, sync::OnceLock};
 
 use anyhow::{Result, bail, ensure};
 use proc_macro2::TokenStream;
@@ -523,7 +523,9 @@ driver_configs![
         driver: interrupts,
         name: "Interrupts",
         peripherals: &[],
-        properties: {}
+        properties: {
+            status_registers: u32,
+        }
     },
     IoMuxProperties {
         driver: io_mux,
@@ -843,6 +845,7 @@ impl Config {
                 .properties()
                 .filter_map(|(name, value)| match value {
                     Value::Boolean(true) => Some(name.to_string()),
+                    Value::Number(value) => Some(format!("{name}=\"{value}\"")),
                     _ => None,
                 }),
         )
@@ -955,19 +958,33 @@ fn define_all_possible_symbols() {
     // Used by our documentation builds to prevent the huge red warning banner.
     println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
 
+    let mut cfg_values: HashMap<String, Vec<String>> = HashMap::new();
+
     for chip in Chip::iter() {
         let config = Config::for_chip(&chip);
         for symbol in config.all() {
-            let symbol_name = symbol
-                .split('=')
-                .next()
-                .expect("The first split can't fail");
-            // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-            println!(
-                "cargo:rustc-check-cfg=cfg({})",
-                symbol_name.replace('.', "_")
-            );
+            if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
+                // cfg's with values need special syntax, so let's collect all
+                // of them separately.
+                let symbol_name = symbol_name.replace('.', "_");
+                let entry = cfg_values.entry(symbol_name).or_default();
+                // Avoid duplicates in the same cfg.
+                if !entry.contains(&symbol_value.to_string()) {
+                    entry.push(symbol_value.to_string());
+                }
+            } else {
+                // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
+                println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
+            }
         }
+    }
+
+    // Now output all cfgs with values.
+    for (symbol_name, symbol_values) in cfg_values {
+        println!(
+            "cargo:rustc-check-cfg=cfg({symbol_name}, values({}))",
+            symbol_values.join(",")
+        );
     }
 }
 
