@@ -121,12 +121,14 @@ pub trait Instance: crate::private::Sealed {
     }
 }
 
+#[cfg(dac_dac1)]
 impl<'d> Instance for crate::peripherals::DAC1<'d> {
     const INDEX: usize = 0;
 
     type Pin = Dac1Gpio<'d>;
 }
 
+#[cfg(dac_dac2)]
 impl<'d> Instance for crate::peripherals::DAC2<'d> {
     const INDEX: usize = 1;
 
