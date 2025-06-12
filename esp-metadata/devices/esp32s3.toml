@@ -80,7 +80,6 @@ symbols = [
     "octal_psram",
     "ulp_riscv_core",
     "very_large_intr_status",
-    "gpio_bank_1",
     "spi_octal",
 
     # ROM capabilities
@@ -103,6 +102,7 @@ memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
 [device.gpio]
 status = "supported"
+has_bank_1 = true
 
 [device.i2c_master]
 status = "supported"
