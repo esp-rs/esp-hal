@@ -1,7 +1,7 @@
 //! RMT Loopback Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% FEATURES: unstable defmt
 
 #![no_std]
 #![no_main]
