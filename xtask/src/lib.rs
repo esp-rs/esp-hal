@@ -347,6 +347,12 @@ pub fn execute_app(
     };
     builder = builder.subcommand(subcommand);
 
+    if env_vars.contains_key("HIL_ENABLE_STACK_PROTECTOR") {
+        builder.add_arg("--config=.cargo/config_spp.toml");
+        // Requires nightly rust. May be overwritten by the esp toolchain on xtensa.
+        builder = builder.toolchain("nightly");
+    }
+
     if !debug {
         builder.add_arg("--release");
     }
@@ -354,7 +360,6 @@ pub fn execute_app(
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
-        builder.add_arg("-Zbuild-std=core,alloc");
     }
 
     let args = builder.build();

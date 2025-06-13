@@ -1,0 +1,9 @@
+[target.'cfg(target_arch = "riscv32")']
+rustflags = [
+    "-Z", "stack-protector=all",
+]
+
+[target.'cfg(target_arch = "xtensa")']
+rustflags = [
+    "-Z", "stack-protector=all",
+]
