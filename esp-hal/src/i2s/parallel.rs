@@ -793,6 +793,6 @@ impl PrivateInstance for AnyI2s<'_> {
 pub trait Instance: PrivateInstance + super::IntoAnyI2s {}
 
 impl Instance for I2S0<'_> {}
-#[cfg(i2s1)]
+#[cfg(soc_has_i2s1)]
 impl Instance for I2S1<'_> {}
 impl Instance for AnyI2s<'_> {}

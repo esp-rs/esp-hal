@@ -726,28 +726,28 @@ cfg_if::cfg_if! {
 
 crate::dma::impl_dma_eligible! {
     AnyGdmaChannel {
-        #[cfg(spi2)]
+        #[cfg(soc_has_spi2)]
         SPI2 => Spi2,
 
-        #[cfg(spi3)]
+        #[cfg(soc_has_spi3)]
         SPI3 => Spi3,
 
-        #[cfg(uhci0)]
+        #[cfg(soc_has_uhci0)]
         UHCI0 => Uhci0,
 
-        #[cfg(i2s0)]
+        #[cfg(soc_has_i2s0)]
         I2S0 => I2s0,
 
-        #[cfg(i2s1)]
+        #[cfg(soc_has_i2s1)]
         I2S1 => I2s1,
 
         #[cfg(esp32s3)]
         LCD_CAM => LcdCam,
 
-        #[cfg(all(gdma, aes))]
+        #[cfg(all(gdma, soc_has_aes))]
         AES => Aes,
 
-        #[cfg(all(gdma, sha))]
+        #[cfg(all(gdma, soc_has_sha))]
         SHA => Sha,
 
         #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -759,7 +759,7 @@ crate::dma::impl_dma_eligible! {
         #[cfg(esp32s3)]
         RMT => Rmt,
 
-        #[cfg(parl_io)]
+        #[cfg(soc_has_parl_io)]
         PARL_IO => ParlIo,
 
         #[cfg(any(esp32c2, esp32c6, esp32h2))]

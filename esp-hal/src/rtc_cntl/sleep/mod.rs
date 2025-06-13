@@ -495,7 +495,7 @@ bitfield::bitfield! {
     pub bt, set_bt: 10;
 }
 
-#[cfg(pmu)]
+#[cfg(soc_has_pmu)]
 bitfield::bitfield! {
     /// Represents the wakeup triggers.
     #[derive(Default, Clone, Copy)]

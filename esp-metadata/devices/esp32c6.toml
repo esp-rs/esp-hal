@@ -60,7 +60,7 @@ peripherals = [
     "rsa",
     "sha",
     "slchost",
-    "soc_etm",
+    "etm",
     "spi0",
     "spi1",
     "spi2",

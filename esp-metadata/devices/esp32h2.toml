@@ -53,7 +53,7 @@ peripherals = [
     "rng",
     "rsa",
     "sha",
-    "soc_etm",
+    "etm",
     "spi0",
     "spi1",
     "spi2",

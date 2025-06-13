@@ -1530,7 +1530,7 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     }
 }
 
-#[cfg(twai1)]
+#[cfg(soc_has_twai1)]
 impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     fn number(&self) -> usize {
         1
@@ -1570,9 +1570,9 @@ impl PrivateInstance for crate::peripherals::TWAI1<'_> {
 crate::any_peripheral! {
     /// Any TWAI peripheral.
     pub peripheral AnyTwai<'d> {
-        #[cfg(twai0)]
+        #[cfg(soc_has_twai0)]
         Twai0(crate::peripherals::TWAI0<'d>),
-        #[cfg(twai1)]
+        #[cfg(soc_has_twai1)]
         Twai1(crate::peripherals::TWAI1<'d>),
     }
 }
@@ -1580,9 +1580,9 @@ crate::any_peripheral! {
 impl PrivateInstance for AnyTwai<'_> {
     delegate::delegate! {
         to match &self.0 {
-            #[cfg(twai0)]
+            #[cfg(soc_has_twai0)]
             AnyTwaiInner::Twai0(twai) => twai,
-            #[cfg(twai1)]
+            #[cfg(soc_has_twai1)]
             AnyTwaiInner::Twai1(twai) => twai,
         } {
             fn number(&self) -> usize;
@@ -1600,8 +1600,9 @@ impl PrivateInstance for AnyTwai<'_> {
 /// A peripheral singleton compatible with the TWAI driver.
 pub trait Instance: PrivateInstance + IntoAnyTwai {}
 
+#[cfg(soc_has_twai0)]
 impl Instance for crate::peripherals::TWAI0<'_> {}
-#[cfg(twai1)]
+#[cfg(soc_has_twai1)]
 impl Instance for crate::peripherals::TWAI1<'_> {}
 impl Instance for AnyTwai<'_> {}
 
@@ -1616,8 +1617,9 @@ mod asynch {
     use procmacros::handler;
 
     use super::*;
+    #[cfg(soc_has_twai0)]
     use crate::peripherals::TWAI0;
-    #[cfg(twai1)]
+    #[cfg(soc_has_twai1)]
     use crate::peripherals::TWAI1;
 
     pub struct TwaiAsyncState {
@@ -1828,13 +1830,14 @@ mod asynch {
         }
     }
 
+    #[cfg(soc_has_twai0)]
     #[handler]
     pub(super) fn twai0() {
         let twai = unsafe { TWAI0::steal() };
         handle_interrupt(twai.register_block(), twai.async_state());
     }
 
-    #[cfg(twai1)]
+    #[cfg(soc_has_twai1)]
     #[handler]
     pub(super) fn twai1() {
         let twai = unsafe { TWAI1::steal() };
