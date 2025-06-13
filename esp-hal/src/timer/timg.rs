@@ -96,9 +96,12 @@ cfg_if::cfg_if! {
     }
 }
 
+#[procmacros::enable_doc_switch]
 /// A timer group consisting of
-#[cfg_attr(not(timergroup_timg_has_timer1), doc = "a general purpose timer")]
-#[cfg_attr(timergroup_timg_has_timer1, doc = "2 timers")]
+#[doc_switch(
+    cfg(timergroup_timg_has_timer1) => "2 timers",
+    _ => "a general purpose timer",
+)]
 /// and a watchdog timer.
 pub struct TimerGroup<'d, T>
 where
