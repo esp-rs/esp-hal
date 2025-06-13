@@ -319,19 +319,14 @@ pub fn generate_config_from_yaml_definition(
                         Value::String(v) => evalexpr::Value::String(v.clone()),
                     },
                 )
-                .map_err(|err| Error::Parse(format!("Error setting value for {} ({})", k, err)))?;
+                .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
         }
         for check in checks {
             if !evalexpr::eval_with_context(&check, &eval_ctx)
-                .map_err(|err| {
-                    Error::Validation(format!("Validation error: '{}' ({})", check, err))
-                })?
-                .as_boolean()
-                .map_err(|err| {
-                    Error::Validation(format!("Validation error: '{}' ({})", check, err))
-                })?
+                .and_then(|v| v.as_boolean())
+                .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
             {
-                return Err(Error::Validation(format!("Validation error: '{}'", check)));
+                return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
         }
     }
@@ -363,8 +358,7 @@ pub fn evaluate_yaml_config(
                         Ok(evalexpr::Value::Boolean(res))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {:?}",
-                            arg
+                            "Bad argument: {arg:?}"
                         )))
                     }
                 }),
@@ -380,8 +374,7 @@ pub fn evaluate_yaml_config(
                         Ok(evalexpr::Value::Boolean(res))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {:?}",
-                            arg
+                            "Bad argument: {arg:?}"
                         )))
                     }
                 }),
@@ -396,8 +389,7 @@ pub fn evaluate_yaml_config(
                         Ok(evalexpr::Value::Boolean(ignore_feature_gates))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {:?}",
-                            arg
+                            "Bad argument: {arg:?}"
                         )))
                     }
                 }),
@@ -427,8 +419,8 @@ pub fn evaluate_yaml_config(
                     if evalexpr::eval_with_context(&constraint.if_, &eval_ctx)
                         .map_err(|err| {
                             Error::Parse(format!(
-                                "Error evaluating '{}', error = {:?}",
-                                constraint.if_, err
+                                "Error evaluating '{}', error = {err:?}",
+                                constraint.if_
                             ))
                         })?
                         .as_boolean()
@@ -459,18 +451,9 @@ pub fn evaluate_yaml_config(
             let mut default_value = None;
             for value in option.default.clone() {
                 if evalexpr::eval_with_context(&value.if_, &eval_ctx)
+                    .and_then(|v| v.as_boolean())
                     .map_err(|err| {
-                        Error::Parse(format!(
-                            "Error evaluating '{}', error = {:?}",
-                            value.if_, err
-                        ))
-                    })?
-                    .as_boolean()
-                    .map_err(|err| {
-                        Error::Parse(format!(
-                            "Error evaluating '{}', error = {:?}",
-                            value.if_, err
-                        ))
+                        Error::Parse(format!("Error evaluating '{}', error = {err:?}", value.if_))
                     })?
                 {
                     default_value = Some(value.value);
@@ -493,7 +476,7 @@ pub fn evaluate_yaml_config(
             description: option.description,
             default_value: default_value.ok_or(Error::Parse(format!(
                 "No default value found for {}",
-                &option.name
+                option.name
             )))?,
             constraint,
             stability: option.stability,

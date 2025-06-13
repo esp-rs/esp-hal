@@ -21,9 +21,9 @@ impl Serialize for Value {
         S: serde::Serializer,
     {
         match self {
-            Value::String(s) => serializer.serialize_str(&format!("\"{}\"", s)),
-            Value::Integer(n) => serializer.serialize_str(&format!("{}", n)),
-            Value::Bool(b) => serializer.serialize_str(&format!("{}", b)),
+            Value::String(s) => serializer.serialize_str(&format!("\"{s}\"")),
+            Value::Integer(n) => serializer.serialize_str(&format!("{n}")),
+            Value::Bool(b) => serializer.serialize_str(&format!("{b}")),
         }
     }
 }

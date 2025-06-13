@@ -18,7 +18,6 @@ pub enum Validator {
     /// Ensure that an integer value falls within the specified range.
     IntegerInRange(Range<i128>),
     /// String-Enumeration. Only allows one of the given Strings.
-    #[serde()]
     Enumeration(Vec<String>),
 }
 

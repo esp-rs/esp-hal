@@ -97,7 +97,7 @@ checks:
 The expression supports these custom functions:
 |Function|Description|
 |---|---|
-|feature(String)|`true` is the given chip feature is present|
+|feature(String)|`true` if the given chip feature is present|
 |cargo_feature(String)|`true` if the given Cargo feature is active|
 |ignore_feature_gates()|Usually `false` but tooling will set this to `true` to hint that the expression is evaluated by e.g. a TUI|
 
