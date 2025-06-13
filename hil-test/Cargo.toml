@@ -129,6 +129,10 @@ name    = "storage_read_app_desc"
 harness = false
 
 [[test]]
+name    = "stack_protector"
+harness = false
+
+[[test]]
 name    = "parl_io"
 harness = false
 
