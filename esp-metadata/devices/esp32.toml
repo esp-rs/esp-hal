@@ -59,17 +59,19 @@ peripherals = [
     "uhci1",
 ]
 
-symbols = [
-    # Additional peripherals defined by us (the developers):
+virtual_peripherals = [
     "adc1",
     "adc2",
-    "dac",
+    "dac1",
+    "dac2",
+]
+
+symbols = [
+    # Additional peripherals defined by us (the developers):
     "pdma",
     "phy",
     "psram",
     "touch",
-    "large_intr_status",
-    "gpio_bank_1",
 
     # ROM capabilities
     "rom_crc_le",
@@ -85,8 +87,23 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
 
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
+
+[device.dac]
+status = "partial"
+instances = [
+    { name = "dac1" },
+    { name = "dac2" },
+]
+
 [device.gpio]
 status = "supported"
+has_bank_1 = true
 
 [device.i2c_master]
 status = "supported"
@@ -99,6 +116,10 @@ i2c0_data_register_ahb_address = 0x6001301c
 
 [device.i2c_slave]
 status = "not_supported"
+
+[device.interrupts]
+status = "partial"
+status_registers = 3
 
 [device.rmt]
 status = "partial"
@@ -143,10 +164,7 @@ status = "not_supported"
 [device.twai]
 
 ## Miscellaneous
-[device.adc]
-[device.dac]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.temp_sensor]

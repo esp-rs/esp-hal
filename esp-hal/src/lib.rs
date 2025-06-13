@@ -306,7 +306,7 @@ unstable_module! {
     #[doc(hidden)]
     pub mod sync;
     // Drivers needed for initialization or they are tightly coupled to something else.
-    #[cfg(any(adc1, adc2, dac))]
+    #[cfg(any(adc, dac))]
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;

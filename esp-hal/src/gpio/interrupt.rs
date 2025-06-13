@@ -207,12 +207,12 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
     let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
 
-    #[cfg(gpio_bank_1)]
+    #[cfg(gpio_has_bank_1)]
     let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
 
     [
         (GpioBank::_0, intrs_bank0),
-        #[cfg(gpio_bank_1)]
+        #[cfg(gpio_has_bank_1)]
         (GpioBank::_1, intrs_bank1),
     ]
 }
