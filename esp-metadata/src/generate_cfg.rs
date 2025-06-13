@@ -457,7 +457,7 @@ driver_configs![
     EtmProperties {
         driver: etm,
         name: "ETM",
-        peripherals: &["soc_etm"],
+        peripherals: &["etm"],
         properties: {}
     },
     GpioProperties {

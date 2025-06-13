@@ -314,7 +314,7 @@ unstable_module! {
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(soc_has_soc_etm)]
+    #[cfg(soc_has_etm)]
     pub mod etm;
     #[cfg(soc_has_usb0)]
     pub mod otg_fs;

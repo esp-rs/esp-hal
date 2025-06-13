@@ -106,7 +106,7 @@ pub enum Peripheral {
     #[cfg(soc_has_ecc)]
     Ecc,
     /// SOC ETM peripheral (Event Task Manager).
-    #[cfg(soc_has_soc_etm)]
+    #[cfg(soc_has_etm)]
     Etm,
     /// TRACE0 peripheral (Debug trace).
     #[cfg(soc_has_trace0)]
@@ -197,7 +197,7 @@ impl Peripheral {
         Self::Hmac,
         #[cfg(soc_has_ecc)]
         Self::Ecc,
-        #[cfg(soc_has_soc_etm)]
+        #[cfg(soc_has_etm)]
         Self::Etm,
         #[cfg(soc_has_trace0)]
         Self::Trace0,
@@ -858,7 +858,7 @@ impl PeripheralClockControl {
             Peripheral::Ecc => {
                 system.ecc_conf().modify(|_, w| w.ecc_clk_en().bit(enable));
             }
-            #[cfg(soc_has_soc_etm)]
+            #[cfg(soc_has_etm)]
             Peripheral::Etm => {
                 system.etm_conf().modify(|_, w| w.etm_clk_en().bit(enable));
             }
@@ -1052,7 +1052,7 @@ impl PeripheralClockControl {
                 system.ecc_conf().modify(|_, w| w.ecc_rst_en().set_bit());
                 system.ecc_conf().modify(|_, w| w.ecc_rst_en().clear_bit());
             }
-            #[cfg(soc_has_soc_etm)]
+            #[cfg(soc_has_etm)]
             Peripheral::Etm => {
                 system.etm_conf().modify(|_, w| w.etm_rst_en().set_bit());
                 system.etm_conf().modify(|_, w| w.etm_rst_en().clear_bit());

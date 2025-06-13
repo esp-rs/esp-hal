@@ -5,7 +5,7 @@
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
 #![cfg_attr(
-    soc_has_soc_etm,
+    soc_has_etm,
     doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
 )]
 #![doc = ""]
@@ -54,7 +54,7 @@
 crate::unstable_module! {
     pub mod interconnect;
 
-    #[cfg(soc_has_soc_etm)]
+    #[cfg(soc_has_etm)]
     pub mod etm;
 
     #[cfg(soc_has_lp_io)]
