@@ -44,7 +44,7 @@ use enumset::{EnumSet, EnumSetType};
 #[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
-use super::{BitOrder, DataMode, DmaError, Error, Mode};
+use super::{BitOrder, DmaError, Error, Mode};
 use crate::{
     Async,
     Blocking,
@@ -64,7 +64,6 @@ use crate::{
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     private::{self, OnDrop, Sealed},
-    spi::AnySpi,
     system::{Cpu, PeripheralGuard},
     time::Rate,
 };
@@ -3713,9 +3712,6 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-// TODO: this macro needs to move to one level up, and it needs to describe the
-// hardware fully. The master module should extend it with the master specific
-// details.
 macro_rules! spi_instance {
     ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, [$($cs:ident),+] $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
         paste::paste! {
@@ -3767,7 +3763,7 @@ macro_rules! spi_instance {
     }
 }
 
-#[cfg(spi2)]
+#[cfg(spi_master_spi2)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         spi_instance!(2, HSPICLK, HSPID, HSPIQ, [HSPICS0, HSPICS1, HSPICS2], HSPIWP, HSPIHD);
@@ -3778,7 +3774,7 @@ cfg_if::cfg_if! {
     }
 }
 
-#[cfg(spi3)]
+#[cfg(spi_master_spi3)]
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         spi_instance!(3, VSPICLK, VSPID, VSPIQ, [VSPICS0, VSPICS1, VSPICS2], VSPIWP, VSPIHD);
@@ -3789,19 +3785,20 @@ cfg_if::cfg_if! {
     }
 }
 
-impl PeripheralInstance for super::AnySpi<'_> {
+impl PeripheralInstance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
-            super::AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi3)]
-            super::AnySpiInner::Spi3(spi) => spi,
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(spi) => spi,
         } {
             fn info(&self) -> &'static Info;
         }
     }
 }
 
-impl QspiInstance for super::AnySpi<'_> {}
+impl QspiInstance for AnySpi<'_> {}
 
 #[doc(hidden)]
 pub struct State {
@@ -3833,7 +3830,7 @@ fn handle_async(instance: impl Instance) {
 }
 
 /// A peripheral singleton compatible with the SPI master driver.
-pub trait Instance: PeripheralInstance + super::IntoAnySpi {
+pub trait Instance: PeripheralInstance + IntoAnySpi {
     #[doc(hidden)]
     fn state(&self) -> &'static State;
     #[doc(hidden)]
@@ -3869,16 +3866,62 @@ macro_rules! master_instance {
     };
 }
 
+/// SPI data mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum DataMode {
+    /// 1 bit, two data lines. (MOSI, MISO)
+    SingleTwoDataLines,
+    /// 1 bit, 1 data line (SIO0)
+    Single,
+    /// 2 bits, two data lines. (SIO0, SIO1)
+    Dual,
+    /// 4 bit, 4 data lines. (SIO0 .. SIO3)
+    Quad,
+    #[cfg(spi_octal)]
+    /// 8 bit, 8 data lines. (SIO0 .. SIO7)
+    Octal,
+}
+
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnySpi<'d> {
+        #[cfg(spi_master_spi2)]
+        Spi2(crate::peripherals::SPI2<'d>),
+        #[cfg(spi_master_spi3)]
+        Spi3(crate::peripherals::SPI3<'d>),
+    }
+}
+
+impl<'d> DmaEligible for AnySpi<'d> {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel<'d>;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnySpiDmaChannel<'d>;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+        }
+    }
+}
+
+#[cfg(spi_master_spi2)]
 master_instance!(SPI2);
-#[cfg(spi3)]
+#[cfg(spi_master_spi3)]
 master_instance!(SPI3);
 
-impl Instance for super::AnySpi<'_> {
+impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
-            super::AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi3)]
-            super::AnySpiInner::Spi3(spi) => spi,
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(spi) => spi,
         } {
             fn state(&self) -> &'static State;
             fn handler(&self) -> InterruptHandler;

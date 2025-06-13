@@ -80,7 +80,6 @@ use crate::{
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     pac::spi2::RegisterBlock,
-    spi::AnySpi,
     system::PeripheralGuard,
 };
 
@@ -579,7 +578,7 @@ pub mod dma {
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
-pub trait Instance: crate::private::Sealed + super::IntoAnySpi {
+pub trait Instance: crate::private::Sealed + IntoAnySpi {
     /// Returns the peripheral data describing this SPI instance.
     #[doc(hidden)]
     fn info(&self) -> &'static Info;
@@ -809,30 +808,55 @@ macro_rules! spi_instance {
     };
 }
 
+crate::any_peripheral! {
+    /// Any SPI peripheral.
+    pub peripheral AnySpi<'d> {
+        #[cfg(spi_master_spi2)]
+        Spi2(crate::peripherals::SPI2<'d>),
+        #[cfg(spi_master_spi3)]
+        Spi3(crate::peripherals::SPI3<'d>),
+    }
+}
+
+impl<'d> DmaEligible for AnySpi<'d> {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel<'d>;
+    #[cfg(pdma)]
+    type Dma = crate::dma::AnySpiDmaChannel<'d>;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+        }
+    }
+}
+
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        #[cfg(spi2)]
         spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
-        #[cfg(spi3)]
         spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
     } else {
-        #[cfg(spi2)]
+        #[cfg(spi_master_spi2)]
         spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0);
-        #[cfg(spi3)]
+        #[cfg(spi_master_spi3)]
         spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
     }
 }
 
-impl Instance for super::AnySpi<'_> {
+impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
-            super::AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi3)]
-            super::AnySpiInner::Spi3(spi) => spi,
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(spi) => spi,
         } {
             fn info(&self) -> &'static Info;
         }
     }
 }
 
-impl InstanceDma for super::AnySpi<'_> {}
+impl InstanceDma for AnySpi<'_> {}
