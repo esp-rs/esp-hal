@@ -1495,11 +1495,15 @@ pub unsafe extern "C" fn log_writev(
     format: *const crate::binary::c_types::c_char,
     args: crate::binary::include::va_list,
 ) {
-    crate::binary::log::syslog(
-        level,
-        format as _,
-        core::mem::transmute::<crate::binary::include::va_list, core::ffi::VaListImpl<'_>>(args),
-    );
+    unsafe {
+        crate::binary::log::syslog(
+            level,
+            format as _,
+            core::mem::transmute::<crate::binary::include::va_list, core::ffi::VaListImpl<'_>>(
+                args,
+            ),
+        );
+    }
 }
 
 /// **************************************************************************

@@ -1,6 +1,6 @@
-/* This memory map assumes the flash cache is on; 
-   the blocks used are excluded from the various memory ranges 
-   
+/* This memory map assumes the flash cache is on;
+   the blocks used are excluded from the various memory ranges
+
    see: https://github.com/espressif/esp-idf/blob/5b1189570025ba027f2ff6c2d91f6ffff3809cc2/components/heap/port/esp32/memory_layout.c
    for details
    */
@@ -19,8 +19,8 @@ MEMORY
 
   reserved_for_rom_seg   : ORIGIN = 0x3FFAE000, len = 8k /* SRAM2; reserved for usage by the ROM */
   dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 176k - RESERVE_DRAM /* SRAM2+1; first 64kB used by BT if enable */
-  
-  /* 
+
+  /*
   * The following values come from the heap allocator in esp-idf: https://github.com/espressif/esp-idf/blob/ab63aaa4a24a05904da2862d627f3987ecbeafd0/components/heap/port/esp32/memory_layout.c#L137-L157
   * The segment dram2_seg after the rom data space is not mentioned in the esp32 linker scripts in esp-idf, instead the space after is used as heap space.
   * It seems not all rom data space is reserved, but only "core"/"important" ROM functions that may be called after booting from ROM.
@@ -30,7 +30,7 @@ MEMORY
 
   /*
   *   The following values are derived from the __stack and _stack_sentry values from ROM.
-  *   They represent the stacks used for each core setup by ROM code. In theory both of these 
+  *   They represent the stacks used for each core setup by ROM code. In theory both of these
   *   can be reclaimed once both cores are running, but for now we play it safe and reserve them both.
   */
   reserved_rom_stack_pro  : ORIGIN = 0x3ffe1320, len = 11264
@@ -38,7 +38,7 @@ MEMORY
 
   dram2_seg              : ORIGIN = 0x3ffe7e30, len = 98767  /* the rest of DRAM after the rom data segments and rom stacks in the middle */
 
-  /* external flash 
+  /* external flash
      The 0x20 offset is a convenience for the app binary image generation.
      Flash cache has 64KB pages. The .bin file which is flashed to the chip
      has a 0x18 byte file header, and each segment has a 0x08 byte segment
