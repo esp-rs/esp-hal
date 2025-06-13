@@ -2,7 +2,6 @@
 runner    = "probe-rs run --preverify"
 rustflags = [
     "--cfg", "embedded_test",
-    "--check-cfg", "cfg(embedded_test)",
 
     "-C", "link-arg=-Tembedded-test.x",
     "-C", "link-arg=-Tdefmt.x",
@@ -14,7 +13,6 @@ rustflags = [
 runner    = "probe-rs run --preverify"
 rustflags = [
     "--cfg", "embedded_test",
-    "--check-cfg", "cfg(embedded_test)",
 
     "-C", "link-arg=-nostartfiles",
     "-C", "link-arg=-Tembedded-test.x",
