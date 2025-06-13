@@ -219,6 +219,10 @@ name              = "esp_wifi_init"
 harness           = false
 required-features = ["esp-wifi", "esp-alloc"]
 
+[[test]]
+name    = "otadata"
+harness = false
+
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 cfg-if             = "1.0.0"

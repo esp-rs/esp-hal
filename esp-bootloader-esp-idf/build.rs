@@ -4,6 +4,8 @@ use chrono::{TimeZone, Utc};
 use esp_config::{ConfigOption, Validator, generate_config};
 
 fn main() {
+    println!("cargo::rustc-check-cfg=cfg(embedded_test)");
+
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => Utc.timestamp_opt(val.parse::<i64>().unwrap(), 0).unwrap(),
         Err(_) => Utc::now(),
