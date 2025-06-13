@@ -347,9 +347,11 @@ pub fn execute_app(
     };
     builder = builder.subcommand(subcommand);
 
-    if env_vars.contains_key("HIL_ENABLE_STACK_PROTECTOR") {
-        builder.add_arg("--config=.cargo/config_spp.toml");
-        // Requires nightly rust. May be overwritten by the esp toolchain on xtensa.
+    for config in app.cargo_config() {
+        log::info!(" Cargo --config: {config}");
+        builder.add_arg("--config").add_arg(config);
+        // Some configuration requires nightly rust, so let's just assume it. May be
+        // overwritten by the esp toolchain on xtensa.
         builder = builder.toolchain("nightly");
     }
 

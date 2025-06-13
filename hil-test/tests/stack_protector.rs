@@ -4,8 +4,9 @@
 //! xtask recognizes this and sets the cargo config to `.cargo/config_spp.toml`,
 //! which enables the feature.
 
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "-Z", "stack-protector=all" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "-Z", "stack-protector=all" ]
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% ENV: HIL_ENABLE_STACK_PROTECTOR = "true"
 //% FEATURES: esp-alloc
 
 #![no_std]
