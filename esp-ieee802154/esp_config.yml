@@ -1,0 +1,10 @@
+crate: esp-ieee802154
+
+options:
+- name: rx_queue_size
+  description: Size of the RX queue in frames
+  default:
+    - value: 10
+  constraints:
+    - type:
+        validator: positive_integer
