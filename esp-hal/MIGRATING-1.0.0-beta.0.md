@@ -346,6 +346,11 @@ The data and ctrl pins of the camera have been split out into individual `with_*
 +work_with(&data[..]);
 ```
 
+## RMT changes
+
+- `TxChannelCreatorAsync` -> `TxChannelCreator`
+- `RxChannelCreatorAsync` -> `RxChannelCreator`
+
 ## Configuration changes
 
 Some configuration options are now unstable and they require the `unstable` feature to be
