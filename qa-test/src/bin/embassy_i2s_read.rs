@@ -58,7 +58,7 @@ async fn main(_spawner: Spawner) {
     #[cfg(not(feature = "esp32"))]
     let i2s = i2s.with_mclk(peripherals.GPIO0);
 
-    let i2s_rx = i2s
+    let mut i2s_rx = i2s
         .i2s_rx
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
