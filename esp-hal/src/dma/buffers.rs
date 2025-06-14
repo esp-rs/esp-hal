@@ -1405,6 +1405,144 @@ impl DmaRxStreamBufView {
     }
 }
 
+/// A continuous DMA transfer buffer for Tx.
+pub struct DmaTxStreamBuf {
+    descriptors: &'static mut [DmaDescriptor],
+    buffer: &'static mut [u8],
+    burst: BurstConfig,
+}
+
+impl DmaTxStreamBuf {
+    /// Creates a new [DmaTxStreamBuf] evenly distributing the buffer between
+    /// the provided descriptors.
+    pub fn new(descriptors: &'static mut [DmaDescriptor], buffer: &'static mut [u8]) -> Self {
+        Self {
+            descriptors,
+            buffer,
+            burst: Default::default(),
+        }
+    }
+
+    /// Consume the buf, returning the descriptors and buffer.
+    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+        (self.descriptors, self.buffer)
+    }
+}
+
+unsafe impl DmaTxBuffer for DmaTxStreamBuf {
+    type View = ();
+
+    fn prepare(&mut self) -> Preparation {
+        // Link up all the descriptors (but not in a circle).
+        let mut next = null_mut();
+        for desc in self.descriptors.iter_mut().rev() {
+            desc.next = next;
+            next = desc;
+
+            desc.reset_for_rx();
+        }
+        Preparation {
+            start: self.descriptors.as_mut_ptr(),
+            direction: TransferDirection::Out,
+            #[cfg(psram_dma)]
+            accesses_psram: false,
+            burst_transfer: self.burst,
+
+            // Whilst we give ownership of the descriptors the DMA, the correctness of this buffer
+            // implementation doesn't rely on the DMA checking for descriptor ownership.
+            // No descriptor is added back to the end of the stream before it's ready for the DMA
+            // to consume it.
+            check_owner: None,
+            auto_write_back: true,
+        }
+    }
+
+    fn into_view(self) -> Self::View {
+        todo!()
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        todo!()
+    }
+}
+
+/// A view into a [DmaRxStreamBuf]
+pub struct DmaTxStreamBufView {
+    buf: DmaTxStreamBuf,
+    descriptor_idx: usize,
+    descriptor_offset: usize,
+}
+
+impl DmaTxStreamBufView {
+    /// Returns the number of bytes available for writing.
+    pub fn available_bytes(&self) -> usize {
+        let (tail, head) = self.buf.descriptors.split_at(self.descriptor_idx);
+        head.iter()
+            .chain(tail)
+            .take_while(|d| d.owner() == Owner::Cpu)
+            .map(|d| d.len())
+            .sum::<usize>()
+            - self.descriptor_offset
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push(&mut self, buf: &[u8]) -> usize {
+        let chunk_size = self.buf.descriptors[0].size();
+        let n_descs = self.buf.descriptors.len();
+
+        // Prepare descriptors and reorganize link list
+        let buf_start = chunk_size * self.descriptor_idx + self.descriptor_offset;
+        let desc_start = self.descriptor_idx;
+        let mut buf_idx = 0;
+        loop {
+            let d = &mut self.buf.descriptors[self.descriptor_idx];
+            if d.owner() == Owner::Dma {
+                break;
+            }
+
+            let desc_remain = d.len() - self.descriptor_offset;
+            if buf_idx + desc_remain >= buf.len() {
+                self.descriptor_offset += desc_remain;
+                break;
+            }
+            buf_idx += desc_remain;
+
+            d.next = null_mut();
+            let prev = self.descriptor_idx.checked_sub(1).unwrap_or(n_descs - 1);
+            self.buf.descriptors[prev].next = d;
+
+            self.descriptor_idx += 1;
+            if self.descriptor_idx > n_descs {
+                self.descriptor_idx = 0;
+            }
+            self.descriptor_offset = 0;
+        }
+        let buf_end = chunk_size * self.descriptor_idx + self.descriptor_offset;
+        let desc_end = self.descriptor_idx;
+
+        // Actually copy buffers
+        if buf_start < buf_end {
+            self.buf.buffer[buf_start..buf_end].copy_from_slice(&buf[..buf_end - buf_start]);
+            self.buf.descriptors[desc_start..desc_end]
+                .iter_mut()
+                .for_each(|d| d.set_owner(Owner::Dma));
+            buf_end - buf_start
+        } else {
+            let buf_len = self.buf.buffer.len();
+            self.buf.buffer[buf_start..].copy_from_slice(&buf[..buf_len - buf_start]);
+            self.buf.buffer[..buf_end].copy_from_slice(&buf[buf_len - buf_start..]);
+            self.buf.descriptors[desc_start..]
+                .iter_mut()
+                .for_each(|d| d.set_owner(Owner::Dma));
+            self.buf.descriptors[..desc_end]
+                .iter_mut()
+                .for_each(|d| d.set_owner(Owner::Dma));
+            buf_len + buf_end - buf_start
+        }
+    }
+}
+
 static mut EMPTY: [DmaDescriptor; 1] = [DmaDescriptor::EMPTY];
 
 /// An empty buffer that can be used when you don't need to transfer any data.
