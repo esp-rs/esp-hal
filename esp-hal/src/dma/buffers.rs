@@ -1472,7 +1472,9 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             desc.next = next;
             next = desc;
 
-            desc.reset_for_tx(desc.next.is_null());
+            desc.reset_for_tx(false);
+            // NOTE: Sending zeros to DMA so that DMA doesn't stop immediately.
+            desc.set_length(desc.size());
         }
         Preparation {
             start: self.descriptors.as_mut_ptr(),
@@ -1570,6 +1572,7 @@ impl DmaTxStreamBufView {
                 let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
                 desc.next = null_mut();
                 prev.next = desc;
+                prev.set_suc_eof(false);
             }
         }
 
