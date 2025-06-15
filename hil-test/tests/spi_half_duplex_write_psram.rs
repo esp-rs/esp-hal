@@ -10,21 +10,22 @@
 use defmt::error;
 use esp_alloc as _;
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf, ExternalBurstConfig},
     dma_buffers,
     dma_descriptors_chunk_size,
     gpio::interconnect::InputSignal,
-    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
+    pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
-        DataMode,
         Mode,
+        master::{Address, Command, Config, DataMode, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 extern crate alloc;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 macro_rules! dma_alloc_buffer {
     ($size:expr, $align:expr) => {{
@@ -43,7 +44,7 @@ macro_rules! dma_alloc_buffer {
 struct Context {
     spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    pcnt_source: InputSignal,
+    pcnt_source: InputSignal<'static>,
 }
 
 #[cfg(test)]
@@ -65,7 +66,7 @@ mod tests {
 
         let dma_channel = peripherals.DMA_CH0;
 
-        let (mosi_loopback, mosi) = mosi.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
 
         let spi = Spi::new(
             peripherals.SPI2,

@@ -20,14 +20,15 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     main,
-    peripheral::Peripheral,
     spi::{
-        master::{Config, Spi},
         Mode,
+        master::{Config, Spi},
     },
     time::Rate,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {

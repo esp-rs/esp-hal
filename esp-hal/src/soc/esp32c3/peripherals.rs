@@ -69,6 +69,10 @@ crate::peripherals! {
         USB_DEVICE <= USB_DEVICE,
         WIFI <= virtual,
         XTS_AES <= XTS_AES,
+
+        DMA_CH0 <= virtual,
+        DMA_CH1 <= virtual,
+        DMA_CH2 <= virtual,
     ],
     pins: [
         (0, [Input, Output, Analog, RtcIo])
@@ -93,10 +97,5 @@ crate::peripherals! {
         (19, [Input, Output])
         (20, [Input, Output] (0 => U0RXD) ())
         (21, [Input, Output] () (0 => U0TXD))
-    ],
-    dma_channels: [
-        DMA_CH0: DmaChannel0,
-        DMA_CH1: DmaChannel1,
-        DMA_CH2: DmaChannel2,
     ]
 }

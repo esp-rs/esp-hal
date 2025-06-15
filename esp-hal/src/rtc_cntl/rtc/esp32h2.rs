@@ -1,8 +1,8 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{clocks_ll::regi2c_write_mask, Clock, XtalClock},
-    peripherals::{LPWR, LP_AON, PCR, PMU, TIMG0},
+    clock::{Clock, XtalClock, clocks_ll::regi2c_write_mask},
+    peripherals::{LP_AON, LPWR, PCR, PMU, TIMG0},
     rtc_cntl::RtcClock,
     time::Rate,
 };
@@ -408,16 +408,15 @@ impl RtcClock {
                 .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         }
 
-        // TODO: very hacky
+        // TODO: very hacky - icg_hp_xtal32k is already set in the above condition?
         // in ESP-IDF these are not called in this function but the fields are set
         lp_clkrst
             .clk_to_hp()
             .modify(|_, w| w.icg_hp_xtal32k().set_bit());
-        pmu.hp_sleep_lp_ck_power()
-            .modify(|_, w| w.hp_sleep_xpd_xtal32k().set_bit());
-
-        pmu.hp_sleep_lp_ck_power()
-            .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+        pmu.hp_sleep_lp_ck_power().modify(|_, w| {
+            w.hp_sleep_xpd_xtal32k().set_bit();
+            w.hp_sleep_xpd_rc32k().set_bit()
+        });
 
         let rc_fast_enabled = pmu
             .hp_sleep_lp_ck_power()

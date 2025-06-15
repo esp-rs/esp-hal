@@ -32,12 +32,12 @@
 //! # use esp_hal::gpio::Pull;
 //! # use esp_hal::gpio::Level;
 //! #
-//! # let mut led = peripherals.GPIO1;
+//! # let led = peripherals.GPIO1;
 //! # let button = peripherals.GPIO9;
 //!
 //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
 //! let led_task = gpio_ext.channel0_task.toggle(
-//!     &mut led,
+//!     led,
 //!     OutputConfig {
 //!         open_drain: false,
 //!         pull: Pull::None,
@@ -55,11 +55,10 @@ use core::marker::PhantomData;
 
 use crate::{
     gpio::{
-        interconnect::{InputSignal, OutputSignal},
         Level,
         Pull,
+        interconnect::{InputSignal, OutputSignal},
     },
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::GPIO_SD,
     private,
 };
@@ -67,7 +66,7 @@ use crate::{
 /// All the GPIO ETM channels
 #[non_exhaustive]
 pub struct Channels<'d> {
-    _gpio_sd: PeripheralRef<'d, GPIO_SD>,
+    _gpio_sd: GPIO_SD<'d>,
     /// Task channel 0 for triggering GPIO tasks.
     pub channel0_task: TaskChannel<0>,
     /// Event channel 0 for handling GPIO events.
@@ -104,9 +103,7 @@ pub struct Channels<'d> {
 
 impl<'d> Channels<'d> {
     /// Create a new instance
-    pub fn new(peripheral: impl Peripheral<P = GPIO_SD> + 'd) -> Self {
-        crate::into_ref!(peripheral);
-
+    pub fn new(peripheral: GPIO_SD<'d>) -> Self {
         Self {
             _gpio_sd: peripheral,
             channel0_task: TaskChannel {},
@@ -130,6 +127,7 @@ impl<'d> Channels<'d> {
 }
 
 /// Configuration for an ETM controlled GPIO input pin
+// TODO: remove this
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InputConfig {
@@ -150,7 +148,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at rising edge
     pub fn rising_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Rising)
@@ -159,7 +157,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at falling edge
     pub fn falling_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Falling)
@@ -168,7 +166,7 @@ impl<const C: u8> EventChannel<C> {
     /// Trigger at any edge
     pub fn any_edge<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
     ) -> Event<'d> {
         self.into_event(pin, pin_config, EventKind::Any)
@@ -176,15 +174,17 @@ impl<const C: u8> EventChannel<C> {
 
     fn into_event<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<InputSignal>> + 'd,
+        pin: impl Into<InputSignal<'d>>,
         pin_config: InputConfig,
         kind: EventKind,
     ) -> Event<'d> {
-        crate::into_mapped_ref!(pin);
+        let pin = pin.into();
+        if let Some(number) = pin.gpio_number() {
+            pin.apply_input_config(&crate::gpio::InputConfig::default().with_pull(pin_config.pull));
+            pin.set_input_enable(true);
 
-        pin.init_input(pin_config.pull);
-
-        enable_event_channel(C, pin.number());
+            enable_event_channel(C, number);
+        }
         Event {
             id: kind.id() + C,
             _pin: PhantomData,
@@ -256,27 +256,19 @@ impl<const C: u8> TaskChannel<C> {
     // number is the pin-count
 
     /// Task to set a high level
-    pub fn set<'d>(
-        self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
-        pin_config: OutputConfig,
-    ) -> Task<'d> {
+    pub fn set<'d>(self, pin: impl Into<OutputSignal<'d>>, pin_config: OutputConfig) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Set)
     }
 
     /// Task to set a low level
-    pub fn clear<'d>(
-        self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
-        pin_config: OutputConfig,
-    ) -> Task<'d> {
+    pub fn clear<'d>(self, pin: impl Into<OutputSignal<'d>>, pin_config: OutputConfig) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Clear)
     }
 
     /// Task to toggle the level
     pub fn toggle<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
+        pin: impl Into<OutputSignal<'d>>,
         pin_config: OutputConfig,
     ) -> Task<'d> {
         self.into_task(pin, pin_config, TaskKind::Toggle)
@@ -284,21 +276,28 @@ impl<const C: u8> TaskChannel<C> {
 
     fn into_task<'d>(
         self,
-        pin: impl Peripheral<P = impl Into<OutputSignal>> + 'd,
+        pin: impl Into<OutputSignal<'d>>,
         pin_config: OutputConfig,
         kind: TaskKind,
     ) -> Task<'d> {
-        crate::into_mapped_ref!(pin);
+        let pin = pin.into();
 
-        pin.set_output_high(pin_config.initial_state.into());
-        if pin_config.open_drain {
-            pin.pull_direction(pin_config.pull);
-            pin.set_to_open_drain_output();
-        } else {
-            pin.set_to_push_pull_output();
+        if let Some(number) = pin.gpio_number() {
+            let config = if pin_config.open_drain {
+                super::OutputConfig::default()
+                    .with_drive_mode(super::DriveMode::OpenDrain)
+                    .with_pull(pin_config.pull)
+            } else {
+                super::OutputConfig::default()
+            };
+
+            pin.set_output_high(pin_config.initial_state.into());
+            pin.apply_output_config(&config);
+            pin.set_output_enable(true);
+
+            // TODO: what should we do if the user passes a Level/NoPin?
+            enable_task_channel(C, number);
         }
-
-        enable_task_channel(C, pin.number());
         Task {
             id: kind.id() + C,
             _pin: PhantomData,

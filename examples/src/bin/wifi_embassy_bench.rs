@@ -21,17 +21,19 @@ use core::net::Ipv4Addr;
 
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
-use embassy_net::{tcp::TcpSocket, Runner, StackResources};
-use embassy_time::{with_timeout, Duration, Timer};
+use embassy_net::{Runner, StackResources, tcp::TcpSocket};
+use embassy_time::{Duration, Timer, with_timeout};
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
+    EspWifiController,
     init,
     wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
-    EspWifiController,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -67,7 +69,7 @@ async fn main(spawner: Spawner) -> ! {
 
     esp_alloc::heap_allocator!(size: 32 * 1024);
     // add some more RAM
-    esp_alloc::heap_allocator!(#[link_section = ".dram2_uninit"] size: 64 * 1024);
+    esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
 
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
@@ -160,8 +162,8 @@ async fn connection(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::Client(ClientConfiguration {
-                ssid: SSID.try_into().unwrap(),
-                password: PASSWORD.try_into().unwrap(),
+                ssid: SSID.into(),
+                password: PASSWORD.into(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();

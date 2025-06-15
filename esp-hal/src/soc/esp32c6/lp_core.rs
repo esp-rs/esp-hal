@@ -19,10 +19,7 @@
 //!
 //! [the repository with corresponding example]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/lp_core_basic.rs
 
-use crate::{
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::{LPWR, LP_AON, LP_CORE, LP_PERI, PMU},
-};
+use crate::peripherals::{LP_AON, LP_CORE, LP_PERI, LPWR, PMU};
 
 /// Represents the possible wakeup sources for the LP (Low Power) core.
 #[derive(Debug, Clone, Copy)]
@@ -44,22 +41,17 @@ pub enum LpCoreClockSource {
 
 /// Represents the Low Power (LP) core peripheral.
 pub struct LpCore<'d> {
-    _lp_core: PeripheralRef<'d, LP_CORE>,
+    _lp_core: LP_CORE<'d>,
 }
 
 impl<'d> LpCore<'d> {
     /// Create a new instance using [LpCoreClockSource::RcFastClk]
-    pub fn new(lp_core: impl Peripheral<P = LP_CORE> + 'd) -> Self {
+    pub fn new(lp_core: LP_CORE<'d>) -> Self {
         LpCore::new_with_clock(lp_core, LpCoreClockSource::RcFastClk)
     }
 
     /// Create a new instance using the given clock
-    pub fn new_with_clock(
-        lp_core: impl Peripheral<P = LP_CORE> + 'd,
-        clk_src: LpCoreClockSource,
-    ) -> Self {
-        crate::into_ref!(lp_core);
-
+    pub fn new_with_clock(lp_core: LP_CORE<'d>, clk_src: LpCoreClockSource) -> Self {
         match clk_src {
             LpCoreClockSource::RcFastClk => LPWR::regs()
                 .lp_clk_conf()

@@ -7,10 +7,12 @@
 #![no_main]
 
 use esp_hal::{
-    uart::{self, UartRx, UartTx},
     Async,
+    uart::{self, UartRx, UartTx},
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 struct Context {
     rx: UartRx<'static, Async>,
@@ -22,9 +24,10 @@ struct Context {
 mod tests {
     use embassy_futures::{
         join::join,
-        select::{select, Either},
+        select::{Either, select},
     };
     use embassy_time::{Duration, Timer};
+    use embedded_io_async::Write;
     use esp_hal::{
         timer::timg::TimerGroup,
         uart::{RxConfig, RxError},
@@ -76,6 +79,43 @@ mod tests {
     }
 
     #[test]
+    async fn flush_async_does_not_return_prematurely(mut ctx: Context) {
+        // Force TX_DONE to be set
+        ctx.tx.write_async(&[0u8; 10]).await.unwrap();
+
+        let mut read = [0u8; 10];
+        ctx.rx.read_exact_async(&mut read).await.unwrap();
+
+        // The flush should not return until the data is actually sent, regardless of
+        // previous TX_DONE status.
+        for _ in 0..10 {
+            ctx.tx.write_async(&[1u8; 10]).await.unwrap();
+            ctx.tx.flush_async().await.unwrap();
+
+            let read_count = ctx.rx.read_buffered(&mut read).unwrap();
+
+            assert_eq!(read_count, 10);
+            assert_eq!(&read, &[1u8; 10]);
+        }
+    }
+
+    #[test]
+    async fn flush_async_does_not_return_prematurely_even_for_short_writes(mut ctx: Context) {
+        let mut read = [0u8; 2];
+        // The flush should not return until the data is actually sent, regardless of
+        // previous TX_DONE status.
+        for i in 0..10 {
+            ctx.tx.write_async(&[i as u8]).await.unwrap();
+            ctx.tx.flush_async().await.unwrap();
+
+            let read_count = ctx.rx.read_buffered(&mut read).unwrap();
+
+            assert_eq!(read_count, 1);
+            assert_eq!(read[0], i as u8);
+        }
+    }
+
+    #[test]
     async fn rx_overflow_is_detected(mut ctx: Context) {
         let mut to_send: &[u8] = &[0; 250];
         let mut read = [0u8; 1];
@@ -90,6 +130,46 @@ mod tests {
         // long.
         let res = ctx.rx.read_async(&mut read).await;
         assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+    }
+
+    #[test]
+    async fn flushing_after_overflow_remains_consistent(mut ctx: Context) {
+        let mut read = [0u8; 1];
+
+        ctx.tx.write_all(&[0; 350]).await.unwrap();
+        ctx.tx.flush_async().await.unwrap();
+
+        // The read is supposed to return an error because the FIFO is just 128 bytes
+        // long.
+        let res = ctx.rx.read_async(&mut read).await;
+        assert!(matches!(res, Err(RxError::FifoOverflowed)), "{:?}", res);
+
+        // Now we should be able to write and read back the same data.
+        for _ in 0..5 {
+            ctx.tx.write_all(&[1, 2, 3, 4]).await.unwrap();
+
+            let mut read = [0u8; 4];
+            ctx.rx.read_exact_async(&mut read).await.unwrap();
+
+            assert_eq!(&read, &[1, 2, 3, 4]);
+        }
+
+        // Can we still handle a full FIFO?
+        // Join two futures to ensure that `read_async` is called first, which should
+        // set up waiting for the FIFO full interrupt.
+        let mut read = [0u8; 128];
+        let read = async {
+            // This read should return as many bytes as the FIFO threshold, which is 120
+            // bytes by default.
+            let read_count = ctx.rx.read_async(&mut read).await.unwrap();
+            assert_eq!(read_count, 120);
+
+            ctx.rx.read_exact_async(&mut read[120..]).await.unwrap();
+            assert_eq!(&read, &[1; 128]);
+        };
+        let write = async { ctx.tx.write_all(&[1; 128]).await.unwrap() };
+
+        embassy_futures::join::join(read, write).await;
     }
 
     #[test]

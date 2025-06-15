@@ -11,15 +11,14 @@ pub mod lcd;
 use core::marker::PhantomData;
 
 use crate::{
+    Async,
+    Blocking,
     asynch::AtomicWaker,
     handler,
     interrupt::InterruptHandler,
     lcd_cam::{cam::Cam, lcd::Lcd},
-    peripheral::Peripheral,
     peripherals::{Interrupt, LCD_CAM},
     system::{Cpu, GenericPeripheralGuard},
-    Async,
-    Blocking,
 };
 
 /// Represents a combined LCD and Camera interface.
@@ -32,9 +31,7 @@ pub struct LcdCam<'d, Dm: crate::DriverMode> {
 
 impl<'d> LcdCam<'d, Blocking> {
     /// Creates a new `LcdCam` instance.
-    pub fn new(lcd_cam: impl Peripheral<P = LCD_CAM> + 'd) -> Self {
-        crate::into_ref!(lcd_cam);
-
+    pub fn new(lcd_cam: LCD_CAM<'d>) -> Self {
         let lcd_guard = GenericPeripheralGuard::new();
         let cam_guard = GenericPeripheralGuard::new();
 
@@ -294,11 +291,7 @@ fn calculate_closest_divider(
 
 // https://en.wikipedia.org/wiki/Euclidean_algorithm
 const fn hcf(a: usize, b: usize) -> usize {
-    if b != 0 {
-        hcf(b, a % b)
-    } else {
-        a
-    }
+    if b != 0 { hcf(b, a % b) } else { a }
 }
 
 struct Fraction {

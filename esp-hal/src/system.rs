@@ -129,7 +129,11 @@ impl Peripheral {
         Peripheral::UsbDevice,
         #[cfg(systimer)]
         Peripheral::Systimer,
+        #[cfg(timg0)]
         Peripheral::Timg0,
+        #[cfg(esp32c6)] // used by some wifi calibration steps.
+        // TODO: We should probably automatically enable this when needed.
+        Peripheral::ApbSarAdc,
     ];
 
     const COUNT: usize = Self::ALL.len();
@@ -284,6 +288,16 @@ impl<const P: u8> GenericPeripheralGuard<P> {
 
     pub(crate) fn new() -> Self {
         Self::new_with(|_| {})
+    }
+}
+
+impl<const P: u8> Clone for GenericPeripheralGuard<P> {
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+
+    fn clone_from(&mut self, _source: &Self) {
+        // This is a no-op since the ref count for P remains the same.
     }
 }
 

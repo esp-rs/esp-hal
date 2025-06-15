@@ -14,7 +14,7 @@
 //! After initializing the HAL, you can access the individual pins using the
 //! [`crate::Peripherals`] struct. These pins can then be used as general
 //! purpose digital IO using pin drivers, or they can be passed to peripherals
-//! (such as SPI, UART, I2C, etc.), or can be [`GpioPin::split`]
+//! (such as SPI, UART, I2C, etc.), or can be [`split`]
 //! into peripheral signals for advanced use.
 //!
 //! Pin drivers can be created using [`Flex::new`], [`Input::new`] and
@@ -40,7 +40,7 @@
 //! external hardware. The [`interconnect`] module provides tools to achieve
 //! this using GPIO pins.
 //!
-//! To obtain peripheral signals, use the [`GpioPin::split`] method to split a
+//! To obtain peripheral signals, use the [`split`] method to split a
 //! pin into an input and output signal. Alternatively, you may use
 //! [`Flex::split`], [`Flex::into_peripheral_output`],
 //! [`Flex::peripheral_input`], and similar methods to split a pin driver into
@@ -49,31 +49,7 @@
 //!
 //! [embedded-hal]: embedded_hal
 //! [embedded-hal-async]: embedded_hal_async
-
-use core::fmt::Display;
-
-use portable_atomic::{AtomicU32, Ordering};
-use procmacros::ram;
-use strum::EnumCount;
-
-#[cfg(any(lp_io, rtc_cntl))]
-use crate::peripherals::gpio::{handle_rtcio, handle_rtcio_with_resistors};
-pub use crate::soc::gpio::*;
-use crate::{
-    interrupt::{self, InterruptHandler, Priority, DEFAULT_INTERRUPT_HANDLER},
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::{
-        gpio::{handle_gpio_input, handle_gpio_output},
-        Interrupt,
-        GPIO,
-        IO_MUX,
-    },
-    private::{self, Sealed},
-};
-
-mod placeholder;
-
-pub use placeholder::NoPin;
+//! [`split`]: crate::peripherals::GPIO0::split
 
 crate::unstable_module! {
     pub mod interconnect;
@@ -88,36 +64,26 @@ crate::unstable_module! {
     pub mod rtc_io;
 }
 
-mod user_irq {
-    use portable_atomic::{AtomicPtr, Ordering};
-    use procmacros::ram;
+mod asynch;
+mod embedded_hal_impls;
+pub(crate) mod interrupt;
+mod placeholder;
 
-    /// Convenience constant for `Option::None` pin
-    pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
+use core::fmt::Display;
 
-    pub(super) struct CFnPtr(AtomicPtr<()>);
-    impl CFnPtr {
-        pub const fn new() -> Self {
-            Self(AtomicPtr::new(core::ptr::null_mut()))
-        }
+use interrupt::*;
+pub use placeholder::NoPin;
+use portable_atomic::AtomicU32;
+use strum::EnumCount;
 
-        pub fn store(&self, f: extern "C" fn()) {
-            self.0.store(f as *mut (), Ordering::Relaxed);
-        }
-
-        pub fn call(&self) {
-            let ptr = self.0.load(Ordering::Relaxed);
-            if !ptr.is_null() {
-                unsafe { (core::mem::transmute::<*mut (), extern "C" fn()>(ptr))() };
-            }
-        }
-    }
-
-    #[ram]
-    pub(super) extern "C" fn user_gpio_interrupt_handler() {
-        super::handle_pin_interrupts(|| USER_INTERRUPT_HANDLER.call());
-    }
-}
+#[cfg(any(lp_io, rtc_cntl))]
+use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
+pub use crate::soc::gpio::*;
+use crate::{
+    interrupt::{InterruptHandler, Priority},
+    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output},
+    private::{self, Sealed},
+};
 
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
@@ -132,20 +98,9 @@ pub(crate) struct PinGuard {
 }
 
 impl crate::private::Sealed for PinGuard {}
-impl Peripheral for PinGuard {
-    type P = Self;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self {
-            pin: self.pin,
-            signal: self.signal,
-        }
-    }
-}
 
 impl PinGuard {
-    pub(crate) fn new(mut pin: AnyPin, signal: OutputSignal) -> Self {
-        signal.connect_to(&mut pin);
+    pub(crate) fn new(pin: AnyPin<'_>, signal: OutputSignal) -> Self {
         Self {
             pin: pin.number(),
             signal,
@@ -158,13 +113,22 @@ impl PinGuard {
             signal,
         }
     }
+
+    #[cfg(any(esp32, esp32s2))]
+    pub(crate) fn pin_number(&self) -> Option<u8> {
+        if self.pin == u8::MAX {
+            None
+        } else {
+            Some(self.pin)
+        }
+    }
 }
 
 impl Drop for PinGuard {
     fn drop(&mut self) {
         if self.pin != u8::MAX {
-            let mut pin = unsafe { AnyPin::steal(self.pin) };
-            self.signal.disconnect_from(&mut pin);
+            let pin = unsafe { AnyPin::steal(self.pin) };
+            self.signal.disconnect_from(&pin);
         }
     }
 }
@@ -405,11 +369,11 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
-    /// Type-erase (degrade) this pin into an [`AnyPin`].
+    /// Type-erase this pin into an [`AnyPin`].
     ///
-    /// This converts pin singletons (`GpioPin<0>`, …), which are all different
-    /// types, into the same type. It is useful for creating arrays of pins,
-    /// or avoiding generics.
+    /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
+    /// different types, into the same type. It is useful for creating
+    /// arrays of pins, or avoiding generics.
     ///
     /// ## Example
     ///
@@ -448,9 +412,9 @@ pub trait Pin: Sealed {
     /// # Ok(())
     /// # }
     /// ```
-    fn degrade(self) -> AnyPin
+    fn degrade<'d>(self) -> AnyPin<'d>
     where
-        Self: Sized,
+        Self: Sized + 'd,
     {
         unsafe { AnyPin::steal(self.number()) }
     }
@@ -463,10 +427,10 @@ pub trait Pin: Sealed {
 }
 
 /// Trait implemented by pins which can be used as inputs.
-pub trait InputPin: Pin + Into<AnyPin> + 'static {}
+pub trait InputPin: Pin {}
 
 /// Trait implemented by pins which can be used as outputs.
-pub trait OutputPin: Pin + Into<AnyPin> + 'static {}
+pub trait OutputPin: Pin {}
 
 /// Trait implemented by pins which can be used as analog pins
 #[instability::unstable]
@@ -614,48 +578,12 @@ impl GpioBank {
     }
 }
 
-/// GPIO pin
-#[non_exhaustive]
+/// Any GPIO pin.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct GpioPin<const GPIONUM: u8>;
-
-/// Type-erased GPIO pin
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct AnyPin(pub(crate) u8);
-
-impl<const GPIONUM: u8> GpioPin<GPIONUM>
-where
-    Self: Pin,
-{
-    /// Create a pin out of thin air.
-    ///
-    /// # Safety
-    ///
-    /// Ensure that only one instance of a pin exists at one time.
-    pub unsafe fn steal() -> Self {
-        Self
-    }
-
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// let (rx, tx) = peripherals.GPIO2.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-        // FIXME: we should implement this in the gpio macro for output pins, but we
-        // should also have an input-only alternative for pins that can't be used as
-        // outputs.
-        self.degrade().split()
-    }
+pub struct AnyPin<'lt> {
+    pub(crate) pin: u8,
+    pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
 }
 
 /// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
@@ -689,57 +617,18 @@ fn disable_usb_pads(gpionum: u8) {
     }
 }
 
-impl<const GPIONUM: u8> Peripheral for GpioPin<GPIONUM>
-where
-    Self: Pin,
-{
-    type P = GpioPin<GPIONUM>;
-
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
-    }
-}
-
-impl<const GPIONUM: u8> private::Sealed for GpioPin<GPIONUM> {}
-
-pub(crate) fn bind_default_interrupt_handler() {
-    // We first check if a handler is set in the vector table.
-    if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
-        let handler = handler as *const unsafe extern "C" fn();
-
-        // We only allow binding the default handler if nothing else is bound.
-        // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-        if !core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
-            // The user has configured an interrupt handler they wish to use.
-            info!("Not using default GPIO interrupt handler: already bound in vector table");
-            return;
-        }
-    }
-    // The vector table doesn't contain a custom entry.Still, the
-    // peripheral interrupt may already be bound to something else.
-    if interrupt::bound_cpu_interrupt_for(crate::system::Cpu::current(), Interrupt::GPIO).is_some()
-    {
-        info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
-        return;
-    }
-
-    unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
-    // By default, we use lowest priority
-    unwrap!(interrupt::enable(Interrupt::GPIO, Priority::min()));
-}
-
 /// General Purpose Input/Output driver
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[instability::unstable]
-pub struct Io {
-    _io_mux: IO_MUX,
+pub struct Io<'d> {
+    _io_mux: IO_MUX<'d>,
 }
 
-impl Io {
+impl<'d> Io<'d> {
     /// Initialize the I/O driver.
     #[instability::unstable]
-    pub fn new(_io_mux: IO_MUX) -> Self {
+    pub fn new(_io_mux: IO_MUX<'d>) -> Self {
         Io { _io_mux }
     }
 
@@ -751,7 +640,7 @@ impl Io {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        unwrap!(interrupt::enable(Interrupt::GPIO, prio));
+        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
     }
 
     #[cfg_attr(
@@ -763,10 +652,23 @@ impl Io {
         doc = "Registers an interrupt handler for all GPIO pins on the current core."
     )]
     #[doc = ""]
-    /// Note that when using interrupt handlers registered by this function,
-    /// we clear the interrupt status register for you. This is NOT the case
-    /// if you register the interrupt handler directly, by defining a
-    /// `#[no_mangle] unsafe extern "C" fn GPIO()` function.
+    /// Note that when using interrupt handlers registered by this function, or
+    /// by defining a `#[no_mangle] unsafe extern "C" fn GPIO()` function, we do
+    /// **not** clear the interrupt status register or the interrupt enable
+    /// setting for you. Based on your use case, you need to do one of this
+    /// yourself:
+    ///
+    /// - Disabling the interrupt enable setting for the GPIO pin allows you to
+    ///   handle an event once per call to [`listen()`]. Using this method, the
+    ///   [`is_interrupt_set()`] method will return `true` if the interrupt is
+    ///   set even after your handler has finished running.
+    /// - Clearing the interrupt status register allows you to handle an event
+    ///   repeatedly after [`listen()`] is called. Using this method,
+    ///   [`is_interrupt_set()`] will return `false` after your handler has
+    ///   finished running.
+    ///
+    /// [`listen()`]: Input::listen
+    /// [`is_interrupt_set()`]: Input::is_interrupt_set
     ///
     /// # Panics
     ///
@@ -778,61 +680,17 @@ impl Io {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
         self.set_interrupt_priority(handler.priority());
-        unsafe {
-            interrupt::bind_interrupt(Interrupt::GPIO, user_irq::user_gpio_interrupt_handler)
-        };
-        user_irq::USER_INTERRUPT_HANDLER.store(handler.handler());
+        unsafe { crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
+        USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 
-impl crate::private::Sealed for Io {}
+impl crate::private::Sealed for Io<'_> {}
 
 #[instability::unstable]
-impl crate::interrupt::InterruptConfigurable for Io {
+impl crate::interrupt::InterruptConfigurable for Io<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
-    }
-}
-
-#[ram]
-extern "C" fn default_gpio_interrupt_handler() {
-    handle_pin_interrupts(|| ());
-}
-
-#[ram]
-fn handle_pin_interrupts(user_handler: fn()) {
-    let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
-
-    #[cfg(gpio_bank_1)]
-    let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
-
-    user_handler();
-
-    let banks = [
-        (GpioBank::_0, intrs_bank0),
-        #[cfg(gpio_bank_1)]
-        (GpioBank::_1, intrs_bank1),
-    ];
-
-    for (bank, intrs) in banks {
-        // Get the mask of active async pins and also unmark them in the same go.
-        let async_pins = bank.async_operations().fetch_and(!intrs, Ordering::Relaxed);
-
-        // Wake up the tasks
-        let mut intr_bits = intrs & async_pins;
-        while intr_bits != 0 {
-            let pin_pos = intr_bits.trailing_zeros();
-            intr_bits -= 1 << pin_pos;
-
-            let pin_nr = pin_pos as u8 + bank.offset();
-
-            crate::interrupt::free(|| {
-                asynch::PIN_WAKERS[pin_nr as usize].wake();
-                set_int_enable(pin_nr, Some(0), 0, false);
-            });
-        }
-
-        bank.write_interrupt_status_clear(intrs);
     }
 }
 
@@ -871,17 +729,17 @@ macro_rules! if_rtcio_pin {
 #[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for $crate::gpio::GpioPin<$gpionum> {}
+        impl $crate::gpio::InputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
     };
     (Output, $gpionum:literal) => {
-        impl $crate::gpio::OutputPin for $crate::gpio::GpioPin<$gpionum> {}
+        impl $crate::gpio::OutputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
     };
     (Analog, $gpionum:literal) => {
         // FIXME: the implementation shouldn't be in the GPIO module
         #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        #[cfg(any(doc, feature = "unstable"))]
+        #[cfg(feature = "unstable")]
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-        impl $crate::gpio::AnalogPin for $crate::gpio::GpioPin<$gpionum> {
+        impl $crate::gpio::AnalogPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {
             /// Configures the pin for analog mode.
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
@@ -919,11 +777,43 @@ macro_rules! gpio {
     ) => {
         paste::paste! {
             $(
+                impl<'d> [< GPIO $gpionum >]<'d> {
+                    /// Split the pin into an input and output signal.
+                    ///
+                    /// Peripheral signals allow connecting peripherals together without using
+                    /// external hardware.
+                    ///
+                    /// # Safety
+                    ///
+                    /// The caller must ensure that peripheral drivers don't configure the same
+                    /// GPIO at the same time in multiple places. This includes clones of the
+                    /// `InputSignal` struct, as well as the `OutputSignal` struct.
+                    ///
+                    /// ```rust, no_run
+                    #[doc = $crate::before_snippet!()]
+                    /// let (rx, tx) = unsafe { peripherals.GPIO2.split() };
+                    /// // rx and tx can then be passed to different peripherals to connect them.
+                    /// # Ok(())
+                    /// # }
+                    /// ```
+                    #[instability::unstable]
+                    pub unsafe fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
+                        use $crate::gpio::Pin;
+
+                        // FIXME: we should implement this in the gpio macro for output pins, but we
+                        // should also have an input-only alternative for pins that can't be used as
+                        // outputs.
+
+                        // This goes through AnyPin which calls `init_gpio` as needed.
+                        unsafe { self.degrade().split() }
+                    }
+                }
+
                 $(
                     $crate::io_type!($type, $gpionum);
                 )*
 
-                impl $crate::gpio::Pin for $crate::gpio::GpioPin<$gpionum> {
+                impl $crate::gpio::Pin for [<GPIO $gpionum>]<'_> {
                     #[inline(always)]
                     fn number(&self) -> u8 {
                         $gpionum
@@ -956,21 +846,14 @@ macro_rules! gpio {
                     }
                 }
 
-                impl From<$crate::gpio::GpioPin<$gpionum>> for $crate::gpio::AnyPin {
-                    fn from(pin: $crate::gpio::GpioPin<$gpionum>) -> Self {
+                impl<'lt> From<[<GPIO $gpionum>]<'lt>> for $crate::gpio::AnyPin<'lt> {
+                    fn from(pin: [<GPIO $gpionum>]<'lt>) -> Self {
                         $crate::gpio::Pin::degrade(pin)
                     }
                 }
             )+
 
-            impl $crate::peripheral::Peripheral for $crate::gpio::AnyPin {
-                type P = $crate::gpio::AnyPin;
-                unsafe fn clone_unchecked(&self) ->  Self {
-                    Self(self.0)
-                }
-            }
-
-            impl $crate::gpio::AnyPin {
+            impl $crate::gpio::AnyPin<'_> {
                 /// Conjure a new GPIO pin out of thin air.
                 ///
                 /// # Safety
@@ -983,11 +866,29 @@ macro_rules! gpio {
                 pub unsafe fn steal(pin: u8) ->  Self {
                     const PINS: &[u8] = &[$($gpionum),*];
                     assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
-                    Self(pin)
+                    Self { pin, _lifetime: core::marker::PhantomData }
+                }
+
+                /// Unsafely clone the pin.
+                ///
+                /// # Safety
+                ///
+                /// Ensure that only one instance of a pin is in use at one time.
+                pub unsafe fn clone_unchecked(&self) -> Self {
+                    Self {
+                        pin: self.pin,
+                        _lifetime: core::marker::PhantomData,
+                    }
+                }
+
+                /// Create a new AnyPin object that is limited to the lifetime of the
+                /// passed reference.
+                pub fn reborrow(&mut self) -> $crate::gpio::AnyPin<'_> {
+                    unsafe { self.clone_unchecked() }
                 }
 
                 pub(crate) fn is_output(&self) -> bool {
-                    match self.0 {
+                    match self.pin {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* { true } else { false }),
                         )+
@@ -1005,7 +906,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => $crate::if_output_pin!($($type),* {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                 $code
                             }} else {{
                                 panic!("Unsupported")
@@ -1023,7 +924,7 @@ macro_rules! gpio {
                         $(
                             $gpionum => {{
                                 #[allow(unused_mut)]
-                                let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                 $code
                             }},
                         )+
@@ -1044,7 +945,8 @@ macro_rules! gpio {
                                 $(
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {{
                                         #[allow(unused_mut)]
-                                        let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                        #[allow(unused_unsafe)]
+                                        let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                         $code
                                     }} else {{
                                         panic!("Unsupported")
@@ -1063,7 +965,7 @@ macro_rules! gpio {
                                     $gpionum => $crate::if_rtcio_pin!($($type),* {
                                         $crate::if_output_pin!($($type),* {{
                                             #[allow(unused_mut)]
-                                            let mut $inner = unsafe { GpioPin::<$gpionum>::steal() };
+                                            let mut $inner = unsafe { $crate::peripherals::[<GPIO $gpionum>]::steal() };
                                             $code
                                         }} else {{
                                             panic!("Unsupported")
@@ -1101,6 +1003,10 @@ pub enum DriveMode {
     /// logical [`Level`], but leaves the high level floating, which is then
     /// determined by external hardware, or internal pull-up/pull-down
     /// resistors.
+    #[cfg_attr(
+        feature = "unstable",
+        doc = "\n\nEnable the input related functionality by using [Output::into_flex] and enabling input via [Flex::set_input_enable]"
+    )]
     OpenDrain,
 }
 
@@ -1146,13 +1052,6 @@ pub struct Output<'d> {
 
 impl private::Sealed for Output<'_> {}
 
-impl<'d> Peripheral for Output<'d> {
-    type P = Flex<'d>;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        self.pin.clone_unchecked()
-    }
-}
-
 impl<'d> Output<'d> {
     /// Creates a new GPIO output driver.
     ///
@@ -1187,59 +1086,16 @@ impl<'d> Output<'d> {
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
-    pub fn new(
-        pin: impl Peripheral<P = impl OutputPin> + 'd,
-        initial_level: Level,
-        config: OutputConfig,
-    ) -> Self {
+    pub fn new(pin: impl OutputPin + 'd, initial_level: Level, config: OutputConfig) -> Self {
         // Set up the pin
         let mut this = Self {
             pin: Flex::new(pin),
         };
         this.set_level(initial_level);
         this.apply_config(&config);
-        this.pin.pin.enable_output(true);
+        this.pin.pin.set_output_enable(true);
 
         this
-    }
-
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
-    /// # let config = OutputConfig::default();
-    /// let pin1 = Output::new(peripherals.GPIO1, Level::High, config);
-    /// let (input, output) = pin1.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-        self.pin.split()
-    }
-
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
-    ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
-    /// # let config = OutputConfig::default();
-    /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
-    /// // Can be passed as an input.
-    /// let input = pin1_gpio.peripheral_input();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
-        self.pin.peripheral_input()
     }
 
     /// Turns the pin object into a peripheral
@@ -1247,6 +1103,10 @@ impl<'d> Output<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::OutputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{Output, OutputConfig, Level};
@@ -1258,7 +1118,7 @@ impl<'d> Output<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
         self.pin.into_peripheral_output()
     }
 
@@ -1357,13 +1217,6 @@ pub struct Input<'d> {
 
 impl private::Sealed for Input<'_> {}
 
-impl<'d> Peripheral for Input<'d> {
-    type P = Flex<'d>;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        self.pin.clone_unchecked()
-    }
-}
-
 impl<'d> Input<'d> {
     /// Creates a new GPIO input.
     ///
@@ -1403,11 +1256,11 @@ impl<'d> Input<'d> {
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
-    pub fn new(pin: impl Peripheral<P = impl InputPin> + 'd, config: InputConfig) -> Self {
+    pub fn new(pin: impl InputPin + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
 
-        pin.pin.enable_output(false);
-        pin.enable_input(true);
+        pin.set_output_enable(false);
+        pin.set_input_enable(true);
         pin.apply_input_config(&config);
 
         Self { pin }
@@ -1417,6 +1270,10 @@ impl<'d> Input<'d> {
     /// this pin.
     ///
     /// The input signal can be passed to peripherals in place of an input pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{Input, InputConfig, Pull};
@@ -1428,7 +1285,7 @@ impl<'d> Input<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
         self.pin.peripheral_input()
     }
 
@@ -1567,46 +1424,6 @@ impl<'d> Input<'d> {
         self.pin.wakeup_enable(enable, event)
     }
 
-    /// Split the pin into an input and output signal.
-    ///
-    /// Peripheral signals allow connecting peripherals together without using
-    /// external hardware.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
-    /// let config = InputConfig::default().with_pull(Pull::Up);
-    /// let pin1 = Input::new(peripherals.GPIO1, config);
-    /// let (input, output) = pin1.split();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-        self.pin.split()
-    }
-
-    /// Turns the pin object into a peripheral
-    /// [output][interconnect::OutputSignal].
-    ///
-    /// The output signal can be passed to peripherals in place of an output
-    /// pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
-    /// let config = InputConfig::default().with_pull(Pull::Up);
-    /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
-    /// // Can be passed as an output.
-    /// let pin1 = pin1_gpio.into_peripheral_output();
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[inline]
-    #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        self.pin.into_peripheral_output()
-    }
-
     /// Converts the pin driver into a [`Flex`] driver.
     #[inline]
     #[instability::unstable]
@@ -1617,45 +1434,32 @@ impl<'d> Input<'d> {
 
 /// Flexible pin driver.
 ///
-/// This driver allows changing the pin mode between input and output.
+/// This pin driver can act as either input, or output, or both at the same
+/// time. The input and output are (not counting the shared pull direction)
+/// separately configurable, and they have independent enable states.
+///
+/// Enabling the input stage does not change the output stage, and vice versa.
+/// Disabling the input or output stages don't forget their configuration.
+/// Disabling the output stage will not change the output level, but it will
+/// disable the driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Flex<'d> {
-    pin: PeripheralRef<'d, AnyPin>,
+    pin: AnyPin<'d>,
 }
 
 impl private::Sealed for Flex<'_> {}
-
-impl Peripheral for Flex<'_> {
-    type P = Self;
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self {
-            pin: PeripheralRef::new(AnyPin(self.pin.number())),
-        }
-    }
-}
 
 impl<'d> Flex<'d> {
     /// Create flexible pin driver for a [Pin].
     /// No mode change happens.
     #[inline]
     #[instability::unstable]
-    pub fn new(pin: impl Peripheral<P = impl Into<AnyPin>> + 'd) -> Self {
-        crate::into_mapped_ref!(pin);
+    pub fn new(pin: impl Pin + 'd) -> Self {
+        let pin = pin.degrade();
 
-        #[cfg(usb_device)]
-        disable_usb_pads(pin.number());
-
-        GPIO::regs()
-            .func_out_sel_cfg(pin.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
-        // Use RMW to not overwrite sleep configuration
-        io_mux_reg(pin.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(GPIO_FUNCTION as u8);
-            w.fun_ie().clear_bit();
-            w.slp_sel().clear_bit()
-        });
+        // Before each use, reset the GPIO to a known state.
+        pin.init_gpio();
 
         Self { pin }
     }
@@ -1664,23 +1468,24 @@ impl<'d> Flex<'d> {
         self.pin.number()
     }
 
-    /// Returns a peripheral [input][interconnect::InputSignal] connected to
-    /// this pin.
+    // Input functions
+
+    /// Applies the given input configuration to the pin.
     ///
-    /// The input signal can be passed to peripherals in place of an input pin.
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Flex;
-    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
-    /// // Can be passed as an input.
-    /// let pin1 = pin1_gpio.peripheral_input();
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// This function does not set the pin as input (i.e. it does not enable the
+    /// input buffer). Note that the pull direction is common between the
+    /// input and output configuration.
     #[inline]
     #[instability::unstable]
-    pub fn peripheral_input(&self) -> interconnect::InputSignal {
-        unsafe { AnyPin::steal(self.number()) }.split().0
+    pub fn apply_input_config(&mut self, config: &InputConfig) {
+        self.pin.apply_input_config(config);
+    }
+
+    /// Enable or disable the GPIO pin input buffer.
+    #[inline]
+    #[instability::unstable]
+    pub fn set_input_enable(&mut self, enable_input: bool) {
+        self.pin.set_input_enable(enable_input);
     }
 
     /// Get whether the pin input level is high.
@@ -1704,32 +1509,6 @@ impl<'d> Flex<'d> {
         self.pin.is_input_high().into()
     }
 
-    fn listen_with_options(
-        &self,
-        event: Event,
-        int_enable: bool,
-        nmi_enable: bool,
-        wake_up_from_light_sleep: bool,
-    ) -> Result<(), WakeConfigError> {
-        if wake_up_from_light_sleep {
-            match event {
-                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
-                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
-                }
-                _ => {}
-            }
-        }
-
-        set_int_enable(
-            self.pin.number(),
-            Some(gpio_intr_enable(int_enable, nmi_enable)),
-            event as u8,
-            wake_up_from_light_sleep,
-        );
-
-        Ok(())
-    }
-
     /// Listen for interrupts.
     ///
     /// See [`Input::listen`] for more information and an example.
@@ -1738,14 +1517,23 @@ impl<'d> Flex<'d> {
     pub fn listen(&mut self, event: Event) {
         // Unwrap can't fail currently as listen_with_options is only supposed to return
         // an error if wake_up_from_light_sleep is true.
-        unwrap!(self.listen_with_options(event, true, false, false));
+        unwrap!(self.pin.listen_with_options(event, true, false, false));
     }
 
     /// Stop listening for interrupts.
     #[inline]
     #[instability::unstable]
     pub fn unlisten(&mut self) {
-        set_int_enable(self.pin.number(), Some(0), 0, false);
+        GPIO_LOCK.lock(|| {
+            set_int_enable(self.pin.number(), Some(0), 0, false);
+        });
+    }
+
+    fn unlisten_and_clear(&mut self) {
+        GPIO_LOCK.lock(|| {
+            set_int_enable(self.pin.number(), Some(0), 0, false);
+            self.clear_interrupt();
+        });
     }
 
     /// Check if the pin is listening for interrupts.
@@ -1782,14 +1570,34 @@ impl<'d> Flex<'d> {
     #[inline]
     #[instability::unstable]
     pub fn wakeup_enable(&mut self, enable: bool, event: WakeEvent) -> Result<(), WakeConfigError> {
-        self.listen_with_options(event.into(), false, false, enable)
+        self.pin
+            .listen_with_options(event.into(), false, false, enable)
     }
 
-    /// Set the GPIO to output mode.
+    // Output functions
+
+    /// Applies the given output configuration to the pin.
+    ///
+    /// This function does not set the pin to output (i.e. it does not enable
+    /// the output driver). Note that the pull direction is common between
+    /// the input and output configuration.
     #[inline]
     #[instability::unstable]
-    pub fn set_as_output(&mut self) {
-        self.pin.set_to_push_pull_output();
+    pub fn apply_output_config(&mut self, config: &OutputConfig) {
+        self.pin.apply_output_config(config);
+    }
+
+    /// Enable or disable the GPIO pin output driver.
+    ///
+    /// The output level will be set to the last value. Use [`Self::set_high`],
+    /// [`Self::set_low`] or [`Self::set_level`] to set the output level before
+    /// enabling the output.
+    ///
+    /// This function does not disable the input buffer.
+    #[inline]
+    #[instability::unstable]
+    pub fn set_output_enable(&mut self, enable_output: bool) {
+        self.pin.set_output_enable(enable_output);
     }
 
     /// Set the output as high.
@@ -1842,69 +1650,45 @@ impl<'d> Flex<'d> {
         self.set_level(!level);
     }
 
-    /// Configure the [DriveStrength] of the pin
+    // Other/common functions
+
+    /// Returns a peripheral [input][interconnect::InputSignal] connected to
+    /// this pin.
+    ///
+    /// The input signal can be passed to peripherals in place of an input pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::gpio::Flex;
+    /// let pin1_gpio = Flex::new(peripherals.GPIO1);
+    /// // Can be passed as an input.
+    /// let pin1 = pin1_gpio.peripheral_input();
+    /// // You can keep using the Flex, as well as connect the pin to a
+    /// // peripheral input.
+    /// # Ok(())
+    /// # }
+    /// ```
     #[inline]
     #[instability::unstable]
-    pub fn set_drive_strength(&mut self, strength: DriveStrength) {
-        self.pin.set_drive_strength(strength);
+    pub fn peripheral_input(&self) -> interconnect::InputSignal<'d> {
+        self.pin.set_input_enable(true);
+        unsafe {
+            // Safety: the signal is frozen by this function.
+            self.pin.clone_unchecked().split_no_init().0.freeze()
+        }
     }
 
-    /// Set the GPIO to open-drain mode.
-    #[inline]
-    #[instability::unstable]
-    pub fn set_as_open_drain(&mut self, pull: Pull) {
-        self.pin.set_to_open_drain_output();
-        self.pin.pull_direction(pull);
-    }
-
-    /// Configure pullup/pulldown resistors.
-    #[inline]
-    #[instability::unstable]
-    pub fn pull_direction(&mut self, pull: Pull) {
-        self.pin.pull_direction(pull);
-    }
-
-    /// Enable or disable the GPIO pin input buffer.
-    #[inline]
-    #[instability::unstable]
-    pub fn enable_input(&mut self, enable_input: bool) {
-        self.pin.enable_input(enable_input);
-    }
-
-    /// Applies the given output configuration to the pin.
-    #[inline]
-    #[instability::unstable]
-    pub fn apply_output_config(&mut self, config: &OutputConfig) {
-        let pull_up = config.pull == Pull::Up;
-        let pull_down = config.pull == Pull::Down;
-
-        #[cfg(esp32)]
-        crate::soc::gpio::errata36(AnyPin(self.pin.0), pull_up, pull_down);
-
-        io_mux_reg(self.number()).modify(|_, w| {
-            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
-            w.fun_wpu().bit(pull_up);
-            w.fun_wpd().bit(pull_down);
-            w
-        });
-
-        GPIO::regs().pin(self.number() as usize).modify(|_, w| {
-            w.pad_driver()
-                .bit(config.drive_mode == DriveMode::OpenDrain)
-        });
-    }
-
-    /// Applies the given input configuration to the pin.
-    #[inline]
-    #[instability::unstable]
-    pub fn apply_input_config(&mut self, config: &InputConfig) {
-        self.pin.pull_direction(config.pull);
-    }
-
-    /// Split the pin into an input and output signal.
+    /// Split the pin into an input and output signal pair.
     ///
     /// Peripheral signals allow connecting peripherals together without using
     /// external hardware.
+    ///
+    /// Note that the signals returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::Flex;
@@ -1915,9 +1699,50 @@ impl<'d> Flex<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
-        assert!(self.pin.is_output());
-        unsafe { AnyPin::steal(self.number()) }.split()
+    pub fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'d>,
+        interconnect::OutputSignal<'d>,
+    ) {
+        let input = self.peripheral_input();
+        let output = self.into_peripheral_output();
+
+        (input, output)
+    }
+
+    /// Split the pin into an [Input] and an [Output] driver pair.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::InputSignal::freeze). On the other hand,
+    /// the pin driver is free to change settings.
+    ///
+    /// This function allows you to configure an input-output pin, then keep
+    /// working with the output half. This is mainly intended for testing,
+    /// allowing you to drive a peripheral from a signal generated by
+    /// software.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that the pins are not being configured via their
+    /// `apply_config` functions in the same time in multiple places. The pin
+    /// drivers must not be turned back into `Flex`, unless one of the
+    /// drivers is dropped first.
+    // TODO is this enough? Register-wise config is the only non-atomic operation, but is it
+    // actually safe to have two drivers on the same pin, otherwise? Perhaps it would be better
+    // to implement ehal traits for signals?
+    #[inline]
+    #[instability::unstable]
+    pub unsafe fn split_into_drivers(self) -> (Input<'d>, Output<'d>) {
+        self.pin.set_input_enable(true);
+        let input = Input {
+            pin: Flex {
+                pin: unsafe { self.pin.clone_unchecked() },
+            },
+        };
+        let output = Output { pin: self };
+
+        (input, output)
     }
 
     /// Turns the pin object into a peripheral
@@ -1925,6 +1750,10 @@ impl<'d> Flex<'d> {
     ///
     /// The output signal can be passed to peripherals in place of an output
     /// pin.
+    ///
+    /// Note that the signal returned by this function is
+    /// [frozen](interconnect::OutputSignal::freeze).
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::Flex;
@@ -1936,14 +1765,17 @@ impl<'d> Flex<'d> {
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn into_peripheral_output(self) -> interconnect::OutputSignal {
-        self.split().1
+    pub fn into_peripheral_output(self) -> interconnect::OutputSignal<'d> {
+        unsafe {
+            // Safety: the signals are frozen by this function.
+            self.pin.split_no_init().1.freeze()
+        }
     }
 }
 
-impl private::Sealed for AnyPin {}
+impl private::Sealed for AnyPin<'_> {}
 
-impl AnyPin {
+impl<'lt> AnyPin<'lt> {
     fn bank(&self) -> GpioBank {
         #[cfg(gpio_bank_1)]
         if self.number() >= 32 {
@@ -1953,17 +1785,26 @@ impl AnyPin {
         GpioBank::_0
     }
 
-    /// Init as input with the given pull-up/pull-down
     #[inline]
-    pub(crate) fn init_input(&self, pull: Pull) {
-        self.pull_direction(pull);
-
+    /// Resets the GPIO to a known state.
+    ///
+    /// This function needs to be called before using the GPIO pin:
+    /// - Before converting it into signals
+    /// - Before using it as an input or output
+    pub(crate) fn init_gpio(&self) {
         #[cfg(usb_device)]
         disable_usb_pads(self.number());
 
+        self.set_output_enable(false);
+
+        GPIO::regs()
+            .func_out_sel_cfg(self.number() as usize)
+            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+
+        // Use RMW to not overwrite sleep configuration
         io_mux_reg(self.number()).modify(|_, w| unsafe {
             w.mcu_sel().bits(GPIO_FUNCTION as u8);
-            w.fun_ie().set_bit();
+            w.fun_ie().clear_bit();
             w.slp_sel().clear_bit()
         });
     }
@@ -1972,22 +1813,114 @@ impl AnyPin {
     ///
     /// Peripheral signals allow connecting peripherals together without
     /// using external hardware.
+    ///
+    /// Creating an input signal enables the pin's input buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers don't configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct, as well as the `OutputSignal` struct.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the pin is not an output pin.
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{AnyPin, Pin};
     /// let pin1 = peripherals.GPIO1.degrade();
-    /// let (input, output) = pin1.split();
+    /// let (input, output) = unsafe { pin1.split() };
     /// # Ok(())
     /// # }
     /// ```
     #[inline]
     #[instability::unstable]
-    pub fn split(self) -> (interconnect::InputSignal, interconnect::OutputSignal) {
+    pub unsafe fn split(
+        self,
+    ) -> (
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
+    ) {
         assert!(self.is_output());
-        (
-            interconnect::InputSignal::new(Self(self.0)),
-            interconnect::OutputSignal::new(Self(self.0)),
-        )
+
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+        self.set_input_enable(true);
+
+        let (input, output) = unsafe { self.split_no_init() };
+
+        // We don't know if the input signal(s) will support bypassing the GPIO matrix.
+        // Since the bypass option is common between input and output halves of
+        // a single GPIO, we can't assume anything about the output, either.
+        let output = output.with_gpio_matrix_forced(true);
+
+        (input, output)
+    }
+
+    /// Convert the pin into an input signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without
+    /// using external hardware.
+    ///
+    /// Creating an input signal enables the pin's input buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that peripheral drivers don't configure the same
+    /// GPIO at the same time in multiple places. This includes clones of the
+    /// `InputSignal` struct.
+    #[inline]
+    #[instability::unstable]
+    pub unsafe fn into_input_signal(self) -> interconnect::InputSignal<'lt> {
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+        self.set_input_enable(true);
+
+        let (input, _) = unsafe { self.split_no_init() };
+
+        input
+    }
+
+    /// Convert the pin into an output signal.
+    ///
+    /// Peripheral signals allow connecting peripherals together without
+    /// using external hardware.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the pin is not an output pin.
+    #[inline]
+    #[instability::unstable]
+    pub fn into_output_signal(self) -> interconnect::OutputSignal<'lt> {
+        assert!(self.is_output());
+
+        // Before each use, reset the GPIO to a known state.
+        self.init_gpio();
+
+        // AnyPin is used as output only, we can allow bypassing the GPIO matrix.
+        let (_, output) = unsafe { self.split_no_init() };
+
+        output
+    }
+
+    unsafe fn split_no_init(
+        self,
+    ) -> (
+        interconnect::InputSignal<'lt>,
+        interconnect::OutputSignal<'lt>,
+    ) {
+        let input = interconnect::InputSignal::new(unsafe { self.clone_unchecked() });
+        let output = interconnect::OutputSignal::new(self);
+
+        // Since InputSignal can be cloned, we have no way of knowing how many signals
+        // end up being configured, and in what order. If multiple signals are
+        // passed to peripherals, and one of them would allow GPIO alternate
+        // function configurations, it would mean that the GPIO MCU_SEL bit's
+        // final value would depend on the order of operations.
+        let input = input.with_gpio_matrix_forced(true);
+
+        (input, output)
     }
 
     #[inline]
@@ -2003,28 +1936,100 @@ impl AnyPin {
 
     /// Enable or disable the GPIO pin output buffer.
     #[inline]
-    pub(crate) fn enable_output(&self, enable: bool) {
+    pub(crate) fn set_output_enable(&self, enable: bool) {
         assert!(self.is_output() || !enable);
         self.bank().write_out_en(self.mask(), enable);
     }
 
     /// Enable input for the pin
     #[inline]
-    pub(crate) fn enable_input(&self, on: bool) {
+    pub(crate) fn set_input_enable(&self, on: bool) {
         io_mux_reg(self.number()).modify(|_, w| w.fun_ie().bit(on));
     }
 
     #[inline]
-    pub(crate) fn pull_direction(&self, pull: Pull) {
-        let pull_up = pull == Pull::Up;
-        let pull_down = pull == Pull::Down;
+    pub(crate) fn apply_input_config(&self, config: &InputConfig) {
+        let pull_up = config.pull == Pull::Up;
+        let pull_down = config.pull == Pull::Down;
 
         #[cfg(esp32)]
-        crate::soc::gpio::errata36(Self(self.0), pull_up, pull_down);
+        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
 
         io_mux_reg(self.number()).modify(|_, w| {
             w.fun_wpd().bit(pull_down);
             w.fun_wpu().bit(pull_up)
+        });
+    }
+
+    fn clear_interrupt(&self) {
+        self.bank().write_interrupt_status_clear(self.mask());
+    }
+
+    fn with_gpio_lock<F, R>(&self, f: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        // If the pin is listening, we need to take a critical section to prevent racing
+        // with the interrupt handler.
+        if is_int_enabled(self.number()) {
+            GPIO_LOCK.lock(f)
+        } else {
+            f()
+        }
+    }
+
+    fn listen_with_options(
+        &self,
+        event: Event,
+        int_enable: bool,
+        nmi_enable: bool,
+        wake_up_from_light_sleep: bool,
+    ) -> Result<(), WakeConfigError> {
+        if wake_up_from_light_sleep {
+            match event {
+                Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {
+                    return Err(WakeConfigError::EdgeTriggeringNotSupported);
+                }
+                _ => {}
+            }
+        }
+
+        self.with_gpio_lock(|| {
+            // Clear the interrupt status bit for this Pin, just in case the user forgot.
+            // Since we disabled the interrupt in the handler, it's not possible to
+            // trigger a new interrupt before we re-enable it here.
+            self.clear_interrupt();
+
+            set_int_enable(
+                self.number(),
+                Some(gpio_intr_enable(int_enable, nmi_enable)),
+                event as u8,
+                wake_up_from_light_sleep,
+            );
+        });
+        Ok(())
+    }
+
+    #[inline]
+    fn apply_output_config(&self, config: &OutputConfig) {
+        let pull_up = config.pull == Pull::Up;
+        let pull_down = config.pull == Pull::Down;
+
+        #[cfg(esp32)]
+        crate::soc::gpio::errata36(unsafe { self.clone_unchecked() }, pull_up, pull_down);
+
+        io_mux_reg(self.number()).modify(|_, w| {
+            unsafe { w.fun_drv().bits(config.drive_strength as u8) };
+            w.fun_wpu().bit(pull_up);
+            w.fun_wpd().bit(pull_down);
+            w
+        });
+
+        self.with_gpio_lock(|| {
+            GPIO::regs().pin(self.number() as usize).modify(|_, w| {
+                w.pad_driver()
+                    .bit(config.drive_mode == DriveMode::OpenDrain)
+            });
         });
     }
 
@@ -2039,67 +2044,10 @@ impl AnyPin {
         self.bank().read_input() & self.mask() != 0
     }
 
-    /// Set up as output
-    #[inline]
-    pub(crate) fn init_output(
-        &self,
-        alternate: AlternateFunction,
-        open_drain: bool,
-        input_enable: Option<bool>,
-    ) {
-        self.enable_output(true);
-
-        let gpio = GPIO::regs();
-
-        gpio.pin(self.number() as usize)
-            .modify(|_, w| w.pad_driver().bit(open_drain));
-
-        gpio.func_out_sel_cfg(self.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
-
-        #[cfg(usb_device)]
-        disable_usb_pads(self.number());
-
-        io_mux_reg(self.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(alternate as u8);
-            if let Some(input_enable) = input_enable {
-                w.fun_ie().bit(input_enable);
-            }
-            w.fun_drv().bits(DriveStrength::_20mA as u8);
-            w.slp_sel().clear_bit()
-        });
-    }
-
-    /// Configure open-drain mode
-    #[inline]
-    pub(crate) fn set_to_open_drain_output(&self) {
-        self.init_output(GPIO_FUNCTION, true, Some(true));
-    }
-
-    /// Configure output mode
-    #[inline]
-    pub(crate) fn set_to_push_pull_output(&self) {
-        self.init_output(GPIO_FUNCTION, false, None);
-    }
-
     /// Set the pin's level to high or low
     #[inline]
     pub(crate) fn set_output_high(&self, high: bool) {
         self.bank().write_output(self.mask(), high);
-    }
-
-    /// Configure the [DriveStrength] of the pin
-    #[inline]
-    pub(crate) fn set_drive_strength(&self, strength: DriveStrength) {
-        io_mux_reg(self.number()).modify(|_, w| unsafe { w.fun_drv().bits(strength as u8) });
-    }
-
-    /// Enable/disable open-drain mode
-    #[inline]
-    pub(crate) fn enable_open_drain(&self, on: bool) {
-        GPIO::regs()
-            .pin(self.number() as usize)
-            .modify(|_, w| w.pad_driver().bit(on));
     }
 
     /// Is the output set to high
@@ -2109,10 +2057,10 @@ impl AnyPin {
     }
 }
 
-impl Pin for AnyPin {
+impl Pin for AnyPin<'_> {
     #[inline(always)]
     fn number(&self) -> u8 {
-        self.0
+        self.pin
     }
 
     fn output_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, OutputSignal)] {
@@ -2128,11 +2076,11 @@ impl Pin for AnyPin {
     }
 }
 
-impl InputPin for AnyPin {}
-impl OutputPin for AnyPin {}
+impl InputPin for AnyPin<'_> {}
+impl OutputPin for AnyPin<'_> {}
 
 #[cfg(any(lp_io, rtc_cntl))]
-impl RtcPin for AnyPin {
+impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
     #[allow(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
@@ -2153,14 +2101,16 @@ impl RtcPin for AnyPin {
 
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-        handle_rtcio!(self, target, {
-            RtcPin::apply_wakeup(&target, wakeup, level)
-        })
+        unsafe {
+            handle_rtcio!(self, target, {
+                RtcPin::apply_wakeup(&target, wakeup, level)
+            })
+        }
     }
 }
 
 #[cfg(any(lp_io, rtc_cntl))]
-impl RtcPinWithResistors for AnyPin {
+impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         handle_rtcio_with_resistors!(self, target, {
             RtcPinWithResistors::rtcio_pullup(&target, enable)
@@ -2193,383 +2143,4 @@ fn set_int_enable(gpio_num: u8, int_ena: Option<u8>, int_type: u8, wake_up_from_
 
 fn is_int_enabled(gpio_num: u8) -> bool {
     GPIO::regs().pin(gpio_num as usize).read().int_ena().bits() != 0
-}
-
-mod asynch {
-    use core::{
-        future::poll_fn,
-        task::{Context, Poll},
-    };
-
-    use super::*;
-    use crate::asynch::AtomicWaker;
-
-    #[ram]
-    pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] =
-        [const { AtomicWaker::new() }; NUM_PINS];
-
-    impl Flex<'_> {
-        /// Wait until the pin experiences a particular [`Event`].
-        ///
-        /// The GPIO driver will disable listening for the event once it occurs,
-        /// or if the `Future` is dropped.
-        ///
-        /// Note that calling this function will overwrite previous
-        /// [`listen`][Self::listen] operations for this pin.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for(&mut self, event: Event) {
-            // We construct the Future first, because its `Drop` implementation
-            // is load-bearing if `wait_for` is dropped during the initialization.
-            let mut future = PinFuture {
-                pin: Flex {
-                    pin: unsafe { self.pin.clone_unchecked() },
-                },
-            };
-
-            // Make sure this pin is not being processed by an interrupt handler.
-            if future.pin.is_listening() {
-                set_int_enable(
-                    future.pin.number(),
-                    None, // Do not disable handling pending interrupts.
-                    0,    // Disable generating new events
-                    false,
-                );
-                poll_fn(|cx| {
-                    if future.pin.is_interrupt_set() {
-                        cx.waker().wake_by_ref();
-                        Poll::Pending
-                    } else {
-                        Poll::Ready(())
-                    }
-                })
-                .await;
-            }
-
-            // At this point the pin is no longer listening, we can safely
-            // do our setup.
-
-            // Mark pin as async.
-            future
-                .bank()
-                .async_operations()
-                .fetch_or(future.mask(), Ordering::Relaxed);
-
-            future.pin.listen(event);
-
-            future.await
-        }
-
-        /// Wait until the pin is high.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for_high(&mut self) {
-            self.wait_for(Event::HighLevel).await
-        }
-
-        /// Wait until the pin is low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for_low(&mut self) {
-            self.wait_for(Event::LowLevel).await
-        }
-
-        /// Wait for the pin to undergo a transition from low to high.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for_rising_edge(&mut self) {
-            self.wait_for(Event::RisingEdge).await
-        }
-
-        /// Wait for the pin to undergo a transition from high to low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for_falling_edge(&mut self) {
-            self.wait_for(Event::FallingEdge).await
-        }
-
-        /// Wait for the pin to undergo any transition, i.e low to high OR high
-        /// to low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        #[instability::unstable]
-        pub async fn wait_for_any_edge(&mut self) {
-            self.wait_for(Event::AnyEdge).await
-        }
-    }
-
-    impl Input<'_> {
-        /// Wait until the pin experiences a particular [`Event`].
-        ///
-        /// The GPIO driver will disable listening for the event once it occurs,
-        /// or if the `Future` is dropped.
-        ///
-        /// Note that calling this function will overwrite previous
-        /// [`listen`][Self::listen] operations for this pin.
-        #[inline]
-        pub async fn wait_for(&mut self, event: Event) {
-            self.pin.wait_for(event).await
-        }
-
-        /// Wait until the pin is high.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        pub async fn wait_for_high(&mut self) {
-            self.pin.wait_for_high().await
-        }
-
-        /// Wait until the pin is low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        pub async fn wait_for_low(&mut self) {
-            self.pin.wait_for_low().await
-        }
-
-        /// Wait for the pin to undergo a transition from low to high.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        pub async fn wait_for_rising_edge(&mut self) {
-            self.pin.wait_for_rising_edge().await
-        }
-
-        /// Wait for the pin to undergo a transition from high to low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        pub async fn wait_for_falling_edge(&mut self) {
-            self.pin.wait_for_falling_edge().await
-        }
-
-        /// Wait for the pin to undergo any transition, i.e low to high OR high
-        /// to low.
-        ///
-        /// See [Self::wait_for] for more information.
-        #[inline]
-        pub async fn wait_for_any_edge(&mut self) {
-            self.pin.wait_for_any_edge().await
-        }
-    }
-
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    struct PinFuture<'d> {
-        pin: Flex<'d>,
-    }
-
-    impl PinFuture<'_> {
-        fn number(&self) -> u8 {
-            self.pin.number()
-        }
-
-        fn bank(&self) -> GpioBank {
-            self.pin.pin.bank()
-        }
-
-        fn mask(&self) -> u32 {
-            self.pin.pin.mask()
-        }
-
-        fn is_done(&self) -> bool {
-            // Only the interrupt handler should clear the async bit, and only if the
-            // specific pin is handling an interrupt.
-            self.bank().async_operations().load(Ordering::Acquire) & self.mask() == 0
-        }
-    }
-
-    impl core::future::Future for PinFuture<'_> {
-        type Output = ();
-
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            PIN_WAKERS[self.number() as usize].register(cx.waker());
-
-            if self.is_done() {
-                Poll::Ready(())
-            } else {
-                Poll::Pending
-            }
-        }
-    }
-
-    impl Drop for PinFuture<'_> {
-        fn drop(&mut self) {
-            // If the pin isn't listening, the future has either been dropped before setup,
-            // or the interrupt has already been handled.
-            if self.pin.is_listening() {
-                // Make sure the future isn't dropped while the interrupt is being handled.
-                // This prevents tricky drop-and-relisten scenarios.
-
-                set_int_enable(
-                    self.number(),
-                    None, // Do not disable handling pending interrupts.
-                    0,    // Disable generating new events
-                    false,
-                );
-
-                while self.pin.is_interrupt_set() {}
-
-                // Unmark pin as async
-                self.bank()
-                    .async_operations()
-                    .fetch_and(!self.mask(), Ordering::Relaxed);
-            }
-        }
-    }
-}
-
-mod embedded_hal_impls {
-    use embedded_hal::digital;
-
-    use super::*;
-
-    impl digital::ErrorType for Input<'_> {
-        type Error = core::convert::Infallible;
-    }
-
-    impl digital::InputPin for Input<'_> {
-        fn is_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_high(self))
-        }
-
-        fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_low(self))
-        }
-    }
-
-    impl digital::ErrorType for Output<'_> {
-        type Error = core::convert::Infallible;
-    }
-
-    impl digital::OutputPin for Output<'_> {
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            Self::set_low(self);
-            Ok(())
-        }
-
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            Self::set_high(self);
-            Ok(())
-        }
-    }
-
-    impl digital::StatefulOutputPin for Output<'_> {
-        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_set_high(self))
-        }
-
-        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_set_low(self))
-        }
-    }
-
-    #[instability::unstable]
-    impl digital::InputPin for Flex<'_> {
-        fn is_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_high(self))
-        }
-
-        fn is_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_low(self))
-        }
-    }
-
-    #[instability::unstable]
-    impl digital::ErrorType for Flex<'_> {
-        type Error = core::convert::Infallible;
-    }
-
-    #[instability::unstable]
-    impl digital::OutputPin for Flex<'_> {
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            Self::set_low(self);
-            Ok(())
-        }
-
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            Self::set_high(self);
-            Ok(())
-        }
-    }
-
-    #[instability::unstable]
-    impl digital::StatefulOutputPin for Flex<'_> {
-        fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_set_high(self))
-        }
-
-        fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-            Ok(Self::is_set_low(self))
-        }
-    }
-}
-
-mod embedded_hal_async_impls {
-    use embedded_hal_async::digital::Wait;
-
-    use super::*;
-
-    #[instability::unstable]
-    impl Wait for Flex<'_> {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_high(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_low(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_rising_edge(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_falling_edge(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_any_edge(self).await;
-            Ok(())
-        }
-    }
-
-    impl Wait for Input<'_> {
-        async fn wait_for_high(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_high(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_low(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_low(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_rising_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_rising_edge(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_falling_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_falling_edge(self).await;
-            Ok(())
-        }
-
-        async fn wait_for_any_edge(&mut self) -> Result<(), Self::Error> {
-            Self::wait_for_any_edge(self).await;
-            Ok(())
-        }
-    }
 }

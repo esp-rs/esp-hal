@@ -7,11 +7,13 @@
 #![no_main]
 
 use esp_hal::{
-    aes::{dma::CipherMode, Aes, Mode},
+    aes::{Aes, Mode, dma::CipherMode},
     dma_buffers,
     peripherals::Peripherals,
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const DMA_BUFFER_SIZE: usize = 16;
 

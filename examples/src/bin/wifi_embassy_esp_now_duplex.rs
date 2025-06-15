@@ -18,10 +18,12 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
-    esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo, BROADCAST_ADDRESS},
-    init,
     EspWifiController,
+    esp_now::{BROADCAST_ADDRESS, EspNowManager, EspNowReceiver, EspNowSender, PeerInfo},
+    init,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -54,7 +56,13 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     let wifi = peripherals.WIFI;
-    let esp_now = esp_wifi::esp_now::EspNow::new(&esp_wifi_ctrl, wifi).unwrap();
+    let (mut controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
+    controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
+    controller.start().unwrap();
+
+    let esp_now = interfaces.esp_now;
+    esp_now.set_channel(11).unwrap();
+
     println!("esp-now version {}", esp_now.version().unwrap());
 
     cfg_if::cfg_if! {
@@ -121,6 +129,7 @@ async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNow
             if !manager.peer_exists(&r.info.src_address) {
                 manager
                     .add_peer(PeerInfo {
+                        interface: esp_wifi::esp_now::EspNowWifiInterface::Sta,
                         peer_address: r.info.src_address,
                         lmk: None,
                         channel: None,

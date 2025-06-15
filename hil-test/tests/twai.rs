@@ -8,11 +8,13 @@
 
 use embedded_can::Frame;
 use esp_hal::{
-    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
     Blocking,
+    twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
 use hil_test as _;
 use nb::block;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 struct Context {
     twai: twai::Twai<'static, Blocking>,
@@ -29,7 +31,7 @@ mod tests {
 
         let (loopback_pin, _) = hil_test::common_test_pins!(peripherals);
 
-        let (rx, tx) = loopback_pin.split();
+        let (rx, tx) = unsafe { loopback_pin.split() };
 
         let mut config = twai::TwaiConfiguration::new(
             peripherals.TWAI0,

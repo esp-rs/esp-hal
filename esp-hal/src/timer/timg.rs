@@ -69,7 +69,7 @@
 use core::marker::PhantomData;
 
 use super::Error;
-#[cfg(timg1)]
+#[cfg(timergroup_timg1)]
 use crate::peripherals::TIMG1;
 #[cfg(any(esp32c6, esp32h2))]
 use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
@@ -78,39 +78,38 @@ use crate::{
     clock::Clocks,
     interrupt::{self, InterruptConfigurable, InterruptHandler},
     pac::timg0::RegisterBlock,
-    peripheral::Peripheral,
     peripherals::{Interrupt, TIMG0},
     private::Sealed,
     system::PeripheralClockControl,
     time::{Duration, Instant, Rate},
 };
 
-const NUM_TIMG: usize = 1 + cfg!(timg1) as usize;
+const NUM_TIMG: usize = 1 + cfg!(timergroup_timg1) as usize;
 
 cfg_if::cfg_if! {
     // We need no locks when a TIMG has a single timer, and we don't need locks for ESP32
     // and S2 where the effective interrupt enable register (config) is not shared between
     // the timers.
-    if #[cfg(all(timg_timer1, not(any(esp32, esp32s2))))] {
+    if #[cfg(all(timergroup_timg_has_timer1, not(any(esp32, esp32s2))))] {
         use crate::sync::{lock, RawMutex};
         static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
     }
 }
 
 /// A timer group consisting of
-#[cfg_attr(not(timg_timer1), doc = "a general purpose timer")]
-#[cfg_attr(timg_timer1, doc = "2 timers")]
+#[cfg_attr(not(timergroup_timg_has_timer1), doc = "a general purpose timer")]
+#[cfg_attr(timergroup_timg_has_timer1, doc = "2 timers")]
 /// and a watchdog timer.
-pub struct TimerGroup<T>
+pub struct TimerGroup<'d, T>
 where
-    T: TimerGroupInstance,
+    T: TimerGroupInstance + 'd,
 {
     _timer_group: PhantomData<T>,
     /// Timer 0
-    pub timer0: Timer,
+    pub timer0: Timer<'d>,
     /// Timer 1
-    #[cfg(timg_timer1)]
-    pub timer1: Timer,
+    #[cfg(timergroup_timg_has_timer1)]
+    pub timer1: Timer<'d>,
     /// Watchdog timer
     pub wdt: Wdt<T>,
 }
@@ -126,7 +125,8 @@ pub trait TimerGroupInstance {
     fn wdt_interrupt() -> Interrupt;
 }
 
-impl TimerGroupInstance for TIMG0 {
+#[cfg(timergroup_timg0)]
+impl TimerGroupInstance for TIMG0<'_> {
     fn id() -> u8 {
         0
     }
@@ -187,8 +187,8 @@ impl TimerGroupInstance for TIMG0 {
     }
 }
 
-#[cfg(timg1)]
-impl TimerGroupInstance for crate::peripherals::TIMG1 {
+#[cfg(timergroup_timg1)]
+impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
     fn id() -> u8 {
         1
     }
@@ -244,9 +244,9 @@ impl TimerGroupInstance for crate::peripherals::TIMG1 {
     }
 }
 
-impl<T> TimerGroup<T>
+impl<'d, T> TimerGroup<'d, T>
 where
-    T: TimerGroupInstance,
+    T: TimerGroupInstance + 'd,
 {
     /// Construct a new instance of [`TimerGroup`] in blocking mode
     pub fn new(_timer_group: T) -> Self {
@@ -261,19 +261,21 @@ where
                 timer: 0,
                 tg: T::id(),
                 register_block: T::register_block(),
+                _lifetime: PhantomData,
             },
-            #[cfg(timg_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             timer1: Timer {
                 timer: 1,
                 tg: T::id(),
                 register_block: T::register_block(),
+                _lifetime: PhantomData,
             },
             wdt: Wdt::new(),
         }
     }
 }
 
-impl super::Timer for Timer {
+impl super::Timer for Timer<'_> {
     fn start(&self) {
         self.set_counter_active(false);
         self.set_alarm_active(false);
@@ -324,11 +326,11 @@ impl super::Timer for Timer {
     fn async_interrupt_handler(&self) -> InterruptHandler {
         match (self.timer_group(), self.timer_number()) {
             (0, 0) => asynch::timg0_timer0_handler,
-            #[cfg(timg_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => asynch::timg0_timer1_handler,
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => asynch::timg1_timer0_handler,
-            #[cfg(all(timg_timer1, timg1))]
+            #[cfg(all(timergroup_timg_has_timer1, timergroup_timg1))]
             (1, 1) => asynch::timg1_timer1_handler,
             _ => unreachable!(),
         }
@@ -337,11 +339,11 @@ impl super::Timer for Timer {
     fn peripheral_interrupt(&self) -> Interrupt {
         match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timg_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => Interrupt::TG0_T1_LEVEL,
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => Interrupt::TG1_T0_LEVEL,
-            #[cfg(all(timg_timer1, timg1))]
+            #[cfg(all(timergroup_timg_has_timer1, timergroup_timg1))]
             (1, 1) => Interrupt::TG1_T1_LEVEL,
             _ => unreachable!(),
         }
@@ -356,37 +358,52 @@ impl super::Timer for Timer {
     }
 }
 
-impl Peripheral for Timer {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        core::ptr::read(self as *const _)
-    }
-}
-
 /// A timer within a Timer Group.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Timer {
+pub struct Timer<'d> {
     register_block: *const RegisterBlock,
+    _lifetime: PhantomData<&'d mut ()>,
     timer: u8,
     tg: u8,
 }
 
-impl Sealed for Timer {}
-unsafe impl Send for Timer {}
+impl Sealed for Timer<'_> {}
+unsafe impl Send for Timer<'_> {}
 
 /// Timer peripheral instance
-impl Timer {
+impl Timer<'_> {
+    /// Unsafely clone this peripheral reference.
+    ///
+    /// # Safety
+    ///
+    /// You must ensure that you're only using one instance of this type at a
+    /// time.
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        Self {
+            register_block: self.register_block,
+            timer: self.timer,
+            tg: self.tg,
+            _lifetime: PhantomData,
+        }
+    }
+
+    /// Creates a new peripheral reference with a shorter lifetime.
+    ///
+    /// Use this method if you would like to keep working with the peripheral
+    /// after you dropped the driver that consumes this.
+    pub fn reborrow(&mut self) -> Timer<'_> {
+        unsafe { self.clone_unchecked() }
+    }
+
     pub(crate) fn set_interrupt_handler(&self, handler: InterruptHandler) {
         let interrupt = match (self.timer_group(), self.timer_number()) {
             (0, 0) => Interrupt::TG0_T0_LEVEL,
-            #[cfg(timg_timer1)]
+            #[cfg(timergroup_timg_has_timer1)]
             (0, 1) => Interrupt::TG0_T1_LEVEL,
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             (1, 0) => Interrupt::TG1_T0_LEVEL,
-            #[cfg(all(timg_timer1, timg1))]
+            #[cfg(all(timergroup_timg_has_timer1, timergroup_timg1))]
             (1, 1) => Interrupt::TG1_T1_LEVEL,
             _ => unreachable!(),
         };
@@ -456,7 +473,9 @@ impl Timer {
                 let clk_src = Clocks::get().apb_clock;
             }
         }
-        let ticks = timeout_to_ticks(value, clk_src, self.divider());
+        let Some(ticks) = timeout_to_ticks(value, clk_src, self.divider()) else {
+            return Err(Error::InvalidTimeout);
+        };
 
         // The counter is 54-bits wide, so we must ensure that the provided
         // value is not too wide:
@@ -542,7 +561,7 @@ impl Timer {
                     .t(self.timer as usize)
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
-            } else if #[cfg(timg_timer1)] {
+            } else if #[cfg(timergroup_timg_has_timer1)] {
                 lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
                     self.register_block()
                         .int_ena()
@@ -564,13 +583,11 @@ fn ticks_to_timeout(ticks: u64, clock: Rate, divider: u32) -> u64 {
     ticks * period / 1_000_000
 }
 
-fn timeout_to_ticks(timeout: Duration, clock: Rate, divider: u32) -> u64 {
+fn timeout_to_ticks(timeout: Duration, clock: Rate, divider: u32) -> Option<u64> {
     let micros = timeout.as_micros();
+    let ticks_per_sec = (clock.as_hz() / divider) as u64;
 
-    // 1_000_000 is used to get rid of `float` calculations
-    let period: u64 = 1_000_000 * 1_000_000 / ((clock.as_hz() / divider) as u64);
-
-    (1_000_000 * micros) / period
+    micros.checked_mul(ticks_per_sec).map(|n| n / 1_000_000)
 }
 
 /// Behavior of the MWDT stage if it times out.
@@ -812,19 +829,19 @@ mod asynch {
     use crate::asynch::AtomicWaker;
 
     const NUM_WAKERS: usize = {
-        let timer_per_group = 1 + cfg!(timg_timer1) as usize;
+        let timer_per_group = 1 + cfg!(timergroup_timg_has_timer1) as usize;
         NUM_TIMG * timer_per_group
     };
 
     static WAKERS: [AtomicWaker; NUM_WAKERS] = [const { AtomicWaker::new() }; NUM_WAKERS];
 
-    pub(super) fn waker(timer: &Timer) -> &AtomicWaker {
+    pub(super) fn waker(timer: &Timer<'_>) -> &'static AtomicWaker {
         let index = (timer.timer_number() << 1) | timer.timer_group();
         &WAKERS[index as usize]
     }
 
     #[inline]
-    fn handle_irq(timer: Timer) {
+    fn handle_irq(timer: Timer<'_>) {
         timer.set_interrupt_enabled(false);
         waker(&timer).wake();
     }
@@ -837,36 +854,40 @@ mod asynch {
     pub(crate) fn timg0_timer0_handler() {
         handle_irq(Timer {
             register_block: TIMG0::regs(),
+            _lifetime: PhantomData,
             timer: 0,
             tg: 0,
         });
     }
 
-    #[cfg(timg1)]
+    #[cfg(timergroup_timg1)]
     #[handler]
     pub(crate) fn timg1_timer0_handler() {
         handle_irq(Timer {
             register_block: TIMG1::regs(),
+            _lifetime: PhantomData,
             timer: 0,
             tg: 1,
         });
     }
 
-    #[cfg(timg_timer1)]
+    #[cfg(timergroup_timg_has_timer1)]
     #[handler]
     pub(crate) fn timg0_timer1_handler() {
         handle_irq(Timer {
             register_block: TIMG0::regs(),
+            _lifetime: PhantomData,
             timer: 1,
             tg: 0,
         });
     }
 
-    #[cfg(all(timg1, timg_timer1))]
+    #[cfg(all(timergroup_timg1, timergroup_timg_has_timer1))]
     #[handler]
     pub(crate) fn timg1_timer1_handler() {
         handle_irq(Timer {
             register_block: TIMG1::regs(),
+            _lifetime: PhantomData,
             timer: 1,
             tg: 1,
         });
@@ -930,7 +951,7 @@ pub mod etm {
         fn alarm_start(&self) -> Task;
     }
 
-    impl Events for Timer {
+    impl Events for Timer<'_> {
         fn on_alarm(&self) -> Event {
             Event {
                 id: 48 + self.timer_group(),
@@ -938,7 +959,7 @@ pub mod etm {
         }
     }
 
-    impl Tasks for Timer {
+    impl Tasks for Timer<'_> {
         fn cnt_start(&self) -> Task {
             Task {
                 id: 88 + self.timer_group(),

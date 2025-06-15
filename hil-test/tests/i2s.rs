@@ -11,23 +11,25 @@
 #![no_main]
 
 use esp_hal::{
+    Async,
     delay::Delay,
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
     time::Rate,
-    Async,
 };
 use hil_test as _;
 
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_I2S0<'d>;
     } else {
-        type DmaChannel0 = esp_hal::dma::DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
     }
 }
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const BUFFER_SIZE: usize = 2000;
 
@@ -100,9 +102,9 @@ mod tests {
     use super::*;
 
     struct Context {
-        dout: AnyPin,
-        dma_channel: DmaChannel0,
-        i2s: I2S0,
+        dout: AnyPin<'static>,
+        dma_channel: DmaChannel0<'static>,
+        i2s: I2S0<'static>,
     }
 
     #[init]
@@ -141,26 +143,24 @@ mod tests {
             DataFormat::Data16Channel16,
             Rate::from_hz(16000),
             ctx.dma_channel,
-            rx_descriptors,
-            tx_descriptors,
         )
         .into_async();
 
-        let (din, dout) = ctx.dout.split();
+        let (din, dout) = unsafe { ctx.dout.split() };
 
         let i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_dout(dout)
-            .build();
+            .build(tx_descriptors);
 
         let i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_din(din)
-            .build();
+            .build(rx_descriptors);
 
         enable_loopback();
 
@@ -194,25 +194,23 @@ mod tests {
             DataFormat::Data16Channel16,
             Rate::from_hz(16000),
             ctx.dma_channel,
-            rx_descriptors,
-            tx_descriptors,
         );
 
-        let (din, dout) = ctx.dout.split();
+        let (din, dout) = unsafe { ctx.dout.split() };
 
         let mut i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_dout(dout)
-            .build();
+            .build(tx_descriptors);
 
         let mut i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_din(din)
-            .build();
+            .build(rx_descriptors);
 
         enable_loopback();
 
@@ -295,7 +293,7 @@ mod tests {
 
     #[test]
     fn test_i2s_push_too_late(ctx: Context) {
-        let (_, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
+        let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -303,8 +301,6 @@ mod tests {
             DataFormat::Data16Channel16,
             Rate::from_hz(16000),
             ctx.dma_channel,
-            rx_descriptors,
-            tx_descriptors,
         );
 
         let mut i2s_tx = i2s
@@ -312,7 +308,7 @@ mod tests {
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_dout(ctx.dout)
-            .build();
+            .build(tx_descriptors);
 
         let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
 
@@ -325,7 +321,7 @@ mod tests {
     #[test]
     #[timeout(1)]
     fn test_i2s_read_too_late(ctx: Context) {
-        let (rx_buffer, rx_descriptors, _, tx_descriptors) = dma_buffers!(16000, 0);
+        let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(16000, 0);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -333,8 +329,6 @@ mod tests {
             DataFormat::Data16Channel16,
             Rate::from_hz(16000),
             ctx.dma_channel,
-            rx_descriptors,
-            tx_descriptors,
         );
 
         let mut i2s_rx = i2s
@@ -342,7 +336,7 @@ mod tests {
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_din(ctx.dout) // not a typo
-            .build();
+            .build(rx_descriptors);
 
         let mut buffer = [0u8; 1024];
         let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();

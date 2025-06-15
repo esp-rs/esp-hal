@@ -27,10 +27,12 @@ use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
     elements::{DSSSParameterSetElement, RawIEEE80211Element, SSIDElement},
-    mgmt_frame::{body::BeaconBody, header::ManagementFrameHeader, BeaconFrame},
+    mgmt_frame::{BeaconFrame, body::BeaconBody, header::ManagementFrameHeader},
     scroll::Pwrite,
     supported_rates,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const SSID: &str = "esp-wifi 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
@@ -56,12 +58,13 @@ fn main() -> ! {
     .unwrap();
 
     // We must initialize some kind of interface and start it.
-    let (mut controller, _) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+    let (mut controller, interfaces) =
+        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
-    let mut sniffer = controller.take_sniffer().unwrap();
+    let mut sniffer = interfaces.sniffer;
 
     // Create a buffer, which can hold the enitre serialized beacon frame.
     let mut beacon = [0u8; 300];

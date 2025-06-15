@@ -102,7 +102,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     const CACHE_4WAYS_ASSOC: u32 = 0;
     const CACHE_LINE_SIZE_16B: u32 = 0;
 
-    extern "C" {
+    unsafe extern "C" {
         /// Allocate memory to used by ICache and DCache.
         ///
         /// [`sram0_layout`]: u32 the usage of first 8KB internal memory block,
@@ -215,6 +215,8 @@ pub(crate) mod utils {
         psram_gpio_config();
 
         if config.size.is_auto() {
+            psram_disable_qio_mode();
+
             // read chip id
             let mut dev_id = 0u32;
             psram_exec_cmd(
@@ -233,21 +235,25 @@ pub(crate) mod utils {
             );
             info!("chip id = {:x}", dev_id);
 
-            const PSRAM_ID_EID_S: u32 = 16;
-            const PSRAM_ID_EID_M: u32 = 0xff;
-            const PSRAM_EID_SIZE_M: u32 = 0x07;
-            const PSRAM_EID_SIZE_S: u32 = 5;
+            let size = if dev_id != 0xffffff {
+                const PSRAM_ID_EID_S: u32 = 16;
+                const PSRAM_ID_EID_M: u32 = 0xff;
+                const PSRAM_EID_SIZE_M: u32 = 0x07;
+                const PSRAM_EID_SIZE_S: u32 = 5;
 
-            let size_id = ((((dev_id) >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
-                & PSRAM_EID_SIZE_M;
+                let size_id = (((dev_id >> PSRAM_ID_EID_S) & PSRAM_ID_EID_M) >> PSRAM_EID_SIZE_S)
+                    & PSRAM_EID_SIZE_M;
 
-            const PSRAM_EID_SIZE_32MBITS: u32 = 1;
-            const PSRAM_EID_SIZE_64MBITS: u32 = 2;
+                const PSRAM_EID_SIZE_32MBITS: u32 = 1;
+                const PSRAM_EID_SIZE_64MBITS: u32 = 2;
 
-            let size = match size_id {
-                PSRAM_EID_SIZE_64MBITS => 16 / 8 * 1024 * 1024,
-                PSRAM_EID_SIZE_32MBITS => 16 / 8 * 1024 * 1024,
-                _ => 16 / 8 * 1024 * 1024,
+                match size_id {
+                    PSRAM_EID_SIZE_64MBITS => 8 * 1024 * 1024,
+                    PSRAM_EID_SIZE_32MBITS => 4 * 1024 * 1024,
+                    _ => 2 * 1024 * 1024,
+                }
+            } else {
+                0
             };
 
             info!("size is {}", size);
@@ -315,6 +321,27 @@ pub(crate) mod utils {
         );
     }
 
+    /// Exit QPI mode
+    fn psram_disable_qio_mode() {
+        const PSRAM_EXIT_QMODE: u16 = 0xF5;
+        const CS_PSRAM_SEL: u8 = 1 << 1;
+
+        psram_exec_cmd(
+            CommandMode::PsramCmdQpi,
+            PSRAM_EXIT_QMODE,
+            8, // command and command bit len
+            0,
+            0, // address and address bit len
+            0, // dummy bit len
+            core::ptr::null(),
+            0, // tx data and tx bit len
+            core::ptr::null_mut(),
+            0,            // rx data and rx bit len
+            CS_PSRAM_SEL, // cs bit mask
+            false,        // whether is program/erase operation
+        );
+    }
+
     #[derive(PartialEq)]
     #[allow(unused)]
     enum CommandMode {
@@ -338,7 +365,7 @@ pub(crate) mod utils {
         cs_mask: u8,
         is_write_erase_operation: bool,
     ) {
-        extern "C" {
+        unsafe extern "C" {
             ///  Start a spi user command sequence
             ///  [`spi_num`] spi port
             ///  [`rx_buf`] buffer pointer to receive data
@@ -415,7 +442,7 @@ pub(crate) mod utils {
             dummy_bit_len: u32,
         }
 
-        extern "C" {
+        unsafe extern "C" {
             /// Config the spi user command
             /// [`spi_num`] spi port
             /// [`pcmd`] pointer to accept the spi command struct
@@ -440,7 +467,7 @@ pub(crate) mod utils {
     }
 
     fn psram_set_op_mode(mode: CommandMode) {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_spi_set_op_mode(spi: u32, mode: u32);
         }
 
@@ -451,7 +478,12 @@ pub(crate) mod utils {
             match mode {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
-                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_quad().set_bit());
+                    // this should be `fcmd_quad` - apparently our ESP32-S2 SVD isn't correct for
+                    // SPI1 and SPI0. i.e. GP-SPI vs MEM-SPI
+                    //
+                    // TODO fix the SVD and change this back!
+                    // (i.e. in our SVD FCMD_QUAD is bit 9 while it should be bit 8)
+                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_dual().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
@@ -473,7 +505,7 @@ pub(crate) mod utils {
     }
 
     fn psram_gpio_config() {
-        extern "C" {
+        unsafe extern "C" {
             fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
             /// Enable Quad I/O pin functions
@@ -515,7 +547,9 @@ pub(crate) mod utils {
                 // rom.
             } else {
                 // this case is currently not yet supported
-                panic!("Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported.");
+                panic!(
+                    "Unsupported for now! The case 'FLASH pins are all configured via GPIO matrix in ROM.' is not yet supported."
+                );
 
                 // FLASH pins are all configured via GPIO matrix in ROM.
                 // psram_io.flash_clk_io =
@@ -592,11 +626,6 @@ pub(crate) mod utils {
             // config sram cache r/w command
             spi.sram_dwr_cmd()
                 .modify(|_, w| w.cache_sram_usr_wr_cmd_bitlen().bits(7));
-
-            spi.sram_dwr_cmd().modify(|_, w| {
-                w.cache_sram_usr_wr_cmd_bitlen()
-                    .bits(PSRAM_QUAD_WRITE as u8)
-            });
 
             spi.sram_dwr_cmd().modify(|_, w| {
                 w.cache_sram_usr_wr_cmd_value()

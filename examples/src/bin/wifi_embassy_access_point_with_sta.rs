@@ -25,12 +25,12 @@ use core::net::Ipv4Addr;
 use embassy_executor::Spawner;
 use embassy_futures::select::Either;
 use embassy_net::{
-    tcp::TcpSocket,
     IpListenEndpoint,
     Ipv4Cidr,
     Runner,
     StackResources,
     StaticConfigV4,
+    tcp::TcpSocket,
 };
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
@@ -38,6 +38,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
+    EspWifiController,
     init,
     wifi::{
         AccessPointConfiguration,
@@ -48,8 +49,9 @@ use esp_wifi::{
         WifiEvent,
         WifiState,
     },
-    EspWifiController,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -122,12 +124,12 @@ async fn main(spawner: Spawner) -> ! {
 
     let client_config = Configuration::Mixed(
         ClientConfiguration {
-            ssid: SSID.try_into().unwrap(),
-            password: PASSWORD.try_into().unwrap(),
+            ssid: SSID.into(),
+            password: PASSWORD.into(),
             ..Default::default()
         },
         AccessPointConfiguration {
-            ssid: "esp-wifi".try_into().unwrap(),
+            ssid: "esp-wifi".into(),
             ..Default::default()
         },
     );

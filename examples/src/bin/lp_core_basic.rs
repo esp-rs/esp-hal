@@ -3,7 +3,7 @@
 //! Code on LP core increments a counter and continuously toggles LED. The
 //! current value is printed by the HP core.
 //!
-//! Make sure to first compile the `esp-lp-hal/examples/blinky.rs` example
+//! ⚠️ Make sure to first compile the `esp-lp-hal/examples/blinky.rs` example ⚠️
 //!
 //! The following wiring is assumed:
 //! - LED => GPIO1
@@ -22,6 +22,8 @@ use esp_hal::{
     main,
 };
 use esp_println::{print, println};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {

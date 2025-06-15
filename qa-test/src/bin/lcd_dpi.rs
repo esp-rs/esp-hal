@@ -33,25 +33,27 @@ use core::iter::{empty, once};
 
 use esp_backtrace as _;
 use esp_hal::{
+    Blocking,
     delay::Delay,
     dma_loop_buffer,
     gpio::{Level, Output, OutputConfig},
     i2c::{self, master::I2c},
     lcd_cam::{
+        LcdCam,
         lcd::{
-            dpi::{Config, Dpi, Format, FrameTiming},
             ClockMode,
             Phase,
             Polarity,
+            dpi::{Config, Dpi, Format, FrameTiming},
         },
-        LcdCam,
     },
     main,
     peripherals::Peripherals,
     time::Rate,
-    Blocking,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -117,7 +119,7 @@ fn main() -> ! {
     let mut vsync_pin = peripherals.GPIO3;
 
     let vsync_must_be_high_during_setup =
-        Output::new(&mut vsync_pin, Level::High, OutputConfig::default());
+        Output::new(vsync_pin.reborrow(), Level::High, OutputConfig::default());
     for &init in INIT_CMDS.iter() {
         match init {
             InitCmd::Cmd(cmd, args) => {

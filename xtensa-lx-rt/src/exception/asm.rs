@@ -195,8 +195,7 @@ global_asm!(
     wsr     a0, PS
     rsync
 
-    movi    a6, \\level                     // put interrupt level in a6 = a2 in callee
-    mov     a7, sp                         // put address of save frame in a7=a3 in callee
+    mov     a6, sp                         // put address of save frame in a6=a2 in callee
     call4   __level_\\level\\()_interrupt    // call handler <= actual call!
 
     RESTORE_CONTEXT \\level
@@ -513,31 +512,32 @@ __default_naked_exception:
 .Ldefault_naked_exception_start:
     SAVE_CONTEXT 1
 
-    movi    a0, (PS_INTLEVEL_EXCM | PS_WOE)
-    wsr     a0, PS
-    rsync
-
     l32i    a6, sp, +XT_STK_EXCCAUSE  // put cause in a6 = a2 in callee
-    beqi    a6, 4, .Level1Interrupt
 
-    mov     a7, sp                    // put address of save frame in a7=a3 in callee
-    call4   __exception               // call handler <= actual call!
+    bnei    a6, 4, .HandleException   // Handle exception elsewhere
 
-    j       .RestoreContext
-
-.Level1Interrupt:
     movi    a0, (1 | PS_WOE)          // set PS.INTLEVEL accordingly
     wsr     a0, PS
     rsync
+    mov     a6, sp                    // put address of save frame in a6=a2 in callee
 
-    movi    a6, 1                     // put interrupt level in a6 = a2 in callee
-    mov     a7, sp                    // put address of save frame in a7=a3 in callee
     call4   __level_1_interrupt       // call handler <= actual call!
 
 .RestoreContext:
     RESTORE_CONTEXT 1
 
     rfe                               // PS.EXCM is cleared
+
+.HandleException:
+    mov     a7, sp                    // put address of save frame in a7=a3 in callee
+
+    movi    a0, (PS_INTLEVEL_EXCM | PS_WOE)
+    wsr     a0, PS
+    rsync
+
+    call4   __exception               // call handler <= actual call!
+    j       .RestoreContext
+
 .Ldefault_naked_exception_end:
     .size .Ldefault_naked_exception_start, .Ldefault_naked_exception_end
 
@@ -717,7 +717,7 @@ _WindowOverflow8:
         s32e    a6, a0, -24
         s32e    a7, a0, -20
         rfwo
-    
+
     .section .WindowUnderflow8.text,\"ax\",@progbits
     .global _WindowUnderflow8
     .p2align 2

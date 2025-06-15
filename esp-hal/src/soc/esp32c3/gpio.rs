@@ -37,7 +37,7 @@
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::{AlternateFunction, GpioPin},
+    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };
@@ -205,43 +205,40 @@ pub enum OutputSignal {
 macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => {
         $(
-            impl $crate::gpio::RtcPin for GpioPin<$pin_num> {
-                unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-                    let rtc_cntl = $crate::peripherals::LPWR::regs();
-                    let gpio_wakeup = rtc_cntl.gpio_wakeup();
+            paste::paste! {
+                impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                    unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
+                        let rtc_cntl = $crate::peripherals::LPWR::regs();
+                        let gpio_wakeup = rtc_cntl.gpio_wakeup();
 
-                    paste::paste! {
-                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
-                        gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                        unsafe {
+                            gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _wakeup_enable >]().bit(wakeup));
+                            gpio_wakeup.modify(|_, w| w.[< gpio_pin $pin_num _int_type >]().bits(level));
+                        }
+                    }
+
+                    fn rtcio_pad_hold(&self, enable: bool) {
+                        $crate::peripherals::LPWR::regs()
+                            .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                     }
                 }
 
-                fn rtcio_pad_hold(&self, enable: bool) {
-                    paste::paste! {
-                        $crate::peripherals::LPWR::regs()
-                            .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
+                impl crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+                    fn rtcio_pullup(&self, enable: bool) {
+                        IO_MUX::regs()
+                            .gpio($pin_num)
+                            .modify(|_, w| w.fun_wpu().bit(enable));
+                    }
+
+                    fn rtcio_pulldown(&self, enable: bool) {
+                        IO_MUX::regs()
+                            .gpio($pin_num)
+                            .modify(|_, w| w.fun_wpd().bit(enable));
                     }
                 }
             }
         )+
     };
-}
-
-impl<const N: u8> crate::gpio::RtcPinWithResistors for GpioPin<N>
-where
-    Self: crate::gpio::RtcPin,
-{
-    fn rtcio_pullup(&self, enable: bool) {
-        IO_MUX::regs()
-            .gpio(N as usize)
-            .modify(|_, w| w.fun_wpu().bit(enable));
-    }
-
-    fn rtcio_pulldown(&self, enable: bool) {
-        IO_MUX::regs()
-            .gpio(N as usize)
-            .modify(|_, w| w.fun_wpd().bit(enable));
-    }
 }
 
 // RTC pins 0 through 5 (inclusive) support GPIO wakeup

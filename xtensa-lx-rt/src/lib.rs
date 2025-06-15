@@ -25,65 +25,67 @@ pub mod exception;
 pub mod interrupt;
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn DefaultPreInit() {}
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn Reset() -> ! {
-    // These symbols come from `link.x`
-    extern "C" {
-        static mut _bss_start: u32;
-        static mut _bss_end: u32;
+    unsafe {
+        // These symbols come from `link.x`
+        unsafe extern "C" {
+            static mut _bss_start: u32;
+            static mut _bss_end: u32;
 
-        static mut _data_start: u32;
-        static mut _data_end: u32;
-        static _sidata: u32;
+            static mut _data_start: u32;
+            static mut _data_end: u32;
+            static _sidata: u32;
 
-        static mut _init_start: u32;
+            static mut _init_start: u32;
 
+        }
+
+        unsafe extern "Rust" {
+            // This symbol will be provided by the user via `#[entry]`
+            fn main() -> !;
+
+            // This symbol will be provided by the user via `#[pre_init]`
+            fn __pre_init();
+
+            fn __post_init();
+
+            fn __zero_bss() -> bool;
+
+            fn __init_data() -> bool;
+        }
+
+        __pre_init();
+
+        if __zero_bss() {
+            r0::zero_bss(addr_of_mut!(_bss_start), addr_of_mut!(_bss_end));
+        }
+
+        if __init_data() {
+            r0::init_data(addr_of_mut!(_data_start), addr_of_mut!(_data_end), &_sidata);
+        }
+
+        // Copy of data segment is done by bootloader
+
+        // According to 4.4.6.2 of the xtensa isa, ccount and compare are undefined on
+        // reset, set all values to zero to disable
+        reset_internal_timers();
+
+        // move vec table
+        set_vecbase(addr_of!(_init_start));
+
+        __post_init();
+
+        main();
     }
-
-    extern "Rust" {
-        // This symbol will be provided by the user via `#[entry]`
-        fn main() -> !;
-
-        // This symbol will be provided by the user via `#[pre_init]`
-        fn __pre_init();
-
-        fn __post_init();
-
-        fn __zero_bss() -> bool;
-
-        fn __init_data() -> bool;
-    }
-
-    __pre_init();
-
-    if __zero_bss() {
-        r0::zero_bss(addr_of_mut!(_bss_start), addr_of_mut!(_bss_end));
-    }
-
-    if __init_data() {
-        r0::init_data(addr_of_mut!(_data_start), addr_of_mut!(_data_end), &_sidata);
-    }
-
-    // Copy of data segment is done by bootloader
-
-    // According to 4.4.6.2 of the xtensa isa, ccount and compare are undefined on
-    // reset, set all values to zero to disable
-    reset_internal_timers();
-
-    // move vec table
-    set_vecbase(addr_of!(_init_start));
-
-    __post_init();
-
-    main();
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub unsafe extern "Rust" fn default_post_init() {}
 
@@ -92,15 +94,16 @@ pub unsafe extern "Rust" fn default_post_init() {}
 #[doc(hidden)]
 #[inline]
 unsafe fn reset_internal_timers() {
-    #[cfg(any(
-        XCHAL_HAVE_TIMER0,
-        XCHAL_HAVE_TIMER1,
-        XCHAL_HAVE_TIMER2,
-        XCHAL_HAVE_TIMER3
-    ))]
-    {
-        let value = 0;
-        cfg_asm!(
+    unsafe {
+        #[cfg(any(
+            XCHAL_HAVE_TIMER0,
+            XCHAL_HAVE_TIMER1,
+            XCHAL_HAVE_TIMER2,
+            XCHAL_HAVE_TIMER3
+        ))]
+        {
+            let value = 0;
+            cfg_asm!(
         {
             #[cfg(XCHAL_HAVE_TIMER0)]
             "wsr.ccompare0 {0}",
@@ -112,40 +115,43 @@ unsafe fn reset_internal_timers() {
             "wsr.ccompare3 {0}",
             "isync",
         }, in(reg) value, options(nostack));
+        }
     }
 }
 
 // CPU Interrupts
-extern "C" {
+unsafe extern "C" {
     #[cfg(XCHAL_HAVE_TIMER0)]
-    pub fn Timer0(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Timer0(save_frame: &mut crate::exception::Context);
     #[cfg(XCHAL_HAVE_TIMER1)]
-    pub fn Timer1(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Timer1(save_frame: &mut crate::exception::Context);
     #[cfg(XCHAL_HAVE_TIMER2)]
-    pub fn Timer2(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Timer2(save_frame: &mut crate::exception::Context);
     #[cfg(XCHAL_HAVE_TIMER3)]
-    pub fn Timer3(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Timer3(save_frame: &mut crate::exception::Context);
 
     #[cfg(XCHAL_HAVE_PROFILING)]
-    pub fn Profiling(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Profiling(save_frame: &mut crate::exception::Context);
 
     #[cfg(XCHAL_HAVE_SOFTWARE0)]
-    pub fn Software0(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Software0(save_frame: &mut crate::exception::Context);
     #[cfg(XCHAL_HAVE_SOFTWARE1)]
-    pub fn Software1(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn Software1(save_frame: &mut crate::exception::Context);
 
     #[cfg(XCHAL_HAVE_NMI)]
-    pub fn NMI(level: u32, save_frame: &mut crate::exception::Context);
+    pub fn NMI(save_frame: &mut crate::exception::Context);
 }
 
 #[doc(hidden)]
 #[inline]
 unsafe fn set_vecbase(base: *const u32) {
-    asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+    unsafe {
+        asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
+    }
 }
 
 #[doc(hidden)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 #[rustfmt::skip]
 pub extern "Rust" fn default_mem_hook() -> bool {
     true // default to zeroing bss & initializing data

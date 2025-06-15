@@ -11,16 +11,16 @@
 #![no_main]
 
 use bleps::{
+    Ble,
+    HciConnector,
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     attribute_server::{AttributeServer, NotificationData, WorkResult},
     gatt,
-    Ble,
-    HciConnector,
 };
 use esp_alloc as _;
 use esp_backtrace as _;
@@ -34,6 +34,8 @@ use esp_hal::{
 };
 use esp_println::println;
 use esp_wifi::{ble::controller::BleConnector, init};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -67,7 +69,7 @@ fn main() -> ! {
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     loop {
-        let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
+        let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
         let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 

@@ -12,11 +12,12 @@
 use super::timer::{TimerIFace, TimerSpeed};
 use crate::{
     gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
+        DriveMode,
+        OutputConfig,
         OutputSignal,
+        interconnect::{self, PeripheralOutput},
     },
     pac::ledc::RegisterBlock,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LEDC,
 };
 
@@ -152,22 +153,18 @@ pub struct Channel<'a, S: TimerSpeed> {
     ledc: &'a RegisterBlock,
     timer: Option<&'a dyn TimerIFace<S>>,
     number: Number,
-    output_pin: PeripheralRef<'a, OutputConnection>,
+    output_pin: interconnect::OutputSignal<'a>,
 }
 
 impl<'a, S: TimerSpeed> Channel<'a, S> {
     /// Return a new channel
-    pub fn new(
-        number: Number,
-        output_pin: impl Peripheral<P = impl PeripheralOutput> + 'a,
-    ) -> Self {
-        crate::into_mapped_ref!(output_pin);
+    pub fn new(number: Number, output_pin: impl PeripheralOutput<'a>) -> Self {
         let ledc = LEDC::regs();
         Channel {
             ledc,
             timer: None,
             number,
-            output_pin,
+            output_pin: output_pin.into(),
         }
     }
 }
@@ -563,10 +560,15 @@ where
                 return Err(Error::Timer);
             }
 
-            match cfg {
-                config::PinConfig::PushPull => self.output_pin.set_to_push_pull_output(),
-                config::PinConfig::OpenDrain => self.output_pin.set_to_open_drain_output(),
+            // TODO this is unnecessary
+            let drive_mode = match cfg {
+                config::PinConfig::PushPull => DriveMode::PushPull,
+                config::PinConfig::OpenDrain => DriveMode::OpenDrain,
             };
+
+            self.output_pin
+                .apply_output_config(&OutputConfig::default().with_drive_mode(drive_mode));
+            self.output_pin.set_output_enable(true);
 
             let timer_number = timer.number() as u8;
 
@@ -614,7 +616,7 @@ where
                 Number::Channel7 => OutputSignal::LEDC_LS_SIG7,
             };
 
-            signal.connect_to(&mut self.output_pin);
+            signal.connect_to(&self.output_pin);
         } else {
             return Err(Error::Timer);
         }

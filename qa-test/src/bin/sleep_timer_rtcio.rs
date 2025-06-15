@@ -4,10 +4,11 @@
 //! The following wiring is assumed for ESP32C3:
 //! - RTC wakeup pin => GPIO2 (low level)
 //! - RTC wakeup pin => GPIO3 (high level)
-//! The following wiring is assumed for ESP32S3:
-//! - RTC wakeup pin => GPIO18 (low level)
+//! The following wiring is assumed for ESP32S2/ESP32S3:
+//! - RTC wakeup pin => GPIO17 (low level)
+//! - RTC wakeup pin => GPIO18 (high level)
 
-//% CHIPS: esp32c3 esp32s3 esp32c2
+//% CHIPS: esp32c3 esp32s2 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
@@ -21,15 +22,17 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
     rtc_cntl::{
+        Rtc,
+        SocResetReason,
         reset_reason,
         sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
-        Rtc,
-        SocResetReason,
     },
     system::Cpu,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -51,16 +54,16 @@ fn main() -> ! {
         if #[cfg(any(feature = "esp32c3", feature = "esp32c2"))] {
             let mut pin2 = peripherals.GPIO2;
             let mut pin3 = peripherals.GPIO3;
-            let _pin2_input = Input::new(&mut pin2, config);
+            let _pin2_input = Input::new(pin2.reborrow(), config);
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut [
                 (&mut pin2, WakeupLevel::Low),
                 (&mut pin3, WakeupLevel::High),
             ];
-        } else if #[cfg(feature = "esp32s3")] {
+        } else if #[cfg(any(feature = "esp32s2", feature = "esp32s3"))] {
             let mut pin17 = peripherals.GPIO17;
             let mut pin18 = peripherals.GPIO18;
-            let _pin17_input = Input::new(&mut pin17, config);
+            let _pin17_input = Input::new(pin17.reborrow(), config);
 
             let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut [
                 (&mut pin17, WakeupLevel::Low),

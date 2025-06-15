@@ -24,6 +24,8 @@ use esp_println::println;
 use esp_wifi::{init, wifi};
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static KNOWN_SSIDS: Mutex<RefCell<BTreeSet<String>>> = Mutex::new(RefCell::new(BTreeSet::new()));
 
 #[main]
@@ -43,13 +45,13 @@ fn main() -> ! {
     .unwrap();
 
     // We must initialize some kind of interface and start it.
-    let (mut controller, _interfaces) =
+    let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
-    let mut sniffer = controller.take_sniffer().unwrap();
+    let mut sniffer = interfaces.sniffer;
     sniffer.set_promiscuous_mode(true).unwrap();
     sniffer.set_receive_cb(|packet| {
         let _ = match_frames! {

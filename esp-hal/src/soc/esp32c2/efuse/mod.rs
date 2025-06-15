@@ -41,7 +41,7 @@
 //! ```
 
 pub use self::fields::*;
-use crate::{analog::adc::Attenuation, peripherals::EFUSE};
+use crate::{analog::adc::Attenuation, peripherals::EFUSE, soc::efuse_field::EfuseField};
 
 mod fields;
 
@@ -49,11 +49,6 @@ mod fields;
 pub struct Efuse;
 
 impl Efuse {
-    /// Reads chip's MAC address from the eFuse storage.
-    pub fn read_base_mac_address() -> [u8; 6] {
-        Self::read_field_be(MAC)
-    }
-
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
         (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
@@ -81,11 +76,7 @@ impl Efuse {
     /// see <https://github.com/espressif/esp-idf/blob/903af13e8/components/efuse/esp32c2/esp_efuse_rtc_calib.c#L14>
     pub fn rtc_calib_version() -> u8 {
         let (major, _minor) = Self::block_version();
-        if major == 0 {
-            1
-        } else {
-            0
-        }
+        if major == 0 { 1 } else { 0 }
     }
 
     /// Get ADC initial code for specified attenuation from efuse
@@ -161,7 +152,8 @@ impl Efuse {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Clone, Copy, strum::FromRepr)]
+#[repr(u32)]
 pub(crate) enum EfuseBlock {
     Block0,
     Block1,

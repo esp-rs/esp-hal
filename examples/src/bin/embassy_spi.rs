@@ -25,12 +25,14 @@ use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     spi::{
-        master::{Config, Spi},
         Mode,
+        master::{Config, Spi},
     },
     time::Rate,
     timer::timg::TimerGroup,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {

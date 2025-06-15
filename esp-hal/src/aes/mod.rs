@@ -58,7 +58,6 @@
 
 use crate::{
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::AES,
     reg_access::{AlignmentHelper, NativeEndianess},
     system::GenericPeripheralGuard,
@@ -109,10 +108,10 @@ impl Key {
     /// Returns a slice representation of the AES key.
     fn as_slice(&self) -> &[u8] {
         match self {
-            Key::Key16(ref key) => key,
+            Key::Key16(key) => key,
             #[cfg(any(esp32, esp32s2))]
-            Key::Key24(ref key) => key,
-            Key::Key32(ref key) => key,
+            Key::Key24(key) => key,
+            Key::Key32(key) => key,
         }
     }
 }
@@ -137,16 +136,14 @@ pub enum Mode {
 
 /// AES peripheral container
 pub struct Aes<'d> {
-    aes: PeripheralRef<'d, AES>,
+    aes: AES<'d>,
     alignment_helper: AlignmentHelper<NativeEndianess>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Aes as u8 }>,
 }
 
 impl<'d> Aes<'d> {
     /// Constructs a new `Aes` instance.
-    pub fn new(aes: impl Peripheral<P = AES> + 'd) -> Self {
-        crate::into_ref!(aes);
-
+    pub fn new(aes: AES<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         let mut ret = Self {
@@ -238,6 +235,7 @@ pub mod dma {
     use core::mem::ManuallyDrop;
 
     use crate::{
+        Blocking,
         aes::{Key, Mode},
         dma::{
             Channel,
@@ -246,12 +244,8 @@ pub mod dma {
             DmaRxBuffer,
             DmaTxBuffer,
             PeripheralDmaChannel,
-            Rx,
-            Tx,
         },
-        peripheral::Peripheral,
         peripherals::AES,
-        Blocking,
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -279,16 +273,13 @@ pub mod dma {
         /// The underlying [`Aes`](super::Aes) driver
         pub aes: super::Aes<'d>,
 
-        channel: Channel<'d, Blocking, PeripheralDmaChannel<AES>>,
+        channel: Channel<Blocking, PeripheralDmaChannel<AES<'d>>>,
     }
 
     impl<'d> crate::aes::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
-        pub fn with_dma<CH>(self, channel: impl Peripheral<P = CH> + 'd) -> AesDma<'d>
-        where
-            CH: DmaChannelFor<AES>,
-        {
-            let channel = Channel::new(channel.map(|ch| ch.degrade()));
+        pub fn with_dma(self, channel: impl DmaChannelFor<AES<'d>>) -> AesDma<'d> {
+            let channel = Channel::new(channel.degrade());
             channel.runtime_ensure_compatible(&self.aes);
             AesDma { aes: self, channel }
         }

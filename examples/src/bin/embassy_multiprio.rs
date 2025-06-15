@@ -15,7 +15,7 @@
 // The interrupt-executor is created in `main` and is used to spawn `high_prio`.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal-embassy/log esp-hal/unstable
+//% FEATURES: embassy esp-hal-embassy/log-04 esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -24,12 +24,14 @@ use embassy_executor::Spawner;
 use embassy_time::{Duration, Instant, Ticker, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    interrupt::{software::SoftwareInterruptControl, Priority},
-    timer::{timg::TimerGroup, AnyTimer},
+    interrupt::{Priority, software::SoftwareInterruptControl},
+    timer::{AnyTimer, timg::TimerGroup},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 /// Periodically print something.
 #[embassy_executor::task]
@@ -58,7 +60,9 @@ async fn low_prio_blocking() {
 /// A well-behaved, but starved async task.
 #[embassy_executor::task]
 async fn low_prio_async() {
-    println!("Starting low-priority task that will not be able to run while the blocking task is running");
+    println!(
+        "Starting low-priority task that will not be able to run while the blocking task is running"
+    );
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         println!("Low priority ticks");

@@ -1,21 +1,6 @@
-const I2C_SAR_ADC: u8 = 0x69;
-const I2C_SAR_ADC_HOSTID: u8 = 0;
-const ADC_SARADC2_ENCAL_REF_ADDR: u8 = 0x7;
-const ADC_SARADC2_ENCAL_REF_ADDR_MSB: u8 = 6;
-const ADC_SARADC2_ENCAL_REF_ADDR_LSB: u8 = 6;
-const ADC_SARADC_DTEST_RTC_ADDR: u8 = 0x7;
-const ADC_SARADC_DTEST_RTC_ADDR_MSB: u8 = 1;
-const ADC_SARADC_DTEST_RTC_ADDR_LSB: u8 = 0;
-const ADC_SARADC_ENT_RTC_ADDR: u8 = 0x7;
-const ADC_SARADC_ENT_RTC_ADDR_MSB: u8 = 3;
-const ADC_SARADC_ENT_RTC_ADDR_LSB: u8 = 3;
-const ADC_SARADC_ENT_TSENS_ADDR: u8 = 0x07;
-const ADC_SARADC_ENT_TSENS_ADDR_MSB: u8 = 2;
-const ADC_SARADC_ENT_TSENS_ADDR_LSB: u8 = 2;
-
 use crate::{
     peripherals::{APB_SARADC, LPWR, SYSTEM},
-    rom::regi2c_write_mask,
+    soc::regi2c,
 };
 
 /// Enable true randomness by enabling the entropy source.
@@ -35,13 +20,10 @@ pub(crate) fn ensure_randomness() {
 
         // Bridging sar2 internal reference voltage
         // Cannot replace with PAC-based functions
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, 1);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_DTEST_RTC_ADDR, 0);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_RTC_ADDR, 0);
-
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC_ENT_TSENS_ADDR, 0);
+        regi2c::ADC_SAR2_ENCAL_REF.write_field(1);
+        regi2c::ADC_SAR_DTEST_RTC.write_field(0);
+        regi2c::ADC_SAR_ENT_RTC.write_field(0);
+        regi2c::ADC_SAR_ENT_TSENS.write_field(0);
 
         // Enable SAR ADC2 internal channel to read adc2 ref voltage for additional
         // entropy
@@ -54,17 +36,11 @@ pub(crate) fn ensure_randomness() {
             .modify(|_, w| w.apb_saradc_rst().clear_bit());
 
         apb_saradc.clkm_conf().modify(|_, w| w.clk_sel().bits(2));
-
         apb_saradc.clkm_conf().modify(|_, w| w.clk_en().set_bit());
-
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_gated().set_bit());
-
         apb_saradc.ctrl().modify(|_, w| w.xpd_sar_force().bits(3));
-
         apb_saradc.ctrl().modify(|_, w| w.sar_clk_div().bits(1));
-
         apb_saradc.fsm_wait().modify(|_, w| w.rstb_wait().bits(8));
-
         apb_saradc.fsm_wait().modify(|_, w| w.xpd_wait().bits(5));
 
         apb_saradc
@@ -111,7 +87,7 @@ pub(crate) fn revert_trng() {
     let rtc_cntl = LPWR::regs();
 
     unsafe {
-        regi2c_write_mask!(I2C_SAR_ADC, ADC_SARADC2_ENCAL_REF_ADDR, 0);
+        regi2c::ADC_SAR2_ENCAL_REF.write_field(0);
 
         apb_saradc.ctrl2().modify(|_, w| w.timer_en().clear_bit());
 

@@ -6,6 +6,8 @@ use strum::FromRepr;
 
 use crate::{
     clock::{
+        Clock,
+        XtalClock,
         clocks_ll::{
             esp32c6_bbpll_get_freq_mhz,
             esp32c6_cpu_get_hs_divider,
@@ -14,62 +16,36 @@ use crate::{
             esp32c6_rtc_freq_to_pll_mhz_raw,
             esp32c6_rtc_update_to_8m,
             esp32c6_rtc_update_to_xtal_raw,
-            regi2c_write_mask,
         },
-        Clock,
-        XtalClock,
     },
     peripherals::TIMG0,
     rtc_cntl::RtcClock,
-    soc::efuse::Efuse,
+    soc::{efuse::Efuse, regi2c},
     time::Rate,
 };
 
-const I2C_DIG_REG: u8 = 0x6d;
-const I2C_DIG_REG_HOSTID: u8 = 0;
-
-const I2C_DIG_REG_XPD_RTC_REG: u8 = 13;
-const I2C_DIG_REG_XPD_RTC_REG_MSB: u8 = 2;
-const I2C_DIG_REG_XPD_RTC_REG_LSB: u8 = 2;
-
-const I2C_DIG_REG_XPD_DIG_REG: u8 = 13;
-const I2C_DIG_REG_XPD_DIG_REG_MSB: u8 = 3;
-const I2C_DIG_REG_XPD_DIG_REG_LSB: u8 = 3;
-
-const I2C_DIG_REG_ENIF_RTC_DREG: u8 = 5;
-const I2C_DIG_REG_ENIF_RTC_DREG_MSB: u8 = 7;
-const I2C_DIG_REG_ENIF_RTC_DREG_LSB: u8 = 7;
-
-const I2C_DIG_REG_ENIF_DIG_DREG: u8 = 7;
-const I2C_DIG_REG_ENIF_DIG_DREG_MSB: u8 = 7;
-const I2C_DIG_REG_ENIF_DIG_DREG_LSB: u8 = 7;
-
-const I2C_DIG_REG_SCK_DCAP: u8 = 14;
-const I2C_DIG_REG_SCK_DCAP_MSB: u8 = 7;
-const I2C_DIG_REG_SCK_DCAP_LSB: u8 = 0;
-
 unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    &*esp32c6::PMU::ptr()
+    unsafe { &*esp32c6::PMU::ptr() }
 }
 
 unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
-    &*esp32c6::MODEM_LPCON::ptr()
+    unsafe { &*esp32c6::MODEM_LPCON::ptr() }
 }
 
 unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
-    &*esp32c6::MODEM_SYSCON::ptr()
+    unsafe { &*esp32c6::MODEM_SYSCON::ptr() }
 }
 
 unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock {
-    &*esp32c6::LP_CLKRST::ptr()
+    unsafe { &*esp32c6::LP_CLKRST::ptr() }
 }
 
 unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
-    &*esp32c6::PCR::ptr()
+    unsafe { &*esp32c6::PCR::ptr() }
 }
 
 unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    &*esp32c6::LP_AON::ptr()
+    unsafe { &*esp32c6::LP_AON::ptr() }
 }
 
 fn pmu_power_domain_force_default() {
@@ -1133,39 +1109,10 @@ pub(crate) fn init() {
     pmu.rf_pwc()
         .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
 
-    regi2c_write_mask(
-        I2C_DIG_REG,
-        I2C_DIG_REG_HOSTID,
-        I2C_DIG_REG_ENIF_RTC_DREG,
-        I2C_DIG_REG_ENIF_RTC_DREG_MSB,
-        I2C_DIG_REG_ENIF_RTC_DREG_LSB,
-        1,
-    );
-    regi2c_write_mask(
-        I2C_DIG_REG,
-        I2C_DIG_REG_HOSTID,
-        I2C_DIG_REG_ENIF_DIG_DREG,
-        I2C_DIG_REG_ENIF_DIG_DREG_MSB,
-        I2C_DIG_REG_ENIF_DIG_DREG_LSB,
-        1,
-    );
-
-    regi2c_write_mask(
-        I2C_DIG_REG,
-        I2C_DIG_REG_HOSTID,
-        I2C_DIG_REG_XPD_RTC_REG,
-        I2C_DIG_REG_XPD_RTC_REG_MSB,
-        I2C_DIG_REG_XPD_RTC_REG_LSB,
-        0,
-    );
-    regi2c_write_mask(
-        I2C_DIG_REG,
-        I2C_DIG_REG_HOSTID,
-        I2C_DIG_REG_XPD_DIG_REG,
-        I2C_DIG_REG_XPD_DIG_REG_MSB,
-        I2C_DIG_REG_XPD_DIG_REG_LSB,
-        0,
-    );
+    regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
+    regi2c::I2C_DIG_REG_ENIF_DIG_DREG.write_field(1);
+    regi2c::I2C_DIG_REG_XPD_RTC_REG.write_field(0);
+    regi2c::I2C_DIG_REG_XPD_DIG_REG.write_field(0);
 
     HpSystemInit::init_default();
     LpSystemInit::init_default();
@@ -1241,34 +1188,15 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         lp_clkrst()
             .fosc_cntl()
             .modify(|_, w| w.fosc_dfreq().bits(100));
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_SCK_DCAP,
-            I2C_DIG_REG_SCK_DCAP_MSB,
-            I2C_DIG_REG_SCK_DCAP_LSB,
-            128,
-        );
+
+        regi2c::I2C_DIG_REG_SCK_DCAP.write_reg(128);
+
         lp_clkrst()
             .rc32k_cntl()
             .modify(|_, w| w.rc32k_dfreq().bits(700));
 
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_ENIF_RTC_DREG,
-            I2C_DIG_REG_ENIF_RTC_DREG_MSB,
-            I2C_DIG_REG_ENIF_RTC_DREG_LSB,
-            1,
-        );
-        regi2c_write_mask(
-            I2C_DIG_REG,
-            I2C_DIG_REG_HOSTID,
-            I2C_DIG_REG_ENIF_DIG_DREG,
-            I2C_DIG_REG_ENIF_DIG_DREG_MSB,
-            I2C_DIG_REG_ENIF_DIG_DREG_LSB,
-            1,
-        );
+        regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
+        regi2c::I2C_DIG_REG_ENIF_DIG_DREG.write_field(1);
 
         pmu()
             .hp_active_hp_regulator0()
@@ -1552,16 +1480,15 @@ impl RtcClock {
                 .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         }
 
-        // TODO: very hacky
+        // TODO: very hacky - icg_hp_xtal32k is already set in the above condition?
         // in ESP-IDF these are not called in this function but the fields are set
         lp_clkrst
             .clk_to_hp()
             .modify(|_, w| w.icg_hp_xtal32k().set_bit());
-        pmu.hp_sleep_lp_ck_power()
-            .modify(|_, w| w.hp_sleep_xpd_xtal32k().set_bit());
-
-        pmu.hp_sleep_lp_ck_power()
-            .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+        pmu.hp_sleep_lp_ck_power().modify(|_, w| {
+            w.hp_sleep_xpd_xtal32k().set_bit();
+            w.hp_sleep_xpd_rc32k().set_bit()
+        });
 
         let rc_fast_enabled = pmu
             .hp_sleep_lp_ck_power()

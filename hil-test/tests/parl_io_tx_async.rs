@@ -9,37 +9,40 @@
 #[cfg(esp32c6)]
 use esp_hal::parl_io::{TxPinConfigWithValidPin, TxSixteenBits};
 use esp_hal::{
-    dma::{DmaChannel0, DmaTxBuf},
+    dma::DmaTxBuf,
     dma_tx_buffer,
     gpio::{
-        interconnect::{InputSignal, OutputSignal},
         NoPin,
+        interconnect::{InputSignal, OutputSignal},
     },
     parl_io::{
         BitPackOrder,
         ClkOutPin,
-        ParlIoTxOnly,
+        ParlIo,
         SampleEdge,
+        TxConfig,
         TxEightBits,
         TxPinConfigIncludingValidPin,
     },
     pcnt::{
+        Pcnt,
         channel::{CtrlMode, EdgeMode},
         unit::Unit,
-        Pcnt,
     },
-    peripherals::PARL_IO,
+    peripherals::{DMA_CH0, PARL_IO},
     time::Rate,
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 struct Context {
-    parl_io: PARL_IO,
-    dma_channel: DmaChannel0,
-    clock: OutputSignal,
-    valid: OutputSignal,
-    clock_loopback: InputSignal,
-    valid_loopback: InputSignal,
+    parl_io: PARL_IO<'static>,
+    dma_channel: DMA_CH0<'static>,
+    clock: OutputSignal<'static>,
+    valid: OutputSignal<'static>,
+    clock_loopback: InputSignal<'static>,
+    valid_loopback: InputSignal<'static>,
     pcnt_unit: Unit<'static, 0>,
 }
 
@@ -56,8 +59,8 @@ mod tests {
 
         let (clock, _) = hil_test::common_test_pins!(peripherals);
         let valid = hil_test::unconnected_pin!(peripherals);
-        let (clock_loopback, clock) = clock.split();
-        let (valid_loopback, valid) = valid.split();
+        let (clock_loopback, clock) = unsafe { clock.split() };
+        let (valid_loopback, valid) = unsafe { valid.split() };
         let pcnt = Pcnt::new(peripherals.PCNT);
         let pcnt_unit = pcnt.unit0;
         let dma_channel = peripherals.DMA_CH0;
@@ -85,21 +88,22 @@ mod tests {
             NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin,
             NoPin, NoPin, NoPin, ctx.valid,
         );
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 
         let mut pio = pio
             .tx
             .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
+                pins,
+                clock_pin,
+                TxConfig::default()
+                    .with_frequency(Rate::from_mhz(10))
+                    .with_sample_edge(SampleEdge::Invert)
+                    .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
 
@@ -148,24 +152,25 @@ mod tests {
         );
 
         #[cfg(esp32h2)]
-        let mut pins = TxPinConfigIncludingValidPin::new(pins);
+        let pins = TxPinConfigIncludingValidPin::new(pins);
         #[cfg(esp32c6)]
-        let mut pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
+        let pins = TxPinConfigWithValidPin::new(pins, ctx.valid);
 
-        let mut clock_pin = ClkOutPin::new(ctx.clock);
+        let clock_pin = ClkOutPin::new(ctx.clock);
 
-        let pio = ParlIoTxOnly::new(ctx.parl_io, ctx.dma_channel, Rate::from_mhz(10))
+        let pio = ParlIo::new(ctx.parl_io, ctx.dma_channel)
             .unwrap()
             .into_async();
 
         let mut pio = pio
             .tx
             .with_config(
-                &mut pins,
-                &mut clock_pin,
-                0,
-                SampleEdge::Invert,
-                BitPackOrder::Msb,
+                pins,
+                clock_pin,
+                TxConfig::default()
+                    .with_frequency(Rate::from_mhz(10))
+                    .with_sample_edge(SampleEdge::Invert)
+                    .with_bit_order(BitPackOrder::Msb),
             )
             .unwrap();
 

@@ -7,44 +7,55 @@ PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
 PROVIDE(__post_init = default_post_init);
 
-PROVIDE(__level_1_interrupt = handle_interrupts);
-PROVIDE(__level_2_interrupt = handle_interrupts);
-PROVIDE(__level_3_interrupt = handle_interrupts);
-
 INCLUDE exception.x
 
-/* ESP32S3 fixups */
 SECTIONS {
-  .rwdata_dummy (NOLOAD) :
+  .rotext_dummy (NOLOAD) :
   {
-    /* This dummy section represents the .rwtext section but in RWDATA.
-     * Thus, it must have its alignment and (at least) its size.
-     */
+    /* This dummy section represents the .rodata section within ROTEXT.
+    * Since the same physical memory is mapped to both DROM and IROM,
+    * we need to make sure the .rodata and .text sections don't overlap.
+    * We skip the amount of memory taken by .rodata* in .text
+    */
 
     /* Start at the same alignment constraint than .flash.text */
 
-    . = ALIGN(ALIGNOF(.rwtext));
+    . = ALIGN(ALIGNOF(.rodata));
+    . = ALIGN(ALIGNOF(.rodata.wifi));
 
-    /*  Create an empty gap as big as .rwtext section - 32k (SRAM0) 
-     *  because SRAM1 is available on the data bus and instruction bus 
+    /* Create an empty gap as big as .text section */
+
+    . = . + SIZEOF(.rodata_desc);
+    . = . + SIZEOF(.rodata);
+    . = . + SIZEOF(.rodata.wifi);
+
+    /* Prepare the alignment of the section above. Few bytes (0x20) must be
+     * added for the mapping header.
      */
-    . = . + MAX(SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + RESERVE_ICACHE + VECTORS_SIZE, 32k) - 32k;
 
-    /* Prepare the alignment of the section above. */
-    . = ALIGN(4);
-    _rwdata_reserved_start = .;
+    . = ALIGN(0x10000) + 0x20;
+    _rotext_reserved_start = .;
+  } > ROTEXT
+}
+INSERT BEFORE .text;
+
+/* Similar to .rotext_dummy this represents .rwtext but in .data */
+SECTIONS {
+  .rwdata_dummy (NOLOAD) : ALIGN(4)
+  {
+    . = . + SIZEOF(.rwtext) + SIZEOF(.rwtext.wifi) + SIZEOF(.vectors);
   } > RWDATA
 }
 INSERT BEFORE .data;
 
-INCLUDE "fixups/rodata_dummy.x"
-/* End of ESP32S3 fixups */
-
 /* Shared sections - ordering matters */
-INCLUDE "rwtext.x"
-INCLUDE "text.x"
-INCLUDE "rwdata.x"
+SECTIONS {
+  INCLUDE "rodata_desc.x"
+  INCLUDE "rwtext.x"
+  INCLUDE "rwdata.x"
+}
 INCLUDE "rodata.x"
+INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"

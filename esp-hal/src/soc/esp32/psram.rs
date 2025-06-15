@@ -85,6 +85,8 @@ pub(crate) fn init_psram(config: PsramConfig) {
     utils::psram_init(&config);
 
     if config.size.is_auto() {
+        const MAX_MEM_SIZE: usize = 4 * 1024 * 1024;
+
         // Reading the device-id turned out to not work as expected (some bits flipped
         // for unknown reason)
         //
@@ -92,33 +94,24 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // probe if we can access top of PSRAM - if not we assume it's 2m
         //
         // This currently doesn't work as expected because of https://github.com/esp-rs/esp-hal/issues/2182
-        utils::s_mapping(EXTMEM_ORIGIN as u32, 4 * 1024 * 1024);
+        utils::s_mapping(EXTMEM_ORIGIN as u32, MAX_MEM_SIZE as u32);
 
         let guessed_size = unsafe {
-            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
-            for i in 0..(36 * 1024) {
-                ptr.add(i).write_volatile(0x7f);
-            }
-
             let ptr = EXTMEM_ORIGIN as *mut u8;
-            for i in 0..(36 * 1024) {
+            for i in (1023..MAX_MEM_SIZE).step_by(1024) {
                 ptr.add(i).write_volatile(0x7f);
             }
 
-            let mut success = true;
-            let ptr = (EXTMEM_ORIGIN + 4 * 1024 * 1024 - 36 * 1024) as *mut u8;
-            for i in 0..(36 * 1024) {
-                if ptr.add(i).read_volatile() != 0x7f {
-                    success = false;
+            let mut last_correctly_read = 0;
+            for i in (1023..MAX_MEM_SIZE).step_by(1024) {
+                if ptr.add(i).read_volatile() == 0x7f {
+                    last_correctly_read = i;
+                } else {
                     break;
                 }
             }
 
-            if success {
-                4 * 1024 * 1024
-            } else {
-                2 * 1024 * 1024
-            }
+            last_correctly_read + 1
         };
 
         info!("Assuming {} bytes of PSRAM", guessed_size);
@@ -220,8 +213,6 @@ pub(crate) mod utils {
         }
     }
 
-    const SPI_USR: u32 = 1 << 18;
-
     const PSRAM_INTERNAL_IO_28: u32 = 28;
     const PSRAM_INTERNAL_IO_29: u32 = 29;
     const SIG_GPIO_OUT_IDX: u32 = 256;
@@ -311,7 +302,7 @@ pub(crate) mod utils {
         pub status_mask: u32,
     }
 
-    extern "C" {
+    unsafe extern "C" {
         fn esp_rom_efuse_get_flash_gpio_info() -> u32;
 
         fn esp_rom_gpio_connect_out_signal(
@@ -616,7 +607,7 @@ pub(crate) mod utils {
                     if clk_mode == PsramClkMode::PsramClkModeDclk {
                         spi.sram_drd_cmd()
                             .modify(|_, w| w.cache_sram_usr_rd_cmd_bitlen().bits(15)); // read command length, 2 bytes(1byte for delay),sending in qio mode in
-                                                                                       // cache
+                        // cache
                         spi.sram_drd_cmd().modify(|_, w| {
                             w.cache_sram_usr_rd_cmd_value()
                                 .bits((PSRAM_FAST_READ_QUAD << 8) as u16)
@@ -768,7 +759,7 @@ pub(crate) mod utils {
     struct PsramCmd {
         cmd: u16,             // Command value
         cmd_bit_len: u16,     // Command byte length
-        addr: *const u32,     // Point to address value
+        addr: u32,            // Address value
         addr_bit_len: u16,    // Address byte length
         tx_data: *const u32,  // Point to send data buffer
         tx_data_bit_len: u16, // Send data byte length.
@@ -782,7 +773,7 @@ pub(crate) mod utils {
             Self {
                 cmd: Default::default(),
                 cmd_bit_len: Default::default(),
-                addr: core::ptr::null(),
+                addr: Default::default(),
                 addr_bit_len: Default::default(),
                 tx_data: core::ptr::null(),
                 tx_data_bit_len: Default::default(),
@@ -811,7 +802,7 @@ pub(crate) mod utils {
             }
         }
         ps_cmd.cmd = 0;
-        ps_cmd.addr = &addr;
+        ps_cmd.addr = addr;
         ps_cmd.addr_bit_len = 8;
         ps_cmd.tx_data = core::ptr::null();
         ps_cmd.tx_data_bit_len = 0;
@@ -819,7 +810,7 @@ pub(crate) mod utils {
         ps_cmd.rx_data_bit_len = 0;
         ps_cmd.dummy_bit_len = 0;
         let (backup_usr, backup_usr1, backup_usr2) = psram_cmd_config_spi1(&ps_cmd);
-        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdSpi);
+        psram_cmd_recv_start_spi1(core::ptr::null_mut(), 0, PsramCmdMode::PsramCmdQpi);
         psram_cmd_end_spi1(backup_usr, backup_usr1, backup_usr2);
     }
 
@@ -827,15 +818,11 @@ pub(crate) mod utils {
     fn psram_cmd_end_spi1(backup_usr: u32, backup_usr1: u32, backup_usr2: u32) {
         unsafe {
             let spi = SPI1::regs();
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
-            spi.user().modify(|_, w| w.bits(backup_usr));
-            spi.user1().modify(|_, w| w.bits(backup_usr1));
-            spi.user2().modify(|_, w| w.bits(backup_usr2));
+            spi.user().write(|w| w.bits(backup_usr));
+            spi.user1().write(|w| w.bits(backup_usr1));
+            spi.user2().write(|w| w.bits(backup_usr2));
         }
     }
 
@@ -844,11 +831,7 @@ pub(crate) mod utils {
     fn psram_cmd_config_spi1(p_in_data: &PsramCmd) -> (u32, u32, u32) {
         unsafe {
             let spi = SPI1::regs();
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
             let backup_usr = spi.user().read().bits();
             let backup_usr1 = spi.user1().read().bits();
@@ -877,8 +860,7 @@ pub(crate) mod utils {
                 // Enable address
                 spi.user().modify(|_, w| w.usr_addr().set_bit());
                 // Set address
-                spi.addr()
-                    .modify(|_, w| w.bits(p_in_data.addr.read_volatile()));
+                spi.addr().modify(|_, w| w.bits(p_in_data.addr));
             } else {
                 spi.user().modify(|_, w| w.usr_addr().clear_bit());
                 spi.user1().modify(|_, w| w.usr_addr_bitlen().bits(0));
@@ -887,13 +869,13 @@ pub(crate) mod utils {
             let p_tx_val = p_in_data.tx_data;
             if p_in_data.tx_data_bit_len != 0 {
                 // Enable MOSI
-                spi.user().modify(|_, w| w.usr_mosi().clear_bit());
+                spi.user().modify(|_, w| w.usr_mosi().set_bit());
                 // Load send buffer
-                let len = (p_in_data.tx_data_bit_len + 31) / 32;
+                let len = p_in_data.tx_data_bit_len.div_ceil(32);
                 if !p_tx_val.is_null() {
                     for i in 0..len {
-                        spi.w(0)
-                            .modify(|_, w| w.bits(p_tx_val.offset(i as isize).read_volatile()));
+                        spi.w(i as usize)
+                            .write(|w| w.bits(p_tx_val.offset(i as isize).read_volatile()));
                     }
                 }
                 // Set data send buffer length.Max data length 64 bytes.
@@ -950,7 +932,7 @@ pub(crate) mod utils {
             let spi = SPI1::regs();
             // get cs1
             spi.pin().modify(|_, w| w.cs1_dis().clear_bit());
-            spi.pin().modify(|_, w| w.cs0_dis().clear_bit());
+            spi.pin().modify(|_, w| w.cs0_dis().set_bit());
 
             let mode_backup: u32 = (spi.user().read().bits() >> SPI_FWRITE_DUAL_S) & 0xf;
             let rd_mode_backup: u32 = spi.ctrl().read().bits()
@@ -965,11 +947,7 @@ pub(crate) mod utils {
             }
 
             // Wait for SPI0 to idle
-            loop {
-                if spi.ext2().read().bits() == 0 {
-                    break;
-                }
-            }
+            while SPI1::regs().ext2().read().bits() != 0 {}
 
             // DPORT_SET_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
             DPORT::regs()
@@ -978,11 +956,7 @@ pub(crate) mod utils {
 
             // Start send data
             spi.cmd().modify(|_, w| w.usr().set_bit());
-            loop {
-                if spi.cmd().read().bits() & SPI_USR == 0 {
-                    break;
-                }
-            }
+            while spi.cmd().read().usr().bit_is_set() {}
 
             // DPORT_CLEAR_PERI_REG_MASK(DPORT_HOST_INF_SEL_REG, 1 << 14);
             DPORT::regs()
@@ -1002,12 +976,13 @@ pub(crate) mod utils {
                 SPI_FWRITE_DUAL_S,
             );
 
-            spi.ctrl().modify(|_, w| w.fread_dio().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_dual().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_quad().clear_bit());
-            spi.ctrl().modify(|_, w| w.fread_qio().clear_bit());
-
-            spi.ctrl().modify(|_, w| w.bits(rd_mode_backup));
+            spi.ctrl().modify(|_, w| {
+                w.fread_dio().clear_bit();
+                w.fread_dual().clear_bit();
+                w.fread_quad().clear_bit();
+                w.fread_qio().clear_bit()
+            });
+            spi.ctrl().modify(|r, w| w.bits(r.bits() | rd_mode_backup));
 
             // return cs to cs0
             spi.pin().modify(|_, w| w.cs1_dis().set_bit());

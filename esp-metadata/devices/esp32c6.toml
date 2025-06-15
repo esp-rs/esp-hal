@@ -1,7 +1,15 @@
+# ESP32-C6 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32c6"
 arch  = "riscv"
-cores = "single_core"
+cores = 1
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -78,10 +86,6 @@ symbols = [
     "large_intr_status",
     "plic",
     "phy",
-    "bt",
-    "wifi",
-    "wifi6",
-    "ieee802154",
     "lp_core",
     "tsens",
 
@@ -98,3 +102,83 @@ symbols = [
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
 ]
+
+memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
+
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+instances = [{ name = "i2c0" }]
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_reliable_fsm_reset = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
+
+[device.rmt]
+status = "partial"
+ram_start = 0x60006400
+channel_ram_size = 48
+
+[device.spi_master]
+status = "supported"
+instances = [{ name = "spi2" }]
+
+[device.timergroup]
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
+[device.uart]
+status = "supported"
+
+[device.ds]
+status = "not_supported"
+
+[device.wifi]
+status = "partial"
+has_wifi6 = true
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.ecc]
+[device.rsa]
+[device.sha]
+[device.hmac]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.ledc]
+[device.mcpwm]
+[device.parl_io]
+[device.pcnt]
+[device.spi_slave]
+[device.sd_slave]
+[device.twai]
+[device.usb_serial_jtag]
+
+## Miscellaneous
+[device.adc]
+[device.assist_debug]
+[device.dma]
+[device.etm]
+[device.interrupts]
+[device.io_mux]
+[device.sleep]
+[device.temp_sensor]
+[device.systimer]
+[device.ulp_riscv]
+
+## Radio
+[device.bt]
+[device.ieee802154]

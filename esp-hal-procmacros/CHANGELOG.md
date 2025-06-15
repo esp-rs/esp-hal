@@ -2,18 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
+
 ### Changed
+
 
 ### Fixed
 
+
 ### Removed
+
+
+## [v0.18.0] - 2025-06-03
+
+### Changed
+
+- Using the `#handler` macro with a priority of `None` will fail at compile time (#3304)
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
 
 ## [0.17.0] - 2025-02-24
 
@@ -22,12 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `#[builder_lite(into)]` attribute that generates the setter with `impl Into<T>` parameter (#3011)
 - Added `#[builder_lite(skip_setter)]` and `#[builder_lite(skip_getter)]` attribute to skip generating setters or getters (#3011)
 - Added `#[builder_lite(skip)]` to ignore a field completely (#3011)
-
-### Changed
-
-### Fixed
-
-### Removed
 
 ## 0.16.0 - 2025-01-15
 
@@ -78,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.1.0 - 2022-08-25
 
-- Initial release
+### Added
+
+- Initial release (#2518)
 
 [0.17.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-procmacros-v0.17.0
+[v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...esp-hal-procmacros-v0.18.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...HEAD

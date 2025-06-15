@@ -15,6 +15,8 @@ use esp_backtrace as _;
 use esp_hal::{assist_debug::DebugAssist, handler, main};
 use esp_println::println;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 static DA: Mutex<RefCell<Option<DebugAssist>>> = Mutex::new(RefCell::new(None));
 
 #[main]
@@ -28,7 +30,7 @@ fn main() -> ! {
         if #[cfg(not(feature = "esp32s3"))] {
             use core::ptr::addr_of_mut;
 
-            extern "C" {
+            unsafe extern "C" {
                 // top of stack
                 static mut _stack_start: u32;
                 // bottom of stack

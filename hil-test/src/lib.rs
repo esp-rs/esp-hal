@@ -40,7 +40,7 @@ macro_rules! i2c_pins {
                 ($peripherals.GPIO12, $peripherals.GPIO22)
             } else if #[cfg(esp32c2)] {
                 ($peripherals.GPIO18, $peripherals.GPIO9)
-            } else {
+            } else { // esp32c3
                 ($peripherals.GPIO4, $peripherals.GPIO5)
             }
         }
@@ -54,7 +54,7 @@ macro_rules! common_test_pins {
             if #[cfg(any(esp32s2, esp32s3))] {
                 ($peripherals.GPIO9, $peripherals.GPIO10)
             } else if #[cfg(esp32)] {
-                ($peripherals.GPIO26, $peripherals.GPIO27)
+                ($peripherals.GPIO2, $peripherals.GPIO4)
             } else {
                 ($peripherals.GPIO2, $peripherals.GPIO3)
             }
@@ -83,15 +83,25 @@ macro_rules! unconnected_pin {
     }};
 }
 
+#[macro_export]
+macro_rules! mk_static {
+    ($t:ty,$val:expr) => {{
+        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
+        #[deny(unused_attributes)]
+        let x = STATIC_CELL.uninit().write(($val));
+        x
+    }};
+}
+
 // A simple looping executor to test async code without esp-hal-embassy (which
 // needs `esp-hal/unstable`).
 #[cfg(not(feature = "embassy"))]
 mod executor {
     use core::marker::PhantomData;
 
-    use embassy_executor::{raw, Spawner};
+    use embassy_executor::{Spawner, raw};
 
-    #[export_name = "__pender"]
+    #[unsafe(export_name = "__pender")]
     fn __pender(_: *mut ()) {}
 
     pub struct Executor {
@@ -121,3 +131,35 @@ mod executor {
 pub use esp_hal_embassy::Executor;
 #[cfg(not(feature = "embassy"))]
 pub use executor::Executor;
+
+/// Initialize esp-hal-embassy with 2 timers.
+#[macro_export]
+macro_rules! init_embassy {
+    ($peripherals:expr, 2) => {{
+        cfg_if::cfg_if! {
+            if #[cfg(timergroup_timg_has_timer1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new($peripherals.TIMG0);
+                esp_hal_embassy::init([
+                    timg0.timer0,
+                    timg0.timer1,
+                ]);
+            } else if #[cfg(timergroup_timg1)] {
+                use esp_hal::timer::timg::TimerGroup;
+                let timg0 = TimerGroup::new($peripherals.TIMG0);
+                let timg1 = TimerGroup::new($peripherals.TIMG1);
+                esp_hal_embassy::init([
+                    timg0.timer0,
+                    timg1.timer0,
+                ]);
+            } else if #[cfg(systimer)] {
+                use esp_hal::timer::systimer::SystemTimer;
+                let systimer = SystemTimer::new($peripherals.SYSTIMER);
+                esp_hal_embassy::init([
+                    systimer.alarm0,
+                    systimer.alarm1,
+                ]);
+            }
+        }
+    }};
+}

@@ -9,7 +9,7 @@
 //! more information on these modes, please refer to the documentation in their
 //! respective modules.
 
-use crate::dma::{DmaEligible, DmaError};
+use crate::dma::DmaError;
 
 pub mod master;
 
@@ -23,7 +23,7 @@ crate::unstable_module! {
 #[non_exhaustive]
 pub enum Error {
     /// Error occurred due to a DMA-related issue.
-    #[cfg(any(doc, feature = "unstable"))]
+    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[allow(clippy::enum_variant_names, reason = "DMA is unstable")]
     DmaError(DmaError),
@@ -48,7 +48,7 @@ impl From<DmaError> for Error {
 }
 
 #[doc(hidden)]
-#[cfg(not(any(doc, feature = "unstable")))]
+#[cfg(not(feature = "unstable"))]
 impl From<DmaError> for Error {
     fn from(_value: DmaError) -> Self {
         Error::Unknown
@@ -91,48 +91,4 @@ pub enum BitOrder {
     MsbFirst,
     /// Least Significant Bit (LSB) is transmitted first.
     LsbFirst,
-}
-
-/// SPI data mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
-pub enum DataMode {
-    /// 1 bit, two data lines. (MOSI, MISO)
-    SingleTwoDataLines,
-    /// 1 bit, 1 data line (SIO0)
-    Single,
-    /// 2 bits, two data lines. (SIO0, SIO1)
-    Dual,
-    /// 4 bit, 4 data lines. (SIO0 .. SIO3)
-    Quad,
-    #[cfg(spi_octal)]
-    /// 8 bit, 8 data lines. (SIO0 .. SIO7)
-    Octal,
-}
-
-crate::any_peripheral! {
-    /// Any SPI peripheral.
-    pub peripheral AnySpi {
-        #[cfg(spi2)]
-        Spi2(crate::peripherals::SPI2),
-        #[cfg(spi3)]
-        Spi3(crate::peripherals::SPI3),
-    }
-}
-
-impl DmaEligible for AnySpi {
-    #[cfg(gdma)]
-    type Dma = crate::dma::AnyGdmaChannel;
-    #[cfg(pdma)]
-    type Dma = crate::dma::AnySpiDmaChannel;
-
-    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
-        match &self.0 {
-            #[cfg(spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
-            #[cfg(spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
-        }
-    }
 }

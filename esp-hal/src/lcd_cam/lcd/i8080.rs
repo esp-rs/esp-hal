@@ -53,34 +53,34 @@
 use core::{
     fmt::Formatter,
     marker::PhantomData,
-    mem::{size_of, ManuallyDrop},
+    mem::{ManuallyDrop, size_of},
     ops::{Deref, DerefMut},
 };
 
 use crate::{
+    Blocking,
+    DriverMode,
     clock::Clocks,
-    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, Tx, TxChannelFor},
+    dma::{ChannelTx, DmaError, DmaPeripheral, DmaTxBuffer, PeripheralTxChannel, TxChannelFor},
     gpio::{
-        interconnect::{OutputConnection, PeripheralOutput},
+        OutputConfig,
         OutputSignal,
+        interconnect::{self, PeripheralOutput},
     },
     lcd_cam::{
-        calculate_clkm,
-        lcd::{ClockMode, DelayMode, Phase, Polarity},
         BitOrder,
         ByteOrder,
         ClockError,
         Instance,
-        Lcd,
         LCD_DONE_WAKER,
+        Lcd,
+        calculate_clkm,
+        lcd::{ClockMode, DelayMode, Phase, Polarity},
     },
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::LCD_CAM,
     system::{self, GenericPeripheralGuard},
     time::Rate,
-    Blocking,
-    DriverMode,
 };
 
 /// A configuration error.
@@ -93,8 +93,8 @@ pub enum ConfigError {
 
 /// Represents the I8080 LCD interface.
 pub struct I8080<'d, Dm: DriverMode> {
-    lcd_cam: PeripheralRef<'d, LCD_CAM>,
-    tx_channel: ChannelTx<'d, Blocking, PeripheralTxChannel<LCD_CAM>>,
+    lcd_cam: LCD_CAM<'d>,
+    tx_channel: ChannelTx<Blocking, PeripheralTxChannel<LCD_CAM<'d>>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::LcdCam as u8 }>,
     _mode: PhantomData<Dm>,
 }
@@ -104,17 +104,13 @@ where
     Dm: DriverMode,
 {
     /// Creates a new instance of the I8080 LCD interface.
-    pub fn new<P, CH>(
+    pub fn new(
         lcd: Lcd<'d, Dm>,
-        channel: impl Peripheral<P = CH> + 'd,
-        mut pins: P,
+        channel: impl TxChannelFor<LCD_CAM<'d>>,
+        mut pins: impl TxPins,
         config: Config,
-    ) -> Result<Self, ConfigError>
-    where
-        CH: TxChannelFor<LCD_CAM>,
-        P: TxPins,
-    {
-        let tx_channel = ChannelTx::new(channel.map(|ch| ch.degrade()));
+    ) -> Result<Self, ConfigError> {
+        let tx_channel = ChannelTx::new(channel.degrade());
 
         let mut this = Self {
             lcd_cam: lcd.lcd_cam,
@@ -273,27 +269,33 @@ where
     }
 
     /// Associates a CS pin with the I8080 interface.
-    pub fn with_cs<CS: PeripheralOutput>(self, cs: impl Peripheral<P = CS> + 'd) -> Self {
-        crate::into_mapped_ref!(cs);
-        cs.set_to_push_pull_output();
-        OutputSignal::LCD_CS.connect_to(cs);
+    pub fn with_cs(self, cs: impl PeripheralOutput<'d>) -> Self {
+        let cs = cs.into();
+
+        cs.apply_output_config(&OutputConfig::default());
+        cs.set_output_enable(true);
+
+        OutputSignal::LCD_CS.connect_to(&cs);
 
         self
     }
 
     /// Configures the control pins for the I8080 interface.
-    pub fn with_ctrl_pins<DC: PeripheralOutput, WRX: PeripheralOutput>(
+    pub fn with_ctrl_pins(
         self,
-        dc: impl Peripheral<P = DC> + 'd,
-        wrx: impl Peripheral<P = WRX> + 'd,
+        dc: impl PeripheralOutput<'d>,
+        wrx: impl PeripheralOutput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(dc, wrx);
+        let dc = dc.into();
+        let wrx = wrx.into();
 
-        dc.set_to_push_pull_output();
-        OutputSignal::LCD_DC.connect_to(dc);
+        dc.apply_output_config(&OutputConfig::default());
+        dc.set_output_enable(true);
+        OutputSignal::LCD_DC.connect_to(&dc);
 
-        wrx.set_to_push_pull_output();
-        OutputSignal::LCD_PCLK.connect_to(wrx);
+        wrx.apply_output_config(&OutputConfig::default());
+        wrx.set_output_enable(true);
+        OutputSignal::LCD_PCLK.connect_to(&wrx);
 
         self
     }
@@ -620,33 +622,33 @@ impl From<u16> for Command<u16> {
 /// Represents a group of 8 output pins configured for 8-bit parallel data
 /// transmission.
 pub struct TxEightBits<'d> {
-    pins: [PeripheralRef<'d, OutputConnection>; 8],
+    pins: [interconnect::OutputSignal<'d>; 8],
 }
 
 impl<'d> TxEightBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxEightBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_0: impl PeripheralOutput<'d>,
+        pin_1: impl PeripheralOutput<'d>,
+        pin_2: impl PeripheralOutput<'d>,
+        pin_3: impl PeripheralOutput<'d>,
+        pin_4: impl PeripheralOutput<'d>,
+        pin_5: impl PeripheralOutput<'d>,
+        pin_6: impl PeripheralOutput<'d>,
+        pin_7: impl PeripheralOutput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(pin_0);
-        crate::into_mapped_ref!(pin_1);
-        crate::into_mapped_ref!(pin_2);
-        crate::into_mapped_ref!(pin_3);
-        crate::into_mapped_ref!(pin_4);
-        crate::into_mapped_ref!(pin_5);
-        crate::into_mapped_ref!(pin_6);
-        crate::into_mapped_ref!(pin_7);
-
         Self {
-            pins: [pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7],
+            pins: [
+                pin_0.into(),
+                pin_1.into(),
+                pin_2.into(),
+                pin_3.into(),
+                pin_4.into(),
+                pin_5.into(),
+                pin_6.into(),
+                pin_7.into(),
+            ],
         }
     }
 }
@@ -664,8 +666,9 @@ impl TxPins for TxEightBits<'_> {
             OutputSignal::LCD_DATA_7,
         ];
 
-        for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output();
+        for (pin, signal) in self.pins.iter().zip(SIGNALS.into_iter()) {
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             signal.connect_to(pin);
         }
     }
@@ -674,39 +677,48 @@ impl TxPins for TxEightBits<'_> {
 /// Represents a group of 16 output pins configured for 16-bit parallel data
 /// transmission.
 pub struct TxSixteenBits<'d> {
-    pins: [PeripheralRef<'d, OutputConnection>; 16],
+    pins: [interconnect::OutputSignal<'d>; 16],
 }
 
 impl<'d> TxSixteenBits<'d> {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
-        pin_0: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_1: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_2: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_3: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_4: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_5: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_6: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_7: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_8: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_9: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_10: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_11: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_12: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_13: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_14: impl Peripheral<P = impl PeripheralOutput> + 'd,
-        pin_15: impl Peripheral<P = impl PeripheralOutput> + 'd,
+        pin_0: impl PeripheralOutput<'d>,
+        pin_1: impl PeripheralOutput<'d>,
+        pin_2: impl PeripheralOutput<'d>,
+        pin_3: impl PeripheralOutput<'d>,
+        pin_4: impl PeripheralOutput<'d>,
+        pin_5: impl PeripheralOutput<'d>,
+        pin_6: impl PeripheralOutput<'d>,
+        pin_7: impl PeripheralOutput<'d>,
+        pin_8: impl PeripheralOutput<'d>,
+        pin_9: impl PeripheralOutput<'d>,
+        pin_10: impl PeripheralOutput<'d>,
+        pin_11: impl PeripheralOutput<'d>,
+        pin_12: impl PeripheralOutput<'d>,
+        pin_13: impl PeripheralOutput<'d>,
+        pin_14: impl PeripheralOutput<'d>,
+        pin_15: impl PeripheralOutput<'d>,
     ) -> Self {
-        crate::into_mapped_ref!(
-            pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10, pin_11,
-            pin_12, pin_13, pin_14, pin_15
-        );
-
         Self {
             pins: [
-                pin_0, pin_1, pin_2, pin_3, pin_4, pin_5, pin_6, pin_7, pin_8, pin_9, pin_10,
-                pin_11, pin_12, pin_13, pin_14, pin_15,
+                pin_0.into(),
+                pin_1.into(),
+                pin_2.into(),
+                pin_3.into(),
+                pin_4.into(),
+                pin_5.into(),
+                pin_6.into(),
+                pin_7.into(),
+                pin_8.into(),
+                pin_9.into(),
+                pin_10.into(),
+                pin_11.into(),
+                pin_12.into(),
+                pin_13.into(),
+                pin_14.into(),
+                pin_15.into(),
             ],
         }
     }
@@ -734,7 +746,8 @@ impl TxPins for TxSixteenBits<'_> {
         ];
 
         for (pin, signal) in self.pins.iter_mut().zip(SIGNALS.into_iter()) {
-            pin.set_to_push_pull_output();
+            pin.apply_output_config(&OutputConfig::default());
+            pin.set_output_enable(true);
             signal.connect_to(pin);
         }
     }

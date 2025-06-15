@@ -17,9 +17,11 @@ use embedded_hal_async::delay::DelayNs;
 use esp_hal::timer::systimer::SystemTimer;
 use esp_hal::{
     peripherals::Peripherals,
-    timer::{timg::TimerGroup, OneShotTimer},
+    timer::{OneShotTimer, timg::TimerGroup},
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 struct Context {
     peripherals: Peripherals,
@@ -92,22 +94,23 @@ mod tests {
         test_async_delay_ns(OneShotTimer::new(alarms.alarm0).into_async(), 10_000).await;
     }
 
+    #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_ns(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_ns(OneShotTimer::new(timg0.timer0).into_async(), 10_000).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_ns(OneShotTimer::new(timg0.timer1).into_async(), 10_000).await;
     }
 
-    #[cfg(timg1)]
+    #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_ns(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_ns(OneShotTimer::new(timg1.timer0).into_async(), 10_000).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_ns(OneShotTimer::new(timg1.timer1).into_async(), 10_000).await;
     }
 
@@ -119,22 +122,23 @@ mod tests {
         test_async_delay_us(OneShotTimer::new(alarms.alarm0).into_async(), 10).await;
     }
 
+    #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_us(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_us(OneShotTimer::new(timg0.timer0).into_async(), 10).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_us(OneShotTimer::new(timg0.timer1).into_async(), 10).await;
     }
 
-    #[cfg(timg1)]
+    #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_us(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_us(OneShotTimer::new(timg1.timer0).into_async(), 10).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_us(OneShotTimer::new(timg1.timer1).into_async(), 10).await;
     }
 
@@ -146,22 +150,23 @@ mod tests {
         test_async_delay_ms(OneShotTimer::new(alarms.alarm0).into_async(), 1).await;
     }
 
+    #[cfg(timergroup_timg0)]
     #[test]
     async fn test_timg0_async_delay_ms(ctx: Context) {
         let timg0 = TimerGroup::new(ctx.peripherals.TIMG0);
 
         test_async_delay_ms(OneShotTimer::new(timg0.timer0).into_async(), 1).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_ms(OneShotTimer::new(timg0.timer1).into_async(), 1).await;
     }
 
-    #[cfg(timg1)]
+    #[cfg(timergroup_timg1)]
     #[test]
     async fn test_timg1_async_delay_ms(ctx: Context) {
         let timg1 = TimerGroup::new(ctx.peripherals.TIMG1);
 
         test_async_delay_ms(OneShotTimer::new(timg1.timer0).into_async(), 1).await;
-        #[cfg(timg_timer1)]
+        #[cfg(timergroup_timg_has_timer1)]
         test_async_delay_ms(OneShotTimer::new(timg1.timer1).into_async(), 1).await;
     }
 }

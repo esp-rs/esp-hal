@@ -1,8 +1,8 @@
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use proc_macro::{Span, TokenStream};
-use proc_macro2::Ident;
 use proc_macro_error2::abort;
-use syn::{parse, Item};
+use proc_macro2::Ident;
+use syn::{Item, parse};
 
 #[derive(Debug, Default, darling::FromMeta)]
 #[darling(default)]
@@ -64,11 +64,11 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let section = match (is_fn, section_name) {
         (true, Ok(section_name)) => quote::quote! {
-            #[link_section = #section_name]
+            #[unsafe(link_section = #section_name)]
             #[inline(never)] // make certain function is not inlined
         },
         (false, Ok(section_name)) => quote::quote! {
-            #[link_section = #section_name]
+            #[unsafe(link_section = #section_name)]
         },
         (_, Err(_)) => {
             abort!(Span::call_site(), "Invalid combination of ram arguments");
@@ -83,13 +83,12 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
         None
     };
     let trait_check = trait_check.map(|name| {
-        use proc_macro_crate::{crate_name, FoundCrate};
+        use proc_macro_crate::{FoundCrate, crate_name};
 
         let hal = Ident::new(
-            if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-                name
-            } else {
-                "crate"
+            match crate_name("esp-hal") {
+                Ok(FoundCrate::Name(ref name)) => name,
+                _ => "crate",
             },
             Span::call_site().into(),
         );

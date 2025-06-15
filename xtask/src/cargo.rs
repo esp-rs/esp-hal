@@ -6,10 +6,12 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Context as _, Result, bail};
+use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
+use toml_edit::{DocumentMut, Formatted, Item, Value};
 
-use crate::windows_safe_path;
+use crate::{Package, windows_safe_path};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
@@ -189,5 +191,375 @@ impl CargoArgsBuilder {
         }
 
         args
+    }
+}
+
+pub struct CargoToml<'a> {
+    pub workspace: &'a Path,
+    pub package: Package,
+    pub manifest: toml_edit::DocumentMut,
+}
+
+const DEPENDENCY_KINDS: [&'static str; 3] =
+    ["dependencies", "dev-dependencies", "build-dependencies"];
+
+impl<'a> CargoToml<'a> {
+    pub fn new(workspace: &'a Path, package: Package) -> Result<Self> {
+        let package_path = workspace.join(package.to_string());
+        let manifest_path = package_path.join("Cargo.toml");
+        if !manifest_path.exists() {
+            bail!(
+                "Could not find Cargo.toml for package {package} at {}",
+                manifest_path.display()
+            );
+        }
+
+        let manifest = std::fs::read_to_string(&manifest_path)
+            .with_context(|| format!("Could not read {}", manifest_path.display()))?;
+
+        Self::from_str(workspace, package, &manifest)
+    }
+
+    pub fn from_str(workspace: &'a Path, package: Package, manifest: &str) -> Result<Self> {
+        // Parse the manifest string into a mutable TOML document.
+        Ok(Self {
+            workspace,
+            package,
+            manifest: manifest.parse::<DocumentMut>()?,
+        })
+    }
+
+    pub fn is_published(&self) -> bool {
+        // Check if the package is published by looking for the `publish` key
+        // in the manifest.
+        let Item::Table(package) = &self.manifest["package"] else {
+            unreachable!("The package table is missing in the manifest");
+        };
+
+        let Some(publish) = package.get("publish") else {
+            return true;
+        };
+
+        publish.as_bool().unwrap_or(true)
+    }
+
+    pub fn package_path(&self) -> PathBuf {
+        self.workspace.join(self.package.to_string())
+    }
+
+    pub fn manifest_path(&self) -> PathBuf {
+        self.package_path().join("Cargo.toml")
+    }
+
+    pub fn version(&self) -> &str {
+        self.manifest["package"]["version"]
+            .as_str()
+            .unwrap()
+            .trim()
+            .trim_matches('"')
+    }
+
+    pub fn package_version(&self) -> semver::Version {
+        semver::Version::parse(self.version()).expect("Failed to parse version")
+    }
+
+    pub fn set_version(&mut self, version: &semver::Version) {
+        log::info!(
+            "Bumping version for package: {} ({} -> {version})",
+            self.package,
+            self.version(),
+        );
+        self.manifest["package"]["version"] = toml_edit::value(version.to_string());
+    }
+
+    pub fn save(&self) -> Result<()> {
+        let manifest_path = self.manifest_path();
+        std::fs::write(&manifest_path, self.manifest.to_string())
+            .with_context(|| format!("Could not write {}", manifest_path.display()))?;
+
+        Ok(())
+    }
+
+    /// Calls a callback for each table that contains dependencies.
+    ///
+    /// Callback arguments:
+    /// - `path`: The path to the table (e.g. `dependencies.package`)
+    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`,
+    ///   `dev-dependencies`)
+    /// - `table`: The table itself
+    pub fn visit_dependencies(
+        &mut self,
+        mut handle_dependencies: impl FnMut(&str, &'static str, &mut toml_edit::Table),
+    ) {
+        fn recurse_dependencies(
+            path: String,
+            table: &mut toml_edit::Table,
+            handle_dependencies: &mut impl FnMut(&str, &'static str, &mut toml_edit::Table),
+        ) {
+            // Walk through tables recursively so that we can find *all* dependencies.
+            for (key, item) in table.iter_mut() {
+                if let Item::Table(table) = item {
+                    let path = if path.is_empty() {
+                        key.to_string()
+                    } else {
+                        format!("{path}.{key}")
+                    };
+                    recurse_dependencies(path, table, handle_dependencies);
+                }
+            }
+            for dependency_kind in DEPENDENCY_KINDS {
+                let Some(Item::Table(table)) = table.get_mut(dependency_kind) else {
+                    continue;
+                };
+
+                handle_dependencies(&path, dependency_kind, table);
+            }
+        }
+
+        recurse_dependencies(
+            String::new(),
+            self.manifest.as_table_mut(),
+            &mut handle_dependencies,
+        );
+    }
+
+    pub fn package(&self) -> Package {
+        self.package
+    }
+
+    /// Returns all dependencies of the package, that come from the repository.
+    ///
+    /// For example, for esp-println this will return [esp-build, esp-metadata]
+    /// (at the time of writing).
+    pub fn repo_dependencies(&mut self) -> Vec<Package> {
+        let mut dependencies = Vec::new();
+        self.visit_dependencies(|_, _, table| {
+            for (name, value) in table.iter() {
+                let name = if let Item::Value(Value::InlineTable(t)) = value {
+                    if let Some(Value::String(name)) = t.get("package") {
+                        name.value()
+                    } else {
+                        name
+                    }
+                } else {
+                    name
+                };
+
+                if let Ok(package) = Package::from_str(name, true) {
+                    if !dependencies.contains(&package) {
+                        dependencies.push(package);
+                    }
+                }
+            }
+        });
+        dependencies
+    }
+
+    pub(crate) fn change_version_of_dependency(
+        &mut self,
+        package_name: &str,
+        version: &semver::Version,
+    ) -> bool {
+        let mut changed = false;
+
+        self.visit_dependencies(|_, _, table| {
+            // Update dependencies which specify a version:
+            match &mut table[&package_name] {
+                Item::Value(Value::String(table)) => {
+                    // package = "version"
+                    *table = Formatted::new(version.to_string());
+                    changed = true;
+                }
+                Item::Table(table) if table.contains_key("version") => {
+                    // [package]
+                    // version = "version"
+                    table["version"] = toml_edit::value(version.to_string());
+                    changed = true;
+                }
+                Item::Value(Value::InlineTable(table)) if table.contains_key("version") => {
+                    // package = { version = "version" }
+                    table["version"] = version.to_string().into();
+                    changed = true;
+                }
+                Item::None => {
+                    // alias = { package = "foo", version = "version" }
+                    let update_renamed_dep = table.get_values().iter().find_map(|(k, p)| {
+                        if let Value::InlineTable(table) = p {
+                            if let Some(Value::String(name)) = &table.get("package") {
+                                if name.value() == &package_name {
+                                    // Return the actual key of this dependency, e.g.:
+                                    // `procmacros = { package = "esp-hal-procmacros" }`
+                                    //  ^^^^^^^^^^
+                                    return Some(k.last().unwrap().get().to_string());
+                                }
+                            }
+                        }
+
+                        None
+                    });
+
+                    if let Some(dependency_name) = update_renamed_dep {
+                        table[&dependency_name]["version"] = version.to_string().into();
+                        changed = true;
+                    }
+                }
+                _ => {}
+            }
+        });
+
+        changed
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bump_version() {
+        struct TestCase {
+            input: &'static str,
+            expected: &'static str,
+        }
+
+        let test_cases = [
+            // Simple dependencies
+            TestCase {
+                input: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                esp-hal-procmacros = "0.1.0"
+
+                [dev-dependencies]
+                esp-hal-procmacros = "0.1.0"
+
+                [build-dependencies]
+                esp-hal-procmacros = "0.1.0"
+                "#,
+                expected: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                esp-hal-procmacros = "0.2.0"
+
+                [dev-dependencies]
+                esp-hal-procmacros = "0.2.0"
+
+                [build-dependencies]
+                esp-hal-procmacros = "0.2.0"
+                "#,
+            },
+            // Dependencies with inline tables
+            TestCase {
+                input: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                esp-hal-procmacros = { version = "0.1.0", foo = "bar" }
+
+                [dev-dependencies]
+                esp-hal-procmacros = { version = "0.1.0", foo = "bar" }
+
+                [build-dependencies]
+                esp-hal-procmacros = { version = "0.1.0", foo = "bar" }
+                "#,
+                expected: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                esp-hal-procmacros = { version = "0.2.0", foo = "bar" }
+
+                [dev-dependencies]
+                esp-hal-procmacros = { version = "0.2.0", foo = "bar" }
+
+                [build-dependencies]
+                esp-hal-procmacros = { version = "0.2.0", foo = "bar" }
+                "#,
+            },
+            // Dependencies with renamed keys
+            TestCase {
+                input: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.1.0", foo = "bar" }
+
+                [dev-dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.1.0", foo = "bar" }
+
+                [build-dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.1.0", foo = "bar" }
+                "#,
+                expected: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.2.0", foo = "bar" }
+
+                [dev-dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.2.0", foo = "bar" }
+
+                [build-dependencies]
+                procmacros = { package = "esp-hal-procmacros", version = "0.2.0", foo = "bar" }
+                "#,
+            },
+            // Dependencies specified as tables
+            TestCase {
+                input: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies.'esp-hal-procmacros']
+                version = "0.1.0"
+
+                [dev-dependencies.'esp-hal-procmacros']
+                version = "0.1.0"
+
+                [build-dependencies.'esp-hal-procmacros']
+                version = "0.1.0"
+                "#,
+                expected: r#"
+                [package]
+                name = "test-package"
+                version = "0.1.0"
+
+                [dependencies.'esp-hal-procmacros']
+                version = "0.2.0"
+
+                [dev-dependencies.'esp-hal-procmacros']
+                version = "0.2.0"
+
+                [build-dependencies.'esp-hal-procmacros']
+                version = "0.2.0"
+                "#,
+            },
+        ];
+
+        for test_case in test_cases {
+            let mut cargo_toml =
+                CargoToml::from_str(Path::new("."), Package::EspAlloc, test_case.input).unwrap();
+
+            let changed = cargo_toml.change_version_of_dependency(
+                "esp-hal-procmacros",
+                &semver::Version::parse("0.2.0").unwrap(),
+            );
+
+            assert!(changed);
+            pretty_assertions::assert_eq!(test_case.expected, cargo_toml.manifest.to_string());
+        }
     }
 }

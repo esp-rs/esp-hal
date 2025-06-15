@@ -39,7 +39,7 @@ crate::rom_fn! {
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spi_read_status_high(
     flash_chip: *const EspRomSpiflashChipT,
     status: &mut u32,
@@ -48,26 +48,26 @@ pub(crate) fn spi_read_status_high(
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spi_read_status(flash_chip: *const EspRomSpiflashChipT, status: &mut u32) -> i32 {
     esp_rom_spi_read_status(flash_chip, status as *mut u32)
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spi_write_status(flash_chip: *const EspRomSpiflashChipT, status_value: u32) -> i32 {
     esp_rom_spi_write_status(flash_chip, status_value)
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn begin() {
     // on some chips disabling cache access caused issues - we don't really need
     // it
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn end() {
     esp_rom_cache_flush(0);
     esp_rom_cache_flush(1);
@@ -87,7 +87,7 @@ pub struct EspRomSpiflashChipT {
 }
 
 #[inline(never)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
     maybe_with_critical_section(|| {
         spiflash_wait_for_ready();
@@ -96,7 +96,7 @@ pub(crate) fn spiflash_read(src_addr: u32, data: *const u32, len: u32) -> i32 {
 }
 
 #[inline(never)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
     maybe_with_critical_section(|| {
         let res = esp_rom_spiflash_erase_sector(sector_number);
@@ -106,7 +106,7 @@ pub(crate) fn spiflash_erase_sector(sector_number: u32) -> i32 {
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn spi_write_enable() {
     spiflash_wait_for_ready();
 
@@ -116,7 +116,7 @@ fn spi_write_enable() {
 }
 
 #[inline(never)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 {
     maybe_with_critical_section(|| {
         begin();
@@ -175,13 +175,13 @@ pub(crate) fn spiflash_write(dest_addr: u32, data: *const u32, len: u32) -> i32 
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub fn read_register(address: u32) -> u32 {
     unsafe { (address as *const u32).read_volatile() }
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub fn write_register(address: u32, value: u32) {
     unsafe {
         (address as *mut u32).write_volatile(value);
@@ -189,7 +189,7 @@ pub fn write_register(address: u32, value: u32) {
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn wait_for_ready() {
     while (read_register(SPI_EXT2_REG) & SPI_ST) != 0 {}
     // ESP32_OR_LATER ... we don't support anything earlier
@@ -197,7 +197,7 @@ fn wait_for_ready() {
 }
 
 #[inline(always)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 fn spiflash_wait_for_ready() {
     let flashchip = FLASH_CHIP_ADDR as *const EspRomSpiflashChipT;
 
@@ -212,7 +212,7 @@ fn spiflash_wait_for_ready() {
 }
 
 #[inline(never)]
-#[link_section = ".rwtext"]
+#[unsafe(link_section = ".rwtext")]
 pub(crate) fn spiflash_unlock() -> i32 {
     let flashchip = FLASH_CHIP_ADDR as *const EspRomSpiflashChipT;
     if (unsafe { (*flashchip).device_id } >> 16) & 0xff == 0x9D {

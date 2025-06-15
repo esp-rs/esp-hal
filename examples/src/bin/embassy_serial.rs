@@ -13,9 +13,9 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
+    Async,
     timer::timg::TimerGroup,
     uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx},
-    Async,
 };
 use static_cell::StaticCell;
 
@@ -23,6 +23,8 @@ use static_cell::StaticCell;
 const READ_BUF_SIZE: usize = 64;
 // EOT (CTRL-D)
 const AT_CMD: u8 = 0x04;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[embassy_executor::task]
 async fn writer(mut tx: UartTx<'static, Async>, signal: &'static Signal<NoopRawMutex, usize>) {

@@ -19,14 +19,16 @@ use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    interrupt::{software::SoftwareInterruptControl, Priority},
+    interrupt::{Priority, software::SoftwareInterruptControl},
     main,
     system::{Cpu, CpuControl, Stack},
-    timer::{timg::TimerGroup, AnyTimer},
+    timer::{AnyTimer, timg::TimerGroup},
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 static mut APP_CORE_STACK: Stack<8192> = Stack::new();
 

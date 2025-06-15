@@ -31,17 +31,19 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     main,
-    twai::{self, filter::SingleStandardFilter, EspTwaiFrame, StandardId, TwaiMode},
+    twai::{self, EspTwaiFrame, StandardId, TwaiMode, filter::SingleStandardFilter},
 };
 use esp_println::println;
 use nb::block;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Without an external transceiver, we only need a single line between the two MCUs.
-    let (rx_pin, tx_pin) = peripherals.GPIO2.split();
+    let (rx_pin, tx_pin) = unsafe { peripherals.GPIO2.split() };
     // Use these if you want to use an external transceiver:
     // let tx_pin = peripherals.GPIO2;
     // let rx_pin = peripherals.GPIO0;

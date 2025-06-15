@@ -155,6 +155,13 @@ impl defmt::Format for Instant {
     }
 }
 
+impl core::hash::Hash for Instant {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.duration_since_epoch().hash(state);
+    }
+}
+
 impl Instant {
     /// Represents the moment the system booted.
     pub const EPOCH: Instant = Instant(InnerInstant::from_ticks(0));
@@ -180,7 +187,7 @@ impl Instant {
     /// Returns the elapsed `Duration` since boot.
     #[inline]
     pub fn duration_since_epoch(&self) -> Duration {
-        Self::EPOCH.elapsed()
+        *self - Self::EPOCH
     }
 
     /// Returns the elapsed `Duration` since this `Instant` was created.
@@ -254,6 +261,13 @@ impl defmt::Format for Duration {
     #[inline]
     fn format(&self, f: defmt::Formatter<'_>) {
         defmt::write!(f, "{=u64} µs", self.as_micros())
+    }
+}
+
+impl core::hash::Hash for Duration {
+    #[inline]
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.as_micros().hash(state);
     }
 }
 

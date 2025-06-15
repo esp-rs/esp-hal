@@ -16,29 +16,14 @@ crate::unstable_module! {
 }
 pub mod gpio;
 pub mod peripherals;
+pub(crate) mod regi2c;
 
-/// The name of the chip ("esp32h2") as `&str`
-#[macro_export]
-macro_rules! chip {
-    () => {
-        "esp32h2"
-    };
-}
-
-/// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! trm_link {
-    () => { "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf" };
-}
-
-pub use chip;
-
-#[allow(unused)]
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x60010000;
 }
 
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;
 
@@ -50,10 +35,6 @@ pub(crate) mod constants {
     /// Clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 96_000_000;
 
-    /// Start address of the RMT (Remote Control) peripheral's RAM.
-    pub const RMT_RAM_START: usize = 0x60007400;
-    /// The size (number of pulse codes) of each RMT channel's dedicated RAM.
-    pub const RMT_CHANNEL_RAM_SIZE: usize = 48;
     /// Clock source for the RMT peripheral (false = default source).
     pub const RMT_CLOCK_SRC: bool = false;
     /// Frequency of the RMT clock source, in Hertz.
@@ -62,11 +43,6 @@ pub(crate) mod constants {
     /// System clock frequency for the parallel I/O (PARL IO) peripheral, in
     /// Hertz.
     pub const PARL_IO_SCLK: u32 = 96_000_000;
-
-    /// Start address of the system's DRAM (low range).
-    pub const SOC_DRAM_LOW: usize = 0x4080_0000;
-    /// End address of the system's DRAM (high range).
-    pub const SOC_DRAM_HIGH: usize = 0x4085_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);

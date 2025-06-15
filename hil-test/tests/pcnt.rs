@@ -9,16 +9,18 @@
 use esp_hal::{
     delay::Delay,
     gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pin, Pull},
-    pcnt::{channel::EdgeMode, Pcnt},
+    pcnt::{Pcnt, channel::EdgeMode},
 };
 use hil_test as _;
 
 struct Context<'d> {
     pcnt: Pcnt<'d>,
-    input: AnyPin,
-    output: AnyPin,
+    input: AnyPin<'d>,
+    output: AnyPin<'d>,
     delay: Delay,
 }
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]

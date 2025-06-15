@@ -15,18 +15,20 @@
 use embassy_executor::Spawner;
 use embassy_futures::join::join;
 use embassy_usb::{
+    Builder,
     class::cdc_acm::{CdcAcmClass, State},
     driver::EndpointError,
-    Builder,
 };
 use esp_backtrace as _;
 use esp_hal::{
     otg_fs::{
-        asynch::{Config, Driver},
         Usb,
+        asynch::{Config, Driver},
     },
     timer::timg::TimerGroup,
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {

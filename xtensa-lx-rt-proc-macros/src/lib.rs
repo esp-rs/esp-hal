@@ -13,9 +13,6 @@ use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
 use syn::{
-    parse,
-    parse_macro_input,
-    spanned::Spanned,
     AttrStyle,
     Attribute,
     FnArg,
@@ -28,6 +25,9 @@ use syn::{
     Stmt,
     Type,
     Visibility,
+    parse,
+    parse_macro_input,
+    spanned::Spanned,
 };
 
 /// Marks a function as the main function to be called on program start
@@ -44,11 +44,8 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         && f.sig.generics.where_clause.is_none()
         && f.sig.variadic.is_none()
         && match f.sig.output {
-            ReturnType::Default => false,
-            ReturnType::Type(_, ref ty) => match **ty {
-                Type::Never(_) => true,
-                _ => false,
-            },
+            ReturnType::Type(_, ref ty) => matches!(**ty, Type::Never(_)),
+            _ => false,
         };
 
     if !valid_signature {
@@ -121,7 +118,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         #(#cfgs)*
         #(#attrs)*
         #[doc(hidden)]
-        #[export_name = "main"]
+        #[unsafe(export_name = "main")]
         pub unsafe extern "C" fn #tramp_ident() {
             #ident(
                 #(#resource_args),*
@@ -242,7 +239,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                         "This attribute accepts an integer attribute",
                     )
                     .to_compile_error()
-                    .into()
+                    .into();
                 }
             },
             _ => {
@@ -251,7 +248,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
                     "This attribute accepts an integer attribute",
                 )
                 .to_compile_error()
-                .into()
+                .into();
             }
         }
     }
@@ -260,7 +257,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         return error;
     }
 
-    let naked = f.attrs.iter().position(|x| eq(x, "naked")).is_some();
+    let naked = f.attrs.iter().any(|x| eq(x, "naked"));
 
     let ident_s = if naked {
         format!("__naked_level_{}_interrupt", level)
@@ -268,14 +265,14 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         format!("__level_{}_interrupt", level)
     };
 
-    if naked && (level < 2 || level > 7) {
+    if naked && !(2..=7).contains(&level) {
         return parse::Error::new(
             f.span(),
             "`#[naked]` `#[interrupt]` handlers must have interrupt level >=2 and <=7",
         )
         .to_compile_error()
         .into();
-    } else if !naked && (level < 1 || level > 7) {
+    } else if !naked && !(1..=7).contains(&level) {
         return parse::Error::new(
             f.span(),
             "`#[interrupt]` handlers must have interrupt level >=1 and <=7",
@@ -287,7 +284,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let valid_signature = f.sig.constness.is_none()
         && f.vis == Visibility::Inherited
         && f.sig.abi.is_none()
-        && ((!naked && f.sig.inputs.len() <= 2) || (naked && f.sig.inputs.len() == 0))
+        && ((!naked && f.sig.inputs.len() <= 2) || (naked && f.sig.inputs.is_empty()))
         && f.sig.generics.params.is_empty()
         && f.sig.generics.where_clause.is_none()
         && f.sig.variadic.is_none()
@@ -472,7 +469,7 @@ fn extract_static_muts(
     let mut seen = HashSet::new();
     let mut statics = vec![];
     let mut stmts = vec![];
-    while let Some(stmt) = istmts.next() {
+    for stmt in istmts.by_ref() {
         match stmt {
             Stmt::Item(Item::Static(var)) => match var.mutability {
                 StaticMutability::Mut(_) => {
@@ -540,7 +537,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
 
     'o: for attr in attrs {
         for val in whitelist {
-            if eq(&attr, &val) {
+            if eq(attr, val) {
                 continue 'o;
             }
         }
@@ -551,7 +548,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
                 "this attribute is not allowed on an exception handler controlled by xtensa-lx-rt"
             }
             WhiteListCaller::Interrupt => {
-                if eq(&attr, "naked") {
+                if eq(attr, "naked") {
                     continue 'o;
                 }
 
@@ -562,7 +559,7 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
             }
         };
 
-        return Err(parse::Error::new(attr.span(), &err_str)
+        return Err(parse::Error::new(attr.span(), err_str)
             .to_compile_error()
             .into());
     }

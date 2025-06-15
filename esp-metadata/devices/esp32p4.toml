@@ -1,7 +1,15 @@
+# ESP32-P4 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32p4"
 arch  = "riscv"
-cores = "multi_core"
+cores = 2
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-p4_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -100,3 +108,5 @@ symbols = [
     "gpio_bank_1",
     "spi_octal",
 ]
+
+memory = [{ name = "dram", start = 0x4FF0_0000, end = 0x4FFC_0000 }]

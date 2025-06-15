@@ -1,16 +1,17 @@
 [package]
-name         = "esp-build"
-version      = "0.2.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Build utilities for esp-hal"
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-build"
+version       = "0.3.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Build utilities for esp-hal"
+documentation = "https://docs.espressif.com/projects/rust/esp-build/latest/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [lib]
 proc-macro = true
 
 [dependencies]
-quote     = "1.0.38"
-syn       = { version = "2.0.96", features = ["fold", "full"] }
+quote     = "1.0.40"
+syn       = { version = "2.0.100", features = ["fold", "full"] }
 termcolor = "1.4.1"

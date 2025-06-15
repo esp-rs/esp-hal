@@ -10,41 +10,43 @@
 #![no_main]
 
 use esp_hal::{
-    dma_buffers,
-    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
-    peripheral::Peripheral,
-    spi::{slave::Spi, Mode},
     Blocking,
+    dma::{DmaRxBuf, DmaTxBuf},
+    dma_buffers,
+    gpio::{Flex, Input, InputConfig, Level, OutputConfig, Pull},
+    spi::{Mode, slave::Spi},
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 cfg_if::cfg_if! {
     if #[cfg(any(esp32, esp32s2))] {
-        type DmaChannel = esp_hal::dma::Spi2DmaChannel;
+        type DmaChannel<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
     } else {
-        type DmaChannel = esp_hal::dma::DmaChannel0;
+        type DmaChannel<'d> = esp_hal::peripherals::DMA_CH0<'d>;
     }
 }
 
 struct Context {
     spi: Spi<'static, Blocking>,
-    dma_channel: DmaChannel,
+    dma_channel: DmaChannel<'static>,
     bitbang_spi: BitbangSpi,
 }
 
 struct BitbangSpi {
-    sclk: Output<'static>,
-    mosi: Output<'static>,
+    sclk: Flex<'static>,
+    mosi: Flex<'static>,
     miso: Input<'static>,
-    cs: Output<'static>,
+    cs: Flex<'static>,
 }
 
 impl BitbangSpi {
     fn new(
-        sclk: Output<'static>,
-        mosi: Output<'static>,
+        sclk: Flex<'static>,
+        mosi: Flex<'static>,
         miso: Input<'static>,
-        cs: Output<'static>,
+        cs: Flex<'static>,
     ) -> Self {
         Self {
             sclk,
@@ -115,23 +117,38 @@ mod tests {
             }
         }
 
-        let mosi_gpio = Output::new(mosi_pin, Level::Low, OutputConfig::default());
-        let cs_gpio = Output::new(cs_pin, Level::High, OutputConfig::default());
-        let sclk_gpio = Output::new(sclk_pin, Level::Low, OutputConfig::default());
-        let miso_gpio = Input::new(miso_pin, InputConfig::default().with_pull(Pull::None));
+        let mut mosi_gpio = Flex::new(mosi_pin);
+        mosi_gpio.apply_output_config(&OutputConfig::default());
+        mosi_gpio.set_level(Level::Low);
+        mosi_gpio.set_output_enable(true);
+
+        let mut cs_gpio = Flex::new(cs_pin);
+        cs_gpio.apply_output_config(&OutputConfig::default());
+        cs_gpio.set_level(Level::High);
+        cs_gpio.set_output_enable(true);
+
+        let mut sclk_gpio = Flex::new(sclk_pin);
+        sclk_gpio.apply_output_config(&OutputConfig::default());
+        sclk_gpio.set_level(Level::Low);
+        sclk_gpio.set_output_enable(true);
+
+        let mut miso_gpio = Flex::new(miso_pin);
+        miso_gpio.set_input_enable(true);
+        miso_gpio.apply_input_config(&InputConfig::default().with_pull(Pull::None));
+        miso_gpio.apply_output_config(&OutputConfig::default());
 
         let cs = cs_gpio.peripheral_input();
         let sclk = sclk_gpio.peripheral_input();
         let mosi = mosi_gpio.peripheral_input();
-        let miso = unsafe { miso_gpio.clone_unchecked() }.into_peripheral_output();
+        let (miso_in, miso_out) = unsafe { miso_gpio.split_into_drivers() };
 
         Context {
             spi: Spi::new(peripherals.SPI2, Mode::_1)
                 .with_sck(sclk)
                 .with_mosi(mosi)
-                .with_miso(miso)
+                .with_miso(miso_out)
                 .with_cs(cs),
-            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_gpio, cs_gpio),
+            bitbang_spi: BitbangSpi::new(sclk_gpio, mosi_gpio, miso_in, cs_gpio),
             dma_channel,
         }
     }
@@ -140,11 +157,10 @@ mod tests {
     fn test_basic(mut ctx: Context) {
         const DMA_SIZE: usize = 32;
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(DMA_SIZE);
-        let mut spi = ctx
-            .spi
-            .with_dma(ctx.dma_channel, rx_descriptors, tx_descriptors);
-        let slave_send = tx_buffer;
-        let slave_receive = rx_buffer;
+        let mut slave_receive = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+        let mut slave_send = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+
+        let spi = ctx.spi.with_dma(ctx.dma_channel);
 
         // The transfer stops if the buffers are full, not when the master
         // deasserts CS. Therefore, these need to be the same size as the DMA buffers.
@@ -154,18 +170,20 @@ mod tests {
         for (i, v) in master_send.iter_mut().enumerate() {
             *v = (i % 255) as u8;
         }
-        for (i, v) in slave_send.iter_mut().enumerate() {
+        for (i, v) in slave_send.as_mut_slice().iter_mut().enumerate() {
             *v = (254 - (i % 255)) as u8;
         }
-        slave_receive.fill(0xFF);
+        slave_receive.as_mut_slice().fill(0xFF);
 
-        let transfer = spi.transfer(slave_receive, &slave_send).unwrap();
+        let transfer = spi
+            .transfer(DMA_SIZE, slave_receive, DMA_SIZE, slave_send)
+            .unwrap();
 
         ctx.bitbang_spi.transfer_buf(master_receive, master_send);
 
-        transfer.wait().unwrap();
+        (_, (slave_receive, slave_send)) = transfer.wait();
 
-        assert_eq!(slave_receive, master_send);
-        assert_eq!(master_receive, slave_send);
+        assert_eq!(slave_receive.as_slice(), master_send);
+        assert_eq!(master_receive, slave_send.as_slice());
     }
 }

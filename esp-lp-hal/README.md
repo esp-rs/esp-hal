@@ -1,7 +1,7 @@
 # esp-lp-hal
 
 [![Crates.io](https://img.shields.io/crates/v/esp-lp-hal?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-lp-hal)
-[![docs.rs](https://img.shields.io/docsrs/esp-lp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-lp-hal)
+[![docs.rs](https://img.shields.io/docsrs/esp-lp-hal?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-lp-hal/latest/)
 ![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-lp-hal?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
@@ -15,9 +15,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 [the rust on esp book]: https://docs.esp-rs.org/book/
 
-## [Documentation]
-
-[documentation]: https://docs.rs/esp-lp-hal/
+## [Documentation](https://docs.espressif.com/projects/rust/esp-lp-hal/latest/)
 
 ## Supported Devices
 

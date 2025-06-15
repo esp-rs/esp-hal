@@ -31,22 +31,19 @@
 use core::marker::PhantomData;
 
 use super::{InputPin, OutputPin, RtcPin};
-use crate::{
-    peripheral::Peripheral,
-    peripherals::{GPIO, LP_AON, LP_IO},
-};
+use crate::peripherals::{GPIO, LP_AON, LP_IO};
 
 /// A GPIO output pin configured for low power operation
 pub struct LowPowerOutput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     /// Create a new output pin for use by the low-power core
     #[instability::unstable]
-    pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(_pin: P) -> Self
     where
-        P: OutputPin + RtcPin,
+        P: OutputPin + RtcPin + 'd,
     {
         init_low_power_pin(PIN);
 
@@ -74,15 +71,15 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
 
 /// A GPIO input pin configured for low power operation
 pub struct LowPowerInput<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     /// Create a new input pin for use by the low-power core
     #[instability::unstable]
-    pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(_pin: P) -> Self
     where
-        P: InputPin + RtcPin,
+        P: InputPin + RtcPin + 'd,
     {
         init_low_power_pin(PIN);
 
@@ -119,15 +116,15 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
 
 /// A GPIO open-drain output pin configured for low power operation
 pub struct LowPowerOutputOpenDrain<'d, const PIN: u8> {
-    phantom: PhantomData<&'d ()>,
+    phantom: PhantomData<&'d mut ()>,
 }
 
 impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     /// Create a new output pin for use by the low-power core
     #[instability::unstable]
-    pub fn new<P>(_pin: impl Peripheral<P = P> + 'd) -> Self
+    pub fn new<P>(_pin: P) -> Self
     where
-        P: InputPin + OutputPin + RtcPin,
+        P: InputPin + OutputPin + RtcPin + 'd,
     {
         init_low_power_pin(PIN);
 
@@ -200,11 +197,13 @@ macro_rules! lp_gpio {
         $($gpionum:literal)+
     ) => {
         $(
-            impl $crate::gpio::RtcPin for GpioPin<$gpionum> {
+            impl $crate::gpio::RtcPin for paste::paste!($crate::peripherals::[<GPIO $gpionum>]<'_>) {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.pin($gpionum).modify(|_, w| {
-                        w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                        unsafe {
+                            w.wakeup_enable().bit(wakeup).int_type().bits(level)
+                        }
                     });
                 }
 
@@ -251,7 +250,7 @@ macro_rules! lp_gpio {
                 }
             }
 
-            impl $crate::gpio::RtcPinWithResistors for GpioPin<$gpionum> {
+            impl $crate::gpio::RtcPinWithResistors for paste::paste!($crate::peripherals::[<GPIO $gpionum>]<'_>) {
                 fn rtcio_pullup(&self, enable: bool) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
                     lp_io.gpio($gpionum).modify(|_, w| w.fun_wpu().bit(enable));

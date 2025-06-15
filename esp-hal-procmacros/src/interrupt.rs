@@ -1,15 +1,15 @@
-use darling::{ast::NestedMeta, FromMeta};
+use darling::{FromMeta, ast::NestedMeta};
 use proc_macro::{Span, TokenStream};
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Ident;
-use proc_macro_crate::{crate_name, FoundCrate};
 use syn::{
-    parse::Error as SynError,
-    spanned::Spanned,
     AttrStyle,
     Attribute,
     ItemFn,
     ReturnType,
     Type,
+    parse::Error as SynError,
+    spanned::Spanned,
 };
 
 pub enum WhiteListCaller {
@@ -40,18 +40,20 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     };
 
     let root = Ident::new(
-        if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-hal") {
-            name
-        } else {
-            "crate"
+        match crate_name("esp-hal") {
+            Ok(FoundCrate::Name(ref name)) => name,
+            _ => "crate",
         },
         Span::call_site().into(),
     );
 
-    let priority = if let Some(priority) = args.priority {
-        quote::quote!( #priority )
-    } else {
-        quote::quote! { #root::interrupt::Priority::min() }
+    let priority = match args.priority {
+        Some(priority) => {
+            quote::quote!( #priority )
+        }
+        _ => {
+            quote::quote! { #root::interrupt::Priority::min() }
+        }
     };
 
     // XXX should we blacklist other attributes?
@@ -88,13 +90,22 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     let orig = f.sig.ident;
     let vis = f.vis.clone();
     f.sig.ident = Ident::new(
-        &format!("__esp_hal_internal_{}", orig),
+        &format!("__esp_hal_internal_{orig}"),
         proc_macro2::Span::call_site(),
     );
     let new = f.sig.ident.clone();
 
     quote::quote_spanned!(original_span =>
         #f
+
+        const _: () = {
+            core::assert!(
+            match #priority {
+                #root::interrupt::Priority::None => false,
+                _ => true,
+            },
+            "Priority::None is not supported");
+        };
 
         #[allow(non_upper_case_globals)]
         #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);

@@ -201,16 +201,11 @@ impl InternalBurstConfig {
     // Size and address alignment as those come in pairs on current hardware.
     const fn min_dram_alignment(self, direction: TransferDirection) -> usize {
         if matches!(direction, TransferDirection::In) {
-            // NOTE(danielb): commenting this check is incorrect as per TRM, but works.
-            //                we'll need to restore this once peripherals can read a
-            //                different amount of data than what is configured in the
-            //                buffer.
-            // if cfg!(esp32) {
-            //     // NOTE: The size must be word-aligned.
-            //     // NOTE: The buffer address must be word-aligned
-            //     4
-            // }
-            if self.is_burst_enabled() {
+            if cfg!(esp32) {
+                // NOTE: The size must be word-aligned.
+                // NOTE: The buffer address must be word-aligned
+                4
+            } else if self.is_burst_enabled() {
                 // As described in "Accessing Internal Memory" paragraphs in the various TRMs.
                 4
             } else {
@@ -234,11 +229,7 @@ impl InternalBurstConfig {
 }
 
 const fn max(a: usize, b: usize) -> usize {
-    if a > b {
-        a
-    } else {
-        b
-    }
+    if a > b { a } else { b }
 }
 
 impl BurstConfig {
@@ -580,7 +571,17 @@ impl DmaTxBuf {
         self.descriptors.set_tx_length(
             len,
             burst.max_chunk_size_for(self.buffer, TransferDirection::Out),
-        )
+        )?;
+
+        // This only needs to be done once (after every significant length change) as
+        // Self::prepare sets Preparation::auto_write_back to false.
+        for desc in self.descriptors.linked_iter_mut() {
+            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
+            // the end of the transfer.
+            desc.reset_for_tx(desc.next.is_null());
+        }
+
+        Ok(())
     }
 
     /// Reset the descriptors to only transmit `len` amount of bytes from this
@@ -617,12 +618,6 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
     type View = BufView<DmaTxBuf>;
 
     fn prepare(&mut self) -> Preparation {
-        for desc in self.descriptors.linked_iter_mut() {
-            // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
-            // the end of the transfer.
-            desc.reset_for_tx(desc.next.is_null());
-        }
-
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
@@ -682,13 +677,29 @@ impl DmaRxBuf {
         descriptors: &'static mut [DmaDescriptor],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
+        Self::new_with_config(descriptors, buffer, BurstConfig::default())
+    }
+
+    /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
+    ///
+    /// There must be enough descriptors for the provided buffer.
+    /// Depending on alignment requirements, each descriptor can handle at most
+    /// 4092 bytes worth of buffer.
+    ///
+    /// Both the descriptors and buffer must be in DMA-capable memory.
+    /// Only DRAM is supported for descriptors.
+    pub fn new_with_config(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+        config: impl Into<BurstConfig>,
+    ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
             descriptors: DescriptorSet::new(descriptors)?,
             buffer,
             burst: BurstConfig::default(),
         };
 
-        buf.configure(buf.burst, buf.capacity())?;
+        buf.configure(config, buf.capacity())?;
 
         Ok(buf)
     }
@@ -782,6 +793,8 @@ impl DmaRxBuf {
     ///
     /// Returns the number of bytes in written to `buf`.
     pub fn read_received_data(&self, mut buf: &mut [u8]) -> usize {
+        // Note that due to an ESP32 quirk, the last received descriptor may not get
+        // updated.
         let capacity = buf.len();
         for chunk in self.received_data() {
             if buf.is_empty() {

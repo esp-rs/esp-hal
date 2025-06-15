@@ -23,7 +23,15 @@
 //! }
 //! ```
 //!
+//! Alternatively, you can use the `heap_allocator!` macro to configure the
+//! global allocator with a given size:
+//!
+//! ```rust
+//! esp_alloc::heap_allocator!(size: 32 * 1024);
+//! ```
+//!
 //! # Using this with the nightly `allocator_api`-feature
+//!
 //! Sometimes you want to have more control over allocations.
 //!
 //! For that, it's convenient to use the nightly `allocator_api`-feature,
@@ -33,6 +41,7 @@
 //! flag.
 //!
 //! Create and initialize an allocator to use in single allocations:
+//!
 //! ```rust
 //! static PSRAM_ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 //!
@@ -41,23 +50,81 @@
 //!         PSRAM_ALLOCATOR.add_region(esp_alloc::HeapRegion::new(
 //!             psram::psram_vaddr_start() as *mut u8,
 //!             psram::PSRAM_BYTES,
-//!             esp_alloc::MemoryCapability::Internal.into(),
+//!             esp_alloc::MemoryCapability::External.into(),
 //!         ));
 //!     }
 //! }
 //! ```
 //!
 //! And then use it in an allocation:
+//!
 //! ```rust
 //! let large_buffer: Vec<u8, _> = Vec::with_capacity_in(1048576, &PSRAM_ALLOCATOR);
 //! ```
 //!
+//! Alternatively, you can use the `psram_allocator!` macro to configure the
+//! global allocator to use PSRAM:
+//!
+//! ```rust
+//! let p = esp_hal::init(esp_hal::Config::default());
+//! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+//! ```
+//!
+//! You can also use the `ExternalMemory` allocator to allocate PSRAM memory
+//! with the global allocator:
+//!
+//! ```rust
+//! let p = esp_hal::init(esp_hal::Config::default());
+//! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+//!
+//! let mut vec = Vec::<u32>::new_in(esp_alloc::ExternalMemory);
+//! ```
+//!
+//! ## `allocator_api` feature on stable Rust
+//!
+//! `esp-alloc` implements the allocator trait from [`allocator_api2`], which
+//! provides the nightly-only `allocator_api` features in stable Rust. The crate
+//! contains implementations for `Box` and `Vec`.
+//!
+//! To use the `allocator_api2` features, you need to add the crate to your
+//! `Cargo.toml`. Note that we do not enable the `alloc` feature by default, but
+//! you will need it for the `Box` and `Vec` types.
+//!
+//! ```toml
+//! allocator-api2 = { version = "0.3", default-features = false, features = ["alloc"] }
+//! ```
+//!
+//! With this, you can use the `Box` and `Vec` types from `allocator_api2`, with
+//! `esp-alloc` allocators:
+//!
+//! ```rust
+//! let p = esp_hal::init(esp_hal::Config::default());
+//! esp_alloc::heap_allocator!(size: 64000);
+//! esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+//!
+//! let mut vec: Vec<u32, _> = Vec::new_in(esp_alloc::InternalMemory);
+//!
+//! vec.push(0xabcd1234);
+//! assert_eq!(vec[0], 0xabcd1234);
+//! ```
+//!
+//! Note that if you use the nightly `allocator_api` feature, you can use the
+//! `Box` and `Vec` types from `alloc`. `allocator_api2` is still available as
+//! an option, but types from `allocator_api2` are not compatible with the
+//! standard library types.
+//!
+//! # Heap stats
+//!
 //! You can also get stats about the heap usage at anytime with:
+//!
 //! ```rust
 //! let stats: HeapStats = esp_alloc::HEAP.stats();
-//! // HeapStats implements the Display and defmt::Format traits, so you can pretty-print the heap stats.
+//! // HeapStats implements the Display and defmt::Format traits, so you can
+//! // pretty-print the heap stats.
 //! println!("{}", stats);
 //! ```
+//!
+//! Example output:
 //!
 //! ```txt
 //! HEAP INFO
@@ -68,8 +135,6 @@
 //! Total allocated: 46148
 //! Memory Layout:
 //! Internal | ████████████░░░░░░░░░░░░░░░░░░░░░░░ | Used: 35% (Used 46148 of 131068, free: 84920)
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
-//! Unused   | ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ |
 //! ```
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
@@ -77,10 +142,9 @@
 #![cfg_attr(feature = "nightly", feature(allocator_api))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
+mod allocators;
 mod macros;
 
-#[cfg(feature = "nightly")]
-use core::alloc::{AllocError, Allocator};
 use core::{
     alloc::{GlobalAlloc, Layout},
     cell::RefCell,
@@ -88,6 +152,7 @@ use core::{
     ptr::{self, NonNull},
 };
 
+pub use allocators::*;
 use critical_section::Mutex;
 use enumset::{EnumSet, EnumSetType};
 use linked_list_allocator::Heap;
@@ -213,10 +278,12 @@ impl HeapRegion {
         size: usize,
         capabilities: EnumSet<MemoryCapability>,
     ) -> Self {
-        let mut heap = Heap::empty();
-        heap.init(heap_bottom, size);
+        unsafe {
+            let mut heap = Heap::empty();
+            heap.init(heap_bottom, size);
 
-        Self { heap, capabilities }
+            Self { heap, capabilities }
+        }
     }
 
     /// Return stats for the current memory region
@@ -274,11 +341,6 @@ impl Display for HeapStats {
             if let Some(region) = region.as_ref() {
                 region.fmt(f)?;
                 writeln!(f)?;
-            } else {
-                // Display unused memory regions
-                write!(f, "Unused   | ")?;
-                write_bar(f, 0)?;
-                writeln!(f, " |")?;
             }
         }
         Ok(())
@@ -301,10 +363,6 @@ impl defmt::Format for HeapStats {
         for region in self.region_stats.iter() {
             if let Some(region) = region.as_ref() {
                 defmt::write!(fmt, "{}\n", region);
-            } else {
-                defmt::write!(fmt, "Unused   | ");
-                write_bar_defmt(fmt, 0);
-                defmt::write!(fmt, " |\n");
             }
         }
     }
@@ -537,53 +595,37 @@ impl EspHeap {
 
 unsafe impl GlobalAlloc for EspHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.alloc_caps(EnumSet::empty(), layout)
+        unsafe { self.alloc_caps(EnumSet::empty(), layout) }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
-            return;
-        }
+        unsafe {
+            if ptr.is_null() {
+                return;
+            }
 
-        critical_section::with(|cs| {
-            #[cfg(feature = "internal-heap-stats")]
-            let before = self.used();
-            let mut regions = self.heap.borrow_ref_mut(cs);
-            let mut iter = (*regions).iter_mut();
+            critical_section::with(|cs| {
+                #[cfg(feature = "internal-heap-stats")]
+                let before = self.used();
+                let mut regions = self.heap.borrow_ref_mut(cs);
+                let mut iter = (*regions).iter_mut();
 
-            while let Some(Some(region)) = iter.next() {
-                if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
-                    region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
+                while let Some(Some(region)) = iter.next() {
+                    if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
+                        region.heap.deallocate(NonNull::new_unchecked(ptr), layout);
+                    }
                 }
-            }
 
-            #[cfg(feature = "internal-heap-stats")]
-            {
-                let mut internal_heap_stats = self.internal_heap_stats.borrow_ref_mut(cs);
-                drop(regions);
-                // We need to call `used()` because [linked_list_allocator::Heap] does internal
-                // size alignment so we cannot use the size provided by the
-                // layout.
-                internal_heap_stats.total_freed += before - self.used();
-            }
-        })
-    }
-}
-
-#[cfg(feature = "nightly")]
-unsafe impl Allocator for EspHeap {
-    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-        let raw_ptr = unsafe { self.alloc(layout) };
-
-        if raw_ptr.is_null() {
-            return Err(AllocError);
+                #[cfg(feature = "internal-heap-stats")]
+                {
+                    let mut internal_heap_stats = self.internal_heap_stats.borrow_ref_mut(cs);
+                    drop(regions);
+                    // We need to call `used()` because [linked_list_allocator::Heap] does internal
+                    // size alignment so we cannot use the size provided by the
+                    // layout.
+                    internal_heap_stats.total_freed += before - self.used();
+                }
+            })
         }
-
-        let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
-        Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
-    }
-
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        self.dealloc(ptr.as_ptr(), layout);
     }
 }

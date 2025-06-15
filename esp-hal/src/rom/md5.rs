@@ -78,7 +78,7 @@ struct InternalContext {
 }
 
 #[cfg(rom_md5_bsd)]
-extern "C" {
+unsafe extern "C" {
     fn esp_rom_md5_init(context: *mut InternalContext);
     fn esp_rom_md5_update(context: *mut InternalContext, buf: *const c_void, len: u32);
     fn esp_rom_md5_final(digest: *mut u8, context: *mut InternalContext);
@@ -94,7 +94,7 @@ struct InternalContext {
 }
 
 #[cfg(rom_md5_mbedtls)]
-extern "C" {
+unsafe extern "C" {
     fn esp_rom_mbedtls_md5_starts_ret(context: *mut InternalContext) -> c_int;
     fn esp_rom_mbedtls_md5_update_ret(
         context: *mut InternalContext,
@@ -185,7 +185,7 @@ pub struct Digest(pub [u8; 16]);
 impl fmt::LowerHex for Digest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &byte in &self.0 {
-            write!(f, "{:02x}", byte)?;
+            write!(f, "{byte:02x}")?;
         }
         Ok(())
     }
@@ -194,7 +194,7 @@ impl fmt::LowerHex for Digest {
 impl fmt::UpperHex for Digest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for &byte in &self.0 {
-            write!(f, "{:02X}", byte)?;
+            write!(f, "{byte:02X}")?;
         }
         Ok(())
     }

@@ -1,43 +1,62 @@
 [package]
-name = "esp-storage"
-version = "0.5.0"
-edition = "2021"
-rust-version = "1.84.0"
-description  = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
-keywords     = ["embedded-storage", "esp32", "espressif", "no-std"]
-categories   = ["embedded", "hardware-support", "no-std"]
-repository   = "https://github.com/esp-rs/esp-storage"
-license      = "MIT OR Apache-2.0"
+name          = "esp-storage"
+version       = "0.6.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Implementation of embedded-storage traits to access unencrypted ESP32 flash"
+documentation = "https://docs.espressif.com/projects/rust/esp-storage/latest/"
+keywords      = ["embedded-storage", "esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 
+[lib]
+bench = false
+test  = false
+
 [dependencies]
 embedded-storage = "0.3.1"
-critical-section = { version =  "1.2.0", optional = true }
+
+# Optional dependencies
+critical-section = { version = "1.2.0", optional = true }
+
+# Unstable dependencies that are not (strictly) part of the public API
+document-features = "0.2.11"
 
 [build-dependencies]
-esp-build = { version = "0.2.0", path = "../esp-build" }
+esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
 [features]
-default = ["critical-section", "storage"]
-critical-section = ["dep:critical-section"]
-# ReadStorage/Storage traits
-storage = []
-# ReadNorFlash/NorFlash traits
-nor-flash = []
-# Bytewise read emulation
-bytewise-read = []
-esp32c2 = []
-esp32c3 = []
-esp32c6 = []
-esp32h2 = []
-esp32   = []
-esp32s2 = []
-esp32s3 = []
-# Enable flash emulation to run tests
-emulation = []
+default = ["critical-section"]
 
-# this feature is reserved for very specific use-cases - usually you don't want to use this!
-low-level = []
+## Place the flash operations in a critical section
+critical-section = ["dep:critical-section"]
+
+## Bytewise read emulation
+bytewise-read = []
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+# The following trailing spaces ("## ") are important to display the feature names.
+
+## 
+esp32c2   = []
+## 
+esp32c3   = []
+## 
+esp32c6   = []
+## 
+esp32h2   = []
+## 
+esp32     = []
+## 
+esp32s2   = []
+## 
+esp32s3   = []
+## Used for testing on a host.
+emulation = []

@@ -6,12 +6,9 @@
 //!
 //! For more information on these modes, please refer to the documentation in
 //! their respective modules.
-//!
-//! ## Implementation State
-//! - RGB is not supported yet
 
 use super::GenericPeripheralGuard;
-use crate::{peripheral::PeripheralRef, peripherals::LCD_CAM, system};
+use crate::{peripherals::LCD_CAM, system};
 
 pub mod dpi;
 pub mod i8080;
@@ -19,7 +16,7 @@ pub mod i8080;
 /// Represents an LCD interface.
 pub struct Lcd<'d, Dm: crate::DriverMode> {
     /// The `LCD_CAM` peripheral reference for managing the LCD functionality.
-    pub(crate) lcd_cam: PeripheralRef<'d, LCD_CAM>,
+    pub(crate) lcd_cam: LCD_CAM<'d>,
 
     /// A marker for the mode of operation (blocking or asynchronous).
     pub(crate) _mode: core::marker::PhantomData<Dm>,

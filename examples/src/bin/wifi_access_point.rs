@@ -29,12 +29,14 @@ use esp_println::{print, println};
 use esp_wifi::{
     init,
     wifi::{
-        event::{self, EventExt},
         AccessPointConfiguration,
         Configuration,
+        event::{self, EventExt},
     },
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -81,7 +83,7 @@ fn main() -> ! {
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-wifi".try_into().unwrap(),
+        ssid: "esp-wifi".into(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
@@ -110,7 +112,9 @@ fn main() -> ! {
         ))
         .unwrap();
 
-    println!("Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    println!(
+        "Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/"
+    );
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
     let mut rx_buffer = [0u8; 1536];

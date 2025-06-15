@@ -91,7 +91,6 @@ use crate::{
     clock::Clocks,
     gpio::OutputSignal,
     pac,
-    peripheral::{Peripheral, PeripheralRef},
     system::{self, PeripheralGuard},
     time::Rate,
 };
@@ -106,7 +105,7 @@ type RegisterBlock = pac::mcpwm0::RegisterBlock;
 /// The MCPWM peripheral
 #[non_exhaustive]
 pub struct McPwm<'d, PWM> {
-    _inner: PeripheralRef<'d, PWM>,
+    _inner: PWM,
     /// Timer0
     pub timer0: Timer<0, PWM>,
     /// Timer1
@@ -122,15 +121,10 @@ pub struct McPwm<'d, PWM> {
     _guard: PeripheralGuard,
 }
 
-impl<'d, PWM: PwmPeripheral> McPwm<'d, PWM> {
+impl<'d, PWM: PwmPeripheral + 'd> McPwm<'d, PWM> {
     /// `pwm_clk = clocks.crypto_pwm_clock / (prescaler + 1)`
     // clocks.crypto_pwm_clock normally is 160 MHz
-    pub fn new(
-        peripheral: impl Peripheral<P = PWM> + 'd,
-        peripheral_clock: PeripheralClockConfig,
-    ) -> Self {
-        crate::into_ref!(peripheral);
-
+    pub fn new(peripheral: PWM, peripheral_clock: PeripheralClockConfig) -> Self {
         let guard = PeripheralGuard::new(PWM::peripheral());
 
         #[cfg(not(esp32c6))]
@@ -324,7 +318,7 @@ pub trait PwmPeripheral: crate::private::Sealed {
 }
 
 #[cfg(mcpwm0)]
-impl PwmPeripheral for crate::peripherals::MCPWM0 {
+impl PwmPeripheral for crate::peripherals::MCPWM0<'_> {
     fn block() -> *const RegisterBlock {
         Self::regs()
     }
@@ -347,7 +341,7 @@ impl PwmPeripheral for crate::peripherals::MCPWM0 {
 }
 
 #[cfg(mcpwm1)]
-impl PwmPeripheral for crate::peripherals::MCPWM1 {
+impl PwmPeripheral for crate::peripherals::MCPWM1<'_> {
     fn block() -> *const RegisterBlock {
         Self::regs()
     }

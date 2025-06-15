@@ -6,32 +6,24 @@
 #![no_std]
 #![no_main]
 
+use embassy_futures::select::select;
 use embassy_time::{Duration, Ticker, Timer};
 #[cfg(not(feature = "esp32"))]
 use esp_hal::{
-    interrupt::software::SoftwareInterruptControl,
     interrupt::Priority,
+    interrupt::software::SoftwareInterruptControl,
     timer::systimer::SystemTimer,
-    timer::AnyTimer,
 };
 use esp_hal::{
     peripherals::Peripherals,
     time,
-    timer::{timg::TimerGroup, OneShotTimer, PeriodicTimer},
+    timer::{AnyTimer, OneShotTimer, PeriodicTimer, timg::TimerGroup},
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
-use hil_test as _;
+use hil_test::mk_static;
 
-#[cfg(not(feature = "esp32"))]
-macro_rules! mk_static {
-    ($t:ty,$val:expr) => {{
-        static STATIC_CELL: static_cell::StaticCell<$t> = static_cell::StaticCell::new();
-        #[deny(unused_attributes)]
-        let x = STATIC_CELL.uninit().write(($val));
-        x
-    }};
-}
+esp_bootloader_esp_idf::esp_app_desc!();
 
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
@@ -44,7 +36,6 @@ mod test_helpers {
 }
 
 mod test_cases {
-    use esp_hal::peripheral::Peripheral;
 
     use super::*;
 
@@ -62,7 +53,7 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_periodic_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+    pub fn run_test_periodic_timer<'d, T: esp_hal::timer::Timer + Into<AnyTimer<'d>>>(timer: T) {
         let mut periodic = PeriodicTimer::new(timer);
 
         let t1 = time::Instant::now();
@@ -80,7 +71,7 @@ mod test_cases {
         );
     }
 
-    pub fn run_test_oneshot_timer<T: esp_hal::timer::Timer>(timer: impl Peripheral<P = T>) {
+    pub fn run_test_oneshot_timer<'d, T: esp_hal::timer::Timer + Into<AnyTimer<'d>>>(timer: T) {
         let mut timer = OneShotTimer::new(timer);
 
         let t1 = esp_hal::time::Instant::now();
@@ -124,6 +115,7 @@ fn set_up_embassy_with_systimer(peripherals: Peripherals) {
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod test {
+
     use super::*;
     use crate::test_cases::*;
     #[cfg(not(feature = "esp32"))]
@@ -167,16 +159,16 @@ mod test {
     #[test]
     fn test_periodic_oneshot_timg(peripherals: Peripherals) {
         let mut timg0 = TimerGroup::new(peripherals.TIMG0);
-        run_test_periodic_timer(&mut timg0.timer0);
-        run_test_oneshot_timer(&mut timg0.timer0);
+        run_test_periodic_timer(timg0.timer0.reborrow());
+        run_test_oneshot_timer(timg0.timer0.reborrow());
     }
 
     #[test]
     #[cfg(not(feature = "esp32"))]
     fn test_periodic_oneshot_systimer(peripherals: Peripherals) {
         let mut systimer = SystemTimer::new(peripherals.SYSTIMER);
-        run_test_periodic_timer(&mut systimer.alarm0);
-        run_test_oneshot_timer(&mut systimer.alarm0);
+        run_test_periodic_timer(systimer.alarm0.reborrow());
+        run_test_oneshot_timer(systimer.alarm0.reborrow());
     }
 
     #[test]
@@ -272,5 +264,17 @@ mod test {
         }
 
         assert!(false, "Test failed after 5 retries");
+    }
+
+    /// Test that timg0 and systimer don't have vastly different tick rates.
+    #[test]
+    async fn test_that_a_very_long_wakeup_does_not_panic(peripherals: Peripherals) {
+        set_up_embassy_with_timg0(peripherals);
+
+        select(
+            Timer::after(Duration::from_micros(u64::MAX / 2)),
+            embassy_futures::yield_now(), // we don't actually want to wait forever
+        )
+        .await;
     }
 }

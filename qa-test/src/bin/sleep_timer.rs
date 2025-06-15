@@ -1,6 +1,6 @@
 //! Demonstrates deep sleep with timer wakeup
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32s3 esp32c2
+//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3 esp32c2
 
 #![no_std]
 #![no_main]
@@ -11,10 +11,12 @@ use esp_backtrace as _;
 use esp_hal::{
     delay::Delay,
     main,
-    rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason},
+    rtc_cntl::{Rtc, SocResetReason, reset_reason, sleep::TimerWakeupSource, wakeup_cause},
     system::Cpu,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {

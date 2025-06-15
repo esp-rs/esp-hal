@@ -1,4 +1,4 @@
-use crate::aes::{Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, Mode, ALIGN_SIZE};
+use crate::aes::{ALIGN_SIZE, Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, Mode};
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {

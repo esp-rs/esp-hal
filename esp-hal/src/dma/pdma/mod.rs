@@ -14,20 +14,17 @@
 use critical_section::CriticalSection;
 use portable_atomic::AtomicBool;
 
-use crate::{
-    asynch::AtomicWaker,
-    dma::*,
-    handler,
-    interrupt::Priority,
-    peripheral::{Peripheral, PeripheralRef},
-    peripherals::Interrupt,
-};
+use crate::{asynch::AtomicWaker, dma::*, handler, interrupt::Priority, peripherals::Interrupt};
 
+#[cfg(esp32s2)]
+mod copy;
 #[cfg(esp32s2)]
 mod crypto;
 mod i2s;
 mod spi;
 
+#[cfg(esp32s2)]
+pub use copy::*;
 #[cfg(esp32s2)]
 pub use crypto::*;
 pub use i2s::*;
@@ -51,56 +48,33 @@ pub trait PdmaChannel: crate::private::Sealed {
 macro_rules! impl_pdma_channel {
     ($peri:ident, $register_block:ident, $instance:ident, $int:ident, [$($compatible:ident),*]) => {
         paste::paste! {
-            #[doc = concat!("DMA channel suitable for ", stringify!([< $instance:upper >]))]
-            #[non_exhaustive]
-            #[derive(Debug)]
-            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-            pub struct [<$instance DmaChannel>] {}
+            use $crate::peripherals::[< $instance >];
+            impl<'d> DmaChannel for $instance<'d> {
+                type Rx = [<$peri DmaRxChannel>]<'d>;
+                type Tx = [<$peri DmaTxChannel>]<'d>;
 
-            impl $crate::private::Sealed for [<$instance DmaChannel>] {}
-
-            impl Peripheral for [<$instance DmaChannel>] {
-                type P = Self;
-
-                unsafe fn clone_unchecked(&self) -> Self::P {
-                    Self::steal()
-                }
+                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) { unsafe {
+                    (
+                        [<$peri DmaRxChannel>](Self::steal().into()),
+                        [<$peri DmaTxChannel>](Self::steal().into()),
+                    )
+                }}
             }
 
-            impl [<$instance DmaChannel>] {
-                /// Unsafely constructs a new DMA channel.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that only a single instance is used.
-                pub unsafe fn steal() -> Self {
-                    Self {}
-                }
-            }
-
-            impl DmaChannel for [<$instance DmaChannel>] {
-                type Rx = [<$peri DmaRxChannel>];
-                type Tx = [<$peri DmaTxChannel>];
-
-                unsafe fn split_internal(self, _: $crate::private::Internal) -> (Self::Rx, Self::Tx) {
-                    ([<$peri DmaRxChannel>](Self {}.into()), [<$peri DmaTxChannel>](Self {}.into()))
-                }
-            }
-
-            impl DmaChannelExt for [<$instance DmaChannel>] {
+            impl DmaChannelExt for $instance<'_> {
                 fn rx_interrupts() -> impl InterruptAccess<DmaRxInterrupt> {
-                    [<$peri DmaRxChannel>](Self {}.into())
+                    [<$peri DmaRxChannel>](unsafe { Self::steal() }.into())
                 }
                 fn tx_interrupts() -> impl InterruptAccess<DmaTxInterrupt> {
-                    [<$peri DmaTxChannel>](Self {}.into())
+                    [<$peri DmaTxChannel>](unsafe { Self::steal() }.into())
                 }
             }
 
-            impl PdmaChannel for [<$instance DmaChannel>] {
+            impl PdmaChannel for $instance<'_> {
                 type RegisterBlock = $register_block;
 
                 fn register_block(&self) -> &Self::RegisterBlock {
-                    crate::peripherals::[< $instance:upper >]::regs()
+                    $crate::peripherals::[< $instance >]::regs()
                 }
                 fn tx_waker(&self) -> &'static AtomicWaker {
                     static WAKER: AtomicWaker = AtomicWaker::new();
@@ -122,8 +96,8 @@ macro_rules! impl_pdma_channel {
                 fn async_handler(&self) -> InterruptHandler {
                     #[handler(priority = Priority::max())]
                     pub(crate) fn interrupt_handler() {
-                        super::asynch::handle_in_interrupt::<[< $instance DmaChannel >]>();
-                        super::asynch::handle_out_interrupt::<[< $instance DmaChannel >]>();
+                        super::asynch::handle_in_interrupt::<$instance<'static>>();
+                        super::asynch::handle_out_interrupt::<$instance<'static>>();
                     }
 
                     interrupt_handler
@@ -138,20 +112,20 @@ macro_rules! impl_pdma_channel {
                 }
             }
 
-            impl DmaChannelConvert<[<$peri DmaChannel>]> for [<$instance DmaChannel>] {
-                fn degrade(self) -> [<$peri DmaChannel>] {
+            impl<'d> DmaChannelConvert<[<$peri DmaChannel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri DmaChannel>]<'d> {
                     self.into()
                 }
             }
 
-            impl DmaChannelConvert<[<$peri DmaRxChannel>]> for [<$instance DmaChannel>] {
-                fn degrade(self) -> [<$peri DmaRxChannel>] {
+            impl<'d> DmaChannelConvert<[<$peri DmaRxChannel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri DmaRxChannel>]<'d> {
                     [<$peri DmaRxChannel>](self.into())
                 }
             }
 
-            impl DmaChannelConvert<[<$peri DmaTxChannel>]> for [<$instance DmaChannel>] {
-                fn degrade(self) -> [<$peri DmaTxChannel>] {
+            impl<'d> DmaChannelConvert<[<$peri DmaTxChannel>]<'d>> for $instance<'d> {
+                fn degrade(self) -> [<$peri DmaTxChannel>]<'d> {
                     [<$peri DmaTxChannel>](self.into())
                 }
             }
@@ -159,25 +133,27 @@ macro_rules! impl_pdma_channel {
     };
 }
 
-impl_pdma_channel!(AnySpi, SpiRegisterBlock, Spi2, SPI2_DMA, [Spi2]);
-impl_pdma_channel!(AnySpi, SpiRegisterBlock, Spi3, SPI3_DMA, [Spi3]);
+impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI2, SPI2_DMA, [Spi2]);
+impl_pdma_channel!(AnySpi, SpiRegisterBlock, DMA_SPI3, SPI3_DMA, [Spi3]);
 
-impl_pdma_channel!(AnyI2s, I2sRegisterBlock, I2s0, I2S0, [I2s0]);
+impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S0, I2S0, [I2s0]);
 #[cfg(i2s1)]
-impl_pdma_channel!(AnyI2s, I2sRegisterBlock, I2s1, I2S1, [I2s1]);
+impl_pdma_channel!(AnyI2s, I2sRegisterBlock, DMA_I2S1, I2S1, [I2s1]);
 
 // Specific peripherals use specific channels. Note that this may be overly
 // restrictive (ESP32 allows configuring 2 SPI DMA channels between 3 different
 // peripherals), but for the current set of restrictions this is sufficient.
-crate::dma::impl_dma_eligible!([Spi2DmaChannel] SPI2 => Spi2);
-crate::dma::impl_dma_eligible!([Spi3DmaChannel] SPI3 => Spi3);
-crate::dma::impl_dma_eligible!([I2s0DmaChannel] I2S0 => I2s0);
+crate::dma::impl_dma_eligible!([DMA_SPI2] SPI2 => Spi2);
+crate::dma::impl_dma_eligible!([DMA_SPI3] SPI3 => Spi3);
+crate::dma::impl_dma_eligible!([DMA_I2S0] I2S0 => I2s0);
 #[cfg(i2s1)]
-crate::dma::impl_dma_eligible!([I2s1DmaChannel] I2S1 => I2s1);
+crate::dma::impl_dma_eligible!([DMA_I2S1] I2S1 => I2s1);
 #[cfg(esp32s2)]
-crate::dma::impl_dma_eligible!([CryptoDmaChannel] AES => Aes);
+use crate::peripherals::DMA_CRYPTO;
 #[cfg(esp32s2)]
-crate::dma::impl_dma_eligible!([CryptoDmaChannel] SHA => Sha);
+crate::dma::impl_dma_eligible!([DMA_CRYPTO] AES => Aes);
+#[cfg(esp32s2)]
+crate::dma::impl_dma_eligible!([DMA_CRYPTO] SHA => Sha);
 
 pub(super) fn init_dma(_cs: CriticalSection<'_>) {
     #[cfg(esp32)]
@@ -193,15 +169,28 @@ pub(super) fn init_dma(_cs: CriticalSection<'_>) {
             .spi_dma_chan_sel()
             .modify(|_, w| unsafe { w.spi2_dma_chan_sel().bits(1).spi3_dma_chan_sel().bits(2) });
     }
+
+    #[cfg(esp32s2)]
+    {
+        // This is the only DMA channel on the S2 that needs to be enabled this way
+        // (using its own registers). Ideally this should be enabled only when
+        // the DMA channel is in use but we don't have a good mechanism for that
+        // yet. For now, we shall just turn in on forever once any DMA channel is used.
+
+        use crate::peripherals::DMA_COPY;
+
+        DMA_COPY::regs().conf().modify(|_, w| w.clk_en().set_bit());
+    }
 }
 
-impl<CH, Dm> Channel<'_, Dm, CH>
+impl<CH, Dm> Channel<Dm, CH>
 where
     CH: DmaChannel,
     Dm: DriverMode,
 {
     /// Asserts that the channel is compatible with the given peripheral.
-    pub fn runtime_ensure_compatible(&self, peripheral: &PeripheralRef<'_, impl DmaEligible>) {
+    #[instability::unstable]
+    pub fn runtime_ensure_compatible(&self, peripheral: &impl DmaEligible) {
         assert!(
             self.tx
                 .tx_impl

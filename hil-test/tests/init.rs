@@ -7,15 +7,17 @@
 #![no_main]
 
 use esp_hal::{
+    Config,
     clock::CpuClock,
     config::{WatchdogConfig, WatchdogStatus},
     delay::Delay,
     rtc_cntl::Rtc,
     time::Duration,
     timer::timg::TimerGroup,
-    Config,
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
@@ -23,6 +25,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt() {
         let peripherals = esp_hal::init(
             Config::default().with_watchdog(
@@ -42,7 +45,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(timg1)]
+    #[cfg(timergroup_timg1)]
     fn test_feeding_timg1_wdt() {
         let peripherals = esp_hal::init(
             Config::default().with_watchdog(
@@ -62,6 +65,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(timergroup_timg0)]
     fn test_feeding_timg0_wdt_max_clock() {
         let peripherals = esp_hal::init(
             Config::default()

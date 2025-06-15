@@ -25,7 +25,7 @@
 //! considered pseudo-random only.
 //!
 //! For more information, please refer to the
-#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", crate::soc::chip!(), "/api-reference/system/random.html)")]
+#![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/system/random.html)")]
 //! ## Configuration
 //! To use the [Rng] Driver, you need to initialize it with the RNG peripheral.
 //! Once initialized, you can generate random numbers by calling the `random`
@@ -69,7 +69,7 @@
 //! let mut buf = [0u8; 16];
 //!
 //! // ADC is not available from now
-//! let mut trng = Trng::new(peripherals.RNG, &mut peripherals.ADC1);
+//! let mut trng = Trng::new(peripherals.RNG, peripherals.ADC1.reborrow());
 //! trng.read(&mut buf);
 //! let mut true_rand = trng.random();
 //! let mut rng = trng.downgrade();
@@ -89,26 +89,21 @@
 //! # Ok(())
 //! # }
 //! ```
-use core::marker::PhantomData;
 
 use crate::{
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::{ADC1, RNG},
     private::Sealed,
 };
 
 /// Random number generator driver
 #[derive(Clone, Copy)]
-pub struct Rng {
-    _phantom: PhantomData<RNG>,
-}
+#[non_exhaustive]
+pub struct Rng;
 
 impl Rng {
     /// Create a new random number generator instance
-    pub fn new(_rng: impl Peripheral<P = RNG>) -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
+    pub fn new(_rng: RNG<'_>) -> Self {
+        Self
     }
 
     #[inline]
@@ -138,16 +133,8 @@ impl Rng {
 
 impl Sealed for Rng {}
 
-impl Peripheral for Rng {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        *self
-    }
-}
-
-impl rand_core::RngCore for Rng {
+#[instability::unstable]
+impl rand_core_06::RngCore for Rng {
     fn next_u32(&mut self) -> u32 {
         self.random()
     }
@@ -163,9 +150,25 @@ impl rand_core::RngCore for Rng {
         self.read(dest);
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core_06::Error> {
         self.read(dest);
         Ok(())
+    }
+}
+
+#[instability::unstable]
+impl rand_core_09::RngCore for Rng {
+    fn next_u32(&mut self) -> u32 {
+        self.random()
+    }
+    fn next_u64(&mut self) -> u64 {
+        let upper = self.random() as u64;
+        let lower = self.random() as u64;
+
+        (upper << 32) | lower
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.read(dest);
     }
 }
 
@@ -180,7 +183,7 @@ pub struct Trng<'d> {
     /// The hardware random number generator instance.
     pub rng: Rng,
     /// A mutable reference to the ADC1 instance.
-    _adc: PeripheralRef<'d, ADC1>,
+    _adc: ADC1<'d>,
 }
 
 impl<'d> Trng<'d> {
@@ -194,13 +197,11 @@ impl<'d> Trng<'d> {
     /// # Returns
     ///
     /// Returns a new `Trng` instance.
-    pub fn new(rng: impl Peripheral<P = RNG>, adc: impl Peripheral<P = ADC1> + 'd) -> Self {
-        crate::into_ref!(adc);
-
-        let gen = Rng::new(rng);
+    pub fn new(rng: RNG<'_>, adc: ADC1<'d>) -> Self {
+        let r#gen = Rng::new(rng);
         crate::soc::trng::ensure_randomness();
         Self {
-            rng: gen,
+            rng: r#gen,
             _adc: adc,
         }
     }
@@ -229,7 +230,8 @@ impl Drop for Trng<'_> {
 }
 
 /// Implementing RngCore trait from rand_core for `Trng` structure
-impl rand_core::RngCore for Trng<'_> {
+#[instability::unstable]
+impl rand_core_06::RngCore for Trng<'_> {
     fn next_u32(&mut self) -> u32 {
         self.rng.next_u32()
     }
@@ -242,25 +244,29 @@ impl rand_core::RngCore for Trng<'_> {
         self.rng.fill_bytes(dest)
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand_core_06::Error> {
         self.rng.try_fill_bytes(dest)
+    }
+}
+
+#[instability::unstable]
+impl rand_core_09::RngCore for Trng<'_> {
+    fn next_u32(&mut self) -> u32 {
+        self.rng.next_u32()
+    }
+    fn next_u64(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        self.rng.fill_bytes(dest)
     }
 }
 
 /// Implementing a CryptoRng marker trait that indicates that the generator is
 /// cryptographically secure.
-impl rand_core::CryptoRng for Trng<'_> {}
+#[instability::unstable]
+impl rand_core_06::CryptoRng for Trng<'_> {}
+#[instability::unstable]
+impl rand_core_09::CryptoRng for Trng<'_> {}
 
 impl Sealed for Trng<'_> {}
-
-impl Peripheral for Trng<'_> {
-    type P = Self;
-
-    #[inline]
-    unsafe fn clone_unchecked(&self) -> Self::P {
-        Self {
-            rng: self.rng.clone_unchecked(),
-            _adc: self._adc.clone_unchecked(),
-        }
-    }
-}

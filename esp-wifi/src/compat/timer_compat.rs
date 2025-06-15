@@ -60,7 +60,7 @@ impl TimerQueue {
     fn find(&mut self, ets_timer: *mut ets_timer) -> Option<&mut Box<Timer>> {
         let mut current = self.head.as_mut();
         while let Some(timer) = current {
-            if timer.ets_timer == ets_timer {
+            if core::ptr::eq(timer.ets_timer, ets_timer) {
                 return Some(timer);
             }
             current = timer.next.as_mut();
@@ -88,7 +88,7 @@ impl TimerQueue {
 
     fn remove(&mut self, ets_timer: *mut ets_timer) {
         if let Some(head) = self.head.as_mut() {
-            if head.ets_timer == ets_timer {
+            if core::ptr::eq(head.ets_timer, ets_timer) {
                 self.head = head.next.take();
                 return;
             }
@@ -102,7 +102,7 @@ impl TimerQueue {
             let before = {
                 let mut found = None;
                 while let Some(before) = current {
-                    if before.next.as_mut().unwrap().ets_timer == ets_timer {
+                    if core::ptr::eq(before.next.as_mut().unwrap().ets_timer, ets_timer) {
                         found = Some(before);
                         break;
                     }
@@ -154,10 +154,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 
     trace!(
         "timer_arm_us {:x} current: {} ticks: {} repeat: {}",
-        ets_timer as usize,
-        systick,
-        ticks,
-        repeat
+        ets_timer as usize, systick, ticks, repeat
     );
 
     TIMERS.with(|timers| {
@@ -210,9 +207,7 @@ pub(crate) fn compat_timer_setfn(
 ) {
     trace!(
         "timer_setfn {:x} {:?} {:?}",
-        ets_timer as usize,
-        pfunction,
-        parg
+        ets_timer as usize, pfunction, parg
     );
     let set = TIMERS.with(|timers| unsafe {
         if let Some(timer) = timers.find(ets_timer) {

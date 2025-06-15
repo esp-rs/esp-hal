@@ -1,32 +1,40 @@
 [package]
-name         = "esp-alloc"
-version      = "0.7.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "A heap allocator for Espressif devices"
-keywords     = ["allocator", "embedded", "esp32", "espressif", "memory"]
-categories   = ["embedded", "memory-management", "no-std"]
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-alloc"
+version       = "0.8.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "A heap allocator for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-alloc/latest/"
+keywords      = ["allocator", "embedded", "esp32", "espressif", "memory"]
+categories    = ["embedded", "memory-management", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["nightly"]
 
+[lib]
+bench = false
+test = false
+
 [dependencies]
-defmt                 = { version = "0.3.10", optional = true }
+allocator-api2        = { version = "0.3.0", default-features = false }
+defmt                 = { version = "1.0.1", optional = true }
 cfg-if                = "1.0.0"
 critical-section      = "1.2.0"
-enumset               = "1.1.5"
+enumset               = "1.1.6"
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
 document-features     = "0.2.11"
 
 [features]
 default = []
+
+## Enable nightly rustc-only features, like `feature(allocator_api)`.
 nightly = []
 
 ## Implement `defmt::Format` on certain types.
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "enumset/defmt"]
 
 ## Enable this feature if you want to keep stats about the internal heap usage such as:
 ## - Max memory usage since initialization of the heap

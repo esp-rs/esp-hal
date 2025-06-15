@@ -11,15 +11,17 @@ use core::{
     task::{Context, Poll},
 };
 
-use embassy_executor::{raw::TaskStorage, Spawner};
+use embassy_executor::{Spawner, raw::TaskStorage};
 use esp_backtrace as _;
 use esp_hal::{
     clock::{Clock, CpuClock},
     handler,
     time::Duration,
-    timer::{systimer::SystemTimer, OneShotTimer},
+    timer::{OneShotTimer, systimer::SystemTimer},
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 static mut COUNTER: u32 = 0;
 static mut T2_COUNTER: u32 = 0;

@@ -15,7 +15,7 @@ pub fn disable() -> u32 {
 /// - Do not call this function inside an `interrupt::free` critical section
 #[inline]
 pub unsafe fn enable() -> u32 {
-    set_mask(!0)
+    unsafe { set_mask(!0) }
 }
 
 /// Enables specific interrupts and returns the previous setting
@@ -25,13 +25,15 @@ pub unsafe fn enable() -> u32 {
 /// - Do not call this function inside an `interrupt::free` critical section
 #[inline]
 pub unsafe fn set_mask(mut mask: u32) -> u32 {
-    asm!("
+    unsafe {
+        asm!("
         xsr {0}, intenable
         rsync
         ",
-        inout(reg) mask, options(nostack)
-    );
-    mask
+            inout(reg) mask, options(nostack)
+        );
+        mask
+    }
 }
 
 /// Disables specific interrupts and returns the previous settings
@@ -59,16 +61,18 @@ pub fn disable_mask(mask: u32) -> u32 {
 /// - Do not call this function inside an `interrupt::free` critical section
 #[inline]
 pub unsafe fn enable_mask(mask: u32) -> u32 {
-    let mut prev: u32 = 0;
-    let _dummy: u32;
-    asm!("
+    unsafe {
+        let mut prev: u32 = 0;
+        let _dummy: u32;
+        asm!("
         xsr.intenable {0} // get mask and temporarily disable interrupts
         or {1}, {1}, {0}
         rsync
         wsr.intenable {1}
         rsync
     ", inout(reg) prev, inout(reg) mask => _dummy, options(nostack));
-    prev
+        prev
+    }
 }
 
 /// Get current interrupt mask
@@ -96,12 +100,14 @@ pub fn get() -> u32 {
 /// Only valid for software interrupts
 #[inline]
 pub unsafe fn set(mask: u32) {
-    asm!("
+    unsafe {
+        asm!("
          wsr.intset {0}
          rsync
          ",
-         in(reg) mask, options(nostack)
-    );
+             in(reg) mask, options(nostack)
+        );
+    }
 }
 
 /// Clear interrupt
@@ -111,12 +117,14 @@ pub unsafe fn set(mask: u32) {
 /// Only valid for software and edge-triggered interrupts
 #[inline]
 pub unsafe fn clear(mask: u32) {
-    asm!("
+    unsafe {
+        asm!("
          wsr.intclear {0}
          rsync
          ",
-         in(reg) mask, options(nostack)
-    );
+             in(reg) mask, options(nostack)
+        );
+    }
 }
 
 /// Get current interrupt level

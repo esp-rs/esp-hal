@@ -24,7 +24,14 @@ MEMORY
     /* memory available after the 2nd stage bootloader is finished */
     dram2_seg ( RW )       : ORIGIN = ORIGIN(RAM) + LENGTH(RAM), len = 0x4087e610 - (ORIGIN(RAM) + LENGTH(RAM))
 
-    /* External flash */
+    /* External flash
+     The 0x20 offset is a convenience for the app binary image generation.
+     Flash cache has 64KB pages. The .bin file which is flashed to the chip
+     has a 0x18 byte file header, and each segment has a 0x08 byte segment
+     header. Setting this offset makes it simple to meet the flash cache MMU's
+     constraint that (paddr % 64KB == vaddr % 64KB).)
+    */
+
     /* Instruction and Data ROM */
     ROM : ORIGIN =   0x42000000 + 0x20, LENGTH = 0x400000 - 0x20
 

@@ -255,16 +255,17 @@ GPIO drivers now take configuration structs.
 
 The OutputOpenDrain driver has been removed. You can use `Output` instead with
 `DriveMode::OpenDrain`. The input-related methods of `OutputOpenDrain` (`level`,
-`is_high`, `is_low`) are available through the (unstable) `Flex` driver.
+`is_high`, `is_low`) are available through the (unstable) `Flex` driver when enabling input.
 
 ```diff
-- OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
-+ Output::new(
-     peripherals.GPIO0,
-     Level::Low,
-     OutputConfig::default()
-         .with_drive_mode(DriveMode::OpenDrain),
- );
+- let mut gpio = OutputOpenDrain::new(peripherals.GPIO0, Level::Low);
++ let mut gpio = Output::new(
++     peripherals.GPIO0,
++     Level::Low,
++     OutputConfig::default()
++         .with_drive_mode(DriveMode::OpenDrain),
++ ).into_flex();
++ gpio.enable_input(true);
 ```
 
 ## AES DMA driver changes

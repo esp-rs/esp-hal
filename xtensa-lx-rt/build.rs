@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::Result;
 use enum_as_inner::EnumAsInner;
-use minijinja::{context, Environment};
+use minijinja::{Environment, context};
 use serde::Deserialize;
 use strum::{Display, EnumIter, EnumString};
 
@@ -24,6 +24,14 @@ enum Chip {
     Esp32s2,
     #[strum(to_string = "xtensa_esp32s3")]
     Esp32s3,
+}
+
+impl Chip {
+    const TARGET_TO_CHIP: &'static [(&'static str, Chip)] = &[
+        ("xtensa-esp32-none-elf", Chip::Esp32),
+        ("xtensa-esp32s2-none-elf", Chip::Esp32s2),
+        ("xtensa-esp32s3-none-elf", Chip::Esp32s3),
+    ];
 }
 
 /// The valid interrupt types declared in the `core-isa.h` headers
@@ -97,15 +105,29 @@ fn handle_esp32() -> Result<()> {
             })
     }
 
-    let chip = match (
-        cfg!(feature = "esp32"),
-        cfg!(feature = "esp32s2"),
-        cfg!(feature = "esp32s3"),
-    ) {
-        (true, false, false) => Chip::Esp32,
-        (false, true, false) => Chip::Esp32s2,
-        (false, false, true) => Chip::Esp32s3,
-        _ => panic!("Either the esp32, esp32s2, esp32s3 feature must be enabled"),
+    // Do not check target when building documentation
+    let chip = if std::env::var("RUSTDOCFLAGS").is_err() {
+        // Based on the build target, determine which chip to use.
+        let target = std::env::var("TARGET");
+        let target = target.as_deref().unwrap_or("unspecified target");
+        let Some(chip) = Chip::TARGET_TO_CHIP
+            .iter()
+            .copied()
+            .find_map(|(t, chip)| (t == target).then_some(chip))
+        else {
+            panic!(
+                "Unsupported target: {target}. Expected one of: {}",
+                Chip::TARGET_TO_CHIP
+                    .iter()
+                    .map(|(t, _)| t.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        };
+        chip
+    } else {
+        // For documentation purposes, we use ESP32
+        Chip::Esp32
     };
 
     let isa_toml = fs::read_to_string(format!("config/{chip}.toml"))?;

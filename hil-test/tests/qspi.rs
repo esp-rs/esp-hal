@@ -7,26 +7,27 @@
 #![no_main]
 
 #[cfg(pcnt)]
-use esp_hal::pcnt::{channel::EdgeMode, unit::Unit, Pcnt};
+use esp_hal::pcnt::{Pcnt, channel::EdgeMode, unit::Unit};
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::{AnyPin, Input, InputConfig, Level, Output, OutputConfig, Pull},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
-        DataMode,
         Mode,
+        master::{Address, Command, Config, DataMode, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 cfg_if::cfg_if! {
     if #[cfg(pdma)] {
-        use esp_hal::dma::Spi2DmaChannel as DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_SPI2<'d>;
     } else {
-        use esp_hal::dma::DmaChannel0;
+        type DmaChannel0<'d> = esp_hal::peripherals::DMA_CH0<'d>;
     }
 }
 
@@ -43,9 +44,9 @@ type SpiUnderTest = SpiDma<'static, Blocking>;
 struct Context {
     spi: Spi<'static, Blocking>,
     #[cfg(pcnt)]
-    pcnt: esp_hal::peripherals::PCNT,
-    dma_channel: DmaChannel0,
-    gpios: [AnyPin; 3],
+    pcnt: esp_hal::peripherals::PCNT<'static>,
+    dma_channel: DmaChannel0<'static>,
+    gpios: [AnyPin<'static>; 3],
 }
 
 fn transfer_read(
@@ -198,9 +199,9 @@ mod tests {
 
         // Make sure pins have no pullups
         let config = InputConfig::default().with_pull(Pull::Down);
-        let _ = Input::new(&mut pin, config);
-        let _ = Input::new(&mut pin_mirror, config);
-        let _ = Input::new(&mut unconnected_pin, config);
+        let _ = Input::new(pin.reborrow(), config);
+        let _ = Input::new(pin_mirror.reborrow(), config);
+        let _ = Input::new(unconnected_pin.reborrow(), config);
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -318,7 +319,7 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -341,8 +342,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -374,8 +375,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0
@@ -407,8 +408,8 @@ mod tests {
         let unit0 = pcnt.unit0;
         let unit1 = pcnt.unit1;
 
-        let (mosi_loopback, mosi) = mosi.split();
-        let (gpio_loopback, gpio) = gpio.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
+        let (gpio_loopback, gpio) = unsafe { gpio.split() };
 
         unit0.channel0.set_edge_signal(mosi_loopback);
         unit0

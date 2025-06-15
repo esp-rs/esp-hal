@@ -1,48 +1,17 @@
 use crate::{
     clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
     peripherals::{APB_CTRL, I2C_ANA_MST, LPWR, SYSTEM},
-    rom::{regi2c_write, regi2c_write_mask},
+    soc::regi2c,
 };
 
-const I2C_BBPLL: u32 = 0x66;
-const I2C_BBPLL_HOSTID: u32 = 0;
-
-const I2C_BBPLL_MODE_HF: u32 = 4;
-
-const I2C_BBPLL_OC_REF_DIV: u32 = 2;
-const I2C_BBPLL_OC_DCHGP_LSB: u32 = 4;
-const I2C_BBPLL_OC_DIV_7_0: u32 = 3;
-
-const I2C_BBPLL_OC_DR1: u32 = 5;
-const I2C_BBPLL_OC_DR1_MSB: u32 = 2;
-const I2C_BBPLL_OC_DR1_LSB: u32 = 0;
-
-const I2C_BBPLL_OC_DR3: u32 = 5;
-const I2C_BBPLL_OC_DR3_MSB: u32 = 6;
-const I2C_BBPLL_OC_DR3_LSB: u32 = 4;
-
-const I2C_BBPLL_OC_DCUR: u32 = 6;
-
-const I2C_BBPLL_OC_VCO_DBIAS: u32 = 9;
-const I2C_BBPLL_OC_VCO_DBIAS_MSB: u32 = 1;
-const I2C_BBPLL_OC_VCO_DBIAS_LSB: u32 = 0;
-
-const I2C_BBPLL_OC_DHREF_SEL: u32 = 6;
-const I2C_BBPLL_OC_DHREF_SEL_MSB: u32 = 5;
-const I2C_BBPLL_OC_DHREF_SEL_LSB: u32 = 4;
-
-const I2C_BBPLL_OC_DLREF_SEL: u32 = 6;
-const I2C_BBPLL_OC_DLREF_SEL_MSB: u32 = 7;
-const I2C_BBPLL_OC_DLREF_SEL_LSB: u32 = 6;
-
 pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock) {
-    let div_ref: u32;
-    let div7_0: u32;
-    let dr1: u32;
-    let dr3: u32;
-    let dchgp: u32;
-    let dcur: u32;
-    let dbias: u32;
+    let div_ref: u8;
+    let div7_0: u8;
+    let dr1: u8;
+    let dr3: u8;
+    let dchgp: u8;
+    let dcur: u8;
+    let dbias: u8;
 
     // Set this register to let the digital part know 480M PLL is used
     SYSTEM::regs().cpu_per_conf().modify(|_, w| {
@@ -89,7 +58,7 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
             }
         }
 
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x6b);
+        regi2c::I2C_BBPLL_REG4.write_reg(0x6b);
     } else {
         // Configure 320M PLL
         match xtal_freq {
@@ -124,29 +93,25 @@ pub(crate) fn esp32c3_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClo
             }
         }
 
-        regi2c_write!(I2C_BBPLL, I2C_BBPLL_MODE_HF, 0x69);
+        regi2c::I2C_BBPLL_REG4.write_reg(0x69);
     }
 
+    const I2C_BBPLL_OC_DCHGP_LSB: u32 = 4;
+    const I2C_BBPLL_OC_DLREF_SEL_LSB: u32 = 6;
+    const I2C_BBPLL_OC_DHREF_SEL_LSB: u32 = 4;
+
     let i2c_bbpll_lref = (dchgp << I2C_BBPLL_OC_DCHGP_LSB) | div_ref;
-    let i2c_bbpll_div_7_0 = div7_0;
     let i2c_bbpll_dcur =
         (2 << I2C_BBPLL_OC_DLREF_SEL_LSB) | (1 << I2C_BBPLL_OC_DHREF_SEL_LSB) | dcur;
 
-    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_REF_DIV, i2c_bbpll_lref);
-
-    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DIV_7_0, i2c_bbpll_div_7_0);
-
-    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR1, dr1);
-
-    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DR3, dr3);
-
-    regi2c_write!(I2C_BBPLL, I2C_BBPLL_OC_DCUR, i2c_bbpll_dcur);
-
-    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_VCO_DBIAS, dbias);
-
-    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DHREF_SEL, 2);
-
-    regi2c_write_mask!(I2C_BBPLL, I2C_BBPLL_OC_DLREF_SEL, 1);
+    regi2c::I2C_BBPLL_OC_REF.write_reg(i2c_bbpll_lref);
+    regi2c::I2C_BBPLL_OC_DIV_REG.write_reg(div7_0);
+    regi2c::I2C_BBPLL_OC_DR1.write_field(dr1);
+    regi2c::I2C_BBPLL_OC_DR3.write_field(dr3);
+    regi2c::I2C_BBPLL_REG6.write_reg(i2c_bbpll_dcur);
+    regi2c::I2C_BBPLL_OC_VCO_DBIAS.write_field(dbias);
+    regi2c::I2C_BBPLL_OC_DHREF_SEL.write_field(2);
+    regi2c::I2C_BBPLL_OC_DLREF_SEL.write_field(1);
 }
 
 pub(crate) fn esp32c3_rtc_bbpll_enable() {

@@ -1,7 +1,7 @@
 # esp-println
 
 [![Crates.io](https://img.shields.io/crates/v/esp-println?labelColor=1C2C2E&color=C96329&logo=Rust&style=flat-square)](https://crates.io/crates/esp-println)
-[![docs.rs](https://img.shields.io/docsrs/esp-println?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.rs/esp-println)
+[![docs.rs](https://img.shields.io/docsrs/esp-println?labelColor=1C2C2E&color=C96329&logo=rust&style=flat-square)](https://docs.espressif.com/projects/rust/esp-println/latest/)
 ![MSRV](https://img.shields.io/badge/MSRV-1.84-blue?labelColor=1C2C2E&style=flat-square)
 ![Crates.io](https://img.shields.io/crates/l/esp-println?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
@@ -33,34 +33,10 @@ use esp_println::println;
 
 You can now `println!("Hello world")` as usual.
 
-# Features
-
-- There is one feature for each supported target: `esp32`, `esp32c2`,
-  `esp32c3`, `esp32c6`, `esp32h2`, `esp32s2`, and `esp32s3`.
-  - One of these features must be enabled.
-  - Only one of these features can be enabled at a time.
-- There is one feature for each supported communication method: `uart`, `jtag-serial` and `auto`.
-  - Only one of these features can be enabled at a time.
-- `no-op`: Don't print anything.
-- `log`: Enables logging using [`log` crate].
-- `colors`: Enable colored logging.
-  - Only effective when using the `log` feature.
-- `critical-section`: Enables critical sections.
-- `defmt-espflash`: This is intended to be used with [`espflash`], see `-L/--log-format` argument
-  of `flash` or `monitor` subcommands of `espflash` and `cargo-espflash`. Uses [rzCOBS] encoding
-  and adds framing.
-
-## Default Features
-
-By default, we use the `auto`, `critial-section` and `colors` features.
-Which means that it will auto-detect if it needs to print to the UART or JTAG-Serial, use critical sections and output
-messages will be colored.
-If we want to use a communication method that is not `auto`, the default
-one, we need to [disable the default features].
-
 ## Logging
 
-With the feature `log` activated you can initialize a simple logger like this
+With the feature `log-04` activated, and version 0.4 of the `log` crate added to your dependencies,
+you can initialize a simple logger like this:
 
 ```rust
 init_logger(log::LevelFilter::Info);
@@ -90,14 +66,13 @@ not allow changing the encoding.
 Follow the [`defmt` book's setup instructions] on how to
 set up `defmt`. Remember, the global logger is already installed for you by `esp-println`!
 
-Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:  
+Please note that `defmt` does _not_ provide MSRV guarantees with releases, and as such we are not able to make any MSRV guarantees when this feature is enabled. For more information refer to the MSRV section of `defmt`'s README:
 https://github.com/knurling-rs/defmt?tab=readme-ov-file#msrv
 
 [`defmt`]: https://github.com/knurling-rs/defmt
 [`log` crate]: https://github.com/rust-lang/log
 [rzCOBS]: https://github.com/Dirbaio/rzcobs
 [`espflash`]: https://github.com/esp-rs/espflash
-[disable the default features]: https://doc.rust-lang.org/cargo/reference/features.html#the-default-feature
 [Implementing a Logger section log documentaion]: https://docs.rs/log/0.4.17/log/#implementing-a-logger
 [`defmt` book's setup instructions]: https://defmt.ferrous-systems.com/setup
 

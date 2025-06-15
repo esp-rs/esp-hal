@@ -1,12 +1,38 @@
 #![doc = include_str!("../README.md")]
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
 #![no_std]
 
 #[cfg(feature = "defmt-espflash")]
 pub mod defmt;
-#[cfg(feature = "log")]
+#[cfg(feature = "log-04")]
 pub mod logger;
+
+macro_rules! log_format {
+    ($value:expr) => {
+        #[unsafe(link_section = concat!(".espressif.metadata"))]
+        #[used]
+        #[unsafe(export_name = concat!("espflash.LOG_FORMAT"))]
+        static LOG_FORMAT: [u8; $value.len()] = const {
+            let val_bytes = $value.as_bytes();
+            let mut val_bytes_array = [0; $value.len()];
+            let mut i = 0;
+            while i < val_bytes.len() {
+                val_bytes_array[i] = val_bytes[i];
+                i += 1;
+            }
+            val_bytes_array
+        };
+    };
+}
+
+#[cfg(feature = "defmt-espflash")]
+log_format!("defmt-espflash");
+
+#[cfg(not(feature = "defmt-espflash"))]
+log_format!("serial");
 
 /// Prints to the selected output, with a newline.
 #[cfg(not(feature = "no-op"))]
@@ -115,9 +141,9 @@ type PrinterImpl = auto_printer::Printer;
 ))]
 mod auto_printer {
     use crate::{
+        LockToken,
         serial_jtag_printer::Printer as PrinterSerialJtag,
         uart_printer::Printer as PrinterUart,
-        LockToken,
     };
 
     pub struct Printer;
@@ -484,12 +510,14 @@ struct LockToken<'a>(LockInner<'a>);
 impl LockToken<'_> {
     #[allow(unused)]
     unsafe fn conjure() -> Self {
-        #[cfg(feature = "critical-section")]
-        let inner = critical_section::CriticalSection::new();
-        #[cfg(not(feature = "critical-section"))]
-        let inner = PhantomData;
+        unsafe {
+            #[cfg(feature = "critical-section")]
+            let inner = critical_section::CriticalSection::new();
+            #[cfg(not(feature = "critical-section"))]
+            let inner = PhantomData;
 
-        LockToken(inner)
+            LockToken(inner)
+        }
     }
 }
 

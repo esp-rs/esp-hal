@@ -8,11 +8,11 @@ use core::cell::Cell;
 
 use embassy_time_driver::Driver;
 use esp_hal::{
+    Blocking,
     interrupt::{InterruptHandler, Priority},
     sync::Locked,
     time::{Duration, Instant},
-    timer::OneShotTimer,
-    Blocking,
+    timer::{Error, OneShotTimer},
 };
 
 pub type Timer = OneShotTimer<'static, Blocking>;
@@ -93,7 +93,7 @@ impl Alarm {
 /// as well as to schedule a wake-up at a certain time.
 ///
 /// We are free to choose how we implement these features, and we provide
-/// two options:
+/// three options:
 ///
 /// - If the `generic` feature is enabled, we implement a single timer queue,
 ///   using the implementation provided by embassy-time-queue-driver.
@@ -101,12 +101,11 @@ impl Alarm {
 ///   queue, using our own integrated timer implementation. Our implementation
 ///   is a copy of the embassy integrated timer queue, with the addition of
 ///   clearing the "owner" information upon dequeueing.
-// TODO: restore this and update the "two options" above:
-// - If the `multiple-integrated` feature is enabled, we provide a separate
-//   timer queue for each executor. We store a separate timer queue for each
-//   executor, and we use the scheduled task's owner to determine which queue to
-//   use. This mode allows us to use less disruptive locks around the timer
-//   queue, but requires more timers - one per timer queue.
+/// - If the `multiple-integrated` feature is enabled, we provide a separate
+///   timer queue for each executor. We store a separate timer queue for each
+///   executor, and we use the scheduled task's owner to determine which queue
+///   to use. This mode allows us to use less disruptive locks around the timer
+///   queue, but requires more timers - one per timer queue.
 pub(super) struct EmbassyTimer {
     /// The timer queue, if we use a single one (single-integrated, or generic).
     #[cfg(single_queue)]
@@ -160,9 +159,13 @@ impl EmbassyTimer {
         });
 
         // Store the available timers
-        DRIVER
-            .available_timers
-            .with(|available_timers| *available_timers = Some(timers));
+        DRIVER.available_timers.with(|available_timers| {
+            assert!(
+                available_timers.is_none(),
+                "The timers have already been initialized."
+            );
+            *available_timers = Some(timers);
+        });
     }
 
     #[cfg(not(single_queue))]
@@ -207,8 +210,20 @@ impl EmbassyTimer {
         let now = Instant::now().duration_since_epoch().as_micros();
 
         if timestamp > now {
-            let timeout = Duration::from_micros(timestamp - now);
-            unwrap!(timer.schedule(timeout));
+            let mut timeout = Duration::from_micros(timestamp - now);
+            loop {
+                // The timer API doesn't let us query a maximum timeout, so let's try backing
+                // off on failure.
+                match timer.schedule(timeout) {
+                    Ok(()) => break,
+                    Err(Error::InvalidTimeout) => {
+                        // It's okay to wake up earlier than scheduled.
+                        timeout = timeout / 2;
+                        assert_ne!(timeout, Duration::ZERO);
+                    }
+                    other => unwrap!(other),
+                }
+            }
             true
         } else {
             // If the timestamp is past, we return `false` to ask embassy to poll again
@@ -229,40 +244,42 @@ impl EmbassyTimer {
     /// When using a single timer queue, the `priority` parameter is always the
     /// highest value possible.
     pub(crate) unsafe fn allocate_alarm(&self, priority: Priority) -> Option<AlarmHandle> {
-        for (i, alarm) in self.alarms.iter().enumerate() {
-            let handle = alarm.inner.with(|alarm| {
-                let AlarmState::Created(interrupt_handler) = alarm.state else {
-                    return None;
-                };
+        unsafe {
+            for (i, alarm) in self.alarms.iter().enumerate() {
+                let handle = alarm.inner.with(|alarm| {
+                    let AlarmState::Created(interrupt_handler) = alarm.state else {
+                        return None;
+                    };
 
-                let timer = self.available_timers.with(|available_timers| {
-                    if let Some(timers) = available_timers.take() {
-                        // If the driver is initialized, we can allocate a timer.
-                        // If this fails, we can't do anything about it.
-                        let Some((timer, rest)) = timers.split_first_mut() else {
-                            not_enough_timers();
-                        };
-                        *available_timers = Some(rest);
-                        timer
-                    } else {
-                        panic!("schedule_wake called before esp_hal_embassy::init()")
-                    }
+                    let timer = self.available_timers.with(|available_timers| {
+                        if let Some(timers) = available_timers.take() {
+                            // If the driver is initialized, we can allocate a timer.
+                            // If this fails, we can't do anything about it.
+                            let Some((timer, rest)) = timers.split_first_mut() else {
+                                not_enough_timers();
+                            };
+                            *available_timers = Some(rest);
+                            timer
+                        } else {
+                            panic!("schedule_wake called before esp_hal_embassy::init()")
+                        }
+                    });
+
+                    alarm.state = AlarmState::initialize(
+                        timer,
+                        InterruptHandler::new(interrupt_handler, priority),
+                    );
+
+                    Some(AlarmHandle::new(i))
                 });
 
-                alarm.state = AlarmState::initialize(
-                    timer,
-                    InterruptHandler::new(interrupt_handler, priority),
-                );
-
-                Some(AlarmHandle::new(i))
-            });
-
-            if handle.is_some() {
-                return handle;
+                if handle.is_some() {
+                    return handle;
+                }
             }
-        }
 
-        None
+            None
+        }
     }
 
     /// Set an alarm to fire at a certain timestamp.
@@ -363,7 +380,9 @@ fn not_enough_timers() -> ! {
     // This is wrapped in a separate function because rustfmt does not like
     // extremely long strings. Also, if log is used, this avoids storing the string
     // twice.
-    panic!("There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the `single-integrated` or the `generic` timer queue flavors.");
+    panic!(
+        "There are not enough timers to allocate a new alarm. Call esp_hal_embassy::init() with the correct number of timers, or consider either using the `single-integrated` or the `generic` timer queue flavors."
+    );
 }
 
 pub(crate) fn set_up_alarm(priority: Priority, _ctx: *mut ()) -> AlarmHandle {

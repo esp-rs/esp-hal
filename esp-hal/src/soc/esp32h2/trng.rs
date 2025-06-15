@@ -1,62 +1,12 @@
-use crate::peripherals::{APB_SARADC, PCR, PMU};
-
-const I2C_SAR_ADC: u8 = 0x69;
-const I2C_SAR_ADC_HOSTID: u8 = 0;
-
-const I2C_SARADC_DTEST: u8 = 7;
-const I2C_SARADC_DTEST_MSB: u8 = 1;
-const I2C_SARADC_DTEST_LSB: u8 = 0;
-const I2C_SARADC_ENT_SAR: u8 = 7;
-const I2C_SARADC_ENT_SAR_MSB: u8 = 3;
-const I2C_SARADC_ENT_SAR_LSB: u8 = 1;
-const I2C_SARADC_EN_TOUT_SAR1_BUS: u8 = 7;
-const I2C_SARADC_EN_TOUT_SAR1_BUS_MSB: u8 = 5;
-const I2C_SARADC_EN_TOUT_SAR1_BUS_LSB: u8 = 5;
-
-const I2C_SARADC_SAR2_INIT_CODE_MSB: u8 = 4;
-const I2C_SARADC_SAR2_INIT_CODE_MSB_MSB: u8 = 3;
-const I2C_SARADC_SAR2_INIT_CODE_MSB_LSB: u8 = 0;
-const I2C_SARADC_SAR2_INIT_CODE_LSB: u8 = 3;
-const I2C_SARADC_SAR2_INIT_CODE_LSB_MSB: u8 = 7;
-const I2C_SARADC_SAR2_INIT_CODE_LSB_LSB: u8 = 0;
-
-const I2C_SARADC_SAR1_INIT_CODE_MSB: u8 = 1;
-const I2C_SARADC_SAR1_INIT_CODE_MSB_MSB: u8 = 3;
-const I2C_SARADC_SAR1_INIT_CODE_MSB_LSB: u8 = 0;
-const I2C_SARADC_SAR1_INIT_CODE_LSB: u8 = 3;
-const I2C_SARADC_SAR1_INIT_CODE_LSB_MSB: u8 = 7;
-const I2C_SARADC_SAR1_INIT_CODE_LSB_LSB: u8 = 0;
+use crate::{
+    peripherals::{APB_SARADC, PCR, PMU},
+    soc::regi2c,
+};
 
 const SAR2_CHANNEL: u32 = 9;
 const SAR2_ATTEN: u32 = 1;
 const SAR1_ATTEN: u32 = 1;
 const PATTERN_BIT_WIDTH: u32 = 6;
-
-const REGI2C_BBPLL: u8 = 0x66;
-const REGI2C_BIAS: u8 = 0x6a;
-const REGI2C_PMU: u8 = 0x6d;
-const REGI2C_ULP_CAL: u8 = 0x61;
-const REGI2C_SAR_I2C: u8 = 0x69;
-
-const I2C_MST_ANA_CONF1_M: u32 = 0x00FFFFFF;
-const I2C_MST_I2C0_CTRL_REG: u32 = 0x600AD800;
-const I2C_MST_ANA_CONF1_REG: u32 = I2C_MST_I2C0_CTRL_REG + 0x1c;
-
-const REGI2C_BBPLL_RD_MASK: u32 = !(1 << 7) & I2C_MST_ANA_CONF1_M;
-const REGI2C_BIAS_RD_MASK: u32 = !(1 << 6) & I2C_MST_ANA_CONF1_M;
-const REGI2C_DIG_REG_RD_MASK: u32 = !(1 << 10) & I2C_MST_ANA_CONF1_M;
-const REGI2C_ULP_CAL_RD_MASK: u32 = !(1 << 8) & I2C_MST_ANA_CONF1_M;
-const REGI2C_SAR_I2C_RD_MASK: u32 = !(1 << 9) & I2C_MST_ANA_CONF1_M;
-const REGI2C_RTC_BUSY: u32 = 1 << 25;
-
-const REGI2C_RTC_SLAVE_ID_V: u8 = 0xFF;
-const REGI2C_RTC_SLAVE_ID_S: u8 = 0;
-const REGI2C_RTC_ADDR_V: u8 = 0xFF;
-const REGI2C_RTC_ADDR_S: u8 = 8;
-const REGI2C_RTC_WR_CNTL_V: u8 = 0x1;
-const REGI2C_RTC_WR_CNTL_S: u8 = 24;
-const REGI2C_RTC_DATA_V: u8 = 0xFF;
-const REGI2C_RTC_DATA_S: u8 = 16;
 
 /// Enable true randomness by enabling the entropy source.
 /// Blocks `ADC` usage.
@@ -95,67 +45,14 @@ pub(crate) fn ensure_randomness() {
 
         // Config ADC circuit (Analog part) with I2C(HOST ID 0x69) and chose internal
         // voltage as sampling source
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_DTEST,
-            I2C_SARADC_DTEST_MSB,
-            I2C_SARADC_DTEST_LSB,
-            2,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_ENT_SAR,
-            I2C_SARADC_ENT_SAR_MSB,
-            I2C_SARADC_ENT_SAR_LSB,
-            1,
-        );
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_EN_TOUT_SAR1_BUS,
-            I2C_SARADC_EN_TOUT_SAR1_BUS_MSB,
-            I2C_SARADC_EN_TOUT_SAR1_BUS_LSB,
-            1,
-        );
+        regi2c::ADC_SARADC_DTEST.write_field(2);
+        regi2c::ADC_SARADC_ENT_SAR.write_field(1);
+        regi2c::ADC_SARADC_EN_TOUT_SAR1_BUS.write_field(1);
 
-        // SAR2 High ADDR
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR2_INIT_CODE_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_MSB_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_MSB_LSB,
-            0x08,
-        );
-        // SAR2 Low ADDR
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR2_INIT_CODE_LSB,
-            I2C_SARADC_SAR2_INIT_CODE_LSB_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_LSB_LSB,
-            0x66,
-        );
-        // SAR1 High ADDR
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR1_INIT_CODE_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_MSB_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_MSB_LSB,
-            0x08,
-        );
-        // SAR1 Low ADDR
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR1_INIT_CODE_LSB,
-            I2C_SARADC_SAR1_INIT_CODE_LSB_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_LSB_LSB,
-            0x66,
-        );
+        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(0x08);
+        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(0x66);
+        regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(0x08);
+        regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(0x66);
 
         // create patterns and set them in pattern table
         let pattern_one: u32 = (SAR2_CHANNEL << 2) | SAR2_ATTEN; // we want channel 9 with max attenuation
@@ -193,69 +90,13 @@ pub(crate) fn revert_trng() {
             .modify(|_, w| w.bits(0xFFFFFF));
 
         // Revert ADC I2C configuration and initial voltage source setting
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR2_INIT_CODE_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_MSB_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_MSB_LSB,
-            0x60,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR2_INIT_CODE_LSB,
-            I2C_SARADC_SAR2_INIT_CODE_LSB_MSB,
-            I2C_SARADC_SAR2_INIT_CODE_LSB_LSB,
-            0,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR1_INIT_CODE_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_MSB_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_MSB_LSB,
-            0x60,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_SAR1_INIT_CODE_LSB,
-            I2C_SARADC_SAR1_INIT_CODE_LSB_MSB,
-            I2C_SARADC_SAR1_INIT_CODE_LSB_LSB,
-            0,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_DTEST,
-            I2C_SARADC_DTEST_MSB,
-            I2C_SARADC_DTEST_LSB,
-            0,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_ENT_SAR,
-            I2C_SARADC_ENT_SAR_MSB,
-            I2C_SARADC_ENT_SAR_LSB,
-            0,
-        );
-
-        regi2c_write_mask(
-            I2C_SAR_ADC,
-            I2C_SAR_ADC_HOSTID,
-            I2C_SARADC_EN_TOUT_SAR1_BUS,
-            I2C_SARADC_EN_TOUT_SAR1_BUS_MSB,
-            I2C_SARADC_EN_TOUT_SAR1_BUS_LSB,
-            0,
-        );
-
+        regi2c::ADC_SAR2_INITIAL_CODE_HIGH.write_field(0x60);
+        regi2c::ADC_SAR2_INITIAL_CODE_LOW.write_field(0);
+        regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(0x60);
+        regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(0);
+        regi2c::ADC_SARADC_DTEST.write_field(0);
+        regi2c::ADC_SARADC_ENT_SAR.write_field(0);
+        regi2c::ADC_SARADC_EN_TOUT_SAR1_BUS.write_field(0);
         // disable ADC_CTRL_CLK (SAR ADC function clock)
         PCR::regs()
             .saradc_clkm_conf()
@@ -264,109 +105,4 @@ pub(crate) fn revert_trng() {
         // Set PCR_SARADC_CONF_REG to initial state
         PCR::regs().saradc_conf().modify(|_, w| w.bits(0x5));
     }
-}
-
-fn regi2c_enable_block(block: u8) {
-    let modem_lpcon = crate::peripherals::MODEM_LPCON::regs();
-
-    modem_lpcon
-        .clk_conf()
-        .modify(|_, w| w.clk_i2c_mst_en().set_bit());
-
-    // Before config I2C register, enable corresponding slave.
-    match block {
-        v if v == REGI2C_BBPLL => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
-        }
-        v if v == REGI2C_BIAS => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
-        }
-        v if v == REGI2C_PMU => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
-        }
-        v if v == REGI2C_ULP_CAL => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
-        }
-        v if v == REGI2C_SAR_I2C => {
-            reg_set_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
-        }
-        _ => (),
-    }
-}
-
-fn regi2c_disable_block(block: u8) {
-    match block {
-        v if v == REGI2C_BBPLL => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BBPLL_RD_MASK);
-        }
-        v if v == REGI2C_BIAS => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_BIAS_RD_MASK);
-        }
-        v if v == REGI2C_PMU => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_DIG_REG_RD_MASK);
-        }
-        v if v == REGI2C_ULP_CAL => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_ULP_CAL_RD_MASK);
-        }
-        v if v == REGI2C_SAR_I2C => {
-            reg_clr_bit(I2C_MST_ANA_CONF1_REG, REGI2C_SAR_I2C_RD_MASK);
-        }
-        _ => (),
-    }
-}
-
-fn reg_write(reg: u32, v: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile(v);
-    }
-}
-
-fn reg_get_bit(reg: u32, b: u32) -> u32 {
-    unsafe { (reg as *mut u32).read_volatile() & b }
-}
-
-fn reg_set_bit(reg: u32, bit: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() | bit);
-    }
-}
-
-fn reg_clr_bit(reg: u32, bit: u32) {
-    unsafe {
-        (reg as *mut u32).write_volatile((reg as *mut u32).read_volatile() & !bit);
-    }
-}
-
-fn reg_get_field(reg: u32, s: u32, v: u32) -> u32 {
-    unsafe { ((reg as *mut u32).read_volatile() >> s) & v }
-}
-
-pub(crate) fn regi2c_write_mask(block: u8, _host_id: u8, reg_add: u8, msb: u8, lsb: u8, data: u8) {
-    assert!(msb - lsb < 8);
-    regi2c_enable_block(block);
-
-    // Read the i2c bus register
-    while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
-
-    let mut temp: u32 = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32)
-        << REGI2C_RTC_SLAVE_ID_S as u32)
-        | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << (REGI2C_RTC_ADDR_S as u32));
-    reg_write(I2C_MST_I2C0_CTRL_REG, temp);
-    while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
-    temp = reg_get_field(
-        I2C_MST_I2C0_CTRL_REG,
-        REGI2C_RTC_DATA_S as u32,
-        REGI2C_RTC_DATA_V as u32,
-    );
-    // Write the i2c bus register
-    temp &= (!(0xFFFFFFFF << lsb)) | (0xFFFFFFFF << (msb + 1));
-    temp |= (data as u32 & (!(0xFFFFFFFF << (msb as u32 - lsb as u32 + 1)))) << (lsb as u32);
-    temp = ((block as u32 & REGI2C_RTC_SLAVE_ID_V as u32) << REGI2C_RTC_SLAVE_ID_S as u32)
-        | ((reg_add as u32 & REGI2C_RTC_ADDR_V as u32) << REGI2C_RTC_ADDR_S as u32)
-        | ((0x1 & REGI2C_RTC_WR_CNTL_V as u32) << REGI2C_RTC_WR_CNTL_S as u32)
-        | ((temp & REGI2C_RTC_DATA_V as u32) << REGI2C_RTC_DATA_S as u32);
-    reg_write(I2C_MST_I2C0_CTRL_REG, temp);
-    while reg_get_bit(I2C_MST_I2C0_CTRL_REG, REGI2C_RTC_BUSY) != 0 {}
-
-    regi2c_disable_block(block);
 }

@@ -7,24 +7,25 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     gpio::interconnect::InputSignal,
-    pcnt::{channel::EdgeMode, unit::Unit, Pcnt},
+    pcnt::{Pcnt, channel::EdgeMode, unit::Unit},
     spi::{
-        master::{Address, Command, Config, Spi, SpiDma},
-        DataMode,
         Mode,
+        master::{Address, Command, Config, DataMode, Spi, SpiDma},
     },
     time::Rate,
-    Blocking,
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 struct Context {
     spi: SpiDma<'static, Blocking>,
     pcnt_unit: Unit<'static, 0>,
-    pcnt_source: InputSignal,
+    pcnt_source: InputSignal<'static>,
 }
 
 fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
@@ -78,7 +79,7 @@ fn perform_spi_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
 fn perform_spidmabus_writes_are_correctly_by_pcnt(ctx: Context, mode: DataMode) {
     const DMA_BUFFER_SIZE: usize = 4;
 
-    let (rx, rxd, buffer, descriptors) = dma_buffers!(1, DMA_BUFFER_SIZE);
+    let (rx, rxd, buffer, descriptors) = dma_buffers!(4, DMA_BUFFER_SIZE);
     let dma_rx_buf = DmaRxBuf::new(rxd, rx).unwrap();
     let dma_tx_buf = DmaTxBuf::new(descriptors, buffer).unwrap();
 
@@ -124,7 +125,7 @@ mod tests {
             }
         }
 
-        let (mosi_loopback, mosi) = mosi.split();
+        let (mosi_loopback, mosi) = unsafe { mosi.split() };
 
         let spi = Spi::new(
             peripherals.SPI2,

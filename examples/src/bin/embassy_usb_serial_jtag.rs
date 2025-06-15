@@ -12,13 +12,15 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use esp_backtrace as _;
 use esp_hal::{
+    Async,
     timer::timg::TimerGroup,
     usb_serial_jtag::{UsbSerialJtag, UsbSerialJtagRx, UsbSerialJtagTx},
-    Async,
 };
 use static_cell::StaticCell;
 
 const MAX_BUFFER_SIZE: usize = 512;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[embassy_executor::task]
 async fn writer(

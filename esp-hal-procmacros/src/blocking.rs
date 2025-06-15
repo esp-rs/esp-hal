@@ -3,9 +3,9 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use syn::{
+    ItemFn,
     parse::{self},
     parse_macro_input,
-    ItemFn,
 };
 
 pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {

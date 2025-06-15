@@ -9,22 +9,24 @@
 use core::ops::Mul;
 
 use crypto_bigint::{
-    modular::runtime_mod::{DynResidue, DynResidueParams},
     Encoding,
     U192,
     U256,
+    modular::runtime_mod::{DynResidue, DynResidueParams},
 };
 use elliptic_curve::sec1::ToEncodedPoint;
 #[cfg(feature = "esp32h2")]
 use esp_hal::ecc::WorkMode;
 use esp_hal::{
+    Blocking,
     clock::CpuClock,
     ecc::{Ecc, EllipticCurve, Error},
     rng::Rng,
-    Blocking,
 };
 use hex_literal::hex;
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 struct TestParams<'a> {
     prime_fields: &'a [&'a [u8]],
@@ -65,7 +67,6 @@ mod tests {
     }
 
     #[test]
-    #[timeout(5)]
     fn test_ecc_affine_point_multiplication(mut ctx: Context<'static>) {
         for &prime_field in TEST_PARAMS_VECTOR.prime_fields {
             match prime_field.len() {
@@ -290,12 +291,15 @@ mod tests {
                     .ecc
                     .affine_point_verification_multiplication(curve, k, px, py, qx, qy, qz);
                 match result {
-                    Err(Error::SizeMismatchCurve) => assert!(false, "Inputs data doesn't match the key length selected."),
+                    Err(Error::SizeMismatchCurve) => {
+                        assert!(false, "Inputs data doesn't match the key length selected.")
+                    }
                     Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false, "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
+                        false,
+                        "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
                         px, py,
                     ),
-                    _ => {},
+                    _ => {}
                 }
 
                 let t2 = &mut [0_u8; 64];
@@ -604,13 +608,19 @@ mod tests {
                     _ => unimplemented!(),
                 };
 
-                match ctx.ecc.affine_point_verification_jacobian_multiplication(curve, k, x, y) {
-                    Err(Error::SizeMismatchCurve) => assert!(false, "Inputs data doesn't match the key length selected."),
+                match ctx
+                    .ecc
+                    .affine_point_verification_jacobian_multiplication(curve, k, x, y)
+                {
+                    Err(Error::SizeMismatchCurve) => {
+                        assert!(false, "Inputs data doesn't match the key length selected.")
+                    }
                     Err(Error::PointNotOnSelectedCurve) => assert!(
-                        false, "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
+                        false,
+                        "ECC failed while affine point verification + multiplication with x = {:02X?} and y = {:02X?}.",
                         x, y,
                     ),
-                    _ => {},
+                    _ => {}
                 }
 
                 match prime_field.len() {

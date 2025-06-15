@@ -9,12 +9,12 @@
 use esp_hal::{
     gpio::NoPin,
     i2s::parallel::{I2sParallel, TxSixteenBits},
-    peripherals::I2S0,
+    peripherals::{DMA_I2S0, I2S0},
     time::Rate,
 };
 use hil_test as _;
 
-type DmaChannel0 = esp_hal::dma::I2s0DmaChannel;
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
@@ -22,8 +22,8 @@ mod tests {
     use super::*;
 
     struct Context {
-        dma_channel: DmaChannel0,
-        i2s: I2S0,
+        dma_channel: DMA_I2S0<'static>,
+        i2s: I2S0<'static>,
     }
 
     #[init]

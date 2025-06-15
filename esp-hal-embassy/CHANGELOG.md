@@ -5,15 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
+
 ### Changed
+
 
 ### Fixed
 
+
 ### Removed
+
+
+## [v0.8.1] - 2025-06-05
+
+### Fixed
+
+- Fixed a potential lockup issue (#3589)
+
+## [v0.8.0] - 2025-06-03
+
+### Added
+
+- Re-added the `multiple-integrated` timer queue flavour (#3166)
+
+### Changed
+
+- Bump Rust edition to 2024, bump MSRV to 1.86. (#3391, #3560)
+- Update `defmt` to 1.0 (#3416)
+- The `IntoAnyTimer` trait has been removed (#3444)
+- The `TimerCollection` trait has been sealed and renamed to `TimeBase`. Former `IntoAnyTimer` functionality has been merged into `TimeBase`. (#3444)
+- `esp_hal_embassy::init` will panic if called multiple times (#3444)
+- The `log` feature has been replaced by `log-04`. (#3425)
+
+### Fixed
+
+- Fixed a panic on very long wakeup times (#3433)
 
 ## [0.7.0] - 2025-02-24
 
@@ -55,14 +84,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Reduce memory footprint by 4 bytes on multi-core MCUs.
+- Reduce memory footprint by 4 bytes on multi-core MCUs. (#2377)
 - The time driver no longer uses cross-core critical sections. (#2559)
 
 ### Fixed
 
 - Alarm interrupts are now handled on the core that allocated them. (For executors created on the second core after calling `esp_hal_embassy::init`) (#2451)
-
-### Removed
 
 ## 0.4.0 - 2024-10-10
 
@@ -99,3 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - 2024-06-04
 
 [0.7.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-embassy-v0.7.0
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.7.0...esp-hal-embassy-v0.8.0
+[v0.8.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.0...esp-hal-embassy-v0.8.1
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-embassy-v0.8.1...HEAD

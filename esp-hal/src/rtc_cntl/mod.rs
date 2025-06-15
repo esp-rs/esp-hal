@@ -30,12 +30,12 @@
 //!
 //! loop {
 //!     // Print the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time_us() / 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time() - Duration::from_millis(500);
-//!     rtc.set_current_time(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
@@ -102,29 +102,26 @@
 //!
 //! loop {
 //!     // Get the current RTC time in milliseconds
-//!     let time_ms = rtc.current_time().and_utc().timestamp_millis();
+//!     let time_ms = rtc.current_time_us() * 1000;
 //!     delay.delay_millis(1000);
 //!
 //!     // Set the time to half a second in the past
-//!     let new_time = rtc.current_time() - Duration::from_millis(500);
-//!     rtc.set_current_time(new_time);
+//!     let new_time = rtc.current_time_us() - 500_000;
+//!     rtc.set_current_time_us(new_time);
 //! }
 //! # }
 //! ```
-
-use chrono::{DateTime, NaiveDateTime};
 
 pub use self::rtc::SocResetReason;
 #[cfg(not(any(esp32c6, esp32h2)))]
 use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
     clock::Clock,
     interrupt::{self, InterruptHandler},
-    peripheral::{Peripheral, PeripheralRef},
     peripherals::Interrupt,
     system::{Cpu, SleepSource},
     time::Duration,
@@ -135,7 +132,7 @@ use crate::{
     time::Rate,
 };
 // only include sleep where it's been implemented
-#[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+#[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
 
 #[cfg_attr(esp32, path = "rtc/esp32.rs")]
@@ -280,7 +277,7 @@ pub(crate) enum RtcCalSel {
 
 /// Low-power Management
 pub struct Rtc<'d> {
-    _inner: PeripheralRef<'d, crate::peripherals::LPWR>,
+    _inner: crate::peripherals::LPWR<'d>,
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
     #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
@@ -292,18 +289,18 @@ impl<'d> Rtc<'d> {
     /// Create a new instance in [crate::Blocking] mode.
     ///
     /// Optionally an interrupt handler can be bound.
-    pub fn new(rtc_cntl: impl Peripheral<P = crate::peripherals::LPWR> + 'd) -> Self {
+    pub fn new(rtc_cntl: crate::peripherals::LPWR<'d>) -> Self {
         rtc::init();
         rtc::configure_clock();
 
         let this = Self {
-            _inner: rtc_cntl.into_ref(),
+            _inner: rtc_cntl,
             rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
         };
 
-        #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+        #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
         RtcSleepConfig::base_settings(&this);
 
         this
@@ -329,7 +326,7 @@ impl<'d> Rtc<'d> {
             let l = rtc_cntl.time0().read().time_lo().bits();
             (l, h)
         };
-        #[cfg(any(esp32c2, esp32c3, esp32s3, esp32s2))]
+        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
         let (l, h) = {
             rtc_cntl.time_update().write(|w| w.time_update().set_bit());
             let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
@@ -400,8 +397,30 @@ impl<'d> Rtc<'d> {
         h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
-    /// Get the current time.
-    pub fn current_time(&self) -> NaiveDateTime {
+    /// Get the current time in microseconds.
+    ///
+    /// # Example
+    ///
+    /// This example shows how to get the weekday of the current time in
+    /// New York using the `jiff` crate. This example works in core-only
+    /// environments without dynamic memory allocation.
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::rtc_cntl::Rtc;
+    /// use jiff::{Timestamp, tz::{self, TimeZone}};
+    ///
+    /// static TZ: TimeZone = tz::get!("America/New_York");
+    ///
+    /// let rtc = Rtc::new(peripherals.LPWR);
+    /// let now = Timestamp::from_microsecond(
+    ///     rtc.current_time_us() as i64,
+    /// )?;
+    /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot
 
         let rtc_time_us = self.time_since_boot().as_micros();
@@ -410,31 +429,16 @@ impl<'d> Rtc<'d> {
 
         // We can detect if we wrapped the boot time by checking if rtc time is greater
         // than the amount of time we would've wrapped.
-        let current_time_us = if rtc_time_us > wrapped_boot_time_us {
+        if rtc_time_us > wrapped_boot_time_us {
             // We also just checked that this won't overflow
             rtc_time_us - wrapped_boot_time_us
         } else {
             boot_time_us + rtc_time_us
-        };
-
-        DateTime::from_timestamp_micros(current_time_us as i64)
-            .unwrap()
-            .naive_utc()
+        }
     }
 
-    /// Set the current time.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `current_time` is before the Unix epoch (meaning the
-    /// underlying timestamp is negative).
-    pub fn set_current_time(&self, current_time: NaiveDateTime) {
-        let current_time_us: u64 = current_time
-            .and_utc()
-            .timestamp_micros()
-            .try_into()
-            .expect("current_time is negative");
-
+    /// Set the current time in microseconds.
+    pub fn set_current_time_us(&self, current_time_us: u64) {
         // Current time is boot time + time since boot (rtc time)
         // So boot time = current time - time since boot (rtc time)
 
@@ -453,7 +457,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
         self.sleep(&config, wake_sources);
@@ -461,7 +465,7 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter light sleep and wake with the provided `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_light(&mut self, wake_sources: &[&dyn WakeSource]) {
         let config = RtcSleepConfig::default();
         self.sleep(&config, wake_sources);
@@ -469,7 +473,7 @@ impl<'d> Rtc<'d> {
 
     /// Enter sleep with the provided `config` and wake with the provided
     /// `wake_sources`.
-    #[cfg(any(esp32, esp32s3, esp32c3, esp32c6, esp32c2))]
+    #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep(&mut self, config: &RtcSleepConfig, wake_sources: &[&dyn WakeSource]) {
         let mut config = *config;
         let mut wakeup_triggers = WakeTriggers::default();
@@ -1268,7 +1272,7 @@ pub fn wakeup_cause() -> SleepSource {
 
 // libphy.a can pull this in on some chips, we provide it here in the hal
 // so that either ieee or esp-wifi gets it for free without duplicating in both
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
     let xtal = RtcClock::xtal_freq();
     xtal.mhz() as i32

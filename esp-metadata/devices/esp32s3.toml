@@ -1,7 +1,15 @@
+# ESP32-S3 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32s3"
 arch  = "xtensa"
-cores = "multi_core"
+cores = 2
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -35,6 +43,7 @@ peripherals = [
     "rtc_cntl",
     "rtc_i2c",
     "rtc_io",
+    "sdhost",
     "sens",
     "sensitive",
     "sha",
@@ -66,13 +75,10 @@ symbols = [
     "assist_debug_region_monitor",
     "gdma",
     "phy",
-    "bt",
-    "wifi",
     "psram",
     "psram_dma",
     "octal_psram",
     "ulp_riscv_core",
-    "timg_timer1",
     "very_large_intr_status",
     "gpio_bank_1",
     "spi_octal",
@@ -91,7 +97,85 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
-
-    # Other capabilities
-    "psram_dma",
 ]
+
+memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
+
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+instances = [{ name = "i2c0" }, { name = "i2c1" }]
+has_fsm_timeouts = true
+has_hw_bus_clear = true
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0x1F
+can_estimate_nack_reason = true
+has_conf_update = true
+has_arbitration_en = true
+has_tx_fifo_watermark = true
+bus_timeout_is_exponential = true
+
+[device.rmt]
+status = "partial"
+ram_start = 0x60016800
+channel_ram_size = 48
+
+[device.spi_master]
+status = "supported"
+instances = [{ name = "spi2" }, { name = "spi3" }]
+
+[device.timergroup]
+timg_has_timer1 = true
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
+[device.uart]
+status = "supported"
+
+[device.touch]
+status = "not_supported"
+
+[device.ds]
+status = "not_supported"
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.rsa]
+[device.hmac]
+[device.sha]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.camera]
+[device.rgb_display]
+[device.ledc]
+[device.mcpwm]
+[device.pcnt]
+[device.sd_host]
+[device.spi_slave]
+[device.twai]
+[device.usb_otg]
+[device.usb_serial_jtag]
+
+## Miscellaneous
+[device.adc]
+[device.assist_debug]
+[device.dma]
+[device.interrupts]
+[device.io_mux]
+[device.psram]
+[device.sleep]
+[device.systimer]
+[device.temp_sensor]
+[device.ulp_fsm]
+[device.ulp_riscv]
+
+## Radio
+[device.wifi]
+[device.bt]

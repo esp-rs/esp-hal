@@ -2,9 +2,9 @@ use darling::ast::NestedMeta;
 use main_mod::*;
 use proc_macro::TokenStream;
 use syn::{
+    Token,
     parse::{Parse, ParseBuffer},
     punctuated::Punctuated,
-    Token,
 };
 
 pub struct Args {
@@ -30,9 +30,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
 pub mod main_mod {
     use std::{cell::RefCell, fmt::Display, thread};
 
-    use darling::{export::NestedMeta, FromMeta};
+    use darling::{FromMeta, export::NestedMeta};
     use proc_macro2::TokenStream;
-    use quote::{quote, ToTokens};
+    use quote::{ToTokens, quote};
     use syn::{ReturnType, Type};
 
     #[derive(Debug, FromMeta)]

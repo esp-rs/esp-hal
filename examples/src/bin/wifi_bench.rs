@@ -31,12 +31,14 @@ use esp_hal::{
 use esp_println::println;
 use esp_wifi::{
     init,
-    wifi::{AccessPointInfo, ClientConfiguration, Configuration, WifiError},
+    wifi::{ClientConfiguration, Configuration},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
 };
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -90,8 +92,8 @@ fn main() -> ! {
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.try_into().unwrap(),
-        password: PASSWORD.try_into().unwrap(),
+        ssid: SSID.into(),
+        password: PASSWORD.into(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
@@ -101,11 +103,9 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let res: Result<(heapless::Vec<AccessPointInfo, 10>, usize), WifiError> = controller.scan_n();
-    if let Ok((res, _count)) = res {
-        for ap in res {
-            println!("{:?}", ap);
-        }
+    let res = controller.scan_n(10).unwrap();
+    for ap in res {
+        println!("{:?}", ap);
     }
 
     println!("{:?}", controller.capabilities());

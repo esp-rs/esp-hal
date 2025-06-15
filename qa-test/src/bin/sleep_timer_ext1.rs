@@ -3,7 +3,7 @@
 //! The following wiring is assumed:
 //! - ext1 wakeup pins => GPIO2, GPIO4
 
-//% CHIPS: esp32 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -16,15 +16,17 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull, RtcPin},
     main,
     rtc_cntl::{
+        Rtc,
+        SocResetReason,
         reset_reason,
         sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
-        Rtc,
-        SocResetReason,
     },
     system::Cpu,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -34,7 +36,10 @@ fn main() -> ! {
 
     let mut pin_2 = peripherals.GPIO2;
     let mut pin_4 = peripherals.GPIO4;
-    let input = Input::new(&mut pin_4, InputConfig::default().with_pull(Pull::None));
+    let input = Input::new(
+        pin_4.reborrow(),
+        InputConfig::default().with_pull(Pull::None),
+    );
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);

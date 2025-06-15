@@ -40,8 +40,10 @@ const UART_FIFO_SIZE: u16 = 128;
 
 #[doc(hidden)]
 pub unsafe fn conjure() -> LpUart {
-    LpUart {
-        uart: LP_UART::steal(),
+    unsafe {
+        LpUart {
+            uart: LP_UART::steal(),
+        }
     }
 }
 

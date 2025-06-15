@@ -48,28 +48,30 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn release() {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.end_frame(do_write);
-
-        Self::flush();
-
-        #[cfg(feature = "critical-section")]
-        {
-            // We don't need to write a custom end-of-frame sequence because:
-            //  - using `defmt`, the rzcobs encoding already includes a terminating zero
-            //  - using `defmt-raw`, we don't add any additional framing data
-
+        unsafe {
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
-            TAKEN = false;
+            ENCODER.end_frame(do_write);
 
-            // safety: accessing the `static mut` is OK because we have acquired a critical
-            // section.
-            let restore = CS_RESTORE;
+            Self::flush();
 
-            // safety: Must be paired with corresponding call to acquire(), see above
-            critical_section::release(restore);
+            #[cfg(feature = "critical-section")]
+            {
+                // We don't need to write a custom end-of-frame sequence because:
+                //  - using `defmt`, the rzcobs encoding already includes a terminating zero
+                //  - using `defmt-raw`, we don't add any additional framing data
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                TAKEN = false;
+
+                // safety: accessing the `static mut` is OK because we have acquired a critical
+                // section.
+                let restore = CS_RESTORE;
+
+                // safety: Must be paired with corresponding call to acquire(), see above
+                critical_section::release(restore);
+            }
         }
     }
 
@@ -83,9 +85,11 @@ unsafe impl defmt::Logger for Logger {
     }
 
     unsafe fn write(bytes: &[u8]) {
-        // safety: accessing the `static mut` is OK because we have acquired a critical
-        // section.
-        ENCODER.write(bytes, do_write);
+        unsafe {
+            // safety: accessing the `static mut` is OK because we have acquired a critical
+            // section.
+            ENCODER.write(bytes, do_write);
+        }
     }
 }
 
@@ -97,3 +101,11 @@ fn do_write(bytes: &[u8]) {
     };
     PrinterImpl::write_bytes_in_cs(bytes, token)
 }
+
+#[cfg(feature = "timestamp")]
+defmt::timestamp!("{=u64:us}", {
+    unsafe extern "Rust" {
+        fn _esp_println_timestamp() -> u64;
+    }
+    unsafe { _esp_println_timestamp() }
+});

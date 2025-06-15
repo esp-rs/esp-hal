@@ -7,6 +7,8 @@
 //% FEATURES: embassy esp-wifi esp-wifi/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
+// Embassy offers another compatible BLE crate [trouble](https://github.com/embassy-rs/trouble/tree/main/examples/esp32) with esp32 examples.
+
 #![no_std]
 #![no_main]
 
@@ -14,10 +16,10 @@ use core::cell::RefCell;
 
 use bleps::{
     ad_structure::{
-        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
+        create_advertising_data,
     },
     async_attribute_server::AttributeServer,
     asynch::Ble,
@@ -35,7 +37,9 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, init, EspWifiController};
+use esp_wifi::{EspWifiController, ble::controller::BleConnector, init};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 // When you are okay with using a nightly compiler it's better to use https://docs.rs/static_cell/2.1.0/static_cell/macro.make_static.html
 macro_rules! mk_static {
@@ -89,7 +93,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let connector = BleConnector::new(&esp_wifi_ctrl, &mut bluetooth);
+    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);

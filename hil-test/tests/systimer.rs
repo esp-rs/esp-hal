@@ -12,18 +12,20 @@ use core::cell::RefCell;
 use critical_section::Mutex;
 use embedded_hal::delay::DelayNs;
 use esp_hal::{
+    Blocking,
     delay::Delay,
     handler,
     time::Duration,
     timer::{
-        systimer::{Alarm, SystemTimer},
         OneShotTimer,
         PeriodicTimer,
+        systimer::{Alarm, SystemTimer},
     },
-    Blocking,
 };
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
     Mutex::new(RefCell::new(None));
@@ -31,8 +33,8 @@ static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> 
     Mutex::new(RefCell::new(None));
 
 struct Context {
-    alarm0: Alarm,
-    alarm1: Alarm,
+    alarm0: Alarm<'static>,
+    alarm1: Alarm<'static>,
 }
 
 #[handler(priority = esp_hal::interrupt::Priority::min())]

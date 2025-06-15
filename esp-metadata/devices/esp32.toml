@@ -1,7 +1,15 @@
+# ESP32 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32"
 arch  = "xtensa"
-cores = "multi_core"
+cores = 2
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -10,6 +18,7 @@ peripherals = [
     "bb",
     "dport",
     "efuse",
+    "emac",
     "flash_encryption",
     "frc_timer",
     "gpio",
@@ -57,10 +66,7 @@ symbols = [
     "dac",
     "pdma",
     "phy",
-    "bt",
-    "wifi",
     "psram",
-    "timg_timer1",
     "touch",
     "large_intr_status",
     "gpio_bank_1",
@@ -76,3 +82,78 @@ symbols = [
     "pm_support_touch_sensor_wakeup",
     "ulp_supported",
 ]
+
+memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
+
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+instances = [{ name = "i2c0" }, { name = "i2c1" }]
+ll_intr_mask = 0x3ffff
+fifo_size = 32
+max_bus_timeout = 0xFFFFF
+separate_filter_config_registers = true
+i2c0_data_register_ahb_address = 0x6001301c
+
+[device.i2c_slave]
+status = "not_supported"
+
+[device.rmt]
+status = "partial"
+ram_start = 0x3ff56800
+channel_ram_size = 64
+
+[device.spi_master]
+status = "supported"
+instances = [{ name = "spi2" }, { name = "spi3" }]
+
+[device.timergroup]
+timg_has_timer1 = true
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
+[device.uart]
+status = "supported"
+
+[device.ethernet]
+status = "not_supported"
+
+[device.camera]
+status = "not_supported"
+[device.rgb_display]
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.rsa]
+[device.sha]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.ledc]
+[device.mcpwm]
+[device.pcnt]
+[device.sd_host]
+[device.sd_slave]
+[device.spi_slave]
+[device.touch]
+[device.twai]
+
+## Miscellaneous
+[device.adc]
+[device.dac]
+[device.dma]
+[device.interrupts]
+[device.io_mux]
+[device.psram]
+[device.temp_sensor]
+[device.sleep]
+
+[device.ulp_fsm]
+
+## Radio
+[device.wifi]
+[device.bt]

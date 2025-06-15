@@ -3,7 +3,7 @@
 //! The following wiring is assumed:
 //! - ext0 wakeup pin => GPIO4
 
-//% CHIPS: esp32 esp32s3
+//% CHIPS: esp32 esp32s2 esp32s3
 
 #![no_std]
 #![no_main]
@@ -16,15 +16,17 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
     rtc_cntl::{
+        Rtc,
+        SocResetReason,
         reset_reason,
         sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel},
         wakeup_cause,
-        Rtc,
-        SocResetReason,
     },
     system::Cpu,
 };
 use esp_println::println;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
@@ -33,7 +35,10 @@ fn main() -> ! {
     let mut rtc = Rtc::new(peripherals.LPWR);
 
     let mut pin4 = peripherals.GPIO4;
-    let ext0_pin = Input::new(&mut pin4, InputConfig::default().with_pull(Pull::None));
+    let ext0_pin = Input::new(
+        pin4.reborrow(),
+        InputConfig::default().with_pull(Pull::None),
+    );
 
     println!("up and runnning!");
     let reason = reset_reason(Cpu::ProCpu).unwrap_or(SocResetReason::ChipPowerOn);
@@ -46,7 +51,7 @@ fn main() -> ! {
     core::mem::drop(ext0_pin);
 
     let timer = TimerWakeupSource::new(Duration::from_secs(30));
-    let ext0 = Ext0WakeupSource::new(&mut pin4, WakeupLevel::High);
+    let ext0 = Ext0WakeupSource::new(pin4, WakeupLevel::High);
     println!("sleeping!");
     delay.delay_millis(100);
     rtc.sleep_deep(&[&timer, &ext0]);

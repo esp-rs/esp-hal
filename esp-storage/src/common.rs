@@ -87,7 +87,6 @@ impl FlashStorage {
         storage
     }
 
-    #[cfg(feature = "nor-flash")]
     #[inline(always)]
     pub(crate) fn check_alignment<const ALIGN: u32>(
         &self,
@@ -112,7 +111,7 @@ impl FlashStorage {
 
     #[allow(clippy::all)]
     #[inline(never)]
-    #[link_section = ".rwtext"]
+    #[unsafe(link_section = ".rwtext")]
     pub(crate) fn internal_read(
         &mut self,
         offset: u32,
@@ -137,7 +136,7 @@ impl FlashStorage {
     }
 
     #[inline(never)]
-    #[link_section = ".rwtext"]
+    #[unsafe(link_section = ".rwtext")]
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
@@ -145,7 +144,7 @@ impl FlashStorage {
     }
 
     #[inline(never)]
-    #[link_section = ".rwtext"]
+    #[unsafe(link_section = ".rwtext")]
     pub(crate) fn internal_write(
         &mut self,
         offset: u32,

@@ -8,7 +8,7 @@ use crate::timer_queue::TimerQueue;
 mod interrupt;
 mod thread;
 
-#[export_name = "__pender"]
+#[unsafe(export_name = "__pender")]
 fn __pender(context: *mut ()) {
     use esp_hal::interrupt::software::SoftwareInterrupt;
 

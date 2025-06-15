@@ -14,8 +14,8 @@
 
 use embedded_graphics::{
     mono_font::{
-        ascii::{FONT_6X10, FONT_9X18_BOLD},
         MonoTextStyleBuilder,
+        ascii::{FONT_6X10, FONT_9X18_BOLD},
     },
     pixelcolor::BinaryColor,
     prelude::*,
@@ -28,7 +28,9 @@ use esp_hal::{
     main,
     time::Duration,
 };
-use ssd1306::{prelude::*, I2CDisplayInterface, Ssd1306};
+use ssd1306::{I2CDisplayInterface, Ssd1306, prelude::*};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {

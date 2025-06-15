@@ -1,15 +1,22 @@
 [package]
-name         = "esp-metadata"
-version      = "0.6.0"
-edition      = "2021"
-rust-version = "1.84.0"
-description  = "Metadata for Espressif devices"
-repository   = "https://github.com/esp-rs/esp-hal"
-license      = "MIT OR Apache-2.0"
+name          = "esp-metadata"
+version       = "0.7.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Metadata for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-metadata/latest/"
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
 
 [dependencies]
-anyhow     = "1.0.95"
-clap       = { version = "4.5.26", features = ["derive"], optional = true }
-basic-toml  = "0.1.9"
-serde       = { version = "1.0.217", features = ["derive"] }
-strum       = { version = "0.26.3",  features = ["derive"] }
+anyhow     = { version = "1.0.98" }
+clap       = { version = "4.5.37", features = ["derive"], optional = true }
+basic-toml = { version = "0.1.9" }
+serde      = { version = "1.0.219", features = ["derive"] }
+strum      = { version = "0.27.1", features = ["derive"] }
+proc-macro2 = { version = "1.0.36" }
+quote      = { version = "1.0.15" }
+
+[features]
+default = []
+clap = ["dep:clap"]

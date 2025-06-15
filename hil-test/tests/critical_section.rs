@@ -3,22 +3,23 @@
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
 //% FEATURES: unstable
 
-// TODO: add multi-core tests
-
 #![no_std]
 #![no_main]
 
 use esp_hal::{
     delay::Delay,
     interrupt::{
-        software::{SoftwareInterrupt, SoftwareInterruptControl},
         InterruptHandler,
         Priority,
+        software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     peripherals::Peripherals,
     sync::{Locked, RawPriorityLimitedMutex},
 };
 use hil_test as _;
+use portable_atomic::{AtomicU32, Ordering};
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 fn test_access_at_priority(peripherals: Peripherals, priority: Priority) {
     static LOCK: RawPriorityLimitedMutex = RawPriorityLimitedMutex::new(Priority::Priority1);
@@ -88,8 +89,6 @@ mod tests {
 
     #[test]
     fn priority_lock_tests(peripherals: Peripherals) {
-        use portable_atomic::{AtomicU32, Ordering};
-
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
@@ -150,8 +149,6 @@ mod tests {
 
     #[test]
     fn max_priority_lock_is_masking_interrupt(peripherals: Peripherals) {
-        use portable_atomic::{AtomicU32, Ordering};
-
         static COUNTER: AtomicU32 = AtomicU32::new(0);
 
         extern "C" fn increment<const INT: u8>() {
@@ -178,5 +175,54 @@ mod tests {
         // Releasing the lock unmasks the lower priority interrupt
         delay.delay_millis(1);
         assert_eq!(COUNTER.load(Ordering::Acquire), 1);
+    }
+
+    #[test]
+    #[cfg(multi_core)]
+    fn critical_section_on_multi_core(p: Peripherals) {
+        // TODO: test other locks, too
+        use core::{cell::Cell, sync::atomic::AtomicBool};
+
+        use critical_section::Mutex;
+        use esp_hal::system::{CpuControl, Stack};
+        use hil_test::mk_static;
+
+        static COUNTER: Mutex<Cell<u32>> = Mutex::new(Cell::new(0));
+        static START_COUNTING: AtomicBool = AtomicBool::new(false);
+        static DONE_COUNTING: AtomicBool = AtomicBool::new(false);
+
+        let mut cpu_control = CpuControl::new(p.CPU_CTRL);
+        let app_core_stack = mk_static!(Stack<8192>, Stack::new());
+
+        let cpu1_fnctn = || {
+            while !START_COUNTING.load(Ordering::Relaxed) {}
+            for _ in 0..1000 {
+                critical_section::with(|cs| {
+                    let data_ref = COUNTER.borrow(cs);
+                    data_ref.set(data_ref.get() + 1);
+                });
+            }
+            DONE_COUNTING.store(true, Ordering::Relaxed);
+            loop {}
+        };
+
+        let _guard = cpu_control
+            .start_app_core(app_core_stack, cpu1_fnctn)
+            .unwrap();
+
+        START_COUNTING.store(true, Ordering::Relaxed);
+        for _ in 0..1000 {
+            critical_section::with(|cs| {
+                let data_ref = COUNTER.borrow(cs);
+                data_ref.set(data_ref.get() + 2);
+            });
+        }
+
+        while !DONE_COUNTING.load(Ordering::Relaxed) {}
+
+        critical_section::with(|cs| {
+            let data_ref = COUNTER.borrow(cs);
+            assert_eq!(data_ref.get(), 3000);
+        });
     }
 }

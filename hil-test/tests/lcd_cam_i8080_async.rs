@@ -7,23 +7,26 @@
 #![no_main]
 
 use esp_hal::{
-    dma::{DmaChannel0, DmaTxBuf},
+    Async,
+    dma::DmaTxBuf,
     dma_buffers,
     gpio::NoPin,
     lcd_cam::{
-        lcd::i8080::{Command, Config, TxEightBits, I8080},
         LcdCam,
+        lcd::i8080::{Command, Config, I8080, TxEightBits},
     },
+    peripherals::DMA_CH0,
     time::Rate,
-    Async,
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const DATA_SIZE: usize = 1024 * 10;
 
 struct Context<'d> {
     lcd_cam: LcdCam<'d, Async>,
-    dma: DmaChannel0,
+    dma: DMA_CH0<'d>,
     dma_buf: DmaTxBuf,
 }
 

@@ -41,7 +41,6 @@ use esp_synopsys_usb_otg::UsbPeripheral;
 
 use crate::{
     gpio::InputSignal,
-    peripheral::{Peripheral, PeripheralRef},
     peripherals,
     system::{GenericPeripheralGuard, Peripheral as PeripheralEnable},
 };
@@ -56,21 +55,21 @@ pub trait UsbDm: crate::private::Sealed {}
 
 /// USB peripheral.
 pub struct Usb<'d> {
-    _usb0: PeripheralRef<'d, peripherals::USB0>,
+    _usb0: peripherals::USB0<'d>,
     _guard: GenericPeripheralGuard<{ PeripheralEnable::Usb as u8 }>,
 }
 
 impl<'d> Usb<'d> {
     /// Creates a new `Usb` instance.
     pub fn new(
-        usb0: impl Peripheral<P = peripherals::USB0> + 'd,
-        _usb_dp: impl Peripheral<P = impl UsbDp> + 'd,
-        _usb_dm: impl Peripheral<P = impl UsbDm> + 'd,
+        usb0: peripherals::USB0<'d>,
+        _usb_dp: impl UsbDp + 'd,
+        _usb_dm: impl UsbDm + 'd,
     ) -> Self {
         let guard = GenericPeripheralGuard::new();
 
         Self {
-            _usb0: usb0.into_ref(),
+            _usb0: usb0,
             _guard: guard,
         }
     }
@@ -92,10 +91,10 @@ impl<'d> Usb<'d> {
 
         use crate::gpio::Level;
 
-        InputSignal::USB_OTG_IDDIG.connect_to(Level::High); // connected connector is mini-B side
-        InputSignal::USB_SRP_BVALID.connect_to(Level::High); // HIGH to force USB device mode
-        InputSignal::USB_OTG_VBUSVALID.connect_to(Level::High); // receiving a valid Vbus from device
-        InputSignal::USB_OTG_AVALID.connect_to(Level::Low);
+        InputSignal::USB_OTG_IDDIG.connect_to(&Level::High); // connected connector is mini-B side
+        InputSignal::USB_SRP_BVALID.connect_to(&Level::High); // HIGH to force USB device mode
+        InputSignal::USB_OTG_VBUSVALID.connect_to(&Level::High); // receiving a valid Vbus from device
+        InputSignal::USB_OTG_AVALID.connect_to(&Level::Low);
     }
 
     fn _disable() {
@@ -132,8 +131,6 @@ pub mod asynch {
     };
     pub use embassy_usb_synopsys_otg::Config;
     use embassy_usb_synopsys_otg::{
-        on_interrupt,
-        otg_v1::Otg,
         Bus as OtgBus,
         ControlPipe,
         Driver as OtgDriver,
@@ -143,6 +140,8 @@ pub mod asynch {
         Out,
         PhyType,
         State,
+        on_interrupt,
+        otg_v1::Otg,
     };
     use procmacros::handler;
 

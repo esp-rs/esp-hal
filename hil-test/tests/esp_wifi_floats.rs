@@ -20,6 +20,8 @@ use esp_hal::{
 };
 use hil_test as _;
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 #[inline(never)]
 fn run_float_calc(x: f32) -> f32 {
     let result = core::hint::black_box(x) * 2.0;
@@ -129,6 +131,19 @@ mod tests {
             .start_app_core(
                 unsafe { &mut *core::ptr::addr_of_mut!(APP_CORE_STACK) },
                 move || {
+                    // app core starts with interrupts disabled
+                    unsafe {
+                        esp_hal::xtensa_lx::interrupt::enable_mask(
+                            esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level1.mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2
+                                    .mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level3
+                                    .mask()
+                                | esp_hal::xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6
+                                    .mask(),
+                        );
+                    }
+
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
                     let _init = esp_wifi::init(
                         timg0.timer1,
@@ -173,9 +188,9 @@ mod tests {
 // anything.
 #[allow(unused)] // compile test
 fn esp_wifi_can_be_initialized_with_any_timer(
-    timer: esp_hal::timer::AnyTimer,
+    timer: esp_hal::timer::AnyTimer<'static>,
     rng: esp_hal::rng::Rng,
-    radio_clocks: esp_hal::peripherals::RADIO_CLK,
+    radio_clocks: esp_hal::peripherals::RADIO_CLK<'static>,
 ) {
     esp_wifi::init(timer, rng, radio_clocks);
 }

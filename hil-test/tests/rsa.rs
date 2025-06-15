@@ -6,18 +6,20 @@
 #![no_std]
 #![no_main]
 
-use crypto_bigint::{Uint, U1024, U512};
+use crypto_bigint::{U512, U1024, Uint};
 use esp_hal::{
+    Blocking,
     rsa::{
-        operand_sizes::*,
         Rsa,
         RsaModularExponentiation,
         RsaModularMultiplication,
         RsaMultiplication,
+        operand_sizes::*,
     },
-    Blocking,
 };
 use hil_test as _;
+
+esp_bootloader_esp_idf::esp_app_desc!();
 
 const BIGNUM_1: U512 = Uint::from_be_hex(
     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\

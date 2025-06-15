@@ -1,6 +1,7 @@
 //! Interrupt handling
 
 use xtensa_lx::interrupt;
+#[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
 use xtensa_lx_rt::exception::Context;
 
@@ -119,7 +120,7 @@ impl CpuInterrupt {
 }
 
 /// The interrupts reserved by the HAL
-#[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+#[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
 pub static RESERVED_INTERRUPTS: &[usize] = &[
     CpuInterrupt::Interrupt1LevelPriority1 as _,
     CpuInterrupt::Interrupt19LevelPriority2 as _,
@@ -174,14 +175,16 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
 pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
     let interrupt_number = interrupt as isize;
     let cpu_interrupt_number = which as isize;
-    let intr_map_base = match core {
-        Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
-        #[cfg(multi_core)]
-        Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
-    };
-    intr_map_base
-        .offset(interrupt_number)
-        .write_volatile(cpu_interrupt_number as u32);
+    unsafe {
+        let intr_map_base = match core {
+            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
+            #[cfg(multi_core)]
+            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
+        };
+        intr_map_base
+            .offset(interrupt_number)
+            .write_volatile(cpu_interrupt_number as u32);
+    }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
@@ -331,7 +334,7 @@ unsafe fn core1_interrupt_peripheral() -> *const crate::pac::interrupt_core1::Re
 }
 
 /// Get the current run level (the level below which interrupts are masked).
-pub(crate) fn current_runlevel() -> Priority {
+pub fn current_runlevel() -> Priority {
     let ps: u32;
     unsafe { core::arch::asm!("rsr.ps {0}", out(reg) ps) };
 
@@ -350,12 +353,14 @@ pub(crate) fn current_runlevel() -> Priority {
 /// runlevel.
 pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
     let token: u32;
-    match level {
-        Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
-        Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
-        Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
-        Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
-    };
+    unsafe {
+        match level {
+            Priority::None => core::arch::asm!("rsil {0}, 0", out(reg) token),
+            Priority::Priority1 => core::arch::asm!("rsil {0}, 1", out(reg) token),
+            Priority::Priority2 => core::arch::asm!("rsil {0}, 2", out(reg) token),
+            Priority::Priority3 => core::arch::asm!("rsil {0}, 3", out(reg) token),
+        };
+    }
 
     let prev_interrupt_priority = token as u8 & 0x0F;
 
@@ -394,10 +399,10 @@ mod vectored {
         }
     }
 
-    impl TryFrom<u8> for Priority {
+    impl TryFrom<u32> for Priority {
         type Error = Error;
 
-        fn try_from(value: u8) -> Result<Self, Self::Error> {
+        fn try_from(value: u32) -> Result<Self, Self::Error> {
             match value {
                 0 => Ok(Priority::None),
                 1 => Ok(Priority::Priority1),
@@ -405,6 +410,14 @@ mod vectored {
                 3 => Ok(Priority::Priority3),
                 _ => Err(Error::InvalidInterrupt),
             }
+        }
+    }
+
+    impl TryFrom<u8> for Priority {
+        type Error = Error;
+
+        fn try_from(value: u8) -> Result<Self, Self::Error> {
+            Self::try_from(value as u32)
         }
     }
 
@@ -474,7 +487,7 @@ mod vectored {
                 let int_level = cpu_interrupt.level() as u8 as u32;
 
                 if int_level == level {
-                    res.set(interrupt_nr as u16);
+                    res.set(interrupt_nr);
                 }
             }
 
@@ -484,11 +497,19 @@ mod vectored {
 
     /// Enable the given peripheral interrupt
     pub fn enable(interrupt: Interrupt, level: Priority) -> Result<(), Error> {
+        enable_on_cpu(Cpu::current(), interrupt, level)
+    }
+
+    pub(crate) fn enable_on_cpu(
+        cpu: Cpu,
+        interrupt: Interrupt,
+        level: Priority,
+    ) -> Result<(), Error> {
         let cpu_interrupt =
             interrupt_level_to_cpu_interrupt(level, chip_specific::interrupt_is_edge(interrupt))?;
 
         unsafe {
-            map(Cpu::current(), interrupt, cpu_interrupt);
+            map(cpu, interrupt, cpu_interrupt);
 
             xtensa_lx::interrupt::enable_mask(
                 xtensa_lx::interrupt::get_mask() | (1 << cpu_interrupt as u32),
@@ -503,9 +524,13 @@ mod vectored {
     ///
     /// This will replace any previously bound interrupt handler
     pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
-            as *mut unsafe extern "C" fn();
-        ptr.write_volatile(handler);
+        let ptr = unsafe {
+            &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
+                as *mut unsafe extern "C" fn()
+        };
+        unsafe {
+            ptr.write_volatile(handler);
+        }
     }
 
     /// Returns the currently bound interrupt handler.
@@ -515,7 +540,6 @@ mod vectored {
             if addr as usize == 0 {
                 return None;
             }
-
             Some(addr)
         }
     }
@@ -542,7 +566,7 @@ mod vectored {
     }
 
     // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
-    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     static CPU_INTERRUPT_LEVELS: [u32; 8] = [
         0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
         0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
@@ -553,15 +577,15 @@ mod vectored {
         0b_0000_0000_0000_0000_0000_0000_0000_0000, // Level 6
         0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
     ];
-    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
-    #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
     #[inline]
     fn cpu_interrupt_nr_to_cpu_interrupt_handler(
         number: u32,
-    ) -> Option<unsafe extern "C" fn(u32, save_frame: &mut Context)> {
+    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
         use xtensa_lx_rt::*;
         // we're fortunate that all esp variants use the same CPU interrupt layout
         Some(match number {
@@ -576,16 +600,36 @@ mod vectored {
         })
     }
 
-    // The linker script defines `__level_1_interrupt`, `__level_2_interrupt` and
-    // `__level_3_interrupt` as `handle_interrupts`
-
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     #[ram]
-    unsafe fn handle_interrupts(level: u32, save_frame: &mut Context) {
+    unsafe fn __level_1_interrupt(save_frame: &mut Context) {
+        unsafe {
+            handle_interrupts::<1>(save_frame);
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    #[ram]
+    unsafe fn __level_2_interrupt(save_frame: &mut Context) {
+        unsafe {
+            handle_interrupts::<2>(save_frame);
+        }
+    }
+
+    #[unsafe(no_mangle)]
+    #[ram]
+    unsafe fn __level_3_interrupt(save_frame: &mut Context) {
+        unsafe {
+            handle_interrupts::<3>(save_frame);
+        }
+    }
+
+    #[inline(always)]
+    unsafe fn handle_interrupts<const LEVEL: u32>(save_frame: &mut Context) {
         let core = Cpu::current();
 
         let cpu_interrupt_mask =
-            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[level as usize];
+            interrupt::get() & interrupt::get_mask() & CPU_INTERRUPT_LEVELS[LEVEL as usize];
 
         if cpu_interrupt_mask & CPU_INTERRUPT_INTERNAL != 0 {
             // Let's handle CPU-internal interrupts (NMI, Timer, Software, Profiling).
@@ -600,19 +644,22 @@ mod vectored {
             // If the interrupt is edge triggered, we need to clear the request on the CPU's
             // side.
             if ((1 << cpu_interrupt_nr) & CPU_INTERRUPT_EDGE) != 0 {
-                interrupt::clear(1 << cpu_interrupt_nr);
+                unsafe {
+                    interrupt::clear(1 << cpu_interrupt_nr);
+                }
             }
 
             if let Some(handler) = cpu_interrupt_nr_to_cpu_interrupt_handler(cpu_interrupt_nr) {
-                handler(level, save_frame);
+                unsafe { handler(save_frame) };
             }
         } else {
-            let status = if (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
-                // Next, handle edge triggered peripheral interrupts.
+            let status = if !cfg!(esp32s3) && (cpu_interrupt_mask & CPU_INTERRUPT_EDGE) != 0 {
+                // Next, handle edge triggered peripheral interrupts. Note that on the S3 all
+                // peripheral interrupts are level-triggered.
 
                 // If the interrupt is edge triggered, we need to clear the
                 // request on the CPU's side
-                interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE);
+                unsafe { interrupt::clear(cpu_interrupt_mask & CPU_INTERRUPT_EDGE) };
 
                 // For edge interrupts we cannot rely on the peripherals' interrupt status
                 // registers, therefore call all registered handlers for current level.
@@ -623,39 +670,36 @@ mod vectored {
                 status(core)
             };
 
-            let configured_interrupts = configured_interrupts(core, status, level);
+            let configured_interrupts = configured_interrupts(core, status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
                 let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
-                handle_interrupt(level, interrupt, save_frame);
+
+                unsafe extern "C" {
+                    // defined in each hal
+                    fn EspDefaultHandler(interrupt: Interrupt);
+                }
+
+                let handler = unsafe { pac::__INTERRUPTS[interrupt as usize]._handler };
+                if core::ptr::eq(
+                    handler as *const _,
+                    EspDefaultHandler as *const unsafe extern "C" fn(),
+                ) {
+                    unsafe { EspDefaultHandler(interrupt) };
+                } else {
+                    let handler: fn(&mut Context) = unsafe {
+                        core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
+                    };
+                    handler(save_frame);
+                }
             }
-        }
-    }
-
-    #[ram]
-    unsafe fn handle_interrupt(level: u32, interrupt: Interrupt, save_frame: &mut Context) {
-        extern "C" {
-            // defined in each hal
-            fn EspDefaultHandler(level: u32, interrupt: Interrupt);
-        }
-
-        let handler = pac::__INTERRUPTS[interrupt as usize]._handler;
-        if core::ptr::eq(
-            handler as *const _,
-            EspDefaultHandler as *const unsafe extern "C" fn(),
-        ) {
-            EspDefaultHandler(level, interrupt);
-        } else {
-            let handler: fn(&mut Context) =
-                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler);
-            handler(save_frame);
         }
     }
 
     #[cfg(esp32)]
     mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1111_1100_0000_0000_0000_0000_0000_0000,
@@ -680,7 +724,7 @@ mod vectored {
     #[cfg(esp32s2)]
     mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
             0b0000_0000_0000_0000_0000_0000_0000_0000,
             0b1100_0000_0000_0000_0000_0000_0000_0000,
@@ -708,7 +752,7 @@ mod vectored {
     #[cfg(esp32s3)]
     mod chip_specific {
         use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, link_section = ".rwtext")]
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
         pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
         #[inline]
         pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
@@ -720,34 +764,34 @@ mod vectored {
 mod raw {
     use super::*;
 
-    extern "C" {
+    unsafe extern "C" {
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);
         fn level6_interrupt(save_frame: &mut Context);
         fn level7_interrupt(save_frame: &mut Context);
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_4_interrupt(_level: u32, save_frame: &mut Context) {
-        level4_interrupt(save_frame)
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".rwtext")]
+    unsafe fn __level_4_interrupt(save_frame: &mut Context) {
+        unsafe { level4_interrupt(save_frame) }
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_5_interrupt(_level: u32, save_frame: &mut Context) {
-        level5_interrupt(save_frame)
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".rwtext")]
+    unsafe fn __level_5_interrupt(save_frame: &mut Context) {
+        unsafe { level5_interrupt(save_frame) }
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_6_interrupt(_level: u32, save_frame: &mut Context) {
-        level6_interrupt(save_frame)
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".rwtext")]
+    unsafe fn __level_6_interrupt(save_frame: &mut Context) {
+        unsafe { level6_interrupt(save_frame) }
     }
 
-    #[no_mangle]
-    #[link_section = ".rwtext"]
-    unsafe fn __level_7_interrupt(_level: u32, save_frame: &mut Context) {
-        level7_interrupt(save_frame)
+    #[unsafe(no_mangle)]
+    #[unsafe(link_section = ".rwtext")]
+    unsafe fn __level_7_interrupt(save_frame: &mut Context) {
+        unsafe { level7_interrupt(save_frame) }
     }
 }

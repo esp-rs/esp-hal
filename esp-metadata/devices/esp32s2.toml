@@ -1,7 +1,15 @@
+# ESP32-S2 Device Metadata
+#
+# Empty [`device.driver`] tables imply `partial` support status.
+#
+# If you modify a driver support status, run `cargo xtask update-chip-support-table` to
+# update the table in the esp-hal README.
+
 [device]
 name  = "esp32s2"
 arch  = "xtensa"
-cores = "single_core"
+cores = 1
+trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 peripherals = [
     # Peripherals available in the PAC:
@@ -54,10 +62,9 @@ symbols = [
     "dac",
     "pdma",
     "phy",
-    "wifi",
     "psram",
+    "psram_dma",
     "ulp_riscv_core",
-    "timg_timer1",
     "large_intr_status",
     "gpio_bank_1",
     "spi_octal",
@@ -74,7 +81,81 @@ symbols = [
     "uart_support_wakeup_int",
     "ulp_supported",
     "riscv_coproc_supported",
-
-    # Other capabilities
-    "psram_dma",
 ]
+
+memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
+
+[device.gpio]
+status = "supported"
+
+[device.i2c_master]
+status = "supported"
+instances = [{ name = "i2c0" }, { name = "i2c1" }]
+ll_intr_mask = 0x1ffff
+fifo_size = 32
+has_bus_timeout_enable = true
+max_bus_timeout = 0xFFFFFF
+separate_filter_config_registers = true
+has_arbitration_en = true
+i2c0_data_register_ahb_address = 0x6001301c
+
+[device.rmt]
+status = "partial"
+ram_start = 0x3f416400
+channel_ram_size = 64
+
+[device.spi_master]
+status = "supported"
+instances = [{ name = "spi2" }, { name = "spi3" }]
+
+[device.timergroup]
+timg_has_timer1 = true
+instances = [{ name = "timg0" }, { name = "timg1" }]
+
+[device.uart]
+status = "supported"
+
+[device.rgb_display] # via SPI and I2S
+status = "not_supported"
+
+[device.camera] # via I2S
+status = "not_supported"
+
+[device.touch]
+status = "not_supported"
+
+[device.ds]
+status = "not_supported"
+
+# Other drivers which are partially supported but have no other configuration:
+
+## Crypto
+[device.aes]
+[device.rsa]
+[device.hmac]
+[device.sha]
+[device.rng]
+
+## Interfaces
+[device.i2s]
+[device.ledc]
+[device.spi_slave]
+[device.pcnt]
+[device.twai]
+[device.usb_otg]
+
+## Miscellaneous
+[device.adc]
+[device.dac]
+[device.dma]
+[device.interrupts]
+[device.io_mux]
+[device.psram]
+[device.sleep]
+[device.systimer]
+[device.temp_sensor]
+[device.ulp_fsm]
+[device.ulp_riscv]
+
+## Radio
+[device.wifi]

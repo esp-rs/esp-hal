@@ -11,36 +11,16 @@ crate::unstable_module! {
 }
 pub mod gpio;
 pub mod peripherals;
-
-/// The name of the chip ("esp32c2") as `&str`
-#[macro_export]
-macro_rules! chip {
-    () => {
-        "esp32c2"
-    };
-}
-
-/// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! trm_link {
-    () => { "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf" };
-}
-
-pub use chip;
+pub(crate) mod regi2c;
 
 #[allow(unused)]
 pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x600c2000;
 }
 
+#[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;
-
-    /// The lower bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_LOW: usize = 0x3FCA_0000;
-    /// The upper bound of the system's DRAM (Data RAM) address space.
-    pub const SOC_DRAM_HIGH: usize = 0x3FCE_0000;
 
     /// RC FAST Clock value (Hertz).
     pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);

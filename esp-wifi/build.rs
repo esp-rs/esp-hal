@@ -1,78 +1,37 @@
-use std::{error::Error, str::FromStr};
+use std::error::Error;
 
-use esp_build::assert_unique_used_features;
-use esp_config::{generate_config, Validator, Value};
+use esp_config::{ConfigOption, Validator, generate_config};
 use esp_metadata::{Chip, Config};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    // Ensure that only a single chip is specified:
-    assert_unique_used_features!(
-        "esp32", "esp32c2", "esp32c3", "esp32c6", "esp32h2", "esp32s2", "esp32s3"
-    );
-
-    // NOTE: update when adding new device support!
-    // Determine the name of the configured device:
-    let device_name = if cfg!(feature = "esp32") {
-        "esp32"
-    } else if cfg!(feature = "esp32c2") {
-        "esp32c2"
-    } else if cfg!(feature = "esp32c3") {
-        "esp32c3"
-    } else if cfg!(feature = "esp32c6") {
-        "esp32c6"
-    } else if cfg!(feature = "esp32h2") {
-        "esp32h2"
-    } else if cfg!(feature = "esp32s2") {
-        "esp32s2"
-    } else if cfg!(feature = "esp32s3") {
-        "esp32s3"
-    } else {
-        unreachable!() // We've confirmed exactly one known device was selected
-    };
-
     // Load the configuration file for the configured device:
-    let chip = Chip::from_str(device_name)?;
+    let chip = Chip::from_cargo_feature()?;
     let config = Config::for_chip(&chip);
 
     // Define all necessary configuration symbols for the configured device:
     config.define_symbols();
 
-    #[cfg(all(feature = "ble", feature = "esp32s2"))]
-    {
-        panic!(
-            r#"
+    assert!(
+        !cfg!(feature = "ble") || config.contains("bt"),
+        r#"
 
         BLE is not supported on this target.
 
         "#
-        );
-    }
-    #[cfg(all(feature = "wifi", feature = "esp32h2"))]
-    {
-        panic!(
-            r#"
+    );
+    assert!(
+        !cfg!(feature = "wifi") || config.contains("wifi"),
+        r#"
 
         WiFi is not supported on this target.
 
         "#
-        );
-    }
-    #[cfg(all(feature = "coex", any(feature = "esp32s2", feature = "esp32h2")))]
-    {
-        panic!(
-            r#"
+    );
 
-        COEX is not supported on this target.
-
-        See https://github.com/esp-rs/esp-wifi/issues/92.
-
-        "#
-        );
-    }
     if let Ok(level) = std::env::var("OPT_LEVEL") {
-        if level != "2" && level != "3" {
+        if level != "2" && level != "3" && level != "s" {
             let message = format!(
-                "esp-wifi should be built with optimization level 2 or 3 - yours is {level}.
+                "esp-wifi should be built with optimization level 2, 3 or s - yours is {level}.
                 See https://github.com/esp-rs/esp-wifi",
             );
             print_warning(message);
@@ -82,6 +41,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(coex)");
     #[cfg(feature = "coex")]
     {
+        assert!(
+            config.contains("wifi") && config.contains("bt"),
+            r#"
+
+            WiFi/Bluetooth coexistence is not supported on this target.
+
+            "#
+        );
+
         #[cfg(all(feature = "wifi", feature = "ble"))]
         println!("cargo:rustc-cfg=coex");
 
@@ -99,148 +67,170 @@ fn main() -> Result<(), Box<dyn Error>> {
     generate_config(
         "esp_wifi",
         &[
-            ("rx_queue_size", "Size of the RX queue in frames", Value::Integer(5), Some(Validator::PositiveInteger)),
-            ("tx_queue_size", "Size of the TX queue in frames", Value::Integer(3), Some(Validator::PositiveInteger)),
-            (
+            ConfigOption::new("rx_queue_size", "Size of the RX queue in frames", 5)
+                .constraint(Validator::PositiveInteger),
+            ConfigOption::new("tx_queue_size", "Size of the TX queue in frames", 3)
+                .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "static_rx_buf_num",
-                "WiFi static RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(10),
-                None
-            ),
-            (
+                "WiFi static RX buffer number. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                10,
+            )
+            .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "dynamic_rx_buf_num",
-                "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(32),
-                None
-            ),
-            (
+                "WiFi dynamic RX buffer number. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                32,
+            )
+            .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "static_tx_buf_num",
-                "WiFi static TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(0),
-                None
+                "WiFi static TX buffer number. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                0,
             ),
-            (
+            ConfigOption::new(
                 "dynamic_tx_buf_num",
-                "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(32),
-                None
+                "WiFi dynamic TX buffer number. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                32,
             ),
-            (
+            ConfigOption::new(
                 "ampdu_rx_enable",
-                "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(true),
-                None
+                "WiFi AMPDU RX feature enable flag. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                true,
             ),
-            (
+            ConfigOption::new(
                 "ampdu_tx_enable",
-                "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(true),
-                None
+                "WiFi AMPDU TX feature enable flag. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                true,
             ),
-            (
+            ConfigOption::new(
                 "amsdu_tx_enable",
-                "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Bool(false),
-                None
+                "WiFi AMSDU TX feature enable flag. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                false,
             ),
-            (
+            ConfigOption::new(
                 "rx_ba_win",
-                "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv418wifi_init_config_t)",
-                Value::Integer(6),
-                None
+                "WiFi Block Ack RX window size. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/\
+                 network/esp_wifi.html#_CPPv418wifi_init_config_t)",
+                6,
             ),
-            (
+            ConfigOption::new(
                 "max_burst_size",
-                "See [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_burst_size)",
-                Value::Integer(1),
-                None
+                "See [smoltcp's documentation]\
+                 (https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html\
+                 #structfield.max_burst_size)",
+                1,
             ),
-            (
+            ConfigOption::new(
                 "country_code",
-                "Country code. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
-                Value::String("CN".to_owned()),
-                None
+                "Country code. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/\
+                 wifi.html#wi-fi-country-code)",
+                "CN",
             ),
-            (
+            ConfigOption::new(
                 "country_code_operating_class",
-                "If not 0: Operating Class table number. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)",
-                Value::Integer(0),
-                None
+                "If not 0: Operating Class table number. See [ESP-IDF Programming Guide]\
+                 (https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/\
+                 wifi.html#wi-fi-country-code)",
+                0,
             ),
-            (
+            ConfigOption::new(
                 "mtu",
-                "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)",
-                Value::Integer(1492),
-                None
-            ),
-            (
+                "MTU, see [smoltcp's documentation]\
+                 (https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html\
+                 #structfield.max_transmission_unit)",
+                1492,
+            )
+            .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "tick_rate_hz",
                 "Tick rate of the internal task scheduler in hertz",
-                Value::Integer(100),
-                None
-            ),
-            (
+                100,
+            )
+            .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "listen_interval",
-                "Interval for station to listen to beacon from AP. The unit of listen interval is one beacon interval. For example, if beacon interval is 100 ms and listen interval is 3, the interval for station to listen to beacon is 300 ms",
-                Value::Integer(3),
-                None
+                "Interval for station to listen to beacon from AP.
+                 The unit of listen interval is one beacon interval.
+                 For example, if beacon interval is 100 ms and listen interval is 3,
+                 the interval for station to listen to beacon is 300 ms",
+                3,
             ),
-            (
+            ConfigOption::new(
                 "beacon_timeout",
-                "For Station, If the station does not receive a beacon frame from the connected SoftAP during the  inactive time, disconnect from SoftAP. Default 6s. Range 6-30",
-                Value::Integer(6),
-                None
-            ),
-            (
+                "For Station, If the station does not receive a beacon frame
+                 from the connected SoftAP during the  inactive time, disconnect from SoftAP.
+                 Default 6s. Range 6-30",
+                6,
+            )
+            .constraint(Validator::IntegerInRange(6..30)),
+            ConfigOption::new(
                 "ap_beacon_timeout",
-                "For SoftAP, If the SoftAP doesn't receive any data from the connected STA during inactive time, the SoftAP will force deauth the STA. Default is 300s",
-                Value::Integer(300),
-                None
+                "For SoftAP, If the SoftAP doesn't receive any data from the connected STA
+                 during inactive time, the SoftAP will force deauth the STA. Default is 300s",
+                300,
             ),
-            (
+            ConfigOption::new(
                 "failure_retry_cnt",
-                "Number of connection retries station will do before moving to next AP. scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config. Note: Enabling this may cause connection time to increase incase best AP doesn't behave properly. Defaults to 1",
-                Value::Integer(1),
-                None
-            ),
-            (
+                "Number of connection retries station will do before moving to next AP.
+                scan_method should be set as WIFI_ALL_CHANNEL_SCAN to use this config.
+                Note: Enabling this may cause connection time to increase incase best AP
+                doesn't behave properly. Defaults to 1",
+                1,
+            )
+            .constraint(Validator::PositiveInteger),
+            ConfigOption::new(
                 "scan_method",
                 "0 = WIFI_FAST_SCAN, 1 = WIFI_ALL_CHANNEL_SCAN, defaults to 0",
-                Value::Integer(0),
-                None
-            ),
-            (
+                0,
+            )
+            .constraint(Validator::IntegerInRange(0..2)),
+            ConfigOption::new(
                 "dump_packets",
                 "Dump packets via an info log statement",
-                Value::Bool(false),
-                None
+                false,
             ),
-            (
+            ConfigOption::new(
                 "phy_enable_usb",
-                "Keeps USB running when using WiFi. This allows debugging and log messages via USB Serial JTAG. Turn off for best WiFi performance.",
-                Value::Bool(true),
-                None
+                "Keeps USB running when using WiFi.
+                 This allows debugging and log messages via USB Serial JTAG.
+                 Turn off for best WiFi performance.",
+                true,
+            ),
+            ConfigOption::new(
+                "phy_skip_calibration_after_deep_sleep",
+                "Use PHY_RF_CAL_NONE after deep sleep.",
+                false,
+            ),
+            ConfigOption::new(
+                "phy_full_calibration",
+                "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL.",
+                true,
             ),
         ],
-        true
+        true,
+        true,
     );
 
     Ok(())
 }
 
-#[cfg(not(any(
-    feature = "esp32",
-    feature = "esp32c2",
-    feature = "esp32c3",
-    feature = "esp32c6",
-    feature = "esp32h2",
-    feature = "esp32s2",
-    feature = "esp32s3",
-)))]
-fn main() {
-    panic!("Select a chip via it's cargo feature");
-}
-
 fn print_warning(message: impl core::fmt::Display) {
-    println!("cargo:warning={}", message);
+    println!("cargo:warning={message}");
 }

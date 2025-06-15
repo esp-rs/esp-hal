@@ -8,11 +8,11 @@ use super::ReceivedPacket;
 use crate::{
     binary::include::*,
     ble::{
-        btdm::ble_os_adapter_chip_specific::{osi_funcs_s, G_OSI_FUNCS},
-        HciOutCollector,
         HCI_OUT_COLLECTOR,
+        HciOutCollector,
+        btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
     },
-    compat::common::{self, str_from_c, ConcurrentQueue},
+    compat::common::{self, ConcurrentQueue, str_from_c},
     hal::ram,
 };
 
@@ -34,7 +34,7 @@ struct VhciHostCallbacks {
     notify_host_recv: extern "C" fn(*mut u8, u16) -> i32,
 }
 
-extern "C" {
+unsafe extern "C" {
     fn btdm_osi_funcs_register(osi_funcs: *const osi_funcs_s) -> i32;
     fn btdm_controller_get_compile_version() -> *const c_char;
 
@@ -86,10 +86,6 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-#[cfg(target_arch = "riscv32")]
-type InterruptsFlagType = u8;
-
-#[cfg(target_arch = "xtensa")]
 type InterruptsFlagType = u32;
 
 static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
@@ -98,24 +94,28 @@ static mut INTERRUPT_DISABLE_CNT: usize = 0;
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
-    INTERRUPT_DISABLE_CNT -= 1;
-    let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
-    trace!("interrupt_enable {}", flags);
-    critical_section::release(core::mem::transmute::<
-        InterruptsFlagType,
-        critical_section::RestoreState,
-    >(flags));
+    unsafe {
+        INTERRUPT_DISABLE_CNT -= 1;
+        let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
+        trace!("interrupt_enable {}", flags);
+        critical_section::release(core::mem::transmute::<
+            InterruptsFlagType,
+            critical_section::RestoreState,
+        >(flags));
+    }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
-    let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
-        critical_section::acquire(),
-    );
-    G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
-    INTERRUPT_DISABLE_CNT += 1;
-    trace!("interrupt_disable {}", flags);
+    unsafe {
+        let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
+            critical_section::acquire(),
+        );
+        G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
+        INTERRUPT_DISABLE_CNT += 1;
+        trace!("interrupt_disable {}", flags);
+    }
 }
 
 #[ram]
@@ -128,19 +128,26 @@ unsafe extern "C" fn task_yield_from_isr() {
 }
 
 unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *const () {
-    crate::common_adapter::semphr_create(max, init) as *const ()
+    unsafe { crate::common_adapter::semphr_create(max, init) as *const () }
 }
 
 unsafe extern "C" fn semphr_delete(sem: *const ()) {
-    crate::common_adapter::semphr_delete(sem as *mut crate::binary::c_types::c_void);
+    unsafe {
+        crate::common_adapter::semphr_delete(sem as *mut crate::binary::c_types::c_void);
+    }
 }
 
 unsafe extern "C" fn semphr_take(sem: *const (), block_time_ms: u32) -> i32 {
-    crate::common_adapter::semphr_take(sem as *mut crate::binary::c_types::c_void, block_time_ms)
+    unsafe {
+        crate::common_adapter::semphr_take(
+            sem as *mut crate::binary::c_types::c_void,
+            block_time_ms,
+        )
+    }
 }
 
 unsafe extern "C" fn semphr_give(sem: *const ()) -> i32 {
-    crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void)
+    unsafe { crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void) }
 }
 
 unsafe extern "C" fn mutex_create() -> *const () {
@@ -185,8 +192,10 @@ unsafe extern "C" fn queue_send_from_isr(
 ) -> i32 {
     trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
     // Force to set the value to be false
-    *(_hptw as *mut bool) = false;
-    queue_send(_queue, _item, 0)
+    unsafe {
+        *(_hptw as *mut bool) = false;
+    }
+    unsafe { queue_send(_queue, _item, 0) }
 }
 
 unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
@@ -215,26 +224,23 @@ unsafe extern "C" fn task_create(
     handle: *mut crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
-    let n = str_from_c(name);
-    trace!(
-        "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
-        func,
-        name,
-        n,
-        stack_depth,
-        param,
-        prio,
-        handle,
-        core_id
-    );
+    unsafe {
+        let n = str_from_c(name);
+        trace!(
+            "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
+            func, name, n, stack_depth, param, prio, handle, core_id
+        );
+    }
 
-    let task_func = core::mem::transmute::<
-        *mut crate::binary::c_types::c_void,
-        extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
-    >(func);
+    unsafe {
+        let task_func = core::mem::transmute::<
+            *mut crate::binary::c_types::c_void,
+            extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+        >(func);
 
-    let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
-    *(handle as *mut usize) = task as usize;
+        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        *(handle as *mut usize) = task as usize;
+    }
 
     1
 }
@@ -252,7 +258,7 @@ unsafe extern "C" fn task_delete(task: *const ()) {
 
 #[ram]
 unsafe extern "C" fn is_in_isr() -> i32 {
-    0
+    crate::is_interrupts_disabled() as i32
 }
 
 #[ram]
@@ -264,7 +270,7 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
     {
         trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
         let intr = 1 << _intr_no;
-        core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack));
+        unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
         0
     }
 }
@@ -279,7 +285,7 @@ unsafe extern "C" fn srand(seed: u32) {
 #[ram]
 unsafe extern "C" fn rand() -> i32 {
     trace!("rand");
-    crate::common_adapter::random() as i32
+    unsafe { crate::common_adapter::random() as i32 }
 }
 
 #[ram]
@@ -296,7 +302,6 @@ unsafe extern "C" fn btdm_hus_2_lpcycles(us: u32) -> u32 {
     // Converts a duration in half us into a number of low power clock cycles.
     let cycles: u64 = (us as u64) << (g_btdm_lpcycle_us_frac as u64 / g_btdm_lpcycle_us as u64);
     trace!("btdm_hus_2_lpcycles {} {}", us, cycles);
-    // probably not right ... NX returns half of the values we calculate here
 
     cycles as u32
 }
@@ -328,23 +333,27 @@ unsafe extern "C" fn btdm_sleep_exit_phase3() {
 unsafe extern "C" fn coex_schm_status_bit_set(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_set {} {}", _typ, status);
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32);
+    unsafe {
+        crate::binary::include::coex_schm_status_bit_set(_typ as u32, status as u32)
+    };
 }
 
 unsafe extern "C" fn coex_schm_status_bit_clear(_typ: i32, status: i32) {
     trace!("coex_schm_status_bit_clear {} {}", _typ, status);
     #[cfg(coex)]
-    crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32);
+    unsafe {
+        crate::binary::include::coex_schm_status_bit_clear(_typ as u32, status as u32)
+    };
 }
 
 #[ram]
 unsafe extern "C" fn read_efuse_mac(mac: *const ()) -> i32 {
-    crate::common_adapter::read_mac(mac as *mut _, 2)
+    unsafe { crate::common_adapter::read_mac(mac as *mut _, 2) }
 }
 
 #[cfg(esp32)]
 unsafe extern "C" fn set_isr13(n: i32, handler: unsafe extern "C" fn(), arg: *const ()) -> i32 {
-    ble_os_adapter_chip_specific::set_isr(n, handler, arg)
+    unsafe { ble_os_adapter_chip_specific::set_isr(n, handler, arg) }
 }
 
 #[cfg(esp32)]
@@ -428,7 +437,7 @@ pub(crate) fn ble_init() {
 
         #[cfg(esp32)]
         {
-            extern "C" {
+            unsafe extern "C" {
                 fn btdm_rf_bb_init_phase2();
             }
 
@@ -443,11 +452,10 @@ pub(crate) fn ble_init() {
 
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
-    crate::flags::BLE.store(true, Ordering::Release);
 }
 
 pub(crate) fn ble_deinit() {
-    extern "C" {
+    unsafe extern "C" {
         fn btdm_controller_deinit();
     }
 
@@ -455,7 +463,6 @@ pub(crate) fn ble_deinit() {
         btdm_controller_deinit();
         crate::common_adapter::chip_specific::phy_disable();
     }
-    crate::flags::BLE.store(false, Ordering::Release);
 }
 
 pub fn send_hci(data: &[u8]) {
@@ -475,7 +482,19 @@ pub fn send_hci(data: &[u8]) {
                 }
 
                 PACKET_SENT.store(false, Ordering::Relaxed);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 API_vhci_host_send_packet(packet.as_ptr(), packet.len() as u16);
+
+                #[cfg(all(esp32, coex))]
+                ble_os_adapter_chip_specific::async_wakeup_request_end(
+                    ble_os_adapter_chip_specific::BTDM_ASYNC_WAKEUP_REQ_HCI,
+                );
+
                 trace!("sent vhci host packet");
 
                 super::dump_packet_info(packet);
