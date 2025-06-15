@@ -1517,7 +1517,7 @@ impl DmaTxStreamBufView {
         head.iter()
             .chain(tail)
             .take_while(|d| d.owner() == Owner::Cpu)
-            .map(|d| d.len())
+            .map(|d| d.size())
             .sum::<usize>()
             - self.descriptor_offset
     }
@@ -1525,58 +1525,60 @@ impl DmaTxStreamBufView {
     /// Pushes a buffer into the stream buffer.
     /// Returns the number of bytes pushed.
     pub fn push(&mut self, buf: &[u8]) -> usize {
+        let bytes_to_fill = buf.len().min(self.available_bytes());
+        let buf = &buf[..bytes_to_fill];
+
+        fn truncate_by(n: usize, by: usize) -> usize {
+            (n >= by).then_some(n - by).unwrap_or(n)
+        }
+
+        let n_chunks = self.buf.descriptors.len();
         let chunk_size = self.buf.descriptors[0].size();
-        let n_descs = self.buf.descriptors.len();
+        let dma_size = self.buf.buffer.len();
+        let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
+        let dma_end = truncate_by(dma_start + buf.len(), dma_size);
 
-        // Prepare descriptors and reorganize link list
-        let buf_start = chunk_size * self.descriptor_idx + self.descriptor_offset;
-        let desc_start = self.descriptor_idx;
-        let mut buf_idx = 0;
-        loop {
-            let d = &mut self.buf.descriptors[self.descriptor_idx];
-            if d.owner() == Owner::Dma {
-                break;
-            }
-
-            let desc_remain = d.len() - self.descriptor_offset;
-            if buf_idx + desc_remain >= buf.len() {
-                self.descriptor_offset += desc_remain;
-                break;
-            }
-            buf_idx += desc_remain;
-
-            d.next = null_mut();
-            let prev = self.descriptor_idx.checked_sub(1).unwrap_or(n_descs - 1);
-            self.buf.descriptors[prev].next = d;
-
-            self.descriptor_idx += 1;
-            if self.descriptor_idx > n_descs {
-                self.descriptor_idx = 0;
-            }
-            self.descriptor_offset = 0;
-        }
-        let buf_end = chunk_size * self.descriptor_idx + self.descriptor_offset;
-        let desc_end = self.descriptor_idx;
-
-        // Actually copy buffers
-        if buf_start < buf_end {
-            self.buf.buffer[buf_start..buf_end].copy_from_slice(&buf[..buf_end - buf_start]);
-            self.buf.descriptors[desc_start..desc_end]
-                .iter_mut()
-                .for_each(|d| d.set_owner(Owner::Dma));
-            buf_end - buf_start
+        if dma_start < dma_end {
+            self.buf.buffer[dma_start..dma_end].copy_from_slice(buf);
         } else {
-            let buf_len = self.buf.buffer.len();
-            self.buf.buffer[buf_start..].copy_from_slice(&buf[..buf_len - buf_start]);
-            self.buf.buffer[..buf_end].copy_from_slice(&buf[buf_len - buf_start..]);
-            self.buf.descriptors[desc_start..]
-                .iter_mut()
-                .for_each(|d| d.set_owner(Owner::Dma));
-            self.buf.descriptors[..desc_end]
-                .iter_mut()
-                .for_each(|d| d.set_owner(Owner::Dma));
-            buf_len + buf_end - buf_start
+            self.buf.buffer[dma_start..].copy_from_slice(&buf[..dma_size - dma_start]);
+            self.buf.buffer[..dma_end].copy_from_slice(&buf[dma_size - dma_start..]);
         }
+
+        let descs = (self.descriptor_idx..n_chunks).chain(0..self.descriptor_idx);
+        let mut offset = self.descriptor_offset;
+        let mut bytes_filled = 0;
+
+        for d in descs {
+            let desc = &mut self.buf.descriptors[d];
+            let bytes_in_d = desc.size() - offset;
+            if bytes_in_d + bytes_filled > buf.len() {
+                // I will have empty space in `desc`
+                self.descriptor_idx = d;
+                self.descriptor_offset = offset + buf.len() - bytes_filled;
+                break;
+            }
+            // fill `desc` with data from `buf`
+            bytes_filled += bytes_in_d;
+            offset = 0;
+
+            desc.set_owner(Owner::Dma);
+            desc.set_length(desc.size());
+            desc.set_suc_eof(true);
+            let p = d.checked_sub(1).unwrap_or(n_chunks - 1);
+            if p != d {
+                let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
+                desc.next = null_mut();
+                prev.next = desc;
+            }
+        }
+
+        info!(
+            "self.descriptor_idx: {}, self.descriptor_offset: {}, dma_start: {}, dma_end: {}",
+            self.descriptor_idx, self.descriptor_offset, dma_start, dma_end
+        );
+
+        bytes_to_fill
     }
 }
 
