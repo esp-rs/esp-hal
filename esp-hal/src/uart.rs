@@ -673,6 +673,7 @@ impl<'d> UartTx<'d, Async> {
             guard: self.guard,
             rts_pin: self.rts_pin,
             tx_pin: self.tx_pin,
+            baudrate: self.baudrate,
         }
     }
 
