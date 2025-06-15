@@ -1160,6 +1160,7 @@ impl DmaRxStreamBuf {
         }
 
         // Check that the last descriptor can hold the excess
+        // FIXME: shouldn't this be `buffer.len() % chunk_size` ?
         let excess = buffer.len() % descriptors.len();
         if chunk_size + excess > 4095 {
             return Err(DmaBufError::InsufficientDescriptors);
@@ -1415,12 +1416,44 @@ pub struct DmaTxStreamBuf {
 impl DmaTxStreamBuf {
     /// Creates a new [DmaTxStreamBuf] evenly distributing the buffer between
     /// the provided descriptors.
-    pub fn new(descriptors: &'static mut [DmaDescriptor], buffer: &'static mut [u8]) -> Self {
-        Self {
+    pub fn new(
+        descriptors: &'static mut [DmaDescriptor],
+        buffer: &'static mut [u8],
+    ) -> Result<Self, DmaBufError> {
+        match () {
+            _ if !is_slice_in_dram(descriptors) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if !is_slice_in_dram(buffer) => Err(DmaBufError::UnsupportedMemoryRegion)?,
+            _ if descriptors.is_empty() => Err(DmaBufError::InsufficientDescriptors)?,
+            _ => (),
+        };
+
+        // Evenly distribute the buffer between the descriptors.
+        let chunk_size = Some(buffer.len() / descriptors.len())
+            .filter(|x| *x <= 4095)
+            .ok_or(DmaBufError::InsufficientDescriptors)?;
+
+        let mut chunks = buffer.chunks_exact_mut(chunk_size);
+        for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
+            desc.buffer = chunk.as_mut_ptr();
+            desc.set_size(chunk.len());
+        }
+        let remainder = chunks.into_remainder();
+
+        if !remainder.is_empty() {
+            // Append any excess to the last descriptor.
+            let last_descriptor = descriptors.last_mut().unwrap();
+            let size = last_descriptor.size() + remainder.len();
+            if size > 4095 {
+                Err(DmaBufError::InsufficientDescriptors)?;
+            }
+            last_descriptor.set_size(size);
+        }
+
+        Ok(Self {
             descriptors,
             buffer,
             burst: Default::default(),
-        }
+        })
     }
 
     /// Consume the buf, returning the descriptors and buffer.
@@ -1430,7 +1463,7 @@ impl DmaTxStreamBuf {
 }
 
 unsafe impl DmaTxBuffer for DmaTxStreamBuf {
-    type View = ();
+    type View = DmaTxStreamBufView;
 
     fn prepare(&mut self) -> Preparation {
         // Link up all the descriptors (but not in a circle).
@@ -1439,7 +1472,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             desc.next = next;
             next = desc;
 
-            desc.reset_for_rx();
+            desc.reset_for_tx(desc.next.is_null());
         }
         Preparation {
             start: self.descriptors.as_mut_ptr(),
@@ -1458,11 +1491,15 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
     }
 
     fn into_view(self) -> Self::View {
-        todo!()
+        DmaTxStreamBufView {
+            buf: self,
+            descriptor_idx: 0,
+            descriptor_offset: 0,
+        }
     }
 
     fn from_view(view: Self::View) -> Self {
-        todo!()
+        view.buf
     }
 }
 
