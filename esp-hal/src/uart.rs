@@ -650,9 +650,12 @@ where
         // Invert the TX line
         self.regs().conf0().modify(|_, w| w.txd_inv().bit(true));
 
-        // 1 bit time in microseconds = 1_000_000 / baudrate_bps
-        let bit_period_us: u32 = 1_000_000 / self.baudrate;
-        crate::rom::ets_delay_us(bit_period_us * bits);
+        // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
+        // Use u64 to avoid overflow, then convert back to u32
+        let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
+        let delay_us = (total_delay_us as u32).max(1);
+        
+        crate::rom::ets_delay_us(delay_us);
 
         // Revert the TX line
         self.regs().conf0().modify(|_, w| w.txd_inv().bit(false));
