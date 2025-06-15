@@ -853,19 +853,23 @@ where
     pub fn send_break(&mut self, bits: u32) {
         // Read the current TX inversion state
         let original_txd_inv = self.regs().conf0().read().txd_inv().bit();
-        
+
         // Invert the TX line (toggle the current state)
-        self.regs().conf0().modify(|_, w| w.txd_inv().bit(!original_txd_inv));
+        self.regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(!original_txd_inv));
 
         // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
         // Use u64 to avoid overflow, then convert back to u32
         let total_delay_us = (bits as u64 * 1_000_000) / self.baudrate as u64;
         let delay_us = (total_delay_us as u32).max(1);
-        
+
         crate::rom::ets_delay_us(delay_us);
 
         // Restore the original TX inversion state
-        self.regs().conf0().modify(|_, w| w.txd_inv().bit(original_txd_inv));
+        self.regs()
+            .conf0()
+            .modify(|_, w| w.txd_inv().bit(original_txd_inv));
     }
 
     /// Checks if the TX line is idle for this UART instance.
