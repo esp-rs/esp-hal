@@ -647,8 +647,11 @@ where
     /// it takes to transfer one bit at the current baud rate. The delay during
     /// the break is just is busy-waiting.
     pub fn send_break(&mut self, bits: u32) {
-        // Invert the TX line
-        self.regs().conf0().modify(|_, w| w.txd_inv().bit(true));
+        // Read the current TX inversion state
+        let original_txd_inv = self.regs().conf0().read().txd_inv().bit();
+        
+        // Invert the TX line (toggle the current state)
+        self.regs().conf0().modify(|_, w| w.txd_inv().bit(!original_txd_inv));
 
         // Calculate total delay in microseconds: (bits * 1_000_000) / baudrate_bps
         // Use u64 to avoid overflow, then convert back to u32
@@ -657,8 +660,8 @@ where
         
         crate::rom::ets_delay_us(delay_us);
 
-        // Revert the TX line
-        self.regs().conf0().modify(|_, w| w.txd_inv().bit(false));
+        // Restore the original TX inversion state
+        self.regs().conf0().modify(|_, w| w.txd_inv().bit(original_txd_inv));
     }
 
     /// Checks if the TX line is idle for this UART instance.
