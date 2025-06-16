@@ -12,9 +12,9 @@ console      = "0.15.10"
 env_logger   = "0.11.5"
 esp-metadata = { path = "../esp-metadata", features = ["clap"] }
 jiff         = { version = "0.2.13" }
-kuchikiki    = "0.8.2"
+kuchikiki    = { version = "0.8.2", optional = true }
 log          = "0.4.22"
-minijinja    = "2.5.0"
+minijinja    = { version = "2.5.0", default-features = false }
 opener       = { version = "0.7.2", optional = true }
 rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
@@ -45,7 +45,7 @@ urlencoding = { version = "2.1.3", optional = true }
 pretty_assertions = "1.2.0"
 
 [features]
-deploy-docs  = ["dep:reqwest"]
+deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]
 semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types", "dep:flate2", "dep:temp-file" ]
 release = ["semver-checks", "dep:opener", "dep:urlencoding"]
