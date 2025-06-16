@@ -58,8 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
-    #[allow(unused_mut)]
-    let mut config_symbols = config.all().collect::<Vec<_>>();
+    let mut config_symbols = config.all().to_vec();
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {

@@ -732,6 +732,8 @@ fn number(n: impl std::fmt::Display) -> TokenStream {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct Config {
     device: Device,
+    #[serde(skip)]
+    all_symbols: OnceLock<Vec<String>>,
 }
 
 impl Config {
@@ -766,6 +768,7 @@ impl Config {
                 memory: Vec::new(),
                 peri_config: PeriConfig::default(),
             },
+            all_symbols: OnceLock::new(),
         }
     }
 
@@ -821,47 +824,45 @@ impl Config {
     }
 
     /// All configuration values for the device.
-    pub fn all(&self) -> impl Iterator<Item = String> + '_ {
-        let mut all = vec![
-            self.device.name.clone(),
-            self.device.arch.to_string(),
-            match self.cores() {
-                Cores::Single => String::from("single_core"),
-                Cores::Multi => String::from("multi_core"),
-            },
-        ];
+    pub fn all(&self) -> &[String] {
+        self.all_symbols.get_or_init(|| {
+            let mut all = vec![
+                self.device.name.clone(),
+                self.device.arch.to_string(),
+                match self.cores() {
+                    Cores::Single => String::from("single_core"),
+                    Cores::Multi => String::from("multi_core"),
+                },
+            ];
+            all.extend(
+                self.device
+                    .peripherals
+                    .iter()
+                    .map(|p| format!("soc_has_{p}")),
+            );
+            all.extend_from_slice(&self.device.symbols);
+            all.extend(
+                self.device
+                    .peri_config
+                    .driver_names()
+                    .map(|name| name.to_string()),
+            );
+            all.extend(self.device.peri_config.driver_instances());
 
-        all.extend(
-            self.device
-                .peripherals
-                .iter()
-                .map(|p| format!("soc_has_{p}")),
-        );
-        all.extend_from_slice(&self.device.symbols);
-        all.extend(
-            self.device
-                .peri_config
-                .driver_names()
-                .map(|name| name.to_string()),
-        );
-        all.extend(self.device.peri_config.driver_instances());
-
-        all.extend(
-            self.device
-                .peri_config
-                .properties()
-                .filter_map(|(name, value)| match value {
+            all.extend(self.device.peri_config.properties().filter_map(
+                |(name, value)| match value {
                     Value::Boolean(true) => Some(name.to_string()),
                     Value::Number(value) => Some(format!("{name}=\"{value}\"")),
                     _ => None,
-                }),
-        );
-        all.into_iter()
+                },
+            ));
+            all
+        })
     }
 
     /// Does the configuration contain `item`?
     pub fn contains(&self, item: &str) -> bool {
-        self.all().any(|i| i == item)
+        self.all().iter().any(|i| i == item)
     }
 
     /// Define all symbols for a given configuration.
