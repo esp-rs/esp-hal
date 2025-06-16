@@ -33,10 +33,11 @@ mod tests {
 
         Context { uart }
     }
-
+    
     #[test]
-    fn test_wait_for_break_blocking(mut ctx: Context) {
+    async fn test_break_detection(mut ctx: Context) {
         ctx.uart.send_break(1);
-        // todo: check interrupt
+        ctx.uart.into_async().wait_for_break_async().await;
+        // should exit with break detected before timeout
     }
 }

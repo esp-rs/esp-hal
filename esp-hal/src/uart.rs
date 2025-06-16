@@ -1110,6 +1110,13 @@ impl<'d> UartRx<'d, Async> {
 
         Ok(())
     }
+
+    /// Interrupt-driven wait for a break condition on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    pub async fn wait_for_break_async(&mut self) {
+        UartRxFuture::new(self.uart.reborrow(), RxEvent::BreakDetected).await;
+    }
 }
 
 impl<'d, Dm> UartRx<'d, Dm>
@@ -1480,6 +1487,14 @@ impl<'d> Uart<'d, Async> {
     pub async fn read_exact_async(&mut self, buf: &mut [u8]) -> Result<(), RxError> {
         self.rx.read_exact_async(buf).await
     }
+
+    /// Asynchronously waits for a break condition on the RX line.
+    /// Condition is met when the receiver detects a NULL character (i.e. logic
+    /// 0 for one NULL character transmission) after stop bits.
+    #[instability::unstable]
+    pub async fn wait_for_break_async(&mut self) {
+        self.rx.wait_for_break_async().await;
+    }
 }
 
 /// List of exposed UART events.
@@ -1597,6 +1612,7 @@ where
     }
 
     /// Sends a break signal for a specified duration
+    #[instability::unstable]
     pub fn send_break(&mut self, bits: u32) {
         self.tx.send_break(bits)
     }
