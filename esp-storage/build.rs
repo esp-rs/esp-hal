@@ -9,7 +9,7 @@ fn main() -> Result<(), String> {
         let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
         println!("cargo:rustc-link-search={}", out.display());
         std::fs::copy("./libs/esp32/libesp_rom.a", out.join("libesp_rom.a")).unwrap();
-        println!("cargo:rustc-link-lib={}", "esp_rom");
+        println!("cargo:rustc-link-lib=esp_rom");
 
         match std::env::var("OPT_LEVEL") {
             Ok(level) if std::env::var("CI").is_err() => {
