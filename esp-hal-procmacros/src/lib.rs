@@ -116,7 +116,6 @@ mod switch;
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     ram::ram(args, input)
 }
@@ -142,7 +141,6 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 /// fn my_function() {}
 /// ```
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
     switch::enable_doc_switch(args, input)
 }
@@ -154,7 +152,6 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// If no priority is given, `Priority::min()` is assumed
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     interrupt::handler(args, input)
 }
@@ -175,7 +172,6 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
 }
