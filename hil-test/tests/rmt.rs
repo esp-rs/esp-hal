@@ -493,6 +493,49 @@ mod tests {
     }
 
     #[test]
+    async fn rmt_loopback_after_drop() {
+        const TX_LEN: usize = 20;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let rx_fut = rx_channel.receive(&mut rcv_data);
+        let tx_fut = tx_channel.transmit(&tx_data);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and this drops it before returning)
+        let _ = embassy_futures::poll_once(rx_fut);
+        let _ = embassy_futures::poll_once(tx_fut);
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+        let (rx_res, tx_res) = embassy_futures::join::join(
+            rx_channel.receive(&mut rcv_data),
+            tx_channel.transmit(&tx_data),
+        )
+        .await;
+
+        tx_res.unwrap();
+        let rx_count = rx_res.unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, rx_count, rx_channel.buffer_size());
+    }
+
+    #[test]
     async fn rmt_pin_reconfigure() {
         let mut peripherals = esp_hal::init(esp_hal::Config::default());
         let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
