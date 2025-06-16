@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a typo in the ESP32-C3 memory linker script, causing ICACHE to not be defined (#3613)
 - Prevent bootloops when DRAM is close to being full. (#3635)
+- Fix PSRAM mapping on ESP32-S3 when the bootloader used the last page to access flash (#3637)
 
 ### Removed
 
