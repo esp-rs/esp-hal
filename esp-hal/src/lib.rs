@@ -377,7 +377,7 @@ pub mod trapframe {
 mod soc;
 
 #[cfg(is_debug_build)]
-esp_build::warning! {"
+procmacros::warning! {"
 WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
