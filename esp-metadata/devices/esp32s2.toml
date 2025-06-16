@@ -88,25 +88,25 @@ symbols = [
 memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
 
 [device.adc]
-status = "partial"
+support_status = "partial"
 instances = [
     { name = "adc1" },
     { name = "adc2" },
 ]
 
 [device.dac]
-status = "partial"
+support_status = "partial"
 instances = [
     { name = "dac1" },
     { name = "dac2" },
 ]
 
 [device.gpio]
-status = "supported"
+support_status = "supported"
 has_bank_1 = true
 
 [device.i2c_master]
-status = "supported"
+support_status = "supported"
 instances = [{ name = "i2c0" }, { name = "i2c1" }]
 ll_intr_mask = 0x1ffff
 fifo_size = 32
@@ -117,16 +117,16 @@ has_arbitration_en = true
 i2c0_data_register_ahb_address = 0x6001301c
 
 [device.interrupts]
-status = "partial"
+support_status = "partial"
 status_registers = 3
 
 [device.rmt]
-status = "partial"
+support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
 
 [device.spi_master]
-status = "supported"
+support_status = "supported"
 instances = [{ name = "spi2" }, { name = "spi3" }]
 
 [device.timergroup]
@@ -134,19 +134,19 @@ timg_has_timer1 = true
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-status = "supported"
+support_status = "supported"
 
 [device.rgb_display] # via SPI and I2S
-status = "not_supported"
+support_status = "not_supported"
 
 [device.camera] # via I2S
-status = "not_supported"
+support_status = "not_supported"
 
 [device.touch]
-status = "not_supported"
+support_status = "not_supported"
 
 [device.ds]
-status = "not_supported"
+support_status = "not_supported"
 
 # Other drivers which are partially supported but have no other configuration:
 

@@ -207,7 +207,6 @@ enum Value {
     Unset,
     /// A numeric value. The generated macro will not include a type suffix
     /// (i.e. will not be generated as `0u32`).
-    // TODO: may add a (`name`, str) macro variant in the future if strings are needed.
     Number(u32),
     /// A boolean value. If true, the value is included in the cfg symbols.
     Boolean(bool),
@@ -285,28 +284,26 @@ macro_rules! driver_configs {
     // Creates a single struct
     (@one
         $struct:tt($group:ident) {
-            $($(#[$meta:meta])? $config:ident: $ty:ty),* $(,)?
+            $(
+                $(#[$meta:meta])? $config:ident: $ty:ty,
+            )*
         }
     ) => {
         #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
         struct $struct {
             #[serde(default)]
-            status: SupportStatus,
-            /// The list of peripherals for which this driver is implemented.
-            /// If empty, the driver supports a single instance only.
+            support_status: SupportStatus,
+            // The list of peripherals for which this driver is implemented.
+            // If empty, the driver supports a single instance only.
             #[serde(default)]
             instances: Vec<PeriInstance<EmptyInstanceConfig>>,
             $(
                 $(#[$meta])?
-                $config: $ty,
-            )*
+                $config: $ty
+            ),*
         }
 
         impl $struct {
-            fn support_status(&self) -> SupportStatus {
-                self.status
-            }
-
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
                 [$( // for each property, generate a tuple
                     (
@@ -329,16 +326,12 @@ macro_rules! driver_configs {
             // double-check the configuration.
             // TODO: remove once the metadata encodes which instances are supported.
             peripherals: $symbols:expr,
-            properties: {
-                $($tokens:tt)*
-            }
-        }
-    ),+ $(,)?) => {
+            properties: $tokens:tt
+        },
+    )+) => {
         // Implement the config driver and DriverConfig trait for each driver
         $(
-            driver_configs!(@one $struct($driver) {
-                $($tokens)*
-            });
+            driver_configs!(@one $struct($driver) $tokens);
         )+
 
         // Generate a single PeriConfig struct that contains all the drivers. Each of the
@@ -368,37 +361,46 @@ macro_rules! driver_configs {
             /// Returns an iterator over all driver names, that are
             /// available on the selected device.
             fn driver_names(&self) -> impl Iterator<Item = &str> {
-                // Chain all driver names from each driver.
-                std::iter::empty()
-                    $(.chain(self.$driver.as_ref().and_then(|d| {
-                        if !matches!(d.status, SupportStatus::NotSupported) {
-                            Some(stringify!($driver))
-                        } else {
-                            None
+                [$(
+                    self.$driver.as_ref().and_then(|d| {
+                        match d.support_status {
+                            SupportStatus::NotSupported => None,
+                            _ => Some(stringify!($driver)),
                         }
-                    } )))*
+                    }),
+                )*].into_iter().flatten()
             }
 
             fn driver_instances(&self) -> impl Iterator<Item = String> {
-                // Chain all driver instances from each driver.
-                std::iter::empty()
-                    $(.chain(self.$driver.iter().flat_map(|d| {
-                        d.instances.iter().map(|i| format!("{}.{}", stringify!($driver), i.name.as_str()))
-                    })))*
+                // Collect into a vector. This compiles faster than chaining iterators.
+                let mut instances = vec![];
+                $(
+                    if let Some(driver) = &self.$driver {
+                        instances.extend(driver.instances.iter().map(|i| {
+                            format!("{}.{}", stringify!($driver), i.name)
+                        }));
+                    }
+                )*
+                instances.into_iter()
             }
 
             /// Returns an iterator over all properties of all peripherals.
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
-                // Chain all properties from each driver.
-                std::iter::empty()
-                    $(.chain(self.$driver.iter().flat_map(|p| p.properties())))*
+                // Collect into a vector. This compiles faster than chaining iterators.
+                let mut properties = vec![];
+                $(
+                    if let Some(driver) = &self.$driver {
+                        properties.extend(driver.properties());
+                    }
+                )*
+                properties.into_iter()
             }
 
             /// Returns the support status of a peripheral by its name.
             fn support_status(&self, peripheral: &str) -> Option<SupportStatus> {
                 // Find the driver by name and return its support status.
                 match peripheral {
-                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status()),)*
+                    $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
                     _ => None, // If the peripheral is not found, return None.
                 }
             }
@@ -820,30 +822,31 @@ impl Config {
 
     /// All configuration values for the device.
     pub fn all(&self) -> impl Iterator<Item = String> + '_ {
-        [
+        let mut all = vec![
             self.device.name.clone(),
             self.device.arch.to_string(),
             match self.cores() {
                 Cores::Single => String::from("single_core"),
                 Cores::Multi => String::from("multi_core"),
             },
-        ]
-        .into_iter()
-        .chain(
+        ];
+
+        all.extend(
             self.device
                 .peripherals
                 .iter()
                 .map(|p| format!("soc_has_{p}")),
-        )
-        .chain(self.device.symbols.iter().cloned())
-        .chain(
+        );
+        all.extend_from_slice(&self.device.symbols);
+        all.extend(
             self.device
                 .peri_config
                 .driver_names()
                 .map(|name| name.to_string()),
-        )
-        .chain(self.device.peri_config.driver_instances())
-        .chain(
+        );
+        all.extend(self.device.peri_config.driver_instances());
+
+        all.extend(
             self.device
                 .peri_config
                 .properties()
@@ -852,7 +855,8 @@ impl Config {
                     Value::Number(value) => Some(format!("{name}=\"{value}\"")),
                     _ => None,
                 }),
-        )
+        );
+        all.into_iter()
     }
 
     /// Does the configuration contain `item`?

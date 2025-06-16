@@ -108,16 +108,16 @@ symbols = [
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
 
 [device.adc]
-status = "partial"
+support_status = "partial"
 instances = [
     { name = "adc1" },
 ]
 
 [device.gpio]
-status = "supported"
+support_status = "supported"
 
 [device.i2c_master]
-status = "supported"
+support_status = "supported"
 instances = [{ name = "i2c0" }]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
@@ -133,29 +133,29 @@ has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
 [device.interrupts]
-status = "partial"
+support_status = "partial"
 status_registers = 3
 
 [device.rmt]
-status = "partial"
+support_status = "partial"
 ram_start = 0x60006400
 channel_ram_size = 48
 
 [device.spi_master]
-status = "supported"
+support_status = "supported"
 instances = [{ name = "spi2" }]
 
 [device.timergroup]
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-status = "supported"
+support_status = "supported"
 
 [device.ds]
-status = "not_supported"
+support_status = "not_supported"
 
 [device.wifi]
-status = "partial"
+support_status = "partial"
 has_wifi6 = true
 
 # Other drivers which are partially supported but have no other configuration:
