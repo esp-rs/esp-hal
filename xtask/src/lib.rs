@@ -347,6 +347,14 @@ pub fn execute_app(
     };
     builder = builder.subcommand(subcommand);
 
+    for config in app.cargo_config() {
+        log::info!(" Cargo --config: {config}");
+        builder.add_arg("--config").add_arg(config);
+        // Some configuration requires nightly rust, so let's just assume it. May be
+        // overwritten by the esp toolchain on xtensa.
+        builder = builder.toolchain("nightly");
+    }
+
     if !debug {
         builder.add_arg("--release");
     }
@@ -354,7 +362,6 @@ pub fn execute_app(
     // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
     if target.starts_with("xtensa") {
         builder = builder.toolchain("esp");
-        builder.add_arg("-Zbuild-std=core,alloc");
     }
 
     let args = builder.build();
