@@ -12,6 +12,7 @@ use esp_hal::{
     delay::Delay,
     gpio::{
         Flex,
+        Input,
         InputConfig,
         Level,
         NoPin,
@@ -493,5 +494,53 @@ mod tests {
 
         // tolerance 25 cycles == 50us
         check_data_eq(&expected, &rx_data, 6, 25);
+    }
+
+    // Use Rmt with a non-static lifetime, keep channel0 around, and the create another reference
+    // to the same channel!
+    // This shouldn't compile, but it does (it does result in a `MemoryBlockNotAvailable` error at
+    // runtime when configuring the channel again).
+    #[test]
+    async fn rmt_pin_reconfigure() {
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
+
+        let mut ch0 = {
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+                .unwrap()
+                .into_async();
+
+            let mut ch0 = rmt
+                .channel0
+                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+
+            ch0
+        };
+
+        let _input = Input::new(tx.reborrow(), Default::default());
+
+        {
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+                .unwrap()
+                .into_async();
+
+            let mut ch0 = rmt
+                .channel0
+                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+        }
+
+        let tx_data: [_; 10] = generate_tx_data(true);
+        ch0.transmit(&tx_data).await.unwrap();
     }
 }
