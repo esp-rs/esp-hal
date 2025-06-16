@@ -32,7 +32,7 @@ mod tests {
 
         Context { uart }
     }
-    
+
     #[test]
     async fn test_break_detection(mut ctx: Context) {
         ctx.uart.send_break(1);
