@@ -457,7 +457,7 @@ driver_configs![
     EtmProperties {
         driver: etm,
         name: "ETM",
-        peripherals: &["soc_etm"],
+        peripherals: &["etm"],
         properties: {}
     },
     GpioProperties {
@@ -820,7 +820,12 @@ impl Config {
             },
         ]
         .into_iter()
-        .chain(self.device.peripherals.iter().cloned())
+        .chain(
+            self.device
+                .peripherals
+                .iter()
+                .map(|p| format!("soc_has_{p}")),
+        )
         .chain(self.device.symbols.iter().cloned())
         .chain(
             self.device

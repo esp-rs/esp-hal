@@ -1702,7 +1702,7 @@ mod chip_specific {
             return Err(Error::UnreachableTargetFrequency);
         };
 
-        #[cfg(not(pcr))]
+        #[cfg(not(soc_has_pcr))]
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
@@ -1714,7 +1714,7 @@ mod chip_specific {
             });
         }
 
-        #[cfg(pcr)]
+        #[cfg(soc_has_pcr)]
         {
             use crate::peripherals::PCR;
             PCR::regs().rmt_sclk_conf().modify(|_, w| unsafe {

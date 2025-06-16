@@ -3,7 +3,7 @@
 //! ## Overview
 //!
 //! The UART is a hardware peripheral which handles communication using serial
-//! communication interfaces, such as RS232 and RS485. This peripheral provides
+//! communication interfaces, such as RS232 and RS485. This peripheral provides!
 //! a cheap and ubiquitous method for full- and half-duplex communication
 //! between devices.
 //!
@@ -149,14 +149,14 @@ impl embedded_io::Error for TxError {
 #[instability::unstable]
 pub enum ClockSource {
     /// APB_CLK clock source
-    #[cfg_attr(not(any(esp32c6, esp32h2, lp_uart)), default)]
+    #[cfg_attr(not(any(esp32c6, esp32h2, soc_has_lp_uart)), default)]
     Apb,
     /// RC_FAST_CLK clock source (17.5 MHz)
     #[cfg(not(any(esp32, esp32s2)))]
     RcFast,
     /// XTAL_CLK clock source
     #[cfg(not(any(esp32, esp32s2)))]
-    #[cfg_attr(any(esp32c6, esp32h2, lp_uart), default)]
+    #[cfg_attr(any(esp32c6, esp32h2, soc_has_lp_uart), default)]
     Xtal,
     /// REF_TICK clock source (derived from XTAL or RC_FAST, 1MHz)
     #[cfg(any(esp32, esp32s2))]
@@ -2201,7 +2201,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 }
 
 /// Low-power UART
-#[cfg(lp_uart)]
+#[cfg(soc_has_lp_uart)]
 #[instability::unstable]
 pub mod lp_uart {
     use crate::{
@@ -3257,19 +3257,21 @@ macro_rules! impl_instance {
     };
 }
 
+#[cfg(soc_has_uart0)]
 impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
+#[cfg(soc_has_uart1)]
 impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
-#[cfg(uart2)]
+#[cfg(soc_has_uart2)]
 impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.
     pub peripheral AnyUart<'d> {
-        #[cfg(uart0)]
+        #[cfg(soc_has_uart0)]
         Uart0(crate::peripherals::UART0<'d>),
-        #[cfg(uart1)]
+        #[cfg(soc_has_uart1)]
         Uart1(crate::peripherals::UART1<'d>),
-        #[cfg(uart2)]
+        #[cfg(soc_has_uart2)]
         Uart2(crate::peripherals::UART2<'d>),
     }
 }
@@ -3278,11 +3280,11 @@ impl Instance for AnyUart<'_> {
     #[inline]
     fn parts(&self) -> (&'static Info, &'static State) {
         match &self.0 {
-            #[cfg(uart0)]
+            #[cfg(soc_has_uart0)]
             AnyUartInner::Uart0(uart) => uart.parts(),
-            #[cfg(uart1)]
+            #[cfg(soc_has_uart1)]
             AnyUartInner::Uart1(uart) => uart.parts(),
-            #[cfg(uart2)]
+            #[cfg(soc_has_uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
         }
     }

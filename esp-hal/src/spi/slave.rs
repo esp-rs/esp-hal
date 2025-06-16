@@ -589,8 +589,9 @@ pub trait Instance: crate::private::Sealed + IntoAnySpi {
 #[allow(private_bounds)]
 pub trait InstanceDma: Instance + DmaEligible {}
 
+#[cfg(soc_has_spi2)]
 impl InstanceDma for crate::peripherals::SPI2<'_> {}
-#[cfg(spi3)]
+#[cfg(soc_has_spi3)]
 impl InstanceDma for crate::peripherals::SPI3<'_> {}
 
 /// Peripheral data describing a particular SPI instance.
@@ -836,7 +837,9 @@ impl<'d> DmaEligible for AnySpi<'d> {
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
+        #[cfg(spi_master_spi2)]
         spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
+        #[cfg(spi_master_spi3)]
         spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
     } else {
         #[cfg(spi_master_spi2)]

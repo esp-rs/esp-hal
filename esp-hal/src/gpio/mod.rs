@@ -5,7 +5,7 @@
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
 #![cfg_attr(
-    soc_etm,
+    soc_has_etm,
     doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
 )]
 #![doc = ""]
@@ -54,13 +54,13 @@
 crate::unstable_module! {
     pub mod interconnect;
 
-    #[cfg(soc_etm)]
+    #[cfg(soc_has_etm)]
     pub mod etm;
 
-    #[cfg(lp_io)]
+    #[cfg(soc_has_lp_io)]
     pub mod lp_io;
 
-    #[cfg(all(rtc_io, not(esp32)))]
+    #[cfg(all(soc_has_rtc_io, not(esp32)))]
     pub mod rtc_io;
 }
 
@@ -76,7 +76,7 @@ pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
 
-#[cfg(any(lp_io, rtc_cntl))]
+#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
@@ -354,7 +354,7 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(any(lp_io, rtc_cntl))]
+#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     #[doc(hidden)]
@@ -588,7 +588,7 @@ pub struct AnyPin<'lt> {
 
 /// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
 /// default are assigned to the `USB_SERIAL_JTAG` peripheral.
-#[cfg(usb_device)]
+#[cfg(soc_has_usb_device)]
 fn disable_usb_pads(gpionum: u8) {
     cfg_if::cfg_if! {
         if #[cfg(esp32c3)] {
@@ -937,7 +937,7 @@ macro_rules! gpio {
             pub(crate) use handle_gpio_input;
 
             cfg_if::cfg_if! {
-                if #[cfg(any(lp_io, rtc_cntl))] {
+                if #[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))] {
                     #[doc(hidden)]
                     macro_rules! handle_rtcio {
                         ($this:expr, $inner:ident, $code:tt) => {
@@ -1792,7 +1792,7 @@ impl<'lt> AnyPin<'lt> {
     /// - Before converting it into signals
     /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
-        #[cfg(usb_device)]
+        #[cfg(soc_has_usb_device)]
         disable_usb_pads(self.number());
 
         self.set_output_enable(false);
@@ -2079,7 +2079,7 @@ impl Pin for AnyPin<'_> {
 impl InputPin for AnyPin<'_> {}
 impl OutputPin for AnyPin<'_> {}
 
-#[cfg(any(lp_io, rtc_cntl))]
+#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
     #[allow(unused_braces, reason = "False positive")]
@@ -2109,7 +2109,7 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(any(lp_io, rtc_cntl))]
+#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         handle_rtcio_with_resistors!(self, target, {
