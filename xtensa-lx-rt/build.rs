@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::Result;
-use enum_as_inner::EnumAsInner;
 use minijinja::{Environment, context};
 use serde::Deserialize;
 use strum::{Display, EnumIter, EnumString};
@@ -54,11 +53,26 @@ enum InterruptType {
 }
 
 /// The allowable value types for definitions
-#[derive(Debug, Clone, PartialEq, EnumAsInner, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 enum Value {
     Integer(i64),
     Interrupt(InterruptType),
     String(String),
+}
+
+impl Value {
+    #[inline]
+    fn as_integer(&self) -> ::core::option::Option<i64> {
+        match self {
+            Self::Integer(inner) => Some(*inner),
+            _ => None,
+        }
+    }
+
+    #[inline]
+    fn is_integer(&self) -> bool {
+        matches!(self, Self::Integer(_))
+    }
 }
 
 fn main() -> Result<()> {
@@ -198,7 +212,7 @@ fn generate_exception_x(out: &Path, isa_config: &HashMap<String, Value>) -> Resu
 fn inject_cfgs(isa_config: &HashMap<String, Value>, disabled_features: &HashSet<String>) {
     for (key, value) in isa_config {
         if key.starts_with("XCHAL_HAVE")
-            && *value.as_integer().unwrap_or(&0) != 0
+            && value.as_integer().unwrap_or(0) != 0
             && !disabled_features.contains(key)
         {
             println!("cargo:rustc-cfg={}", key);
@@ -211,7 +225,7 @@ fn inject_cpu_cfgs(isa_config: &HashMap<String, Value>) {
         if (key.starts_with("XCHAL_TIMER")
             || key.starts_with("XCHAL_PROFILING")
             || key.starts_with("XCHAL_NMI"))
-            && value.as_integer().is_some()
+            && value.is_integer()
         {
             let mut s = String::from(key.trim_end_matches("_INTERRUPT"));
             let first = s.chars().position(|c| c == '_').unwrap() + 1;
