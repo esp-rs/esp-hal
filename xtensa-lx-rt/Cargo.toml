@@ -24,7 +24,7 @@ xtensa-lx         = { version = "0.11.0", path = "../xtensa-lx" }
 anyhow          = "1.0.98"
 serde           = { version = "1.0.219", features = ["derive"] }
 strum           = { version = "0.27.1", features = ["derive"] }
-toml            = "0.8.20"
+toml            = { version = "0.8.20", default-features = false, features = ["parse"] }
 
 [features]
 ## Save and restore float registers for exceptions
