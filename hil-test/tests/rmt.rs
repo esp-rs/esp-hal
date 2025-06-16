@@ -8,7 +8,7 @@
 
 use esp_hal::{
     DriverMode,
-    gpio::{InputPin, Level, NoPin, OutputPin},
+    gpio::{Input, InputPin, Level, NoPin, OutputPin},
     rmt::{
         AnyRxChannel,
         AnyTxChannel,
@@ -471,5 +471,51 @@ mod tests {
             ch0.transmit(&no_end_long).await,
             Err(Error::EndMarkerMissing)
         );
+    }
+
+    #[test]
+    async fn rmt_pin_reconfigure() {
+        use esp_hal::rmt::{TxChannelAsync, TxChannelCreator};
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
+
+        let mut ch0 = {
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+                .unwrap()
+                .into_async();
+            let mut ch0 = rmt
+                .channel0
+                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+
+            ch0
+        };
+
+        let _input = Input::new(tx.reborrow(), Default::default());
+
+        {
+            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+                .unwrap()
+                .into_async();
+
+            // FIXME: Allow reborrow of ChannelCreator!
+            let mut ch0 = rmt
+                .channel0
+                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .unwrap();
+
+            let tx_data: [_; 10] = generate_tx_data(true);
+
+            ch0.transmit(&tx_data).await.unwrap();
+        }
+
+        let tx_data: [_; 10] = generate_tx_data(true);
+        ch0.transmit(&tx_data).await.unwrap();
     }
 }
