@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::Result;
-use minijinja::{Environment, context};
 use serde::Deserialize;
 use strum::{Display, EnumIter, EnumString};
 
@@ -156,55 +155,38 @@ fn handle_esp32() -> Result<()> {
 }
 
 fn generate_interrupt_level_masks(out: &Path, isa_config: &HashMap<String, Value>) -> Result<()> {
-    let exception_source_template = include_str!("interrupt_level_masks.rs.jinja");
+    let exception_source_template = include_str!("interrupt_level_masks.rs.template");
 
-    let mut env = Environment::new();
-    env.add_template("interrupt_level_masks.rs", exception_source_template)?;
+    let mut masks = exception_source_template.to_string();
+    for mask in [
+        "XCHAL_INTLEVEL1_MASK",
+        "XCHAL_INTLEVEL2_MASK",
+        "XCHAL_INTLEVEL3_MASK",
+        "XCHAL_INTLEVEL4_MASK",
+        "XCHAL_INTLEVEL5_MASK",
+        "XCHAL_INTLEVEL6_MASK",
+        "XCHAL_INTLEVEL7_MASK",
+    ] {
+        masks = masks.replace(
+            &format!("{{{{ {mask} }}}}"),
+            &isa_config
+                .get(mask)
+                .unwrap()
+                .as_integer()
+                .unwrap()
+                .to_string(),
+        );
+    }
 
-    let template = env.get_template("interrupt_level_masks.rs").unwrap();
-    let exception_source = template.render(context! {
-        XCHAL_INTLEVEL1_MASK => isa_config.get("XCHAL_INTLEVEL1_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL2_MASK => isa_config.get("XCHAL_INTLEVEL2_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL3_MASK => isa_config.get("XCHAL_INTLEVEL3_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL4_MASK => isa_config.get("XCHAL_INTLEVEL4_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL5_MASK => isa_config.get("XCHAL_INTLEVEL5_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL6_MASK => isa_config.get("XCHAL_INTLEVEL6_MASK").unwrap().as_integer(),
-        XCHAL_INTLEVEL7_MASK => isa_config.get("XCHAL_INTLEVEL7_MASK").unwrap().as_integer(),
-    })?;
-
-    File::create(out.join("interrupt_level_masks.rs"))?.write_all(exception_source.as_bytes())?;
+    std::fs::write(out.join("interrupt_level_masks.rs"), masks)?;
 
     Ok(())
 }
 
-fn generate_exception_x(out: &Path, isa_config: &HashMap<String, Value>) -> Result<()> {
-    let exception_source_template = include_str!("exception-esp32.x.jinja");
+fn generate_exception_x(out: &Path, _isa_config: &HashMap<String, Value>) -> Result<()> {
+    let exception_source_template = include_str!("exception-esp32.x.template");
 
-    let mut env = Environment::new();
-    env.add_template("exception.x", exception_source_template)?;
-
-    let template = env.get_template("exception.x")?;
-    let exception_source = template.render(
-        context! {
-            XCHAL_WINDOW_OF4_VECOFS => isa_config.get("XCHAL_WINDOW_OF4_VECOFS").unwrap().as_integer(),
-            XCHAL_WINDOW_UF4_VECOFS => isa_config.get("XCHAL_WINDOW_UF4_VECOFS").unwrap().as_integer(),
-            XCHAL_WINDOW_OF8_VECOFS => isa_config.get("XCHAL_WINDOW_OF8_VECOFS").unwrap().as_integer(),
-            XCHAL_WINDOW_UF8_VECOFS => isa_config.get("XCHAL_WINDOW_UF8_VECOFS").unwrap().as_integer(),
-            XCHAL_WINDOW_OF12_VECOFS => isa_config.get("XCHAL_WINDOW_OF12_VECOFS").unwrap().as_integer(),
-            XCHAL_WINDOW_UF12_VECOFS => isa_config.get("XCHAL_WINDOW_UF12_VECOFS").unwrap().as_integer(),
-            XCHAL_INTLEVEL2_VECOFS => isa_config.get("XCHAL_INTLEVEL2_VECOFS").unwrap().as_integer(),
-            XCHAL_INTLEVEL3_VECOFS => isa_config.get("XCHAL_INTLEVEL3_VECOFS").unwrap().as_integer(),
-            XCHAL_INTLEVEL4_VECOFS => isa_config.get("XCHAL_INTLEVEL4_VECOFS").unwrap().as_integer(),
-            XCHAL_INTLEVEL5_VECOFS => isa_config.get("XCHAL_INTLEVEL5_VECOFS").unwrap().as_integer(),
-            XCHAL_INTLEVEL6_VECOFS => isa_config.get("XCHAL_INTLEVEL6_VECOFS").unwrap().as_integer(),
-            XCHAL_NMI_VECOFS => isa_config.get("XCHAL_NMI_VECOFS").unwrap().as_integer(),
-            XCHAL_KERNEL_VECOFS => isa_config.get("XCHAL_KERNEL_VECOFS").unwrap().as_integer(),
-            XCHAL_USER_VECOFS => isa_config.get("XCHAL_USER_VECOFS").unwrap().as_integer(),
-            XCHAL_DOUBLEEXC_VECOFS => isa_config.get("XCHAL_DOUBLEEXC_VECOFS").unwrap().as_integer(),
-        }
-    )?;
-
-    File::create(out.join("exception.x"))?.write_all(exception_source.as_bytes())?;
+    std::fs::write(out.join("exception.x"), exception_source_template)?;
 
     Ok(())
 }
