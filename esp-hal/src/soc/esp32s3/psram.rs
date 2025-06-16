@@ -208,17 +208,14 @@ pub(crate) fn init_psram(config: PsramConfig) {
             CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE,
         );
 
-        if cache_dbus_mmu_set(
+        let cache_dbus_mmu_set_res = cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             start,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        ) != 0
-        {
-            //   panic!("cache_dbus_mmu_set failed");
-        }
+        );
 
         EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
             w.dcache_shut_core0_bus()
@@ -228,6 +225,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
         });
 
         Cache_Resume_DCache(0);
+
+        // panic AFTER resuming the cache
+        if cache_dbus_mmu_set_res != 0 {
+            panic!("cache_dbus_mmu_set failed");
+        }
 
         start
     };
