@@ -265,7 +265,7 @@ fn do_rmt_single_shot_iter(
         i: 0,
         write_end_marker,
     };
-    tx_channel.transmit(&mut tx_data)?.wait()
+    tx_channel.transmit_iter(&mut tx_data)?.wait()
 }
 
 #[must_use = "Tests should fail on errors"]
@@ -290,7 +290,7 @@ async fn do_rmt_single_shot_iter_async(
         i: 0,
         write_end_marker,
     };
-    tx_channel.transmit(&mut tx_data).await
+    tx_channel.transmit_iter(&mut tx_data).await
 }
 
 #[cfg(test)]
