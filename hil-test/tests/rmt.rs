@@ -51,15 +51,14 @@ fn setup<Dm: DriverMode>(
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
-            let rx_channel_creator = rmt.channel4;
+            let rx_channel_creator = rmt.channel4.degrade();
         } else {
-            let rx_channel_creator = rmt.channel2;
+            let rx_channel_creator = rmt.channel2.degrade();
         }
     };
     let rx_channel = rx_channel_creator
         .configure_rx(rx, rx_config.with_clk_divider(DIV))
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     (tx_channel, rx_channel)
 }
