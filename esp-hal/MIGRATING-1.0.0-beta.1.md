@@ -22,3 +22,23 @@
 -use esp_hal::spi::DataMode;
 +use esp_hal::spi::master::DataMode;
 ```
+
+## RMT Channel generic parameters have changed
+Instead of being parameterized by a `const CHANNEL: u8`, channels now take a generic
+parameter `Raw: RawChannelAccess<Dir>` where `Dir=Tx` or `Dir=Rx` that identifies the
+channel.
+
+```diff
++use esp_hal::rmt::{ConstChannelAccess, Rx, Tx};
++
+-let channel: Channel<Blocking, 0> = {
++let channel: Channel<Blocking, ConstChannelAccess<Tx, 0>> = {
+     use esp_hal::rmt::TxChannelCreator;
+     rmt.channel0().configure(pin, TxChannelConfig::default())
+ };
+-let channel: Channel<Blocking, 2> = {
++let channel: Channel<Blocking, ConstChannelAccess<Rx, 0>> = {
+     use esp_hal::rmt::RxChannelCreator;
+     rmt.channel2().configure(pin, RxChannelConfig::default())
+ };
+```

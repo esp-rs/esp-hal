@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnySpi` has been moved from `esp_hal::spi` to `esp_hal::spi::master` and `esp_hal::spi::slave` (#3627)
 - `DataMode` has been moved from `esp_hal::spi` to `esp_hal::spi::master` (#3627)
 - The `handler` macro (reexported from `esp-hal-procmacros`) no longer accepts priority as a string (#3643)
+- Generic parameters of RMT `Channel`s have changed in preparation for type-erased channels. (#3505) 
 
 ### Fixed
 
