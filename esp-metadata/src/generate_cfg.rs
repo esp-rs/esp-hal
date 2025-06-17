@@ -6,9 +6,15 @@ use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
 macro_rules! include_toml {
-    ($type:ty, $file:expr) => {{
-        static LOADED_TOML: OnceLock<$type> = OnceLock::new();
-        LOADED_TOML.get_or_init(|| basic_toml::from_str(include_str!($file)).unwrap())
+    (Config, $file:expr) => {{
+        static LOADED_TOML: OnceLock<Config> = OnceLock::new();
+        LOADED_TOML.get_or_init(|| {
+            let config: Config = basic_toml::from_str(include_str!($file)).unwrap();
+
+            config.validate().expect("Invalid device configuration");
+
+            config
+        })
     }};
 }
 
@@ -739,7 +745,7 @@ pub struct Config {
 impl Config {
     /// The configuration for the specified chip.
     pub fn for_chip(chip: &Chip) -> &Self {
-        let config = match chip {
+        match chip {
             Chip::Esp32 => include_toml!(Config, "../devices/esp32.toml"),
             Chip::Esp32c2 => include_toml!(Config, "../devices/esp32c2.toml"),
             Chip::Esp32c3 => include_toml!(Config, "../devices/esp32c3.toml"),
@@ -747,11 +753,7 @@ impl Config {
             Chip::Esp32h2 => include_toml!(Config, "../devices/esp32h2.toml"),
             Chip::Esp32s2 => include_toml!(Config, "../devices/esp32s2.toml"),
             Chip::Esp32s3 => include_toml!(Config, "../devices/esp32s3.toml"),
-        };
-
-        config.validate().expect("Invalid device configuration");
-
-        config
+        }
     }
 
     /// Create an empty configuration
