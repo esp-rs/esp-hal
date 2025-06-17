@@ -1527,8 +1527,12 @@ impl DmaTxStreamBufView {
     /// Pushes a buffer into the stream buffer.
     /// Returns the number of bytes pushed.
     pub fn push(&mut self, buf: &[u8]) -> usize {
-        let bytes_to_fill = buf.len().min(self.available_bytes());
+        let bytes = self.available_bytes();
+        let bytes_to_fill = buf.len().min(bytes);
         let buf = &buf[..bytes_to_fill];
+        if buf.is_empty() {
+            return 0;
+        }
 
         fn truncate_by(n: usize, by: usize) -> usize {
             (n >= by).then_some(n - by).unwrap_or(n)
@@ -1540,7 +1544,7 @@ impl DmaTxStreamBufView {
         let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
         let dma_end = truncate_by(dma_start + buf.len(), dma_size);
 
-        if dma_start <= dma_end {
+        if dma_start < dma_end {
             self.buf.buffer[dma_start..dma_end].copy_from_slice(buf);
         } else {
             self.buf.buffer[dma_start..].copy_from_slice(&buf[..dma_size - dma_start]);
@@ -1548,21 +1552,20 @@ impl DmaTxStreamBufView {
         }
 
         let descs = (self.descriptor_idx..n_chunks).chain(0..self.descriptor_idx);
-        let mut offset = self.descriptor_offset;
         let mut bytes_filled = 0;
 
         for d in descs {
             let desc = &mut self.buf.descriptors[d];
-            let bytes_in_d = desc.size() - offset;
+            let bytes_in_d = desc.size() - self.descriptor_offset;
             if bytes_in_d + bytes_filled > buf.len() {
                 // I will have empty space in `desc`
                 self.descriptor_idx = d;
-                self.descriptor_offset = offset + buf.len() - bytes_filled;
+                self.descriptor_offset = self.descriptor_offset + buf.len() - bytes_filled;
                 break;
             }
             // fill `desc` with data from `buf`
             bytes_filled += bytes_in_d;
-            offset = 0;
+            self.descriptor_offset = 0;
 
             desc.set_owner(Owner::Dma);
             desc.set_length(desc.size());
