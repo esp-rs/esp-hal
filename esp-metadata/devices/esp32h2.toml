@@ -69,9 +69,12 @@ peripherals = [
     "usb_device",
 ]
 
+virtual_peripherals = [
+    "adc1",
+]
+
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc1",
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
@@ -86,6 +89,12 @@ symbols = [
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
+
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+]
 
 [device.gpio]
 status = "supported"
@@ -105,6 +114,10 @@ has_reliable_fsm_reset = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+
+[device.interrupts]
+status = "partial"
+status_registers = 2
 
 [device.rmt]
 status = "partial"
@@ -145,11 +158,9 @@ status = "not_supported"
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.adc]
 [device.assist_debug]
 [device.dma]
 [device.etm]
-[device.interrupts]
 [device.io_mux]
 [device.sleep]
 [device.systimer]

@@ -68,10 +68,13 @@ peripherals = [
     "xts_aes",
 ]
 
-symbols = [
-    # Additional peripherals defined by us (the developers):
+virtual_peripherals = [
     "adc1",
     "adc2",
+]
+
+symbols = [
+    # Additional peripherals defined by us (the developers):
     "assist_debug_region_monitor",
     "gdma",
     "phy",
@@ -79,8 +82,6 @@ symbols = [
     "psram_dma",
     "octal_psram",
     "ulp_riscv_core",
-    "very_large_intr_status",
-    "gpio_bank_1",
     "spi_octal",
 
     # ROM capabilities
@@ -101,8 +102,16 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
+[device.adc]
+status = "partial"
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
+
 [device.gpio]
 status = "supported"
+has_bank_1 = true
 
 [device.i2c_master]
 status = "supported"
@@ -118,6 +127,10 @@ has_conf_update = true
 has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
+
+[device.interrupts]
+status = "partial"
+status_registers = 4
 
 [device.rmt]
 status = "partial"
@@ -164,10 +177,8 @@ status = "not_supported"
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.adc]
 [device.assist_debug]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.sleep]
