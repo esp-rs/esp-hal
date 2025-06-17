@@ -1,36 +1,47 @@
-use darling::{Error, FromMeta, ast::NestedMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
-use syn::{Item, parse};
-
-#[derive(Debug, Default, darling::FromMeta)]
-#[darling(default)]
-struct RamArgs {
-    rtc_fast: bool,
-    rtc_slow: bool,
-    persistent: bool,
-    zeroed: bool,
-}
+use syn::{Item, Token, parse, parse::Parser, punctuated::Punctuated};
 
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+    let attr_args = match Punctuated::<syn::Meta, Token![,]>::parse_terminated.parse2(args.into()) {
         Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(Error::from(e).write_errors());
-        }
+        Err(e) => return e.to_compile_error().into(),
     };
 
-    let RamArgs {
-        rtc_fast,
-        rtc_slow,
-        persistent,
-        zeroed,
-    } = match FromMeta::from_list(&attr_args) {
-        Ok(v) => v,
-        Err(e) => {
-            return e.write_errors().into();
+    let mut rtc_fast = false;
+    let mut rtc_slow = false;
+    let mut persistent = false;
+    let mut zeroed = false;
+
+    for attr_arg in &attr_args {
+        if let syn::Meta::Path(path) = attr_arg {
+            let ident = match path.require_ident() {
+                Ok(i) => i,
+                Err(e) => return e.into_compile_error().into(),
+            };
+            let arg = match ident {
+                i if i == "rtc_fast" => &mut rtc_fast,
+                i if i == "rtc_slow" => &mut rtc_slow,
+                i if i == "persistent" => &mut persistent,
+                i if i == "zeroed" => &mut zeroed,
+                i => {
+                    return syn::Error::new(i.span(), format!("Unknown argument `{i}`"))
+                        .into_compile_error()
+                        .into();
+                }
+            };
+
+            if *arg {
+                return syn::Error::new(
+                    ident.span(),
+                    format!("Argument `{}` is already set", ident),
+                )
+                .into_compile_error()
+                .into();
+            }
+            *arg = true;
         }
-    };
+    }
 
     let item: Item = parse(input).expect("failed to parse input");
 
