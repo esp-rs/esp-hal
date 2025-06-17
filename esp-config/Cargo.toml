@@ -53,5 +53,6 @@ tui = [
     "dep:toml_edit",
     "dep:tui-textarea",
     "dep:cargo_metadata",
+    "esp-metadata?/clap",
     "build",
 ]
