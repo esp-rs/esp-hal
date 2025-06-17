@@ -94,11 +94,9 @@ impl CFnPtr {
 pub(crate) fn bind_default_interrupt_handler() {
     // We first check if a handler is set in the vector table.
     if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
-        let handler = handler as *const unsafe extern "C" fn();
-
         // We only allow binding the default handler if nothing else is bound.
         // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-        if !core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
+        if !core::ptr::fn_addr_eq(handler, DEFAULT_INTERRUPT_HANDLER.handler()) {
             // The user has configured an interrupt handler they wish to use.
             info!("Not using default GPIO interrupt handler: already bound in vector table");
             return;

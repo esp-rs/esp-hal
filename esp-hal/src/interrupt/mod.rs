@@ -122,17 +122,11 @@ pub trait InterruptConfigurable: crate::private::Sealed {
     multi_core,
     doc = "**Note**: Interrupts are handled on the core they were setup on, if a driver is initialized on core 0, and moved to core 1, core 0 will still handle the interrupt."
 )]
-#[derive(Copy, Clone, Debug, Eq, Hash)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InterruptHandler {
     f: extern "C" fn(),
     prio: Priority,
-}
-
-impl PartialEq for InterruptHandler {
-    fn eq(&self, other: &Self) -> bool {
-        core::ptr::fn_addr_eq(self.f, other.f) && self.prio == other.prio
-    }
 }
 
 impl InterruptHandler {
