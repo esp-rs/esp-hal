@@ -15,11 +15,11 @@ use heapless::spsc::Queue;
 
 use crate::{
     frame::{
-        frame_get_version,
-        frame_is_ack_required,
         FRAME_SIZE,
         FRAME_VERSION_1,
         FRAME_VERSION_2,
+        frame_get_version,
+        frame_is_ack_required,
     },
     hal::*,
     pib::*,

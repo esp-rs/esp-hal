@@ -506,7 +506,7 @@ fn extract_cfgs(attrs: &[Attribute]) -> (Vec<&Attribute>, Vec<&Attribute>) {
     let mut not_cfgs = vec![];
 
     for attr in attrs {
-        if eq(&attr, "cfg") {
+        if eq(attr, "cfg") {
             cfgs.push(attr);
         } else {
             not_cfgs.push(attr);
