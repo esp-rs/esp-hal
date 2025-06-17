@@ -22,6 +22,10 @@ struct Args {
     /// Chip
     #[arg(short = 'C', long)]
     chip: Option<esp_metadata::Chip>,
+
+    /// Config file - using `.cargo/config.toml` by default
+    #[arg(short = 'c', long)]
+    config_file: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +50,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let work_dir = args.path.clone().unwrap_or(".".into());
 
-    let mut configs = parse_configs(&work_dir)?;
+    if let Some(config_file) = args.config_file.as_ref() {
+        if !std::fs::exists(work_dir.join(config_file))? {
+            return Err(
+                format!("Config file {config_file} does not exist or not readable.").into(),
+            );
+        }
+    }
+
+    let mut configs = parse_configs(&work_dir, args.chip, args.config_file.clone())?;
     let initial_configs = configs.clone();
     let mut previous_config = initial_configs.clone();
 
@@ -66,15 +78,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         // done with the TUI
         if let Some(updated_cfg) = updated_cfg {
             configs = updated_cfg.clone();
-            apply_config(&work_dir, updated_cfg.clone(), previous_config.clone())?;
+            apply_config(
+                &work_dir,
+                updated_cfg.clone(),
+                previous_config.clone(),
+                args.config_file.clone(),
+            )?;
             previous_config = updated_cfg;
         } else {
             println!("Reverted configuration...");
-            apply_config(&work_dir, initial_configs, vec![])?;
+            apply_config(&work_dir, initial_configs, vec![], args.config_file.clone())?;
             break;
         }
 
-        if let Some(errors) = check_after_changes(&work_dir)? {
+        if let Some(errors) = check_after_changes(&work_dir, args.chip, args.config_file.clone())? {
             errors_to_show = Some(errors);
         } else {
             println!("Updated configuration...");
@@ -89,8 +106,9 @@ fn apply_config(
     path: &Path,
     updated_cfg: Vec<CrateConfig>,
     previous_cfg: Vec<CrateConfig>,
+    cfg_file: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    let config_toml = path.join(".cargo/config.toml");
+    let config_toml = path.join(cfg_file.unwrap_or(".cargo/config.toml".to_string()));
 
     let mut config = std::fs::read_to_string(&config_toml)?
         .as_str()
@@ -139,8 +157,14 @@ fn apply_config(
     Ok(())
 }
 
-fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
-    let config_toml = std::fs::read_to_string(path.join(".cargo/config.toml")).unwrap();
+fn parse_configs(
+    path: &Path,
+    chip_from_args: Option<esp_metadata::Chip>,
+    config_file: Option<String>,
+) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
+    let config_toml =
+        std::fs::read_to_string(path.join(config_file.unwrap_or(".cargo/config.toml".to_string())))
+            .unwrap();
     let config_toml = config_toml.as_str().parse::<DocumentMut>()?;
 
     let envs = config_toml.get("env").unwrap().as_table().unwrap();
@@ -154,6 +178,7 @@ fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
         .exec()
         .unwrap();
 
+    // try to guess the chip from the metadata
     let chip_from_meta = {
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
@@ -179,14 +204,25 @@ fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
         chip
     };
 
-    let mut configs = Vec::new();
+    // the "ESP_CONFIG_CHIP" if present
+    let chip_from_config = envs
+        .get("ESP_CONFIG_CHIP")
+        .map(|chip| clap::ValueEnum::from_str(chip, true).ok().unwrap());
 
-    // TODO "guess" the chip
     // - if given as a parameter, use it
     // - if there is a hint in the config.toml, use it
-    // - if we can infer it from metadata, use it (done)
-    let chip = chip_from_meta.unwrap();
-    let chip = esp_metadata::Config::for_chip(&chip);
+    // - if we can infer it from metadata, use it
+    // otherwise, fail
+    let chip = chip_from_args
+        .or_else(|| chip_from_config)
+        .or_else(|| chip_from_meta);
+
+    if chip.is_none() {
+        return Err("No chip given or inferred.".into());
+    }
+
+    let mut configs = Vec::new();
+    let chip = esp_metadata::Config::for_chip(chip.as_ref().unwrap());
     let features = vec![];
     for krate in meta.packages {
         let maybe_cfg = krate.manifest_path.parent().unwrap().join("esp_config.yml");
@@ -233,10 +269,14 @@ fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
     Ok(configs)
 }
 
-fn check_after_changes(work_dir: &PathBuf) -> Result<Option<String>, Box<dyn Error>> {
+fn check_after_changes(
+    work_dir: &PathBuf,
+    chip_from_args: Option<esp_metadata::Chip>,
+    config_file: Option<String>,
+) -> Result<Option<String>, Box<dyn Error>> {
     println!("Check configuration...");
 
-    let configs = parse_configs(work_dir)?;
+    let configs = parse_configs(work_dir, chip_from_args, config_file)?;
 
     for config in configs {
         let cfg: HashMap<String, Value> = config

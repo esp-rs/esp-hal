@@ -7,8 +7,6 @@
 
 #[cfg(feature = "build")]
 mod generate;
-#[cfg(feature = "tui")]
-pub use generate::{evaluate_yaml_config, do_checks};
 #[cfg(feature = "build")]
 pub use generate::{
     ConfigOption,
@@ -20,6 +18,8 @@ pub use generate::{
     validator::Validator,
     value::Value,
 };
+#[cfg(feature = "tui")]
+pub use generate::{do_checks, evaluate_yaml_config};
 
 /// Parse the value of an environment variable as a [bool] at compile time.
 #[macro_export]
