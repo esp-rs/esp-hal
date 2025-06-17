@@ -8,7 +8,7 @@
 #[cfg(feature = "build")]
 mod generate;
 #[cfg(feature = "tui")]
-pub use generate::evaluate_yaml_config;
+pub use generate::{evaluate_yaml_config, do_checks};
 #[cfg(feature = "build")]
 pub use generate::{
     ConfigOption,

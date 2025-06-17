@@ -150,7 +150,14 @@ pub fn generate_config_from_yaml_definition(
 
     let cfg = generate_config(&config.krate, &options, enable_unstable, emit_md_tables);
 
-    if let Some(checks) = config.checks {
+    do_checks(config.checks.as_ref(), &cfg)?;
+
+    Ok(cfg)
+}
+
+/// Check the given actual values by applying checking the given checks
+pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> Result<(), Error> {
+    Ok(if let Some(checks) = checks {
         let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
         for (k, v) in cfg.iter() {
             eval_ctx
@@ -172,9 +179,7 @@ pub fn generate_config_from_yaml_definition(
                 return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
         }
-    }
-
-    Ok(cfg)
+    })
 }
 
 /// Evaluate the given YAML representation of a config definition.
