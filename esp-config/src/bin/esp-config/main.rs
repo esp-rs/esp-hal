@@ -12,6 +12,8 @@ use toml_edit::{DocumentMut, Formatted, Item, Table};
 
 mod tui;
 
+const DEFAULT_CONFIG_PATH: &str = ".cargo/config.toml";
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -50,18 +52,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let work_dir = args.path.clone().unwrap_or(".".into());
 
-    if let Some(config_file) = args.config_file.as_ref() {
-        if !std::fs::exists(work_dir.join(config_file))? {
-            return Err(
-                format!("Config file {config_file} does not exist or not readable.").into(),
-            );
-        }
+    let config_file_path =
+        work_dir.join(args.config_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
+    if !config_file_path.exists() {
+        return Err(format!(
+            "Config file {} does not exist or is not readable.",
+            config_file_path.display()
+        )
+        .into());
     }
 
     let mut configs = parse_configs(&work_dir, args.chip, args.config_file.clone())?;
     let initial_configs = configs.clone();
     let mut previous_config = initial_configs.clone();
-
     let mut errors_to_show = None;
 
     loop {
@@ -108,9 +111,9 @@ fn apply_config(
     previous_cfg: Vec<CrateConfig>,
     cfg_file: Option<String>,
 ) -> Result<(), Box<dyn Error>> {
-    let config_toml = path.join(cfg_file.unwrap_or(".cargo/config.toml".to_string()));
+    let config_toml_path = path.join(cfg_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
 
-    let mut config = std::fs::read_to_string(&config_toml)?
+    let mut config = std::fs::read_to_string(&config_toml_path)?
         .as_str()
         .parse::<DocumentMut>()?;
 
@@ -152,7 +155,7 @@ fn apply_config(
         }
     }
 
-    std::fs::write(&config_toml, config.to_string().as_bytes())?;
+    std::fs::write(&config_toml_path, config.to_string().as_bytes())?;
 
     Ok(())
 }
@@ -162,23 +165,27 @@ fn parse_configs(
     chip_from_args: Option<esp_metadata::Chip>,
     config_file: Option<String>,
 ) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
-    let config_toml =
-        std::fs::read_to_string(path.join(config_file.unwrap_or(".cargo/config.toml".to_string())))
-            .unwrap();
-    let config_toml = config_toml.as_str().parse::<DocumentMut>()?;
+    let config_toml_path = path.join(config_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
+    let config_toml_content = std::fs::read_to_string(config_toml_path)?;
+    let config_toml = config_toml_content.as_str().parse::<DocumentMut>()?;
 
-    let envs = config_toml.get("env").unwrap().as_table().unwrap();
-    let envs: HashMap<String, String> = envs
-        .iter()
-        .map(|(k, v)| (k.into(), v.as_str().unwrap().into()))
-        .collect();
+    let envs: HashMap<String, String> = config_toml
+        .get("env")
+        .and_then(Item::as_table)
+        .map(|table| {
+            table
+                .iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.to_string(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
 
     let meta = cargo_metadata::MetadataCommand::new()
         .current_dir(path)
-        .exec()
-        .unwrap();
+        .exec()?;
 
-    // try to guess the chip from the metadata
+    // try to guess the chip from the metadata by looking at an active chip feature
+    // for esp-hal
     let chip_from_meta = {
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
@@ -200,14 +207,13 @@ fn parse_configs(
                 }
             }
         }
-
         chip
     };
 
-    // the "ESP_CONFIG_CHIP" if present
+    // the "ESP_CONFIG_CHIP" hint env-var if present
     let chip_from_config = envs
         .get("ESP_CONFIG_CHIP")
-        .map(|chip| clap::ValueEnum::from_str(chip, true).ok().unwrap());
+        .and_then(|chip_str| clap::ValueEnum::from_str(chip_str, true).ok());
 
     // - if given as a parameter, use it
     // - if there is a hint in the config.toml, use it
@@ -218,7 +224,7 @@ fn parse_configs(
         .or_else(|| chip_from_meta);
 
     if chip.is_none() {
-        return Err("No chip given or inferred.".into());
+        return Err("No chip given or inferred. Try using the `--chip` argument.".into());
     }
 
     let mut configs = Vec::new();
@@ -230,15 +236,19 @@ fn parse_configs(
             let yaml = std::fs::read_to_string(&maybe_cfg)?;
             let (cfg, options) =
                 esp_config::evaluate_yaml_config(&yaml, Some(chip.clone()), features.clone(), true)
-                    .unwrap();
+                    .map_err(|e| {
+                        format!(
+                            "Error evaluating YAML config for crate {}: {}",
+                            krate.name, e
+                        )
+                    })?;
 
             let crate_name = cfg.krate.clone();
-            configs.push(CrateConfig {
-                name: crate_name.clone(),
-                checks: cfg.checks.clone(),
-                options: options
-                    .iter()
-                    .map(|cfg| ConfigItem {
+
+            let options: Vec<ConfigItem> = options
+                .iter()
+                .map(|cfg| {
+                    Ok::<ConfigItem, Box<dyn Error>>(ConfigItem {
                         option: cfg.clone(),
                         actual_value: {
                             let key = format!(
@@ -249,15 +259,22 @@ fn parse_configs(
                             let def_val = &cfg.default_value.to_string();
                             let val = envs.get(&key).unwrap_or(def_val);
 
-                            let val = match cfg.default_value {
-                                Value::Bool(_) => Value::Bool(val.parse().unwrap()),
-                                Value::Integer(_) => Value::Integer(parse_i128(val).unwrap()),
-                                Value::String(_) => Value::String(val.into()),
-                            };
-                            val
+                            parse_value_from_string(val, &cfg.default_value) //
+                                .map_err(|_| {
+                                    <std::string::String as Into<Box<dyn Error>>>::into(format!(
+                                        "Unable to parse '{val}' for option '{}'",
+                                        &cfg.name
+                                    ))
+                                })?
                         },
                     })
-                    .collect(),
+                })
+                .collect::<Result<Vec<ConfigItem>, Box<dyn Error>>>()?;
+
+            configs.push(CrateConfig {
+                name: crate_name.clone(),
+                checks: cfg.checks.clone(),
+                options,
             });
         }
     }
@@ -313,4 +330,17 @@ fn parse_i128(str: &str) -> Result<i128, std::num::ParseIntError> {
     }
 
     str.parse::<i128>()
+}
+
+fn parse_value_from_string(text: &str, expected_type: &Value) -> Result<Value, Box<dyn Error>> {
+    match expected_type {
+        Value::Bool(_) => text
+            .parse::<bool>()
+            .map(Value::Bool)
+            .map_err(|e| format!("Invalid boolean value '{}': {}", text, e).into()),
+        Value::Integer(_) => parse_i128(text)
+            .map(Value::Integer)
+            .map_err(|e| format!("Invalid integer value '{}': {}", text, e).into()),
+        Value::String(_) => Ok(Value::String(text.to_string())),
+    }
 }
