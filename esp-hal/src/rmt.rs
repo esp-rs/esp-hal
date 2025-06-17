@@ -2261,43 +2261,65 @@ where
     }
 }
 
+/// TODO: docs
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a, Raw>
+pub struct RmtRxFuture<'a, Raw, D, T>
 where
     Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     raw: Raw,
     _phantom: PhantomData<&'a mut Raw>,
+
+    reader: RmtReader,
+
+    data: D,
 }
 
-impl<Raw> core::future::Future for RmtRxFuture<'_, Raw>
+impl<'a, Raw, D, T> core::future::Future for RmtRxFuture<'a, Raw, D, T>
 where
     Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let raw = &self.raw;
+        let this = self.get_mut();
+        let raw = this.raw;
+
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         let result = match raw.get_rx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
-            _ => Poll::Pending,
+            Some(Event::Error) => Err(Error::ReceiverError),
+            Some(Event::End) => {
+                raw.stop_rx();
+                raw.update();
+
+                this.reader.read(&mut this.data, raw, true);
+
+                Ok(())
+            }
+            Some(Event::Threshold) => {
+                unreachable!("wrapping async rx currently not implemented");
+            }
+            _ => return Poll::Pending,
         };
 
-        if matches!(result, Poll::Ready(_)) {
-            raw.clear_rx_interrupts();
-            STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
-        }
+        raw.unlisten_rx_interrupt(Event::Error | Event::End | Event::Threshold);
+        raw.clear_rx_interrupts();
+        STATE[raw.channel() as usize].store(RmtState::RxIdle as u8, Ordering::Relaxed);
 
-        result
+        Poll::Ready(result)
     }
 }
 
-impl<Raw> Drop for RmtRxFuture<'_, Raw>
+impl<'a, Raw, D, T> Drop for RmtRxFuture<'a, Raw, D, T>
 where
     Raw: RxChannelInternal,
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     fn drop(&mut self) {
         let raw = self.raw;
@@ -2318,13 +2340,17 @@ where
 
 /// RX channel in async mode
 pub trait RxChannelAsync {
+    #[doc(hidden)]
+    type Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal;
+
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<'a, D, T>(&mut self, data: D) -> Result<(), Error>
+    fn receive<'a, D, T>(&mut self, data: D) -> RmtRxFuture<'a, Self::Raw, D::IntoIter, T>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
+        D::IntoIter: Unpin,
         T: From<PulseCode> + 'static;
 }
 
@@ -2332,16 +2358,19 @@ impl<Raw> RxChannelAsync for Channel<Async, Raw>
 where
     Raw: RawChannelAccess<Dir = Rx> + RxChannelInternal,
 {
-    async fn receive<'a, D, T>(&mut self, data: D) -> Result<(), Error>
+    type Raw = Raw;
+
+    fn receive<'a, D, T>(&mut self, data: D) -> RmtRxFuture<'a, Self::Raw, D::IntoIter, T>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
+        D::IntoIter: Unpin,
         T: From<PulseCode> + 'static,
     {
         let raw = self.raw;
 
-        let mut data = data.into_iter();
-        let mut reader = RmtReader::new();
+        let data = data.into_iter();
+        let reader = RmtReader::new();
 
         STATE[raw.channel() as usize].store(RmtState::RxAsync as u8, Ordering::Relaxed);
 
@@ -2349,22 +2378,12 @@ where
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive(false);
 
-        let result = RmtRxFuture {
+        RmtRxFuture {
             raw,
             _phantom: PhantomData,
+            reader,
+            data,
         }
-        .await;
-
-        if result.is_ok() {
-            raw.stop_rx();
-            raw.clear_rx_interrupts();
-            raw.update();
-
-            reader.read(&mut data, raw, memsize);
-            reader.read(&mut data, raw, true);
-        }
-
-        result
     }
 }
 
