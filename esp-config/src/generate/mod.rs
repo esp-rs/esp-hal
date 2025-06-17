@@ -157,7 +157,7 @@ pub fn generate_config_from_yaml_definition(
 
 /// Check the given actual values by applying checking the given checks
 pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> Result<(), Error> {
-    Ok(if let Some(checks) = checks {
+    if let Some(checks) = checks {
         let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
         for (k, v) in cfg.iter() {
             eval_ctx
@@ -172,14 +172,15 @@ pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> 
                 .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
         }
         for check in checks {
-            if !evalexpr::eval_with_context(&check, &eval_ctx)
+            if !evalexpr::eval_with_context(check, &eval_ctx)
                 .and_then(|v| v.as_boolean())
                 .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
             {
                 return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
         }
-    })
+    };
+    Ok(())
 }
 
 /// Evaluate the given YAML representation of a config definition.
