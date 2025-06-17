@@ -6,7 +6,6 @@
 //! compile with older versions but that may change in any new patch release.
 //!
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
 #![feature(asm_experimental_arch)]

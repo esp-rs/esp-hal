@@ -90,12 +90,11 @@ xtensa-lx        = { version = "0.11.0", path = "../xtensa-lx" }
 xtensa-lx-rt     = { version = "0.19.0", path = "../xtensa-lx-rt" }
 
 [build-dependencies]
-basic-toml   = "0.1.10"
 cfg-if       = "1.0.0"
 esp-build    = { version = "0.3.0", path = "../esp-build" }
 esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
-serde        = { version = "1.0.219", features = ["derive"] }
+serde        = { version = "1.0.219", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }

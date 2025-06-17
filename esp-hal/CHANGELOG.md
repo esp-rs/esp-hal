@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnyI2c` has been moved from `esp_hal::i2c` to `esp_hal::i2c::master` (#3627)
 - `AnySpi` has been moved from `esp_hal::spi` to `esp_hal::spi::master` and `esp_hal::spi::slave` (#3627)
 - `DataMode` has been moved from `esp_hal::spi` to `esp_hal::spi::master` (#3627)
+- The `handler` macro (reexported from `esp-hal-procmacros`) no longer accepts priority as a string (#3643)
 
 ### Fixed
 
