@@ -1704,13 +1704,10 @@ pub mod asynch {
         dma::{
             DmaEligible,
             DmaTxBuffer,
-            ReadBuffer,
             RxCircularState,
-            TxCircularState,
             WriteBuffer,
-            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture},
         },
-        i2s::master::private::RegBlock,
     };
 
     impl<'d> I2sTx<'d, Async> {
@@ -1786,6 +1783,17 @@ pub mod asynch {
         /// Checks if the DMA transfer is done.
         pub fn is_done(&self) -> bool {
             self.i2s_tx.tx_channel.is_done()
+        }
+
+        /// Stops and restarts the DMA transfer.
+        pub fn restart(self) -> Result<Self, Error> {
+            let (i2s, buf) = self.stop();
+            i2s.write(buf)
+        }
+
+        /// Checks if the DMA transfer has an error.
+        pub fn has_error(&self) -> bool {
+            self.i2s_tx.tx_channel.has_error()
         }
 
         /// Waits for any DMA process to be made.

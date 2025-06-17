@@ -1540,7 +1540,7 @@ impl DmaTxStreamBufView {
         let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
         let dma_end = truncate_by(dma_start + buf.len(), dma_size);
 
-        if dma_start < dma_end {
+        if dma_start <= dma_end {
             self.buf.buffer[dma_start..dma_end].copy_from_slice(buf);
         } else {
             self.buf.buffer[dma_start..].copy_from_slice(&buf[..dma_size - dma_start]);
@@ -1575,11 +1575,6 @@ impl DmaTxStreamBufView {
                 prev.set_suc_eof(false);
             }
         }
-
-        info!(
-            "self.descriptor_idx: {}, self.descriptor_offset: {}, dma_start: {}, dma_end: {}",
-            self.descriptor_idx, self.descriptor_offset, dma_start, dma_end
-        );
 
         bytes_to_fill
     }
