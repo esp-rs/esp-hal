@@ -9,8 +9,8 @@ extern crate proc_macro;
 use std::collections::HashSet;
 
 use proc_macro::TokenStream;
-use proc_macro2::{Span, TokenStream as TokenStream2};
-use quote::{ToTokens, quote};
+use proc_macro2::Span;
+use quote::quote;
 use syn::{
     AttrStyle,
     Attribute,
@@ -25,51 +25,10 @@ use syn::{
     Token,
     Type,
     Visibility,
-    ext::IdentExt,
     parse::{self, Parser},
     parse_macro_input,
     spanned::Spanned,
 };
-
-enum NestedMeta {
-    Meta(syn::Meta),
-    Lit(syn::Lit),
-}
-
-impl NestedMeta {
-    pub fn parse_meta_list(tokens: TokenStream2) -> syn::Result<Vec<Self>> {
-        syn::punctuated::Punctuated::<NestedMeta, Token![,]>::parse_terminated
-            .parse2(tokens)
-            .map(
-                |punctuated: syn::punctuated::Punctuated<NestedMeta, syn::token::Comma>| {
-                    punctuated.into_iter().collect()
-                },
-            )
-    }
-}
-
-impl syn::parse::Parse for NestedMeta {
-    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
-        if input.peek(syn::Lit) && !(input.peek(syn::LitBool) && input.peek2(Token![=])) {
-            input.parse().map(NestedMeta::Lit)
-        } else if input.peek(syn::Ident::peek_any)
-            || input.peek(Token![::]) && input.peek3(syn::Ident::peek_any)
-        {
-            input.parse().map(NestedMeta::Meta)
-        } else {
-            Err(input.error("expected identifier or literal"))
-        }
-    }
-}
-
-impl ToTokens for NestedMeta {
-    fn to_tokens(&self, tokens: &mut TokenStream2) {
-        match self {
-            NestedMeta::Meta(meta) => meta.to_tokens(tokens),
-            NestedMeta::Lit(lit) => lit.to_tokens(tokens),
-        }
-    }
-}
 
 /// Marks a function as the main function to be called on program start
 #[proc_macro_attribute]
@@ -252,7 +211,10 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+    let attr_args = match syn::punctuated::Punctuated::<syn::Lit, Token![,]>::parse_terminated
+        .parse2(args.into())
+        .map(|punctuated| punctuated.into_iter().collect::<Vec<_>>())
+    {
         Ok(v) => v,
         Err(e) => return e.into_compile_error().into(),
     };
@@ -270,7 +232,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if attr_args.len() == 1 {
         match &attr_args[0] {
-            NestedMeta::Lit(syn::Lit::Int(lit_int)) => match lit_int.base10_parse::<u32>() {
+            syn::Lit::Int(lit_int) => match lit_int.base10_parse::<u32>() {
                 Ok(x) => level = x,
                 Err(_) => {
                     return parse::Error::new(
