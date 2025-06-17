@@ -837,11 +837,20 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     }
 }
 
+// Declare input/output signals in a const array.
+macro_rules! declare_signals {
+    ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
+        pub(crate) const $name: [crate::gpio::$type; $count] = [
+            $(crate::gpio::$type::$entry,)*
+        ];
+    };
+}
+
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal};
+    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
     use crate::system::GenericPeripheralGuard;
 
     /// RMT Instance
@@ -895,18 +904,29 @@ mod impl_for_chip {
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
 
-    super::chip_specific::impl_tx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_1, 1);
+    declare_signals!(
+        OUTPUT_SIGNALS,
+        OutputSignal,
+        [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+    );
+    declare_signals!(
+        INPUT_SIGNALS,
+        InputSignal,
+        [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+    );
 
-    super::chip_specific::impl_rx_channel!(RMT_SIG_0, 2, 0);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_1, 3, 1);
+    super::chip_specific::impl_tx_channel!(0);
+    super::chip_specific::impl_tx_channel!(1);
+
+    super::chip_specific::impl_rx_channel!(2, 0);
+    super::chip_specific::impl_rx_channel!(3, 1);
 }
 
 #[cfg(esp32)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal};
+    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -996,30 +1016,41 @@ mod impl_for_chip {
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
 
-    super::chip_specific::impl_tx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_3, 3);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_4, 4);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_5, 5);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_6, 6);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_7, 7);
+    declare_signals!(
+        OUTPUT_SIGNALS,
+        OutputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+    );
+    declare_signals!(
+        INPUT_SIGNALS,
+        InputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+    );
 
-    super::chip_specific::impl_rx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_1, 1);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_2, 2);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_3, 3);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_4, 4);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_5, 5);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_6, 6);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_7, 7);
+    super::chip_specific::impl_tx_channel!(0);
+    super::chip_specific::impl_tx_channel!(1);
+    super::chip_specific::impl_tx_channel!(2);
+    super::chip_specific::impl_tx_channel!(3);
+    super::chip_specific::impl_tx_channel!(4);
+    super::chip_specific::impl_tx_channel!(5);
+    super::chip_specific::impl_tx_channel!(6);
+    super::chip_specific::impl_tx_channel!(7);
+
+    super::chip_specific::impl_rx_channel!(0);
+    super::chip_specific::impl_rx_channel!(1);
+    super::chip_specific::impl_rx_channel!(2);
+    super::chip_specific::impl_rx_channel!(3);
+    super::chip_specific::impl_rx_channel!(4);
+    super::chip_specific::impl_rx_channel!(5);
+    super::chip_specific::impl_rx_channel!(6);
+    super::chip_specific::impl_rx_channel!(7);
 }
 
 #[cfg(esp32s2)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal};
+    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1077,22 +1108,33 @@ mod impl_for_chip {
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
 
-    super::chip_specific::impl_tx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_3, 3);
+    declare_signals!(
+        OUTPUT_SIGNALS,
+        OutputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+    );
+    declare_signals!(
+        INPUT_SIGNALS,
+        InputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+    );
 
-    super::chip_specific::impl_rx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_1, 1);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_2, 2);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_3, 3);
+    super::chip_specific::impl_tx_channel!(0);
+    super::chip_specific::impl_tx_channel!(1);
+    super::chip_specific::impl_tx_channel!(2);
+    super::chip_specific::impl_tx_channel!(3);
+
+    super::chip_specific::impl_rx_channel!(0);
+    super::chip_specific::impl_rx_channel!(1);
+    super::chip_specific::impl_rx_channel!(2);
+    super::chip_specific::impl_rx_channel!(3);
 }
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal};
+    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1174,15 +1216,26 @@ mod impl_for_chip {
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
 
-    super::chip_specific::impl_tx_channel!(RMT_SIG_0, 0);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_1, 1);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_2, 2);
-    super::chip_specific::impl_tx_channel!(RMT_SIG_3, 3);
+    declare_signals!(
+        OUTPUT_SIGNALS,
+        OutputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+    );
+    declare_signals!(
+        INPUT_SIGNALS,
+        InputSignal,
+        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+    );
 
-    super::chip_specific::impl_rx_channel!(RMT_SIG_0, 4, 0);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_1, 5, 1);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_2, 6, 2);
-    super::chip_specific::impl_rx_channel!(RMT_SIG_3, 7, 3);
+    super::chip_specific::impl_tx_channel!(0);
+    super::chip_specific::impl_tx_channel!(1);
+    super::chip_specific::impl_tx_channel!(2);
+    super::chip_specific::impl_tx_channel!(3);
+
+    super::chip_specific::impl_rx_channel!(4, 0);
+    super::chip_specific::impl_rx_channel!(5, 1);
+    super::chip_specific::impl_rx_channel!(6, 2);
+    super::chip_specific::impl_rx_channel!(7, 3);
 }
 
 /// RMT Channel
@@ -1601,7 +1654,9 @@ pub trait ChannelInternal {
 
 #[doc(hidden)]
 pub trait TxChannelInternal: ChannelInternal {
-    fn output_signal() -> crate::gpio::OutputSignal;
+    fn output_signal() -> crate::gpio::OutputSignal {
+        impl_for_chip::OUTPUT_SIGNALS[usize::from(Self::CHANNEL)]
+    }
 
     fn set_generate_repeat_interrupt(repeats: u16);
 
@@ -1672,7 +1727,9 @@ pub trait TxChannelInternal: ChannelInternal {
 
 #[doc(hidden)]
 pub trait RxChannelInternal: ChannelInternal {
-    fn input_signal() -> crate::gpio::InputSignal;
+    fn input_signal() -> crate::gpio::InputSignal {
+        impl_for_chip::INPUT_SIGNALS[usize::from(Self::CHANNEL)]
+    }
 
     fn clear_interrupts();
 
@@ -1979,17 +2036,13 @@ mod chip_specific {
     }
 
     macro_rules! impl_tx_channel {
-        ($signal:ident, $ch_num:literal) => {
+        ($ch_num:literal) => {
             $crate::rmt::chip_specific::impl_channel!($ch_num, $ch_num, true);
 
             impl<Dm> $crate::rmt::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
             where
                 Dm: $crate::DriverMode,
             {
-                fn output_signal() -> crate::gpio::OutputSignal {
-                    crate::gpio::OutputSignal::$signal
-                }
-
                 fn set_generate_repeat_interrupt(repeats: u16) {
                     let rmt = crate::peripherals::RMT::regs();
                     if repeats > 1 {
@@ -2125,7 +2178,7 @@ mod chip_specific {
     }
 
     macro_rules! impl_rx_channel {
-        ($signal:ident, $ch_num:literal, $ch_index:literal) => {
+        ($ch_num:literal, $ch_index:literal) => {
             $crate::rmt::chip_specific::impl_channel!($ch_num, $ch_index, false);
 
             impl<Dm> $crate::rmt::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
@@ -2133,7 +2186,7 @@ mod chip_specific {
                 Dm: $crate::DriverMode,
             {
                 fn input_signal() -> crate::gpio::InputSignal {
-                    crate::gpio::InputSignal::$signal
+                    $crate::rmt::impl_for_chip::INPUT_SIGNALS[$ch_index]
                 }
 
                 fn clear_interrupts() {
@@ -2337,17 +2390,13 @@ mod chip_specific {
     }
 
     macro_rules! impl_tx_channel {
-        ($signal:ident, $ch_num:literal) => {
+        ($ch_num:literal) => {
             $crate::rmt::chip_specific::impl_channel!($ch_num);
 
             impl<Dm> super::TxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
             where
                 Dm: $crate::DriverMode,
             {
-                fn output_signal() -> crate::gpio::OutputSignal {
-                    crate::gpio::OutputSignal::$signal
-                }
-
                 #[cfg(not(esp32))]
                 fn set_generate_repeat_interrupt(repeats: u16) {
                     let rmt = crate::peripherals::RMT::regs();
@@ -2482,15 +2531,11 @@ mod chip_specific {
     }
 
     macro_rules! impl_rx_channel {
-        ($signal:ident, $ch_num:literal) => {
+        ($ch_num:literal) => {
             impl<Dm> super::RxChannelInternal for $crate::rmt::Channel<Dm, $ch_num>
             where
                 Dm: $crate::DriverMode,
             {
-                fn input_signal() -> crate::gpio::InputSignal {
-                    crate::gpio::InputSignal::$signal
-                }
-
                 fn clear_interrupts() {
                     let rmt = crate::peripherals::RMT::regs();
 
