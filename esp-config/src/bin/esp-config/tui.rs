@@ -38,22 +38,23 @@ impl Item {
                     Value::String(s) => s.clone(),
                 };
 
-                format!(
-                    "{} ({}{}){}",
-                    config_option.option.name,
-                    display_value,
+                let default_indicator =
                     if config_option.actual_value == config_option.option.default_value {
                         ui_elements.default_value
                     } else {
                         ""
-                    },
-                    if config_option.option.stability == Stability::Unstable {
-                        ui_elements.unstable
-                    } else {
-                        ""
-                    }
+                    };
+
+                let unstable_indicator = if config_option.option.stability == Stability::Unstable {
+                    ui_elements.unstable
+                } else {
+                    ""
+                };
+
+                format!(
+                    "{} ({}{}){}",
+                    config_option.option.name, display_value, default_indicator, unstable_indicator
                 )
-                .to_string()
             }
         }
     }
@@ -222,7 +223,7 @@ impl Colors {
 
 impl UiElements {
     const FANCY: Self = Self {
-        default_value: " 📌",
+        default_value: " ⭐",
         unstable: " 🚧",
         popup_highlight_symbol: "▶️ ",
     };
@@ -335,16 +336,8 @@ impl App<'_> {
                             if self.repository.is_option(selected) {
                                 let current = self.repository.current_level()[selected].value();
                                 let text = self.textarea.lines().join("").to_string();
-
-                                if let Some(value) = match current {
-                                    Value::Bool(_) => Some(Value::Bool(text.parse().unwrap())),
-                                    Value::Integer(_) => match parse_i128(&text) {
-                                        Ok(value) => Some(Value::Integer(value)),
-                                        Err(_) => None,
-                                    },
-                                    Value::String(_) => Some(Value::String(text)),
-                                } {
-                                    self.repository.set_current(selected, value)
+                                if let Some(value) = parse_text_to_value(&text, &current) {
+                                    self.repository.set_current(selected, value);
                                 };
                             }
 
@@ -359,16 +352,7 @@ impl App<'_> {
                                 if self.repository.is_option(selected) {
                                     let current = self.repository.current_level()[selected].value();
                                     let text = self.textarea.lines().join("").to_string();
-
-                                    let parsed_value = match current {
-                                        Value::Bool(_) => Some(Value::Bool(text.parse().unwrap())),
-                                        Value::Integer(_) => match parse_i128(&text) {
-                                            Ok(value) => Some(Value::Integer(value)),
-                                            Err(_) => None,
-                                        },
-                                        Value::String(_) => Some(Value::String(text)),
-                                    };
-
+                                    let parsed_value = parse_text_to_value(&text, &current);
                                     let validator_failed =
                                         if let Some(constraint) = &self.editing_constraints {
                                             match &parsed_value {
@@ -646,17 +630,15 @@ impl App<'_> {
         // We can now render the item list
         // (look carefully, we are using StatefulWidget's render.)
         // ratatui::widgets::StatefulWidget::render as stateful_render
-        if let Some(current_state) = self.state.last_mut() {
-            // Create a List from all list items and highlight the currently selected one
-            let items = List::new(items)
-                .block(inner_block)
-                .highlight_style(self.colors.selected_active_style)
-                .highlight_spacing(HighlightSpacing::Always);
-            StatefulWidget::render(items, inner_area, buf, current_state);
-        } else {
-            ratatui::restore();
-            panic!("menu state not found!")
-        }
+        let current_state = self
+            .state
+            .last_mut()
+            .expect("State should always have at least one element");
+        let list_widget = List::new(items)
+            .block(inner_block)
+            .highlight_style(self.colors.selected_active_style)
+            .highlight_spacing(HighlightSpacing::Always);
+        StatefulWidget::render(list_widget, inner_area, buf, current_state);
     }
 
     fn help_paragraph(&self) -> Option<Paragraph<'_>> {
@@ -718,5 +700,13 @@ impl App<'_> {
 
     fn render_footer(&self, area: Rect, buf: &mut Buffer) {
         self.footer_paragraph().render(area, buf);
+    }
+}
+
+fn parse_text_to_value(text: &str, current_type: &Value) -> Option<Value> {
+    match current_type {
+        Value::Bool(_) => text.parse::<bool>().ok().map(Value::Bool),
+        Value::Integer(_) => parse_i128(text).ok().map(Value::Integer),
+        Value::String(_) => Some(Value::String(text.to_string())),
     }
 }
