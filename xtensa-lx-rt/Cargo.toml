@@ -21,10 +21,6 @@ r0                = "1.0.0"
 xtensa-lx         = { version = "0.11.0", path = "../xtensa-lx" }
 
 [build-dependencies]
-anyhow          = "1.0.98"
-serde           = { version = "1.0.219", default-features = false, features = ["derive"] }
-strum           = { version = "0.27.1", features = ["derive"] }
-toml            = { version = "0.8.20", default-features = false, features = ["parse"] }
 
 [features]
 ## Save and restore float registers for exceptions
