@@ -42,3 +42,16 @@ channel.
      rmt.channel2().configure(pin, RxChannelConfig::default())
  };
 ```
+
+## RMT ChannelCreator traits have been re-arranged
+`TxChannelCreatorAsync` and `RxChannelCreatorAsync` have been removed.
+Instead, `TxChannelCreator` and `RxChannelCreator` now carry a `Dm: DriverMode`
+generic parameter. `ChannelCreator<Dm, CHANNEL>` thus implements `TxChannelCreator<Dm>`
+and `RxChannelCreator<Dm>`, respectively.
+
+```diff
+-use esp_hal::rmt::TxChannelCreatorAsync;
++use esp_hal::rmt::TxChannelCreator;
+ 
+ let channel = rmt.into_async().channel0.configure(pin, tx_config);
+```
