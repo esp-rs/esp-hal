@@ -2133,41 +2133,63 @@ impl Channel<Async, Tx> {
     }
 }
 
+/// TODO: docs
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a>
+pub struct RmtRxFuture<'a, D, T>
 where
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'a mut DynChannelAccess<Rx>>,
+
+    reader: RmtReader,
+
+    data: D,
 }
 
-impl core::future::Future for RmtRxFuture<'_>
+impl<'a, D, T> core::future::Future for RmtRxFuture<'a, D, T>
 where
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let raw = self.raw;
+        let this = self.get_mut();
+        let raw = this.raw;
+
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         let result = match raw.get_rx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
-            _ => Poll::Pending,
+            Some(Event::Error) => Err(Error::ReceiverError),
+            Some(Event::End) => {
+                raw.stop_rx();
+                raw.update();
+
+                this.reader.read(&mut this.data, raw, true);
+
+                Ok(())
+            }
+            Some(Event::Threshold) => {
+                unreachable!("wrapping async rx currently not implemented");
+            }
+            _ => return Poll::Pending,
         };
 
-        if matches!(result, Poll::Ready(_)) {
-            raw.clear_rx_interrupts();
-            RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
-        }
+        raw.unlisten_rx_interrupt(Event::Error | Event::End | Event::Threshold);
+        raw.clear_rx_interrupts();
+        RmtState::store(RmtState::RxIdle, raw, Ordering::Relaxed);
 
-        result
+        Poll::Ready(result)
     }
 }
 
-impl Drop for RmtRxFuture<'_>
+impl<'a, D, T> Drop for RmtRxFuture<'a, D, T>
 where
+    D: Iterator<Item = &'a mut T> + Unpin,
+    T: From<PulseCode> + 'static,
 {
     fn drop(&mut self) {
         let raw = self.raw;
@@ -2192,16 +2214,17 @@ impl Channel<Async, Rx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn receive<'a, D, T>(&mut self, data: D) -> Result<(), Error>
+    pub fn receive<'a, D, T>(&mut self, data: D) -> RmtRxFuture<'a, D::IntoIter, T>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
+        D::IntoIter: Unpin,
         T: From<PulseCode> + 'static,
     {
         let raw = self.raw;
 
-        let mut data = data.into_iter();
-        let mut reader = RmtReader::new();
+        let data = data.into_iter();
+        let reader = RmtReader::new();
 
         RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
@@ -2209,21 +2232,12 @@ impl Channel<Async, Rx> {
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive(false);
 
-        let result = RmtRxFuture {
+        RmtRxFuture {
             raw,
             _phantom: PhantomData,
+            reader,
+            data,
         }
-        .await;
-
-        if result.is_ok() {
-            raw.stop_rx();
-            raw.clear_rx_interrupts();
-            raw.update();
-
-            reader.read(&mut data, raw, true);
-        }
-
-        result
     }
 }
 
