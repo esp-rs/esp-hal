@@ -669,7 +669,10 @@ fn configure_tx_channel<'d>(
 }
 
 /// Creates a TX channel
-pub trait TxChannelCreator<'d> {
+pub trait TxChannelCreator<'d, Dm>
+where
+    Dm: crate::DriverMode,
+{
     /// Type of the raw channel access token
     type Raw: TxChannelInternal;
 
@@ -681,29 +684,7 @@ pub trait TxChannelCreator<'d> {
         self,
         pin: impl PeripheralOutput<'d>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Blocking, Self::Raw>, Error>
-    where
-        Self: Sized,
-    {
-        configure_tx_channel(Self::RAW, pin, config)?;
-        Ok(Channel::new(Self::RAW))
-    }
-}
-
-/// Creates a TX channel in async mode
-pub trait TxChannelCreatorAsync<'d> {
-    /// Type of the raw channel access token
-    type Raw: TxChannelInternal;
-
-    #[doc(hidden)]
-    const RAW: Self::Raw;
-
-    /// Configure the TX channel
-    fn configure(
-        self,
-        pin: impl PeripheralOutput<'d>,
-        config: TxChannelConfig,
-    ) -> Result<Channel<Async, Self::Raw>, Error>
+    ) -> Result<Channel<Dm, Self::Raw>, Error>
     where
         Self: Sized,
     {
@@ -713,7 +694,10 @@ pub trait TxChannelCreatorAsync<'d> {
 }
 
 /// Creates a RX channel
-pub trait RxChannelCreator<'d> {
+pub trait RxChannelCreator<'d, Dm>
+where
+    Dm: crate::DriverMode,
+{
     /// Type of the raw channel access token
     type Raw: RxChannelInternal;
 
@@ -725,29 +709,7 @@ pub trait RxChannelCreator<'d> {
         self,
         pin: impl PeripheralInput<'d>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Blocking, Self::Raw>, Error>
-    where
-        Self: Sized,
-    {
-        configure_rx_channel(Self::RAW, pin, config)?;
-        Ok(Channel::new(Self::RAW))
-    }
-}
-
-/// Creates a RX channel in async mode
-pub trait RxChannelCreatorAsync<'d> {
-    /// Type of the raw channel access token
-    type Raw: RxChannelInternal;
-
-    #[doc(hidden)]
-    const RAW: Self::Raw;
-
-    /// Configure the RX channel
-    fn configure(
-        self,
-        pin: impl PeripheralInput<'d>,
-        config: RxChannelConfig,
-    ) -> Result<Channel<Async, Self::Raw>, Error>
+    ) -> Result<Channel<Dm, Self::Raw>, Error>
     where
         Self: Sized,
     {
@@ -896,13 +858,9 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
 
 macro_rules! impl_tx_channel_creator {
     ($channel:literal) => {
-        impl<'d> $crate::rmt::TxChannelCreator<'d> for ChannelCreator<$crate::Blocking, $channel> {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Tx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-
-        impl<'d> $crate::rmt::TxChannelCreatorAsync<'d>
-            for ChannelCreator<$crate::Async, $channel>
+        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $channel>
+        where
+            Dm: $crate::DriverMode,
         {
             type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Tx, $channel>;
             const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
@@ -912,13 +870,9 @@ macro_rules! impl_tx_channel_creator {
 
 macro_rules! impl_rx_channel_creator {
     ($channel:literal) => {
-        impl<'d> $crate::rmt::RxChannelCreator<'d> for ChannelCreator<$crate::Blocking, $channel> {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Rx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-
-        impl<'d> $crate::rmt::RxChannelCreatorAsync<'d>
-            for ChannelCreator<$crate::Async, $channel>
+        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $channel>
+        where
+            Dm: $crate::DriverMode,
         {
             type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Rx, $channel>;
             const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
