@@ -28,6 +28,7 @@ struct Args {
 pub struct CrateConfig {
     name: String,
     options: Vec<ConfigItem>,
+    checks: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -73,7 +74,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        if let Some(errors) = check_after_changes(&work_dir) {
+        if let Some(errors) = check_after_changes(&work_dir)? {
             errors_to_show = Some(errors);
         } else {
             println!("Updated configuration...");
@@ -198,6 +199,7 @@ fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
             let crate_name = cfg.krate.clone();
             configs.push(CrateConfig {
                 name: crate_name.clone(),
+                checks: cfg.checks.clone(),
                 options: options
                     .iter()
                     .map(|cfg| ConfigItem {
@@ -231,12 +233,32 @@ fn parse_configs(path: &Path) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
     Ok(configs)
 }
 
-fn check_after_changes(path: &PathBuf) -> Option<String> {
+fn check_after_changes(work_dir: &PathBuf) -> Result<Option<String>, Box<dyn Error>> {
     println!("Check configuration...");
 
-    // TODO check the config by evaluating the `checks` - in case of an error return
-    // Some(message)
-    None
+    let configs = parse_configs(work_dir)?;
+
+    for config in configs {
+        let cfg: HashMap<String, Value> = config
+            .options
+            .into_iter()
+            .map(|option| {
+                (
+                    format!(
+                        "{}_CONFIG_{}",
+                        config.name.to_uppercase().replace("-", "_"),
+                        option.option.name.to_uppercase().replace("-", "_")
+                    ),
+                    option.actual_value.clone(),
+                )
+            })
+            .collect();
+        if let Err(error) = esp_config::do_checks(config.checks.as_ref(), &cfg) {
+            return Ok(Some(error.to_string()));
+        }
+    }
+
+    Ok(None)
 }
 
 fn parse_i128(str: &str) -> Result<i128, std::num::ParseIntError> {
