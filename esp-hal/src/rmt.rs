@@ -1272,15 +1272,12 @@ where
 }
 
 /// Channel in TX mode
-pub trait TxChannel: TxChannelInternal {
+pub trait TxChannel: TxChannelInternal + Sized {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Self>, Error>
-    where
-        Self: Sized,
-    {
+    fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Self>, Error> {
         let index = Self::send_raw(data, false, 0)?;
         Ok(SingleShotTxTransaction {
             channel: self,
@@ -1294,10 +1291,7 @@ pub trait TxChannel: TxChannelInternal {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously(self, data: &[u32]) -> Result<ContinuousTxTransaction<Self>, Error>
-    where
-        Self: Sized,
-    {
+    fn transmit_continuously(self, data: &[u32]) -> Result<ContinuousTxTransaction<Self>, Error> {
         self.transmit_continuously_with_loopcount(0, data)
     }
 
@@ -1308,10 +1302,7 @@ pub trait TxChannel: TxChannelInternal {
         self,
         loopcount: u16,
         data: &[u32],
-    ) -> Result<ContinuousTxTransaction<Self>, Error>
-    where
-        Self: Sized,
-    {
+    ) -> Result<ContinuousTxTransaction<Self>, Error> {
         if data.len() > Self::memsize().codes() {
             return Err(Error::Overflow);
         }
@@ -1361,15 +1352,12 @@ where
 }
 
 /// Channel is RX mode
-pub trait RxChannel: RxChannelInternal {
+pub trait RxChannel: RxChannelInternal + Sized {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error>
-    where
-        Self: Sized,
-    {
+    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self>, Error> {
         if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
@@ -1443,14 +1431,11 @@ where
 }
 
 /// TX channel in async mode
-pub trait TxChannelAsync: TxChannelInternal {
+pub trait TxChannelAsync: TxChannelInternal + Sized {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit(&mut self, data: &[u32]) -> Result<(), Error>
-    where
-        Self: Sized,
-    {
+    async fn transmit(&mut self, data: &[u32]) -> Result<(), Error> {
         if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
@@ -1505,14 +1490,11 @@ where
 }
 
 /// RX channel in async mode
-pub trait RxChannelAsync: RxChannelInternal {
+pub trait RxChannelAsync: RxChannelInternal + Sized {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
-    where
-        Self: Sized,
-    {
+    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error> {
         if data.len() > Self::memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
