@@ -409,10 +409,18 @@ pub struct ConstChannelAccess<Dir: Direction, const CHANNEL: u8> {
     _direction: PhantomData<Dir>,
 }
 
+/// Type-erased equivalent of ConstChannelAccess.
+#[derive(Clone, Copy, Debug)]
+pub struct DynChannelAccess<Dir: Direction> {
+    channel: u8,
+    _direction: PhantomData<Dir>,
+}
+
 impl<Dir: Direction, const CHANNEL: u8> crate::private::Sealed
     for ConstChannelAccess<Dir, CHANNEL>
 {
 }
+impl<Dir: Direction> crate::private::Sealed for DynChannelAccess<Dir> {}
 
 impl<Dir, const CHANNEL: u8> ConstChannelAccess<Dir, CHANNEL>
 where
@@ -421,6 +429,15 @@ where
 {
     const unsafe fn conjure() -> Self {
         Self {
+            _direction: PhantomData,
+        }
+    }
+}
+
+impl<Dir: Direction> DynChannelAccess<Dir> {
+    unsafe fn conjure(channel: u8) -> Self {
+        Self {
+            channel,
             _direction: PhantomData,
         }
     }
@@ -443,6 +460,19 @@ impl<const CHANNEL: u8> RawChannelAccess for ConstChannelAccess<Rx, CHANNEL> {
     }
 }
 
+impl<Dir: Direction> RawChannelAccess for DynChannelAccess<Dir> {
+    type Dir = Dir;
+
+    #[inline]
+    fn channel(&self) -> u8 {
+        self.channel
+    }
+}
+
+/// Alias for a type-erased channels configured for tx.
+pub type AnyTxChannel<Dm> = Channel<Dm, DynChannelAccess<Tx>>;
+/// Alias for a type-erased channels configured for rx.
+pub type AnyRxChannel<Dm> = Channel<Dm, DynChannelAccess<Rx>>;
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1284,6 +1314,29 @@ where
             raw,
             _mode: core::marker::PhantomData,
             _guard: GenericPeripheralGuard::new(),
+        }
+    }
+}
+
+impl<Dm, Dir, const CHANNEL: u8> Channel<Dm, ConstChannelAccess<Dir, CHANNEL>>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+    ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess<Dir = Dir>,
+{
+    /// Consume the channel and return a type-erase version
+    pub fn degrade(self) -> Channel<Dm, DynChannelAccess<Dir>> {
+        use core::mem::ManuallyDrop;
+        // Disable Drop handler on self
+        let old = ManuallyDrop::new(self);
+        Channel {
+            raw: DynChannelAccess {
+                channel: old.raw.channel(),
+                _direction: PhantomData,
+            },
+            _mode: PhantomData,
+            // FIXME: Don't clone, but move old._guard
+            _guard: old._guard.clone(),
         }
     }
 }

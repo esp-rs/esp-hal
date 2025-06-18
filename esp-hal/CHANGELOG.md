@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
+- The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 
 ### Changed
 
