@@ -547,6 +547,65 @@ impl Default for RxChannelConfig {
     }
 }
 
+// Declare input/output signals in a const array.
+macro_rules! declare_signals {
+    ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
+        pub(crate) const $name: [crate::gpio::$type; $count] = [
+            $(crate::gpio::$type::$entry,)*
+        ];
+    };
+}
+
+const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
+
+cfg_if::cfg_if! {
+    if #[cfg(esp32)] {
+        declare_signals!(
+            OUTPUT_SIGNALS,
+            OutputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+        );
+        declare_signals!(
+            INPUT_SIGNALS,
+            InputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+        );
+    } else if #[cfg(esp32s2)] {
+        declare_signals!(
+            OUTPUT_SIGNALS,
+            OutputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+        );
+        declare_signals!(
+            INPUT_SIGNALS,
+            InputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+        );
+    } else if #[cfg(esp32s3)] {
+        declare_signals!(
+            OUTPUT_SIGNALS,
+            OutputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+        );
+        declare_signals!(
+            INPUT_SIGNALS,
+            InputSignal,
+            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+        );
+    } else {
+        declare_signals!(
+            OUTPUT_SIGNALS,
+            OutputSignal,
+            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+        );
+        declare_signals!(
+            INPUT_SIGNALS,
+            InputSignal,
+            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+        );
+    }
+}
+
 pub use impl_for_chip::Rmt;
 
 impl<'d, Dm> Rmt<'d, Dm>
@@ -1006,20 +1065,11 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     }
 }
 
-// Declare input/output signals in a const array.
-macro_rules! declare_signals {
-    ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
-        pub(crate) const $name: [crate::gpio::$type; $count] = [
-            $(crate::gpio::$type::$entry,)*
-        ];
-    };
-}
-
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, NUM_CHANNELS};
+    use super::ChannelCreator;
     use crate::system::GenericPeripheralGuard;
 
     /// RMT Instance
@@ -1072,24 +1122,13 @@ mod impl_for_chip {
 
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
-
-    declare_signals!(
-        OUTPUT_SIGNALS,
-        OutputSignal,
-        [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
-    );
-    declare_signals!(
-        INPUT_SIGNALS,
-        InputSignal,
-        [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
-    );
 }
 
 #[cfg(esp32)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, NUM_CHANNELS};
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1178,24 +1217,13 @@ mod impl_for_chip {
     impl_rx_channel_creator!(5);
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
-
-    declare_signals!(
-        OUTPUT_SIGNALS,
-        OutputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
-    );
-    declare_signals!(
-        INPUT_SIGNALS,
-        InputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
-    );
 }
 
 #[cfg(esp32s2)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1252,24 +1280,13 @@ mod impl_for_chip {
     impl_rx_channel_creator!(1);
     impl_rx_channel_creator!(2);
     impl_rx_channel_creator!(3);
-
-    declare_signals!(
-        OUTPUT_SIGNALS,
-        OutputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
-    );
-    declare_signals!(
-        INPUT_SIGNALS,
-        InputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
-    );
 }
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
     use core::marker::PhantomData;
 
-    use super::{ChannelCreator, ChannelInternal, NUM_CHANNELS};
+    use super::ChannelCreator;
     use crate::{peripherals::RMT, system::GenericPeripheralGuard};
 
     /// RMT Instance
@@ -1350,17 +1367,6 @@ mod impl_for_chip {
     impl_rx_channel_creator!(5);
     impl_rx_channel_creator!(6);
     impl_rx_channel_creator!(7);
-
-    declare_signals!(
-        OUTPUT_SIGNALS,
-        OutputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
-    );
-    declare_signals!(
-        INPUT_SIGNALS,
-        InputSignal,
-        [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
-    );
 }
 
 /// Channel in TX mode
@@ -1496,8 +1502,6 @@ where
         })
     }
 }
-
-const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 
 #[repr(u8)]
 enum RmtState {
@@ -1806,7 +1810,7 @@ pub trait ChannelInternal: RawChannelAccess {
 #[doc(hidden)]
 pub trait TxChannelInternal: ChannelInternal {
     fn output_signal(&self) -> crate::gpio::OutputSignal {
-        impl_for_chip::OUTPUT_SIGNALS[self.channel() as usize]
+        OUTPUT_SIGNALS[self.channel() as usize]
     }
 
     fn set_generate_repeat_interrupt(&self, repeats: u16);
@@ -1879,7 +1883,7 @@ pub trait TxChannelInternal: ChannelInternal {
 #[doc(hidden)]
 pub trait RxChannelInternal: ChannelInternal {
     fn input_signal(&self) -> crate::gpio::InputSignal {
-        impl_for_chip::INPUT_SIGNALS[self.channel() as usize]
+        INPUT_SIGNALS[self.channel() as usize]
     }
 
     fn clear_rx_interrupts(&self);
@@ -2226,7 +2230,7 @@ mod chip_specific {
     {
         fn input_signal(&self) -> crate::gpio::InputSignal {
             let ch_idx = ch_idx(self) as usize;
-            super::impl_for_chip::INPUT_SIGNALS[ch_idx]
+            super::INPUT_SIGNALS[ch_idx]
         }
 
         fn clear_rx_interrupts(&self) {
