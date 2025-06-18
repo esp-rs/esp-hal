@@ -556,10 +556,85 @@ macro_rules! declare_signals {
     };
 }
 
+macro_rules! declare_channels {
+    // Final step of the macro, when all input has been iterated over: Declares the Rmt struct and
+    // its constructor.
+    (@define_rmt {
+        () -> (
+            [$($field_decl:tt)*],
+            [$($field_init:tt)*]
+        )
+    }) => {
+        /// RMT Instance
+        pub struct Rmt<'d, Dm>
+        where
+            Dm: $crate::DriverMode,
+        {
+            pub(super) peripheral: $crate::peripherals::RMT<'d>,
+            $($field_decl)+
+            _mode: ::core::marker::PhantomData<Dm>,
+        }
+
+        impl<'d, Dm> Rmt<'d, Dm>
+        where
+            Dm: crate::DriverMode,
+        {
+            fn create(peripheral: crate::peripherals::RMT<'d>) -> Self {
+                Self {
+                    peripheral,
+                    $($field_init)+
+                    _mode: ::core::marker::PhantomData,
+                }
+            }
+        }
+    };
+
+    // Iteration step of the macro when going through channels: Takes one entry from the channel
+    // declaration and builds up field definitions for the Rmt struct as well as corresponding
+    // initializers.
+    (@define_rmt {
+        ([$name:ident, $num:literal] $(, $($ch:tt),+)?)
+        -> (
+            [$($field_decl:tt)*],
+            [$($field_init:tt)*]
+        )
+    }) => {
+        declare_channels! (@define_rmt {
+            ($($($ch),+)?) -> ([
+                $($field_decl)*
+                #[doc = concat!("RMT Channel ", $num)]
+                pub $name: ChannelCreator<Dm, $num>,
+            ], [
+                $($field_init)*
+                $name: $crate::rmt::ChannelCreator {
+                    _mode: ::core::marker::PhantomData,
+                    _guard: $crate::system::GenericPeripheralGuard::new(),
+                },
+            ])
+        });
+    };
+
+    // The main entry-point of the macro: takes a comma-separated list of channels,
+    // allowing for a trailing comma.
+    ($($ch:tt),+ $(,)?) => {
+        declare_channels! (@define_rmt { ($($ch),+) -> ([], []) });
+    };
+}
+
 const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
+        declare_channels!(
+            [channel0, 0],
+            [channel1, 1],
+            [channel2, 2],
+            [channel3, 3],
+            [channel4, 4],
+            [channel5, 5],
+            [channel6, 6],
+            [channel7, 7],
+        );
         declare_signals!(
             OUTPUT_SIGNALS,
             OutputSignal,
@@ -571,6 +646,12 @@ cfg_if::cfg_if! {
             [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
         );
     } else if #[cfg(esp32s2)] {
+        declare_channels!(
+            [channel0, 0],
+            [channel1, 1],
+            [channel2, 2],
+            [channel3, 3],
+        );
         declare_signals!(
             OUTPUT_SIGNALS,
             OutputSignal,
@@ -582,6 +663,16 @@ cfg_if::cfg_if! {
             [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
         );
     } else if #[cfg(esp32s3)] {
+        declare_channels!(
+            [channel0, 0],
+            [channel1, 1],
+            [channel2, 2],
+            [channel3, 3],
+            [channel4, 4],
+            [channel5, 5],
+            [channel6, 6],
+            [channel7, 7],
+        );
         declare_signals!(
             OUTPUT_SIGNALS,
             OutputSignal,
@@ -593,6 +684,12 @@ cfg_if::cfg_if! {
             [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
         );
     } else {
+        declare_channels!(
+            [channel0, 0],
+            [channel1, 1],
+            [channel2, 2],
+            [channel3, 3],
+        );
         declare_signals!(
             OUTPUT_SIGNALS,
             OutputSignal,
@@ -605,8 +702,6 @@ cfg_if::cfg_if! {
         );
     }
 }
-
-pub use impl_for_chip::Rmt;
 
 impl<'d, Dm> Rmt<'d, Dm>
 where
@@ -1019,7 +1114,8 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
 
 macro_rules! impl_tx_channel_creator {
     ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $channel>
+        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm>
+            for $crate::rmt::ChannelCreator<Dm, $channel>
         where
             Dm: $crate::DriverMode,
         {
@@ -1031,7 +1127,8 @@ macro_rules! impl_tx_channel_creator {
 
 macro_rules! impl_rx_channel_creator {
     ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $channel>
+        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm>
+            for $crate::rmt::ChannelCreator<Dm, $channel>
         where
             Dm: $crate::DriverMode,
         {
@@ -1046,7 +1143,7 @@ pub struct ChannelCreator<Dm, const CHANNEL: u8>
 where
     Dm: crate::DriverMode,
 {
-    phantom: PhantomData<Dm>,
+    _mode: PhantomData<Dm>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
 }
 
@@ -1059,7 +1156,7 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     /// multiple handles to the same peripheral structure.
     pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
         ChannelCreator {
-            phantom: PhantomData,
+            _mode: PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
@@ -1067,56 +1164,6 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
 
 #[cfg(not(any(esp32, esp32s2, esp32s3)))]
 mod impl_for_chip {
-    use core::marker::PhantomData;
-
-    use super::ChannelCreator;
-    use crate::system::GenericPeripheralGuard;
-
-    /// RMT Instance
-    pub struct Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) peripheral: crate::peripherals::RMT<'d>,
-        /// RMT Channel 0.
-        pub channel0: ChannelCreator<Dm, 0>,
-        /// RMT Channel 1.
-        pub channel1: ChannelCreator<Dm, 1>,
-        /// RMT Channel 2.
-        pub channel2: ChannelCreator<Dm, 2>,
-        /// RMT Channel 3.
-        pub channel3: ChannelCreator<Dm, 3>,
-        phantom: PhantomData<Dm>,
-    }
-
-    impl<'d, Dm> Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) fn create(peripheral: crate::peripherals::RMT<'d>) -> Self {
-            Self {
-                peripheral,
-                channel0: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel1: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel2: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel3: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                phantom: PhantomData,
-            }
-        }
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
 
@@ -1126,80 +1173,6 @@ mod impl_for_chip {
 
 #[cfg(esp32)]
 mod impl_for_chip {
-    use core::marker::PhantomData;
-
-    use super::ChannelCreator;
-    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
-
-    /// RMT Instance
-    pub struct Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) peripheral: RMT<'d>,
-        /// RMT Channel 0.
-        pub channel0: ChannelCreator<Dm, 0>,
-        /// RMT Channel 1.
-        pub channel1: ChannelCreator<Dm, 1>,
-        /// RMT Channel 2.
-        pub channel2: ChannelCreator<Dm, 2>,
-        /// RMT Channel 3.
-        pub channel3: ChannelCreator<Dm, 3>,
-        /// RMT Channel 4.
-        pub channel4: ChannelCreator<Dm, 4>,
-        /// RMT Channel 5.
-        pub channel5: ChannelCreator<Dm, 5>,
-        /// RMT Channel 6.
-        pub channel6: ChannelCreator<Dm, 6>,
-        /// RMT Channel 7.
-        pub channel7: ChannelCreator<Dm, 7>,
-        phantom: PhantomData<Dm>,
-    }
-
-    impl<'d, Dm> Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) fn create(peripheral: RMT<'d>) -> Self {
-            Self {
-                peripheral,
-                channel0: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel1: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel2: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel3: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel4: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel5: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel6: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel7: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                phantom: PhantomData,
-            }
-        }
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
@@ -1221,56 +1194,6 @@ mod impl_for_chip {
 
 #[cfg(esp32s2)]
 mod impl_for_chip {
-    use core::marker::PhantomData;
-
-    use super::ChannelCreator;
-    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
-
-    /// RMT Instance
-    pub struct Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) peripheral: RMT<'d>,
-        /// RMT Channel 0.
-        pub channel0: ChannelCreator<Dm, 0>,
-        /// RMT Channel 1.
-        pub channel1: ChannelCreator<Dm, 1>,
-        /// RMT Channel 2.
-        pub channel2: ChannelCreator<Dm, 2>,
-        /// RMT Channel 3.
-        pub channel3: ChannelCreator<Dm, 3>,
-        phantom: PhantomData<Dm>,
-    }
-
-    impl<'d, Dm> Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) fn create(peripheral: RMT<'d>) -> Self {
-            Self {
-                peripheral,
-                channel0: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel1: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel2: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel3: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                phantom: PhantomData,
-            }
-        }
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
@@ -1284,80 +1207,6 @@ mod impl_for_chip {
 
 #[cfg(esp32s3)]
 mod impl_for_chip {
-    use core::marker::PhantomData;
-
-    use super::ChannelCreator;
-    use crate::{peripherals::RMT, system::GenericPeripheralGuard};
-
-    /// RMT Instance
-    pub struct Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) peripheral: RMT<'d>,
-        /// RMT Channel 0.
-        pub channel0: ChannelCreator<Dm, 0>,
-        /// RMT Channel 1.
-        pub channel1: ChannelCreator<Dm, 1>,
-        /// RMT Channel 2.
-        pub channel2: ChannelCreator<Dm, 2>,
-        /// RMT Channel 3.
-        pub channel3: ChannelCreator<Dm, 3>,
-        /// RMT Channel 4.
-        pub channel4: ChannelCreator<Dm, 4>,
-        /// RMT Channel 5.
-        pub channel5: ChannelCreator<Dm, 5>,
-        /// RMT Channel 6.
-        pub channel6: ChannelCreator<Dm, 6>,
-        /// RMT Channel 7.
-        pub channel7: ChannelCreator<Dm, 7>,
-        phantom: PhantomData<Dm>,
-    }
-
-    impl<'d, Dm> Rmt<'d, Dm>
-    where
-        Dm: crate::DriverMode,
-    {
-        pub(super) fn create(peripheral: RMT<'d>) -> Self {
-            Self {
-                peripheral,
-                channel0: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel1: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel2: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel3: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel4: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel5: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel6: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                channel7: ChannelCreator {
-                    phantom: PhantomData,
-                    _guard: GenericPeripheralGuard::new(),
-                },
-                phantom: PhantomData,
-            }
-        }
-    }
-
     impl_tx_channel_creator!(0);
     impl_tx_channel_creator!(1);
     impl_tx_channel_creator!(2);
