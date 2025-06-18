@@ -157,8 +157,13 @@ impl Drop for Ctxt {
 }
 
 pub fn main_fn() -> TokenStream2 {
+    let root = match proc_macro_crate::crate_name("esp-hal") {
+        Ok(proc_macro_crate::FoundCrate::Name(ref name)) => quote::format_ident!("{name}"),
+        _ => quote::format_ident!("esp_hal"),
+    };
+
     quote! {
-        #[esp_hal::main]
+        #[#root::main]
         fn main() -> ! {
             let mut executor = ::esp_hal_embassy::Executor::new();
             let executor = unsafe { __make_static(&mut executor) };
