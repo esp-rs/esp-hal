@@ -37,22 +37,9 @@
 //! `gpio` peripheral to access the appropriate registers.
 
 use crate::{
-    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };
-
-pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
-
-pub(crate) type InputSignalType = u16;
-pub(crate) type OutputSignalType = u16;
-pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
-pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
-
-pub(crate) const ONE_INPUT: u8 = 0x38;
-pub(crate) const ZERO_INPUT: u8 = 0x3c;
-
-pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
     IO_MUX::regs().gpio(gpio_num as usize)

@@ -35,22 +35,9 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 use crate::{
-    gpio::AlternateFunction,
     pac::io_mux,
     peripherals::{GPIO, IO_MUX},
 };
-
-pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
-
-pub(crate) type InputSignalType = u8;
-pub(crate) type OutputSignalType = u8;
-pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
-pub(crate) const INPUT_SIGNAL_MAX: u8 = 100;
-
-pub(crate) const ONE_INPUT: u8 = 0x1e;
-pub(crate) const ZERO_INPUT: u8 = 0x1f;
-
-pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
     IO_MUX::regs().gpio(gpio_num as usize)

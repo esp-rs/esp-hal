@@ -104,6 +104,11 @@ instances = [
 [device.gpio]
 support_status = "supported"
 has_bank_1 = true
+gpio_function = 1
+input_signal_max = 204
+output_signal_max = 256
+constant_0_input = 0x3c
+constant_1_input = 0x38
 instances = [
     { name = "gpio", pins = [
         { pin =  0, kind = ["input", "output", "analog", "rtc"] },

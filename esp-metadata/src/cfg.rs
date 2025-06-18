@@ -325,6 +325,13 @@ driver_configs![
         properties: {
             #[serde(default)]
             has_bank_1: bool,
+            gpio_function: u32,
+            input_signal_max: u32,
+            output_signal_max: u32,
+            constant_0_input: u32,
+            constant_1_input: u32,
+            #[serde(default)] // currently 0 in all devices
+            func_in_sel_offset:u32,
         }
     },
     HmacProperties {

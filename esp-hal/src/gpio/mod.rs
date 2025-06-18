@@ -300,19 +300,30 @@ pub enum AlternateFunction {
     _5 = 5,
 }
 
+impl AlternateFunction {
+    const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
+        Ok(func) => func,
+        Err(_) => ::core::panic!("Invalid GPIO function"),
+    };
+
+    const fn const_try_from(value: usize) -> Result<Self, ()> {
+        match value {
+            0 => Ok(Self::_0),
+            1 => Ok(Self::_1),
+            2 => Ok(Self::_2),
+            3 => Ok(Self::_3),
+            4 => Ok(Self::_4),
+            5 => Ok(Self::_5),
+            _ => Err(()),
+        }
+    }
+}
+
 impl TryFrom<usize> for AlternateFunction {
     type Error = ();
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(AlternateFunction::_0),
-            1 => Ok(AlternateFunction::_1),
-            2 => Ok(AlternateFunction::_2),
-            3 => Ok(AlternateFunction::_3),
-            4 => Ok(AlternateFunction::_4),
-            5 => Ok(AlternateFunction::_5),
-            _ => Err(()),
-        }
+        Self::const_try_from(value)
     }
 }
 
@@ -1805,11 +1816,11 @@ impl<'lt> AnyPin<'lt> {
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
 
         // Use RMW to not overwrite sleep configuration
         io_mux_reg(self.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(GPIO_FUNCTION as u8);
+            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
             w.fun_ie().clear_bit();
             w.slp_sel().clear_bit()
         });
