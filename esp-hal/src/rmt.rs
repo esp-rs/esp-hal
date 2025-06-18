@@ -697,6 +697,79 @@ fn configure_tx_channel<'d>(
 
     Ok(())
 }
+/// RMT Channel
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct Channel<Dm, Raw>
+where
+    Dm: crate::DriverMode,
+    Raw: ChannelInternal,
+{
+    raw: Raw,
+    _mode: PhantomData<Dm>,
+    _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
+}
+
+impl<Dm, Raw> Channel<Dm, Raw>
+where
+    Dm: crate::DriverMode,
+    Raw: ChannelInternal,
+{
+    fn new(raw: Raw) -> Self {
+        Self {
+            raw,
+            _mode: core::marker::PhantomData,
+            _guard: GenericPeripheralGuard::new(),
+        }
+    }
+}
+
+impl<Dm, Dir, const CHANNEL: u8> Channel<Dm, ConstChannelAccess<Dir, CHANNEL>>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+    ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess<Dir = Dir>,
+{
+    /// Consume the channel and return a type-erase version
+    pub fn degrade(self) -> Channel<Dm, DynChannelAccess<Dir>> {
+        use core::mem::ManuallyDrop;
+        // Disable Drop handler on self
+        let old = ManuallyDrop::new(self);
+        Channel {
+            raw: DynChannelAccess {
+                channel: old.raw.channel(),
+                _direction: PhantomData,
+            },
+            _mode: PhantomData,
+            // FIXME: Don't clone, but move old._guard
+            _guard: old._guard.clone(),
+        }
+    }
+}
+
+impl<Dm, Raw> Drop for Channel<Dm, Raw>
+where
+    Dm: crate::DriverMode,
+    Raw: ChannelInternal,
+{
+    fn drop(&mut self) {
+        let memsize = self.raw.memsize();
+
+        // This isn't really necessary, but be extra sure that this channel can't
+        // interfere with others.
+        self.raw.set_memsize(MemSize::from_blocks(0));
+
+        for s in STATE
+            [usize::from(self.raw.channel())..usize::from(self.raw.channel() + memsize.blocks())]
+            .iter()
+            .rev()
+        {
+            // Existence of this `Channel` struct implies exclusive access to these hardware
+            // channels, thus simply store the new state.
+            s.store(RmtState::Unconfigured as u8, Ordering::Release);
+        }
+    }
+}
 
 /// Creates a TX channel
 pub trait TxChannelCreator<'d, Dm>
@@ -1289,80 +1362,6 @@ mod impl_for_chip {
         InputSignal,
         [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
     );
-}
-
-/// RMT Channel
-#[derive(Debug)]
-#[non_exhaustive]
-pub struct Channel<Dm, Raw>
-where
-    Dm: crate::DriverMode,
-    Raw: ChannelInternal,
-{
-    raw: Raw,
-    _mode: PhantomData<Dm>,
-    _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
-}
-
-impl<Dm, Raw> Channel<Dm, Raw>
-where
-    Dm: crate::DriverMode,
-    Raw: ChannelInternal,
-{
-    fn new(raw: Raw) -> Self {
-        Self {
-            raw,
-            _mode: core::marker::PhantomData,
-            _guard: GenericPeripheralGuard::new(),
-        }
-    }
-}
-
-impl<Dm, Dir, const CHANNEL: u8> Channel<Dm, ConstChannelAccess<Dir, CHANNEL>>
-where
-    Dm: crate::DriverMode,
-    Dir: Direction,
-    ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess<Dir = Dir>,
-{
-    /// Consume the channel and return a type-erase version
-    pub fn degrade(self) -> Channel<Dm, DynChannelAccess<Dir>> {
-        use core::mem::ManuallyDrop;
-        // Disable Drop handler on self
-        let old = ManuallyDrop::new(self);
-        Channel {
-            raw: DynChannelAccess {
-                channel: old.raw.channel(),
-                _direction: PhantomData,
-            },
-            _mode: PhantomData,
-            // FIXME: Don't clone, but move old._guard
-            _guard: old._guard.clone(),
-        }
-    }
-}
-
-impl<Dm, Raw> Drop for Channel<Dm, Raw>
-where
-    Dm: crate::DriverMode,
-    Raw: ChannelInternal,
-{
-    fn drop(&mut self) {
-        let memsize = self.raw.memsize();
-
-        // This isn't really necessary, but be extra sure that this channel can't
-        // interfere with others.
-        self.raw.set_memsize(MemSize::from_blocks(0));
-
-        for s in STATE
-            [usize::from(self.raw.channel())..usize::from(self.raw.channel() + memsize.blocks())]
-            .iter()
-            .rev()
-        {
-            // Existence of this `Channel` struct implies exclusive access to these hardware
-            // channels, thus simply store the new state.
-            s.store(RmtState::Unconfigured as u8, Ordering::Release);
-        }
-    }
 }
 
 /// Channel in TX mode
