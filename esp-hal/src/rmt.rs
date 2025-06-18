@@ -1924,10 +1924,6 @@ mod chip_specific {
         fn start_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.ref_cnt_rst()
-                .write(|w| unsafe { w.bits(1 << self.channel()) });
-            self.update();
-
             rmt.ch_tx_conf0(self.channel().into()).modify(|_, w| {
                 w.mem_rd_rst().set_bit();
                 w.apb_mem_rst().set_bit();
