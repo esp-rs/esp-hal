@@ -1073,16 +1073,12 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
         raw.update();
 
         loop {
-            if raw.is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
-
-            if raw.is_tx_done() {
-                break;
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
+                Some(Event::End) => break Ok(self.channel),
+                _ => continue,
             }
         }
-
-        Ok(self.channel)
     }
 
     /// Stop transaction as soon as possible.
@@ -1101,16 +1097,12 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
         }
 
         loop {
-            if raw.is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
-
-            if raw.is_tx_done() {
-                break;
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
+                Some(Event::End) => break Ok(self.channel),
+                _ => continue,
             }
         }
-
-        Ok(self.channel)
     }
 
     /// Check if the `loopcount` interrupt bit is set
