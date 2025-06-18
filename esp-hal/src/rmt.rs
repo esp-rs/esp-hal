@@ -1623,7 +1623,7 @@ fn async_interrupt_handler() {
         _ => unreachable!(),
     }
 
-    WAKER[channel].wake();
+    WAKER[channel as usize].wake();
 }
 
 #[cfg(esp32s3)]
@@ -1653,7 +1653,7 @@ fn async_interrupt_handler() {
         _ => unreachable!(),
     }
 
-    WAKER[channel].wake();
+    WAKER[channel as usize].wake();
 }
 
 #[cfg(any(esp32, esp32s2))]
@@ -1719,7 +1719,7 @@ fn async_interrupt_handler() {
         _ => unreachable!(),
     }
 
-    WAKER[channel].wake();
+    WAKER[channel as usize].wake();
 }
 
 #[derive(Debug, EnumSetType)]
@@ -1935,47 +1935,23 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    #[cfg(not(esp32s3))]
-    pub fn pending_interrupt_for_channel() -> Option<usize> {
+    pub fn pending_interrupt_for_channel() -> Option<u8> {
         let st = RMT::regs().int_st().read();
 
-        if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
-            Some(0)
-        } else if st.ch1_tx_end().bit() || st.ch1_tx_err().bit() {
-            Some(1)
-        } else if st.ch2_rx_end().bit() || st.ch2_rx_err().bit() {
-            Some(2)
-        } else if st.ch3_rx_end().bit() || st.ch3_rx_err().bit() {
-            Some(3)
-        } else {
-            None
+        for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
+            if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
+                // The first half of all channels support tx...
+                let ch_num = ch_idx;
+                return Some(ch_num);
+            }
+            if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
+                // ...whereas the second half of channels support rx.
+                let ch_num = NUM_CHANNELS as u8 / 2 + ch_idx;
+                return Some(ch_num);
+            }
         }
-    }
 
-    #[allow(unused)]
-    #[cfg(esp32s3)]
-    pub fn pending_interrupt_for_channel() -> Option<usize> {
-        let st = RMT::regs().int_st().read();
-
-        if st.ch0_tx_end().bit() || st.ch0_tx_err().bit() {
-            Some(0)
-        } else if st.ch1_tx_end().bit() || st.ch1_tx_err().bit() {
-            Some(1)
-        } else if st.ch2_tx_end().bit() || st.ch2_tx_err().bit() {
-            Some(2)
-        } else if st.ch3_tx_end().bit() || st.ch3_tx_err().bit() {
-            Some(3)
-        } else if st.ch4_rx_end().bit() || st.ch4_rx_err().bit() {
-            Some(4)
-        } else if st.ch5_rx_end().bit() || st.ch5_rx_err().bit() {
-            Some(5)
-        } else if st.ch6_rx_end().bit() || st.ch6_rx_err().bit() {
-            Some(6)
-        } else if st.ch7_rx_end().bit() || st.ch7_rx_err().bit() {
-            Some(7)
-        } else {
-            None
-        }
+        None
     }
 
     // The index of this channel among all Tx/Rx channels (which may be different
@@ -2345,14 +2321,12 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub fn pending_interrupt_for_channel() -> Option<usize> {
+    pub fn pending_interrupt_for_channel() -> Option<u8> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
-        (0..NUM_CHANNELS).find(|&ch_num| {
-            st.ch_rx_end(ch_num as u8).bit()
-                || st.ch_tx_end(ch_num as u8).bit()
-                || st.ch_err(ch_num as u8).bit()
+        (0..NUM_CHANNELS as u8).find(|&ch_num| {
+            st.ch_rx_end(ch_num).bit() || st.ch_tx_end(ch_num).bit() || st.ch_err(ch_num).bit()
         })
     }
 
