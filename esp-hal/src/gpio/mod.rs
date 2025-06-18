@@ -80,6 +80,7 @@ use strum::EnumCount;
 use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
+    asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
     peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output},
     private::{self, Sealed},
@@ -427,7 +428,10 @@ pub trait Pin: Sealed {
 }
 
 /// Trait implemented by pins which can be used as inputs.
-pub trait InputPin: Pin {}
+pub trait InputPin: Pin {
+    #[doc(hidden)]
+    fn waker(&self) -> &'static AtomicWaker;
+}
 
 /// Trait implemented by pins which can be used as outputs.
 pub trait OutputPin: Pin {}
@@ -729,7 +733,13 @@ macro_rules! if_rtcio_pin {
 #[macro_export]
 macro_rules! io_type {
     (Input, $gpionum:literal) => {
-        impl $crate::gpio::InputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
+        impl $crate::gpio::InputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {
+            #[inline(always)]
+            fn waker(&self) -> &'static $crate::asynch::AtomicWaker {
+                static WAKER: $crate::asynch::AtomicWaker = $crate::asynch::AtomicWaker::new();
+                &WAKER
+            }
+        }
     };
     (Output, $gpionum:literal) => {
         impl $crate::gpio::OutputPin for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
@@ -1464,10 +1474,6 @@ impl<'d> Flex<'d> {
         Self { pin }
     }
 
-    fn number(&self) -> u8 {
-        self.pin.number()
-    }
-
     // Input functions
 
     /// Applies the given input configuration to the pin.
@@ -2076,13 +2082,18 @@ impl Pin for AnyPin<'_> {
     }
 }
 
-impl InputPin for AnyPin<'_> {}
+impl InputPin for AnyPin<'_> {
+    #[expect(unused_braces, reason = "False positive")]
+    fn waker(&self) -> &'static AtomicWaker {
+        handle_gpio_input!(self, target, { InputPin::waker(&target) })
+    }
+}
 impl OutputPin for AnyPin<'_> {}
 
 #[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
-    #[allow(unused_braces, reason = "False positive")]
+    #[expect(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
         handle_rtcio!(self, target, { RtcPin::rtc_number(&target) })
     }
@@ -2094,7 +2105,7 @@ impl RtcPin for AnyPin<'_> {
         })
     }
 
-    #[allow(unused_braces, reason = "False positive")]
+    #[expect(unused_braces, reason = "False positive")]
     fn rtcio_pad_hold(&self, enable: bool) {
         handle_rtcio!(self, target, { RtcPin::rtcio_pad_hold(&target, enable) })
     }

@@ -3,15 +3,7 @@ use core::{
     task::{Context, Poll},
 };
 
-use procmacros::ram;
-
-use crate::{
-    asynch::AtomicWaker,
-    gpio::{Event, Flex, GpioBank, Input, NUM_PINS},
-};
-
-#[ram]
-pub(super) static PIN_WAKERS: [AtomicWaker; NUM_PINS] = [const { AtomicWaker::new() }; NUM_PINS];
+use crate::gpio::{Event, Flex, GpioBank, Input, InputPin};
 
 impl Flex<'_> {
     /// Wait until the pin experiences a particular [`Event`].
@@ -162,10 +154,6 @@ struct PinFuture<'f, 'd> {
 }
 
 impl PinFuture<'_, '_> {
-    fn number(&self) -> u8 {
-        self.pin.number()
-    }
-
     fn bank(&self) -> GpioBank {
         self.pin.pin.bank()
     }
@@ -186,7 +174,7 @@ impl core::future::Future for PinFuture<'_, '_> {
     type Output = ();
 
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        PIN_WAKERS[self.number() as usize].register(cx.waker());
+        self.pin.pin.waker().register(cx.waker());
 
         if self.is_done() {
             Poll::Ready(())

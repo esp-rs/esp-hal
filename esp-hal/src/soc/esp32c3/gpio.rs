@@ -42,9 +42,6 @@ use crate::{
     peripherals::{GPIO, IO_MUX},
 };
 
-/// The total number of GPIO pins available.
-pub const NUM_PINS: usize = 22;
-
 pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
 
 pub(crate) type InputSignalType = u8;

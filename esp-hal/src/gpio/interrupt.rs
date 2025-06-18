@@ -62,7 +62,7 @@ use procmacros::ram;
 use strum::EnumCount;
 
 use crate::{
-    gpio::{GpioBank, InterruptStatusRegisterAccess, asynch, set_int_enable},
+    gpio::{AnyPin, GpioBank, InputPin, InterruptStatusRegisterAccess, set_int_enable},
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
     peripherals::Interrupt,
     sync::RawMutex,
@@ -234,7 +234,7 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
         // Disable the interrupt for this pin.
         set_int_enable(pin_nr, Some(0), 0, false);
 
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
+        unsafe { AnyPin::steal(pin_nr) }.waker().wake();
     }
 
     // This is an optimization (in case multiple pin interrupts are handled at once)
@@ -290,6 +290,6 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
 
         let pin_nr = pin_pos as u8 + bank.offset();
 
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
+        unsafe { AnyPin::steal(pin_nr) }.waker().wake();
     }
 }
