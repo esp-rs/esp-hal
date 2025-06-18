@@ -1789,7 +1789,7 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
 
         if frequency > src_clock {
@@ -1839,7 +1839,7 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub fn pending_interrupt_for_channel() -> Option<u8> {
+    pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
@@ -2204,7 +2204,7 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub fn configure_clock(frequency: Rate) -> Result<(), Error> {
+    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
         if frequency != Rate::from_mhz(80) {
             return Err(Error::UnreachableTargetFrequency);
         }
@@ -2225,7 +2225,7 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub fn pending_interrupt_for_channel() -> Option<u8> {
+    pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
