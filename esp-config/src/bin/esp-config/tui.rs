@@ -1,4 +1,4 @@
-use std::{error::Error, io};
+use std::{collections::HashMap, error::Error, io};
 
 use crossterm::{
     ExecutableCommand,
@@ -10,6 +10,7 @@ use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use tui_textarea::{CursorMove, TextArea};
 
 use super::parse_i128;
+use crate::CrateConfig;
 
 type AppResult<T> = Result<T, Box<dyn Error>>;
 
@@ -128,12 +129,22 @@ impl Repository {
         }
     }
 
-    fn set_current(&mut self, index: usize, new_value: Value) {
+    fn set_current(&mut self, index: usize, new_value: Value) -> Result<(), String> {
         if self.current_crate.is_none() {
-            return;
+            return Ok(());
         }
 
-        self.configs[self.current_crate.unwrap()].options[index].actual_value = new_value;
+        let crate_config = &mut self.configs[self.current_crate.unwrap()];
+        let previous = crate_config.options[index].actual_value.clone();
+        crate_config.options[index].actual_value = new_value;
+
+        let res = validate_config(crate_config);
+        if let Some(error) = res {
+            crate_config.options[index].actual_value = previous;
+            return Err(error.to_string());
+        }
+
+        Ok(())
     }
 
     // true if this is a configurable option
@@ -250,7 +261,7 @@ pub struct App<'a> {
     list_popup: List<'a>,
     list_popup_state: ListState,
 
-    show_initial_message: bool,
+    show_error_message: bool,
     initial_message: Option<String>,
 
     ui_elements: UiElements,
@@ -279,7 +290,7 @@ impl App<'_> {
             showing_selection_popup: false,
             list_popup: List::default(),
             list_popup_state: ListState::default(),
-            show_initial_message: errors_to_show.is_some(),
+            show_error_message: errors_to_show.is_some(),
             initial_message: errors_to_show,
             ui_elements,
             colors,
@@ -337,7 +348,8 @@ impl App<'_> {
                                 let current = self.repository.current_level()[selected].value();
                                 let text = self.textarea.lines().join("").to_string();
                                 if let Some(value) = parse_text_to_value(&text, &current) {
-                                    self.repository.set_current(selected, value);
+                                    let set_res = self.repository.set_current(selected, value);
+                                    self.handle_error(set_res);
                                 };
                             }
 
@@ -390,21 +402,22 @@ impl App<'_> {
                                 .option
                                 .constraint
                             {
-                                self.repository.set_current(
+                                let set_res = self.repository.set_current(
                                     selected,
                                     Value::String(
                                         items[self.list_popup_state.selected().unwrap()].clone(),
                                     ),
                                 );
+                                self.handle_error(set_res);
                             }
                             self.showing_selection_popup = false;
                         }
                         _ => (),
                     }
-                } else if self.show_initial_message {
+                } else if self.show_error_message {
                     match key.code {
                         KeyCode::Enter if key.kind == KeyEventKind::Press => {
-                            self.show_initial_message = false;
+                            self.show_error_message = false;
                         }
                         _ => (),
                     }
@@ -443,7 +456,10 @@ impl App<'_> {
 
                                 match current {
                                     Value::Bool(value) => {
-                                        self.repository.set_current(selected, Value::Bool(!value))
+                                        let set_res = self
+                                            .repository
+                                            .set_current(selected, Value::Bool(!value));
+                                        self.handle_error(set_res);
                                     }
                                     Value::Integer(value) => {
                                         let display_value = match self.repository.current_level()
@@ -500,6 +516,13 @@ impl App<'_> {
         })?;
 
         Ok(())
+    }
+
+    fn handle_error(&mut self, result: Result<(), String>) {
+        if let Err(error) = result {
+            self.show_error_message = true;
+            self.initial_message = Some(error);
+        }
     }
 }
 
@@ -569,7 +592,7 @@ impl Widget for &mut App<'_> {
             StatefulWidget::render(&self.list_popup, area, buf, &mut self.list_popup_state);
         }
 
-        if self.show_initial_message {
+        if self.show_error_message {
             let area = Rect {
                 x: 5,
                 y: area.height / 2 - 5,
@@ -581,10 +604,12 @@ impl Widget for &mut App<'_> {
                 .style(self.colors.edit_invalid_style)
                 .block(
                     Block::bordered()
-                        .title("The project generated errors")
+                        .title("Validation Error")
                         .style(self.colors.border_error_style)
                         .padding(Padding::uniform(1)),
                 );
+
+            ratatui::widgets::Clear.render(area, buf);
             block.render(area, buf);
         }
     }
@@ -685,7 +710,7 @@ impl App<'_> {
             "ENTER to confirm, ESC to cancel"
         } else if self.showing_selection_popup {
             "Use ↓↑ to move, ENTER to confirm, ESC to cancel"
-        } else if self.show_initial_message {
+        } else if self.show_error_message {
             "ENTER to confirm"
         } else {
             "Use ↓↑ to move, ESC/← to go up, → to go deeper or change the value, s/S to save and generate, ESC/q to cancel"
@@ -709,4 +734,25 @@ fn parse_text_to_value(text: &str, current_type: &Value) -> Option<Value> {
         Value::Integer(_) => parse_i128(text).ok().map(Value::Integer),
         Value::String(_) => Some(Value::String(text.to_string())),
     }
+}
+
+pub(super) fn validate_config(config: &CrateConfig) -> Option<String> {
+    let cfg: HashMap<String, Value> = config
+        .options
+        .iter()
+        .map(|option| {
+            (
+                format!(
+                    "{}_CONFIG_{}",
+                    config.name.to_uppercase().replace("-", "_"),
+                    option.option.name.to_uppercase().replace("-", "_")
+                ),
+                option.actual_value.clone(),
+            )
+        })
+        .collect();
+    if let Err(error) = esp_config::do_checks(config.checks.as_ref(), &cfg) {
+        return Some(error.to_string());
+    }
+    None
 }
