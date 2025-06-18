@@ -116,11 +116,15 @@
   <div class="content">
     <div class="logo">
       <img src="esp-rs.svg" alt="esp-rs logo" />
-      <div>
       <h2>esp-rs Documentation and Resources</h2>
-      esp-hal enables Rust embedded developers to build safe, high-level, and efficient firmware for a wide range of ESP32 chips.
-      It supports both blocking and async APIs, with additional crates for Wi-Fi, Bluetooth, flash storage, logging, and more.</div>
+      Bare-metal (no_std) hardware abstraction layer for Espressif devices.
     </div>
+
+    <h2>Resources</h2>
+
+    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/book/">The Rust on ESP Book</a></span></div>
+    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/no_std-training/">Embedded Rust (no_std) on Espressif Training</a></span></div>
+
 
     <h2>Package Documentation</h2>
 
@@ -133,10 +137,6 @@
       <span class="crate-version">{{ meta.version }}</span>
     </div>
     {%- endfor %}
-
-    <h2>Resources</h2>
-    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/book/">The Rust on ESP Book</a></span></div>
-    <div class="resource"><span class="resource-name"><a href="https://docs.espressif.com/projects/rust/no_std-training/">Embedded Rust (no_std) on Espressif Training</a></span></div>
 
   </div>
 </body>
