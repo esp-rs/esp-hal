@@ -1482,15 +1482,15 @@ impl<Raw> core::future::Future for RmtTxFuture<'_, Raw>
 where
     Raw: TxChannelInternal,
 {
-    type Output = ();
+    type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
 
-        if self.raw.is_error() || self.raw.is_tx_done() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+        match self.raw.get_tx_status() {
+            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
+            Some(Event::End) => Poll::Ready(Ok(())),
+            _ => Poll::Pending,
         }
     }
 }
@@ -1540,13 +1540,7 @@ where
             raw,
             _phantom: PhantomData,
         })
-        .await;
-
-        if raw.is_error() {
-            Err(Error::TransmissionError)
-        } else {
-            Ok(())
-        }
+        .await
     }
 }
 
