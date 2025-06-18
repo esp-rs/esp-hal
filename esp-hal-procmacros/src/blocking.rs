@@ -23,8 +23,13 @@ pub fn main(args: TokenStream, input: TokenStream) -> TokenStream {
             .into();
     }
 
+    let root = match proc_macro_crate::crate_name("esp-hal") {
+        Ok(proc_macro_crate::FoundCrate::Name(ref name)) => quote::format_ident!("{name}"),
+        _ => quote::format_ident!("esp_hal"),
+    };
+
     quote::quote!(
-        #[esp_hal::__macro_implementation::__entry]
+        #[#root::__macro_implementation::__entry]
         #f
     )
     .into()
