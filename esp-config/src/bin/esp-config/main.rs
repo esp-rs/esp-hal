@@ -296,22 +296,8 @@ fn check_after_changes(
     let configs = parse_configs(work_dir, chip_from_args, config_file)?;
 
     for config in configs {
-        let cfg: HashMap<String, Value> = config
-            .options
-            .into_iter()
-            .map(|option| {
-                (
-                    format!(
-                        "{}_CONFIG_{}",
-                        config.name.to_uppercase().replace("-", "_"),
-                        option.option.name.to_uppercase().replace("-", "_")
-                    ),
-                    option.actual_value.clone(),
-                )
-            })
-            .collect();
-        if let Err(error) = esp_config::do_checks(config.checks.as_ref(), &cfg) {
-            return Ok(Some(error.to_string()));
+        if let Some(value) = tui::validate_config(&config) {
+            return Err(value.into());
         }
     }
 
