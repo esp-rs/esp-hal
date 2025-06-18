@@ -1508,53 +1508,18 @@ where
     }
 }
 
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
+#[cfg(not(any(esp32, esp32s2)))]
 #[handler]
 fn async_interrupt_handler() {
-    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
+    let Some((channel, is_tx)) = chip_specific::pending_interrupt_for_channel() else {
         return;
     };
-    match channel {
-        0 => unsafe { ConstChannelAccess::<Tx, 0>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        1 => unsafe { ConstChannelAccess::<Tx, 1>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        2 => unsafe { ConstChannelAccess::<Rx, 2>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-        3 => unsafe { ConstChannelAccess::<Rx, 3>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-
-        _ => unreachable!(),
-    }
-
-    WAKER[channel as usize].wake();
-}
-
-#[cfg(esp32s3)]
-#[handler]
-fn async_interrupt_handler() {
-    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
-        return;
-    };
-    match channel {
-        0 => unsafe { ConstChannelAccess::<Tx, 0>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        1 => unsafe { ConstChannelAccess::<Tx, 1>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        2 => unsafe { ConstChannelAccess::<Tx, 2>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        3 => unsafe { ConstChannelAccess::<Tx, 3>::conjure() }
-            .unlisten_tx_interrupt(Event::End | Event::Error),
-        4 => unsafe { ConstChannelAccess::<Rx, 4>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-        5 => unsafe { ConstChannelAccess::<Rx, 5>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-        6 => unsafe { ConstChannelAccess::<Rx, 6>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-        7 => unsafe { ConstChannelAccess::<Rx, 7>::conjure() }
-            .unlisten_rx_interrupt(Event::End | Event::Error),
-
-        _ => unreachable!(),
+    if is_tx {
+        unsafe { DynChannelAccess::<Tx>::conjure(channel) }
+            .unlisten_tx_interrupt(Event::End | Event::Error);
+    } else {
+        unsafe { DynChannelAccess::<Rx>::conjure(channel) }
+            .unlisten_rx_interrupt(Event::End | Event::Error);
     }
 
     WAKER[channel as usize].wake();
@@ -1566,62 +1531,11 @@ fn async_interrupt_handler() {
     let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
         return;
     };
-    match channel {
-        0 => {
-            unsafe { ConstChannelAccess::<Tx, 0>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 0>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        1 => {
-            unsafe { ConstChannelAccess::<Tx, 1>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 1>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        2 => {
-            unsafe { ConstChannelAccess::<Tx, 2>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 2>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        3 => {
-            unsafe { ConstChannelAccess::<Tx, 3>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 3>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        #[cfg(esp32)]
-        4 => {
-            unsafe { ConstChannelAccess::<Tx, 4>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 4>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        #[cfg(esp32)]
-        5 => {
-            unsafe { ConstChannelAccess::<Tx, 5>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 5>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        #[cfg(esp32)]
-        6 => {
-            unsafe { ConstChannelAccess::<Tx, 6>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 6>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
-        #[cfg(esp32)]
-        7 => {
-            unsafe { ConstChannelAccess::<Tx, 7>::conjure() }
-                .unlisten_tx_interrupt(Event::End | Event::Error);
-            unsafe { ConstChannelAccess::<Rx, 7>::conjure() }
-                .unlisten_rx_interrupt(Event::End | Event::Error);
-        }
 
-        _ => unreachable!(),
-    }
+    unsafe { DynChannelAccess::<Tx>::conjure(channel) }
+        .unlisten_tx_interrupt(Event::End | Event::Error);
+    unsafe { DynChannelAccess::<Rx>::conjure(channel) }
+        .unlisten_rx_interrupt(Event::End | Event::Error);
 
     WAKER[channel as usize].wake();
 }
@@ -1839,19 +1753,19 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
+    pub(super) fn pending_interrupt_for_channel() -> Option<(u8, bool)> {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
             if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
                 // The first half of all channels support tx...
                 let ch_num = ch_idx;
-                return Some(ch_num);
+                return Some((ch_num, true));
             }
             if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
                 // ...whereas the second half of channels support rx.
                 let ch_num = NUM_CHANNELS as u8 / 2 + ch_idx;
-                return Some(ch_num);
+                return Some((ch_num, false));
             }
         }
 
