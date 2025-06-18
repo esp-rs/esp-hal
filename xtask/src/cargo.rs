@@ -6,12 +6,12 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{bail, Context as _, Result};
 use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
 use toml_edit::{DocumentMut, Formatted, Item, Value};
 
-use crate::{Package, windows_safe_path};
+use crate::{windows_safe_path, Package};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
@@ -329,7 +329,7 @@ impl<'a> CargoToml<'a> {
 
     /// Returns all dependencies of the package, that come from the repository.
     ///
-    /// For example, for esp-println this will return [esp-build, esp-metadata]
+    /// For example, for esp-println this will return [esp-metadata]
     /// (at the time of writing).
     pub fn repo_dependencies(&mut self) -> Vec<Package> {
         let mut dependencies = Vec::new();
