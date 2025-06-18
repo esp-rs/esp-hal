@@ -512,10 +512,12 @@ impl Config {
 
                 for af in 0..6 {
                     if let Some(signal) = pin.af_input.get(af) {
+                        let af = quote::format_ident!("_{af}");
                         let signal = TokenStream::from_str(signal).unwrap();
                         input_afs.push(quote::quote! { #af => #signal });
                     }
                     if let Some(signal) = pin.af_output.get(af) {
+                        let af = quote::format_ident!("_{af}");
                         let signal = TokenStream::from_str(signal).unwrap();
                         output_afs.push(quote::quote! { #af => #signal });
                     }
