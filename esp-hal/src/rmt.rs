@@ -759,8 +759,7 @@ where
         // interfere with others.
         self.raw.set_memsize(MemSize::from_blocks(0));
 
-        for s in STATE
-            [usize::from(self.raw.channel())..usize::from(self.raw.channel() + memsize.blocks())]
+        for s in STATE[usize::from(self.raw.channel())..][..usize::from(memsize.blocks())]
             .iter()
             .rev()
         {
