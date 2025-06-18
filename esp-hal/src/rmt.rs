@@ -1237,14 +1237,11 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
         raw.set_tx_continuous(false);
         raw.update();
 
-        // FIXME: Merge is_done and is_error checks
         let result = loop {
-            if raw.is_error() {
-                break Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break Ok(());
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
+                _ => continue,
             }
         };
 
@@ -1264,13 +1261,10 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
         raw.stop_tx();
 
         let result = loop {
-            // FIXME: Merge is_done and is_error checks
-            if raw.is_error() {
-                break Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break Ok(());
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => break Ok(()),
+                _ => continue,
             }
         };
 
@@ -1299,7 +1293,7 @@ impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
 
         raw.stop_tx();
 
-        while !raw.is_error() && !raw.is_tx_done() {}
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
