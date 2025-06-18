@@ -1146,65 +1146,57 @@ where
         let raw = self.raw;
         let memsize = raw.memsize().codes();
 
-        // FIXME: Return if writer.state indicates an error
-        while !self.remaining_data.is_empty() {
-            // wait for TX-THR
-            while !raw.is_tx_threshold_set() {
-                // FIXME: Merge is_done and is_error checks
-                if raw.is_tx_done() {
-                    // Unexpectedly done, even though we have data left: For example, this could
-                    // happen if there is a stop code inside the data and not just at the end.
-                    let _ = ManuallyDrop::new(self);
-                    return Err(Error::TransmissionError);
+        let result = loop {
+            // Not sure that all the error cases below can happen. However, it's best to
+            // handle them to be sure that we don't lock up here in case they can happen.
+            match raw.get_tx_status() {
+                Some(Event::Error) => break Err(Error::TransmissionError),
+                Some(Event::End) => {
+                    if !self.remaining_data.is_empty() {
+                        // Unexpectedly done, even though we have data left: For example, this could
+                        // happen if there is a stop code inside the data and not just at the end.
+                        break Err(Error::TransmissionError);
+                    } else {
+                        break Ok(());
+                    }
                 }
-                if raw.is_error() {
-                    // Not sure that this can happen? In any case, be sure that we don't lock up
-                    // here in case it can.
-                    let _ = ManuallyDrop::new(self);
-                    return Err(Error::TransmissionError);
+                Some(Event::Threshold) => {
+                    if self.writer.state == WriterState::Active {
+                        continue;
+                    }
+                    raw.reset_tx_threshold_set();
+
+                    // re-fill TX RAM
+                    let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
+                    let count = self.remaining_data.len().min(memsize / 2);
+                    let (chunk, remaining) = self.remaining_data.split_at(count);
+                    for (idx, entry) in chunk.iter().enumerate() {
+                        unsafe {
+                            ptr.add(idx).write_volatile(*entry);
+                        }
+                    }
+
+                    // If count == memsize / 2 codes were written, update ram_index as
+                    // - 0 -> memsize / 2
+                    // - memsize / 2 -> 0
+                    // Otherwise, for count < memsize / 2, the new position is invalid but the new
+                    // slice is empty and we won't use ram_index again.
+                    self.ram_index = memsize / 2 - self.ram_index;
+                    self.remaining_data = remaining;
+                    debug_assert!(
+                        self.ram_index == 0
+                            || self.ram_index == memsize / 2
+                            || self.remaining_data.is_empty()
+                    );
                 }
+                _ => continue,
             }
-            raw.reset_tx_threshold_set();
-
-            // re-fill TX RAM
-            let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
-            let count = self.remaining_data.len().min(memsize / 2);
-            let (chunk, remaining) = self.remaining_data.split_at(count);
-            for (idx, entry) in chunk.iter().enumerate() {
-                unsafe {
-                    ptr.add(idx).write_volatile(*entry);
-                }
-            }
-
-            // If count == memsize / 2 codes were written, update ram_index as
-            // - 0 -> memsize / 2
-            // - memsize / 2 -> 0
-            // Otherwise, for count < memsize / 2, the new position is invalid but the new
-            // slice is empty and we won't use ram_index again.
-            self.ram_index = memsize / 2 - self.ram_index;
-            self.remaining_data = remaining;
-            debug_assert!(
-                self.ram_index == 0
-                    || self.ram_index == memsize / 2
-                    || self.remaining_data.is_empty()
-            );
-        }
-
-        loop {
-            // FIXME: Merge is_done and is_error checks
-            if raw.is_error() {
-                return Err(Error::TransmissionError);
-            }
-
-            if raw.is_tx_done() {
-                break;
-            }
-        }
+        };
 
         // Disable the Drop handler since the transaction is properly stopped
         // already.
         let _ = ManuallyDrop::new(self);
-        Ok(())
+        result
     }
 }
 
@@ -1219,7 +1211,8 @@ where
         // safe (i.e. start from a state where the hardware is stopped).
         let raw = self.raw;
         raw.stop_tx();
-        while !raw.is_error() && !raw.is_tx_done() {}
+
+        while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
     }
 }
 
