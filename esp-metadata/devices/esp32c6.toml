@@ -115,6 +115,41 @@ instances = [
 
 [device.gpio]
 support_status = "supported"
+instances = [
+    { name = "gpio", pins = [
+        { pin =  0, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  1, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  2, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIQ" },   af_output = { 2 = "FSPIQ" } },
+        { pin =  3, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  4, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIHD" },  af_output = { 0 = "USB_JTAG_TMS", 2 = "FSPIHD" } },
+        { pin =  5, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIWP" },  af_output = { 0 = "USB_JTAG_TDI", 2 = "FSPIWP" } },
+        { pin =  6, kind = ["input", "output"],                  af_input = { 2 = "FSPICLK" }, af_output = { 0 = "USB_JTAG_TCK", 2 = "FSPICLK_MUX" } },
+        { pin =  7, kind = ["input", "output"],                  af_input = { 2 = "FSPID" },   af_output = { 0 = "USB_JTAG_TDO", 2 = "FSPID" } },
+        { pin =  8, kind = ["input", "output"] },
+        { pin =  9, kind = ["input", "output"] },
+        { pin = 10, kind = ["input", "output"] },
+        { pin = 11, kind = ["input", "output"] },
+        { pin = 12, kind = ["input", "output"] },
+        { pin = 13, kind = ["input", "output"] },
+        { pin = 14, kind = ["input", "output"] },
+        { pin = 15, kind = ["input", "output"] },
+        { pin = 16, kind = ["input", "output"], af_input = { 0 = "U0RXD" }, af_output = {              2 = "FSPICS0" } },
+        { pin = 17, kind = ["input", "output"],                             af_output = { 0 = "U0TXD", 2 = "FSPICS1" } },
+        { pin = 18, kind = ["input", "output"],                             af_output = {              2 = "FSPICS2" } },
+        { pin = 19, kind = ["input", "output"],                             af_output = {              2 = "FSPICS3" } },
+        { pin = 20, kind = ["input", "output"],                             af_output = {              2 = "FSPICS4" } },
+        { pin = 21, kind = ["input", "output"],                             af_output = {              2 = "FSPICS5" } },
+        { pin = 22, kind = ["input", "output"] },
+        { pin = 23, kind = ["input", "output"] },
+        { pin = 24, kind = ["input", "output"],                             af_output = { 0 = "SPICS0" } },
+        { pin = 25, kind = ["input", "output"], af_input = { 0 = "SPIQ" },  af_output = { 0 = "SPIQ" } },
+        { pin = 26, kind = ["input", "output"], af_input = { 0 = "SPIWP" }, af_output = { 0 = "SPIWP" } },
+        { pin = 27, kind = ["input", "output"] },
+        { pin = 28, kind = ["input", "output"], af_input = { 0 = "SPIHD" }, af_output = { 0 = "SPIHD" } },
+        { pin = 29, kind = ["input", "output"],                             af_output = { 0 = "SPICLK_MUX" } },
+        { pin = 30, kind = ["input", "output"], af_input = { 0 = "SPID" },  af_output = { 0 = "SPID" } },
+    ] },
+]
 
 [device.i2c_master]
 support_status = "supported"

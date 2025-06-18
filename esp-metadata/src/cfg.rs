@@ -59,9 +59,67 @@ impl SupportStatus {
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct EmptyInstanceConfig {}
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PinCapability {
+    Input,
+    Output,
+    Analog,
+    Rtc,
+    Touch,
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct AfMap {
+    #[serde(rename = "0")]
+    af0: Option<String>,
+    #[serde(rename = "1")]
+    af1: Option<String>,
+    #[serde(rename = "2")]
+    af2: Option<String>,
+    #[serde(rename = "3")]
+    af3: Option<String>,
+    #[serde(rename = "4")]
+    af4: Option<String>,
+    #[serde(rename = "5")]
+    af5: Option<String>,
+}
+
+impl AfMap {
+    pub fn get(&self, af: usize) -> Option<&str> {
+        match af {
+            0 => self.af0.as_deref(),
+            1 => self.af1.as_deref(),
+            2 => self.af2.as_deref(),
+            3 => self.af3.as_deref(),
+            4 => self.af4.as_deref(),
+            5 => self.af5.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct PinConfig {
+    /// The GPIO pin number.
+    pub pin: usize,
+    pub kind: Vec<PinCapability>,
+    // Pin => InputSignal
+    #[serde(default)]
+    pub af_input: AfMap,
+    // Pin => OutputSignal
+    #[serde(default)]
+    pub af_output: AfMap,
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct GpioInstanceConfig {
+    pub pins: Vec<PinConfig>,
+}
+
 /// A peripheral instance for which a driver is implemented.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct PeriInstance<I> {
+pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
     /// The name of the instance
     pub name: String,
     #[serde(flatten)]
@@ -79,7 +137,7 @@ pub(crate) struct SupportItem {
 macro_rules! driver_configs {
     // Creates a single struct
     (@one
-        $struct:tt($group:ident) {
+        $struct:ident $(<$instance_config:ident>)? ($group:ident) {
             $(
                 $(#[$meta:meta])? $config:ident: $ty:ty,
             )*
@@ -92,7 +150,7 @@ macro_rules! driver_configs {
             // The list of peripherals for which this driver is implemented.
             // If empty, the driver supports a single instance only.
             #[serde(default)]
-            pub instances: Vec<PeriInstance<EmptyInstanceConfig>>,
+            pub instances: Vec<PeriInstance $(<$instance_config>)?>,
             $(
                 $(#[$meta])?
                 pub $config: $ty
@@ -113,7 +171,7 @@ macro_rules! driver_configs {
 
     // Repeat pattern for multiple structs
     ($(
-        $struct:tt {
+        $struct:ident $(<$instance_config:ident>)? {
             // This name will be emitted as a cfg symbol, to activate a driver.
             driver: $driver:ident,
             // Driver name, used in the generated documentation.
@@ -127,7 +185,7 @@ macro_rules! driver_configs {
     )+) => {
         // Implement the config driver and DriverConfig trait for each driver
         $(
-            driver_configs!(@one $struct($driver) $tokens);
+            driver_configs!(@one $struct $(<$instance_config>)? ($driver) $tokens);
         )+
 
         // Generate a single PeriConfig struct that contains all the drivers. Each of the
@@ -260,7 +318,7 @@ driver_configs![
         peripherals: &["etm"],
         properties: {}
     },
-    GpioProperties {
+    GpioProperties<GpioInstanceConfig> {
         driver: gpio,
         name: "GPIO",
         peripherals: &["gpio"],

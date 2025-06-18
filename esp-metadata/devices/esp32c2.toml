@@ -72,6 +72,24 @@ instances = [
 
 [device.gpio]
 support_status = "supported"
+instances = [
+    { name = "gpio", pins = [
+        { pin =  0, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  1, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  2, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIQ" },   af_output = { 2 = "FSPIQ" } },
+        { pin =  3, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  4, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIHD" },  af_output = { 2 = "FSPIHD" } },
+        { pin =  5, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIWP" },  af_output = { 2 = "FSPIWP" } },
+        { pin =  6, kind = ["input", "output"],                  af_input = { 2 = "FSPICLK" }, af_output = { 2 = "FSPICLK_MUX" } },
+        { pin =  7, kind = ["input", "output"],                  af_input = { 2 = "FSPID" },   af_output = { 2 = "FSPID" } },
+        { pin =  8, kind = ["input", "output"] },
+        { pin =  9, kind = ["input", "output"] },
+        { pin = 10, kind = ["input", "output"],                  af_input = { 2 = "FSPICS0" }, af_output = { 2 = "FSPICS0" } },
+        { pin = 18, kind = ["input", "output"] },
+        { pin = 19, kind = ["input", "output"] },
+        { pin = 20, kind = ["input", "output"],                  af_input = { 0 = "U0RXD" } },
+    ] },
+]
 
 [device.i2c_master]
 support_status = "supported"

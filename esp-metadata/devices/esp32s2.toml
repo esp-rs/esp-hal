@@ -104,7 +104,54 @@ instances = [
 [device.gpio]
 support_status = "supported"
 has_bank_1 = true
+instances = [
+    { name = "gpio", pins = [
+        { pin =  0, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  1, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  2, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  3, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  4, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  5, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  6, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  7, kind = ["input", "output", "analog", "rtc"] },
+        { pin =  8, kind = ["input", "output", "analog", "rtc"],                                                              af_output = {                3 = "SUBSPICS1"                } },
+        { pin =  9, kind = ["input", "output", "analog", "rtc"], af_input = {                3 = "SUBSPIHD", 4 = "FSPIHD"  }, af_output = {                3 = "SUBSPIHD",  4 = "FSPIHD"  } },
+        { pin = 10, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIIO4",                 4 = "FSPICS0" }, af_output = { 2 = "FSPIIO4", 3 = "SUBSPICS0", 4 = "FSPICS0" } },
+        { pin = 11, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIIO5", 3 = "SUBSPID",  4 = "FSPID"   }, af_output = { 2 = "FSPIIO5", 3 = "SUBSPID",   4 = "FSPID"   } },
+        { pin = 12, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIIO6",                 4 = "FSPICLK" }, af_output = { 2 = "FSPIIO6", 3 = "SUBSPICLK", 4 = "FSPICLK" } },
+        { pin = 13, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "FSPIIO7", 3 = "SUBSPIQ",  4 = "FSPIQ"   }, af_output = { 2 = "FSPIIO7", 3 = "SUBSPIQ",   4 = "FSPIQ"   } },
+        { pin = 14, kind = ["input", "output", "analog", "rtc"], af_input = {                3 = "SUBSPIWP", 4 = "FSPIWP"  }, af_output = { 2 = "FSPIDQS", 3 = "SUBSPIWP",  4 = "FSPIWP"  } },
+        { pin = 15, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U0RTS" } },
+        { pin = 16, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U0CTS" } },
+        { pin = 17, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1TXD" } },
+        { pin = 18, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1RXD" } },
+        { pin = 19, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1RTS" } },
+        { pin = 20, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1CTS" } },
+        { pin = 21, kind = ["input", "output", "analog", "rtc"] },
 
+        { pin = 26, kind = ["input", "output"] },
+        { pin = 27, kind = ["input", "output"] },
+        { pin = 28, kind = ["input", "output"] },
+        { pin = 29, kind = ["input", "output"] },
+        { pin = 30, kind = ["input", "output"] },
+        { pin = 31, kind = ["input", "output"] },
+        { pin = 32, kind = ["input", "output"] },
+        { pin = 33, kind = ["input", "output"], af_input = { 2 = "FSPIHD", 3 = "SUBSPIHD"              }, af_output = { 2 = "FSPIHD",  3 = "SUBSPIHD"              } },
+        { pin = 34, kind = ["input", "output"], af_input = { 2 = "FSPICS0"                             }, af_output = { 2 = "FSPICS0", 3 = "SUBSPICS0"             } },
+        { pin = 35, kind = ["input", "output"], af_input = { 2 = "FSPID",  3 = "SUBSPID"               }, af_output = { 2 = "FSPID",   3 = "SUBSPID"               } },
+        { pin = 36, kind = ["input", "output"], af_input = { 2 = "FSPICLK"                             }, af_output = { 2 = "FSPICLK", 3 = "SUBSPICLK"             } },
+        { pin = 37, kind = ["input", "output"], af_input = { 2 = "FSPIQ",  3 = "SUBSPIQ", 4 = "SPIDQS" }, af_output = { 2 = "FSPIQ",   3 = "SUBSPIQ", 4 = "SPIDQS" } },
+        { pin = 38, kind = ["input", "output"], af_input = { 2 = "FSPIWP", 3 = "SUBSPIWP"              }, af_output = { 2 = "FSPIWP",  3 = "SUBSPIWP"              } },
+        { pin = 39, kind = ["input", "output"],                                                           af_output = {                3 = "SUBSPICS1"             } },
+        { pin = 40, kind = ["input", "output"] },
+        { pin = 41, kind = ["input", "output"] },
+        { pin = 42, kind = ["input", "output"] },
+        { pin = 43, kind = ["input", "output"] },
+        { pin = 44, kind = ["input", "output"] },
+        { pin = 45, kind = ["input", "output"] },
+        { pin = 46, kind = ["input", "output"] },
+    ] },
+]
 [device.i2c_master]
 support_status = "supported"
 instances = [{ name = "i2c0" }, { name = "i2c1" }]

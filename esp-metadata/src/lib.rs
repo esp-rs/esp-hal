@@ -2,7 +2,7 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{collections::HashMap, fmt::Write, sync::OnceLock};
+use std::{collections::HashMap, fmt::Write, path::Path, sync::OnceLock};
 
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
@@ -369,8 +369,14 @@ impl Config {
 
     pub fn generate_metadata(&self) {
         let out_dir = std::env::var_os("OUT_DIR").unwrap();
-        let out_dir = std::path::Path::new(&out_dir);
-        let out_file = out_dir.join("_generated.rs").to_string_lossy().to_string();
+        let out_dir = Path::new(&out_dir);
+
+        self.generate_properties(out_dir, "_generated.rs");
+        self.generate_gpios(out_dir, "_generated_gpio.rs");
+    }
+
+    fn generate_properties(&self, out_dir: &Path, file_name: &str) {
+        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
 
         let mut g = TokenStream::new();
 
@@ -442,6 +448,89 @@ impl Config {
                 #(#region_branches)*
             }
         });
+
+        std::fs::write(&out_file, g.to_string()).unwrap();
+    }
+
+    fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
+        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+
+        let pins = self.device.peri_config.gpio.as_ref().unwrap().instances[0]
+            .instance_config
+            .pins
+            .iter()
+            .map(|pin| {
+                let pin_number = number(pin.pin);
+
+                struct PinAttrs {
+                    input: bool,
+                    output: bool,
+                    analog: bool,
+                    rtc_io: bool,
+                    touch: bool,
+                }
+
+                let mut pin_attrs = PinAttrs {
+                    input: false,
+                    output: false,
+                    analog: false,
+                    rtc_io: false,
+                    touch: false,
+                };
+                pin.kind.iter().for_each(|kind| match kind {
+                    cfg::PinCapability::Input => pin_attrs.input = true,
+                    cfg::PinCapability::Output => pin_attrs.output = true,
+                    cfg::PinCapability::Analog => pin_attrs.analog = true,
+                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
+                    cfg::PinCapability::Touch => pin_attrs.touch = true,
+                });
+
+                let mut attrs = vec![];
+
+                if pin_attrs.input {
+                    attrs.push(quote::quote! { Input });
+                }
+                if pin_attrs.output {
+                    attrs.push(quote::quote! { Output });
+                }
+                if pin_attrs.analog {
+                    attrs.push(quote::quote! { Analog });
+                }
+                if pin_attrs.rtc_io {
+                    if !pin_attrs.output {
+                        attrs.push(quote::quote! { RtcIo });
+                    } else {
+                        attrs.push(quote::quote! { RtcIoInput });
+                    }
+                }
+                if pin_attrs.touch {
+                    attrs.push(quote::quote! { Touch });
+                }
+
+                let mut input_afs = vec![];
+                let mut output_afs = vec![];
+
+                for af in 0..6 {
+                    if let Some(signal) = pin.af_input.get(af) {
+                        let signal = TokenStream::from_str(signal).unwrap();
+                        input_afs.push(quote::quote! { #af => #signal });
+                    }
+                    if let Some(signal) = pin.af_output.get(af) {
+                        let signal = TokenStream::from_str(signal).unwrap();
+                        output_afs.push(quote::quote! { #af => #signal });
+                    }
+                }
+
+                quote::quote! {
+                    ( #pin_number, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
+                }
+            });
+
+        let g = quote::quote! {
+            crate::gpio! {
+                #(#pins)*
+            }
+        };
 
         std::fs::write(&out_file, g.to_string()).unwrap();
     }

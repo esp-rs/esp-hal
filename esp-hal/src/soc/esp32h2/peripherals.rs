@@ -99,33 +99,35 @@ crate::peripherals! {
         DMA_CH2 <= virtual,
     ],
     pins: [
-        (0, [Input, Output, Analog] (2 => FSPIQ) (2 => FSPIQ))
-        (1, [Input, Output, Analog] (2 => FSPICS0) (2 => FSPICS0))
-        (2, [Input, Output, Analog] (2 => FSPIWP) (2 => FSPIWP))
-        (3, [Input, Output, Analog] (2 => FSPIHD) (2 => FSPIHD))
-        (4, [Input, Output, Analog] (2 => FSPICLK) (2 => FSPICLK_MUX))
-        (5, [Input, Output, Analog] (2 => FSPID) (2 => FSPID))
-        (6, [Input, Output])
-        (7, [Input, Output])
-        (8, [Input, Output])
-        (9, [Input, Output])
-        (10, [Input, Output])
-        (11, [Input, Output])
-        (12, [Input, Output])
-        (13, [Input, Output])
-        (14, [Input, Output])
-        (15, [Input, Output] () (0 => SPICS0))
-        (16, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-        (17, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-        (18, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-        (19, [Input, Output] () (0 => SPICLK))
-        (20, [Input, Output] (0 => SPID) (0 => SPID))
-        (21, [Input, Output])
-        (22, [Input, Output])
-        (23, [Input, Output] () (2 => FSPICS1))
-        (24, [Input, Output] () (2 => FSPICS2))
-        (25, [Input, Output] () (2 => FSPICS3))
-        (26, [Input, Output] () (2 => FSPICS4))
-        (27, [Input, Output] () (2 => FSPICS5))
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
     ]
 }
+
+include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
