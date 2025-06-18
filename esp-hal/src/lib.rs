@@ -160,14 +160,14 @@
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
-//! [documentation]: https://docs.esp-rs.org/esp-hal
+//! [documentation]: https://docs.espressif.com/projects/rust/esp-hal/latest/
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [esp-generate]: https://github.com/esp-rs/esp-generate
-//! [book]: https://docs.esp-rs.org/book/
-//! [training]: https://docs.esp-rs.org/no_std-training/
+//! [book]: https://docs.espressif.com/projects/rust/book/
+//! [training]: https://docs.espressif.com/projects/rust/no_std-training/
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
