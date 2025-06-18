@@ -851,6 +851,26 @@ fn configure_tx_channel<'d>(
 
     Ok(())
 }
+#[repr(u8)]
+enum RmtState {
+    // The channel is not configured for either rx or tx, and its memory is available
+    Unconfigured,
+
+    // The channels is not in use, but one of the preceding channels is using its memory
+    Reserved,
+
+    // The channel is configured for rx
+    Rx,
+
+    // The channel is configured for tx
+    Tx,
+}
+
+// This must only holds value of RmtState. However, we need atomic access, thus
+// represent as AtomicU8.
+static STATE: [AtomicU8; NUM_CHANNELS] =
+    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
@@ -1352,27 +1372,7 @@ where
     }
 }
 
-#[repr(u8)]
-enum RmtState {
-    // The channel is not configured for either rx or tx, and its memory is available
-    Unconfigured,
-
-    // The channels is not in use, but one of the preceding channels is using its memory
-    Reserved,
-
-    // The channel is configured for rx
-    Rx,
-
-    // The channel is configured for tx
-    Tx,
-}
-
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
-// This must only holds value of RmtState. However, we need atomic access, thus
-// represent as AtomicU8.
-static STATE: [AtomicU8; NUM_CHANNELS] =
-    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
-
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub(crate) struct RmtTxFuture<Raw>
 where
