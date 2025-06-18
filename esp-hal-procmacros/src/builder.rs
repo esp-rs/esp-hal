@@ -90,8 +90,6 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
         if helper_attributes.iter().any(|h| h == "into") {
             field_setter_type = quote! { impl Into<#field_setter_type> };
             field_assigns = quote! { #field_ident .into() };
-        } else {
-            field_setter_type = field_setter_type.clone();
         }
 
         if !helper_attributes.iter().any(|h| h == "skip_setter") {
