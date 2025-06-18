@@ -1609,6 +1609,10 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn start_tx(&self);
 
+    // Return the first flag that is set of, in order of decreasing priority,
+    // Event::Error, Event::End, Event::Threshold
+    fn get_tx_status(&self) -> Option<Event>;
+
     fn is_tx_done(&self) -> bool;
 
     fn is_tx_threshold_set(&self) -> bool;
@@ -1676,6 +1680,10 @@ pub trait RxChannelInternal: ChannelInternal {
     fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level);
 
     fn start_rx(&self);
+
+    // Return the first flag that is set of, in order of decreasing priority,
+    // Event::Error, Event::End, Event::Threshold
+    fn get_rx_status(&self) -> Option<Event>;
 
     fn is_rx_done(&self) -> bool;
 
@@ -1962,6 +1970,23 @@ mod chip_specific {
         }
 
         #[inline]
+        fn get_tx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_tx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_tx_err(ch).bit() {
+                Some(Event::Error)
+            } else if reg.ch_tx_thr_event(ch).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
+        }
+
+        #[inline]
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
@@ -2081,6 +2106,23 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.rx_en().set_bit()
             });
+        }
+
+        #[inline]
+        fn get_rx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch_idx = ch_idx(self);
+
+            if reg.ch_rx_end(ch_idx).bit() {
+                Some(Event::End)
+            } else if reg.ch_rx_err(ch_idx).bit() {
+                Some(Event::Error)
+            } else if reg.ch_rx_thr_event(ch_idx).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
         }
 
         #[inline]
@@ -2316,6 +2358,23 @@ mod chip_specific {
         }
 
         #[inline]
+        fn get_tx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_tx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_err(ch).bit() {
+                Some(Event::Error)
+            } else if reg.ch_tx_thr_event(ch).bit() {
+                Some(Event::Threshold)
+            } else {
+                None
+            }
+        }
+
+        #[inline]
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
@@ -2430,6 +2489,21 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.rx_en().set_bit()
             });
+        }
+
+        #[inline]
+        fn get_rx_status(&self) -> Option<Event> {
+            let rmt = crate::peripherals::RMT::regs();
+            let reg = rmt.int_raw().read();
+            let ch = self.channel();
+
+            if reg.ch_rx_end(ch).bit() {
+                Some(Event::End)
+            } else if reg.ch_err(ch).bit() {
+                Some(Event::Error)
+            } else {
+                None
+            }
         }
 
         #[inline]
