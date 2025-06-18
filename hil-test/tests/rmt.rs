@@ -7,10 +7,8 @@
 #![no_main]
 
 use esp_hal::{
-    Async,
-    Blocking,
     DriverMode,
-    gpio::{Level, NoPin},
+    gpio::{InputPin, Level, NoPin, OutputPin},
     rmt::{
         AnyRxChannel,
         AnyTxChannel,
@@ -38,36 +36,13 @@ cfg_if::cfg_if! {
     }
 }
 
-trait WithMode<'rmt, Dm: DriverMode> {
-    fn with_mode(self) -> Rmt<'rmt, Dm>;
-}
-
-impl<'rmt> WithMode<'rmt, Blocking> for Rmt<'rmt, Blocking> {
-    fn with_mode(self) -> Rmt<'rmt, Blocking> {
-        self
-    }
-}
-
-impl<'rmt> WithMode<'rmt, Async> for Rmt<'rmt, Blocking> {
-    fn with_mode(self) -> Rmt<'rmt, Async> {
-        self.into_async()
-    }
-}
-
 fn setup<Dm: DriverMode>(
+    rmt: Rmt<'static, Dm>,
+    rx: impl InputPin,
+    tx: impl OutputPin,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>)
-where
-    for<'rmt> Rmt<'rmt, Blocking>: WithMode<'rmt, Dm>,
-{
-    let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
-    let rmt = <Rmt<Blocking> as WithMode<'_, Dm>>::with_mode(rmt);
-
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
-
+) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
@@ -107,12 +82,16 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_first: bool) {
     use esp_hal::rmt::{RxChannel, TxChannel};
 
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (tx_channel, rx_channel) = setup::<Blocking>(tx_config, rx_config);
+    let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
@@ -138,12 +117,16 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_
 async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
 
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (mut tx_channel, mut rx_channel) = setup::<Async>(tx_config, rx_config);
+    let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
@@ -170,10 +153,14 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 ) -> Result<(), Error> {
     use esp_hal::rmt::TxChannel;
 
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
     let tx_config = TxChannelConfig::default()
         .with_clk_divider(DIV)
         .with_memsize(tx_memsize);
-    let (tx_channel, _) = setup(tx_config, Default::default());
+    let (tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
     let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker);
 
