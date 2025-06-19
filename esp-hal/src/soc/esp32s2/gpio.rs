@@ -8,10 +8,6 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0:`:
-//!       * This function returns a reference to the GPIO register associated
-//!         with the given GPIO number. It uses unsafe code and transmutation to
-//!         access the GPIO registers based on the provided GPIO number.
 //!   - `impl_get_rtc_pad`:
 //!       * This macro_rule generates a function to get a specific RTC pad. It
 //!         takes a single argument `$pad_name`, which is an identifier
@@ -40,15 +36,6 @@
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
-
-use crate::{
-    pac::io_mux,
-    peripherals::{IO_MUX, SENS},
-};
-
-pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
-    IO_MUX::regs().gpio(gpio_num as usize)
-}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -353,7 +340,7 @@ rtcio_analog! {
 }
 
 fn enable_iomux_clk_gate() {
-    SENS::regs()
+    crate::peripherals::SENS::regs()
         .sar_io_mux_conf()
         .modify(|_, w| w.iomux_clk_gate_en().set_bit());
 }

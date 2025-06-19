@@ -332,6 +332,8 @@ driver_configs![
             output_signal_max: u32,
             constant_0_input: u32,
             constant_1_input: u32,
+            #[serde(default)]
+            remap_iomux_pin_registers: bool,
             #[serde(default)] // currently 0 in all devices
             func_in_sel_offset:u32,
         }

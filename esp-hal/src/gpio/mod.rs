@@ -82,7 +82,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output},
+    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output, io_mux_reg},
     private::{self, Sealed},
 };
 
@@ -765,7 +765,7 @@ macro_rules! io_type {
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
 
-                $crate::gpio::io_mux_reg($gpionum).modify(|_, w| unsafe {
+                $crate::peripherals::io_mux_reg($gpionum).modify(|_, w| unsafe {
                     w.mcu_sel().bits(1);
                     w.fun_ie().clear_bit();
                     w.fun_wpu().clear_bit();
