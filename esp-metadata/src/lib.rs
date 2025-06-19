@@ -526,16 +526,39 @@ impl Config {
             let mut output_afs = vec![];
 
             for af in 0..6 {
-                if let Some(signal) = pin.af_input.get(af) {
-                    let af = quote::format_ident!("_{af}");
-                    let signal = TokenStream::from_str(signal).unwrap();
-                    input_afs.push(quote::quote! { #af => #signal });
+                let Some(signal) = pin.alternate_functions.get(af) else {
+                    continue;
+                };
+
+                let af_variant = quote::format_ident!("_{af}");
+                let mut found = false;
+
+                // Is the signal present among the input signals?
+                if let Some(signal) = gpio_instance
+                    .input_signals
+                    .iter()
+                    .find(|s| s.name == signal)
+                {
+                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                    input_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    found = true;
                 }
-                if let Some(signal) = pin.af_output.get(af) {
-                    let af = quote::format_ident!("_{af}");
-                    let signal = TokenStream::from_str(signal).unwrap();
-                    output_afs.push(quote::quote! { #af => #signal });
+
+                // Is the signal present among the output signals?
+                if let Some(signal) = gpio_instance
+                    .output_signals
+                    .iter()
+                    .find(|s| s.name == signal)
+                {
+                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                    output_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    found = true;
                 }
+
+                assert!(
+                    found,
+                    "Signal '{signal}' not found in input signals for GPIO pin {pin_number}"
+                );
             }
 
             quote::quote! {
