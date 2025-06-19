@@ -115,8 +115,17 @@ pub(crate) struct PinConfig {
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct IoMuxSignal {
+    pub name: String,
+    #[serde(default)]
+    pub id: Option<usize>,
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct GpioInstanceConfig {
     pub pins: Vec<PinConfig>,
+    pub input_signals: Vec<IoMuxSignal>,
+    pub output_signals: Vec<IoMuxSignal>,
 }
 
 /// A peripheral instance for which a driver is implemented.
