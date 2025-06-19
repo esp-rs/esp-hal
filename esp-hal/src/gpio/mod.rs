@@ -778,6 +778,12 @@ macro_rules! io_type {
             }
         }
     };
+    (UsbDm, $gpionum:literal) => {
+        impl $crate::otg_fs::UsbDm for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
+    };
+    (UsbDp, $gpionum:literal) => {
+        impl $crate::otg_fs::UsbDp for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
+    };
     ($other:ident, $gpionum:literal) => {
         // TODO
     };

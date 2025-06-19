@@ -468,6 +468,8 @@ impl Config {
                     analog: bool,
                     rtc_io: bool,
                     touch: bool,
+                    usb_dm: bool,
+                    usb_dp: bool,
                 }
 
                 let mut pin_attrs = PinAttrs {
@@ -476,6 +478,8 @@ impl Config {
                     analog: false,
                     rtc_io: false,
                     touch: false,
+                    usb_dm: false,
+                    usb_dp: false,
                 };
                 pin.kind.iter().for_each(|kind| match kind {
                     cfg::PinCapability::Input => pin_attrs.input = true,
@@ -483,6 +487,8 @@ impl Config {
                     cfg::PinCapability::Analog => pin_attrs.analog = true,
                     cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
                     cfg::PinCapability::Touch => pin_attrs.touch = true,
+                    cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
+                    cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
                 });
 
                 let mut attrs = vec![];
@@ -505,6 +511,12 @@ impl Config {
                 }
                 if pin_attrs.touch {
                     attrs.push(quote::quote! { Touch });
+                }
+                if pin_attrs.usb_dm {
+                    attrs.push(quote::quote! { UsbDm });
+                }
+                if pin_attrs.usb_dp {
+                    attrs.push(quote::quote! { UsbDp });
                 }
 
                 let mut input_afs = vec![];

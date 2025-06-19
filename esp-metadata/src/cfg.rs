@@ -67,6 +67,8 @@ pub(crate) enum PinCapability {
     Analog,
     Rtc,
     Touch,
+    UsbDm,
+    UsbDp,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]

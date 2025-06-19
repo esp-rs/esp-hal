@@ -426,10 +426,6 @@ impl InterruptStatusRegisterAccess {
     }
 }
 
-// implement marker traits on USB pins
-impl crate::otg_fs::UsbDm for crate::peripherals::GPIO19<'_> {}
-impl crate::otg_fs::UsbDp for crate::peripherals::GPIO20<'_> {}
-
 fn enable_iomux_clk_gate() {
     SENS::regs()
         .sar_io_mux_conf()

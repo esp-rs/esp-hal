@@ -130,8 +130,8 @@ instances = [
         { pin = 16, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U0CTS" } },
         { pin = 17, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1TXD" } },
         { pin = 18, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1RXD" } },
-        { pin = 19, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1RTS" } },
-        { pin = 20, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1CTS" } },
+        { pin = 19, kind = ["input", "output", "analog", "rtc", "usb_dm"],                                                    af_output = { 2 = "U1RTS" } },
+        { pin = 20, kind = ["input", "output", "analog", "rtc", "usb_dp"], af_input = { 2 = "U1CTS" } },
         { pin = 21, kind = ["input", "output", "analog", "rtc"] },
 
         { pin = 26, kind = ["input", "output"] },
