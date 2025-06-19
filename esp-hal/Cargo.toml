@@ -15,7 +15,7 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
-features       = ["esp32c6"]
+features       = ["esp32c6", "unstable"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
 [lib]
