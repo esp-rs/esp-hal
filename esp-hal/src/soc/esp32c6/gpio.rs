@@ -36,10 +36,7 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-use crate::{
-    pac::io_mux,
-    peripherals::{GPIO, IO_MUX},
-};
+use crate::{pac::io_mux, peripherals::IO_MUX};
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
     IO_MUX::regs().gpio(gpio_num as usize)
@@ -281,15 +278,4 @@ crate::gpio::lp_io::lp_gpio! {
     5
     6
     7
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        GPIO::regs().pcpu_int().read().bits()
-    }
 }

@@ -51,7 +51,7 @@ use core::mem::transmute;
 
 use crate::{
     pac::io_mux,
-    peripherals::{GPIO, IO_MUX, SENS},
+    peripherals::{IO_MUX, SENS},
 };
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
@@ -409,21 +409,6 @@ rtcio_analog! {
     (19, rtc_pad19(),    pad19      )
     (20, rtc_pad20(),    pad20      )
     (21, rtc_pad21(),    pad21      )
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-    Bank1,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        match self {
-            Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
-            Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
-        }
-    }
 }
 
 fn enable_iomux_clk_gate() {
