@@ -460,9 +460,8 @@ impl Config {
         };
 
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
-        let gpio_instance = &gpio.instances[0].instance_config;
 
-        let pins = gpio_instance.pins.iter().map(|pin| {
+        let pins = gpio.pins_and_signals.pins.iter().map(|pin| {
             let pin_number = number(pin.pin);
 
             struct PinAttrs {
@@ -534,7 +533,8 @@ impl Config {
                 let mut found = false;
 
                 // Is the signal present among the input signals?
-                if let Some(signal) = gpio_instance
+                if let Some(signal) = gpio
+                    .pins_and_signals
                     .input_signals
                     .iter()
                     .find(|s| s.name == signal)
@@ -545,7 +545,8 @@ impl Config {
                 }
 
                 // Is the signal present among the output signals?
-                if let Some(signal) = gpio_instance
+                if let Some(signal) = gpio
+                    .pins_and_signals
                     .output_signals
                     .iter()
                     .find(|s| s.name == signal)
@@ -567,7 +568,7 @@ impl Config {
         });
 
         let io_mux_accessor = if gpio.remap_iomux_pin_registers {
-            let iomux_pin_regs = gpio_instance.pins.iter().map(|pin| {
+            let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
                 let pin = number(pin.pin);
                 let reg = quote::format_ident!("GPIO{pin}");
                 let accessor = quote::format_ident!("gpio{pin}");
@@ -618,10 +619,9 @@ impl Config {
         };
 
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
-        let gpio_instance = &gpio.instances[0].instance_config;
 
-        let input_signals = render_signals("InputSignal", &gpio_instance.input_signals);
-        let output_signals = render_signals("OutputSignal", &gpio_instance.output_signals);
+        let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
+        let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
         let g = quote::quote! {
             #input_signals
