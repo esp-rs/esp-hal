@@ -9,7 +9,7 @@ use cfg::PeriConfig;
 use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
-use crate::cfg::{SupportItem, SupportStatus, Value};
+use crate::cfg::{IoMuxSignal, SupportItem, SupportStatus, Value};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -373,6 +373,7 @@ impl Config {
 
         self.generate_properties(out_dir, "_generated.rs");
         self.generate_gpios(out_dir, "_generated_gpio.rs");
+        self.generate_gpio_extras(out_dir, "_generated_gpio_extras.rs");
     }
 
     fn generate_properties(&self, out_dir: &Path, file_name: &str) {
@@ -459,8 +460,9 @@ impl Config {
         };
 
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+        let gpio_instance = &gpio.instances[0].instance_config;
 
-        let pins = gpio.instances[0].instance_config.pins.iter().map(|pin| {
+        let pins = gpio_instance.pins.iter().map(|pin| {
             let pin_number = number(pin.pin);
 
             struct PinAttrs {
@@ -542,7 +544,7 @@ impl Config {
         });
 
         let io_mux_accessor = if gpio.remap_iomux_pin_registers {
-            let iomux_pin_regs = gpio.instances[0].instance_config.pins.iter().map(|pin| {
+            let iomux_pin_regs = gpio_instance.pins.iter().map(|pin| {
                 let pin = number(pin.pin);
                 let reg = quote::format_ident!("GPIO{pin}");
                 let accessor = quote::format_ident!("gpio{pin}");
@@ -583,6 +585,72 @@ impl Config {
         };
 
         std::fs::write(&out_file, g.to_string()).unwrap();
+    }
+
+    // TODO temporary name, we likely don't want a new file for these
+    fn generate_gpio_extras(&self, out_dir: &Path, file_name: &str) {
+        let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
+            // No GPIOs defined, nothing to do.
+            return;
+        };
+
+        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+        let gpio_instance = &gpio.instances[0].instance_config;
+
+        let input_signals = render_signals("InputSignal", &gpio_instance.input_signals);
+        let output_signals = render_signals("OutputSignal", &gpio_instance.output_signals);
+
+        let g = quote::quote! {
+            #input_signals
+            #output_signals
+        };
+
+        std::fs::write(&out_file, g.to_string()).unwrap();
+    }
+}
+
+fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
+    if signals.is_empty() {
+        // If there are no signals, we don't need to generate an enum.
+        return quote::quote! {};
+    }
+    let mut variants = vec![];
+
+    for signal in signals {
+        // First, process only signals that have an ID.
+        let Some(id) = signal.id else {
+            continue;
+        };
+
+        let name = quote::format_ident!("{}", signal.name);
+        let value = number(id);
+        variants.push(quote::quote! {
+            #name = #value,
+        });
+    }
+
+    for signal in signals {
+        // Now process signals that do not have an ID.
+        if signal.id.is_some() {
+            continue;
+        };
+
+        let name = quote::format_ident!("{}", signal.name);
+        variants.push(quote::quote! {
+            #name,
+        });
+    }
+
+    let enum_name = quote::format_ident!("{enum_name}");
+
+    quote::quote! {
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum #enum_name {
+            #(#variants)*
+        }
     }
 }
 
