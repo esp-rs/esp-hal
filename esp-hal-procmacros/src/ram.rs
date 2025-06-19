@@ -32,12 +32,9 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
             };
 
             if *arg {
-                return syn::Error::new(
-                    ident.span(),
-                    format!("Argument `{}` is already set", ident),
-                )
-                .into_compile_error()
-                .into();
+                return syn::Error::new(ident.span(), format!("Argument `{ident}` is already set"))
+                    .into_compile_error()
+                    .into();
             }
             *arg = true;
         }
