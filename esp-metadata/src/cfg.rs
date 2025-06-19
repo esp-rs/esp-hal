@@ -106,12 +106,9 @@ pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
     pub kind: Vec<PinCapability>,
-    // Pin => InputSignal
+    // Pin => Input/OutputSignal
     #[serde(default)]
-    pub af_input: AfMap,
-    // Pin => OutputSignal
-    #[serde(default)]
-    pub af_output: AfMap,
+    pub alternate_functions: AfMap,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
@@ -344,7 +341,7 @@ driver_configs![
             #[serde(default)]
             remap_iomux_pin_registers: bool,
             #[serde(default)] // currently 0 in all devices
-            func_in_sel_offset:u32,
+            func_in_sel_offset: u32,
         }
     },
     HmacProperties {
