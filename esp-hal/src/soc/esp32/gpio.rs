@@ -12,12 +12,6 @@
 //!       * This function returns a reference to the GPIO register associated
 //!         with the given GPIO number. It uses unsafe code and transmutation to
 //!         access the GPIO registers based on the provided GPIO number.
-//!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
-//!       * This function enables or disables GPIO interrupts and Non-Maskable
-//!         Interrupts (NMI). It takes two boolean arguments int_enable and
-//!         nmi_enable to control the interrupt and NMI enable settings. The
-//!         function returns an u8 value representing the interrupt enable
-//!         settings.
 //!   - `errata36(pin_num: u8, pull_up: bool, pull_down: bool)`:
 //!       * Handles the configuration of pull-up and pull-down resistors for
 //!         specific GPIO pins
@@ -42,7 +36,7 @@
 
 use core::mem::transmute;
 
-use crate::{pac::io_mux, peripherals::IO_MUX, system::Cpu};
+use crate::{pac::io_mux, peripherals::IO_MUX};
 
 pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
     let iomux = IO_MUX::regs();
@@ -87,13 +81,6 @@ pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
             39 => transmute::<&'static io_mux::GPIO39, &'static io_mux::GPIO0>(iomux.gpio39()),
             other => panic!("GPIO {} does not exist", other),
         }
-    }
-}
-
-pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    match Cpu::current() {
-        Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
-        Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
     }
 }
 

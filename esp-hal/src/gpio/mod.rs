@@ -2008,6 +2008,21 @@ impl<'lt> AnyPin<'lt> {
         nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) -> Result<(), WakeConfigError> {
+        /// Assembles a valid value for the int_ena pin register field.
+        fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    match crate::system::Cpu::current() {
+                        crate::system::Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
+                        crate::system::Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
+                    }
+                } else {
+                    // ESP32 and ESP32-C3 have separate bits for maskable and NMI interrupts.
+                    int_enable as u8 | ((nmi_enable as u8) << 1)
+                }
+            }
+        }
+
         if wake_up_from_light_sleep {
             match event {
                 Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {

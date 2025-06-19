@@ -12,12 +12,6 @@
 //!       * This function returns a reference to the GPIO register associated
 //!         with the given GPIO number. It uses unsafe code and transmutation to
 //!         access the GPIO registers based on the provided GPIO number.
-//!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
-//!       * This function enables or disables GPIO interrupts and Non-Maskable
-//!         Interrupts (NMI). It takes two boolean arguments int_enable and
-//!         nmi_enable to control the interrupt and NMI enable settings. The
-//!         function returns an u8 value representing the interrupt enable
-//!         settings.
 //!   - `impl_get_rtc_pad`:
 //!       * This macro_rule generates a function to get a specific RTC pad. It
 //!         takes a single argument `$pad_name`, which is an identifier
@@ -100,13 +94,6 @@ pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO0 {
             _ => ::core::unreachable!(),
         }
     }
-}
-
-pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8
-        | ((nmi_enable as u8) << 1)
-        | ((int_enable as u8) << 2)
-        | ((nmi_enable as u8) << 3)
 }
 
 /// Peripheral input signals for the GPIO mux
