@@ -130,8 +130,8 @@ impl<'d> Pins<'d> {
     /// Returns an [Error] if the [Mode] is not SD 4-bit.
     pub const fn dat1(&self) -> Result<&Flex<'_>, Error> {
         match self.mode {
-            Mode::Sd4bit => Ok(&self.dat1_irq),
-            Mode::Sd1bit | Mode::Spi => Err(Error::General),
+            Mode::Sd1bit | Mode::Sd4bit => Ok(&self.dat1_irq),
+            Mode::Spi => Err(Error::General),
         }
     }
 
@@ -140,8 +140,8 @@ impl<'d> Pins<'d> {
     /// Returns an [Error] if the [Mode] is SD 4-bit.
     pub const fn irq(&self) -> Result<&Flex<'_>, Error> {
         match self.mode {
-            Mode::Sd1bit | Mode::Spi => Ok(&self.dat1_irq),
-            Mode::Sd4bit => Err(Error::General),
+            Mode::Spi => Ok(&self.dat1_irq),
+            Mode::Sd1bit | Mode::Sd4bit => Err(Error::General),
         }
     }
 
@@ -150,8 +150,8 @@ impl<'d> Pins<'d> {
     /// Returns an [Error] if the [Mode] is not SD 4-bit.
     pub const fn dat2(&self) -> Result<&Flex<'_>, Error> {
         match self.mode {
-            Mode::Sd4bit => Ok(&self.dat2),
-            Mode::Sd1bit | Mode::Spi => Err(Error::General),
+            Mode::Sd1bit | Mode::Sd4bit => Ok(&self.dat2),
+            Mode::Spi => Err(Error::General),
         }
     }
 
@@ -160,8 +160,8 @@ impl<'d> Pins<'d> {
     /// Returns an [Error] if the [Mode] is SPI.
     pub const fn dat3(&self) -> Result<&Flex<'_>, Error> {
         match self.mode {
-            Mode::Sd4bit => Ok(&self.dat3_cs),
-            Mode::Sd1bit | Mode::Spi => Err(Error::General),
+            Mode::Sd1bit | Mode::Sd4bit => Ok(&self.dat3_cs),
+            Mode::Spi => Err(Error::General),
         }
     }
 
