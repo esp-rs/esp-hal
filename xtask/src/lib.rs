@@ -50,6 +50,7 @@ pub enum Package {
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
+    EspHalRom,
     EspIeee802154,
     EspLpHal,
     EspMetadata,
@@ -75,6 +76,7 @@ impl Package {
             EspBacktrace
                 | EspHal
                 | EspHalEmbassy
+                | EspHalRom
                 | EspIeee802154
                 | EspLpHal
                 | EspPrintln
@@ -135,7 +137,7 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy)
+        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspHalRom)
     }
 
     /// Should documentation be built for the package, and should the package be

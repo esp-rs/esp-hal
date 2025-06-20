@@ -197,6 +197,8 @@ mod _generated {
 
 use core::marker::PhantomData;
 
+use esp_hal_rom as _;
+
 metadata!("build_info", CHIP_NAME, chip!());
 
 #[cfg(riscv)]

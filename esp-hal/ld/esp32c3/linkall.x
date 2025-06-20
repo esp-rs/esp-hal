@@ -11,4 +11,3 @@ REGION_ALIAS("RTC_FAST_RWDATA", RTC_FAST);
 
 INCLUDE "esp32c3.x"
 INCLUDE "hal-defaults.x"
-INCLUDE "rom-functions.x"
