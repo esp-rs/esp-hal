@@ -6,10 +6,6 @@ impl Crc32 {
     }
 
     pub fn crc(&self, data: &[u8]) -> u32 {
-        unsafe extern "C" {
-            fn esp_rom_crc32_le(crc: u32, buf: *const u8, len: u32) -> u32;
-        }
-
-        unsafe { esp_rom_crc32_le(u32::MAX, data.as_ptr(), data.len() as u32) }
+        esp_hal_rom::rom::crc::crc32_le(u32::MAX, data)
     }
 }
