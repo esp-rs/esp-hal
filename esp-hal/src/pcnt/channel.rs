@@ -120,7 +120,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
             _ => unreachable!(),
         };
 
-        if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
+        if signal as usize <= property!("gpio.input_signal_max") {
             let source = source.into();
             source.set_input_enable(true);
             signal.connect_to(&source);
@@ -178,7 +178,7 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
             _ => unreachable!(),
         };
 
-        if (signal as usize) <= crate::gpio::INPUT_SIGNAL_MAX as usize {
+        if signal as usize <= property!("gpio.input_signal_max") {
             let source = source.into();
             source.set_input_enable(true);
             signal.connect_to(&source);
