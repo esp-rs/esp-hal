@@ -1,3 +1,5 @@
+use esp_hal_rom as _;
+
 use crate::maybe_with_critical_section;
 
 unsafe extern "C" {
