@@ -25,7 +25,7 @@ macro_rules! peripherals {
             ),* $(,)?
         ],
         pins: [
-            $( ( $pin:literal, $($pin_tokens:tt)* ) )*
+            $( $pin:literal, )*
         ]
     ) => {
         paste::paste! {
@@ -108,10 +108,6 @@ macro_rules! peripherals {
                         }
                     }
                 }
-            }
-
-            $crate::gpio! {
-                $( ($pin, $($pin_tokens)* ) )*
             }
         }
 

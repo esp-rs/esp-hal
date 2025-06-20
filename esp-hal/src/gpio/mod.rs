@@ -779,8 +779,8 @@ macro_rules! gpio {
         $(
             ($gpionum:literal, [$($type:tt),*]
                 $(
-                    ( $( $af_input_num:literal => $af_input_signal:ident )* )
-                    ( $( $af_output_num:literal => $af_output_signal:ident )* )
+                    ( $( $af_input_num:ident => $af_input_signal:ident )* )
+                    ( $( $af_output_num:ident => $af_output_signal:ident )* )
                 )?
             )
         )+
@@ -834,7 +834,7 @@ macro_rules! gpio {
                             $(
                                 $(
                                     (
-                                        $crate::gpio::AlternateFunction::[< _ $af_output_num >],
+                                        $crate::gpio::AlternateFunction::$af_output_num,
                                         $crate::gpio::OutputSignal::$af_output_signal
                                     ),
                                 )*
@@ -847,7 +847,7 @@ macro_rules! gpio {
                             $(
                                 $(
                                     (
-                                        $crate::gpio::AlternateFunction::[< _ $af_input_num >],
+                                        $crate::gpio::AlternateFunction::$af_input_num,
                                         $crate::gpio::InputSignal::$af_input_signal
                                     ),
                                 )*
