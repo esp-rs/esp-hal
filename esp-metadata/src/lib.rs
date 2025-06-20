@@ -522,10 +522,9 @@ impl Config {
                     attrs.push(quote::quote! { Analog });
                 }
                 if pin_attrs.rtc_io {
-                    if !pin_attrs.output {
-                        attrs.push(quote::quote! { RtcIo });
-                    } else {
-                        attrs.push(quote::quote! { RtcIoInput });
+                    attrs.push(quote::quote! { RtcIo });
+                    if pin_attrs.output {
+                        attrs.push(quote::quote! { RtcIoOutput });
                     }
                 }
                 if pin_attrs.touch {
@@ -629,11 +628,70 @@ impl Config {
         };
 
         let mut io_type_macro_calls = vec![];
-        for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
+        for (pin, attrs) in pin_peris.iter().zip(pin_attrs.iter()) {
             io_type_macro_calls.push(quote::quote! {
-                #( crate::io_type!(#attr, #pin); )*
+                #( crate::io_type!(#attrs, #pin); )*
             })
         }
+
+        // Generates a macro that can select between a `then` and an `else` branch based
+        // on whether a pin implement a certain attribute.
+        //
+        // In essence this expands to (in case of pin = GPIO5, attr = Analog):
+        // `if typeof(GPIO5) == Analog { then_tokens } else { else_tokens }`
+        let if_pin_is_type = {
+            let mut branches = vec![];
+
+            for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
+                branches.push(quote::quote! {
+                            #( (#pin, #attr, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($then_tt)* }; )*
+                        });
+
+                branches.push(quote::quote! {
+                    (#pin, $t:tt, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($else_tt)* };
+                });
+            }
+
+            quote::quote! {
+                macro_rules! if_pin_is_type {
+                    #(#branches)*
+                }
+
+                pub(crate) use if_pin_is_type;
+            }
+        };
+
+        // Delegates AnyPin functions to GPIOn functions when the pin implements a
+        // certain attribute.
+        //
+        // In essence this expands to (in case of attr = Analog):
+        // `if typeof(anypin's current value) == Analog { call $code } else { panic }`
+        let impl_for_pin_type = {
+            let mut impl_branches = vec![];
+            for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
+                impl_branches.push(quote::quote! {
+                    #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
+                        #[allow(unused_unsafe, unused_mut)]
+                        let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
+                        $($code)*
+                    }} else {{
+                        panic!("Unsupported")
+                    }}),
+                });
+            }
+
+            quote::quote! {
+                macro_rules! impl_for_pin_type {
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $($code:tt)*) => {
+                        match $any_pin.number() {
+                            #(#impl_branches)*
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+                pub(crate) use impl_for_pin_type;
+            }
+        };
 
         let g = quote::quote! {
             crate::gpio! {
@@ -641,6 +699,9 @@ impl Config {
             }
 
             #( #io_type_macro_calls )*
+
+            #if_pin_is_type
+            #impl_for_pin_type
 
             #io_mux_accessor
         };
