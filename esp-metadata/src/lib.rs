@@ -695,7 +695,7 @@ impl Config {
 
         let g = quote::quote! {
             crate::gpio! {
-                #( (#pin_numbers, #pin_peris, [#( #pin_attrs ),*] #pin_afs) )*
+                #( (#pin_numbers, #pin_peris #pin_afs) )*
             }
 
             #( #io_type_macro_calls )*
@@ -726,7 +726,7 @@ impl Config {
             #output_signals
         };
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
 }
 

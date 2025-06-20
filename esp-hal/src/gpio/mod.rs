@@ -80,7 +80,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{impl_for_pin_type, io_mux_reg, Interrupt, GPIO, IO_MUX},
+    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
     private::{self, Sealed},
 };
 
@@ -764,7 +764,7 @@ macro_rules! gpio {
     (
         $(
             (
-                $gpionum:literal, $peri:ident, [$($type:tt),*]
+                $gpionum:literal, $peri:ident
                 ( $( $af_input_num:ident => $af_input_signal:ident )* )
                 ( $( $af_output_num:ident => $af_output_signal:ident )* )
             )
