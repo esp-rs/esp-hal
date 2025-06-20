@@ -450,7 +450,7 @@ impl Config {
             }
         });
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
 
     fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
@@ -465,98 +465,108 @@ impl Config {
             .instance_config
             .pins
             .iter()
-            .map(|pin| number(pin.pin));
+            .map(|pin| number(pin.pin))
+            .collect::<Vec<_>>();
 
         let pin_peris = gpio.instances[0]
             .instance_config
             .pins
             .iter()
-            .map(|pin| format_ident!("GPIO{}", pin.pin));
+            .map(|pin| format_ident!("GPIO{}", pin.pin))
+            .collect::<Vec<_>>();
 
-        let pin_attrs = gpio.instances[0].instance_config.pins.iter().map(|pin| {
-            struct PinAttrs {
-                input: bool,
-                output: bool,
-                analog: bool,
-                rtc_io: bool,
-                touch: bool,
-                usb_dm: bool,
-                usb_dp: bool,
-            }
-
-            let mut pin_attrs = PinAttrs {
-                input: false,
-                output: false,
-                analog: false,
-                rtc_io: false,
-                touch: false,
-                usb_dm: false,
-                usb_dp: false,
-            };
-            pin.kind.iter().for_each(|kind| match kind {
-                cfg::PinCapability::Input => pin_attrs.input = true,
-                cfg::PinCapability::Output => pin_attrs.output = true,
-                cfg::PinCapability::Analog => pin_attrs.analog = true,
-                cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                cfg::PinCapability::Touch => pin_attrs.touch = true,
-                cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
-                cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
-            });
-
-            let mut attrs = vec![];
-
-            if pin_attrs.input {
-                attrs.push(quote::quote! { Input });
-            }
-            if pin_attrs.output {
-                attrs.push(quote::quote! { Output });
-            }
-            if pin_attrs.analog {
-                attrs.push(quote::quote! { Analog });
-            }
-            if pin_attrs.rtc_io {
-                if !pin_attrs.output {
-                    attrs.push(quote::quote! { RtcIo });
-                } else {
-                    attrs.push(quote::quote! { RtcIoInput });
+        let pin_attrs = gpio.instances[0]
+            .instance_config
+            .pins
+            .iter()
+            .map(|pin| {
+                struct PinAttrs {
+                    input: bool,
+                    output: bool,
+                    analog: bool,
+                    rtc_io: bool,
+                    touch: bool,
+                    usb_dm: bool,
+                    usb_dp: bool,
                 }
-            }
-            if pin_attrs.touch {
-                attrs.push(quote::quote! { Touch });
-            }
-            if pin_attrs.usb_dm {
-                attrs.push(quote::quote! { UsbDm });
-            }
-            if pin_attrs.usb_dp {
-                attrs.push(quote::quote! { UsbDp });
-            }
 
-            quote::quote! {
-                #( #attrs ),*
-            }
-        });
+                let mut pin_attrs = PinAttrs {
+                    input: false,
+                    output: false,
+                    analog: false,
+                    rtc_io: false,
+                    touch: false,
+                    usb_dm: false,
+                    usb_dp: false,
+                };
+                pin.kind.iter().for_each(|kind| match kind {
+                    cfg::PinCapability::Input => pin_attrs.input = true,
+                    cfg::PinCapability::Output => pin_attrs.output = true,
+                    cfg::PinCapability::Analog => pin_attrs.analog = true,
+                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
+                    cfg::PinCapability::Touch => pin_attrs.touch = true,
+                    cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
+                    cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
+                });
 
-        let pin_afs = gpio.instances[0].instance_config.pins.iter().map(|pin| {
-            let mut input_afs = vec![];
-            let mut output_afs = vec![];
+                let mut attrs = vec![];
 
-            for af in 0..6 {
-                if let Some(signal) = pin.af_input.get(af) {
-                    let af = quote::format_ident!("_{af}");
-                    let signal = TokenStream::from_str(signal).unwrap();
-                    input_afs.push(quote::quote! { #af => #signal });
+                if pin_attrs.input {
+                    attrs.push(quote::quote! { Input });
                 }
-                if let Some(signal) = pin.af_output.get(af) {
-                    let af = quote::format_ident!("_{af}");
-                    let signal = TokenStream::from_str(signal).unwrap();
-                    output_afs.push(quote::quote! { #af => #signal });
+                if pin_attrs.output {
+                    attrs.push(quote::quote! { Output });
                 }
-            }
+                if pin_attrs.analog {
+                    attrs.push(quote::quote! { Analog });
+                }
+                if pin_attrs.rtc_io {
+                    if !pin_attrs.output {
+                        attrs.push(quote::quote! { RtcIo });
+                    } else {
+                        attrs.push(quote::quote! { RtcIoInput });
+                    }
+                }
+                if pin_attrs.touch {
+                    attrs.push(quote::quote! { Touch });
+                }
+                if pin_attrs.usb_dm {
+                    attrs.push(quote::quote! { UsbDm });
+                }
+                if pin_attrs.usb_dp {
+                    attrs.push(quote::quote! { UsbDp });
+                }
 
-            quote::quote! {
-                ( #(#input_afs)* ) ( #(#output_afs)* )
-            }
-        });
+                attrs
+            })
+            .collect::<Vec<_>>();
+
+        let pin_afs = gpio.instances[0]
+            .instance_config
+            .pins
+            .iter()
+            .map(|pin| {
+                let mut input_afs = vec![];
+                let mut output_afs = vec![];
+
+                for af in 0..6 {
+                    if let Some(signal) = pin.af_input.get(af) {
+                        let af = quote::format_ident!("_{af}");
+                        let signal = TokenStream::from_str(signal).unwrap();
+                        input_afs.push(quote::quote! { #af => #signal });
+                    }
+                    if let Some(signal) = pin.af_output.get(af) {
+                        let af = quote::format_ident!("_{af}");
+                        let signal = TokenStream::from_str(signal).unwrap();
+                        output_afs.push(quote::quote! { #af => #signal });
+                    }
+                }
+
+                quote::quote! {
+                    ( #(#input_afs)* ) ( #(#output_afs)* )
+                }
+            })
+            .collect::<Vec<_>>();
 
         let io_mux_accessor = if gpio.remap_iomux_pin_registers {
             let iomux_pin_regs = gpio.instances[0].instance_config.pins.iter().map(|pin| {
@@ -591,16 +601,36 @@ impl Config {
             }
         };
 
+        let mut io_type_macro_calls = vec![];
+        for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
+            io_type_macro_calls.push(quote::quote! {
+                #( crate::io_type!(#attr, #pin); )*
+            })
+        }
+
         let g = quote::quote! {
             crate::gpio! {
-                #( (#pin_numbers, #pin_peris, [#pin_attrs] #pin_afs) )*
+                #( (#pin_numbers, #pin_peris, [#( #pin_attrs ),*] #pin_afs) )*
             }
+
+            #( #io_type_macro_calls )*
 
             #io_mux_accessor
         };
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
+}
+
+fn save(path: impl AsRef<Path>, tokens: TokenStream) {
+    let source = tokens.to_string();
+
+    #[cfg(feature = "pretty")]
+    let syntax_tree = syn::parse_file(&source).unwrap();
+    #[cfg(feature = "pretty")]
+    let source = prettyplease::unparse(&syntax_tree);
+
+    std::fs::write(path, source).unwrap();
 }
 
 /// Defines all possible symbols that _could_ be output from this crate

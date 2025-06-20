@@ -82,7 +82,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output, io_mux_reg},
+    peripherals::{handle_gpio_input, handle_gpio_output, io_mux_reg, Interrupt, GPIO, IO_MUX},
     private::{self, Sealed},
 };
 
@@ -835,10 +835,6 @@ macro_rules! gpio {
                     unsafe { self.degrade().split() }
                 }
             }
-
-            $(
-                $crate::io_type!($type, $peri);
-            )*
 
             impl $crate::gpio::Pin for $peri<'_> {
                 #[inline(always)]
