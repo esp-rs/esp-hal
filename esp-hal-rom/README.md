@@ -8,6 +8,10 @@
 
 ROM code support.
 
+This includes the definition of ROM code function addresses.
+
+For some targets (ESP32 currently) we will use `libesp_rom.a` from ESP-IDF. The code here corresponds to [ESP-IDF v5.3.1](https://github.com/espressif/esp-idf/blob/v5.3.1/components/esp_rom/patches/esp_rom_spiflash.c)
+
 ## [Documentation](https://docs.espressif.com/projects/rust/esp-hal-rom/latest/)
 
 ## Minimum Supported Rust Version (MSRV)
