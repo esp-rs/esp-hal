@@ -124,7 +124,6 @@ fn apply_config(
     let envs = config.get_mut("env").unwrap().as_table_mut().unwrap();
 
     for cfg in updated_cfg {
-        let prefix = cfg.name.to_ascii_uppercase().replace("-", "_");
         let previous_crate_cfg = previous_cfg.iter().find(|c| c.name == cfg.name);
 
         for option in cfg.options {
@@ -133,11 +132,7 @@ fn apply_config(
                     .iter()
                     .find(|o| o.option.name == option.option.name)
             });
-
-            let key = format!(
-                "{prefix}_CONFIG_{}",
-                option.option.name.to_ascii_uppercase().replace("-", "_")
-            );
+            let key = option.option.full_env_var(&cfg.name);
 
             // avoid updating unchanged options to keep the comments (if any)
             if Some(&option.actual_value) != previous_option.map(|option| &option.actual_value) {
@@ -251,21 +246,18 @@ fn parse_configs(
                     Ok::<ConfigItem, Box<dyn Error>>(ConfigItem {
                         option: cfg.clone(),
                         actual_value: {
-                            let key = format!(
-                                "{}_CONFIG_{}",
-                                crate_name.clone().to_ascii_uppercase().replace("-", "_"),
-                                cfg.name.to_ascii_uppercase().replace("-", "_")
-                            );
+                            let key = cfg.full_env_var(&crate_name);
                             let def_val = &cfg.default_value.to_string();
                             let val = envs.get(&key).unwrap_or(def_val);
 
-                            parse_value_from_string(val, &cfg.default_value) //
-                                .map_err(|_| {
-                                    <std::string::String as Into<Box<dyn Error>>>::into(format!(
-                                        "Unable to parse '{val}' for option '{}'",
-                                        &cfg.name
-                                    ))
-                                })?
+                            let mut parsed_val = cfg.default_value.clone();
+                            parsed_val.parse_in_place(val).map_err(|_| {
+                                <std::string::String as Into<Box<dyn Error>>>::into(format!(
+                                    "Unable to parse '{val}' for option '{}'",
+                                    &cfg.name
+                                ))
+                            })?;
+                            parsed_val
                         },
                     })
                 })
@@ -302,31 +294,4 @@ fn check_after_changes(
     }
 
     Ok(None)
-}
-
-fn parse_i128(str: &str) -> Result<i128, std::num::ParseIntError> {
-    let str = str.trim();
-
-    if let Some(stripped) = str.strip_prefix("0x") {
-        return i128::from_str_radix(stripped, 16);
-    }
-
-    if let Some(stripped) = str.strip_prefix("0b") {
-        return i128::from_str_radix(stripped, 2);
-    }
-
-    str.parse::<i128>()
-}
-
-fn parse_value_from_string(text: &str, expected_type: &Value) -> Result<Value, Box<dyn Error>> {
-    match expected_type {
-        Value::Bool(_) => text
-            .parse::<bool>()
-            .map(Value::Bool)
-            .map_err(|e| format!("Invalid boolean value '{}': {}", text, e).into()),
-        Value::Integer(_) => parse_i128(text)
-            .map(Value::Integer)
-            .map_err(|e| format!("Invalid integer value '{}': {}", text, e).into()),
-        Value::String(_) => Ok(Value::String(text.to_string())),
-    }
 }
