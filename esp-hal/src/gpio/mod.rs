@@ -796,11 +796,10 @@ macro_rules! io_type {
 macro_rules! gpio {
     (
         $(
-            ($gpionum:literal, $peri:ident, [$($type:tt),*]
-                $(
-                    ( $( $af_input_num:ident => $af_input_signal:ident )* )
-                    ( $( $af_output_num:ident => $af_output_signal:ident )* )
-                )?
+            (
+                $gpionum:literal, $peri:ident, [$($type:tt),*]
+                ( $( $af_input_num:ident => $af_input_signal:ident )* )
+                ( $( $af_output_num:ident => $af_output_signal:ident )* )
             )
         )+
     ) => {
@@ -850,26 +849,22 @@ macro_rules! gpio {
                 fn output_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
                     &[
                         $(
-                            $(
-                                (
-                                    $crate::gpio::AlternateFunction::$af_output_num,
-                                    $crate::gpio::OutputSignal::$af_output_signal
-                                ),
-                            )*
-                        )?
+                            (
+                                $crate::gpio::AlternateFunction::$af_output_num,
+                                $crate::gpio::OutputSignal::$af_output_signal
+                            ),
+                        )*
                     ]
                 }
 
                 fn input_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
                     &[
                         $(
-                            $(
-                                (
-                                    $crate::gpio::AlternateFunction::$af_input_num,
-                                    $crate::gpio::InputSignal::$af_input_signal
-                                ),
-                            )*
-                        )?
+                            (
+                                $crate::gpio::AlternateFunction::$af_input_num,
+                                $crate::gpio::InputSignal::$af_input_signal
+                            ),
+                        )*
                     ]
                 }
             }
