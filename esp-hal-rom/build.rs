@@ -49,13 +49,12 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result
 
 fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(path)? {
-        let file_name = entry?.path().display().to_string();
-        if file_name
+        let file_name = entry?.file_name().display().to_string();
+        if let Some(lib_name) = file_name
             .strip_prefix("lib")
             .and_then(|f| f.strip_suffix(".a"))
-            .is_some()
         {
-            println!("cargo:rustc-link-lib=static={}", file_name);
+            println!("cargo:rustc-link-lib=static={}", lib_name);
         }
     }
     Ok(())
