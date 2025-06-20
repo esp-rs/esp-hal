@@ -82,7 +82,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output},
+    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output, io_mux_reg},
     private::{self, Sealed},
 };
 
@@ -300,19 +300,30 @@ pub enum AlternateFunction {
     _5 = 5,
 }
 
+impl AlternateFunction {
+    const GPIO: Self = match Self::const_try_from(property!("gpio.gpio_function")) {
+        Ok(func) => func,
+        Err(_) => ::core::panic!("Invalid GPIO function"),
+    };
+
+    const fn const_try_from(value: usize) -> Result<Self, ()> {
+        match value {
+            0 => Ok(Self::_0),
+            1 => Ok(Self::_1),
+            2 => Ok(Self::_2),
+            3 => Ok(Self::_3),
+            4 => Ok(Self::_4),
+            5 => Ok(Self::_5),
+            _ => Err(()),
+        }
+    }
+}
+
 impl TryFrom<usize> for AlternateFunction {
     type Error = ();
 
     fn try_from(value: usize) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(AlternateFunction::_0),
-            1 => Ok(AlternateFunction::_1),
-            2 => Ok(AlternateFunction::_2),
-            3 => Ok(AlternateFunction::_3),
-            4 => Ok(AlternateFunction::_4),
-            5 => Ok(AlternateFunction::_5),
-            _ => Err(()),
-        }
+        Self::const_try_from(value)
     }
 }
 
@@ -754,7 +765,7 @@ macro_rules! io_type {
             fn set_analog(&self, _: $crate::private::Internal) {
                 use $crate::peripherals::GPIO;
 
-                $crate::gpio::io_mux_reg($gpionum).modify(|_, w| unsafe {
+                $crate::peripherals::io_mux_reg($gpionum).modify(|_, w| unsafe {
                     w.mcu_sel().bits(1);
                     w.fun_ie().clear_bit();
                     w.fun_wpu().clear_bit();
@@ -766,6 +777,12 @@ macro_rules! io_type {
                     .write(|w| unsafe { w.bits(1 << $gpionum) });
             }
         }
+    };
+    (UsbDm, $gpionum:literal) => {
+        impl $crate::otg_fs::UsbDm for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
+    };
+    (UsbDp, $gpionum:literal) => {
+        impl $crate::otg_fs::UsbDp for paste::paste!( [<GPIO $gpionum>]<'_> ) {}
     };
     ($other:ident, $gpionum:literal) => {
         // TODO
@@ -1805,11 +1822,11 @@ impl<'lt> AnyPin<'lt> {
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
-            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as OutputSignalType) });
+            .modify(|_, w| unsafe { w.out_sel().bits(OutputSignal::GPIO as _) });
 
         // Use RMW to not overwrite sleep configuration
         io_mux_reg(self.number()).modify(|_, w| unsafe {
-            w.mcu_sel().bits(GPIO_FUNCTION as u8);
+            w.mcu_sel().bits(AlternateFunction::GPIO as u8);
             w.fun_ie().clear_bit();
             w.slp_sel().clear_bit()
         });
@@ -1991,6 +2008,21 @@ impl<'lt> AnyPin<'lt> {
         nmi_enable: bool,
         wake_up_from_light_sleep: bool,
     ) -> Result<(), WakeConfigError> {
+        /// Assembles a valid value for the int_ena pin register field.
+        fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    match crate::system::Cpu::current() {
+                        crate::system::Cpu::AppCpu => int_enable as u8 | ((nmi_enable as u8) << 1),
+                        crate::system::Cpu::ProCpu => ((int_enable as u8) << 2) | ((nmi_enable as u8) << 3),
+                    }
+                } else {
+                    // ESP32 and ESP32-C3 have separate bits for maskable and NMI interrupts.
+                    int_enable as u8 | ((nmi_enable as u8) << 1)
+                }
+            }
+        }
+
         if wake_up_from_light_sleep {
             match event {
                 Event::AnyEdge | Event::RisingEdge | Event::FallingEdge => {

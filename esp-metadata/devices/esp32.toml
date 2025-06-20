@@ -104,6 +104,12 @@ instances = [
 [device.gpio]
 support_status = "supported"
 has_bank_1 = true
+gpio_function = 2
+input_signal_max = 255
+output_signal_max = 256
+constant_0_input = 0x30
+constant_1_input = 0x38
+remap_iomux_pin_registers = true
 instances = [
     { name = "gpio", pins = [
         { pin =  0, kind = ["input", "output", "analog", "rtc", "touch"], af_input = { 5 = "EMAC_TX_CLK" },                                               af_output = { 1 = "CLK_OUT1" } },

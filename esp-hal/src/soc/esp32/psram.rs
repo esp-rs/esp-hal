@@ -1060,7 +1060,7 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::gpio::io_mux_reg(gpio);
+                    let ptr = crate::peripherals::io_mux_reg(gpio);
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }

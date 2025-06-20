@@ -104,17 +104,11 @@ use crate::{
         self,
         AlternateFunction,
         AnyPin,
-        FUNC_IN_SEL_OFFSET,
         Flex,
-        GPIO_FUNCTION,
-        INPUT_SIGNAL_MAX,
         InputPin,
-        InputSignalType,
         Level,
         NoPin,
-        OUTPUT_SIGNAL_MAX,
         OutputPin,
-        OutputSignalType,
         Pin,
         PinGuard,
     },
@@ -321,7 +315,7 @@ impl<'d> PeripheralOutput<'d> for OutputSignal<'d> {
 
 impl gpio::InputSignal {
     fn can_use_gpio_matrix(self) -> bool {
-        self as InputSignalType <= INPUT_SIGNAL_MAX
+        self as usize <= property!("gpio.input_signal_max")
     }
 
     /// Connects a peripheral input signal to a GPIO or a constant level.
@@ -344,7 +338,7 @@ impl gpio::InputSignal {
 
 impl gpio::OutputSignal {
     fn can_use_gpio_matrix(self) -> bool {
-        self as OutputSignalType <= OUTPUT_SIGNAL_MAX
+        self as usize <= property!("gpio.output_signal_max")
     }
 
     /// Connects a peripheral output signal to a GPIO.
@@ -417,24 +411,24 @@ impl Signal<'_> {
         let use_gpio_matrix = match self {
             Signal::Pin(pin) => {
                 let af = if is_inverted || force_gpio {
-                    GPIO_FUNCTION
+                    AlternateFunction::GPIO
                 } else {
                     pin.input_signals(private::Internal)
                         .iter()
                         .find(|(_af, s)| *s == signal)
                         .map(|(af, _)| *af)
-                        .unwrap_or(GPIO_FUNCTION)
+                        .unwrap_or(AlternateFunction::GPIO)
                 };
                 pin.set_alternate_function(af);
-                af == GPIO_FUNCTION
+                af == AlternateFunction::GPIO
             }
             Signal::Level(_) => true,
         };
 
         let input = match self {
             Signal::Pin(pin) => pin.number(),
-            Signal::Level(Level::Low) => gpio::ZERO_INPUT,
-            Signal::Level(Level::High) => gpio::ONE_INPUT,
+            Signal::Level(Level::Low) => property!("gpio.constant_0_input"),
+            Signal::Level(Level::High) => property!("gpio.constant_1_input"),
         };
 
         assert!(
@@ -443,8 +437,9 @@ impl Signal<'_> {
             signal
         );
         // No need for a critical section, this is a write and not a modify operation.
+        let offset = property!("gpio.func_in_sel_offset");
         GPIO::regs()
-            .func_in_sel_cfg(signal as usize - FUNC_IN_SEL_OFFSET)
+            .func_in_sel_cfg(signal as usize - offset)
             .write(|w| unsafe {
                 w.sel().bit(use_gpio_matrix);
                 w.in_inv_sel().bit(is_inverted);
@@ -465,17 +460,17 @@ impl Signal<'_> {
             return;
         };
         let af = if is_inverted || force_gpio {
-            GPIO_FUNCTION
+            AlternateFunction::GPIO
         } else {
             pin.output_signals(private::Internal)
                 .iter()
                 .find(|(_af, s)| *s == signal)
                 .map(|(af, _)| *af)
-                .unwrap_or(GPIO_FUNCTION)
+                .unwrap_or(AlternateFunction::GPIO)
         };
         pin.set_alternate_function(af);
 
-        let use_gpio_matrix = af == GPIO_FUNCTION;
+        let use_gpio_matrix = af == AlternateFunction::GPIO;
 
         assert!(
             signal.can_use_gpio_matrix() || use_gpio_matrix,
