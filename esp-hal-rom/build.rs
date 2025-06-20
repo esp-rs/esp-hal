@@ -1,6 +1,6 @@
 use std::{error::Error, path::Path};
 
-use esp_metadata::Chip;
+use esp_metadata::{Chip, Config};
 
 #[macro_export]
 macro_rules! assert_unique_features {
@@ -16,6 +16,13 @@ macro_rules! assert_unique_features {
 fn main() -> Result<(), Box<dyn Error>> {
     // Ensure that exactly one chip has been specified:
     let chip = Chip::from_cargo_feature()?;
+
+    // Load the configuration file for the configured device:
+    let config = Config::for_chip(&chip);
+
+    // Define all necessary configuration symbols for the configured device:
+    config.define_symbols();
+    config.generate_metadata();
 
     let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
