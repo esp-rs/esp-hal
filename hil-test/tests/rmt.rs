@@ -6,11 +6,20 @@
 #![no_std]
 #![no_main]
 
-use core::fmt::Debug;
-
 use esp_hal::{
-    gpio::{Level, NoPin},
-    rmt::{Error, PulseCode, Rmt, RxChannel, RxChannelConfig, TxChannel, TxChannelConfig},
+    DriverMode,
+    gpio::{InputPin, Level, NoPin, OutputPin},
+    rmt::{
+        AnyRxChannel,
+        AnyTxChannel,
+        Error,
+        PulseCode,
+        Rmt,
+        RxChannelConfig,
+        RxChannelCreator,
+        TxChannelConfig,
+        TxChannelCreator,
+    },
     time::Rate,
 };
 use hil_test as _;
@@ -27,22 +36,18 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup(
+fn setup<Dm: DriverMode>(
+    rmt: Rmt<'static, Dm>,
+    rx: impl InputPin,
+    tx: impl OutputPin,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (impl TxChannel + Debug, impl RxChannel + Debug) {
-    let peripherals = esp_hal::init(esp_hal::Config::default());
-
-    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
-
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
-
-    let tx_channel = {
-        use esp_hal::rmt::TxChannelCreator;
-        rmt.channel0
-            .configure(tx, tx_config.with_clk_divider(DIV))
-            .unwrap()
-    };
+) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>) {
+    let tx_channel = rmt
+        .channel0
+        .configure_tx(tx, tx_config.with_clk_divider(DIV))
+        .unwrap()
+        .degrade();
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
@@ -51,12 +56,10 @@ fn setup(
             let rx_channel_creator = rmt.channel2;
         }
     };
-    let rx_channel = {
-        use esp_hal::rmt::RxChannelCreator;
-        rx_channel_creator
-            .configure(rx, rx_config.with_clk_divider(DIV))
-            .unwrap()
-    };
+    let rx_channel = rx_channel_creator
+        .configure_rx(rx, rx_config.with_clk_divider(DIV))
+        .unwrap()
+        .degrade();
 
     (tx_channel, rx_channel)
 }
@@ -77,12 +80,18 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_first: bool) {
+    use esp_hal::rmt::{RxChannel, TxChannel};
+
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
 
-    let (tx_channel, rx_channel) = setup(tx_config, rx_config);
+    let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
@@ -103,16 +112,55 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_
     assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
 }
 
+// Run a test where some data is sent from one channel and looped back to
+// another one for receive, and verify that the data matches.
+async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
+    use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
+
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let rx_config = RxChannelConfig::default()
+        .with_idle_threshold(1000)
+        .with_memsize(rx_memsize);
+
+    let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+
+    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
+
+    let (rx_res, tx_res) = embassy_futures::join::join(
+        rx_channel.receive(&mut rcv_data),
+        tx_channel.transmit(&tx_data),
+    )
+    .await;
+
+    assert!(tx_res.is_ok());
+    assert!(rx_res.is_ok());
+
+    // the last two pulse-codes are the ones which wait for the timeout so
+    // they can't be equal
+    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+}
+
 // Run a test that just sends some data, without trying to recive it.
 #[must_use = "Tests should fail on errors"]
 fn do_rmt_single_shot<const TX_LEN: usize>(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
+    use esp_hal::rmt::TxChannel;
+
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
     let tx_config = TxChannelConfig::default()
         .with_clk_divider(DIV)
         .with_memsize(tx_memsize);
-    let (tx_channel, _) = setup(tx_config, Default::default());
+    let (tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
     let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker);
 
@@ -122,7 +170,7 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 1)]
+#[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
@@ -135,6 +183,11 @@ mod tests {
         do_rmt_loopback::<20>(1, 1, false);
     }
 
+    #[test]
+    async fn rmt_loopback_simple_async() {
+        // 20 codes fit a single RAM block
+        do_rmt_loopback_async::<20>(1, 1).await;
+    }
     #[test]
     fn rmt_loopback_extended_ram() {
         // 80 codes require two RAM blocks
@@ -193,17 +246,15 @@ mod tests {
 
     #[test]
     fn rmt_overlapping_ram_fails() {
-        use esp_hal::rmt::TxChannelCreator;
-
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
         let ch0 = rmt
             .channel0
-            .configure(NoPin, TxChannelConfig::default().with_memsize(2));
+            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2));
 
-        let ch1 = rmt.channel1.configure(NoPin, TxChannelConfig::default());
+        let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
         assert!(ch0.is_ok());
         assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
