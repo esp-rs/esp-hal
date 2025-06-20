@@ -9,7 +9,7 @@ use cfg::PeriConfig;
 use proc_macro2::TokenStream;
 use strum::IntoEnumIterator;
 
-use crate::cfg::{SupportItem, SupportStatus, Value};
+use crate::cfg::{IoMuxSignal, SupportItem, SupportStatus, Value};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -373,6 +373,7 @@ impl Config {
 
         self.generate_properties(out_dir, "_generated.rs");
         self.generate_gpios(out_dir, "_generated_gpio.rs");
+        self.generate_gpio_extras(out_dir, "_generated_gpio_extras.rs");
     }
 
     fn generate_properties(&self, out_dir: &Path, file_name: &str) {
@@ -453,88 +454,228 @@ impl Config {
     }
 
     fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
+        let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
+            // No GPIOs defined, nothing to do.
+            return;
+        };
+
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
 
-        let pins = self.device.peri_config.gpio.as_ref().unwrap().instances[0]
-            .instance_config
-            .pins
-            .iter()
-            .map(|pin| {
-                let pin_number = number(pin.pin);
+        let pins = gpio.pins_and_signals.pins.iter().map(|pin| {
+            let pin_number = number(pin.pin);
 
-                struct PinAttrs {
-                    input: bool,
-                    output: bool,
-                    analog: bool,
-                    rtc_io: bool,
-                    touch: bool,
-                }
+            struct PinAttrs {
+                input: bool,
+                output: bool,
+                analog: bool,
+                rtc_io: bool,
+                touch: bool,
+                usb_dm: bool,
+                usb_dp: bool,
+            }
 
-                let mut pin_attrs = PinAttrs {
-                    input: false,
-                    output: false,
-                    analog: false,
-                    rtc_io: false,
-                    touch: false,
-                };
-                pin.kind.iter().for_each(|kind| match kind {
-                    cfg::PinCapability::Input => pin_attrs.input = true,
-                    cfg::PinCapability::Output => pin_attrs.output = true,
-                    cfg::PinCapability::Analog => pin_attrs.analog = true,
-                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                    cfg::PinCapability::Touch => pin_attrs.touch = true,
-                });
-
-                let mut attrs = vec![];
-
-                if pin_attrs.input {
-                    attrs.push(quote::quote! { Input });
-                }
-                if pin_attrs.output {
-                    attrs.push(quote::quote! { Output });
-                }
-                if pin_attrs.analog {
-                    attrs.push(quote::quote! { Analog });
-                }
-                if pin_attrs.rtc_io {
-                    if !pin_attrs.output {
-                        attrs.push(quote::quote! { RtcIo });
-                    } else {
-                        attrs.push(quote::quote! { RtcIoInput });
-                    }
-                }
-                if pin_attrs.touch {
-                    attrs.push(quote::quote! { Touch });
-                }
-
-                let mut input_afs = vec![];
-                let mut output_afs = vec![];
-
-                for af in 0..6 {
-                    if let Some(signal) = pin.af_input.get(af) {
-                        let af = quote::format_ident!("_{af}");
-                        let signal = TokenStream::from_str(signal).unwrap();
-                        input_afs.push(quote::quote! { #af => #signal });
-                    }
-                    if let Some(signal) = pin.af_output.get(af) {
-                        let af = quote::format_ident!("_{af}");
-                        let signal = TokenStream::from_str(signal).unwrap();
-                        output_afs.push(quote::quote! { #af => #signal });
-                    }
-                }
-
-                quote::quote! {
-                    ( #pin_number, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
-                }
+            let mut pin_attrs = PinAttrs {
+                input: false,
+                output: false,
+                analog: false,
+                rtc_io: false,
+                touch: false,
+                usb_dm: false,
+                usb_dp: false,
+            };
+            pin.kind.iter().for_each(|kind| match kind {
+                cfg::PinCapability::Input => pin_attrs.input = true,
+                cfg::PinCapability::Output => pin_attrs.output = true,
+                cfg::PinCapability::Analog => pin_attrs.analog = true,
+                cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
+                cfg::PinCapability::Touch => pin_attrs.touch = true,
+                cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
+                cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
             });
+
+            let mut attrs = vec![];
+
+            if pin_attrs.input {
+                attrs.push(quote::quote! { Input });
+            }
+            if pin_attrs.output {
+                attrs.push(quote::quote! { Output });
+            }
+            if pin_attrs.analog {
+                attrs.push(quote::quote! { Analog });
+            }
+            if pin_attrs.rtc_io {
+                if !pin_attrs.output {
+                    attrs.push(quote::quote! { RtcIo });
+                } else {
+                    attrs.push(quote::quote! { RtcIoInput });
+                }
+            }
+            if pin_attrs.touch {
+                attrs.push(quote::quote! { Touch });
+            }
+            if pin_attrs.usb_dm {
+                attrs.push(quote::quote! { UsbDm });
+            }
+            if pin_attrs.usb_dp {
+                attrs.push(quote::quote! { UsbDp });
+            }
+
+            let mut input_afs = vec![];
+            let mut output_afs = vec![];
+
+            for af in 0..6 {
+                let Some(signal) = pin.alternate_functions.get(af) else {
+                    continue;
+                };
+
+                let af_variant = quote::format_ident!("_{af}");
+                let mut found = false;
+
+                // Is the signal present among the input signals?
+                if let Some(signal) = gpio
+                    .pins_and_signals
+                    .input_signals
+                    .iter()
+                    .find(|s| s.name == signal)
+                {
+                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                    input_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    found = true;
+                }
+
+                // Is the signal present among the output signals?
+                if let Some(signal) = gpio
+                    .pins_and_signals
+                    .output_signals
+                    .iter()
+                    .find(|s| s.name == signal)
+                {
+                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                    output_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    found = true;
+                }
+
+                assert!(
+                    found,
+                    "Signal '{signal}' not found in input signals for GPIO pin {pin_number}"
+                );
+            }
+
+            let pin_peri = quote::format_ident!("GPIO{pin_number}");
+
+            quote::quote! {
+                ( #pin_number, #pin_peri, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
+            }
+        });
+
+        let io_mux_accessor = if gpio.remap_iomux_pin_registers {
+            let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
+                let pin = number(pin.pin);
+                let reg = quote::format_ident!("GPIO{pin}");
+                let accessor = quote::format_ident!("gpio{pin}");
+
+                quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
+            });
+
+            quote::quote! {
+                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+                    use core::mem::transmute;
+
+                    use crate::{pac::io_mux, peripherals::IO_MUX};
+
+                    let iomux = IO_MUX::regs();
+                    unsafe {
+                        match gpio_num {
+                            #(#iomux_pin_regs)*
+                            other => panic!("GPIO {} does not exist", other),
+                        }
+                    }
+                }
+
+            }
+        } else {
+            quote::quote! {
+                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
+                    crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
+                }
+            }
+        };
 
         let g = quote::quote! {
             crate::gpio! {
                 #(#pins)*
             }
+
+            #io_mux_accessor
         };
 
         std::fs::write(&out_file, g.to_string()).unwrap();
+    }
+
+    // TODO temporary name, we likely don't want a new file for these
+    fn generate_gpio_extras(&self, out_dir: &Path, file_name: &str) {
+        let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
+            // No GPIOs defined, nothing to do.
+            return;
+        };
+
+        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+
+        let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
+        let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
+
+        let g = quote::quote! {
+            #input_signals
+            #output_signals
+        };
+
+        std::fs::write(&out_file, g.to_string()).unwrap();
+    }
+}
+
+fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
+    if signals.is_empty() {
+        // If there are no signals, we don't need to generate an enum.
+        return quote::quote! {};
+    }
+    let mut variants = vec![];
+
+    for signal in signals {
+        // First, process only signals that have an ID.
+        let Some(id) = signal.id else {
+            continue;
+        };
+
+        let name = quote::format_ident!("{}", signal.name);
+        let value = number(id);
+        variants.push(quote::quote! {
+            #name = #value,
+        });
+    }
+
+    for signal in signals {
+        // Now process signals that do not have an ID.
+        if signal.id.is_some() {
+            continue;
+        };
+
+        let name = quote::format_ident!("{}", signal.name);
+        variants.push(quote::quote! {
+            #name,
+        });
+    }
+
+    let enum_name = quote::format_ident!("{enum_name}");
+
+    quote::quote! {
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum #enum_name {
+            #(#variants)*
+        }
     }
 }
 

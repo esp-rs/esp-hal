@@ -197,6 +197,7 @@ macro_rules! lp_gpio {
         $($gpionum:literal)+
     ) => {
         $(
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             impl $crate::gpio::RtcPin for paste::paste!($crate::peripherals::[<GPIO $gpionum>]<'_>) {
                 unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
@@ -250,6 +251,7 @@ macro_rules! lp_gpio {
                 }
             }
 
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             impl $crate::gpio::RtcPinWithResistors for paste::paste!($crate::peripherals::[<GPIO $gpionum>]<'_>) {
                 fn rtcio_pullup(&self, enable: bool) {
                     let lp_io = $crate::peripherals::LP_IO::regs();
