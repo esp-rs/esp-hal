@@ -2,7 +2,7 @@
 #![doc = document_features::document_features!()]
 #![cfg_attr(not(all(test, feature = "emulation")), no_std)]
 
-#[cfg_attr(not(feature = "esp32c2"), path = "hardware.rs")]
+#[cfg_attr(not(feature = "emulation"), path = "hardware.rs")]
 #[cfg_attr(feature = "emulation", path = "stub.rs")]
 mod chip_specific;
 
