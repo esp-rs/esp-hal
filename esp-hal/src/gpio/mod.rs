@@ -451,8 +451,24 @@ pub trait OutputPin: Pin {}
 #[instability::unstable]
 pub trait AnalogPin: Pin {
     /// Configure the pin for analog operation
+    #[cfg(not(riscv))]
     #[doc(hidden)]
     fn set_analog(&self, _: private::Internal);
+
+    #[cfg(riscv)]
+    #[doc(hidden)]
+    fn set_analog(&self, _: private::Internal) {
+        io_mux_reg(self.number()).modify(|_, w| unsafe {
+            w.mcu_sel().bits(1);
+            w.fun_ie().clear_bit();
+            w.fun_wpu().clear_bit();
+            w.fun_wpd().clear_bit()
+        });
+
+        GPIO::regs()
+            .enable_w1tc()
+            .write(|w| unsafe { w.bits(1 << self.number()) });
+    }
 }
 
 /// Trait implemented by pins which can be used as Touchpad pins
@@ -756,25 +772,11 @@ macro_rules! io_type {
         impl $crate::gpio::OutputPin for $peri<'_> {}
     };
     (Analog, $peri:ident) => {
-        // FIXME: the implementation shouldn't be in the GPIO module
-        #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))]
-        #[cfg(feature = "unstable")]
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
         impl $crate::gpio::AnalogPin for $peri<'_> {
-            /// Configures the pin for analog mode.
+            #[cfg(not(riscv))]
             fn set_analog(&self, _: $crate::private::Internal) {
-                use $crate::{gpio::Pin, peripherals::GPIO};
-
-                $crate::peripherals::io_mux_reg(self.number()).modify(|_, w| unsafe {
-                    w.mcu_sel().bits(1);
-                    w.fun_ie().clear_bit();
-                    w.fun_wpu().clear_bit();
-                    w.fun_wpd().clear_bit()
-                });
-
-                GPIO::regs()
-                    .enable_w1tc()
-                    .write(|w| unsafe { w.bits(1 << self.number()) });
+                self.set_analog_impl();
             }
         }
     };
