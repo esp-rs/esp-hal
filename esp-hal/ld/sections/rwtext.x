@@ -10,6 +10,7 @@
 {
   . = ALIGN (4);
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+  ${RWTEXT_ADDITION}
   . = ALIGN(4);
 } > RWTEXT
 
