@@ -174,3 +174,15 @@ jobs:
           source: "docs/"
           strip_components: 1 # remove the docs prefix
           overwrite: true
+  docsrs:
+    runs-on: ubuntu-latest
+    if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: esp-rs/esp-hal
+
+      - name: Install cargo-docs-rs
+        run: cargo install cargo-docs-rs --locked
+      - name: Run cargo-docs-rs
+        run: cd esp-hal && cargo docs-rs
