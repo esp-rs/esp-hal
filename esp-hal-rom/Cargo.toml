@@ -1,0 +1,31 @@
+[package]
+name          = "esp-hal-rom"
+version       = "0.0.0"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "ROM code support"
+documentation = "https://docs.espressif.com/projects/rust/esp-hal-rom/latest/"
+keywords      = ["embedded", "esp32", "espressif"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
+
+[lib]
+bench = false
+test  = false
+
+[build-dependencies]
+esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
+
+[features]
+esp32   = []
+esp32c2 = []
+esp32c3 = []
+esp32c6 = []
+esp32h2 = []
+esp32s2 = []
+esp32s3 = []
