@@ -165,4 +165,39 @@ mod tests {
 
         assert_eq!(&app_desc_wanted, &app_desc);
     }
+
+    #[test]
+    fn test_spiram_is_reliable_when_using_esp_storage() {
+        // adapted from the reproducer in https://github.com/esp-rs/esp-hal/issues/3642
+
+        const NVS_PART_FLASH_ADDR: usize = 0x9000;
+
+        #[repr(C, align(4))]
+        struct AlignedBuf<const N: usize>([u8; N]);
+
+        let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+
+        for _ in 0..100 {
+            let mut buf = [0u8; 1024];
+            let mut heap_buf = alloc::vec![0u8; 1024];
+            rng.read(&mut buf);
+            heap_buf.copy_from_slice(&buf);
+            let mut flash_buf = AlignedBuf([0; 4096]);
+            unsafe {
+                esp_storage::ll::spiflash_write(
+                    NVS_PART_FLASH_ADDR as u32,
+                    flash_buf.0.as_mut_ptr() as *const u32,
+                    1024,
+                )
+                .unwrap();
+            }
+
+            for i in 0..1024 {
+                if !(buf[i] == heap_buf[i]) {
+                    assert_eq!(buf[i], heap_buf[i], "buf != heap_buf at index {}", i);
+                    break;
+                }
+            }
+        }
+    }
 }

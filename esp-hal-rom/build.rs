@@ -48,7 +48,7 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result
 }
 
 fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
-    for entry in std::fs::read_dir(path)? {
+    for entry in std::fs::read_dir(path.as_ref())? {
         let file_name = entry?.file_name().display().to_string();
         if let Some(lib_name) = file_name
             .strip_prefix("lib")
@@ -56,6 +56,12 @@ fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
         {
             println!("cargo:rustc-link-lib=static={}", lib_name);
         }
+    }
+
+    let add_rwtext_file = std::path::PathBuf::from(path.as_ref()).join("add_rwtext");
+    if std::fs::exists(&add_rwtext_file)? {
+        let contents = std::fs::read_to_string(add_rwtext_file)?.replace("\n", "\\n");
+        println!("cargo::metadata=RWTEXT_ROM_FUNCTIONS={contents}");
     }
     Ok(())
 }
