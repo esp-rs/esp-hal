@@ -7,6 +7,7 @@ use std::{collections::HashMap, fmt::Write, path::Path, sync::OnceLock};
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use strum::IntoEnumIterator;
 
 use crate::cfg::{IoMuxSignal, SupportItem, SupportStatus, Value};
@@ -461,9 +462,15 @@ impl Config {
 
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
 
-        let pins = gpio.pins_and_signals.pins.iter().map(|pin| {
-            let pin_number = number(pin.pin);
+        let pin_numbers = gpio.pins_and_signals.pins.iter().map(|pin| number(pin.pin));
 
+        let pin_peris = gpio
+            .pins_and_signals
+            .pins
+            .iter()
+            .map(|pin| format_ident!("GPIO{}", pin.pin));
+
+        let pin_attrs = gpio.pins_and_signals.pins.iter().map(|pin| {
             struct PinAttrs {
                 input: bool,
                 output: bool,
@@ -521,6 +528,12 @@ impl Config {
                 attrs.push(quote::quote! { UsbDp });
             }
 
+            quote::quote! {
+                #( #attrs ),*
+            }
+        });
+
+        let pin_afs = gpio.pins_and_signals.pins.iter().map(|pin| {
             let mut input_afs = vec![];
             let mut output_afs = vec![];
 
@@ -558,14 +571,13 @@ impl Config {
 
                 assert!(
                     found,
-                    "Signal '{signal}' not found in input signals for GPIO pin {pin_number}"
+                    "Signal '{signal}' not found in input signals for GPIO pin {}",
+                    pin.pin
                 );
             }
 
-            let pin_peri = quote::format_ident!("GPIO{pin_number}");
-
             quote::quote! {
-                ( #pin_number, #pin_peri, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
+                ( #(#input_afs)* ) ( #(#output_afs)* )
             }
         });
 
@@ -604,7 +616,7 @@ impl Config {
 
         let g = quote::quote! {
             crate::gpio! {
-                #(#pins)*
+                #( (#pin_numbers, #pin_peris, [#pin_attrs] #pin_afs) )*
             }
 
             #io_mux_accessor
