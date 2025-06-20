@@ -668,7 +668,7 @@ impl Config {
 
         let g = quote::quote! {
             crate::gpio! {
-                #( (#pin_numbers, #pin_peris, [#( #pin_attrs ),*] #pin_afs) )*
+                #( (#pin_numbers, #pin_peris #pin_afs) )*
             }
 
             #( #io_type_macro_calls )*

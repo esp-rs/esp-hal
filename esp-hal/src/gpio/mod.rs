@@ -764,7 +764,7 @@ macro_rules! gpio {
     (
         $(
             (
-                $gpionum:literal, $peri:ident, [$($type:tt),*]
+                $gpionum:literal, $peri:ident
                 ( $( $af_input_num:ident => $af_input_signal:ident )* )
                 ( $( $af_output_num:ident => $af_output_signal:ident )* )
             )

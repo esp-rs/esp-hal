@@ -20,6 +20,6 @@ quote      = { version = "1.0.15" }
 prettyplease = { version = "0.2.34", optional = true }
 
 [features]
-default = ["pretty"]
+default = []
 clap = ["dep:clap"]
 pretty = ["dep:prettyplease", "dep:syn"]
