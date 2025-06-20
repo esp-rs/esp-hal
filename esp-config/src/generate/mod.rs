@@ -487,6 +487,11 @@ pub struct ConfigOption {
 }
 
 impl ConfigOption {
+    /// Get the corresponding ENV_VAR name given the crate-name
+    pub fn full_env_var(&self, crate_name: &str) -> String {
+        self.env_var(&format!("{}_CONFIG_", screaming_snake_case(crate_name)))
+    }
+
     fn env_var(&self, prefix: &str) -> String {
         format!("{}{}", prefix, screaming_snake_case(&self.name))
     }

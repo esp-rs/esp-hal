@@ -9,7 +9,6 @@ use esp_config::{DisplayHint, Stability, Validator, Value};
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use tui_textarea::{CursorMove, TextArea};
 
-use super::parse_i128;
 use crate::CrateConfig;
 
 type AppResult<T> = Result<T, Box<dyn Error>>;
@@ -347,10 +346,13 @@ impl App<'_> {
                             if self.repository.is_option(selected) {
                                 let current = self.repository.current_level()[selected].value();
                                 let text = self.textarea.lines().join("").to_string();
-                                if let Some(value) = parse_text_to_value(&text, &current) {
+                                let mut value = current.clone();
+                                if value.parse_in_place(&text).is_ok() {
                                     let set_res = self.repository.set_current(selected, value);
                                     self.handle_error(set_res);
-                                };
+                                } else {
+                                    self.handle_error(Err("Invalid value".to_string()));
+                                }
                             }
 
                             self.editing = false;
@@ -364,18 +366,20 @@ impl App<'_> {
                                 if self.repository.is_option(selected) {
                                     let current = self.repository.current_level()[selected].value();
                                     let text = self.textarea.lines().join("").to_string();
-                                    let parsed_value = parse_text_to_value(&text, &current);
-                                    let validator_failed =
-                                        if let Some(constraint) = &self.editing_constraints {
-                                            match &parsed_value {
-                                                Some(value) => constraint.validate(value).is_err(),
-                                                None => false,
-                                            }
-                                        } else {
-                                            false
-                                        };
+                                    let mut parsed_value = current.clone();
+                                    let parse_res = parsed_value.parse_in_place(&text);
+                                    let validator_failed = if let Some(constraint) =
+                                        &self.editing_constraints
+                                    {
+                                        match parse_res {
+                                            Ok(()) => constraint.validate(&parsed_value).is_err(),
+                                            _ => false,
+                                        }
+                                    } else {
+                                        false
+                                    };
 
-                                    let invalid = parsed_value.is_none() || validator_failed;
+                                    let invalid = parse_res.is_err() || validator_failed;
 
                                     self.textarea.set_style(if invalid {
                                         self.colors.edit_invalid_style
@@ -728,25 +732,13 @@ impl App<'_> {
     }
 }
 
-fn parse_text_to_value(text: &str, current_type: &Value) -> Option<Value> {
-    match current_type {
-        Value::Bool(_) => text.parse::<bool>().ok().map(Value::Bool),
-        Value::Integer(_) => parse_i128(text).ok().map(Value::Integer),
-        Value::String(_) => Some(Value::String(text.to_string())),
-    }
-}
-
 pub(super) fn validate_config(config: &CrateConfig) -> Option<String> {
     let cfg: HashMap<String, Value> = config
         .options
         .iter()
         .map(|option| {
             (
-                format!(
-                    "{}_CONFIG_{}",
-                    config.name.to_uppercase().replace("-", "_"),
-                    option.option.name.to_uppercase().replace("-", "_")
-                ),
+                option.option.full_env_var(&config.name),
                 option.actual_value.clone(),
             )
         })
