@@ -2,6 +2,7 @@
 {
   . = ALIGN (4);
   *(.rwtext.literal .rwtext .rwtext.literal.* .rwtext.*)
+  *libesp_rom.a:esp_rom_spiflash.*(.literal .literal.* .text .text.*)
   . = ALIGN(4);
 } > RWTEXT
 
