@@ -81,7 +81,8 @@ impl<'de> Deserialize<'de> for Value {
 
 // TODO: Do we want to handle negative values for non-decimal values?
 impl Value {
-    pub(crate) fn parse_in_place(&mut self, s: &str) -> Result<(), Error> {
+    /// Try to parse the given String
+    pub fn parse_in_place(&mut self, s: &str) -> Result<(), Error> {
         *self = match self {
             Value::Bool(_) => match s {
                 "true" => Value::Bool(true),
