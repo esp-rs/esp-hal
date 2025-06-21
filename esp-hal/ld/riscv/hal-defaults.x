@@ -21,6 +21,9 @@ PROVIDE(_start_trap = default_start_trap);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
+/* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
+PROVIDE(_setup_interrupts = default_setup_interrupts);
+
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);
 PROVIDE(MachineSoft = DefaultHandler);

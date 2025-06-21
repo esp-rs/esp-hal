@@ -5,9 +5,6 @@ PROVIDE(interrupt0 = DefaultHandler);
 
 PROVIDE(__post_init = default_post_init);
 
-/* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
-PROVIDE(_setup_interrupts = default_setup_interrupts);
-
 SECTIONS {
   .trap : ALIGN(4)
   {

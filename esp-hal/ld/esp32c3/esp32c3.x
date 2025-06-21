@@ -1,8 +1,5 @@
 PROVIDE(__post_init = default_post_init);
 
-/* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
-PROVIDE(_setup_interrupts = default_setup_interrupts);
-
 /* esp32c3 fixups */
 
 SECTIONS {
