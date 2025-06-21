@@ -3,15 +3,6 @@ PROVIDE(__post_init = default_post_init);
 /* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
 PROVIDE(_setup_interrupts = default_setup_interrupts);
 
-/* # Multi-processing hook function
-   fn _mp_hook() -> bool;
-
-   This function is called from all the harts and must return true only for one hart,
-   which will perform memory initialization. For other harts it must return false
-   and implement wake-up in platform-dependent way (e.g. after waiting for a user interrupt).
-*/
-PROVIDE(_mp_hook = default_mp_hook);
-
 /* esp32c3 fixups */
 
 SECTIONS {

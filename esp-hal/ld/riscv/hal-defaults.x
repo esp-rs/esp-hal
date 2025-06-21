@@ -12,6 +12,15 @@ PROVIDE(__global_pointer$ = _data_start + 0x800);
 */
 PROVIDE(_start_trap = default_start_trap);
 
+/* # Multi-processing hook function
+   fn _mp_hook() -> bool;
+
+   This function is called from all the harts and must return true only for one hart,
+   which will perform memory initialization. For other harts it must return false
+   and implement wake-up in platform-dependent way (e.g. after waiting for a user interrupt).
+*/
+PROVIDE(_mp_hook = default_mp_hook);
+
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);
 PROVIDE(MachineSoft = DefaultHandler);
