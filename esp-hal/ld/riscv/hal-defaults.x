@@ -3,6 +3,9 @@ ENTRY(_start)
 PROVIDE(_stext = ORIGIN(ROTEXT));
 PROVIDE(_max_hart_id = 0);
 
+/* Must be called __global_pointer$ for linker relaxations to work. */
+PROVIDE(__global_pointer$ = _data_start + 0x800);
+
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);
 PROVIDE(MachineSoft = DefaultHandler);

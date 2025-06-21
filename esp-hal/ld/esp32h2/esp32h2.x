@@ -23,10 +23,6 @@ PROVIDE(_mp_hook = default_mp_hook);
 */
 PROVIDE(_start_trap = default_start_trap);
 
-/* Must be called __global_pointer$ for linker relaxations to work. */
-PROVIDE(__global_pointer$ = _data_start + 0x800);
-
-
 SECTIONS {
   .trap : ALIGN(4)
   {

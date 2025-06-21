@@ -29,9 +29,6 @@ PROVIDE(_start_trap = default_start_trap);
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
 
-/* Must be called __global_pointer$ for linker relaxations to work. */
-PROVIDE(__global_pointer$ = _data_start + 0x800);
-
 SECTIONS {
   .trap : ALIGN(4)
   {

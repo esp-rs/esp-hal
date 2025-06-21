@@ -68,8 +68,6 @@ SECTIONS {
 }
 INSERT BEFORE .data;
 
-/* Must be called __global_pointer$ for linker relaxations to work. */
-PROVIDE(__global_pointer$ = _data_start + 0x800);
 /* end of esp32c3 fixups */
 
 /* Shared sections - ordering matters */
