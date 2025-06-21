@@ -1,20 +1,3 @@
-ENTRY(_start)
-
-PROVIDE(_stext = ORIGIN(ROTEXT));
-PROVIDE(_max_hart_id = 0);
-
-PROVIDE(UserSoft = DefaultHandler);
-PROVIDE(SupervisorSoft = DefaultHandler);
-PROVIDE(MachineSoft = DefaultHandler);
-PROVIDE(UserTimer = DefaultHandler);
-PROVIDE(SupervisorTimer = DefaultHandler);
-PROVIDE(MachineTimer = DefaultHandler);
-PROVIDE(UserExternal = DefaultHandler);
-PROVIDE(SupervisorExternal = DefaultHandler);
-PROVIDE(MachineExternal = DefaultHandler);
-
-PROVIDE(ExceptionHandler = DefaultExceptionHandler);
-
 PROVIDE(__post_init = default_post_init);
 
 /* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */

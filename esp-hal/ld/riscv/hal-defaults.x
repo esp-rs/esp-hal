@@ -1,3 +1,20 @@
+ENTRY(_start)
+
+PROVIDE(_stext = ORIGIN(ROTEXT));
+PROVIDE(_max_hart_id = 0);
+
+PROVIDE(UserSoft = DefaultHandler);
+PROVIDE(SupervisorSoft = DefaultHandler);
+PROVIDE(MachineSoft = DefaultHandler);
+PROVIDE(UserTimer = DefaultHandler);
+PROVIDE(SupervisorTimer = DefaultHandler);
+PROVIDE(MachineTimer = DefaultHandler);
+PROVIDE(UserExternal = DefaultHandler);
+PROVIDE(SupervisorExternal = DefaultHandler);
+PROVIDE(MachineExternal = DefaultHandler);
+
+PROVIDE(ExceptionHandler = DefaultExceptionHandler);
+
 PROVIDE(DefaultHandler = EspDefaultHandler);
 
 PROVIDE(interrupt1 = DefaultHandler);
@@ -32,4 +49,5 @@ PROVIDE(interrupt29 = DefaultHandler);
 PROVIDE(interrupt30 = DefaultHandler);
 PROVIDE(interrupt31 = DefaultHandler);
 
+/* not included by esp-hal? */
 INCLUDE "device.x"

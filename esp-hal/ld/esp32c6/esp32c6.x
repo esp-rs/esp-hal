@@ -1,20 +1,3 @@
-ENTRY(_start)
-
-PROVIDE(_stext = ORIGIN(ROTEXT));
-PROVIDE(_max_hart_id = 0);
-
-PROVIDE(UserSoft = DefaultHandler);
-PROVIDE(SupervisorSoft = DefaultHandler);
-PROVIDE(MachineSoft = DefaultHandler);
-PROVIDE(UserTimer = DefaultHandler);
-PROVIDE(SupervisorTimer = DefaultHandler);
-PROVIDE(MachineTimer = DefaultHandler);
-PROVIDE(UserExternal = DefaultHandler);
-PROVIDE(SupervisorExternal = DefaultHandler);
-PROVIDE(MachineExternal = DefaultHandler);
-
-PROVIDE(ExceptionHandler = DefaultExceptionHandler);
-
 /* The ESP32-C2 and ESP32-C3 have interrupt IDs 1-31, while the ESP32-C6 has
    IDs 0-31, so we much define the handler for the one additional interrupt
    ID: */
