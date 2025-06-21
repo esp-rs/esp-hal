@@ -3,8 +3,6 @@
    ID: */
 PROVIDE(interrupt0 = DefaultHandler);
 
-PROVIDE(__post_init = default_post_init);
-
 SECTIONS {
   .trap : ALIGN(4)
   {

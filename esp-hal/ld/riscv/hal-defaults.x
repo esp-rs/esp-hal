@@ -24,6 +24,8 @@ PROVIDE(_mp_hook = default_mp_hook);
 /* A PAC/HAL defined routine that should initialize custom interrupt controller if needed. */
 PROVIDE(_setup_interrupts = default_setup_interrupts);
 
+PROVIDE(__post_init = default_post_init);
+
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);
 PROVIDE(MachineSoft = DefaultHandler);

@@ -1,5 +1,3 @@
-PROVIDE(__post_init = default_post_init);
-
 /* esp32c3 fixups */
 
 SECTIONS {
