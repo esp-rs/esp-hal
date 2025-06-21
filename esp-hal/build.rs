@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use esp_config::{Value, generate_config_from_yaml_definition};
+use esp_config::{generate_config_from_yaml_definition, Value};
 use esp_metadata::{Chip, Config};
 
 #[macro_export]
@@ -107,12 +107,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             &cfg,
             "ld/riscv/asserts.x",
             out.join("asserts.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/debug.x",
-            out.join("debug.x"),
         )?;
         preprocess_file(
             &config_symbols,
