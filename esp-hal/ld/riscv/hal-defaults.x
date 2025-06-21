@@ -6,6 +6,12 @@ PROVIDE(_max_hart_id = 0);
 /* Must be called __global_pointer$ for linker relaxations to work. */
 PROVIDE(__global_pointer$ = _data_start + 0x800);
 
+/* # Start trap function override
+  By default uses the riscv crates default trap handler
+  but by providing the `_start_trap` symbol external crates can override.
+*/
+PROVIDE(_start_trap = default_start_trap);
+
 PROVIDE(UserSoft = DefaultHandler);
 PROVIDE(SupervisorSoft = DefaultHandler);
 PROVIDE(MachineSoft = DefaultHandler);

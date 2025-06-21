@@ -17,12 +17,6 @@ PROVIDE(_setup_interrupts = default_setup_interrupts);
 */
 PROVIDE(_mp_hook = default_mp_hook);
 
-/* # Start trap function override
-  By default uses the riscv crates default trap handler
-  but by providing the `_start_trap` symbol external crates can override.
-*/
-PROVIDE(_start_trap = default_start_trap);
-
 SECTIONS {
   .trap : ALIGN(4)
   {
