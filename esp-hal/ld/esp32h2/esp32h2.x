@@ -85,6 +85,4 @@ INCLUDE "stack.x"
 INCLUDE "dram2.x"
 /* End of Shared sections #2 */
 
-INCLUDE "debug.x"
-
 _dram_origin = ORIGIN( RAM );
