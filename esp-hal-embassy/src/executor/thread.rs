@@ -121,6 +121,55 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     // it is shorter than the interrupt handler that would clear the interrupt source.
     #[macros::ram]
     fn wait_impl(cpu: usize) {
+        // code copied from esp-wifi:
+        #[cfg(low_power_wait_wifi_perf_opt)]
+        fn yield_task() {
+            const SW_INTERRUPT: u32 = if cfg!(esp32) { 1 << 29 } else { 1 << 7 };
+            let intr = SW_INTERRUPT;
+            unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
+        }
+
+        #[cfg(low_power_wait_wifi_perf_opt)]
+        if cpu == 0 {
+            // If we are running on core 0, since core 0 uses a preemptive task scheduler
+            // we can use cooperative multitasking here rather than just go to sleep
+            // immediately.
+            //
+            // If we are running on core 0, 2 things may have happened where we can improve
+            // performance (situation A and B):
+            //
+            // A: A future may have tried to send wifi data. If so, it is in TX queue and
+            //    won't be sent until there is a task switch to the wifi task.
+            //    We have no work to do now, so why not switch?
+            //
+            // B: We may have woken up from waiti below because of a wifi interrupt,
+            //    repolled with no work to do and no progress made because the executor
+            //    will not be able to do anything with the inbound wifi data
+            //    until there is a task switch to the wifi task.
+            //
+            // C: something else caused us to poll without progress. Maybe some interrupt
+            //    completely unrelated to wifi caused us to wake from waiti for example.
+            //
+            // Both A and B are fixed by task switching to the wifi stack here.
+            // C probably won't hurt that bad since the wifi task will just yield
+            // back if there is no work for it to do.
+            //
+            // Potential improvements:
+            // This is probably the ideal place to deal with A but we might switch
+            // unnecessarily. It would be even better if we could check cheaper than a
+            // context switch if there are outbound packets in
+            // the TX queue and yield here only if TX queue is non-empty.
+            //
+            // This is probably NOT the ideal place to deal with B, because if we wake up
+            // from waiti instruction because of a wifi receive interrupt, it
+            // would be better to yield directly after waiti avoiding unnecessary
+            // repolling before the wifi stack has processed it.
+            //
+            // WARNING: printing here before yielding here will cause waiti to instantly
+            // return turning this into busy polling. Don't know why. Printing after
+            // yielding seems fine!
+            yield_task();
+        }
         // Manual critical section implementation that only masks interrupts handlers.
         // We must not acquire the cross-core on dual-core systems because that would
         // prevent the other core from doing useful work while this core is sleeping.
