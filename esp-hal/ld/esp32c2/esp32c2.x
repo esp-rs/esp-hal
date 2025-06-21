@@ -99,6 +99,7 @@ INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
+INCLUDE "metadata.x"
 /* End of Shared sections */
 
 INCLUDE "debug.x"
