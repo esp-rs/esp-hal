@@ -111,12 +111,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         preprocess_file(
             &config_symbols,
             &cfg,
-            "ld/riscv/debug.x",
-            out.join("debug.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
             "ld/riscv/hal-defaults.x",
             out.join("hal-defaults.x"),
         )?;
