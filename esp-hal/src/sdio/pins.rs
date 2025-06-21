@@ -10,12 +10,12 @@ use crate::gpio::{Flex, Level, Output, OutputConfig, OutputPin, Pin};
 #[derive(Debug)]
 pub struct Pins<'d> {
     mode: Mode,
-    clk_sclk: Output<'d>,
-    cmd_mosi: Flex<'d>,
-    dat0_miso: Flex<'d>,
-    dat1_irq: Flex<'d>,
-    dat2: Flex<'d>,
-    dat3_cs: Flex<'d>,
+    pub(crate) clk_sclk: Output<'d>,
+    pub(crate) cmd_mosi: Flex<'d>,
+    pub(crate) dat0_miso: Flex<'d>,
+    pub(crate) dat1_irq: Flex<'d>,
+    pub(crate) dat2: Flex<'d>,
+    pub(crate) dat3_cs: Flex<'d>,
 }
 
 impl<'d> Pins<'d> {

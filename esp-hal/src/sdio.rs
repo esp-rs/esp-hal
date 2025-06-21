@@ -18,6 +18,8 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
+use crate::gpio::{InputConfig, OutputConfig, Pull};
+
 mod interrupt;
 mod pins;
 mod slc;
@@ -157,6 +159,11 @@ impl<'d> Sdio<'d> {
             .valid_transition(state)
             .map(|_| self.state = state)
     }
+
+    /// Performs final low-level HAL hardware initialization.
+    pub(crate) fn hal_hw_init(&mut self) -> Result<(), Error> {
+        Err(Error::unimplemented())
+    }
 }
 
 /// Represents the error variants for SDIO peripherals.
@@ -254,10 +261,37 @@ impl Common for Sdio<'_> {
     }
 
     fn init(&mut self) -> Result<(), Error> {
-        // TODO: perform peripheral configuration
-        self.state_transition(State::Standby)?;
+        self.pins.clk_sclk.apply_config(&OutputConfig::default());
 
-        Err(Error::unimplemented())
+        let input_pullup = InputConfig::default().with_pull(Pull::Up);
+        let output_pullup = OutputConfig::default().with_pull(Pull::Up);
+
+        self.pins.cmd_mosi.apply_input_config(&input_pullup);
+        self.pins.cmd_mosi.apply_output_config(&output_pullup);
+
+        self.pins.dat0_miso.apply_input_config(&input_pullup);
+        self.pins.dat0_miso.apply_output_config(&output_pullup);
+
+        // TODO: Add an Configuration struct, and a SdioDevice::config member
+        // TODO: test config host_intr disabled
+        // if self.config.host_intr() {
+        self.pins.dat1_irq.apply_input_config(&input_pullup);
+        self.pins.dat1_irq.apply_output_config(&output_pullup);
+        // }
+        //
+        // TODO: test config dat2 disabled
+        // if self.config.dat2() {
+        self.pins.dat2.apply_input_config(&input_pullup);
+        self.pins.dat2.apply_output_config(&output_pullup);
+        // }
+
+        self.pins.dat3_cs.apply_input_config(&input_pullup);
+        self.pins.dat3_cs.apply_output_config(&output_pullup);
+
+        // TODO: implement HAL hardware init
+        self.hal_hw_init()?;
+
+        self.state_transition(State::Standby)
     }
 
     fn set_sample_phase(&mut self, _sample_phase: u8) {}
