@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
+- Added `send_break` for sending software breaks with the UART driver (#3177)
 
 ### Changed
 
