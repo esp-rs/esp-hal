@@ -46,7 +46,7 @@ fn check<const ALIGN: u32, const SIZE: u32, const MAX_LEN: u32>(
         print_error!("Length out of range: {length} > {MAX_LEN}");
         return false;
     }
-    let addr = unsafe { (data as *const u8).offset_from(ptr::null()) } as u32;
+    let addr = data as u32;
     if addr % ALIGN > 0 {
         print_error!("Not aligned data: {addr:#0x}");
         return false;

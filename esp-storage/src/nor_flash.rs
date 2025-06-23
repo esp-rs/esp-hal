@@ -19,7 +19,7 @@ impl FlashStorage {
     #[inline(always)]
     fn is_word_aligned(bytes: &[u8]) -> bool {
         // TODO: Use is_aligned_to when stabilized (see `pointer_is_aligned`)
-        (unsafe { bytes.as_ptr().offset_from(core::ptr::null()) }) % Self::WORD_SIZE as isize == 0
+        (bytes.as_ptr() as usize) % (Self::WORD_SIZE as usize) == 0
     }
 }
 
@@ -222,6 +222,7 @@ mod test {
         }
     }
 
+    #[cfg(not(miri))]
     fn range_gen<const ALIGN: u32, const MAX_OFF: u32, const MAX_LEN: u32>(
         aligned: Option<bool>,
     ) -> impl Iterator<Item = (u32, u32)> {
@@ -234,6 +235,27 @@ mod test {
                 })
                 .map(move |len| (off, len))
         })
+    }
+
+    #[cfg(miri)]
+    fn range_gen<const ALIGN: u32, const MAX_OFF: u32, const MAX_LEN: u32>(
+        aligned: Option<bool>,
+    ) -> impl Iterator<Item = (u32, u32)> {
+        // MIRI is very slow - just use a couple of combinations
+        match aligned {
+            Some(true) => vec![(0, 4), (0, 8), (0, 16), (0, 32), (0, 1024)],
+            Some(false) => vec![(3, 7), (11, 11)],
+            None => vec![
+                (0, 4),
+                (0, 8),
+                (0, 16),
+                (0, 32),
+                (0, 1024),
+                (3, 7),
+                (11, 11),
+            ],
+        }
+        .into_iter()
     }
 
     #[test]
@@ -249,9 +271,6 @@ mod test {
 
         for (off, len) in range_gen::<WORD_SIZE, MAX_OFFSET, MAX_LENGTH>(Some(true)) {
             flash.read(off, &mut data.data[..len as usize]).unwrap();
-            println!("{} {}", off, len);
-            println!("{:02x?} {:02x?}", &src.data[..30], &data.data[..30]);
-            println!();
             assert_eq!(
                 data.data[..len as usize],
                 src.data[off as usize..][..len as usize]
