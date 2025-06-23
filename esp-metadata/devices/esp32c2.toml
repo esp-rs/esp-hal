@@ -195,7 +195,9 @@ output_signals = [
 
 [device.i2c_master]
 support_status = "supported"
-instances = [{ name = "i2c0" }]
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
+]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
