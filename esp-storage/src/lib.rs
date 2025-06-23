@@ -12,9 +12,9 @@
 #[cfg_attr(feature = "emulation", path = "stub.rs")]
 mod chip_specific;
 
+mod buffer;
 mod common;
 
-use common::FlashSectorBuffer;
 pub use common::{FlashStorage, FlashStorageError};
 
 pub mod ll;
