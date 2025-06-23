@@ -8,22 +8,12 @@ pub(crate) enum Value {
     Boolean(bool),
 }
 
-impl From<u32> for Value {
-    fn from(value: u32) -> Self {
-        Value::Number(value)
-    }
-}
 impl From<Option<u32>> for Value {
     fn from(value: Option<u32>) -> Self {
         match value {
             Some(v) => Value::Number(v),
             None => Value::Unset,
         }
-    }
-}
-impl From<bool> for Value {
-    fn from(value: bool) -> Self {
-        Value::Boolean(value)
     }
 }
 
@@ -106,17 +96,23 @@ pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
     pub kind: Vec<PinCapability>,
-    // Pin => InputSignal
+    // Pin => Input/OutputSignal
     #[serde(default)]
-    pub af_input: AfMap,
-    // Pin => OutputSignal
-    #[serde(default)]
-    pub af_output: AfMap,
+    pub alternate_functions: AfMap,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct GpioInstanceConfig {
+pub(crate) struct IoMuxSignal {
+    pub name: String,
+    #[serde(default)]
+    pub id: Option<usize>,
+}
+
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct GpioPinsAndSignals {
     pub pins: Vec<PinConfig>,
+    pub input_signals: Vec<IoMuxSignal>,
+    pub output_signals: Vec<IoMuxSignal>,
 }
 
 /// A peripheral instance for which a driver is implemented.
@@ -137,11 +133,17 @@ pub(crate) struct SupportItem {
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
+    (@reify $t:tt) => { $t };
+    (@property (u32)           $self:ident, $config:ident) => { Value::Number($self.$config) };
+    (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
+    (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
+    (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Unset };  // Not a property
+
     // Creates a single struct
     (@one
         $struct:ident $(<$instance_config:ident>)? ($group:ident) {
             $(
-                $(#[$meta:meta])? $config:ident: $ty:ty,
+                $(#[$meta:meta])? $config:ident: $ty:tt $(<$generic:tt>)?,
             )*
         }
     ) => {
@@ -155,7 +157,7 @@ macro_rules! driver_configs {
             pub instances: Vec<PeriInstance $(<$instance_config>)?>,
             $(
                 $(#[$meta])?
-                pub $config: $ty
+                pub $config: $ty $(<$generic>)?
             ),*
         }
 
@@ -163,8 +165,8 @@ macro_rules! driver_configs {
             fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
                 [$( // for each property, generate a tuple
                     (
-                        /* name: */ concat!(stringify!($group), ".", stringify!($config)),
-                        /* value: */ Value::from(self.$config),
+                        /* name: */  concat!(stringify!($group), ".", stringify!($config)),
+                        /* value: */ driver_configs!(@property ($ty $(<$generic>)?) self, $config),
                     ),
                 )*].into_iter()
             }
@@ -320,7 +322,7 @@ driver_configs![
         peripherals: &["etm"],
         properties: {}
     },
-    GpioProperties<GpioInstanceConfig> {
+    GpioProperties {
         driver: gpio,
         name: "GPIO",
         peripherals: &["gpio"],
@@ -335,7 +337,10 @@ driver_configs![
             #[serde(default)]
             remap_iomux_pin_registers: bool,
             #[serde(default)] // currently 0 in all devices
-            func_in_sel_offset:u32,
+            func_in_sel_offset: u32,
+
+            #[serde(flatten)]
+            pins_and_signals: GpioPinsAndSignals,
         }
     },
     HmacProperties {
