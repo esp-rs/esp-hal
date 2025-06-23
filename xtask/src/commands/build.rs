@@ -1,15 +1,15 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
 
 use super::{ExamplesArgs, TestsArgs};
 use crate::{
-    Package,
     cargo::{self, CargoAction, CargoArgsBuilder},
     firmware::Metadata,
+    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -178,6 +178,7 @@ pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
 
     let mut builder = CargoArgsBuilder::default()
         .subcommand("build")
+        .arg(&format!("--target-dir={}/target", workspace.display()))
         .arg("--release");
 
     if let Some(toolchain) = args.toolchain {

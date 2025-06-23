@@ -251,13 +251,16 @@ fn lint_package(
 
     let path = workspace.join(package.to_string());
 
-    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("clippy")
+        .arg(&format!("--target-dir={}/target", workspace.display()));
 
     let mut builder = if !package.build_on_host() {
         if chip.is_xtensa() {
             // We only overwrite Xtensas so that externally set nightly/stable toolchains
             // are not overwritten.
             builder = builder.arg("-Zbuild-std=core,alloc");
+            // TODO: this may not be actually working
             builder = builder.toolchain("esp");
         }
 
@@ -364,21 +367,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 debug: false,
             },
             CargoAction::Build(PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
+                "./target/{}/release/examples",
                 args.chip.target()
             ))),
         )
         .inspect_err(|_| failed.push("Build LP-HAL Examples"))
         .and_then(|_| {
             let from_dir = PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples/{}",
+                "./target/{}/release/examples/{}",
                 args.chip.target(),
                 args.chip
             ));
-            let to_dir = PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
-                args.chip.target()
-            ));
+            let to_dir = PathBuf::from(format!("./target/{}/release/examples", args.chip.target()));
             from_dir.read_dir()?.for_each(|entry| {
                 let entry = entry.unwrap();
                 let path = entry.path();

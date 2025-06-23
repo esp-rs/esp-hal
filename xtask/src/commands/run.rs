@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result, bail, ensure};
+use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
@@ -62,6 +62,7 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     let builder = CargoArgsBuilder::default()
         .toolchain(toolchain)
         .subcommand("test")
+        .arg(&format!("--target-dir={}/target", workspace.display()))
         .arg("--doc")
         .arg("-Zdoctest-xcompile")
         .arg("-Zbuild-std=core,panic_abort")

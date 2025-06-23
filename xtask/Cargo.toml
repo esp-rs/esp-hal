@@ -17,7 +17,7 @@ minijinja    = { version = "2.5.0", default-features = false }
 opener       = { version = "0.7.2", optional = true }
 rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
-serde        = { version = "1.0.215", default-features = false, features = ["derive"] }
+serde        = { version = "1.0.219", default-features = false, features = ["derive"] }
 serde_json   = "1.0.70"
 strum        = { version = "0.27.1", features = ["derive"] }
 toml_edit    = "0.22.22"

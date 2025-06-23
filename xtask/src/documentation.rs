@@ -205,6 +205,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let mut builder = CargoArgsBuilder::default()
         .toolchain(toolchain)
         .subcommand("doc")
+        .arg(&format!("--target-dir={}/target", workspace.display()))
         .features(&features)
         .arg("-Zrustdoc-map")
         .arg("--lib")

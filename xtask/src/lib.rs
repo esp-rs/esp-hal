@@ -326,6 +326,10 @@ pub fn execute_app(
 
     let mut builder = CargoArgsBuilder::default()
         .target(target)
+        .arg(&format!(
+            "--target-dir={}/../target",
+            package_path.display()
+        ))
         .features(&features);
 
     let bin_arg = if package.starts_with("src/bin") {
