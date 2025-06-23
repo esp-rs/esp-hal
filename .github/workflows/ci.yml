@@ -176,9 +176,9 @@ jobs:
       - run: cd esp-bootloader-esp-idf && cargo test --features=std
 
       # Run tests in esp-storage
-      - run: cd esp-bootloader-esp-idf && cargo test --features=emulation -- --test-threads=1
-      - run: cd esp-bootloader-esp-idf && cargo test --features=emulation,bytewise-read -- --test-threads=1
+      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
+      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
 
       # Miri tests in esp-storage
-      - run: cd esp-bootloader-esp-idf && cargo +nightly miri test --features=emulation -- --test-threads=1
-      - run: cd esp-bootloader-esp-idf && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1
+      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
+      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1
