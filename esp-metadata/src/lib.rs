@@ -562,8 +562,10 @@ impl Config {
                 );
             }
 
+            let pin_peri = quote::format_ident!("GPIO{pin_number}");
+
             quote::quote! {
-                ( #pin_number, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
+                ( #pin_number, #pin_peri, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
             }
         });
 
