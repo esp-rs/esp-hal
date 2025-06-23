@@ -247,12 +247,7 @@ fn lint_package(
     features: &[String],
     fix: bool,
 ) -> Result<()> {
-    log::info!(
-        "Linting package: {} ({}, features: {:?})",
-        package,
-        chip,
-        features
-    );
+    log::info!("Linting package: {package} ({chip}, features: {features:?})");
 
     let path = workspace.join(package.to_string());
 
@@ -429,7 +424,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (examples)
     println!("::group::Build examples");
 
-    // The `ota_example` expects a file named `examples/target/ota_image` - it doesn't care about the contents however
+    // The `ota_example` expects a file named `examples/target/ota_image` - it
+    // doesn't care about the contents however
     std::fs::create_dir_all("./examples/target")?;
     std::fs::write("./examples/target/ota_image", "DUMMY")?;
 

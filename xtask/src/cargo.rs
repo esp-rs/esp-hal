@@ -76,7 +76,10 @@ where
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        bail!("Failed to execute cargo subcommand")
+        bail!(
+            "Failed to execute cargo subcommand (cargo {})",
+            args.join(" "),
+        )
     }
 }
 
