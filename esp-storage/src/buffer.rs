@@ -1,11 +1,11 @@
 use core::{mem::MaybeUninit, slice};
 
 pub fn uninit_slice(bytes: &[u8]) -> &[MaybeUninit<u8>] {
-    unsafe { core::mem::transmute(bytes) }
+    unsafe { core::slice::from_raw_parts(bytes.as_ptr() as *const _, bytes.len()) }
 }
 
 pub fn uninit_slice_mut(bytes: &mut [u8]) -> &mut [MaybeUninit<u8>] {
-    unsafe { core::mem::transmute(bytes) }
+    unsafe { core::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut _, bytes.len()) }
 }
 
 pub type FlashWordBuffer = FlashBuffer<4>;
@@ -29,10 +29,10 @@ impl<const N: usize> FlashBuffer<N> {
     }
 
     pub unsafe fn assume_init_bytes(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.bytes.as_ptr() as *const u8, self.bytes.len()) }
+        unsafe { slice::from_raw_parts(self.bytes.as_ptr() as *const _, self.bytes.len()) }
     }
 
     pub unsafe fn assume_init_bytes_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.bytes.as_mut_ptr() as *mut u8, self.bytes.len()) }
+        unsafe { slice::from_raw_parts_mut(self.bytes.as_mut_ptr() as *mut _, self.bytes.len()) }
     }
 }
