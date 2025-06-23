@@ -23,7 +23,7 @@ mod storage;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]
-#[cfg_attr(not(not(target_os = "macos")), unsafe(link_section = ".rwtext"))]
+#[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
     return critical_section::with(|_| f());
@@ -44,7 +44,7 @@ macro_rules! rom_fn {
         $(#[$attrs])*
         #[allow(unused)]
         #[inline(always)]
-        #[cfg_attr(not(not(target_os = "macos")), unsafe(link_section = ".rwtext"))]
+        #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
         fn $name($($arg:$ty),*) $(-> $retval)? {
             unsafe {
                 let rom_fn: unsafe extern "C" fn($($arg: $ty),*) $(-> $retval)? =
