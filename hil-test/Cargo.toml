@@ -252,7 +252,7 @@ esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-wifi           = { path = "../esp-wifi", optional = true }
 portable-atomic    = "1.11.0"
-static_cell        = { version = "2.1.0", features = ["nightly"] }
+static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 xtensa-lx-rt       = { path = "../xtensa-lx-rt", optional = true }
 
