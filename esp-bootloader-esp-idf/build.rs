@@ -3,8 +3,24 @@ use std::env;
 use esp_config::generate_config_from_yaml_definition;
 use jiff::Timestamp;
 
+#[macro_export]
+macro_rules! assert_unique_features {
+    ($($feature:literal),+ $(,)?) => {
+        assert!(
+            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
+            "Exactly zero or one of the following features must be enabled: {}",
+            [$($feature),+].join(", ")
+        );
+    };
+}
+
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(embedded_test)");
+
+    // Log and defmt are mutually exclusive features. The main technical reason is
+    // that allowing both would make the exact panicking behaviour a fragile
+    // implementation detail.
+    assert_unique_features!("log-04", "defmt");
 
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
         Ok(val) => Timestamp::from_microsecond(val.parse::<i64>().unwrap()).unwrap(),
