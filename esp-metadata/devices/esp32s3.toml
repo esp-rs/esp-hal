@@ -112,6 +112,11 @@ instances = [
 [device.gpio]
 support_status = "supported"
 has_bank_1 = true
+gpio_function = 1
+input_signal_max = 189
+output_signal_max = 256
+constant_0_input = 0x3c
+constant_1_input = 0x38
 instances = [
     { name = "gpio", pins = [
         { pin =  0, kind = ["input", "output", "analog", "rtc"] },
@@ -133,8 +138,8 @@ instances = [
         { pin = 16, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U0CTS" } },
         { pin = 17, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1TXD" } },
         { pin = 18, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1RXD" } },
-        { pin = 19, kind = ["input", "output", "analog", "rtc"],                                                              af_output = { 2 = "U1RTS" } },
-        { pin = 20, kind = ["input", "output", "analog", "rtc"], af_input = { 2 = "U1CTS" } },
+        { pin = 19, kind = ["input", "output", "analog", "rtc", "usb_dm"],                                                    af_output = { 2 = "U1RTS" } },
+        { pin = 20, kind = ["input", "output", "analog", "rtc", "usb_dp"], af_input = { 2 = "U1CTS" } },
         { pin = 21, kind = ["input", "output", "analog", "rtc"] },
 
         { pin = 26, kind = ["input", "output"] },

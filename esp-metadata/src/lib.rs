@@ -453,85 +453,133 @@ impl Config {
     }
 
     fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
+        let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
+            // No GPIOs defined, nothing to do.
+            return;
+        };
+
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
 
-        let pins = self.device.peri_config.gpio.as_ref().unwrap().instances[0]
-            .instance_config
-            .pins
-            .iter()
-            .map(|pin| {
-                let pin_number = number(pin.pin);
+        let pins = gpio.instances[0].instance_config.pins.iter().map(|pin| {
+            let pin_number = number(pin.pin);
 
-                struct PinAttrs {
-                    input: bool,
-                    output: bool,
-                    analog: bool,
-                    rtc_io: bool,
-                    touch: bool,
-                }
+            struct PinAttrs {
+                input: bool,
+                output: bool,
+                analog: bool,
+                rtc_io: bool,
+                touch: bool,
+                usb_dm: bool,
+                usb_dp: bool,
+            }
 
-                let mut pin_attrs = PinAttrs {
-                    input: false,
-                    output: false,
-                    analog: false,
-                    rtc_io: false,
-                    touch: false,
-                };
-                pin.kind.iter().for_each(|kind| match kind {
-                    cfg::PinCapability::Input => pin_attrs.input = true,
-                    cfg::PinCapability::Output => pin_attrs.output = true,
-                    cfg::PinCapability::Analog => pin_attrs.analog = true,
-                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                    cfg::PinCapability::Touch => pin_attrs.touch = true,
-                });
-
-                let mut attrs = vec![];
-
-                if pin_attrs.input {
-                    attrs.push(quote::quote! { Input });
-                }
-                if pin_attrs.output {
-                    attrs.push(quote::quote! { Output });
-                }
-                if pin_attrs.analog {
-                    attrs.push(quote::quote! { Analog });
-                }
-                if pin_attrs.rtc_io {
-                    if !pin_attrs.output {
-                        attrs.push(quote::quote! { RtcIo });
-                    } else {
-                        attrs.push(quote::quote! { RtcIoInput });
-                    }
-                }
-                if pin_attrs.touch {
-                    attrs.push(quote::quote! { Touch });
-                }
-
-                let mut input_afs = vec![];
-                let mut output_afs = vec![];
-
-                for af in 0..6 {
-                    if let Some(signal) = pin.af_input.get(af) {
-                        let af = quote::format_ident!("_{af}");
-                        let signal = TokenStream::from_str(signal).unwrap();
-                        input_afs.push(quote::quote! { #af => #signal });
-                    }
-                    if let Some(signal) = pin.af_output.get(af) {
-                        let af = quote::format_ident!("_{af}");
-                        let signal = TokenStream::from_str(signal).unwrap();
-                        output_afs.push(quote::quote! { #af => #signal });
-                    }
-                }
-
-                quote::quote! {
-                    ( #pin_number, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
-                }
+            let mut pin_attrs = PinAttrs {
+                input: false,
+                output: false,
+                analog: false,
+                rtc_io: false,
+                touch: false,
+                usb_dm: false,
+                usb_dp: false,
+            };
+            pin.kind.iter().for_each(|kind| match kind {
+                cfg::PinCapability::Input => pin_attrs.input = true,
+                cfg::PinCapability::Output => pin_attrs.output = true,
+                cfg::PinCapability::Analog => pin_attrs.analog = true,
+                cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
+                cfg::PinCapability::Touch => pin_attrs.touch = true,
+                cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
+                cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
             });
+
+            let mut attrs = vec![];
+
+            if pin_attrs.input {
+                attrs.push(quote::quote! { Input });
+            }
+            if pin_attrs.output {
+                attrs.push(quote::quote! { Output });
+            }
+            if pin_attrs.analog {
+                attrs.push(quote::quote! { Analog });
+            }
+            if pin_attrs.rtc_io {
+                if !pin_attrs.output {
+                    attrs.push(quote::quote! { RtcIo });
+                } else {
+                    attrs.push(quote::quote! { RtcIoInput });
+                }
+            }
+            if pin_attrs.touch {
+                attrs.push(quote::quote! { Touch });
+            }
+            if pin_attrs.usb_dm {
+                attrs.push(quote::quote! { UsbDm });
+            }
+            if pin_attrs.usb_dp {
+                attrs.push(quote::quote! { UsbDp });
+            }
+
+            let mut input_afs = vec![];
+            let mut output_afs = vec![];
+
+            for af in 0..6 {
+                if let Some(signal) = pin.af_input.get(af) {
+                    let af = quote::format_ident!("_{af}");
+                    let signal = TokenStream::from_str(signal).unwrap();
+                    input_afs.push(quote::quote! { #af => #signal });
+                }
+                if let Some(signal) = pin.af_output.get(af) {
+                    let af = quote::format_ident!("_{af}");
+                    let signal = TokenStream::from_str(signal).unwrap();
+                    output_afs.push(quote::quote! { #af => #signal });
+                }
+            }
+
+            quote::quote! {
+                ( #pin_number, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
+            }
+        });
+
+        let io_mux_accessor = if gpio.remap_iomux_pin_registers {
+            let iomux_pin_regs = gpio.instances[0].instance_config.pins.iter().map(|pin| {
+                let pin = number(pin.pin);
+                let reg = quote::format_ident!("GPIO{pin}");
+                let accessor = quote::format_ident!("gpio{pin}");
+
+                quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
+            });
+
+            quote::quote! {
+                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+                    use core::mem::transmute;
+
+                    use crate::{pac::io_mux, peripherals::IO_MUX};
+
+                    let iomux = IO_MUX::regs();
+                    unsafe {
+                        match gpio_num {
+                            #(#iomux_pin_regs)*
+                            other => panic!("GPIO {} does not exist", other),
+                        }
+                    }
+                }
+
+            }
+        } else {
+            quote::quote! {
+                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
+                    crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
+                }
+            }
+        };
 
         let g = quote::quote! {
             crate::gpio! {
                 #(#pins)*
             }
+
+            #io_mux_accessor
         };
 
         std::fs::write(&out_file, g.to_string()).unwrap();

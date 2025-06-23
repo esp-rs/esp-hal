@@ -67,6 +67,8 @@ pub(crate) enum PinCapability {
     Analog,
     Rtc,
     Touch,
+    UsbDm,
+    UsbDp,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
@@ -325,6 +327,15 @@ driver_configs![
         properties: {
             #[serde(default)]
             has_bank_1: bool,
+            gpio_function: u32,
+            input_signal_max: u32,
+            output_signal_max: u32,
+            constant_0_input: u32,
+            constant_1_input: u32,
+            #[serde(default)]
+            remap_iomux_pin_registers: bool,
+            #[serde(default)] // currently 0 in all devices
+            func_in_sel_offset:u32,
         }
     },
     HmacProperties {

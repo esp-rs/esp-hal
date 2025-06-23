@@ -8,15 +8,6 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `io_mux_reg(gpio_num: u8) -> &'static
-//!     crate::peripherals::io_mux::GPIO0:`:
-//!       * Returns the IO_MUX register for the specified GPIO pin number.
-//!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
-//!       * This function enables or disables GPIO interrupts and Non-Maskable
-//!         Interrupts (NMI). It takes two boolean arguments int_enable and
-//!         nmi_enable to control the interrupt and NMI enable settings. The
-//!         function returns an u8 value representing the interrupt enable
-//!         settings.
 //!   - `gpio` block:
 //!       * Defines the pin configurations for various GPIO pins. Each line
 //!         represents a pin and its associated options such as input/output
@@ -35,32 +26,6 @@
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
-
-use crate::{
-    gpio::AlternateFunction,
-    pac::io_mux,
-    peripherals::{GPIO, IO_MUX},
-};
-
-pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
-
-pub(crate) type InputSignalType = u16;
-pub(crate) type OutputSignalType = u16;
-pub(crate) const OUTPUT_SIGNAL_MAX: u16 = 256;
-pub(crate) const INPUT_SIGNAL_MAX: u16 = 189;
-
-pub(crate) const ONE_INPUT: u8 = 0x38;
-pub(crate) const ZERO_INPUT: u8 = 0x3c;
-
-pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
-
-pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
-    IO_MUX::regs().gpio(gpio_num as usize)
-}
-
-pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8 | ((nmi_enable as u8) << 1)
-}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -501,27 +466,6 @@ rtcio_analog! {
     (20, rtc_pad20(),    pad20      )
     (21, rtc_pad21(),    pad21      )
 }
-
-// Whilst the S3 is a dual core chip, it shares the enable registers between
-// cores so treat it as a single core device
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-    Bank1,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        match self {
-            Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
-            Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
-        }
-    }
-}
-
-// implement marker traits on USB pins
-impl crate::otg_fs::UsbDm for crate::peripherals::GPIO19<'_> {}
-impl crate::otg_fs::UsbDp for crate::peripherals::GPIO20<'_> {}
 
 fn enable_iomux_clk_gate() {
     crate::peripherals::SENS::regs()

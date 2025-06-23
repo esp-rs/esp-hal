@@ -8,14 +8,6 @@
 //!
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
-//!   - `io_mux_reg(gpio_num: u8) -> &'static crate::peripherals::io_mux::GPIO`:
-//!       * Returns the IO_MUX register for the specified GPIO pin number.
-//!   - `gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8`:
-//!       * This function enables or disables GPIO interrupts and Non-Maskable
-//!         Interrupts (NMI). It takes two boolean arguments int_enable and
-//!         nmi_enable to control the interrupt and NMI enable settings. The
-//!         function returns an u8 value representing the interrupt enable
-//!         settings.
 //!   - `gpio` block:
 //!       * Defines the pin configurations for various GPIO pins. Each line
 //!         represents a pin and its associated options such as input/output
@@ -34,31 +26,6 @@
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
-use crate::{
-    gpio::AlternateFunction,
-    pac::io_mux,
-    peripherals::{GPIO, IO_MUX},
-};
-
-pub(crate) const FUNC_IN_SEL_OFFSET: usize = 0;
-
-pub(crate) type InputSignalType = u8;
-pub(crate) type OutputSignalType = u8;
-pub(crate) const OUTPUT_SIGNAL_MAX: u8 = 128;
-pub(crate) const INPUT_SIGNAL_MAX: u8 = 100;
-
-pub(crate) const ONE_INPUT: u8 = 0x1e;
-pub(crate) const ZERO_INPUT: u8 = 0x1f;
-
-pub(crate) const GPIO_FUNCTION: AlternateFunction = AlternateFunction::_1;
-
-pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static io_mux::GPIO {
-    IO_MUX::regs().gpio(gpio_num as usize)
-}
-
-pub(crate) fn gpio_intr_enable(int_enable: bool, nmi_enable: bool) -> u8 {
-    int_enable as u8 | ((nmi_enable as u8) << 1)
-}
 
 /// Peripheral input signals for the GPIO mux
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -195,13 +162,13 @@ macro_rules! rtc_pins {
 
             impl crate::gpio::RtcPinWithResistors for paste::paste!($crate::peripherals::[<GPIO $pin_num>]<'_>) {
                 fn rtcio_pullup(&self, enable: bool) {
-                    IO_MUX::regs()
+                    $crate::peripherals::IO_MUX::regs()
                         .gpio($pin_num)
                         .modify(|_, w| w.fun_wpu().bit(enable));
                 }
 
                 fn rtcio_pulldown(&self, enable: bool) {
-                    IO_MUX::regs()
+                    $crate::peripherals::IO_MUX::regs()
                         .gpio($pin_num)
                         .modify(|_, w| w.fun_wpd().bit(enable));
                 }
@@ -217,15 +184,4 @@ rtc_pins! {
     3
     4
     5
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum InterruptStatusRegisterAccess {
-    Bank0,
-}
-
-impl InterruptStatusRegisterAccess {
-    pub(crate) fn interrupt_status_read(self) -> u32 {
-        GPIO::regs().pcpu_int().read().bits()
-    }
 }
