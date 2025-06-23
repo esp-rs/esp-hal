@@ -1,5 +1,3 @@
-use core::mem::MaybeUninit;
-
 use embedded_storage::{ReadStorage, Storage};
 
 use crate::{FlashStorage, FlashStorageError, buffer::FlashSectorBuffer};
@@ -23,14 +21,11 @@ impl ReadStorage for FlashStorage {
                 & !(Self::WORD_SIZE - 1) as usize;
 
             // Read only needed data words
-            self.internal_read(
-                aligned_offset,
-                &mut sector_data.as_bytes_mut()[..aligned_end],
-            )?;
-
-            let sector_data = &sector_data.as_bytes()[..aligned_end];
-            let sector_data =
-                unsafe { core::mem::transmute::<&[MaybeUninit<u8>], &[u8]>(sector_data) };
+            let sector_data = &mut sector_data.as_bytes_mut()[..aligned_end];
+            self.internal_read(aligned_offset, sector_data)?;
+            let sector_data = unsafe {
+                core::slice::from_raw_parts_mut(sector_data.as_ptr() as *mut u8, sector_data.len())
+            };
             bytes[..len].copy_from_slice(&sector_data[data_offset as usize..][..len]);
 
             aligned_offset += Self::SECTOR_SIZE;

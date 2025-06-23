@@ -24,10 +24,6 @@ impl<const N: usize> FlashBuffer<N> {
         }
     }
 
-    pub fn as_bytes(&self) -> &[MaybeUninit<u8>] {
-        unsafe { self.bytes.as_ref() }
-    }
-
     pub fn as_bytes_mut(&mut self) -> &mut [MaybeUninit<u8>] {
         unsafe { self.bytes.as_mut() }
     }
