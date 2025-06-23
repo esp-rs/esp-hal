@@ -69,7 +69,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### Self-testing (self reception of transmitted messages)
 //! ```rust, no_run
 #![doc = crate::before_snippet!()]
@@ -1765,23 +1765,20 @@ mod asynch {
     fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                let intr_enable = register_block.int_ena().read();
                 let intr_status = register_block.int_raw().read();
 
                 let int_ena_reg = register_block.int_ena();
-
                 let tx_int_status = intr_status.tx_int_st();
                 let rx_int_status = intr_status.rx_int_st();
             } else {
-                let intr_enable = register_block.interrupt_enable().read();
                 let intr_status = register_block.interrupt().read();
 
                 let int_ena_reg = register_block.interrupt_enable();
-
                 let tx_int_status = intr_status.transmit_int_st();
                 let rx_int_status = intr_status.receive_int_st();
             }
         }
+        let intr_enable = int_ena_reg.read();
 
         if tx_int_status.bit_is_set() {
             async_state.tx_waker.wake();
