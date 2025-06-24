@@ -139,7 +139,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
-    peripherals::Interrupt,
     private,
     system::PeripheralGuard,
     time::{Duration, Instant, Rate},
@@ -745,7 +744,7 @@ impl<'d> I2c<'d, Blocking> {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.i2c.info().set_interrupt_handler(handler);
+        self.i2c.set_interrupt_handler(handler);
     }
 
     /// Listen for the given interrupts
@@ -778,7 +777,7 @@ impl private::Sealed for I2c<'_, Blocking> {}
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.i2c.info().set_interrupt_handler(handler);
+        self.i2c.set_interrupt_handler(handler);
     }
 }
 
@@ -916,7 +915,7 @@ impl Drop for I2cFuture<'_> {
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        self.i2c.info().disable_interrupts();
+        self.i2c.disable_peri_interrupt();
 
         I2c {
             i2c: self.i2c,
@@ -1350,9 +1349,6 @@ pub struct Info {
     /// Interrupt handler for the asynchronous operations of this I2C instance.
     pub async_handler: InterruptHandler,
 
-    /// Interrupt for this I2C instance.
-    pub interrupt: Interrupt,
-
     /// SCL output signal.
     pub scl_output: OutputSignal,
 
@@ -1423,20 +1419,6 @@ impl Info {
             }
             w
         });
-    }
-
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, self.interrupt);
-        }
-        self.enable_listen(EnumSet::all(), false);
-        self.clear_interrupts(EnumSet::all());
-        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
-    }
-
-    fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::system::Cpu::current(), self.interrupt);
     }
 }
 
@@ -3115,7 +3097,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
 }
 
 crate::peripherals::for_each_i2c_master!(
-    ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
+    ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
                 #[crate::handler]
@@ -3131,7 +3113,6 @@ crate::peripherals::for_each_i2c_master!(
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
-                    interrupt: Interrupt::$interrupt,
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
@@ -3163,5 +3144,30 @@ impl Instance for AnyI2c<'_> {
         } {
             fn parts(&self) -> (&Info, &State);
         }
+    }
+}
+
+impl AnyI2c<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(i2c_master_i2c0)]
+            AnyI2cInner::I2c0(i2c) => i2c,
+            #[cfg(i2c_master_i2c1)]
+            AnyI2cInner::I2c1(i2c) => i2c,
+        } {
+            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+            fn disable_peri_interrupt(&self);
+            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
+        }
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.disable_peri_interrupt();
+
+        self.info().enable_listen(EnumSet::all(), false);
+        self.info().clear_interrupts(EnumSet::all());
+
+        self.bind_peri_interrupt(handler.handler());
+        self.enable_peri_interrupt(handler.priority());
     }
 }
