@@ -44,9 +44,13 @@
 //! # }
 //! ```
 
+use core::{marker::PhantomData, sync::atomic::Ordering};
+
+use portable_atomic::AtomicU8;
+
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
-use crate::time::Rate;
+use crate::{private::Sealed, time::Rate};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -638,7 +642,7 @@ impl<'d> RadioClockController<'d> {
         clocks_ll::enable_ieee802154(enable);
     }
 
-    /// Reset the MAC
+    /// Reset the Wi-Fi MAC
     #[instability::unstable]
     #[inline]
     pub fn reset_mac(&mut self) {
@@ -664,5 +668,78 @@ impl<'d> RadioClockController<'d> {
     #[inline]
     pub fn reset_rpa(&mut self) {
         clocks_ll::reset_rpa();
+    }
+}
+
+#[doc(hidden)]
+/// These are all modems with bitmasks as their representation.
+pub enum ModemBitmask {
+    #[cfg(wifi)]
+    WiFi = 1,
+    #[cfg(bt)]
+    Bt = 2,
+    #[cfg(ieee802154)]
+    Ieee802154 = 4
+}
+
+/// Tracks which modems currently request an active PHY clock.
+///
+/// Using an AtomicU8 wrapped in a critical section mutex, isntead of a RefCell, prevents panic
+/// machinery from being generated.
+static PHY_CLOCK_REFS: critical_section::Mutex<AtomicU8> = critical_section::Mutex::new(AtomicU8::new(0));
+
+
+// These functions are moved out of the trait to prevent monomorphization for every modem clock
+// controller. If that doens't really make sense, this can be moved back.
+
+fn enable_phy_clock_internal(modem_bitmask: ModemBitmask) {
+    critical_section::with(|cs| {
+        let inner = PHY_CLOCK_REFS.borrow(cs);
+        let new_phy_clock_ref_count = inner.load(Ordering::Relaxed);
+        if new_phy_clock_ref_count == 0 {
+            clocks_ll::enable_phy(true);
+        }
+        inner.store(new_phy_clock_ref_count | (modem_bitmask as u8), Ordering::Relaxed);
+    })
+}
+fn disable_phy_clock_internal(modem_bitmask: ModemBitmask) {
+    critical_section::with(|cs| {
+        let inner = PHY_CLOCK_REFS.borrow(cs);
+        let new_phy_clock_ref_count = inner.load(Ordering::Relaxed) & !(modem_bitmask as u8);
+        if new_phy_clock_ref_count == 0 {
+            clocks_ll::enable_phy(false);
+        }
+        inner.store(new_phy_clock_ref_count, Ordering::Relaxed);
+    })
+}
+
+/// This trait provides common functionality for all 
+pub trait ModemClockController: Sealed {
+    #[doc(hidden)]
+    const MODEM_BITMASK: ModemBitmask;
+    /// Enable the modem clock for this controller.
+    fn enable_modem_clock(&mut self, enable: bool);
+
+    /// Enable the PHY clock.
+    ///
+    /// If disabling the PHY clock is requested, but another modem currently relies on the PHY
+    /// clock being active, this won't disable the clock.
+    fn enable_phy_clock(&mut self, enable: bool) {
+        if enable {
+        enable_phy_clock_internal(Self::MODEM_BITMASK);
+        } else {
+            disable_phy_clock_internal(Self::MODEM_BITMASK);
+        }
+    }
+}
+/// Controller for the Wi-Fi modem clock.
+pub struct WiFiClockController<'d> {
+    _phantom: PhantomData<&'d ()>
+}
+impl Sealed for WiFiClockController<'_> {}
+impl ModemClockController for WiFiClockController<'_> {
+    const MODEM_BITMASK: ModemBitmask = ModemBitmask::WiFi;
+    fn enable_modem_clock(&mut self, enable: bool) {
+        clocks_ll::enable_wifi(enable);
     }
 }
