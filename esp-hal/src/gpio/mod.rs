@@ -76,13 +76,11 @@ pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
 
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
-use crate::peripherals::{handle_rtcio, handle_rtcio_with_resistors};
 pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, handle_gpio_input, handle_gpio_output, io_mux_reg},
+    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
     private::{self, Sealed},
 };
 
@@ -727,37 +725,6 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! if_output_pin {
-    // Base case: not an Output pin, substitute the else branch
-    ({ $($then:tt)* } else { $($else:tt)* }) => { $($else)* };
-
-    // First is an Output pin, skip checking and substitute the then branch
-    (Output $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
-
-    // First is not an Output pin, check the rest
-    ($not:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => {
-        $crate::if_output_pin!($($other),* { $($then)* } else { $($else)* })
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! if_rtcio_pin {
-    // Base case: not an RtcIo pin, substitute the else branch
-    ({ $($then:tt)* } else { $($else:tt)* }) => { $($else)* };
-
-    // First is an RtcIo pin, skip checking and substitute the then branch
-    (RtcIo $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
-    (RtcIoInput $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => { $($then)* };
-
-    // First is not an RtcIo pin, check the rest
-    ($not:ident $(, $other:ident)* { $($then:tt)* } else { $($else:tt)* }) => {
-        $crate::if_rtcio_pin!($($other),* { $($then)* } else { $($else)* })
-    };
-}
-
-#[doc(hidden)]
-#[macro_export]
 macro_rules! io_type {
     (Input, $peri:ident) => {
         impl $crate::gpio::InputPin for $peri<'_> {
@@ -799,7 +766,7 @@ macro_rules! gpio {
     (
         $(
             (
-                $gpionum:literal, $peri:ident, [$($type:tt),*]
+                $gpionum:literal, $peri:ident
                 ( $( $af_input_num:ident => $af_input_signal:ident )* )
                 ( $( $af_output_num:ident => $af_output_signal:ident )* )
             )
@@ -837,10 +804,6 @@ macro_rules! gpio {
                     unsafe { self.degrade().split() }
                 }
             }
-
-            $(
-                $crate::io_type!($type, $peri);
-            )*
 
             impl $crate::gpio::Pin for $peri<'_> {
                 #[inline(always)]
@@ -915,97 +878,10 @@ macro_rules! gpio {
             pub(crate) fn is_output(&self) -> bool {
                 match self.pin {
                     $(
-                        $gpionum => $crate::if_output_pin!($($type),* { true } else { false }),
+                        $gpionum => $crate::peripherals::if_pin_is_type!($peri, Output, { true } else { false }),
                     )+
                     _ => false,
                 }
-            }
-        }
-
-        // These macros call the code block on the actually contained GPIO pin.
-
-        #[doc(hidden)]
-        macro_rules! handle_gpio_output {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this.number() {
-                    $(
-                        $gpionum => $crate::if_output_pin!($($type),* {{
-                            #[allow(unused_mut)]
-                            let mut $inner = unsafe { $crate::peripherals::$peri::steal() };
-                            $code
-                        }} else {{
-                            panic!("Unsupported")
-                        }}),
-                    )+
-                    _ => unreachable!(),
-                }
-            }
-        }
-
-        #[doc(hidden)]
-        macro_rules! handle_gpio_input {
-            ($this:expr, $inner:ident, $code:tt) => {
-                match $this.number() {
-                    $(
-                        $gpionum => {{
-                            #[allow(unused_mut)]
-                            let mut $inner = unsafe { $crate::peripherals::$peri::steal() };
-                            $code
-                        }},
-                    )+
-                    _ => unreachable!(),
-                }
-            }
-        }
-
-        pub(crate) use handle_gpio_output;
-        pub(crate) use handle_gpio_input;
-
-        cfg_if::cfg_if! {
-            if #[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))] {
-                #[doc(hidden)]
-                macro_rules! handle_rtcio {
-                    ($this:expr, $inner:ident, $code:tt) => {
-                        match $this.number() {
-                            $(
-                                $gpionum => $crate::if_rtcio_pin!($($type),* {{
-                                    #[allow(unused_mut)]
-                                    #[allow(unused_unsafe)]
-                                    let mut $inner = unsafe { $crate::peripherals::$peri::steal() };
-                                    $code
-                                }} else {{
-                                    panic!("Unsupported")
-                                }}),
-                            )+
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-
-                #[doc(hidden)]
-                macro_rules! handle_rtcio_with_resistors {
-                    ($this:expr, $inner:ident, $code:tt) => {
-                        match $this.number() {
-                            $(
-                                $gpionum => $crate::if_rtcio_pin!($($type),* {
-                                    $crate::if_output_pin!($($type),* {{
-                                        #[allow(unused_mut)]
-                                        let mut $inner = unsafe { $crate::peripherals::$peri::steal() };
-                                        $code
-                                    }} else {{
-                                        panic!("Unsupported")
-                                    }})
-                                } else {{
-                                    panic!("Unsupported")
-                                }}),
-                            )+
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-
-                pub(crate) use handle_rtcio;
-                pub(crate) use handle_rtcio_with_resistors;
             }
         }
     };
@@ -2098,15 +1974,21 @@ impl Pin for AnyPin<'_> {
         self.pin
     }
 
-    fn output_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, OutputSignal)] {
-        handle_gpio_output!(self, target, {
-            Pin::output_signals(&target, private::Internal)
+    fn output_signals(
+        &self,
+        private: private::Internal,
+    ) -> &'static [(AlternateFunction, OutputSignal)] {
+        impl_for_pin_type!(self, target, Output, {
+            Pin::output_signals(&target, private)
         })
     }
 
-    fn input_signals(&self, _: private::Internal) -> &'static [(AlternateFunction, InputSignal)] {
-        handle_gpio_input!(self, target, {
-            Pin::input_signals(&target, private::Internal)
+    fn input_signals(
+        &self,
+        private: private::Internal,
+    ) -> &'static [(AlternateFunction, InputSignal)] {
+        impl_for_pin_type!(self, target, Input, {
+            Pin::input_signals(&target, private)
         })
     }
 }
@@ -2114,7 +1996,7 @@ impl Pin for AnyPin<'_> {
 impl InputPin for AnyPin<'_> {
     #[expect(unused_braces, reason = "False positive")]
     fn waker(&self) -> &'static AtomicWaker {
-        handle_gpio_input!(self, target, { InputPin::waker(&target) })
+        impl_for_pin_type!(self, target, Input, { InputPin::waker(&target) })
     }
 }
 impl OutputPin for AnyPin<'_> {}
@@ -2124,41 +2006,40 @@ impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
     #[expect(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
-        handle_rtcio!(self, target, { RtcPin::rtc_number(&target) })
+        impl_for_pin_type!(self, target, RtcIo, { RtcPin::rtc_number(&target) })
     }
 
     #[cfg(any(xtensa, esp32c6))]
     fn rtc_set_config(&self, input_enable: bool, mux: bool, func: RtcFunction) {
-        handle_rtcio!(self, target, {
+        impl_for_pin_type!(self, target, RtcIo, {
             RtcPin::rtc_set_config(&target, input_enable, mux, func)
         })
     }
 
-    #[expect(unused_braces, reason = "False positive")]
     fn rtcio_pad_hold(&self, enable: bool) {
-        handle_rtcio!(self, target, { RtcPin::rtcio_pad_hold(&target, enable) })
+        impl_for_pin_type!(self, target, RtcIo, {
+            RtcPin::rtcio_pad_hold(&target, enable)
+        })
     }
 
     #[cfg(any(esp32c2, esp32c3, esp32c6))]
     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
-        unsafe {
-            handle_rtcio!(self, target, {
-                RtcPin::apply_wakeup(&target, wakeup, level)
-            })
-        }
+        impl_for_pin_type!(self, target, RtcIo, {
+            unsafe { RtcPin::apply_wakeup(&target, wakeup, level) }
+        })
     }
 }
 
 #[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
-        handle_rtcio_with_resistors!(self, target, {
+        impl_for_pin_type!(self, target, RtcIoOutput, {
             RtcPinWithResistors::rtcio_pullup(&target, enable)
         })
     }
 
     fn rtcio_pulldown(&self, enable: bool) {
-        handle_rtcio_with_resistors!(self, target, {
+        impl_for_pin_type!(self, target, RtcIoOutput, {
             RtcPinWithResistors::rtcio_pulldown(&target, enable)
         })
     }

@@ -7,6 +7,7 @@ use std::{collections::HashMap, fmt::Write, path::Path, sync::OnceLock};
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
 use proc_macro2::TokenStream;
+use quote::format_ident;
 use strum::IntoEnumIterator;
 
 use crate::cfg::{IoMuxSignal, SupportItem, SupportStatus, Value};
@@ -450,7 +451,7 @@ impl Config {
             }
         });
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
 
     fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
@@ -461,113 +462,137 @@ impl Config {
 
         let out_file = out_dir.join(file_name).to_string_lossy().to_string();
 
-        let pins = gpio.pins_and_signals.pins.iter().map(|pin| {
-            let pin_number = number(pin.pin);
+        let pin_numbers = gpio
+            .pins_and_signals
+            .pins
+            .iter()
+            .map(|pin| number(pin.pin))
+            .collect::<Vec<_>>();
 
-            struct PinAttrs {
-                input: bool,
-                output: bool,
-                analog: bool,
-                rtc_io: bool,
-                touch: bool,
-                usb_dm: bool,
-                usb_dp: bool,
-            }
+        let pin_peris = gpio
+            .pins_and_signals
+            .pins
+            .iter()
+            .map(|pin| format_ident!("GPIO{}", pin.pin))
+            .collect::<Vec<_>>();
 
-            let mut pin_attrs = PinAttrs {
-                input: false,
-                output: false,
-                analog: false,
-                rtc_io: false,
-                touch: false,
-                usb_dm: false,
-                usb_dp: false,
-            };
-            pin.kind.iter().for_each(|kind| match kind {
-                cfg::PinCapability::Input => pin_attrs.input = true,
-                cfg::PinCapability::Output => pin_attrs.output = true,
-                cfg::PinCapability::Analog => pin_attrs.analog = true,
-                cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                cfg::PinCapability::Touch => pin_attrs.touch = true,
-                cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
-                cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
-            });
-
-            let mut attrs = vec![];
-
-            if pin_attrs.input {
-                attrs.push(quote::quote! { Input });
-            }
-            if pin_attrs.output {
-                attrs.push(quote::quote! { Output });
-            }
-            if pin_attrs.analog {
-                attrs.push(quote::quote! { Analog });
-            }
-            if pin_attrs.rtc_io {
-                if !pin_attrs.output {
-                    attrs.push(quote::quote! { RtcIo });
-                } else {
-                    attrs.push(quote::quote! { RtcIoInput });
+        let pin_attrs = gpio
+            .pins_and_signals
+            .pins
+            .iter()
+            .map(|pin| {
+                struct PinAttrs {
+                    input: bool,
+                    output: bool,
+                    analog: bool,
+                    rtc_io: bool,
+                    touch: bool,
+                    usb_dm: bool,
+                    usb_dp: bool,
                 }
-            }
-            if pin_attrs.touch {
-                attrs.push(quote::quote! { Touch });
-            }
-            if pin_attrs.usb_dm {
-                attrs.push(quote::quote! { UsbDm });
-            }
-            if pin_attrs.usb_dp {
-                attrs.push(quote::quote! { UsbDp });
-            }
 
-            let mut input_afs = vec![];
-            let mut output_afs = vec![];
-
-            for af in 0..6 {
-                let Some(signal) = pin.alternate_functions.get(af) else {
-                    continue;
+                let mut pin_attrs = PinAttrs {
+                    input: false,
+                    output: false,
+                    analog: false,
+                    rtc_io: false,
+                    touch: false,
+                    usb_dm: false,
+                    usb_dp: false,
                 };
+                pin.kind.iter().for_each(|kind| match kind {
+                    cfg::PinCapability::Input => pin_attrs.input = true,
+                    cfg::PinCapability::Output => pin_attrs.output = true,
+                    cfg::PinCapability::Analog => pin_attrs.analog = true,
+                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
+                    cfg::PinCapability::Touch => pin_attrs.touch = true,
+                    cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
+                    cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
+                });
 
-                let af_variant = quote::format_ident!("_{af}");
-                let mut found = false;
+                let mut attrs = vec![];
 
-                // Is the signal present among the input signals?
-                if let Some(signal) = gpio
-                    .pins_and_signals
-                    .input_signals
-                    .iter()
-                    .find(|s| s.name == signal)
-                {
-                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    input_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                    found = true;
+                if pin_attrs.input {
+                    attrs.push(quote::quote! { Input });
+                }
+                if pin_attrs.output {
+                    attrs.push(quote::quote! { Output });
+                }
+                if pin_attrs.analog {
+                    attrs.push(quote::quote! { Analog });
+                }
+                if pin_attrs.rtc_io {
+                    attrs.push(quote::quote! { RtcIo });
+                    if pin_attrs.output {
+                        attrs.push(quote::quote! { RtcIoOutput });
+                    }
+                }
+                if pin_attrs.touch {
+                    attrs.push(quote::quote! { Touch });
+                }
+                if pin_attrs.usb_dm {
+                    attrs.push(quote::quote! { UsbDm });
+                }
+                if pin_attrs.usb_dp {
+                    attrs.push(quote::quote! { UsbDp });
                 }
 
-                // Is the signal present among the output signals?
-                if let Some(signal) = gpio
-                    .pins_and_signals
-                    .output_signals
-                    .iter()
-                    .find(|s| s.name == signal)
-                {
-                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    output_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                    found = true;
+                attrs
+            })
+            .collect::<Vec<_>>();
+
+        let pin_afs = gpio
+            .pins_and_signals
+            .pins
+            .iter()
+            .map(|pin| {
+                let mut input_afs = vec![];
+                let mut output_afs = vec![];
+
+                for af in 0..6 {
+                    let Some(signal) = pin.alternate_functions.get(af) else {
+                        continue;
+                    };
+
+                    let af_variant = quote::format_ident!("_{af}");
+                    let mut found = false;
+
+                    // Is the signal present among the input signals?
+                    if let Some(signal) = gpio
+                        .pins_and_signals
+                        .input_signals
+                        .iter()
+                        .find(|s| s.name == signal)
+                    {
+                        let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                        input_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                        found = true;
+                    }
+
+                    // Is the signal present among the output signals?
+                    if let Some(signal) = gpio
+                        .pins_and_signals
+                        .output_signals
+                        .iter()
+                        .find(|s| s.name == signal)
+                    {
+                        let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                        output_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                        found = true;
+                    }
+
+                    assert!(
+                        found,
+                        "Signal '{signal}' not found in input signals for GPIO pin {}",
+                        pin.pin
+                    );
                 }
 
-                assert!(
-                    found,
-                    "Signal '{signal}' not found in input signals for GPIO pin {pin_number}"
-                );
-            }
-
-            let pin_peri = quote::format_ident!("GPIO{pin_number}");
-
-            quote::quote! {
-                ( #pin_number, #pin_peri, [#(#attrs),*] ( #(#input_afs)* ) ( #(#output_afs)* ) )
-            }
-        });
+                quote::quote! {
+                    ( #(#input_afs)* ) ( #(#output_afs)* )
+                }
+            })
+            .collect::<Vec<_>>();
 
         let io_mux_accessor = if gpio.remap_iomux_pin_registers {
             let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
@@ -602,15 +627,86 @@ impl Config {
             }
         };
 
+        let mut io_type_macro_calls = vec![];
+        for (pin, attrs) in pin_peris.iter().zip(pin_attrs.iter()) {
+            io_type_macro_calls.push(quote::quote! {
+                #( crate::io_type!(#attrs, #pin); )*
+            })
+        }
+
+        // Generates a macro that can select between a `then` and an `else` branch based
+        // on whether a pin implement a certain attribute.
+        //
+        // In essence this expands to (in case of pin = GPIO5, attr = Analog):
+        // `if typeof(GPIO5) == Analog { then_tokens } else { else_tokens }`
+        let if_pin_is_type = {
+            let mut branches = vec![];
+
+            for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
+                branches.push(quote::quote! {
+                            #( (#pin, #attr, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($then_tt)* }; )*
+                        });
+
+                branches.push(quote::quote! {
+                    (#pin, $t:tt, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($else_tt)* };
+                });
+            }
+
+            quote::quote! {
+                macro_rules! if_pin_is_type {
+                    #(#branches)*
+                }
+
+                pub(crate) use if_pin_is_type;
+            }
+        };
+
+        // Delegates AnyPin functions to GPIOn functions when the pin implements a
+        // certain attribute.
+        //
+        // In essence this expands to (in case of attr = Analog):
+        // `if typeof(anypin's current value) == Analog { call $code } else { panic }`
+        let impl_for_pin_type = {
+            let mut impl_branches = vec![];
+            for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
+                impl_branches.push(quote::quote! {
+                    #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
+                        #[allow(unused_unsafe, unused_mut)]
+                        let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
+                        $($code)*
+                    }} else {{
+                        panic!("Unsupported")
+                    }}),
+                });
+            }
+
+            quote::quote! {
+                macro_rules! impl_for_pin_type {
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $($code:tt)*) => {
+                        match $any_pin.number() {
+                            #(#impl_branches)*
+                            _ => unreachable!(),
+                        }
+                    }
+                }
+                pub(crate) use impl_for_pin_type;
+            }
+        };
+
         let g = quote::quote! {
             crate::gpio! {
-                #(#pins)*
+                #( (#pin_numbers, #pin_peris #pin_afs) )*
             }
+
+            #( #io_type_macro_calls )*
+
+            #if_pin_is_type
+            #impl_for_pin_type
 
             #io_mux_accessor
         };
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
 
     // TODO temporary name, we likely don't want a new file for these
@@ -630,7 +726,7 @@ impl Config {
             #output_signals
         };
 
-        std::fs::write(&out_file, g.to_string()).unwrap();
+        save(&out_file, g);
     }
 }
 
@@ -677,6 +773,17 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
             #(#variants)*
         }
     }
+}
+
+fn save(path: impl AsRef<Path>, tokens: TokenStream) {
+    let source = tokens.to_string();
+
+    #[cfg(feature = "pretty")]
+    let syntax_tree = syn::parse_file(&source).unwrap();
+    #[cfg(feature = "pretty")]
+    let source = prettyplease::unparse(&syntax_tree);
+
+    std::fs::write(path, source).unwrap();
 }
 
 /// Defines all possible symbols that _could_ be output from this crate
