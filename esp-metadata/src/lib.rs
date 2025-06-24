@@ -375,6 +375,7 @@ impl Config {
         self.generate_properties(out_dir, "_generated.rs");
         self.generate_gpios(out_dir, "_generated_gpio.rs");
         self.generate_gpio_extras(out_dir, "_generated_gpio_extras.rs");
+        self.generate_peripherals(out_dir, "_generated_peris.rs");
     }
 
     fn generate_properties(&self, out_dir: &Path, file_name: &str) {
@@ -597,8 +598,8 @@ impl Config {
         let io_mux_accessor = if gpio.remap_iomux_pin_registers {
             let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
                 let pin = number(pin.pin);
-                let reg = quote::format_ident!("GPIO{pin}");
-                let accessor = quote::format_ident!("gpio{pin}");
+                let reg = format_ident!("GPIO{pin}");
+                let accessor = format_ident!("gpio{pin}");
 
                 quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
             });
@@ -728,6 +729,43 @@ impl Config {
 
         save(&out_file, g);
     }
+
+    fn generate_peripherals(&self, out_dir: &Path, file_name: &str) {
+        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+
+        let i2c_master_instance_cfgs = self
+            .device
+            .peri_config
+            .i2c_master
+            .iter()
+            .flat_map(|peri| {
+                peri.instances.iter().map(|instance| {
+                    let instance_config = &instance.instance_config;
+
+                    let instance = format_ident!("{}", instance.name.to_uppercase());
+
+                    let sys = format_ident!("{}", instance_config.sys_instance);
+                    let sda = format_ident!("{}", instance_config.sda);
+                    let scl = format_ident!("{}", instance_config.scl);
+                    let int = format_ident!("{}", instance_config.interrupt);
+
+                    // The order and meaning of these tokens must match their use in the
+                    // `for_each_i2c_master!` call.
+                    quote::quote! {
+                        #instance, #sys, #scl, #sda, #int
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let for_each_i2c_master = generate_for_each_macro("i2c_master", &i2c_master_instance_cfgs);
+
+        let g = quote::quote! {
+            #for_each_i2c_master
+        };
+
+        save(&out_file, g);
+    }
 }
 
 fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
@@ -743,7 +781,7 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
             continue;
         };
 
-        let name = quote::format_ident!("{}", signal.name);
+        let name = format_ident!("{}", signal.name);
         let value = number(id);
         variants.push(quote::quote! {
             #name = #value,
@@ -756,13 +794,13 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
             continue;
         };
 
-        let name = quote::format_ident!("{}", signal.name);
+        let name = format_ident!("{}", signal.name);
         variants.push(quote::quote! {
             #name,
         });
     }
 
-    let enum_name = quote::format_ident!("{enum_name}");
+    let enum_name = format_ident!("{enum_name}");
 
     quote::quote! {
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
@@ -772,6 +810,28 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
         pub enum #enum_name {
             #(#variants)*
         }
+    }
+}
+
+fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream {
+    let macro_name = format_ident!("for_each_{name}");
+    quote::quote! {
+        // This macro is called in esp-hal to implement a driver's
+        // Instance trait for available peripherals. It works by defining, then calling an inner
+        // macro that substitutes the properties into the template provided by the call in esp-hal.
+        macro_rules! #macro_name {
+            (
+                $pattern:tt => $code:tt;
+            ) => {
+                macro_rules! _for_each_inner {
+                    ($pattern) => $code;
+                }
+
+                #(_for_each_inner!(( #branches ));)*
+            };
+        }
+
+        pub(crate) use #macro_name;
     }
 }
 

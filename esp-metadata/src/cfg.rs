@@ -49,6 +49,14 @@ impl SupportStatus {
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct EmptyInstanceConfig {}
 
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct I2cMasterInstanceConfig {
+    pub sys_instance: String,
+    pub scl: String,
+    pub sda: String,
+    pub interrupt: String,
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PinCapability {
@@ -349,7 +357,7 @@ driver_configs![
         peripherals: &["hmac"],
         properties: {}
     },
-    I2cMasterProperties {
+    I2cMasterProperties<I2cMasterInstanceConfig> {
         driver: i2c_master,
         name: "I2C master",
         peripherals: &["i2c0", "i2c1"],
