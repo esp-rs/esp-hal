@@ -796,7 +796,7 @@ impl ModemClockController for WiFiClockController<'_> {
         clocks_ll::enable_wifi(enable);
     }
 }
-#[cfg(bt)]
+#[cfg(wifi)]
 #[instability::unstable]
 impl WiFiClockController<'_> {
     /// Reset the Wi-Fi MAC
