@@ -16,12 +16,12 @@ macro_rules! peripherals {
     (
         peripherals: [
             $(
-                $name:ident <= $from_pac:tt $(($($interrupt:ident),*))?
+                $name:ident <= $from_pac:tt $(($($interrupt_name:ident => $interrupt:ident),*))?
             ),* $(,)?
         ],
         unstable_peripherals: [
             $(
-                $unstable_name:ident <= $unstable_from_pac:tt $(($($unstable_interrupt:ident),*))?
+                $unstable_name:ident <= $unstable_from_pac:tt $(($($unstable_interrupt_name:ident => $unstable_interrupt:ident),*))?
             ),* $(,)?
         ],
         pins: [
@@ -118,7 +118,7 @@ macro_rules! peripherals {
                         paste::paste!{
                             /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
                             #[instability::unstable]
-                            pub fn [<bind_ $interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                            pub fn [<bind_ $interrupt_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
                                 unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
                             }
                         }
@@ -134,7 +134,7 @@ macro_rules! peripherals {
                         paste::paste!{
                             /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
                             #[instability::unstable]
-                            pub fn [<bind_ $unstable_interrupt:lower _interrupt >](&mut self, handler: unsafe extern "C" fn() -> ()) {
+                            pub fn [<bind_ $unstable_interrupt_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
                                 unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$unstable_interrupt, handler); }
                             }
                         }

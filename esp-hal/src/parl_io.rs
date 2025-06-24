@@ -987,7 +987,7 @@ where
 }
 
 fn internal_set_interrupt_handler(handler: InterruptHandler) {
-    let mut peri = unsafe { PARL_IO::steal() };
+    let peri = unsafe { PARL_IO::steal() };
     #[cfg(esp32c6)]
     {
         for core in crate::system::Cpu::other() {
@@ -995,7 +995,7 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         }
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        peri.bind_parl_io_interrupt(handler.handler());
+        peri.bind_peri_interrupt(handler.handler());
 
         unwrap!(crate::interrupt::enable(
             Interrupt::PARL_IO,
@@ -1010,8 +1010,8 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
         }
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        peri.bind_parl_io_tx_interrupt(handler.handler());
-        peri.bind_parl_io_rx_interrupt(handler.handler());
+        peri.bind_tx_interrupt(handler.handler());
+        peri.bind_rx_interrupt(handler.handler());
 
         unwrap!(crate::interrupt::enable(
             Interrupt::PARL_IO_TX,

@@ -20,7 +20,7 @@ pub use pac::Interrupt;
 crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0,
-        SPI2 <= SPI2 (SPI2),
+        SPI2 <= SPI2 (peri => SPI2),
         UART0 <= UART0,
         UART1 <= UART1,
     ],
@@ -43,7 +43,7 @@ crate::peripherals! {
         HP_APM <= HP_APM,
         HP_SYS <= HP_SYS,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         IEEE802154 <= IEEE802154,
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         INTPRI <= INTPRI,
@@ -68,7 +68,7 @@ crate::peripherals! {
         MODEM_LPCON <= MODEM_LPCON,
         MODEM_SYSCON <= MODEM_SYSCON,
         OTP_DEBUG <= OTP_DEBUG,
-        PARL_IO <= PARL_IO (PARL_IO),
+        PARL_IO <= PARL_IO (peri => PARL_IO),
         PAU <= PAU,
         PCR <= PCR,
         PCNT <= PCNT,
