@@ -163,7 +163,9 @@ impl NorFlash for FlashStorage {
                 // Copy to temporary buffer first
                 buffer.as_bytes_mut()[..chunk.len()].copy_from_slice(uninit_slice(chunk));
                 // Write from temporary buffer
-                self.internal_write(offset, unsafe { buffer.assume_init_bytes() })?;
+                self.internal_write(offset, unsafe {
+                    &buffer.assume_init_bytes()[..chunk.len()]
+                })?;
             }
         }
 
