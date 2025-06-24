@@ -61,7 +61,7 @@ fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result
 
 fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
     for entry in std::fs::read_dir(path.as_ref())? {
-        let file_name = entry?.file_name().display().to_string();
+        let file_name = entry?.file_name().into_string().unwrap();
         if let Some(lib_name) = file_name
             .strip_prefix("lib")
             .and_then(|f| f.strip_suffix(".a"))

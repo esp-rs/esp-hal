@@ -36,7 +36,8 @@ macro_rules! before_snippet {
 
 pub mod rom;
 
-/// This is needed by `libesp_rom.a` (if used)
+/// This is needed by `libesp_rom.a` (if used) - some chips contain it in ROM
+#[cfg(esp32)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __assert_func(
     file: *const core::ffi::c_char,
