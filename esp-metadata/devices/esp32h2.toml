@@ -130,8 +130,8 @@ pins = [
     { pin = 23, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS1" } },
     { pin = 24, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS2" } },
     { pin = 25, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS3" } },
-    { pin = 26, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS4" } },
-    { pin = 27, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS5" } },
+    { pin = 26, kind = ["input", "output", "usb_device"], alternate_functions = { 2 = "FSPICS4" } },
+    { pin = 27, kind = ["input", "output", "usb_device"], alternate_functions = { 2 = "FSPICS5" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },
