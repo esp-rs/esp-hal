@@ -33,6 +33,7 @@ macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => {
         $(
             paste::paste! {
+                #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
                 impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                     unsafe fn apply_wakeup(&self, wakeup: bool, level: u8) {
                         let rtc_cntl = $crate::peripherals::LPWR::regs();
@@ -50,6 +51,7 @@ macro_rules! rtc_pins {
                     }
                 }
 
+                #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
                 impl crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                     fn rtcio_pullup(&self, enable: bool) {
                         $crate::peripherals::IO_MUX::regs()

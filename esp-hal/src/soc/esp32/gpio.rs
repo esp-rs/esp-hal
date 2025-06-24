@@ -37,6 +37,7 @@ macro_rules! rtcio_analog {
         $pin_num:expr, $rtc_pin:expr, $pin_reg:expr, $prefix:pat, $hold:ident $(, $rue:literal)?
     ) => {
         paste::paste! {
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
             impl $crate::gpio::RtcPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                 fn rtc_number(&self) -> u8 {
                     $rtc_pin
@@ -64,6 +65,8 @@ macro_rules! rtcio_analog {
             $(
                 // FIXME: replace with $(ignore($rue)) once stable
                 $crate::ignore!($rue);
+
+                #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
                 impl $crate::gpio::RtcPinWithResistors for $crate::peripherals::[<GPIO $pin_num>]<'_> {
                     fn rtcio_pullup(&self, enable: bool) {
                         $crate::peripherals::RTC_IO::regs()
@@ -77,9 +80,9 @@ macro_rules! rtcio_analog {
                 }
             )?
 
-            impl $crate::gpio::AnalogPin for $crate::peripherals::[<GPIO $pin_num>]<'_> {
+            impl $crate::peripherals::[<GPIO $pin_num>]<'_> {
                 /// Configures the pin for analog mode.
-                fn set_analog(&self, _: $crate::private::Internal) {
+                pub(crate) fn set_analog_impl(&self) {
                     use $crate::gpio::RtcPin;
                     let rtcio = $crate::peripherals::RTC_IO::regs();
 

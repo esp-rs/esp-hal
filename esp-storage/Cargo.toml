@@ -16,7 +16,6 @@ features       = ["esp32c6"]
 
 [lib]
 bench = false
-test  = false
 
 [dependencies]
 embedded-storage = "0.3.1"

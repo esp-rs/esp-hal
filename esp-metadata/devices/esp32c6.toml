@@ -127,8 +127,8 @@ pins = [
     { pin =  3, kind = ["input", "output", "analog", "rtc"] },
     { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TMS", 2 = "FSPIHD" } },
     { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TDI", 2 = "FSPIWP" } },
-    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 0 = "USB_JTAG_TCK", 2 = "FSPICLK" } },
-    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 0 = "USB_JTAG_TDO", 2 = "FSPID" } },
+    { pin =  6, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TCK", 2 = "FSPICLK" } },
+    { pin =  7, kind = ["input", "output", "rtc"],           alternate_functions = { 0 = "USB_JTAG_TDO", 2 = "FSPID" } },
     { pin =  8, kind = ["input", "output"] },
     { pin =  9, kind = ["input", "output"] },
     { pin = 10, kind = ["input", "output"] },
@@ -367,7 +367,9 @@ output_signals = [
 
 [device.i2c_master]
 support_status = "supported"
-instances = [{ name = "i2c0" }]
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
+]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
