@@ -175,13 +175,25 @@ fn parse_configs(
         })
         .unwrap_or_default();
 
+    // Get the metadata of the project to
+    // - discover configurable crates
+    // - get the active features on crates (e.g. to guess the chip the project is
+    //   targeting)
+    // this might fetch the dependencies from registries and/or git repositories
+    // so this
+    // - might take a few seconds (while it's usually very quick)
+    // - might need an internet connection to succeed
+
     let meta = cargo_metadata::MetadataCommand::new()
         .current_dir(path)
-        .exec()?;
+        .verbose(true) // entertain the user by showing what exactly is going on
+        .exec()
+        // with verbose output the error we get doesn't contain anything useful or interesting
+        .map_err(|_| "`cargo metadata` failed for your project. Make sure it's buildable.")?;
 
     // try to guess the chip from the metadata by looking at an active chip feature
     // for esp-hal
-    let chip_from_meta = {
+    let chip_from_meta = || {
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
             if pkg.name == "esp-hal" {
@@ -206,17 +218,18 @@ fn parse_configs(
     };
 
     // the "ESP_CONFIG_CHIP" hint env-var if present
-    let chip_from_config = envs
-        .get("ESP_CONFIG_CHIP")
-        .and_then(|chip_str| clap::ValueEnum::from_str(chip_str, true).ok());
+    let chip_from_config = || {
+        envs.get("ESP_CONFIG_CHIP")
+            .and_then(|chip_str| clap::ValueEnum::from_str(chip_str, true).ok())
+    };
 
     // - if given as a parameter, use it
     // - if there is a hint in the config.toml, use it
     // - if we can infer it from metadata, use it
     // otherwise, fail
     let chip = chip_from_args
-        .or_else(|| chip_from_config)
-        .or_else(|| chip_from_meta);
+        .or_else(|| chip_from_config())
+        .or_else(|| chip_from_meta());
 
     if chip.is_none() {
         return Err("No chip given or inferred. Try using the `--chip` argument.".into());
