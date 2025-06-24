@@ -67,6 +67,8 @@ pub(crate) enum PinCapability {
     Touch,
     UsbDm,
     UsbDp,
+    // Pin has USB pullup according to the IO MUX Function list
+    UsbDevice,
 }
 
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
