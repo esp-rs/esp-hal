@@ -57,7 +57,7 @@ pub(crate) struct I2cMasterInstanceConfig {
     pub interrupt: String,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PinCapability {
     Input,
