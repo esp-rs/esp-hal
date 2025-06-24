@@ -671,6 +671,7 @@ impl<'d> RadioClockController<'d> {
     }
 }
 
+#[derive(Clone, Copy)]
 #[doc(hidden)]
 /// These are all modems with bitmasks as their representation.
 pub enum ModemBitmask {
@@ -683,34 +684,21 @@ pub enum ModemBitmask {
 }
 
 /// Tracks which modems currently request an active PHY clock.
-///
-/// Using an AtomicU8 wrapped in a critical section mutex, isntead of a RefCell, prevents panic
-/// machinery from being generated.
-static PHY_CLOCK_REFS: critical_section::Mutex<AtomicU8> = critical_section::Mutex::new(AtomicU8::new(0));
+static PHY_CLOCK_REFS: AtomicU8 = AtomicU8::new(0);
 
 
 // These functions are moved out of the trait to prevent monomorphization for every modem clock
 // controller. If that doens't really make sense, this can be moved back.
 
 fn enable_phy_clock_internal(modem_bitmask: ModemBitmask) {
-    critical_section::with(|cs| {
-        let inner = PHY_CLOCK_REFS.borrow(cs);
-        let new_phy_clock_ref_count = inner.load(Ordering::Relaxed);
-        if new_phy_clock_ref_count == 0 {
-            clocks_ll::enable_phy(true);
-        }
-        inner.store(new_phy_clock_ref_count | (modem_bitmask as u8), Ordering::Relaxed);
-    })
+    if PHY_CLOCK_REFS.fetch_or(modem_bitmask as u8, Ordering::Relaxed) == 0 {
+        clocks_ll::enable_phy(true);
+    }
 }
 fn disable_phy_clock_internal(modem_bitmask: ModemBitmask) {
-    critical_section::with(|cs| {
-        let inner = PHY_CLOCK_REFS.borrow(cs);
-        let new_phy_clock_ref_count = inner.load(Ordering::Relaxed) & !(modem_bitmask as u8);
-        if new_phy_clock_ref_count == 0 {
-            clocks_ll::enable_phy(false);
-        }
-        inner.store(new_phy_clock_ref_count, Ordering::Relaxed);
-    })
+    if PHY_CLOCK_REFS.fetch_and(!(modem_bitmask as u8), Ordering::Relaxed) == modem_bitmask as u8 {
+        clocks_ll::enable_phy(false);
+    }
 }
 
 /// This trait provides common functionality for all 
