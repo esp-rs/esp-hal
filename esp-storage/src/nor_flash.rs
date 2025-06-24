@@ -163,7 +163,7 @@ impl NorFlash for FlashStorage {
                 // Copy to temporary buffer first
                 buffer.as_bytes_mut()[..chunk.len()].copy_from_slice(uninit_slice(chunk));
                 // Write from temporary buffer
-                self.internal_write(offset, chunk)?;
+                self.internal_write(offset, unsafe { buffer.assume_init_bytes() })?;
             }
         }
 
@@ -253,6 +253,7 @@ mod test {
                 (0, 1024),
                 (3, 7),
                 (11, 11),
+                (0, 4098),
             ],
         }
         .into_iter()
@@ -352,5 +353,20 @@ mod test {
                 src.data[off as usize..][..len as usize]
             );
         }
+    }
+
+    #[test]
+    fn write_not_aligned_buffer() {
+        let mut flash = FlashStorage::new();
+        flash.capacity = 4 * 4096;
+        let mut read_data = TestBuffer::default();
+        let write_data = TestBuffer::seq();
+
+        flash.erase(0, FLASH_SIZE).unwrap();
+        flash.write(0, &write_data.data[1..129]).unwrap();
+
+        flash.read(0, &mut read_data.data[..128]).unwrap();
+
+        assert_eq!(&read_data.data[..128], &write_data.data[1..129]);
     }
 }
