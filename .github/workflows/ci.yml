@@ -151,9 +151,9 @@ jobs:
           cargo +esp xtask lint-packages --chips esp32,esp32s2,esp32s3
 
   # --------------------------------------------------------------------------
-  # Format
+  # host tests
 
-  rustfmt:
+  host-tests:
     runs-on: macos-m1-self-hosted
 
     steps:
@@ -168,19 +168,6 @@ jobs:
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
-
-  # --------------------------------------------------------------------------
-  # host tests
-
-  host-tests:
-    runs-on: macos-m1-self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
       # Run tests in esp-config
       - run: cd esp-config && cargo test --features build
