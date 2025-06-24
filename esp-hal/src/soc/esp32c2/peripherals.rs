@@ -20,7 +20,7 @@ pub use pac::Interrupt;
 crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0,
-        SPI2 <= SPI2 (SPI2),
+        SPI2 <= SPI2 (peri => SPI2),
         UART0 <= UART0,
         UART1 <= UART1,
     ],

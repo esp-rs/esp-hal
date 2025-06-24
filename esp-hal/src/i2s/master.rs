@@ -1517,7 +1517,7 @@ mod private {
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S0);
             }
-            unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
+            self.bind_peri_interrupt(handler.handler());
             unwrap!(crate::interrupt::enable(
                 Interrupt::I2S0,
                 handler.priority()
@@ -1626,7 +1626,7 @@ mod private {
             for core in crate::system::Cpu::other() {
                 crate::interrupt::disable(core, Interrupt::I2S1);
             }
-            unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
+            self.bind_peri_interrupt(handler.handler());
             unwrap!(crate::interrupt::enable(
                 Interrupt::I2S1,
                 handler.priority()
