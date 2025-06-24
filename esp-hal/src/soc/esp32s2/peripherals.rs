@@ -19,8 +19,8 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        I2C1 <= I2C1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        I2C1 <= I2C1 (peri => I2C_EXT1),
         SPI2 <= SPI2 (dma => SPI2_DMA, peri => SPI2),
         SPI3 <= SPI3 (dma => SPI3_DMA, peri => SPI3),
         UART0 <= UART0,

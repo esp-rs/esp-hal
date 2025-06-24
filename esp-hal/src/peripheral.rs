@@ -28,6 +28,32 @@ macro_rules! peripherals {
             $( $pin:literal, )*
         ]
     ) => {
+        macro_rules! generate_interrupt_fns {
+            ($fn_name:ident, $int_name:ident) => {
+                paste::paste!{
+                    /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                    #[instability::unstable]
+                    pub fn [<bind_ $fn_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
+                        unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$int_name, handler); }
+                    }
+
+                    /// Disables the interrupt handler
+                    #[instability::unstable]
+                    pub fn [<disable_ $fn_name _interrupt >](&self) {
+                        for core in $crate::system::Cpu::other() {
+                            $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$int_name);
+                        }
+                    }
+
+                    /// Enables the interrupt handler on the given core
+                    #[instability::unstable]
+                    pub fn [<enable_ $fn_name _interrupt >](&self, priority: $crate::interrupt::Priority) {
+                        unwrap!(crate::interrupt::enable($crate::peripherals::Interrupt::$int_name, priority));
+                    }
+                }
+            };
+        }
+
         paste::paste! {
             $(
                 $crate::create_peripheral!($name <= $from_pac);
@@ -115,13 +141,7 @@ macro_rules! peripherals {
             $(
                 impl $name<'_> {
                     $(
-                        paste::paste!{
-                            /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                            #[instability::unstable]
-                            pub fn [<bind_ $interrupt_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
-                                unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
-                            }
-                        }
+                        generate_interrupt_fns!($interrupt_name, $interrupt);
                     )*
                 }
             )*
@@ -131,13 +151,7 @@ macro_rules! peripherals {
             $(
                 impl $unstable_name<'_> {
                     $(
-                        paste::paste!{
-                            /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                            #[instability::unstable]
-                            pub fn [<bind_ $unstable_interrupt_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
-                                unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$unstable_interrupt, handler); }
-                            }
-                        }
+                        generate_interrupt_fns!($unstable_interrupt_name, $unstable_interrupt);
                     )*
                 }
             )*
