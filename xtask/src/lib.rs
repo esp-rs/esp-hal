@@ -74,6 +74,7 @@ impl Package {
         matches!(
             self,
             EspBacktrace
+                | EspBootloaderEspIdf
                 | EspHal
                 | EspHalEmbassy
                 | EspHalRom
@@ -137,7 +138,7 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspHalRom)
+        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspHalRom | EspBootloaderEspIdf)
     }
 
     /// Should documentation be built for the package, and should the package be
