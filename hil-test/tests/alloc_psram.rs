@@ -193,10 +193,7 @@ mod tests {
             }
 
             for i in 0..1024 {
-                if !(buf[i] == heap_buf[i]) {
-                    assert_eq!(buf[i], heap_buf[i], "buf != heap_buf at index {}", i);
-                    break;
-                }
+                assert_eq!(buf[i], heap_buf[i], "buf != heap_buf at index {}", i);
             }
         }
     }
