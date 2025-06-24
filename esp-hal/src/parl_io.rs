@@ -990,37 +990,24 @@ fn internal_set_interrupt_handler(handler: InterruptHandler) {
     let peri = unsafe { PARL_IO::steal() };
     #[cfg(esp32c6)]
     {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::PARL_IO);
-        }
+        peri.disable_peri_interrupt();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
         peri.bind_peri_interrupt(handler.handler());
 
-        unwrap!(crate::interrupt::enable(
-            Interrupt::PARL_IO,
-            handler.priority()
-        ));
+        peri.enable_peri_interrupt(handler.priority());
     }
     #[cfg(esp32h2)]
     {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::PARL_IO_RX);
-            crate::interrupt::disable(core, Interrupt::PARL_IO_TX);
-        }
+        peri.disable_rx_interrupt();
+        peri.disable_tx_interrupt();
         internal_listen(EnumSet::all(), false);
         internal_clear_interrupts(EnumSet::all());
-        peri.bind_tx_interrupt(handler.handler());
         peri.bind_rx_interrupt(handler.handler());
+        peri.bind_tx_interrupt(handler.handler());
 
-        unwrap!(crate::interrupt::enable(
-            Interrupt::PARL_IO_TX,
-            handler.priority(),
-        ));
-        unwrap!(crate::interrupt::enable(
-            Interrupt::PARL_IO_RX,
-            handler.priority(),
-        ));
+        peri.enable_rx_interrupt(handler.priority());
+        peri.enable_tx_interrupt(handler.priority());
     }
 }
 

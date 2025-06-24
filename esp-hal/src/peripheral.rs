@@ -48,7 +48,7 @@ macro_rules! peripherals {
                     /// Enables the interrupt handler on the given core
                     #[instability::unstable]
                     pub fn [<enable_ $fn_name _interrupt >](&self, priority: $crate::interrupt::Priority) {
-                        unwrap!(crate::interrupt::enable($crate::peripherals::Interrupt::$int_name, priority));
+                        unwrap!($crate::interrupt::enable($crate::peripherals::Interrupt::$int_name, priority));
                     }
                 }
             };
