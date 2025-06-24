@@ -21,8 +21,8 @@ crate::peripherals! {
     peripherals: [
         I2C0 <= I2C0 (peri => I2C_EXT0),
         SPI2 <= SPI2 (peri => SPI2),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
