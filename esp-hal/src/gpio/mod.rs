@@ -1994,7 +1994,6 @@ impl Pin for AnyPin<'_> {
 }
 
 impl InputPin for AnyPin<'_> {
-    #[expect(unused_braces, reason = "False positive")]
     fn waker(&self) -> &'static AtomicWaker {
         impl_for_pin_type!(self, target, Input, { InputPin::waker(&target) })
     }
@@ -2004,7 +2003,6 @@ impl OutputPin for AnyPin<'_> {}
 #[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
-    #[expect(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
         impl_for_pin_type!(self, target, RtcIo, { RtcPin::rtc_number(&target) })
     }

@@ -645,11 +645,11 @@ impl Config {
 
             for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
                 branches.push(quote::quote! {
-                            #( (#pin, #attr, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($then_tt)* }; )*
-                        });
+                    #( (#pin, #attr, $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
+                });
 
                 branches.push(quote::quote! {
-                    (#pin, $t:tt, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($else_tt)* };
+                    (#pin, $t:tt, $then_tt:tt else $else_tt:tt ) => { $else_tt };
                 });
             }
 
@@ -674,21 +674,25 @@ impl Config {
                     #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
                         #[allow(unused_unsafe, unused_mut)]
                         let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
-                        $($code)*
-                    }} else {{
-                        panic!("Unsupported")
-                    }}),
+                        #[allow(unused_braces)]
+                        $code
+                    }} else {
+                        $otherwise
+                    }),
                 });
             }
 
             quote::quote! {
                 macro_rules! impl_for_pin_type {
-                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $($code:tt)*) => {
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
                         match $any_pin.number() {
                             #(#impl_branches)*
                             _ => unreachable!(),
                         }
-                    }
+                    };
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt) => {
+                        impl_for_pin_type!($any_pin, $inner_ident, $on_type, $code else { panic!("Unsupported") })
+                    };
                 }
                 pub(crate) use impl_for_pin_type;
             }
