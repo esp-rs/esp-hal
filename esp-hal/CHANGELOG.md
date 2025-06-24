@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
+- ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `InterruptHandler` no longer implements `PartialEq`, `Eq` or `Hash`. (#3650)
+- `gpio::NUM_PINS` (#3658)
 
 ## [v1.0.0-beta.1] - 2025-06-03
 

@@ -1,27 +1,6 @@
-use core::ops::{Deref, DerefMut};
+use core::mem::MaybeUninit;
 
 use crate::chip_specific;
-
-#[repr(C, align(4))]
-pub struct FlashSectorBuffer {
-    // NOTE: Ensure that no unaligned fields are added above `data` to maintain its required
-    // alignment
-    data: [u8; FlashStorage::SECTOR_SIZE as usize],
-}
-
-impl Deref for FlashSectorBuffer {
-    type Target = [u8; FlashStorage::SECTOR_SIZE as usize];
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl DerefMut for FlashSectorBuffer {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.data
-    }
-}
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -71,8 +50,9 @@ impl FlashStorage {
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         const ADDR: u32 = 0x1000;
 
-        let mut buffer = [0u8; 8];
-        storage.internal_read(ADDR, &mut buffer).ok();
+        let mut buffer = crate::buffer::FlashWordBuffer::uninit();
+        storage.internal_read(ADDR, buffer.as_bytes_mut()).unwrap();
+        let buffer = unsafe { buffer.assume_init_bytes() };
         let mb = match buffer[3] & 0xf0 {
             0x00 => 1,
             0x10 => 2,
@@ -83,7 +63,6 @@ impl FlashStorage {
             _ => 0,
         };
         storage.capacity = mb * 1024 * 1024;
-
         storage
     }
 
@@ -111,15 +90,15 @@ impl FlashStorage {
 
     #[allow(clippy::all)]
     #[inline(never)]
-    #[unsafe(link_section = ".rwtext")]
+    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_read(
         &mut self,
         offset: u32,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<(), FlashStorageError> {
         check_rc(chip_specific::spiflash_read(
             offset,
-            bytes.as_ptr() as *mut u32,
+            bytes.as_mut_ptr() as *mut u32,
             bytes.len() as u32,
         ))
     }
@@ -136,7 +115,7 @@ impl FlashStorage {
     }
 
     #[inline(never)]
-    #[unsafe(link_section = ".rwtext")]
+    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
@@ -144,7 +123,7 @@ impl FlashStorage {
     }
 
     #[inline(never)]
-    #[unsafe(link_section = ".rwtext")]
+    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_write(
         &mut self,
         offset: u32,

@@ -19,6 +19,7 @@ wokwi.toml
 
 # We'll ignore VS Code settings (at least for now...)
 **/.vscode/settings.json
+**/.zed/
 
 # Ignore generated documentation
 docs/

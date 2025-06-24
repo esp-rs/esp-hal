@@ -120,6 +120,8 @@
 
 use core::marker::PhantomData;
 
+use procmacros::handler;
+
 use self::filter::{Filter, FilterType};
 use crate::{
     Async,
@@ -1299,9 +1301,6 @@ where
 /// TWAI peripheral instance.
 #[doc(hidden)]
 pub trait PrivateInstance: crate::private::Sealed {
-    /// The identifier number for this TWAI instance.
-    fn number(&self) -> usize;
-
     /// Returns the system peripheral marker for this instance.
     fn peripheral(&self) -> crate::system::Peripheral;
 
@@ -1483,10 +1482,6 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
 }
 
 impl PrivateInstance for crate::peripherals::TWAI0<'_> {
-    fn number(&self) -> usize {
-        0
-    }
-
     fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::Twai0
     }
@@ -1516,7 +1511,13 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
     }
 
     fn async_handler(&self) -> InterruptHandler {
-        asynch::twai0
+        #[handler]
+        fn twai0() {
+            let twai = unsafe { crate::peripherals::TWAI0::steal() };
+            asynch::handle_interrupt(twai.register_block(), twai.async_state());
+        }
+
+        twai0
     }
 
     #[inline(always)]
@@ -1532,10 +1533,6 @@ impl PrivateInstance for crate::peripherals::TWAI0<'_> {
 
 #[cfg(soc_has_twai1)]
 impl PrivateInstance for crate::peripherals::TWAI1<'_> {
-    fn number(&self) -> usize {
-        1
-    }
-
     fn peripheral(&self) -> crate::system::Peripheral {
         crate::system::Peripheral::Twai1
     }
@@ -1553,7 +1550,13 @@ impl PrivateInstance for crate::peripherals::TWAI1<'_> {
     }
 
     fn async_handler(&self) -> InterruptHandler {
-        asynch::twai1
+        #[handler]
+        fn twai1() {
+            let twai = unsafe { crate::peripherals::TWAI1::steal() };
+            asynch::handle_interrupt(twai.register_block(), twai.async_state());
+        }
+
+        twai1
     }
 
     #[inline(always)]
@@ -1585,7 +1588,6 @@ impl PrivateInstance for AnyTwai<'_> {
             #[cfg(soc_has_twai1)]
             AnyTwaiInner::Twai1(twai) => twai,
         } {
-            fn number(&self) -> usize;
             fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
             fn output_signal(&self) -> OutputSignal;
@@ -1614,13 +1616,8 @@ mod asynch {
         channel::Channel,
         waitqueue::AtomicWaker,
     };
-    use procmacros::handler;
 
     use super::*;
-    #[cfg(soc_has_twai0)]
-    use crate::peripherals::TWAI0;
-    #[cfg(soc_has_twai1)]
-    use crate::peripherals::TWAI1;
 
     pub struct TwaiAsyncState {
         pub tx_waker: AtomicWaker,
@@ -1762,26 +1759,23 @@ mod asynch {
         }
     }
 
-    fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
+    pub(super) fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                let intr_enable = register_block.int_ena().read();
                 let intr_status = register_block.int_raw().read();
 
                 let int_ena_reg = register_block.int_ena();
-
                 let tx_int_status = intr_status.tx_int_st();
                 let rx_int_status = intr_status.rx_int_st();
             } else {
-                let intr_enable = register_block.interrupt_enable().read();
                 let intr_status = register_block.interrupt().read();
 
                 let int_ena_reg = register_block.interrupt_enable();
-
                 let tx_int_status = intr_status.transmit_int_st();
                 let rx_int_status = intr_status.receive_int_st();
             }
         }
+        let intr_enable = int_ena_reg.read();
 
         if tx_int_status.bit_is_set() {
             async_state.tx_waker.wake();
@@ -1828,19 +1822,5 @@ mod asynch {
         unsafe {
             int_ena_reg.modify(|_, w| w.bits(intr_enable.bits() & (!intr_status.bits() | 1)));
         }
-    }
-
-    #[cfg(soc_has_twai0)]
-    #[handler]
-    pub(super) fn twai0() {
-        let twai = unsafe { TWAI0::steal() };
-        handle_interrupt(twai.register_block(), twai.async_state());
-    }
-
-    #[cfg(soc_has_twai1)]
-    #[handler]
-    pub(super) fn twai1() {
-        let twai = unsafe { TWAI1::steal() };
-        handle_interrupt(twai.register_block(), twai.async_state());
     }
 }

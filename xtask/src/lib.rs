@@ -46,7 +46,6 @@ pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBootloaderEspIdf,
-    EspBuild,
     EspConfig,
     EspHal,
     EspHalEmbassy,
@@ -153,7 +152,7 @@ impl Package {
     pub fn build_on_host(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspBuild | EspConfig | EspMetadata)
+        matches!(self, EspConfig | EspMetadata)
     }
 
     /// Given a device config, return the features which should be enabled for
