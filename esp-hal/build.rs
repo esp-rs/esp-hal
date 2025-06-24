@@ -70,9 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "RWTEXT_ADDITION".to_string(),
         Value::String(
             if let Ok(rwtext_addition) = std::env::var("DEP_ESP_HAL_ROM_RWTEXT_ROM_FUNCTIONS") {
-                let rwtext_addition = rwtext_addition.replace("\\n", "\n");
-
-                rwtext_addition
+                rwtext_addition.replace("\\n", "\n")
             } else {
                 "".to_string()
             },
