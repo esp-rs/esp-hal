@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_features!("log-04", "defmt");
 
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
-        Ok(val) => Timestamp::from_microsecond(val.parse::<i64>().unwrap()).unwrap(),
+        Ok(val) => Timestamp::from_microsecond(val.parse::<i64>()?).unwrap(),
         Err(_) => Timestamp::now(),
     };
 

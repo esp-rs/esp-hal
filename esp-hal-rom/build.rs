@@ -17,6 +17,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Ensure that exactly one chip has been specified:
     let chip = Chip::from_cargo_feature()?;
 
+    // Log and defmt are mutually exclusive features. The main technical reason is
+    // that allowing both would make the exact panicking behaviour a fragile
+    // implementation detail.
+    assert_unique_features!("log-04", "defmt");
+
     // Load the configuration file for the configured device:
     let config = Config::for_chip(&chip);
 
