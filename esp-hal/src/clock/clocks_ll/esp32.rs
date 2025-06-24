@@ -252,7 +252,7 @@ pub(super) fn enable_wifi(enable: bool) {
     });
 }
 
-pub(super) fn reset_mac() {
+pub(super) fn reset_wifi_mac() {
     DPORT::regs()
         .wifi_rst_en()
         .modify(|_, w| w.mac_rst().set_bit());

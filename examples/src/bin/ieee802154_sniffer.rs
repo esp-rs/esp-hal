@@ -11,6 +11,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     main,
+    clock::RadioClockController,
     system::software_reset,
     uart::{self, Uart},
 };
@@ -59,8 +60,8 @@ fn main() -> ! {
         .parse()
         .unwrap();
 
-    let radio = peripherals.IEEE802154;
-    let mut ieee802154 = Ieee802154::new(radio, peripherals.RADIO_CLK);
+    let rcc = RadioClockController::new(peripherals.RADIO_CLK);
+    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, rcc.split().ieee802154);
 
     ieee802154.set_config(Config {
         channel,

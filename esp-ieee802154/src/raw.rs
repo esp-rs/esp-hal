@@ -1,7 +1,11 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_hal::{clock::RadioClockController, handler, interrupt::Priority, peripherals::RADIO_CLK};
+use esp_hal::{
+    clock::{Ieee802154ClockController, ModemClockController},
+    handler,
+    interrupt::Priority,
+};
 use esp_wifi_sys::include::{
     esp_phy_calibration_data_t,
     esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
@@ -15,11 +19,11 @@ use heapless::spsc::Queue;
 
 use crate::{
     frame::{
+        frame_get_version,
+        frame_is_ack_required,
         FRAME_SIZE,
         FRAME_VERSION_1,
         FRAME_VERSION_2,
-        frame_get_version,
-        frame_is_ack_required,
     },
     hal::*,
     pib::*,
@@ -71,11 +75,10 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(radio_clock_control: RADIO_CLK<'_>) {
-    let mut radio_clock_control = RadioClockController::new(radio_clock_control);
-    radio_clock_control.init_clocks();
-    radio_clock_control.enable_phy(true);
-    radio_clock_control.enable_ieee802154(true);
+pub(crate) fn esp_ieee802154_enable(mut ieee802154_clock_controller: Ieee802154ClockController<'_>) {
+    ieee802154_clock_controller.init_clocks();
+    ieee802154_clock_controller.enable_phy_clock(true);
+    ieee802154_clock_controller.enable_modem_clock(true);
 
     esp_phy_enable();
     esp_btbb_enable();

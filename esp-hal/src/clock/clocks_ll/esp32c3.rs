@@ -192,7 +192,7 @@ pub(super) fn enable_bt(_: bool) {
     // `periph_ll_wifi_module__clk_clear_rst`, no-op
 }
 
-pub(super) fn reset_mac() {
+pub(super) fn reset_wifi_mac() {
     APB_CTRL::regs()
         .wifi_rst_en()
         .modify(|_, w| w.mac_rst().set_bit());

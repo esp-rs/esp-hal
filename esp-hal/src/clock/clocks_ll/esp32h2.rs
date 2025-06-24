@@ -290,7 +290,7 @@ pub(super) fn enable_ieee802154(en: bool) {
     ble_ieee802154_clock_enable(en);
 }
 
-pub(super) fn reset_mac() {
+pub(super) fn reset_wifi_mac() {
     // empty
 }
 

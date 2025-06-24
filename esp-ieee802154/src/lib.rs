@@ -22,7 +22,7 @@ use core::{cell::RefCell, marker::PhantomData};
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_config::*;
-use esp_hal::peripherals::{IEEE802154, RADIO_CLK};
+use esp_hal::{clock::Ieee802154ClockController, peripherals::IEEE802154};
 use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
@@ -118,8 +118,8 @@ pub struct Ieee802154<'a> {
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154<'a>, radio_clocks: RADIO_CLK<'a>) -> Self {
-        esp_ieee802154_enable(radio_clocks);
+    pub fn new(_radio: IEEE802154<'a>, ieee802154_clock_controller: Ieee802154ClockController<'a>) -> Self {
+        esp_ieee802154_enable(ieee802154_clock_controller);
 
         Self {
             _align: 0,

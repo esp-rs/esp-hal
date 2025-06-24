@@ -595,6 +595,21 @@ impl Clocks {
     }
 }
 
+/// Split modem clock controllers
+#[cfg(any(bt, ieee802154, wifi))]
+#[instability::unstable]
+pub struct ModemClockControllers<'d> {
+    /// Modem clock controller for Wi-Fi
+    #[cfg(wifi)]
+    pub wifi: WiFiClockController<'d>,
+    /// Modem clock controller for Bluetooth
+    #[cfg(bt)]
+    pub bt: BtClockController<'d>,
+    /// Modem clock controller for IEEE 802.15.4
+    #[cfg(ieee802154)]
+    pub ieee802154: Ieee802154ClockController<'d>
+}
+
 /// Control the radio peripheral clocks
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
@@ -645,8 +660,8 @@ impl<'d> RadioClockController<'d> {
     /// Reset the Wi-Fi MAC
     #[instability::unstable]
     #[inline]
-    pub fn reset_mac(&mut self) {
-        clocks_ll::reset_mac();
+    pub fn reset_wifi_mac(&mut self) {
+        clocks_ll::reset_wifi_mac();
     }
 
     /// Do any common initial initialization needed
@@ -663,71 +678,177 @@ impl<'d> RadioClockController<'d> {
         clocks_ll::ble_rtc_clk_init();
     }
 
-    /// Reset the Resolvable Private Address (RPA).
+    /// Reset the Bluetooth Resolvable Private Address (RPA).
     #[instability::unstable]
     #[inline]
     pub fn reset_rpa(&mut self) {
         clocks_ll::reset_rpa();
     }
+    /// Split the radio clock controller into individual modem clock controllers.
+    #[instability::unstable]
+    #[inline]
+    pub fn split(self) -> ModemClockControllers<'d> {
+        ModemClockControllers {
+            #[cfg(wifi)]
+            wifi: WiFiClockController { _phantom: PhantomData },
+            #[cfg(bt)]
+            bt: BtClockController { _phantom: PhantomData },
+            #[cfg(ieee802154)]
+            ieee802154: Ieee802154ClockController { _phantom: PhantomData }
+        }
+    }
 }
 
+#[cfg(any(bt, ieee802154, wifi))]
+#[instability::unstable]
 #[derive(Clone, Copy)]
 #[doc(hidden)]
 /// These are all modems with bitmasks as their representation.
-pub enum ModemBitmask {
+pub enum Modem {
     #[cfg(wifi)]
-    WiFi = 1,
+    WiFi       = 0,
     #[cfg(bt)]
-    Bt = 2,
+    Bt         = 1,
     #[cfg(ieee802154)]
-    Ieee802154 = 4
+    Ieee802154 = 2,
 }
 
+#[cfg(any(bt, ieee802154, wifi))]
 /// Tracks which modems currently request an active PHY clock.
-static PHY_CLOCK_REFS: AtomicU8 = AtomicU8::new(0);
+static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[AtomicU8; 3]> = critical_section::Mutex::new([const { AtomicU8::new(0) }; 3]);
 
+// These functions are moved out of the trait to prevent monomorphization for
+// every modem clock controller. If that doens't really make sense, this can be
+// moved back.
 
-// These functions are moved out of the trait to prevent monomorphization for every modem clock
-// controller. If that doens't really make sense, this can be moved back.
-
-fn enable_phy_clock_internal(modem_bitmask: ModemBitmask) {
-    if PHY_CLOCK_REFS.fetch_or(modem_bitmask as u8, Ordering::Relaxed) == 0 {
-        clocks_ll::enable_phy(true);
-    }
+#[cfg(any(bt, ieee802154, wifi))]
+fn enable_phy_clock_internal(modem: Modem) {
+    critical_section::with(|cs| {
+        let phy_clock_refs = PHY_CLOCK_REF_COUNTERS.borrow(cs);
+        if phy_clock_refs[modem as usize].fetch_add(1, Ordering::Relaxed) == 0 {
+            clocks_ll::enable_phy(true);
+        }
+    });
 }
-fn disable_phy_clock_internal(modem_bitmask: ModemBitmask) {
-    if PHY_CLOCK_REFS.fetch_and(!(modem_bitmask as u8), Ordering::Relaxed) == modem_bitmask as u8 {
-        clocks_ll::enable_phy(false);
-    }
+#[cfg(any(bt, ieee802154, wifi))]
+fn disable_phy_clock_internal(modem: Modem) {
+    critical_section::with(|cs| {
+        let mut phy_clock_refs_present = false;
+
+        for (i, modem_phy_clock_ref_counter) in PHY_CLOCK_REF_COUNTERS.borrow(cs).iter().enumerate() {
+            let mut modem_phy_clock_ref_count = modem_phy_clock_ref_counter.load(Ordering::Relaxed);
+
+            if i == modem as usize {
+                modem_phy_clock_ref_count = modem_phy_clock_ref_count.saturating_sub(1);
+                modem_phy_clock_ref_counter.store(modem_phy_clock_ref_count, Ordering::Relaxed);
+            }
+            if modem_phy_clock_ref_count != 0 {
+                phy_clock_refs_present = true;
+            }
+        }
+        if !phy_clock_refs_present {
+            clocks_ll::enable_phy(false);
+        }
+    });
 }
 
-/// This trait provides common functionality for all 
+#[cfg(any(bt, ieee802154, wifi))]
+#[instability::unstable]
+/// This trait provides common functionality for all
 pub trait ModemClockController: Sealed {
     #[doc(hidden)]
-    const MODEM_BITMASK: ModemBitmask;
+    const MODEM: Modem;
+
     /// Enable the modem clock for this controller.
     fn enable_modem_clock(&mut self, enable: bool);
 
     /// Enable the PHY clock.
     ///
-    /// If disabling the PHY clock is requested, but another modem currently relies on the PHY
-    /// clock being active, this won't disable the clock.
+    /// If disabling the PHY clock is requested, but another modem currently
+    /// relies on the PHY clock being active, this won't disable the clock.
     fn enable_phy_clock(&mut self, enable: bool) {
         if enable {
-        enable_phy_clock_internal(Self::MODEM_BITMASK);
+            enable_phy_clock_internal(Self::MODEM);
         } else {
-            disable_phy_clock_internal(Self::MODEM_BITMASK);
+            disable_phy_clock_internal(Self::MODEM);
         }
     }
+
+    /// Do any common initial initialization needed
+    #[instability::unstable]
+    #[inline]
+    fn init_clocks(&mut self) {
+        clocks_ll::init_clocks();
+    }
 }
+#[cfg(wifi)]
+#[instability::unstable]
 /// Controller for the Wi-Fi modem clock.
 pub struct WiFiClockController<'d> {
-    _phantom: PhantomData<&'d ()>
+    _phantom: PhantomData<&'d ()>,
 }
+#[cfg(wifi)]
 impl Sealed for WiFiClockController<'_> {}
+#[cfg(wifi)]
 impl ModemClockController for WiFiClockController<'_> {
-    const MODEM_BITMASK: ModemBitmask = ModemBitmask::WiFi;
+    const MODEM: Modem = Modem::WiFi;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_wifi(enable);
+    }
+}
+#[cfg(bt)]
+#[instability::unstable]
+impl WiFiClockController<'_> {
+    /// Reset the Wi-Fi MAC
+    pub fn reset_wifi_mac(&mut self) {
+        clocks_ll::reset_wifi_mac();
+    }
+}
+
+#[cfg(bt)]
+#[instability::unstable]
+/// Controller for the Bluetooth / BLE modem clock.
+pub struct BtClockController<'d> {
+    _phantom: PhantomData<&'d ()>,
+}
+#[cfg(bt)]
+impl Sealed for BtClockController<'_> {}
+#[cfg(bt)]
+impl ModemClockController for BtClockController<'_> {
+    const MODEM: Modem = Modem::Bt;
+    fn enable_modem_clock(&mut self, enable: bool) {
+        clocks_ll::enable_bt(enable);
+    }
+}
+#[cfg(bt)]
+impl BtClockController<'_> {
+    /// Reset the Bluetooth Resolvable Private Address (RPA).
+    #[instability::unstable]
+    #[inline]
+    pub fn reset_rpa(&mut self) {
+        clocks_ll::reset_rpa();
+    }
+
+    /// Initialize BLE RTC clocks
+    #[instability::unstable]
+    #[inline]
+    pub fn ble_rtc_clk_init(&mut self) {
+        clocks_ll::ble_rtc_clk_init();
+    }
+}
+
+#[cfg(ieee802154)]
+#[instability::unstable]
+/// Controller for the IEEE 802.15.4 modem clock.
+pub struct Ieee802154ClockController<'d> {
+    _phantom: PhantomData<&'d ()>,
+}
+#[cfg(ieee802154)]
+impl Sealed for Ieee802154ClockController<'_> {}
+#[cfg(ieee802154)]
+impl ModemClockController for Ieee802154ClockController<'_> {
+    const MODEM: Modem = Modem::Ieee802154;
+    fn enable_modem_clock(&mut self, enable: bool) {
+        clocks_ll::enable_ieee802154(enable);
     }
 }

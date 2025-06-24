@@ -1061,7 +1061,7 @@ pub unsafe extern "C" fn wifi_reset_mac() {
     // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
     // value) into `init`
     let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).reset_mac();
+    RadioClockController::new(radio_clocks).reset_wifi_mac();
 }
 
 /// **************************************************************************
