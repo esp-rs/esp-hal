@@ -490,6 +490,7 @@ impl Config {
                     touch: bool,
                     usb_dm: bool,
                     usb_dp: bool,
+                    usb_device: bool,
                 }
 
                 let mut pin_attrs = PinAttrs {
@@ -500,6 +501,7 @@ impl Config {
                     touch: false,
                     usb_dm: false,
                     usb_dp: false,
+                    usb_device: false,
                 };
                 pin.kind.iter().for_each(|kind| match kind {
                     cfg::PinCapability::Input => pin_attrs.input = true,
@@ -509,6 +511,7 @@ impl Config {
                     cfg::PinCapability::Touch => pin_attrs.touch = true,
                     cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
                     cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
+                    cfg::PinCapability::UsbDevice => pin_attrs.usb_device = true,
                 });
 
                 let mut attrs = vec![];
@@ -536,6 +539,9 @@ impl Config {
                 }
                 if pin_attrs.usb_dp {
                     attrs.push(quote::quote! { UsbDp });
+                }
+                if pin_attrs.usb_device {
+                    attrs.push(quote::quote! { UsbDevice });
                 }
 
                 attrs
@@ -687,7 +693,7 @@ impl Config {
                     ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
                         match $any_pin.number() {
                             #(#impl_branches)*
-                            _ => unreachable!(),
+                            _ => $otherwise,
                         }
                     };
                     ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt) => {
