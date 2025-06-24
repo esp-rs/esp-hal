@@ -10,8 +10,8 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
-# this is commonly used to force a single version of a crate
-# but we use this to make Cargo metadata passing to a dependent crate
+# this is commonly used to force a single version of a crate (with mediocre DX)
+# but we also use this to make Cargo metadata passing to a dependent crate
 # work: see https://doc.rust-lang.org/cargo/reference/build-scripts.html#the-links-manifest-key
 # and only allowing one version of the ROM functions is a wanted side effect
 links         = "esp_hal_rom"
@@ -24,16 +24,36 @@ features       = ["esp32c6"]
 bench = false
 test  = false
 
+[dependencies]
+defmt  = { version = "1.0.1", optional = true }
+log-04 = { package = "log", version = "0.4.26", optional = true }
+
 [build-dependencies]
 esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
 [features]
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+# The following trailing spaces ("## ") are important to display the feature names.
+
+## 
 esp32   = []
+## 
 esp32c2 = []
+## 
 esp32c3 = []
+## 
 esp32c6 = []
+## 
 esp32h2 = []
+## 
 esp32s2 = []
+## 
 esp32s3 = []
 
-defmt   = []
+## Enable support for version 0.4 of the `log` crate
+log-04 = ["dep:log-04"]
+
+## Enable support for `defmt`
+defmt = ["dep:defmt"]
