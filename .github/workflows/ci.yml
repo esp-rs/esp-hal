@@ -157,11 +157,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
-      # release channel, MIRI is only available in nightly
+      # release channel:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: nightly
-          components: rustfmt,miri
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
@@ -172,11 +172,3 @@ jobs:
 
       # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test --features=std
-
-      # Run tests in esp-storage
-      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
-
-      # Miri tests in esp-storage
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1

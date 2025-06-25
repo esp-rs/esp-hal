@@ -1,6 +1,8 @@
+use core::mem::MaybeUninit;
+
 use embedded_storage::{ReadStorage, Storage};
 
-use crate::{FlashStorage, FlashStorageError, buffer::FlashSectorBuffer};
+use crate::{FlashSectorBuffer, FlashStorage, FlashStorageError};
 
 impl ReadStorage for FlashStorage {
     type Error = FlashStorageError;
@@ -12,7 +14,8 @@ impl ReadStorage for FlashStorage {
         let mut aligned_offset = offset - data_offset;
 
         // Bypass clearing sector buffer for performance reasons
-        let mut sector_data = FlashSectorBuffer::uninit();
+        let mut sector_data = MaybeUninit::<FlashSectorBuffer>::uninit();
+        let sector_data = unsafe { sector_data.assume_init_mut() };
 
         while !bytes.is_empty() {
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as _);
@@ -21,11 +24,8 @@ impl ReadStorage for FlashStorage {
                 & !(Self::WORD_SIZE - 1) as usize;
 
             // Read only needed data words
-            let sector_data = &mut sector_data.as_bytes_mut()[..aligned_end];
-            self.internal_read(aligned_offset, sector_data)?;
-            let sector_data = unsafe {
-                core::slice::from_raw_parts_mut(sector_data.as_ptr() as *mut u8, sector_data.len())
-            };
+            self.internal_read(aligned_offset, &mut sector_data[..aligned_end])?;
+
             bytes[..len].copy_from_slice(&sector_data[data_offset as usize..][..len]);
 
             aligned_offset += Self::SECTOR_SIZE;
@@ -52,17 +52,17 @@ impl Storage for FlashStorage {
         let mut aligned_offset = offset - data_offset;
 
         // Bypass clearing sector buffer for performance reasons
-        let mut sector_data = FlashSectorBuffer::uninit();
+        let mut sector_data = MaybeUninit::<FlashSectorBuffer>::uninit();
+        let sector_data = unsafe { sector_data.assume_init_mut() };
 
         while !bytes.is_empty() {
-            self.internal_read(aligned_offset, sector_data.as_bytes_mut())?;
-            let sector_data = unsafe { sector_data.assume_init_bytes_mut() };
+            self.internal_read(aligned_offset, &mut sector_data[..])?;
 
             let len = bytes.len().min((Self::SECTOR_SIZE - data_offset) as _);
 
             sector_data[data_offset as usize..][..len].copy_from_slice(&bytes[..len]);
             self.internal_erase(aligned_offset / Self::SECTOR_SIZE)?;
-            self.internal_write(aligned_offset, sector_data)?;
+            self.internal_write(aligned_offset, &sector_data[..])?;
 
             aligned_offset += Self::SECTOR_SIZE;
             data_offset = 0;
