@@ -77,7 +77,7 @@ crate::peripherals! {
         UHCI1 <= UHCI1,
         ULP_RISCV_CORE <= virtual,
         USB0 <= USB0,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         USB_WRAP <= USB_WRAP,
         WCL <= WCL,
         WIFI <= virtual,
