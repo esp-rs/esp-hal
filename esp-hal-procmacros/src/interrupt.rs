@@ -65,12 +65,17 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     );
 
     let priority = match priority {
-        Some(priority) => {
-            quote::quote!( #priority )
-        }
-        _ => {
-            quote::quote! { #root::interrupt::Priority::min() }
-        }
+        Some(ref priority) => quote::quote!( {
+            const {
+                core::assert!(
+                    !matches!(#priority, #root::interrupt::Priority::None),
+                    "Priority::None is not supported",
+                );
+            };
+
+            #priority
+        } ),
+        _ => quote::quote! { #root::interrupt::Priority::min() },
     };
 
     // XXX should we blacklist other attributes?
@@ -114,15 +119,6 @@ pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
 
     quote::quote_spanned!(original_span =>
         #f
-
-        const _: () = {
-            core::assert!(
-            match #priority {
-                #root::interrupt::Priority::None => false,
-                _ => true,
-            },
-            "Priority::None is not supported");
-        };
 
         #[allow(non_upper_case_globals)]
         #vis const #orig: #root::interrupt::InterruptHandler = #root::interrupt::InterruptHandler::new(#new, #priority);
