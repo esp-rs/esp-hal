@@ -197,7 +197,7 @@ mod _generated {
 
 use core::marker::PhantomData;
 
-use esp_hal_rom as _;
+use esp_rom_sys as _;
 
 metadata!("build_info", CHIP_NAME, chip!());
 

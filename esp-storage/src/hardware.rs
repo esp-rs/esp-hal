@@ -1,5 +1,5 @@
-use esp_hal_rom as _;
-use esp_hal_rom::rom::spiflash::*;
+use esp_rom_sys as _;
+use esp_rom_sys::rom::spiflash::*;
 
 use crate::maybe_with_critical_section;
 

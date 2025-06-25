@@ -65,11 +65,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut cfg =
         generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
 
-    // esp-hal-rom might wish to contribute to .rwtext
+    // esp-rom-sys might wish to contribute to .rwtext
     cfg.insert(
         "RWTEXT_ADDITION".to_string(),
         Value::String(
-            if let Ok(rwtext_addition) = std::env::var("DEP_ESP_HAL_ROM_RWTEXT_ROM_FUNCTIONS") {
+            if let Ok(rwtext_addition) = std::env::var("DEP_esp_rom_sys_RWTEXT_ROM_FUNCTIONS") {
                 rwtext_addition.replace("\\n", "\n")
             } else {
                 "".to_string()

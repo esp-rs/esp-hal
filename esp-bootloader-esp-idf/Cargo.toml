@@ -22,7 +22,7 @@ cfg-if = "1.0.0"
 defmt = { version = "1.0.1", optional = true }
 document-features = "0.2.11"
 esp-config = { version = "0.4.0", path = "../esp-config" }
-esp-hal-rom = { version = "0.0.0", path = "../esp-hal-rom", optional = true }
+esp-rom-sys = { version = "0.0.0", path = "../esp-rom-sys", optional = true }
 embedded-storage = "0.3.1"
 log-04 = { package = "log", version = "0.4.26", optional = true }
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
@@ -56,16 +56,16 @@ std = ["dep:crc"]
 # The following trailing spaces ("## ") are important to display the feature names.
 
 ## 
-esp32c2   = ["esp-hal-rom/esp32c2"]
+esp32c2   = ["esp-rom-sys/esp32c2"]
 ## 
-esp32c3   = ["esp-hal-rom/esp32c3"]
+esp32c3   = ["esp-rom-sys/esp32c3"]
 ## 
-esp32c6   = ["esp-hal-rom/esp32c6"]
+esp32c6   = ["esp-rom-sys/esp32c6"]
 ## 
-esp32h2   = ["esp-hal-rom/esp32h2"]
+esp32h2   = ["esp-rom-sys/esp32h2"]
 ## 
-esp32     = ["esp-hal-rom/esp32"]
+esp32     = ["esp-rom-sys/esp32"]
 ## 
-esp32s2   = ["esp-hal-rom/esp32s2"]
+esp32s2   = ["esp-rom-sys/esp32s2"]
 ## 
-esp32s3   = ["esp-hal-rom/esp32s3"]
+esp32s3   = ["esp-rom-sys/esp32s3"]

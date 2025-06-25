@@ -23,6 +23,6 @@
 //! [CRC (Cyclic Redundancy Check)]: ./crc/index.html
 //! [MD5 (Message Digest 5)]: ./md5/index.html
 
-pub use esp_hal_rom::rom::*;
+pub use esp_rom_sys::rom::*;
 
 pub(crate) mod regi2c;
