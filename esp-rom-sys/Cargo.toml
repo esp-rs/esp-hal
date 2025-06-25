@@ -1,10 +1,10 @@
 [package]
-name          = "esp-hal-rom"
+name          = "esp-rom-sys"
 version       = "0.0.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "ROM code support"
-documentation = "https://docs.espressif.com/projects/rust/esp-hal-rom/latest/"
+documentation = "https://docs.espressif.com/projects/rust/esp-rom-sys/latest/"
 keywords      = ["embedded", "esp32", "espressif"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
@@ -14,7 +14,7 @@ license       = "MIT OR Apache-2.0"
 # but we also use this to make Cargo metadata passing to a dependent crate
 # work: see https://doc.rust-lang.org/cargo/reference/build-scripts.html#the-links-manifest-key
 # and only allowing one version of the ROM functions is a wanted side effect
-links         = "esp_hal_rom"
+links         = "esp_rom_sys"
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

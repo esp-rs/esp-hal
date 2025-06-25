@@ -9,7 +9,7 @@ exclude  = [
     "esp-hal",
     "esp-hal-embassy",
     "esp-hal-procmacros",
-    "esp-hal-rom",
+    "esp-rom-sys",
     "esp-ieee802154",
     "esp-lp-hal",
     "esp-metadata",

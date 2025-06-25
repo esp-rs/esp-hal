@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // exploit the fact that linkers treat an unknown library format as a linker
     // script
-    println!("cargo:rustc-link-lib=esp_hal_rom");
+    println!("cargo:rustc-link-lib=esp_rom_sys");
 
     Ok(())
 }

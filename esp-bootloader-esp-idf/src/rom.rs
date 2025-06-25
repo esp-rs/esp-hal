@@ -6,6 +6,6 @@ impl Crc32 {
     }
 
     pub fn crc(&self, data: &[u8]) -> u32 {
-        esp_hal_rom::rom::crc::crc32_le(u32::MAX, data)
+        esp_rom_sys::rom::crc::crc32_le(u32::MAX, data)
     }
 }
