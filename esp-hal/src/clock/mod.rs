@@ -44,9 +44,7 @@
 //! # }
 //! ```
 
-use core::{marker::PhantomData, sync::atomic::Ordering};
-
-use portable_atomic::AtomicU8;
+use core::{marker::PhantomData, cell::Cell};
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
@@ -715,7 +713,7 @@ pub enum Modem {
 
 #[cfg(any(bt, ieee802154, wifi))]
 /// Tracks which modems currently request an active PHY clock.
-static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[AtomicU8; 3]> = critical_section::Mutex::new([const { AtomicU8::new(0) }; 3]);
+static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[Cell<u8>; 3]> = critical_section::Mutex::new([const { Cell::new(0) }; 3]);
 
 // These functions are moved out of the trait to prevent monomorphization for
 // every modem clock controller. If that doens't really make sense, this can be
@@ -724,8 +722,12 @@ static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[AtomicU8; 3]> = critical
 #[cfg(any(bt, ieee802154, wifi))]
 fn enable_phy_clock_internal(modem: Modem) {
     critical_section::with(|cs| {
-        let phy_clock_refs = PHY_CLOCK_REF_COUNTERS.borrow(cs);
-        if phy_clock_refs[modem as usize].fetch_add(1, Ordering::Relaxed) == 0 {
+        let modem_phy_clock_ref_counter = &PHY_CLOCK_REF_COUNTERS.borrow(cs)[modem as usize];
+        let modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
+
+        // If other modems have reference to the PHY clock, but this one doesn't, the PHY clock
+        // will just be set to enabled again, which shouldn't have any effect.
+        if modem_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
     });
@@ -736,11 +738,11 @@ fn disable_phy_clock_internal(modem: Modem) {
         let mut phy_clock_refs_present = false;
 
         for (i, modem_phy_clock_ref_counter) in PHY_CLOCK_REF_COUNTERS.borrow(cs).iter().enumerate() {
-            let mut modem_phy_clock_ref_count = modem_phy_clock_ref_counter.load(Ordering::Relaxed);
+            let mut modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
 
             if i == modem as usize {
                 modem_phy_clock_ref_count = modem_phy_clock_ref_count.saturating_sub(1);
-                modem_phy_clock_ref_counter.store(modem_phy_clock_ref_count, Ordering::Relaxed);
+                modem_phy_clock_ref_counter.set(modem_phy_clock_ref_count);
             }
             if modem_phy_clock_ref_count != 0 {
                 phy_clock_refs_present = true;
