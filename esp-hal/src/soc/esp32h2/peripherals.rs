@@ -83,7 +83,7 @@ crate::peripherals! {
         TRACE0 <= TRACE,
         TWAI0 <= TWAI0,
         UHCI0 <= UHCI0,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         MEM2MEM1 <= virtual,
         MEM2MEM4 <= virtual,
         MEM2MEM5 <= virtual,
