@@ -1,10 +1,5 @@
 //! Low-level access to Xtensa LX processors and peripherals.
 //!
-//! ## Minimum Supported Rust Version (MSRV)
-//!
-//! This crate is guaranteed to compile on stable Rust 1.65 and up. It might
-//! compile with older versions but that may change in any new patch release.
-//!
 //! ## Feature Flags
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register)]
