@@ -2,9 +2,10 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::{Ieee802154ClockController, ModemClockController},
+    clock::{ModemClockController, PhyClockGuard},
     handler,
     interrupt::Priority,
+    peripherals::IEEE802154,
 };
 use esp_wifi_sys::include::{
     esp_phy_calibration_data_t,
@@ -19,11 +20,11 @@ use heapless::spsc::Queue;
 
 use crate::{
     frame::{
-        frame_get_version,
-        frame_is_ack_required,
         FRAME_SIZE,
         FRAME_VERSION_1,
         FRAME_VERSION_2,
+        frame_get_version,
+        frame_is_ack_required,
     },
     hal::*,
     pib::*,
@@ -75,10 +76,10 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(mut ieee802154_clock_controller: Ieee802154ClockController<'_>) {
-    ieee802154_clock_controller.init_clocks();
-    ieee802154_clock_controller.enable_phy_clock(true);
-    ieee802154_clock_controller.enable_modem_clock(true);
+pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<'_> {
+    radio.init_clocks();
+    let phy_clock_guard = radio.enable_phy_clock();
+    radio.enable_modem_clock(true);
 
     esp_phy_enable();
     esp_btbb_enable();
@@ -86,6 +87,7 @@ pub(crate) fn esp_ieee802154_enable(mut ieee802154_clock_controller: Ieee802154C
 
     unsafe { phy_version_print() }; // libphy.a
     info!("date={:x}", mac_date());
+    phy_clock_guard
 }
 
 fn esp_phy_enable() {

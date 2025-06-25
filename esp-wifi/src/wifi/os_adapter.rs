@@ -30,8 +30,8 @@ use crate::{
         malloc::calloc,
     },
     hal::{
-        clock::RadioClockController,
-        peripherals::RADIO_CLK,
+        clock::ModemClockController,
+        peripherals::WIFI,
         sync::{Locked, RawMutex},
     },
     memory_fence::memory_fence,
@@ -1058,10 +1058,9 @@ pub unsafe extern "C" fn phy_update_country_info(
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_reset_mac() {
     trace!("wifi_reset_mac");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // stealing WIFI is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).reset_wifi_mac();
+    unsafe { WIFI::steal() }.reset_wifi_mac();
 }
 
 /// **************************************************************************
@@ -1079,10 +1078,9 @@ pub unsafe extern "C" fn wifi_reset_mac() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_enable() {
     trace!("wifi_clock_enable");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // stealing WIFI is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).enable_wifi(true);
+    unsafe { WIFI::steal() }.enable_modem_clock(true);
 }
 
 /// **************************************************************************
@@ -1100,10 +1098,9 @@ pub unsafe extern "C" fn wifi_clock_enable() {
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_clock_disable() {
     trace!("wifi_clock_disable");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // stealing WIFI is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).enable_wifi(false);
+    unsafe { WIFI::steal() }.enable_modem_clock(false);
 }
 
 /// **************************************************************************

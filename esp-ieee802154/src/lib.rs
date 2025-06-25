@@ -17,12 +17,12 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
-use core::{cell::RefCell, marker::PhantomData};
+use core::cell::RefCell;
 
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_config::*;
-use esp_hal::{clock::Ieee802154ClockController, peripherals::IEEE802154};
+use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
 use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
@@ -113,18 +113,16 @@ impl Default for Config {
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
-    _phantom1: PhantomData<&'a ()>,
+    _phy_clock_guard: PhyClockGuard<'a>,
 }
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154<'a>, ieee802154_clock_controller: Ieee802154ClockController<'a>) -> Self {
-        esp_ieee802154_enable(ieee802154_clock_controller);
-
+    pub fn new(radio: IEEE802154<'a>) -> Self {
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
-            _phantom1: PhantomData,
+            _phy_clock_guard: esp_ieee802154_enable(radio),
         }
     }
 

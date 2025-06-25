@@ -44,8 +44,14 @@
 //! # }
 //! ```
 
-use core::{marker::PhantomData, cell::Cell};
+use core::{cell::Cell, marker::PhantomData};
 
+#[cfg(bt)]
+use crate::peripherals::BT;
+#[cfg(ieee802154)]
+use crate::peripherals::IEEE802154;
+#[cfg(wifi)]
+use crate::peripherals::WIFI;
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
 use crate::{private::Sealed, time::Rate};
@@ -593,113 +599,9 @@ impl Clocks {
     }
 }
 
-/// Split modem clock controllers
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
-pub struct ModemClockControllers<'d> {
-    /// Modem clock controller for Wi-Fi
-    #[cfg(wifi)]
-    pub wifi: WiFiClockController<'d>,
-    /// Modem clock controller for Bluetooth
-    #[cfg(bt)]
-    pub bt: BtClockController<'d>,
-    /// Modem clock controller for IEEE 802.15.4
-    #[cfg(ieee802154)]
-    pub ieee802154: Ieee802154ClockController<'d>
-}
-
-/// Control the radio peripheral clocks
-#[cfg(any(bt, ieee802154, wifi))]
-#[instability::unstable]
-pub struct RadioClockController<'d> {
-    _rcc: crate::peripherals::RADIO_CLK<'d>,
-}
-
-#[cfg(any(bt, ieee802154, wifi))]
-impl<'d> RadioClockController<'d> {
-    /// Create a new instance of the radio clock controller
-    #[instability::unstable]
-    pub fn new(rcc: crate::peripherals::RADIO_CLK<'d>) -> Self {
-        Self { _rcc: rcc }
-    }
-
-    /// Enable the PHY clocks
-    #[instability::unstable]
-    #[cfg(phy)]
-    #[inline]
-    pub fn enable_phy(&mut self, enable: bool) {
-        clocks_ll::enable_phy(enable);
-    }
-
-    /// Enable the Bluetooth clocks
-    #[instability::unstable]
-    #[cfg(bt)]
-    #[inline]
-    pub fn enable_bt(&mut self, enable: bool) {
-        clocks_ll::enable_bt(enable);
-    }
-
-    /// Enable the WiFi clocks
-    #[instability::unstable]
-    #[cfg(wifi)]
-    #[inline]
-    pub fn enable_wifi(&mut self, enable: bool) {
-        clocks_ll::enable_wifi(enable);
-    }
-
-    /// Enable the IEEE 802.15.4 peripheral clocks
-    #[instability::unstable]
-    #[cfg(ieee802154)]
-    #[inline]
-    pub fn enable_ieee802154(&mut self, enable: bool) {
-        clocks_ll::enable_ieee802154(enable);
-    }
-
-    /// Reset the Wi-Fi MAC
-    #[instability::unstable]
-    #[inline]
-    pub fn reset_wifi_mac(&mut self) {
-        clocks_ll::reset_wifi_mac();
-    }
-
-    /// Do any common initial initialization needed
-    #[instability::unstable]
-    #[inline]
-    pub fn init_clocks(&mut self) {
-        clocks_ll::init_clocks();
-    }
-
-    /// Initialize BLE RTC clocks
-    #[instability::unstable]
-    #[inline]
-    pub fn ble_rtc_clk_init(&mut self) {
-        clocks_ll::ble_rtc_clk_init();
-    }
-
-    /// Reset the Bluetooth Resolvable Private Address (RPA).
-    #[instability::unstable]
-    #[inline]
-    pub fn reset_rpa(&mut self) {
-        clocks_ll::reset_rpa();
-    }
-    /// Split the radio clock controller into individual modem clock controllers.
-    #[instability::unstable]
-    #[inline]
-    pub fn split(self) -> ModemClockControllers<'d> {
-        ModemClockControllers {
-            #[cfg(wifi)]
-            wifi: WiFiClockController { _phantom: PhantomData },
-            #[cfg(bt)]
-            bt: BtClockController { _phantom: PhantomData },
-            #[cfg(ieee802154)]
-            ieee802154: Ieee802154ClockController { _phantom: PhantomData }
-        }
-    }
-}
-
-#[cfg(any(bt, ieee802154, wifi))]
-#[instability::unstable]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[doc(hidden)]
 /// These are all modems with bitmasks as their representation.
 pub enum Modem {
@@ -713,20 +615,22 @@ pub enum Modem {
 
 #[cfg(any(bt, ieee802154, wifi))]
 /// Tracks which modems currently request an active PHY clock.
-static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[Cell<u8>; 3]> = critical_section::Mutex::new([const { Cell::new(0) }; 3]);
+static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[Cell<u8>; 3]> =
+    critical_section::Mutex::new([const { Cell::new(0) }; 3]);
 
 // These functions are moved out of the trait to prevent monomorphization for
 // every modem clock controller. If that doens't really make sense, this can be
 // moved back.
 
 #[cfg(any(bt, ieee802154, wifi))]
-fn enable_phy_clock_internal(modem: Modem) {
+fn increase_phy_clock_ref_count_internal(modem: Modem) {
     critical_section::with(|cs| {
         let modem_phy_clock_ref_counter = &PHY_CLOCK_REF_COUNTERS.borrow(cs)[modem as usize];
         let modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
 
-        // If other modems have reference to the PHY clock, but this one doesn't, the PHY clock
-        // will just be set to enabled again, which shouldn't have any effect.
+        // If other modems have reference to the PHY clock, but this one doesn't, the
+        // PHY clock will just be set to enabled again, which shouldn't have any
+        // effect.
         if modem_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
@@ -735,11 +639,12 @@ fn enable_phy_clock_internal(modem: Modem) {
     });
 }
 #[cfg(any(bt, ieee802154, wifi))]
-fn disable_phy_clock_internal(modem: Modem) {
+fn decrease_phy_clock_ref_count_internal(modem: Modem) {
     critical_section::with(|cs| {
         let mut phy_clock_refs_present = false;
 
-        for (i, modem_phy_clock_ref_counter) in PHY_CLOCK_REF_COUNTERS.borrow(cs).iter().enumerate() {
+        for (i, modem_phy_clock_ref_counter) in PHY_CLOCK_REF_COUNTERS.borrow(cs).iter().enumerate()
+        {
             let mut modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
 
             if i == modem as usize {
@@ -755,54 +660,81 @@ fn disable_phy_clock_internal(modem: Modem) {
         }
     });
 }
-
+/// Do any common initial initialization needed for the radio clocks
+#[inline]
+pub fn init_radio_clocks() {
+    clocks_ll::init_clocks();
+}
+#[instability::unstable]
+#[cfg(any(bt, ieee802154, wifi))]
+#[derive(Debug)]
+/// Prevents the PHY clock from being disabled.
+///
+/// As long as at least one [PhyClockGuard] exists, the PHY clock will remain
+/// active. To release this guard, you can either let it go out of scope or use
+/// [PhyClockGuard::release] to explicitly release it.
+pub struct PhyClockGuard<'d> {
+    modem: Modem,
+    _phantom: PhantomData<&'d ()>,
+}
+#[cfg(any(bt, ieee802154, wifi))]
+impl PhyClockGuard<'_> {
+    #[instability::unstable]
+    #[inline]
+    /// Release the clock guard.
+    ///
+    /// The PHY clock will be disabled, if this is the last clock guard.
+    pub fn release(self) {}
+}
+#[cfg(any(bt, ieee802154, wifi))]
+impl Drop for PhyClockGuard<'_> {
+    fn drop(&mut self) {
+        decrease_phy_clock_ref_count_internal(self.modem);
+    }
+}
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
 /// This trait provides common functionality for all
-pub trait ModemClockController: Sealed {
+pub trait ModemClockController<'d>: Sealed + 'd {
     #[doc(hidden)]
     const MODEM: Modem;
 
     /// Enable the modem clock for this controller.
     fn enable_modem_clock(&mut self, enable: bool);
 
-    /// Enable the PHY clock.
+    /// Enable the PHY clock and acquire a [PhyClockGuard].
     ///
-    /// If disabling the PHY clock is requested, but another modem currently
-    /// relies on the PHY clock being active, this won't disable the clock.
-    fn enable_phy_clock(&mut self, enable: bool) {
-        if enable {
-            enable_phy_clock_internal(Self::MODEM);
-        } else {
-            disable_phy_clock_internal(Self::MODEM);
+    /// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
+    /// modems were dropped.
+    fn enable_phy_clock(&self) -> PhyClockGuard<'d> {
+        increase_phy_clock_ref_count_internal(Self::MODEM);
+        PhyClockGuard {
+            modem: Self::MODEM,
+            _phantom: PhantomData,
         }
     }
 
-    /// Do any common initial initialization needed
-    #[instability::unstable]
-    #[inline]
-    fn init_clocks(&mut self) {
-        clocks_ll::init_clocks();
+    /// Unsafely decrease the PHY clock reference count for this modem.
+    ///
+    /// # Safety
+    /// Calling this is only safe, if you previously [core::mem::forget] a
+    /// [PhyClockGuard], since otherwise the reference counting would be
+    /// left in an invalid state.
+    unsafe fn decrease_phy_clock_ref_count(&self) {
+        decrease_phy_clock_ref_count_internal(Self::MODEM);
     }
 }
+
 #[cfg(wifi)]
 #[instability::unstable]
-/// Controller for the Wi-Fi modem clock.
-pub struct WiFiClockController<'d> {
-    _phantom: PhantomData<&'d ()>,
-}
-#[cfg(wifi)]
-impl Sealed for WiFiClockController<'_> {}
-#[cfg(wifi)]
-#[instability::unstable]
-impl ModemClockController for WiFiClockController<'_> {
+impl<'d> ModemClockController<'d> for WIFI<'d> {
     const MODEM: Modem = Modem::WiFi;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_wifi(enable);
     }
 }
 #[cfg(wifi)]
-impl WiFiClockController<'_> {
+impl WIFI<'_> {
     #[instability::unstable]
     /// Reset the Wi-Fi MAC
     pub fn reset_wifi_mac(&mut self) {
@@ -812,22 +744,14 @@ impl WiFiClockController<'_> {
 
 #[cfg(bt)]
 #[instability::unstable]
-/// Controller for the Bluetooth / BLE modem clock.
-pub struct BtClockController<'d> {
-    _phantom: PhantomData<&'d ()>,
-}
-#[cfg(bt)]
-impl Sealed for BtClockController<'_> {}
-#[cfg(bt)]
-#[instability::unstable]
-impl ModemClockController for BtClockController<'_> {
+impl<'d> ModemClockController<'d> for BT<'d> {
     const MODEM: Modem = Modem::Bt;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_bt(enable);
     }
 }
 #[cfg(bt)]
-impl BtClockController<'_> {
+impl BT<'_> {
     /// Reset the Bluetooth Resolvable Private Address (RPA).
     #[instability::unstable]
     #[inline]
@@ -845,15 +769,7 @@ impl BtClockController<'_> {
 
 #[cfg(ieee802154)]
 #[instability::unstable]
-/// Controller for the IEEE 802.15.4 modem clock.
-pub struct Ieee802154ClockController<'d> {
-    _phantom: PhantomData<&'d ()>,
-}
-#[cfg(ieee802154)]
-impl Sealed for Ieee802154ClockController<'_> {}
-#[cfg(ieee802154)]
-#[instability::unstable]
-impl ModemClockController for Ieee802154ClockController<'_> {
+impl<'d> ModemClockController<'d> for IEEE802154<'d> {
     const MODEM: Modem = Modem::Ieee802154;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_ieee802154(enable);
