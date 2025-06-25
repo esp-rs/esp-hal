@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     cfg.insert(
         "RWTEXT_ADDITION".to_string(),
         Value::String(
-            if let Ok(rwtext_addition) = std::env::var("DEP_esp_rom_sys_RWTEXT_ROM_FUNCTIONS") {
+            if let Ok(rwtext_addition) = std::env::var("DEP_ESP_ROM_SYS_RWTEXT_ROM_FUNCTIONS") {
                 rwtext_addition.replace("\\n", "\n")
             } else {
                 "".to_string()
