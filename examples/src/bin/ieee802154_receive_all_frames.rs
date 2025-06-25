@@ -18,7 +18,7 @@ fn main() -> ! {
     let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, rcc.split().ieee802154);
 
     ieee802154.set_config(Config {
-        channel: 11,
+        channel: 15,
         promiscuous: true,
         rx_when_idle: true,
         auto_ack_rx: false,
