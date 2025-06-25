@@ -2204,13 +2204,6 @@ impl Driver<'_> {
             return Err(Error::ArbitrationLost);
         }
 
-        #[cfg(not(esp32))]
-        if r.trans_complete().bit_is_set() && self.regs().sr().read().resp_rec().bit_is_clear() {
-            return Err(Error::AcknowledgeCheckFailed(
-                AcknowledgeCheckFailedReason::Data,
-            ));
-        }
-
         #[cfg(i2c_master_has_fsm_timeouts)]
         {
             if r.scl_st_to().bit_is_set() {
