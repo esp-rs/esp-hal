@@ -358,9 +358,20 @@ pub fn execute_app(
         builder.add_arg("--release");
     }
 
-    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    if target.starts_with("xtensa") {
-        builder = builder.toolchain("esp");
+    let tc = std::env::var("RUSTUP_TOOLCHAIN");
+    let toolchain = match tc {
+        // Preserve user choice
+        Ok(ref tc) => Some(tc.as_str()),
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        _ if target.starts_with("xtensa") => Some("esp"),
+        _ => None,
+    };
+
+    if let Some(toolchain) = toolchain {
+        if toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
     }
 
     let args = builder.build();

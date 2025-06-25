@@ -55,6 +55,7 @@ where
     );
 
     let mut command = Command::new(get_cargo());
+
     command
         .args(args)
         .current_dir(cwd)
@@ -69,6 +70,11 @@ where
         } else {
             Stdio::inherit()
         });
+
+    if args.iter().any(|a| a.starts_with('+')) {
+        // Make sure the right cargo runs
+        command.env_remove("CARGO");
+    }
 
     let output = command.stdin(Stdio::inherit()).output()?;
 
@@ -88,11 +94,17 @@ fn get_cargo() -> String {
     // On Windows when executed via `cargo run` (e.g. via the xtask alias) the
     // `cargo` on the search path is NOT the cargo-wrapper but the `cargo` from the
     // toolchain - that one doesn't understand `+toolchain`
-    if let Ok(cargo) = std::env::var("CARGO_HOME") {
+    #[cfg(target_os = "windows")]
+    let cargo = if let Ok(cargo) = std::env::var("CARGO_HOME") {
         format!("{cargo}/bin/cargo")
     } else {
         String::from("cargo")
-    }
+    };
+
+    #[cfg(not(target_os = "windows"))]
+    let cargo = String::from("cargo");
+
+    cargo
 }
 
 #[derive(Debug, Default)]

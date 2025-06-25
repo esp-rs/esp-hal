@@ -251,7 +251,7 @@ fn lint_package(
     args: &[&str],
     features: &[String],
     fix: bool,
-    toolchain: Option<&str>,
+    mut toolchain: Option<&str>,
 ) -> Result<()> {
     log::info!(
         "Linting package: {} ({}, features: {:?})",
@@ -264,21 +264,18 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let mut builder = if !package.build_on_host() {
+    if !package.build_on_host() {
         if chip.is_xtensa() {
-            // We only overwrite Xtensas so that externally set nightly/stable toolchains
-            // are not overwritten.
-            builder = builder.arg("-Zbuild-std=core,alloc");
             // In case the user doesn't specify a toolchain, make sure we use +esp
-            builder = builder.toolchain("esp");
+            toolchain.get_or_insert("esp");
         }
-
-        builder.target(package.target_triple(chip)?)
-    } else {
-        builder
-    };
+        builder = builder.target(package.target_triple(chip)?);
+    }
 
     if let Some(toolchain) = toolchain {
+        if !package.build_on_host() && toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
         builder = builder.toolchain(toolchain);
     }
 

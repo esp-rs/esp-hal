@@ -11,6 +11,3 @@ target = "riscv32imac-unknown-none-elf" # ESP32-C6
 rustflags = [
   "-C", "link-arg=-Tlink.x",
 ]
-
-[unstable]
-build-std = ["core"]
