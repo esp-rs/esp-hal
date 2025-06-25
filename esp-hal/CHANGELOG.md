@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
-- The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 
 ### Changed
@@ -19,9 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnySpi` has been moved from `esp_hal::spi` to `esp_hal::spi::master` and `esp_hal::spi::slave` (#3627)
 - `DataMode` has been moved from `esp_hal::spi` to `esp_hal::spi::master` (#3627)
 - The `handler` macro (reexported from `esp-hal-procmacros`) no longer accepts priority as a string (#3643)
-- Generic parameters of RMT `Channel`s have changed in preparation for type-erased channels. (#3505) 
-- RMT `TxChannelCreator` and `RxChannelCreator` now have a `DriverMode` generic parameter; `TxChannelCreatorAsync` and `RxChannelCreatorAsync` have been removed. (#3505)
-- RMT `ChannelCreator` methods have been renamed from `configure` to `configure_tx` and `configure_rx` to avoid trait disambiguation issues. (#3505)
 
 ### Fixed
 
