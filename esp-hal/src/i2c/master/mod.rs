@@ -2802,7 +2802,7 @@ mod bus_clear {
 
     impl<'a> ClearBusFuture<'a> {
         // Number of SCL pulses to clear the bus
-        const BUS_CLEAR_BITS: u8 = 9;
+        const BUS_CLEAR_BITS: u8 = 10;
 
         pub fn new(driver: Driver<'a>) -> Self {
             let mut this = Self { driver };
