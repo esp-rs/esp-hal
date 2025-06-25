@@ -730,6 +730,8 @@ fn enable_phy_clock_internal(modem: Modem) {
         if modem_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
+
+        modem_phy_clock_ref_counter.set(modem_phy_clock_ref_count + 1);
     });
 }
 #[cfg(any(bt, ieee802154, wifi))]
