@@ -145,5 +145,4 @@ crate::peripherals! {
     ]
 }
 
-include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
 include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));

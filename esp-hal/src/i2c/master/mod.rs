@@ -3114,7 +3114,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
     }
 }
 
-crate::peripherals::for_each_i2c_master!(
+macro_rules! instance {
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
@@ -3141,7 +3141,12 @@ crate::peripherals::for_each_i2c_master!(
             }
         }
     };
-);
+}
+
+#[cfg(i2c_master_i2c0)]
+instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
+#[cfg(i2c_master_i2c1)]
+instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
 
 crate::any_peripheral! {
     /// Any I2C peripheral.
