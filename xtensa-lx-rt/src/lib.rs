@@ -1,10 +1,5 @@
 //! Minimal startup/runtime for Xtensa LX CPUs.
 //!
-//! ## Minimum Supported Rust Version (MSRV)
-//!
-//! This crate is guaranteed to compile on stable Rust 1.65 and up. It might
-//! compile with older versions but that may change in any new patch release.
-//!
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
