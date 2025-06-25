@@ -797,8 +797,8 @@ impl ModemClockController for WiFiClockController<'_> {
     }
 }
 #[cfg(wifi)]
-#[instability::unstable]
 impl WiFiClockController<'_> {
+    #[instability::unstable]
     /// Reset the Wi-Fi MAC
     pub fn reset_wifi_mac(&mut self) {
         clocks_ll::reset_wifi_mac();
