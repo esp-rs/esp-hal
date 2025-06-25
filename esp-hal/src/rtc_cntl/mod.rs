@@ -457,6 +457,12 @@ impl<'d> Rtc<'d> {
     }
 
     /// Enter deep sleep and wake with the provided `wake_sources`.
+    ///
+    /// In Deep-sleep mode, the CPUs, most of the RAM, and all digital
+    /// peripherals that are clocked from APB_CLK are powered off.
+    ///
+    /// You can use the [`#[esp_hal::ram(persistent)]`][procmacros::ram]
+    /// attribute to persist a variable though deep sleep.
     #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
     pub fn sleep_deep(&mut self, wake_sources: &[&dyn WakeSource]) -> ! {
         let config = RtcSleepConfig::deep();
