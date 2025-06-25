@@ -94,7 +94,7 @@ crate::peripherals! {
         TWAI0 <= TWAI0,
         TWAI1 <= TWAI1,
         UHCI0 <= UHCI0,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         WIFI <= virtual,
         MEM2MEM1 <= virtual,
         MEM2MEM4 <= virtual,
