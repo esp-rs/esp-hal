@@ -2,8 +2,9 @@
 //!
 //! ## Minimum Supported Rust Version (MSRV)
 //!
-//! This crate is guaranteed to compile on stable Rust 1.65 and up. It might
-//! compile with older versions but that may change in any new patch release.
+//! This crate is guaranteed to compile when using the latest stable Rust
+//! version at the time of the crate's release. It _might_ compile with older
+//! versions, but that may change in any new release, including patches.
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
