@@ -9,8 +9,6 @@ keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
-links         = "esp-hal"
-
 exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.docs.rs]
