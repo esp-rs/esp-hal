@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
-- ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 
 ### Changed
 
