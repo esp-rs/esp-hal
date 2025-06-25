@@ -54,7 +54,8 @@ where
         envs
     );
 
-    let output = Command::new(get_cargo())
+    let mut command = Command::new(get_cargo());
+    command
         .args(args)
         .current_dir(cwd)
         .envs(envs)
@@ -67,16 +68,19 @@ where
             Stdio::piped()
         } else {
             Stdio::inherit()
-        })
-        .stdin(Stdio::inherit())
-        .output()?;
+        });
+
+    let output = command.stdin(Stdio::inherit()).output()?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
     // requires this in order to function correctly:
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        bail!("Failed to execute cargo subcommand")
+        bail!(
+            "Failed to execute cargo subcommand `cargo {}`",
+            args.join(" "),
+        )
     }
 }
 
@@ -84,17 +88,11 @@ fn get_cargo() -> String {
     // On Windows when executed via `cargo run` (e.g. via the xtask alias) the
     // `cargo` on the search path is NOT the cargo-wrapper but the `cargo` from the
     // toolchain - that one doesn't understand `+toolchain`
-    #[cfg(target_os = "windows")]
-    let cargo = if let Ok(cargo) = std::env::var("CARGO_HOME") {
+    if let Ok(cargo) = std::env::var("CARGO_HOME") {
         format!("{cargo}/bin/cargo")
     } else {
         String::from("cargo")
-    };
-
-    #[cfg(not(target_os = "windows"))]
-    let cargo = String::from("cargo");
-
-    cargo
+    }
 }
 
 #[derive(Debug, Default)]
