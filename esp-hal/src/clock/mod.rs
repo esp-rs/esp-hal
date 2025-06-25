@@ -792,6 +792,7 @@ pub struct WiFiClockController<'d> {
 #[cfg(wifi)]
 impl Sealed for WiFiClockController<'_> {}
 #[cfg(wifi)]
+#[instability::unstable]
 impl ModemClockController for WiFiClockController<'_> {
     const MODEM: Modem = Modem::WiFi;
     fn enable_modem_clock(&mut self, enable: bool) {
@@ -816,6 +817,7 @@ pub struct BtClockController<'d> {
 #[cfg(bt)]
 impl Sealed for BtClockController<'_> {}
 #[cfg(bt)]
+#[instability::unstable]
 impl ModemClockController for BtClockController<'_> {
     const MODEM: Modem = Modem::Bt;
     fn enable_modem_clock(&mut self, enable: bool) {
@@ -848,6 +850,7 @@ pub struct Ieee802154ClockController<'d> {
 #[cfg(ieee802154)]
 impl Sealed for Ieee802154ClockController<'_> {}
 #[cfg(ieee802154)]
+#[instability::unstable]
 impl ModemClockController for Ieee802154ClockController<'_> {
     const MODEM: Modem = Modem::Ieee802154;
     fn enable_modem_clock(&mut self, enable: bool) {
