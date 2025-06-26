@@ -366,6 +366,7 @@ unstable_driver! {
 
 /// State of the CPU saved when entering exception or interrupt
 #[instability::unstable]
+#[cfg(feature = "rt")]
 #[allow(unused_imports)]
 pub mod trapframe {
     #[cfg(riscv)]
