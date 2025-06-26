@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generic parameters of RMT `Channel`s have changed in preparation for type-erased channels. (#3505) 
 - RMT `TxChannelCreator` and `RxChannelCreator` now have a `DriverMode` generic parameter; `TxChannelCreatorAsync` and `RxChannelCreatorAsync` have been removed. (#3505)
 - RMT `ChannelCreator` methods have been renamed from `configure` to `configure_tx` and `configure_rx` to avoid trait disambiguation issues. (#3505)
+- The RMT `Error` type has been marked `non_exhaustive` (#3701)
 
 ### Fixed
 
