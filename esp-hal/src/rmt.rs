@@ -1635,11 +1635,12 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture {
+struct RmtTxFuture<'a> {
     raw: DynChannelAccess<Tx>,
+    _phantom: PhantomData<Channel<'a, Async, Tx>>,
 }
 
-impl core::future::Future for RmtTxFuture {
+impl core::future::Future for RmtTxFuture<'_> {
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -1685,16 +1686,21 @@ impl Channel<'_, Async, Tx> {
         raw.listen_tx_interrupt(Event::End | Event::Error);
         raw.start_send(None, memsize);
 
-        (RmtTxFuture { raw }).await
+        (RmtTxFuture {
+            raw,
+            _phantom: PhantomData,
+        })
+        .await
     }
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture {
+struct RmtRxFuture<'a> {
     raw: DynChannelAccess<Rx>,
+    _phantom: PhantomData<Channel<'a, Async, Rx>>,
 }
 
-impl core::future::Future for RmtRxFuture {
+impl core::future::Future for RmtRxFuture<'_> {
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -1733,7 +1739,11 @@ impl Channel<'_, Async, Rx> {
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive();
 
-        let result = (RmtRxFuture { raw }).await;
+        let result = RmtRxFuture {
+            raw,
+            _phantom: PhantomData,
+        }
+        .await;
 
         if result.is_ok() {
             raw.stop_rx();
