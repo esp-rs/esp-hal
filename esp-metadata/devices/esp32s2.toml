@@ -69,7 +69,6 @@ symbols = [
     "psram",
     "psram_dma",
     "ulp_riscv_core",
-    "spi_octal",
 
     # ROM capabilities
     "rom_crc_le",
@@ -360,6 +359,7 @@ channel_ram_size = 64
 
 [device.spi_master]
 support_status = "supported"
+has_octal = true
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },

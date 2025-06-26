@@ -722,7 +722,7 @@ impl<'d> Spi<'d, Blocking> {
 
     /// Converts the SPI instance into async mode.
     pub fn into_async(mut self) -> Spi<'d, Async> {
-        self.set_interrupt_handler(self.spi.handler());
+        self.set_interrupt_handler(self.spi.info().async_handler);
         Spi {
             spi: self.spi,
             _mode: PhantomData,
@@ -1254,7 +1254,7 @@ mod dma {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
         pub fn into_async(mut self) -> SpiDma<'d, Async> {
-            self.set_interrupt_handler(self.spi.handler());
+            self.set_interrupt_handler(self.spi.info().async_handler);
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_async(),
@@ -2649,16 +2649,30 @@ mod ehal1 {
 }
 
 /// SPI peripheral instance.
-#[doc(hidden)]
-#[allow(private_bounds)]
-pub trait PeripheralInstance: private::Sealed + DmaEligible {
-    /// Returns the peripheral data describing this SPI instance.
-    fn info(&self) -> &'static Info;
+#[cfg_attr(not(feature = "unstable"), expect(private_bounds))] // DmaEligible
+pub trait Instance: private::Sealed + IntoAnySpi + DmaEligible {
+    #[doc(hidden)]
+    /// Returns the peripheral data and state describing this instance.
+    fn parts(&self) -> (&'static Info, &'static State);
+
+    /// Returns the peripheral data describing this instance.
+    #[doc(hidden)]
+    #[inline(always)]
+    fn info(&self) -> &'static Info {
+        self.parts().0
+    }
+
+    /// Returns the peripheral state for this instance.
+    #[doc(hidden)]
+    #[inline(always)]
+    fn state(&self) -> &'static State {
+        self.parts().1
+    }
 }
 
 /// Marker trait for QSPI-capable SPI peripherals.
 #[doc(hidden)]
-pub trait QspiInstance: PeripheralInstance {}
+pub trait QspiInstance: Instance {}
 
 /// Peripheral data describing a particular SPI instance.
 #[doc(hidden)]
@@ -2671,6 +2685,9 @@ pub struct Info {
 
     /// The system peripheral marker.
     pub peripheral: crate::system::Peripheral,
+
+    /// Interrupt handler for the asynchronous operations.
+    pub async_handler: InterruptHandler,
 
     /// SCLK signal.
     pub sclk: OutputSignal,
@@ -2703,35 +2720,35 @@ pub struct Info {
     pub sio3_input: Option<InputSignal>,
 
     /// SIO4 output signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio4_output: Option<OutputSignal>,
 
     /// SIO4 input signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio4_input: Option<InputSignal>,
 
     /// SIO5 output signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio5_output: Option<OutputSignal>,
 
     /// SIO5 input signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio5_input: Option<InputSignal>,
 
     /// SIO6 output signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio6_output: Option<OutputSignal>,
 
     /// SIO6 input signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio6_input: Option<InputSignal>,
 
     /// SIO7 output signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio7_output: Option<OutputSignal>,
 
     /// SIO7 input signal for OPI mode.
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     pub sio7_input: Option<InputSignal>,
 }
 
@@ -3696,12 +3713,19 @@ unsafe impl Sync for Info {}
 
 crate::peripherals::for_each_spi_master! {
     ($peri:ident, $sys:ident, $sclk:ident [$($cs:ident),+] $mosi:ident, $miso:ident $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
-        impl PeripheralInstance for crate::peripherals::$peri<'_> {
+        impl Instance for crate::peripherals::$peri<'_> {
             #[inline(always)]
-            fn info(&self) -> &'static Info {
+            fn parts(&self) -> (&'static Info, &'static State) {
+                #[crate::handler]
+                #[cfg_attr(place_spi_master_driver_in_ram, ram)]
+                fn irq_handler() {
+                    handle_async(&INFO, &STATE)
+                }
+
                 static INFO: Info = Info {
                     register_block: crate::peripherals::$peri::regs(),
                     peripheral: crate::system::Peripheral::$sys,
+                    async_handler: irq_handler,
                     sclk: OutputSignal::$sclk,
                     mosi: OutputSignal::$mosi,
                     miso: InputSignal::$miso,
@@ -3712,25 +3736,34 @@ crate::peripherals::for_each_spi_master! {
                     sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
                     sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
                     sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
-                    #[cfg(spi_octal)]
+                    #[cfg(spi_master_has_octal)]
                     sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
                 };
 
-                &INFO
+                static STATE: State = State {
+                    waker: AtomicWaker::new(),
+                    #[cfg(esp32)]
+                    esp32_hack: Esp32Hack {
+                        timing_miso_delay: Cell::new(None),
+                        extra_dummy: Cell::new(0),
+                    },
+                };
+
+                (&INFO, &STATE)
             }
         }
 
@@ -3740,19 +3773,6 @@ crate::peripherals::for_each_spi_master! {
             impl QspiInstance for crate::peripherals::$peri<'_> {}
         )?
     };
-}
-
-impl PeripheralInstance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn info(&self) -> &'static Info;
-        }
-    }
 }
 
 impl QspiInstance for AnySpi<'_> {}
@@ -3775,52 +3795,12 @@ struct Esp32Hack {
 unsafe impl Sync for Esp32Hack {}
 
 #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-fn handle_async(instance: impl Instance) {
-    let state = instance.state();
-    let info = instance.info();
-
+fn handle_async(info: &'static Info, state: &'static State) {
     let driver = Driver { info, state };
     if driver.interrupts().contains(SpiInterrupt::TransferDone) {
         driver.enable_listen(SpiInterrupt::TransferDone.into(), false);
         state.waker.wake();
     }
-}
-
-/// A peripheral singleton compatible with the SPI master driver.
-pub trait Instance: PeripheralInstance + IntoAnySpi {
-    #[doc(hidden)]
-    fn state(&self) -> &'static State;
-    #[doc(hidden)]
-    fn handler(&self) -> InterruptHandler;
-}
-
-macro_rules! master_instance {
-    ($peri:ident) => {
-        impl Instance for $crate::peripherals::$peri<'_> {
-            fn state(&self) -> &'static State {
-                static STATE: State = State {
-                    waker: AtomicWaker::new(),
-                    #[cfg(esp32)]
-                    esp32_hack: Esp32Hack {
-                        timing_miso_delay: Cell::new(None),
-                        extra_dummy: Cell::new(0),
-                    },
-                };
-
-                &STATE
-            }
-
-            fn handler(&self) -> InterruptHandler {
-                #[$crate::handler]
-                #[cfg_attr(place_spi_master_driver_in_ram, ram)]
-                fn handle() {
-                    handle_async(unsafe { $crate::peripherals::$peri::steal() })
-                }
-
-                handle
-            }
-        }
-    };
 }
 
 /// SPI data mode
@@ -3836,7 +3816,7 @@ pub enum DataMode {
     Dual,
     /// 4 bit, 4 data lines. (SIO0 .. SIO3)
     Quad,
-    #[cfg(spi_octal)]
+    #[cfg(spi_master_has_octal)]
     /// 8 bit, 8 data lines. (SIO0 .. SIO7)
     Octal,
 }
@@ -3867,11 +3847,6 @@ impl<'d> DmaEligible for AnySpi<'d> {
     }
 }
 
-#[cfg(spi_master_spi2)]
-master_instance!(SPI2);
-#[cfg(spi_master_spi3)]
-master_instance!(SPI3);
-
 impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
@@ -3880,8 +3855,7 @@ impl Instance for AnySpi<'_> {
             #[cfg(spi_master_spi3)]
             AnySpiInner::Spi3(spi) => spi,
         } {
-            fn state(&self) -> &'static State;
-            fn handler(&self) -> InterruptHandler;
+            fn parts(&self) -> (&'static Info, &'static State);
         }
     }
 }
