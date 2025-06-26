@@ -86,6 +86,7 @@ mod xtensa;
 pub mod software;
 
 #[cfg_attr(feature = "rt", unsafe(no_mangle))]
+#[cfg_attr(not(feature = "rt"), allow(non_snake_case))]
 extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
     panic!("Unhandled interrupt: {:?}", _interrupt);
 }

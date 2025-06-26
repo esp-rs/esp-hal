@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt"), allow(unused))]
+
 use core::ops::Range;
 
 use portable_atomic::{AtomicU8, Ordering};
