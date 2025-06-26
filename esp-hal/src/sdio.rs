@@ -161,8 +161,35 @@ impl<'d> Sdio<'d> {
     }
 
     /// Performs final low-level HAL hardware initialization.
-    pub(crate) fn hal_hw_init(&mut self) -> Result<(), Error> {
+    pub(crate) fn hardware_init(&mut self) -> Result<(), Error> {
+        self.low_level_init()?;
+
         Err(Error::unimplemented())
+    }
+
+    /// Performs low-level initialization of the SDIO peripheral.
+    fn low_level_init(&mut self) -> Result<(), Error> {
+        let slc = unsafe { &*self.slc.info().register_block };
+
+        slc.slcconf0().modify(|_, w| {
+            w.sdio_slc0_rx_auto_wrback().set_bit();
+            w.sdio_slc0_token_auto_clr().clear_bit();
+
+            w.sdio_slc0_rx_loop_test().clear_bit();
+            w.sdio_slc0_tx_loop_test().clear_bit()
+        });
+
+        slc.slcconf1().modify(|_, w| {
+            w.sdio_slc0_rx_stitch_en().clear_bit();
+            w.sdio_slc0_tx_stitch_en().clear_bit();
+
+            w.sdio_slc0_len_auto_clr().clear_bit()
+        });
+
+        slc.slc_rx_dscr_conf()
+            .modify(|_, w| w.sdio_slc0_token_no_replace().set_bit());
+
+        Ok(())
     }
 }
 
@@ -261,6 +288,8 @@ impl Common for Sdio<'_> {
     }
 
     fn init(&mut self) -> Result<(), Error> {
+        // This implementation is based on the `esp-idf` driver:
+        // <https://github.com/espressif/esp-idf/blob/release/v5.5/components/esp_driver_sdio/src/sdio_slave.c#L299>
         self.pins.clk_sclk.apply_config(&OutputConfig::default());
 
         let input_pullup = InputConfig::default().with_pull(Pull::Up);
@@ -289,7 +318,7 @@ impl Common for Sdio<'_> {
         self.pins.dat3_cs.apply_output_config(&output_pullup);
 
         // TODO: implement HAL hardware init
-        self.hal_hw_init()?;
+        self.hardware_init()?;
 
         self.state_transition(State::Standby)
     }
