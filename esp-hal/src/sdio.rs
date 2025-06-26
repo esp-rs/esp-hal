@@ -20,12 +20,14 @@ use embedded_hal_sdmmc::{
 
 use crate::gpio::{InputConfig, OutputConfig, Pull};
 
+mod hinf;
 mod interrupt;
 mod pins;
 mod slc;
 mod slchost;
 mod state;
 
+pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::HostInterrupt;
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
@@ -83,6 +85,7 @@ pub enum Mode {
 pub struct Sdio<'d> {
     slc: AnySlc<'d>,
     slchost: AnySlchost<'d>,
+    hinf: AnyHinf<'d>,
     pins: Pins<'d>,
     state: State,
 }
@@ -105,16 +108,18 @@ impl<'d> Sdio<'d> {
     ///     peripherals.GPIO23, // DAT3/#CS
     /// );
     ///
-    /// let _sdio = Sdio::new(peripherals.slc, peripherals.slchost, pins);
+    /// let _sdio = Sdio::new(peripherals.slc, peripherals.slchost, peripherals.hinf, pins);
     /// ```
     pub fn new(
         slc: impl SlcInstance + 'd,
         slchost: impl SlchostInstance + 'd,
+        hinf: impl HinfInstance + 'd,
         pins: Pins<'d>,
     ) -> Self {
         Self {
             slc: slc.degrade(),
             slchost: slchost.degrade(),
+            hinf: hinf.degrade(),
             pins,
             state: State::new(),
         }
@@ -128,6 +133,11 @@ impl<'d> Sdio<'d> {
     /// Gets a static reference to the SLCHOST information.
     pub fn slchost(&self) -> &'static SlchostInfo {
         self.slchost.info()
+    }
+
+    /// Gets a static reference to the HINF information.
+    pub fn hinf(&self) -> &'static HinfInfo {
+        self.hinf.info()
     }
 
     /// Gets a reference to the [Pins] information.
