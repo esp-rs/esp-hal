@@ -73,8 +73,9 @@ macro_rules! peripherals {
             impl Peripherals {
                 /// Returns all the peripherals *once*
                 #[inline]
+                #[cfg(feature = "rt")]
                 pub(crate) fn take() -> Self {
-                    #[unsafe(no_mangle)]
+                    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
                     static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
 
                     critical_section::with(|_| unsafe {

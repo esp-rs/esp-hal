@@ -600,7 +600,7 @@ mod vectored {
         })
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[ram]
     unsafe fn __level_1_interrupt(save_frame: &mut Context) {
         unsafe {
@@ -608,7 +608,7 @@ mod vectored {
         }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[ram]
     unsafe fn __level_2_interrupt(save_frame: &mut Context) {
         unsafe {
@@ -616,7 +616,7 @@ mod vectored {
         }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[ram]
     unsafe fn __level_3_interrupt(save_frame: &mut Context) {
         unsafe {
@@ -771,25 +771,25 @@ mod raw {
         fn level7_interrupt(save_frame: &mut Context);
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_4_interrupt(save_frame: &mut Context) {
         unsafe { level4_interrupt(save_frame) }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_5_interrupt(save_frame: &mut Context) {
         unsafe { level5_interrupt(save_frame) }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_6_interrupt(save_frame: &mut Context) {
         unsafe { level6_interrupt(save_frame) }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".rwtext")]
     unsafe fn __level_7_interrupt(save_frame: &mut Context) {
         unsafe { level7_interrupt(save_frame) }

@@ -202,10 +202,12 @@ metadata!("build_info", CHIP_NAME, chip!());
 #[cfg(riscv)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+#[cfg(feature = "rt")]
 pub use esp_riscv_rt::{self, riscv};
 #[cfg(xtensa)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
+#[cfg(feature = "rt")]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(soc_has_efuse)]
@@ -571,6 +573,7 @@ pub struct Config {
 ///
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
+#[cfg(feature = "rt")]
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
