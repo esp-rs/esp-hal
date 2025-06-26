@@ -61,6 +61,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
     - see [this example](https://github.com/esp-rs/esp-hal/blob/df2b7bd8472cc1d18db0d9441156575570f59bb3/esp-hal/src/spi/mod.rs#L15)
     - e.g. `#[cfg_attr(feature = "defmt", derive(defmt::Format))]`
   - Implementations of common, but unstable traits (e.g. `embassy_embedded_hal::SetConfig`) need to be gated with the `unstable` feature.
+- Libraries depending on esp-hal, should disable the `rt` feature to avoid future compatibility concerns.
 
 ## API Surface
 
