@@ -707,7 +707,7 @@ impl Default for RxChannelConfig {
 // Declare input/output signals in a const array.
 macro_rules! declare_signals {
     ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
-        pub(crate) const $name: [crate::gpio::$type; $count] = [
+        const $name: [crate::gpio::$type; $count] = [
             $(crate::gpio::$type::$entry,)*
         ];
     };
