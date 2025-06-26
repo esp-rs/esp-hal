@@ -9,6 +9,7 @@ keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
+links         = "esp-riscv-rt"
 
 [lib]
 bench = false
