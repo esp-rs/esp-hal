@@ -3,6 +3,7 @@
 use xtensa_lx::interrupt;
 #[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
+#[cfg(feature = "rt")]
 use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
