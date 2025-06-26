@@ -31,10 +31,16 @@ pub(crate) fn generate_spi_master_peripehrals(spi_slave: &SpiMasterProperties) -
             let cs = instance_config.cs.iter().map(|cs| format_ident!("{cs}"));
             let sio = instance_config.sio.iter().map(|cs| format_ident!("{cs}"));
 
+            let is_qspi = if instance_config.sio.len() > 2 {
+                quote::quote! { , true }
+            } else {
+                quote::quote! {}
+            };
+
             // The order and meaning of these tokens must match their use in the
             // `for_each_i2c_master!` call.
             quote::quote! {
-                #instance, #sys, #sclk [#(#cs),*] #(#sio),*
+                #instance, #sys, #sclk [#(#cs),*] [#(#sio),*] #is_qspi
             }
         })
         .collect::<Vec<_>>();
