@@ -1,6 +1,25 @@
+use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
-use crate::{asynch::AtomicWaker, dma::*, peripherals::Interrupt};
+use crate::{
+    asynch::AtomicWaker,
+    dma::{
+        BurstConfig,
+        DmaChannel,
+        DmaPeripheral,
+        DmaRxChannel,
+        DmaRxInterrupt,
+        DmaTxChannel,
+        DmaTxInterrupt,
+        InterruptAccess,
+        PdmaChannel,
+        RegisterAccess,
+        RxRegisterAccess,
+        TxRegisterAccess,
+    },
+    interrupt::InterruptHandler,
+    peripherals::Interrupt,
+};
 
 pub(super) type I2sRegisterBlock = crate::pac::i2s0::RegisterBlock;
 
@@ -89,7 +108,7 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -97,7 +116,7 @@ impl RegisterAccess for AnyI2sDmaTxChannel<'_> {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnyI2sDmaChannel(AnyI2sDmaChannelInner::I2s0(_)))
+        matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }
 }
 
@@ -270,7 +289,7 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .lc_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -278,7 +297,7 @@ impl RegisterAccess for AnyI2sDmaRxChannel<'_> {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnyI2sDmaChannel(AnyI2sDmaChannelInner::I2s0(_)))
+        matches!(self.0, AnyI2sDmaChannel(any::Inner::I2s0(_)))
     }
 }
 
@@ -386,9 +405,9 @@ crate::any_peripheral! {
     /// An I2S-compatible type-erased DMA channel.
     pub peripheral AnyI2sDmaChannel<'d> {
         #[cfg(soc_has_i2s0)]
-        I2s0(super::DMA_I2S0<'d>),
+        I2s0(crate::peripherals::DMA_I2S0<'d>),
         #[cfg(soc_has_i2s1)]
-        I2s1(super::DMA_I2S1<'d>),
+        I2s1(crate::peripherals::DMA_I2S1<'d>),
     }
 }
 

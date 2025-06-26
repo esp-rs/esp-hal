@@ -1,9 +1,27 @@
+use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
 use crate::{
     asynch::AtomicWaker,
-    dma::*,
-    interrupt::Priority,
+    dma::{
+        BurstConfig,
+        DmaChannel,
+        DmaChannelConvert,
+        DmaChannelExt,
+        DmaExtMemBKSize,
+        DmaPeripheral,
+        DmaRxChannel,
+        DmaRxInterrupt,
+        DmaTxChannel,
+        DmaTxInterrupt,
+        InterruptAccess,
+        PdmaChannel,
+        RegisterAccess,
+        RxRegisterAccess,
+        TxRegisterAccess,
+        asynch,
+    },
+    interrupt::{InterruptHandler, Priority},
     peripherals::{DMA_CRYPTO, Interrupt},
 };
 
@@ -455,15 +473,12 @@ impl PdmaChannel for DMA_CRYPTO<'_> {
     }
     fn async_handler(&self) -> InterruptHandler {
         pub(crate) extern "C" fn __esp_hal_internal_interrupt_handler() {
-            super::asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
-            super::asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
+            asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
+            asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
         }
         #[allow(non_upper_case_globals)]
-        pub(crate) static interrupt_handler: crate::interrupt::InterruptHandler =
-            crate::interrupt::InterruptHandler::new(
-                __esp_hal_internal_interrupt_handler,
-                Priority::max(),
-            );
+        pub(crate) static interrupt_handler: InterruptHandler =
+            InterruptHandler::new(__esp_hal_internal_interrupt_handler, Priority::max());
         interrupt_handler
     }
     fn rx_async_flag(&self) -> &'static AtomicBool {
