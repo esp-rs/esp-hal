@@ -1985,36 +1985,39 @@ where
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
-#[handler]
-fn async_interrupt_handler() {
-    let Some((channel, is_tx)) = chip_specific::pending_interrupt_for_channel() else {
-        return;
-    };
-    if is_tx {
-        unsafe { DynChannelAccess::<Tx>::conjure(channel) }
-            .unlisten_tx_interrupt(Event::End | Event::Error);
-    } else {
-        unsafe { DynChannelAccess::<Rx>::conjure(channel) }
-            .unlisten_rx_interrupt(Event::End | Event::Error);
-    }
-
-    WAKER[channel as usize].wake();
+enum AnyChannelAccess {
+    Tx(DynChannelAccess<Tx>),
+    Rx(DynChannelAccess<Rx>),
 }
 
-#[cfg(any(esp32, esp32s2))]
+impl AnyChannelAccess {
+    #[inline]
+    fn conjure(ch_num: u8, is_tx: bool) -> Self {
+        if is_tx {
+            Self::Tx(unsafe { DynChannelAccess::<Tx>::conjure(ch_num) })
+        } else {
+            Self::Rx(unsafe { DynChannelAccess::<Rx>::conjure(ch_num) })
+        }
+    }
+
+    #[inline]
+    fn channel(self) -> u8 {
+        match self {
+            Self::Tx(raw) => raw.channel(),
+            Self::Rx(raw) => raw.channel(),
+        }
+    }
+}
+
 #[handler]
 fn async_interrupt_handler() {
-    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
-        return;
-    };
-
-    unsafe { DynChannelAccess::<Tx>::conjure(channel) }
-        .unlisten_tx_interrupt(Event::End | Event::Error);
-    unsafe { DynChannelAccess::<Rx>::conjure(channel) }
-        .unlisten_rx_interrupt(Event::End | Event::Error);
-
-    WAKER[channel as usize].wake();
+    if let Some(raw) = chip_specific::pending_interrupt_for_channel() {
+        match raw {
+            AnyChannelAccess::Tx(ref raw) => raw.unlisten_tx_interrupt(Event::End | Event::Error),
+            AnyChannelAccess::Rx(ref raw) => raw.unlisten_rx_interrupt(Event::End | Event::Error),
+        }
+        WAKER[raw.channel() as usize].wake();
+    }
 }
 
 #[derive(Debug, EnumSetType)]
@@ -2147,6 +2150,7 @@ mod chip_specific {
     use enumset::EnumSet;
 
     use super::{
+        AnyChannelAccess,
         ChannelInternal,
         Direction,
         Error,
@@ -2212,19 +2216,19 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub(super) fn pending_interrupt_for_channel() -> Option<(u8, bool)> {
+    pub(super) fn pending_interrupt_for_channel() -> Option<AnyChannelAccess> {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
             if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
                 // The first half of all channels support tx...
                 let ch_num = ch_idx;
-                return Some((ch_num, true));
+                return Some(AnyChannelAccess::conjure(ch_num, true));
             }
             if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
                 // ...whereas the second half of channels support rx.
                 let ch_num = NUM_CHANNELS as u8 / 2 + ch_idx;
-                return Some((ch_num, false));
+                return Some(AnyChannelAccess::conjure(ch_num, false));
             }
         }
 
@@ -2560,8 +2564,10 @@ mod chip_specific {
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
     use enumset::EnumSet;
+    use portable_atomic::Ordering;
 
     use super::{
+        AnyChannelAccess,
         ChannelInternal,
         Direction,
         Error,
@@ -2570,6 +2576,7 @@ mod chip_specific {
         MemSize,
         NUM_CHANNELS,
         RawChannelAccess,
+        RmtState,
         Rx,
         RxChannelInternal,
         Tx,
@@ -2598,13 +2605,27 @@ mod chip_specific {
     }
 
     #[allow(unused)]
-    pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
+    pub(super) fn pending_interrupt_for_channel() -> Option<AnyChannelAccess> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
 
-        (0..NUM_CHANNELS as u8).find(|&ch_num| {
-            st.ch_rx_end(ch_num).bit() || st.ch_tx_end(ch_num).bit() || st.ch_err(ch_num).bit()
-        })
+        for ch_num in 0..NUM_CHANNELS as u8 {
+            if st.ch_rx_end(ch_num).bit() {
+                return Some(AnyChannelAccess::conjure(ch_num, false));
+            }
+            if st.ch_tx_end(ch_num).bit() {
+                return Some(AnyChannelAccess::conjure(ch_num, true));
+            }
+            if st.ch_err(ch_num).bit() {
+                if let Some(is_tx) =
+                    unsafe { RmtState::load_unchecked(ch_num, Ordering::Relaxed) }.is_tx()
+                {
+                    return Some(AnyChannelAccess::conjure(ch_num, is_tx));
+                }
+            }
+        }
+
+        None
     }
 
     impl<A> ChannelInternal for A
