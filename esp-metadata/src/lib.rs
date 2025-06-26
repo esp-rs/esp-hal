@@ -479,11 +479,17 @@ impl Config {
         let mut tokens = TokenStream::new();
 
         // TODO: repeat for all drivers that have Instance traits
-        if let Some(i2c) = self.device.peri_config.i2c_master.as_ref() {
-            tokens.extend(cfg::generate_i2c_master_peripherals(i2c));
+        if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
+            tokens.extend(cfg::generate_i2c_master_peripherals(peri));
         };
-        if let Some(uart) = self.device.peri_config.uart.as_ref() {
-            tokens.extend(cfg::generate_uart_peripherals(uart));
+        if let Some(peri) = self.device.peri_config.uart.as_ref() {
+            tokens.extend(cfg::generate_uart_peripherals(peri));
+        }
+        if let Some(peri) = self.device.peri_config.spi_master.as_ref() {
+            tokens.extend(cfg::generate_spi_master_peripehrals(peri));
+        };
+        if let Some(peri) = self.device.peri_config.spi_slave.as_ref() {
+            tokens.extend(cfg::generate_spi_slave_peripehrals(peri));
         };
 
         save(out_dir.join(file_name), tokens);
