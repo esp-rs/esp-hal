@@ -55,35 +55,6 @@ macro_rules! trm_markdown_link {
 }
 
 #[doc(hidden)]
-/// Shorthand to define enums with From implementations.
-#[macro_export]
-macro_rules! any_enum {
-    ($(#[$meta:meta])* $vis:vis enum $name:ident {
-        $(
-            $(#[$variant_meta:meta])*
-            $variant:ident($inner:ty)
-        ),* $(,)?
-    }) => {
-        $(#[$meta])*
-        $vis enum $name {
-            $(
-                $(#[$variant_meta])*
-                $variant($inner),
-            )*
-        }
-
-        $(
-            $(#[$variant_meta])*
-            impl From<$inner> for $name {
-                fn from(inner: $inner) -> Self {
-                    $name::$variant(inner)
-                }
-            }
-        )*
-    };
-}
-
-#[doc(hidden)]
 /// Shorthand to define AnyPeripheral instances.
 ///
 /// This macro generates the following:
