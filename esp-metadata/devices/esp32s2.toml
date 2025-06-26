@@ -70,6 +70,8 @@ symbols = [
     "psram_dma",
     "ulp_riscv_core",
     "spi_octal",
+    "soc_has_copy_dma",
+    "soc_has_crypto_dma",
 
     # ROM capabilities
     "rom_crc_le",

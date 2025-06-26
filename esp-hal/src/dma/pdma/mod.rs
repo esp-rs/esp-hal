@@ -14,21 +14,42 @@
 use critical_section::CriticalSection;
 use portable_atomic::AtomicBool;
 
-use crate::{asynch::AtomicWaker, dma::*, handler, interrupt::Priority, peripherals::Interrupt};
+use crate::{
+    DriverMode,
+    asynch::AtomicWaker,
+    dma::{
+        Channel,
+        DmaChannel,
+        DmaChannelConvert,
+        DmaChannelExt,
+        DmaEligible,
+        DmaPeripheral,
+        DmaRxInterrupt,
+        DmaTxInterrupt,
+        InterruptAccess,
+        InterruptHandler,
+        RegisterAccess,
+    },
+    handler,
+    interrupt::Priority,
+    peripherals::Interrupt,
+};
 
-#[cfg(esp32s2)]
+#[cfg(soc_has_copy_dma)]
 mod copy;
-#[cfg(esp32s2)]
+#[cfg(soc_has_crypto_dma)]
 mod crypto;
 mod i2s;
 mod spi;
 
-#[cfg(esp32s2)]
-pub use copy::*;
-#[cfg(esp32s2)]
-pub use crypto::*;
-pub use i2s::*;
-pub use spi::*;
+#[cfg(soc_has_copy_dma)]
+pub use copy::{CopyDmaRxChannel, CopyDmaTxChannel};
+#[cfg(soc_has_crypto_dma)]
+pub use crypto::{CryptoDmaRxChannel, CryptoDmaTxChannel};
+use i2s::I2sRegisterBlock;
+pub use i2s::{AnyI2sDmaChannel, AnyI2sDmaRxChannel, AnyI2sDmaTxChannel};
+use spi::SpiRegisterBlock;
+pub use spi::{AnySpiDmaChannel, AnySpiDmaRxChannel, AnySpiDmaTxChannel};
 
 #[doc(hidden)]
 pub trait PdmaChannel: crate::private::Sealed {
