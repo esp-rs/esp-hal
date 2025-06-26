@@ -522,6 +522,11 @@ pub struct Tx;
 #[derive(Clone, Copy, Debug)]
 pub struct Rx;
 
+/// Marker for a channel capable of transmit and receive operations
+#[cfg(any(esp32, esp32s2))]
+#[derive(Clone, Copy, Debug)]
+pub struct RxTx;
+
 /// A trait implemented by the `Rx` and `Tx` marker structs.
 ///
 /// For internal use by the driver.
@@ -704,7 +709,10 @@ impl Default for RxChannelConfig {
     }
 }
 
-// Declare input/output signals in a const array.
+// Channel specification
+
+// Declare input/output signals and define the main Rmt struct, holding
+// channels.
 macro_rules! declare_signals {
     ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
         const $name: [crate::gpio::$type; $count] = [
@@ -750,7 +758,7 @@ macro_rules! declare_channels {
     // declaration and builds up field definitions for the Rmt struct as well as corresponding
     // initializers.
     (@define_rmt {
-        ([$name:ident, $num:literal] $(, $($ch:tt),+)?)
+        ([$name:ident, $num:literal, $cap:ident] $(, $($ch:tt),+)?)
         -> (
             [$($field_decl:tt)*],
             [$($field_init:tt)*]
@@ -760,11 +768,12 @@ macro_rules! declare_channels {
             ($($($ch),+)?) -> ([
                 $($field_decl)*
                 #[doc = concat!("RMT Channel ", $num)]
-                pub $name: ChannelCreator<Dm, $num>,
+                pub $name: ChannelCreator<Dm, $num, $cap>,
             ], [
                 $($field_init)*
                 $name: $crate::rmt::ChannelCreator {
                     _mode: ::core::marker::PhantomData,
+                    _capabilities: ::core::marker::PhantomData,
                     _guard: $crate::system::GenericPeripheralGuard::new(),
                 },
             ])
@@ -783,14 +792,14 @@ const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
         declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+            [channel0, 0, RxTx],
+            [channel1, 1, RxTx],
+            [channel2, 2, RxTx],
+            [channel3, 3, RxTx],
+            [channel4, 4, RxTx],
+            [channel5, 5, RxTx],
+            [channel6, 6, RxTx],
+            [channel7, 7, RxTx],
         );
         declare_signals!(
             OUTPUT_SIGNALS,
@@ -804,10 +813,10 @@ cfg_if::cfg_if! {
         );
     } else if #[cfg(esp32s2)] {
         declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+            [channel0, 0, RxTx],
+            [channel1, 1, RxTx],
+            [channel2, 2, RxTx],
+            [channel3, 3, RxTx],
         );
         declare_signals!(
             OUTPUT_SIGNALS,
@@ -821,14 +830,14 @@ cfg_if::cfg_if! {
         );
     } else if #[cfg(esp32s3)] {
         declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+            [channel0, 0, Tx],
+            [channel1, 1, Tx],
+            [channel2, 2, Tx],
+            [channel3, 3, Tx],
+            [channel4, 4, Rx],
+            [channel5, 5, Rx],
+            [channel6, 6, Rx],
+            [channel7, 7, Rx],
         );
         declare_signals!(
             OUTPUT_SIGNALS,
@@ -842,10 +851,10 @@ cfg_if::cfg_if! {
         );
     } else {
         declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+            [channel0, 0, Tx],
+            [channel1, 1, Tx],
+            [channel2, 2, Rx],
+            [channel3, 3, Rx],
         );
         declare_signals!(
             OUTPUT_SIGNALS,
@@ -857,6 +866,143 @@ cfg_if::cfg_if! {
             InputSignal,
             [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
         );
+    }
+}
+
+/// RMT Channel Creator
+pub struct ChannelCreator<Dm, const CHANNEL: u8, Cap>
+where
+    Dm: crate::DriverMode,
+{
+    _mode: PhantomData<Dm>,
+    _capabilities: PhantomData<Cap>,
+    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+}
+
+impl<Dm, const CHANNEL: u8, Cap> ChannelCreator<Dm, CHANNEL, Cap>
+where
+    Dm: crate::DriverMode,
+{
+    // FIXME: This interface isn't great. Come up with a safe alternative that uses
+    // STATE tracking.
+    /// Unsafely steal a channel creator instance.
+    ///
+    /// # Safety
+    ///
+    /// Circumvents HAL ownership and safety guarantees and allows creating
+    /// multiple handles to the same peripheral structure.
+    pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL, Cap> {
+        ChannelCreator {
+            _mode: PhantomData,
+            _capabilities: PhantomData,
+            _guard: GenericPeripheralGuard::new(),
+        }
+    }
+}
+
+/// FIXME: docs
+pub trait TxChannelCreator<Dm: crate::DriverMode> {
+    /// FIXME: docs
+    type Raw: TxChannelInternal;
+
+    /// FIXME: docs
+    fn configure_tx<'pin>(
+        self,
+        pin: impl PeripheralOutput<'pin>,
+        config: TxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error>;
+}
+
+/// FIXME: docs
+pub trait RxChannelCreator<Dm: crate::DriverMode> {
+    /// FIXME: docs
+    type Raw: RxChannelInternal;
+
+    /// FIXME: docs
+    fn configure_rx<'pin>(
+        self,
+        pin: impl PeripheralInput<'pin>,
+        config: RxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error>;
+}
+
+// TODO:
+// - RxTx devices: always allow reconfigure + unconfigure
+// - Rx/Tx devices: allow Unconfigure and reconfigure with the same direction
+
+#[cfg(not(any(esp32, esp32s2)))]
+impl<Dm, const CHANNEL: u8> TxChannelCreator<Dm> for ChannelCreator<Dm, CHANNEL, Tx>
+where
+    Dm: crate::DriverMode,
+{
+    type Raw = ConstChannelAccess<Tx, CHANNEL>;
+
+    /// Configure the TX channel
+    fn configure_tx<'pin>(
+        self,
+        pin: impl PeripheralOutput<'pin>,
+        config: TxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+        let raw = unsafe { ConstChannelAccess::conjure() };
+        configure_tx_channel(raw, pin, config)?;
+        Ok(Channel::new(raw))
+    }
+}
+
+#[cfg(not(any(esp32, esp32s2)))]
+impl<Dm, const CHANNEL: u8> RxChannelCreator<Dm> for ChannelCreator<Dm, CHANNEL, Rx>
+where
+    Dm: crate::DriverMode,
+{
+    type Raw = ConstChannelAccess<Rx, CHANNEL>;
+
+    /// Configure the RX channel
+    fn configure_rx<'pin>(
+        self,
+        pin: impl PeripheralInput<'pin>,
+        config: RxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+        let raw = unsafe { ConstChannelAccess::conjure() };
+        configure_rx_channel(raw, pin, config)?;
+        Ok(Channel::new(raw))
+    }
+}
+
+#[cfg(any(esp32, esp32s2))]
+impl<Dm, const CHANNEL: u8> TxChannelCreator<Dm> for ChannelCreator<Dm, CHANNEL, RxTx>
+where
+    Dm: crate::DriverMode,
+{
+    type Raw = ConstChannelAccess<Tx, CHANNEL>;
+
+    /// Configure the TX channel
+    fn configure_tx<'pin>(
+        self,
+        pin: impl PeripheralOutput<'pin>,
+        config: TxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+        let raw = unsafe { ConstChannelAccess::conjure() };
+        configure_tx_channel(raw, pin, config)?;
+        Ok(Channel::new(raw))
+    }
+}
+
+#[cfg(any(esp32, esp32s2))]
+impl<Dm, const CHANNEL: u8> RxChannelCreator<Dm> for ChannelCreator<Dm, CHANNEL, RxTx>
+where
+    Dm: crate::DriverMode,
+{
+    type Raw = ConstChannelAccess<Rx, CHANNEL>;
+
+    /// Configure the RX channel
+    fn configure_rx<'pin>(
+        self,
+        pin: impl PeripheralInput<'pin>,
+        config: RxChannelConfig,
+    ) -> Result<Channel<Dm, Self::Raw>, Error> {
+        let raw = unsafe { ConstChannelAccess::conjure() };
+        configure_rx_channel(raw, pin, config)?;
+        Ok(Channel::new(raw))
     }
 }
 
@@ -1128,56 +1274,6 @@ where
     }
 }
 
-/// Creates a TX channel
-pub trait TxChannelCreator<'d, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    /// Type of the raw channel access token
-    type Raw: TxChannelInternal;
-
-    #[doc(hidden)]
-    const RAW: Self::Raw;
-
-    /// Configure the TX channel
-    fn configure_tx(
-        self,
-        pin: impl PeripheralOutput<'d>,
-        config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error>
-    where
-        Self: Sized,
-    {
-        configure_tx_channel(Self::RAW, pin, config)?;
-        Ok(Channel::new(Self::RAW))
-    }
-}
-
-/// Creates a RX channel
-pub trait RxChannelCreator<'d, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    /// Type of the raw channel access token
-    type Raw: RxChannelInternal;
-
-    #[doc(hidden)]
-    const RAW: Self::Raw;
-
-    /// Configure the RX channel
-    fn configure_rx(
-        self,
-        pin: impl PeripheralInput<'d>,
-        config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Self::Raw>, Error>
-    where
-        Self: Sized,
-    {
-        configure_rx_channel(Self::RAW, pin, config)?;
-        Ok(Channel::new(Self::RAW))
-    }
-}
-
 /// An in-progress transaction for a single shot TX transaction.
 ///
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
@@ -1324,112 +1420,6 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
     pub fn is_loopcount_interrupt_set(&self) -> bool {
         self.channel.raw.is_tx_loopcount_interrupt_set()
     }
-}
-
-macro_rules! impl_tx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Tx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
-macro_rules! impl_rx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Rx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
-/// RMT Channel Creator
-pub struct ChannelCreator<Dm, const CHANNEL: u8>
-where
-    Dm: crate::DriverMode,
-{
-    _mode: PhantomData<Dm>,
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
-}
-
-impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
-    /// Unsafely steal a channel creator instance.
-    ///
-    /// # Safety
-    ///
-    /// Circumvents HAL ownership and safety guarantees and allows creating
-    /// multiple handles to the same peripheral structure.
-    pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
-        ChannelCreator {
-            _mode: PhantomData,
-            _guard: GenericPeripheralGuard::new(),
-        }
-    }
-}
-
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-    impl_tx_channel_creator!(4);
-    impl_tx_channel_creator!(5);
-    impl_tx_channel_creator!(6);
-    impl_tx_channel_creator!(7);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
-}
-
-#[cfg(esp32s2)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32s3)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
 }
 
 /// Channel in TX mode
