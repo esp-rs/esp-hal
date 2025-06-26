@@ -1008,6 +1008,8 @@ fn configure_tx_channel<'d>(
 
     Ok(())
 }
+
+#[derive(Copy, Clone)]
 #[repr(u8)]
 enum RmtState {
     // The channel is not configured for either rx or tx, and its memory is available
@@ -1021,6 +1023,29 @@ enum RmtState {
 
     // The channel is configured for tx
     Tx,
+}
+
+impl RmtState {
+    #[allow(unused)]
+    fn is_tx(&self) -> Option<bool> {
+        use RmtState::*;
+        match self {
+            Rx => Some(false),
+            Tx => Some(true),
+            _ => None,
+        }
+    }
+
+    // Safety: Must only be called with valid values of the RmtState discrimiant
+    #[allow(unused)]
+    unsafe fn from_u8_unchecked(value: u8) -> Self {
+        unsafe { core::mem::transmute::<_, Self>(value) }
+    }
+
+    #[allow(unused)]
+    unsafe fn load_unchecked(channel: u8, ordering: Ordering) -> Self {
+        unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
+    }
 }
 
 // This must only holds value of RmtState. However, we need atomic access, thus
