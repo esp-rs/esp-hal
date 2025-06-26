@@ -664,13 +664,14 @@ mod plic {
         }
     }
 
-    /// Get interrupt priority
+    /// Get interrupt priority for the CPU
     #[inline]
     pub fn priority_by_core(_core: Cpu, cpu_interrupt: CpuInterrupt) -> Priority {
-        unsafe { priority(cpu_interrupt) }
+        priority(cpu_interrupt)
     }
 
     #[inline]
+    /// Get interrupt priority.
     pub fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
         let prio = PLIC_MX::regs()
             .mxint_pri(cpu_interrupt as usize)

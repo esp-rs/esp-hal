@@ -586,24 +586,6 @@ mod vectored {
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
-    #[inline]
-    pub(crate) fn cpu_interrupt_nr_to_cpu_interrupt_handler(
-        number: u32,
-    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
-        use xtensa_lx_rt::*;
-        // we're fortunate that all esp variants use the same CPU interrupt layout
-        Some(match number {
-            6 => Timer0,
-            7 => Software0,
-            11 => Profiling,
-            14 => NMI,
-            15 => Timer1,
-            16 => Timer2,
-            29 => Software1,
-            _ => return None,
-        })
-    }
-
     #[cfg(esp32)]
     pub(crate) mod chip_specific {
         use super::*;
@@ -767,6 +749,24 @@ mod rt {
                 }
             }
         }
+    }
+
+    #[inline]
+    pub(crate) fn cpu_interrupt_nr_to_cpu_interrupt_handler(
+        number: u32,
+    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
+        use xtensa_lx_rt::*;
+        // we're fortunate that all esp variants use the same CPU interrupt layout
+        Some(match number {
+            6 => Timer0,
+            7 => Software0,
+            11 => Profiling,
+            14 => NMI,
+            15 => Timer1,
+            16 => Timer2,
+            29 => Software1,
+            _ => return None,
+        })
     }
 
     // Raw handlers for CPU interrupts, assembly only.

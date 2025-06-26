@@ -159,7 +159,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 }
 
 #[cfg(xtensa)]
-#[cfg_attr(feature = "rt", unsafe(no_mangle))]
+#[cfg(feature = "rt")]
 #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
 unsafe extern "C" fn ESP32Reset() -> ! {
     unsafe {
@@ -170,7 +170,7 @@ unsafe extern "C" fn ESP32Reset() -> ! {
     /// into the right place therefore we skip loading it again. This function
     /// is called by xtensa-lx-rt in Reset.
     #[doc(hidden)]
-    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
+    #[unsafe(no_mangle)]
     pub extern "Rust" fn __init_data() -> bool {
         false
     }
@@ -235,11 +235,13 @@ unsafe extern "C" fn ESP32Reset() -> ! {
     unsafe { xtensa_lx_rt::Reset() }
 }
 
-#[cfg_attr(feature = "rt", unsafe(export_name = "__stack_chk_fail"))]
+#[cfg(feature = "rt")]
+#[unsafe(export_name = "__stack_chk_fail")]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
+#[cfg(feature = "rt")]
 fn setup_stack_guard() {
     unsafe extern "C" {
         static mut __stack_chk_guard: u32;
