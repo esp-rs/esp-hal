@@ -20,6 +20,7 @@ use embedded_hal_sdmmc::{
 
 use crate::gpio::{InputConfig, OutputConfig, Pull};
 
+mod config;
 mod hinf;
 mod interrupt;
 mod pins;
@@ -27,6 +28,7 @@ mod slc;
 mod slchost;
 mod state;
 
+pub use config::Config;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::HostInterrupt;
 pub use pins::Pins;
@@ -87,6 +89,7 @@ pub struct Sdio<'d> {
     slchost: AnySlchost<'d>,
     hinf: AnyHinf<'d>,
     pins: Pins<'d>,
+    config: Config,
     state: State,
 }
 
@@ -96,7 +99,7 @@ impl<'d> Sdio<'d> {
     /// # Example
     #[doc = crate::before_snippet!()]
     /// ```rust, no_run
-    /// use esp_hal::sdio::{Mode, Pins, Sdio};
+    /// use esp_hal::sdio::{Config, Mode, Pins, Sdio};
     ///
     /// let pins = Pins::new(
     ///     Mode::Sd4bit,
@@ -108,19 +111,29 @@ impl<'d> Sdio<'d> {
     ///     peripherals.GPIO23, // DAT3/#CS
     /// );
     ///
-    /// let _sdio = Sdio::new(peripherals.slc, peripherals.slchost, peripherals.hinf, pins);
+    /// let config = Config::new();
+    ///
+    /// let _sdio = Sdio::new(
+    ///     peripherals.slc,
+    ///     peripherals.slchost,
+    ///     peripherals.hinf,
+    ///     pins,
+    ///     config,
+    /// );
     /// ```
     pub fn new(
         slc: impl SlcInstance + 'd,
         slchost: impl SlchostInstance + 'd,
         hinf: impl HinfInstance + 'd,
         pins: Pins<'d>,
+        config: Config,
     ) -> Self {
         Self {
             slc: slc.degrade(),
             slchost: slchost.degrade(),
             hinf: hinf.degrade(),
             pins,
+            config,
             state: State::new(),
         }
     }
@@ -143,6 +156,11 @@ impl<'d> Sdio<'d> {
     /// Gets a reference to the [Pins] information.
     pub const fn pins(&self) -> &Pins<'_> {
         &self.pins
+    }
+
+    /// Gets a reference to the [Config] information.
+    pub const fn config(&self) -> &Config {
+        &self.config
     }
 
     /// Gets the bus mode of the SDIO peripheral.
@@ -173,6 +191,7 @@ impl<'d> Sdio<'d> {
     /// Performs final low-level HAL hardware initialization.
     pub(crate) fn hardware_init(&mut self) -> Result<(), Error> {
         self.low_level_init()?;
+        self.low_level_enable_hs()?;
 
         Err(Error::unimplemented())
     }
@@ -198,6 +217,16 @@ impl<'d> Sdio<'d> {
 
         slc.slc_rx_dscr_conf()
             .modify(|_, w| w.sdio_slc0_token_no_replace().set_bit());
+
+        Ok(())
+    }
+
+    /// Sets the high-speed supported bit to be read by the host.
+    fn low_level_enable_hs(&mut self) -> Result<(), Error> {
+        let hinf = unsafe { &*self.hinf.info().register_block };
+
+        hinf.cfg_data1()
+            .modify(|_, w| w.highspeed_enable().variant(self.config.hs));
 
         Ok(())
     }
