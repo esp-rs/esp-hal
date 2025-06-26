@@ -30,9 +30,9 @@
 #![doc = crate::before_snippet!()]
 //! use esp_hal::i2c::master::I2c;
 //! # use esp_hal::{i2c::master::Config, time::Rate};
-//!
+//! #
 //! # let config = Config::default();
-//!
+//! #
 //! // You need to configure the driver during initialization:
 //! let mut i2c = I2c::new(peripherals.I2C0, config)?
 //!     .with_sda(peripherals.GPIO2)
@@ -54,7 +54,7 @@
 //! # use esp_hal::i2c::master::{I2c, Config, Operation};
 //! # let config = Config::default();
 //! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
-//!
+//! #
 //! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
 //! // address does not contain the `R/W` bit!
 //! const DEVICE_ADDR: u8 = 0x77;
@@ -80,11 +80,11 @@
 //! # use esp_hal::i2c::master::{I2c, Config, Operation};
 //! # let config = Config::default();
 //! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
-//!
+//! #
 //! # const DEVICE_ADDR: u8 = 0x77;
 //! # let write_buffer = [0xAA];
 //! # let mut read_buffer = [0u8; 22];
-//!
+//! #
 //! // Reconfigure the driver to use async mode.
 //! let mut i2c = i2c.into_async();
 //!
@@ -2997,7 +2997,7 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance: crate::private::Sealed + IntoAnyI2c {
+pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -3143,9 +3143,9 @@ impl Instance for AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(i2c_master_i2c0)]
-            AnyI2cInner::I2c0(i2c) => i2c,
+            any::Inner::I2c0(i2c) => i2c,
             #[cfg(i2c_master_i2c1)]
-            AnyI2cInner::I2c1(i2c) => i2c,
+            any::Inner::I2c1(i2c) => i2c,
         } {
             fn parts(&self) -> (&Info, &State);
         }
@@ -3156,9 +3156,9 @@ impl AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(i2c_master_i2c0)]
-            AnyI2cInner::I2c0(i2c) => i2c,
+            any::Inner::I2c0(i2c) => i2c,
             #[cfg(i2c_master_i2c1)]
-            AnyI2cInner::I2c1(i2c) => i2c,
+            any::Inner::I2c1(i2c) => i2c,
         } {
             fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
             fn disable_peri_interrupt(&self);

@@ -578,7 +578,7 @@ pub mod dma {
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
-pub trait Instance: crate::private::Sealed + IntoAnySpi {
+pub trait Instance: crate::private::Sealed + any::Degrade {
     /// Returns the peripheral data describing this SPI instance.
     #[doc(hidden)]
     fn info(&self) -> &'static Info;
@@ -826,9 +826,9 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
@@ -836,9 +836,9 @@ impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn info(&self) -> &'static Info;
         }

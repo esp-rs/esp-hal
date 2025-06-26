@@ -2656,7 +2656,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[cfg_attr(not(feature = "unstable"), expect(private_bounds))] // DmaEligible
-pub trait Instance: private::Sealed + IntoAnySpi + DmaEligible {
+pub trait Instance: private::Sealed + any::Degrade + DmaEligible {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -3793,9 +3793,9 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
@@ -3804,9 +3804,9 @@ impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn parts(&self) -> (&'static Info, &'static State);
         }
@@ -3817,9 +3817,9 @@ impl AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
             fn disable_peri_interrupt(&self);
