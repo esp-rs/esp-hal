@@ -564,18 +564,19 @@ pub mod __macro_implementation {
     #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
+    #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
+    #[cfg(feature = "rt")]
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::entry as __entry;
 }
 
+use crate::clock::CpuClock;
 #[cfg(feature = "unstable")]
 use crate::config::{WatchdogConfig, WatchdogStatus};
-use crate::{
-    clock::{Clocks, CpuClock},
-    peripherals::Peripherals,
-};
+#[cfg(feature = "rt")]
+use crate::{clock::Clocks, peripherals::Peripherals};
 
 /// System configuration.
 ///
