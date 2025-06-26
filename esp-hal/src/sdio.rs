@@ -27,6 +27,7 @@ mod pins;
 mod slc;
 mod slchost;
 mod state;
+mod timing;
 
 pub use config::Config;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
@@ -35,6 +36,7 @@ pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
 pub use state::State;
+pub use timing::Timing;
 
 /// SDIO peripheral instance.
 pub trait PeripheralInstance: crate::private::Sealed {
@@ -192,6 +194,7 @@ impl<'d> Sdio<'d> {
     pub(crate) fn hardware_init(&mut self) -> Result<(), Error> {
         self.low_level_init()?;
         self.low_level_enable_hs()?;
+        self.low_level_set_timing()?;
 
         Err(Error::unimplemented())
     }
@@ -226,7 +229,48 @@ impl<'d> Sdio<'d> {
         let hinf = unsafe { &*self.hinf.info().register_block };
 
         hinf.cfg_data1()
-            .modify(|_, w| w.highspeed_enable().variant(self.config.hs));
+            .modify(|_, w| w.highspeed_enable().variant(self.config.hs()));
+
+        Ok(())
+    }
+
+    fn low_level_set_timing(&mut self) -> Result<(), Error> {
+        let host = unsafe { &*self.slchost.info().register_block };
+
+        match self.config.timing() {
+            Timing::PsendPsample => {
+                host.conf().modify(|_, w| unsafe {
+                    w.frc_sdio20().bits(0x1f);
+                    w.frc_sdio11().bits(0x0);
+                    w.frc_pos_samp().bits(0x1f);
+                    w.frc_neg_samp().bits(0x0)
+                });
+            }
+            Timing::PsendNsample => {
+                host.conf().modify(|_, w| unsafe {
+                    w.frc_sdio20().bits(0x1f);
+                    w.frc_sdio11().bits(0x0);
+                    w.frc_pos_samp().bits(0x0);
+                    w.frc_neg_samp().bits(0x1f)
+                });
+            }
+            Timing::NsendPsample => {
+                host.conf().modify(|_, w| unsafe {
+                    w.frc_sdio20().bits(0x0);
+                    w.frc_sdio11().bits(0x1f);
+                    w.frc_pos_samp().bits(0x1f);
+                    w.frc_neg_samp().bits(0x0)
+                });
+            }
+            Timing::NsendNsample => {
+                host.conf().modify(|_, w| unsafe {
+                    w.frc_sdio20().bits(0x0);
+                    w.frc_sdio11().bits(0x1f);
+                    w.frc_pos_samp().bits(0x0);
+                    w.frc_neg_samp().bits(0x1f)
+                });
+            }
+        }
 
         Ok(())
     }
