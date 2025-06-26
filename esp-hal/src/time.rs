@@ -746,7 +746,7 @@ fn now() -> Instant {
     Instant::from_ticks(ticks / div)
 }
 
-#[cfg(esp32)]
+#[cfg(all(esp32, feature = "rt"))]
 pub(crate) fn time_init() {
     let apb = crate::Clocks::get().apb_clock.as_hz();
     // we assume 80MHz APB clock source - there is no way to configure it in a

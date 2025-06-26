@@ -83,11 +83,11 @@ esp32s3 = { version = "0.32.0", features = ["critical-section", "rt"], git = "ht
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }
-esp-riscv-rt     = { version = "0.11.0", path = "../esp-riscv-rt" }
+esp-riscv-rt     = { version = "0.11.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
 xtensa-lx        = { version = "0.11.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.19.0", path = "../xtensa-lx-rt" }
+xtensa-lx-rt     = { version = "0.19.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
 cfg-if       = "1.0.0"
@@ -99,7 +99,7 @@ serde        = { version = "1.0.219", default-features = false, features = ["der
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
-default = []
+default = ["rt"]
 
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
@@ -172,6 +172,21 @@ esp32s3 = [
     "__usb_otg",
     "esp-rom-sys/esp32s3",
     "esp-metadata-generated/esp32s3",
+]
+
+## Runtime support
+##
+## If you are depending on `esp-hal` as a library, you should *not* enable the `rt` feature under any circumstance.
+rt = [
+    "dep:xtensa-lx-rt",
+    "dep:esp-riscv-rt",
+    "esp32?/rt",
+    "esp32c2?/rt",
+    "esp32c3?/rt",
+    "esp32c6?/rt",
+    "esp32h2?/rt",
+    "esp32s2?/rt",
+    "esp32s3?/rt",
 ]
 
 

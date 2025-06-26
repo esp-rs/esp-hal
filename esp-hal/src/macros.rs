@@ -299,6 +299,7 @@ macro_rules! ignore {
 #[doc(hidden)]
 macro_rules! metadata {
     ($category:literal, $key:ident, $value:expr) => {
+        #[cfg(feature = "rt")]
         #[unsafe(link_section = concat!(".espressif.metadata"))]
         #[used]
         #[unsafe(export_name = concat!($category, ".", stringify!($key)))]

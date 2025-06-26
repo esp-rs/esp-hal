@@ -279,7 +279,9 @@ fn lint_package(
         builder = builder.arg(arg.to_string());
     }
 
-    builder = builder.arg(format!("--features={}", features.join(",")));
+    if !features.is_empty() {
+        builder = builder.arg(format!("--features={}", features.join(",")));
+    }
 
     let builder = if fix {
         builder.arg("--fix").arg("--lib").arg("--allow-dirty")

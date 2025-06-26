@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added the feature `requires-unstable` (#3772)
 - `AnyPin::downcast`/`AnyPeripheral::downcast` to allow retrieving the original GPIO/peripheral type (#3783, #3784)
 - Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778).
+- The `rt` feature (#3706)
 
 ### Changed
 
@@ -35,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjusted ESP32-S2 and ESP-S3 memory region lengths to reflect those defined in ESP-IDF. (#3709)
 - Changed the various `ConfigError` variant names to use a consistent word order. (#3782)
 - Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
+- Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
 
 ### Fixed
 
