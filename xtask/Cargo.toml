@@ -15,7 +15,7 @@ kuchikiki    = { version = "0.8.2", optional = true }
 log          = "0.4.22"
 minijinja    = { version = "2.5.0", default-features = false }
 opener       = { version = "0.7.2", optional = true }
-regex        = "1.11.1"
+regex        = { version = "1.11.1", optional = true }
 rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", default-features = false, features = ["derive"] }
@@ -49,3 +49,4 @@ deploy-docs  = ["dep:reqwest", "dep:kuchikiki"]
 preview-docs = ["dep:opener", "dep:rocket"]
 semver-checks = [ "dep:cargo-semver-checks", "dep:rustdoc-types", "dep:flate2", "dep:temp-file" ]
 release = ["semver-checks", "dep:opener", "dep:urlencoding"]
+msrv = ["dep:regex"]

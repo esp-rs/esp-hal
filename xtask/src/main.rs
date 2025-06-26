@@ -44,6 +44,7 @@ enum Cli {
     UpdateChipSupportTable,
     /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml, the
     /// toolchain used in CI)
+    #[cfg(feature = "msrv")]
     BumpMsrv(BumpMsrvArgs),
 }
 
@@ -164,7 +165,8 @@ fn main() -> Result<()> {
             xtask::update_chip_support_table(&workspace)?;
             Ok(())
         }
-        Cli::BumpMsrv(args) => bump_msrv(&workspace, &args.msrv),
+        #[cfg(feature = "msrv")]
+        Cli::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, &args.msrv),
     }
 }
 

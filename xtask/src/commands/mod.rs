@@ -4,11 +4,12 @@ use anyhow::{Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 
-pub use self::{build::*, bump_msrv::*, check_changelog::*, release::*, run::*};
+pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{Package, cargo::CargoAction};
 
 mod build;
-mod bump_msrv;
+#[cfg(feature = "msrv")]
+pub mod bump_msrv;
 mod check_changelog;
 mod release;
 mod run;
