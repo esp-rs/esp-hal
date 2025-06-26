@@ -18,7 +18,10 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
-use crate::gpio::{InputConfig, OutputConfig, Pull};
+use crate::{
+    gpio::{InputConfig, OutputConfig, Pull},
+    pac,
+};
 
 mod config;
 mod hinf;
@@ -31,22 +34,12 @@ mod timing;
 
 pub use config::Config;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
-pub use interrupt::HostInterrupt;
+pub use interrupt::{DeviceInterrupt, HostInterrupt};
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
 pub use state::State;
 pub use timing::Timing;
-
-/// SDIO peripheral instance.
-pub trait PeripheralInstance: crate::private::Sealed {
-    /// Represents the peripheral information type containing the register
-    /// block.
-    type Info;
-
-    /// Gets a static shared reference to the peripheral information.
-    fn info(&self) -> &'static Self::Info;
-}
 
 /// Represents the transmission modes for the SDIO peripheral.
 #[repr(u8)]
@@ -98,9 +91,10 @@ pub struct Sdio<'d> {
 impl<'d> Sdio<'d> {
     /// Creates a new [Sdio].
     ///
-    /// # Example
-    #[doc = crate::before_snippet!()]
+    /// ## Example
+    ///
     /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
     /// use esp_hal::sdio::{Config, Mode, Pins, Sdio};
     ///
     /// let pins = Pins::new(
@@ -116,12 +110,14 @@ impl<'d> Sdio<'d> {
     /// let config = Config::new();
     ///
     /// let _sdio = Sdio::new(
-    ///     peripherals.slc,
-    ///     peripherals.slchost,
-    ///     peripherals.hinf,
+    ///     peripherals.SLC,
+    ///     peripherals.SLCHOST,
+    ///     peripherals.HINF,
     ///     pins,
     ///     config,
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(
         slc: impl SlcInstance + 'd,
@@ -145,14 +141,29 @@ impl<'d> Sdio<'d> {
         self.slc.info()
     }
 
+    /// Convenience function to get a reference to the SLC register block.
+    fn slc_block(&self) -> &'_ pac::slc::RegisterBlock {
+        unsafe { &*self.slc().register_block }
+    }
+
     /// Gets a static reference to the SLCHOST information.
     pub fn slchost(&self) -> &'static SlchostInfo {
         self.slchost.info()
     }
 
+    /// Convenience function to get a reference to the SLCHOST register block.
+    fn slchost_block(&self) -> &'_ pac::slchost::RegisterBlock {
+        unsafe { &*self.slchost().register_block }
+    }
+
     /// Gets a static reference to the HINF information.
     pub fn hinf(&self) -> &'static HinfInfo {
         self.hinf.info()
+    }
+
+    /// Convenience function to get a reference to the HINF register block.
+    fn hinf_block(&self) -> &'_ pac::hinf::RegisterBlock {
+        unsafe { &*self.hinf().register_block }
     }
 
     /// Gets a reference to the [Pins] information.
@@ -192,16 +203,42 @@ impl<'d> Sdio<'d> {
 
     /// Performs final low-level HAL hardware initialization.
     pub(crate) fn hardware_init(&mut self) -> Result<(), Error> {
-        self.low_level_init()?;
-        self.low_level_enable_hs()?;
-        self.low_level_set_timing()?;
-
-        Err(Error::unimplemented())
+        self.pac_init()?;
+        self.pac_enable_hs()?;
+        self.pac_set_timing()?;
+        self.pac_dev_interrupt_enable(0xffu8.into())
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    fn low_level_init(&mut self) -> Result<(), Error> {
-        let slc = unsafe { &*self.slc.info().register_block };
+    #[cfg(feature = "esp32")]
+    fn pac_init(&mut self) -> Result<(), Error> {
+        let slc = self.slc_block();
+
+        slc.conf0().modify(|_, w| {
+            w.slc0_rx_auto_wrback().set_bit();
+            w.slc0_token_auto_clr().clear_bit();
+
+            w.slc0_rx_loop_test().clear_bit();
+            w.slc0_tx_loop_test().clear_bit()
+        });
+
+        slc.conf1().modify(|_, w| {
+            w.slc0_rx_stitch_en().clear_bit();
+            w.slc0_tx_stitch_en().clear_bit();
+
+            w.slc0_len_auto_clr().clear_bit()
+        });
+
+        slc.rx_dscr_conf()
+            .modify(|_, w| w.slc0_token_no_replace().set_bit());
+
+        Ok(())
+    }
+
+    /// Performs low-level initialization of the SDIO peripheral.
+    #[cfg(feature = "esp32c6")]
+    fn pac_init(&mut self) -> Result<(), Error> {
+        let slc = self.slc_block();
 
         slc.slcconf0().modify(|_, w| {
             w.sdio_slc0_rx_auto_wrback().set_bit();
@@ -225,52 +262,87 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets the high-speed supported bit to be read by the host.
-    fn low_level_enable_hs(&mut self) -> Result<(), Error> {
-        let hinf = unsafe { &*self.hinf.info().register_block };
-
-        hinf.cfg_data1()
+    #[cfg(any(feature = "esp32", feature = "esp32c6"))]
+    fn pac_enable_hs(&mut self) -> Result<(), Error> {
+        self.hinf_block()
+            .cfg_data1()
             .modify(|_, w| w.highspeed_enable().variant(self.config.hs()));
 
         Ok(())
     }
 
-    fn low_level_set_timing(&mut self) -> Result<(), Error> {
-        let host = unsafe { &*self.slchost.info().register_block };
-
+    /// Sets the communication timing.
+    fn pac_set_timing(&mut self) -> Result<(), Error> {
         match self.config.timing() {
             Timing::PsendPsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x1f);
-                    w.frc_sdio11().bits(0x0);
-                    w.frc_pos_samp().bits(0x1f);
-                    w.frc_neg_samp().bits(0x0)
-                });
+                self.set_timing_registers(0x1f, 0x0, 0x1f, 0x0);
             }
             Timing::PsendNsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x1f);
-                    w.frc_sdio11().bits(0x0);
-                    w.frc_pos_samp().bits(0x0);
-                    w.frc_neg_samp().bits(0x1f)
-                });
+                self.set_timing_registers(0x1f, 0x0, 0x0, 0x1f);
             }
             Timing::NsendPsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x0);
-                    w.frc_sdio11().bits(0x1f);
-                    w.frc_pos_samp().bits(0x1f);
-                    w.frc_neg_samp().bits(0x0)
-                });
+                self.set_timing_registers(0x0, 0x1f, 0x1f, 0x0);
             }
             Timing::NsendNsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x0);
-                    w.frc_sdio11().bits(0x1f);
-                    w.frc_pos_samp().bits(0x0);
-                    w.frc_neg_samp().bits(0x1f)
-                });
+                self.set_timing_registers(0x0, 0x1f, 0x0, 0x1f);
             }
         }
+
+        Ok(())
+    }
+
+    #[cfg(esp32)]
+    fn set_timing_registers(&self, sdio20: u8, sdio11: u8, pos_samp: u8, neg_samp: u8) {
+        self.slchost_block()
+            .host_slchost_conf()
+            .modify(|_, w| unsafe {
+                w.host_frc_sdio20().bits(sdio20);
+                w.host_frc_sdio11().bits(sdio11);
+                w.host_frc_pos_samp().bits(pos_samp);
+                w.host_frc_neg_samp().bits(neg_samp)
+            });
+    }
+
+    #[cfg(esp32c6)]
+    fn set_timing_registers(&self, sdio20: u8, sdio11: u8, pos_samp: u8, neg_samp: u8) {
+        self.slchost_block().conf().modify(|_, w| unsafe {
+            w.frc_sdio20().bits(sdio20);
+            w.frc_sdio11().bits(sdio11);
+            w.frc_pos_samp().bits(pos_samp);
+            w.frc_neg_samp().bits(neg_samp)
+        });
+    }
+
+    /// Sets which device interrupts to enable based on the provided mask.
+    #[cfg(feature = "esp32")]
+    fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
+        self.slc_block()._0int_ena().modify(|_, w| {
+            w.frhost_bit0_int_ena().variant(mask.general0());
+            w.frhost_bit1_int_ena().variant(mask.general1());
+            w.frhost_bit2_int_ena().variant(mask.general2());
+            w.frhost_bit3_int_ena().variant(mask.general3());
+            w.frhost_bit4_int_ena().variant(mask.general4());
+            w.frhost_bit5_int_ena().variant(mask.general5());
+            w.frhost_bit6_int_ena().variant(mask.general6());
+            w.frhost_bit7_int_ena().variant(mask.general7())
+        });
+
+        Ok(())
+    }
+
+    /// Sets which device interrupts to enable based on the provided mask.
+    #[cfg(feature = "esp32c6")]
+    fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
+        self.slc_block().slc0int_ena().modify(|_, w| {
+            w.sdio_slc_frhost_bit0_int_ena().variant(mask.general0());
+            w.sdio_slc_frhost_bit1_int_ena().variant(mask.general1());
+            w.sdio_slc_frhost_bit2_int_ena().variant(mask.general2());
+            w.sdio_slc_frhost_bit3_int_ena().variant(mask.general3());
+            w.sdio_slc_frhost_bit4_int_ena().variant(mask.general4());
+            w.sdio_slc_frhost_bit5_int_ena().variant(mask.general5());
+            w.sdio_slc_frhost_bit6_int_ena().variant(mask.general6());
+            w.sdio_slc_frhost_bit7_int_ena().variant(mask.general7())
+        });
 
         Ok(())
     }
@@ -400,7 +472,6 @@ impl Common for Sdio<'_> {
         self.pins.dat3_cs.apply_input_config(&input_pullup);
         self.pins.dat3_cs.apply_output_config(&output_pullup);
 
-        // TODO: implement HAL hardware init
         self.hardware_init()?;
 
         self.state_transition(State::Standby)

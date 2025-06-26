@@ -1,8 +1,7 @@
-use super::PeripheralInstance;
 use crate::pac::slchost;
 
 crate::any_peripheral! {
-    /// Any SDIO peripheral.
+    /// Any SDIO SLCHOST peripheral.
     pub peripheral AnySlchost<'d> {
         Slchost(crate::peripherals::SLCHOST<'d>)
     }
@@ -16,10 +15,10 @@ pub struct SlchostInfo {
 
 unsafe impl Sync for SlchostInfo {}
 
-impl PeripheralInstance for AnySlchost<'_> {
-    type Info = SlchostInfo;
-
-    fn info(&self) -> &'static Self::Info {
+/// A peripheral singleton compatible with the SDIO SLCHOST driver.
+pub trait SlchostInstance: IntoAnySlchost {
+    /// Gets a static reference the the [SlchostInfo].
+    fn info(&self) -> &'static SlchostInfo {
         static INFO: SlchostInfo = SlchostInfo {
             register_block: crate::peripherals::SLCHOST::ptr(),
         };
@@ -28,7 +27,5 @@ impl PeripheralInstance for AnySlchost<'_> {
     }
 }
 
-/// A peripheral singleton compatible with the SDIO SLCHOST driver.
-pub trait SlchostInstance: PeripheralInstance + IntoAnySlchost {}
-
 impl SlchostInstance for AnySlchost<'_> {}
+impl SlchostInstance for crate::peripherals::SLCHOST<'_> {}
