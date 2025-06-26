@@ -204,7 +204,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use portable_atomic::{AtomicU8, Ordering};
+use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
@@ -920,18 +920,21 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
 
     let mut next_state = state;
     for cur_channel in channel..channel + memsize.blocks() {
-        if STATE[cur_channel as usize]
-            .compare_exchange(
-                RmtState::Unconfigured as u8,
-                next_state as u8,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
-            .is_err()
+        if RmtState::compare_exchange(
+            cur_channel,
+            RmtState::Unconfigured,
+            next_state,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        )
+        .is_err()
         {
-            for i in (channel..cur_channel).rev() {
-                STATE[i as usize].store(RmtState::Unconfigured as u8, Ordering::Release);
-            }
+            RmtState::store_range_rev(
+                RmtState::Unconfigured,
+                channel,
+                cur_channel,
+                Ordering::Relaxed,
+            );
 
             return Err(Error::MemoryBlockNotAvailable);
         }
@@ -1010,25 +1013,107 @@ fn configure_tx_channel<'d>(
 
     Ok(())
 }
-#[repr(u8)]
-enum RmtState {
-    // The channel is not configured for either rx or tx, and its memory is available
-    Unconfigured,
 
-    // The channels is not in use, but one of the preceding channels is using its memory
-    Reserved,
+// We store values of type `RmtState` in the global `STATE`. However, we also need atomic access,
+// thus the enum needs to be represented as AtomicU8. Thus, we end up with unsafe conversions
+// between `RmtState` and `u8` to avoid constant range checks.
+// This submodule wraps all accesses in a safe API which ensures that only valid enum values can
+// be stored to `STATE` such that other code in this driver does not need to be concerned with
+// these details.
+mod state {
+    use portable_atomic::{AtomicU8, Ordering};
 
-    // The channel is configured for rx
-    Rx,
+    use super::{Direction, NUM_CHANNELS, RawChannelAccess};
 
-    // The channel is configured for tx
-    Tx,
+    static STATE: [AtomicU8; NUM_CHANNELS] =
+        [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub(super) enum RmtState {
+        // The channel is not configured for either rx or tx, and its memory is available
+        Unconfigured,
+
+        // The channels is not in use, but one of the preceding channels is using its memory
+        Reserved,
+
+        // The channel is configured for rx
+        Rx,
+
+        // The channel is configured for tx
+        Tx,
+    }
+
+    impl RmtState {
+        /// Check whether this state corresponds to a rx, tx, or other configuration.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn is_tx(&self) -> Option<bool> {
+            match self {
+                Self::Rx => Some(false),
+                Self::Tx => Some(true),
+                _ => None,
+            }
+        }
+
+        /// Convert a `u8` to `Self` without checking that it has a valid value for the enum.
+        ///
+        /// # Safety
+        ///
+        /// - Must only be called with valid values of the RmtState discrimiant
+        #[allow(unused)]
+        #[inline]
+        unsafe fn from_u8_unchecked(value: u8) -> Self {
+            unsafe { core::mem::transmute::<_, Self>(value) }
+        }
+
+        /// Load channel state from the global `STATE` by channel index.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn load_by_idx(channel: u8, ordering: Ordering) -> Self {
+            unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
+        }
+
+        /// Store the given state to all channel states for an index range in reverse order.
+        #[inline]
+        pub(super) fn store_range_rev(self, start: u8, end: u8, ordering: Ordering) {
+            for ch_num in (start as usize..end as usize).rev() {
+                STATE[ch_num].store(self as u8, ordering);
+            }
+        }
+
+        /// Store channel state to the global `STATE` given a `RawChannelAccess`.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn store(self, raw: impl RawChannelAccess<Dir: Direction>, ordering: Ordering) {
+            STATE[raw.channel() as usize].store(self as u8, ordering);
+        }
+
+        /// Load channel state from the global `STATE` given a `RawChannelAccess`.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn load(raw: impl RawChannelAccess<Dir: Direction>, ordering: Ordering) -> Self {
+            Self::load_by_idx(raw.channel(), ordering)
+        }
+
+        /// Perform a compare_exchange for the channel state for a `RawChannelAccess`.
+        #[inline]
+        pub(super) fn compare_exchange(
+            ch_num: u8,
+            current: Self,
+            new: Self,
+            success: Ordering,
+            failure: Ordering,
+        ) -> Result<Self, Self> {
+            STATE[ch_num as usize]
+                .compare_exchange(current as u8, new as u8, success, failure)
+                .map(|prev| unsafe { Self::from_u8_unchecked(prev) })
+                .map_err(|prev| unsafe { Self::from_u8_unchecked(prev) })
+        }
+    }
 }
 
-// This must only holds value of RmtState. However, we need atomic access, thus
-// represent as AtomicU8.
-static STATE: [AtomicU8; NUM_CHANNELS] =
-    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+use state::RmtState;
 
 /// RMT Channel
 #[derive(Debug)]
@@ -1094,14 +1179,14 @@ where
         // interfere with others.
         self.raw.set_memsize(MemSize::from_blocks(0));
 
-        for s in STATE[usize::from(self.raw.channel())..][..usize::from(memsize.blocks())]
-            .iter()
-            .rev()
-        {
-            // Existence of this `Channel` struct implies exclusive access to these hardware
-            // channels, thus simply store the new state.
-            s.store(RmtState::Unconfigured as u8, Ordering::Release);
-        }
+        // Existence of this `Channel` struct implies exclusive access to these hardware
+        // channels, thus simply store the new state.
+        RmtState::store_range_rev(
+            RmtState::Unconfigured,
+            self.raw.channel(),
+            self.raw.channel() + memsize.blocks(),
+            Ordering::Release,
+        );
     }
 }
 
