@@ -31,7 +31,7 @@ mod timing;
 
 pub use config::Config;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
-pub use interrupt::HostInterrupt;
+pub use interrupt::{DeviceInterrupt, HostInterrupt};
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
@@ -195,12 +195,12 @@ impl<'d> Sdio<'d> {
         self.low_level_init()?;
         self.low_level_enable_hs()?;
         self.low_level_set_timing()?;
-
-        Err(Error::unimplemented())
+        self.low_level_set_timing()?;
+        self.low_level_dev_interrupt_enable(0xffu8.into())
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    fn low_level_init(&mut self) -> Result<(), Error> {
+    pub(crate) fn low_level_init(&mut self) -> Result<(), Error> {
         let slc = unsafe { &*self.slc.info().register_block };
 
         slc.slcconf0().modify(|_, w| {
@@ -225,7 +225,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets the high-speed supported bit to be read by the host.
-    fn low_level_enable_hs(&mut self) -> Result<(), Error> {
+    pub(crate) fn low_level_enable_hs(&mut self) -> Result<(), Error> {
         let hinf = unsafe { &*self.hinf.info().register_block };
 
         hinf.cfg_data1()
@@ -234,7 +234,8 @@ impl<'d> Sdio<'d> {
         Ok(())
     }
 
-    fn low_level_set_timing(&mut self) -> Result<(), Error> {
+    /// Sets the communication timing.
+    pub(crate) fn low_level_set_timing(&mut self) -> Result<(), Error> {
         let host = unsafe { &*self.slchost.info().register_block };
 
         match self.config.timing() {
@@ -271,6 +272,27 @@ impl<'d> Sdio<'d> {
                 });
             }
         }
+
+        Ok(())
+    }
+
+    /// Sets which device interrupts to enable based on the provided mask.
+    pub(crate) fn low_level_dev_interrupt_enable(
+        &self,
+        mask: DeviceInterrupt,
+    ) -> Result<(), Error> {
+        let slc = unsafe { &*self.slc.info().register_block };
+
+        slc.slc0int_ena().modify(|_, w| {
+            w.sdio_slc_frhost_bit0_int_ena().variant(mask.general0());
+            w.sdio_slc_frhost_bit1_int_ena().variant(mask.general1());
+            w.sdio_slc_frhost_bit2_int_ena().variant(mask.general2());
+            w.sdio_slc_frhost_bit3_int_ena().variant(mask.general3());
+            w.sdio_slc_frhost_bit4_int_ena().variant(mask.general4());
+            w.sdio_slc_frhost_bit5_int_ena().variant(mask.general5());
+            w.sdio_slc_frhost_bit6_int_ena().variant(mask.general6());
+            w.sdio_slc_frhost_bit7_int_ena().variant(mask.general7())
+        });
 
         Ok(())
     }
