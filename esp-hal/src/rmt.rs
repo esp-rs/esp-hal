@@ -1590,14 +1590,15 @@ where
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct RmtTxFuture<Raw>
+struct RmtTxFuture<'a, Raw>
 where
     Raw: TxChannelInternal,
 {
     raw: Raw,
+    _phantom: PhantomData<&'a mut Raw>,
 }
 
-impl<Raw> core::future::Future for RmtTxFuture<Raw>
+impl<Raw> core::future::Future for RmtTxFuture<'_, Raw>
 where
     Raw: TxChannelInternal,
 {
@@ -1642,19 +1643,24 @@ where
         raw.listen_tx_interrupt(Event::End | Event::Error);
         raw.start_send(data, false, 0)?;
 
-        (RmtTxFuture { raw }).await
+        (RmtTxFuture {
+            raw,
+            _phantom: PhantomData,
+        })
+        .await
     }
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct RmtRxFuture<Raw>
+struct RmtRxFuture<'a, Raw>
 where
     Raw: RxChannelInternal,
 {
     raw: Raw,
+    _phantom: PhantomData<&'a mut Raw>,
 }
 
-impl<Raw> core::future::Future for RmtRxFuture<Raw>
+impl<Raw> core::future::Future for RmtRxFuture<'_, Raw>
 where
     Raw: RxChannelInternal,
 {
@@ -1699,7 +1705,11 @@ where
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive();
 
-        let result = (RmtRxFuture { raw }).await;
+        let result = RmtRxFuture {
+            raw,
+            _phantom: PhantomData,
+        }
+        .await;
 
         if result.is_ok() {
             raw.stop_rx();
