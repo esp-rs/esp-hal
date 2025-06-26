@@ -226,6 +226,7 @@ static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
 /// Disable all peripherals.
 ///
 /// Peripherals listed in [KEEP_ENABLED] are NOT disabled.
+#[cfg_attr(not(feature = "rt"), expect(dead_code))]
 pub(crate) fn disable_peripherals() {
     // Take the critical section up front to avoid taking it multiple times.
     critical_section::with(|cs| {

@@ -68,11 +68,12 @@ crate::unstable_module! {
 mod asynch;
 mod embedded_hal_impls;
 pub(crate) mod interrupt;
+use interrupt::*;
+
 mod placeholder;
 
 use core::fmt::Display;
 
-use interrupt::*;
 pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
@@ -82,9 +83,12 @@ use crate::{
     interrupt::{InterruptHandler, Priority},
     peripherals::{GPIO, IO_MUX, Interrupt, io_mux_reg},
     private::{self, Sealed},
+    sync::RawMutex,
 };
 
 define_io_mux_signals!();
+
+pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
@@ -642,7 +646,7 @@ impl<'d> Io<'d> {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, prio: Priority) {
-        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
+        interrupt::set_interrupt_priority(crate::peripherals::Interrupt::GPIO, prio);
     }
 
     #[cfg_attr(
@@ -675,13 +679,13 @@ impl<'d> Io<'d> {
     /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
+    pub fn set_interrupt_handler(&mut self, _handler: InterruptHandler) {
         for core in crate::system::Cpu::other() {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
-        self.set_interrupt_priority(handler.priority());
+        self.set_interrupt_priority(_handler.priority());
         unsafe { crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+        USER_INTERRUPT_HANDLER.store(_handler.handler());
     }
 }
 
