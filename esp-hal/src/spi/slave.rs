@@ -787,23 +787,21 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-macro_rules! spi_instance {
-    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
-        paste::paste! {
-            impl Instance for crate::peripherals::[<SPI $num>]<'_> {
-                #[inline(always)]
-                fn info(&self) -> &'static Info {
-                    static INFO: Info = Info {
-                        register_block: crate::peripherals::[<SPI $num>]::regs(),
-                        peripheral: crate::system::Peripheral::[<Spi $num>],
-                        sclk: InputSignal::$sclk,
-                        mosi: InputSignal::$mosi,
-                        miso: OutputSignal::$miso,
-                        cs: InputSignal::$cs,
-                    };
+crate::peripherals::for_each_spi_slave! {
+    ($peri:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
+        impl Instance for crate::peripherals::$peri<'_> {
+            #[inline(always)]
+            fn info(&self) -> &'static Info {
+                static INFO: Info = Info {
+                    register_block: crate::peripherals::$peri::regs(),
+                    peripheral: crate::system::Peripheral::$sys,
+                    sclk: InputSignal::$sclk,
+                    mosi: InputSignal::$mosi,
+                    miso: OutputSignal::$miso,
+                    cs: InputSignal::$cs,
+                };
 
-                    &INFO
-                }
+                &INFO
             }
         }
     };
@@ -834,21 +832,6 @@ impl<'d> DmaEligible for AnySpi<'d> {
         }
     }
 }
-
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        #[cfg(spi_master_spi2)]
-        spi_instance!(2, HSPICLK, HSPID, HSPIQ, HSPICS0);
-        #[cfg(spi_master_spi3)]
-        spi_instance!(3, VSPICLK, VSPID, VSPIQ, VSPICS0);
-    } else {
-        #[cfg(spi_master_spi2)]
-        spi_instance!(2, FSPICLK, FSPID, FSPIQ, FSPICS0);
-        #[cfg(spi_master_spi3)]
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, SPI3_CS0);
-    }
-}
-
 impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {

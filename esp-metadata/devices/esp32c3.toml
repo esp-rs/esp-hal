@@ -269,7 +269,14 @@ channel_ram_size = 48
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+]
 
 [device.timergroup]
 instances = [{ name = "timg0" }, { name = "timg1" }]
@@ -296,7 +303,6 @@ support_status = "not_supported"
 ## Interfaces
 [device.i2s]
 [device.ledc]
-[device.spi_slave]
 [device.twai]
 [device.usb_serial_jtag]
 

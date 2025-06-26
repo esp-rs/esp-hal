@@ -575,7 +575,16 @@ channel_ram_size = 64
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }, { name = "spi3" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", sio = ["HSPID", "HSPIQ", "HSPIWP", "HSPIHD"], cs = ["HSPICS0", "HSPICS1", "HSPICS2"] },
+    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", sio = ["VSPID", "VSPIQ", "VSPIWP", "VSPIHD"], cs = ["VSPICS0", "VSPICS1", "VSPICS2"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
+    { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },
+]
 
 [device.timergroup]
 timg_has_timer1 = true
@@ -611,7 +620,6 @@ support_status = "not_supported"
 [device.pcnt]
 [device.sd_host]
 [device.sd_slave]
-[device.spi_slave]
 [device.touch]
 [device.twai]
 

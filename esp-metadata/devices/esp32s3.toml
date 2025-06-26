@@ -512,7 +512,16 @@ channel_ram_size = 48
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }, { name = "spi3" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q", "SPI3_WP", "SPI3_HD"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },
+]
 
 [device.timergroup]
 timg_has_timer1 = true
@@ -549,7 +558,6 @@ support_status = "not_supported"
 [device.mcpwm]
 [device.pcnt]
 [device.sd_host]
-[device.spi_slave]
 [device.twai]
 [device.usb_otg]
 [device.usb_serial_jtag]

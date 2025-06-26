@@ -3694,76 +3694,52 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-macro_rules! spi_instance {
-    ($num:literal, $sclk:ident, $mosi:ident, $miso:ident, [$($cs:ident),+] $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
-        paste::paste! {
-            impl PeripheralInstance for crate::peripherals::[<SPI $num>]<'_> {
-                #[inline(always)]
-                fn info(&self) -> &'static Info {
-                    static INFO: Info = Info {
-                        register_block: crate::peripherals::[<SPI $num>]::regs(),
-                        peripheral: crate::system::Peripheral::[<Spi $num>],
-                        sclk: OutputSignal::$sclk,
-                        mosi: OutputSignal::$mosi,
-                        miso: InputSignal::$miso,
-                        cs: &[$(OutputSignal::$cs),+],
-                        sio0_input: InputSignal::$mosi,
-                        sio1_output: OutputSignal::$miso,
-                        sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
-                        sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
-                        sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
-                        sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
-                        #[cfg(spi_octal)]
-                        sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
-                        #[cfg(spi_octal)]
-                        sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
-                    };
+crate::peripherals::for_each_spi_master! {
+    ($peri:ident, $sys:ident, $sclk:ident [$($cs:ident),+] $mosi:ident, $miso:ident $(, $sio2:ident, $sio3:ident $(, $sio4:ident, $sio5:ident, $sio6:ident, $sio7:ident)?)?) => {
+        impl PeripheralInstance for crate::peripherals::$peri<'_> {
+            #[inline(always)]
+            fn info(&self) -> &'static Info {
+                static INFO: Info = Info {
+                    register_block: crate::peripherals::$peri::regs(),
+                    peripheral: crate::system::Peripheral::$sys,
+                    sclk: OutputSignal::$sclk,
+                    mosi: OutputSignal::$mosi,
+                    miso: InputSignal::$miso,
+                    cs: &[$(OutputSignal::$cs),+],
+                    sio0_input: InputSignal::$mosi,
+                    sio1_output: OutputSignal::$miso,
+                    sio2_output: $crate::if_set!($(Some(OutputSignal::$sio2))?, None),
+                    sio2_input: $crate::if_set!($(Some(InputSignal::$sio2))?, None),
+                    sio3_output: $crate::if_set!($(Some(OutputSignal::$sio3))?, None),
+                    sio3_input: $crate::if_set!($(Some(InputSignal::$sio3))?, None),
+                    #[cfg(spi_octal)]
+                    sio4_output: $crate::if_set!($($(Some(OutputSignal::$sio4))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio4_input: $crate::if_set!($($(Some(InputSignal::$sio4))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio5_output: $crate::if_set!($($(Some(OutputSignal::$sio5))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio5_input: $crate::if_set!($($(Some(InputSignal::$sio5))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio6_output: $crate::if_set!($($(Some(OutputSignal::$sio6))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio6_input: $crate::if_set!($($(Some(InputSignal::$sio6))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio7_output: $crate::if_set!($($(Some(OutputSignal::$sio7))?)?, None),
+                    #[cfg(spi_octal)]
+                    sio7_input: $crate::if_set!($($(Some(InputSignal::$sio7))?)?, None),
+                };
 
-                    &INFO
-                }
+                &INFO
             }
-
-            $(
-                // If the extra pins are set, implement QspiInstance
-                $crate::ignore!($sio2);
-                impl QspiInstance for crate::peripherals::[<SPI $num>]<'_> {}
-            )?
         }
-    }
-}
 
-#[cfg(spi_master_spi2)]
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        spi_instance!(2, HSPICLK, HSPID, HSPIQ, [HSPICS0, HSPICS1, HSPICS2], HSPIWP, HSPIHD);
-    } else if #[cfg(any(esp32s2, esp32s3))] {
-        spi_instance!(2, FSPICLK, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7);
-    } else {
-        spi_instance!(2, FSPICLK, FSPID, FSPIQ, [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5], FSPIWP, FSPIHD);
-    }
-}
-
-#[cfg(spi_master_spi3)]
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        spi_instance!(3, VSPICLK, VSPID, VSPIQ, [VSPICS0, VSPICS1, VSPICS2], VSPIWP, VSPIHD);
-    } else if #[cfg(esp32s3)] {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2], SPI3_WP, SPI3_HD);
-    } else {
-        spi_instance!(3, SPI3_CLK, SPI3_D, SPI3_Q, [SPI3_CS0, SPI3_CS1, SPI3_CS2]);
-    }
+        $(
+            // If the extra pins are set, implement QspiInstance
+            $crate::ignore!($sio2);
+            impl QspiInstance for crate::peripherals::$peri<'_> {}
+        )?
+    };
 }
 
 impl PeripheralInstance for AnySpi<'_> {
