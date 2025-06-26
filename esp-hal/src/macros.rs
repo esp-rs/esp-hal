@@ -74,9 +74,25 @@ macro_rules! any_peripheral {
             $variant:ident($inner:ty)
         ),* $(,)?
     }) => {
-        pub(crate) mod any {
+        #[doc = concat!("Utilities related to [`", stringify!($name), "`]")]
+        #[doc(hidden)]
+        #[instability::unstable]
+        pub mod any {
             #[allow(unused_imports)]
             use super::*;
+
+            macro_rules! delegate {
+                ($any:ident, $inner_ident:ident => $code:tt) => {
+                    match &$any.0 {
+                        $(
+                            $(#[cfg($variant_meta)])*
+                            any::Inner::$variant($inner_ident) => $code,
+                        )*
+                    }
+                }
+            }
+
+            pub(crate) use delegate;
 
             $(#[$meta])*
             #[derive(Debug)]
@@ -104,7 +120,6 @@ macro_rules! any_peripheral {
             // this trait as a supertrait, but will not give its definition.
             // Users are encouraged to use From to convert a singleton into its
             // relevant AnyPeripheral counterpart.
-            #[doc(hidden)]
             #[allow(unused)]
             pub trait Degrade: Sized + $crate::private::Sealed {
                 fn degrade<'a>(self) -> super::$name<'a>
@@ -134,12 +149,7 @@ macro_rules! any_peripheral {
             /// You must ensure that you're only using one instance of this type at a time.
             #[inline]
             pub unsafe fn clone_unchecked(&self) -> Self { unsafe {
-                match &self.0 {
-                    $(
-                        $(#[cfg($variant_meta)])*
-                        any::Inner::$variant(inner) => $name(any::Inner::$variant(inner.clone_unchecked())),
-                    )*
-                }
+                any::delegate!(self, inner => { Self::from(inner.clone_unchecked()) })
             }}
 
             /// Creates a new peripheral reference with a shorter lifetime.

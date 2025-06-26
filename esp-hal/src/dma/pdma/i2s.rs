@@ -410,9 +410,9 @@ impl PdmaChannel for AnyI2sDmaChannel<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(soc_has_i2s0)]
-            AnyI2sDmaChannelInner::I2s0(channel) => channel,
+            any::Inner::I2s0(channel) => channel,
             #[cfg(soc_has_i2s1)]
-            AnyI2sDmaChannelInner::I2s1(channel) => channel,
+            any::Inner::I2s1(channel) => channel,
         } {
             fn register_block(&self) -> &I2sRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;

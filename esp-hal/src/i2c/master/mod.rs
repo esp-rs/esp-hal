@@ -3140,30 +3140,22 @@ crate::any_peripheral! {
 }
 
 impl Instance for AnyI2c<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(i2c_master_i2c0)]
-            any::Inner::I2c0(i2c) => i2c,
-            #[cfg(i2c_master_i2c1)]
-            any::Inner::I2c1(i2c) => i2c,
-        } {
-            fn parts(&self) -> (&Info, &State);
-        }
+    fn parts(&self) -> (&Info, &State) {
+        any::delegate!(self, i2c => { i2c.parts() })
     }
 }
 
 impl AnyI2c<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(i2c_master_i2c0)]
-            any::Inner::I2c0(i2c) => i2c,
-            #[cfg(i2c_master_i2c1)]
-            any::Inner::I2c1(i2c) => i2c,
-        } {
-            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
-            fn disable_peri_interrupt(&self);
-            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
-        }
+    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+        any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt(&self) {
+        any::delegate!(self, i2c => { i2c.disable_peri_interrupt() })
+    }
+
+    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
+        any::delegate!(self, i2c => { i2c.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
