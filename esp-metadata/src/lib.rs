@@ -482,6 +482,9 @@ impl Config {
         if let Some(i2c) = self.device.peri_config.i2c_master.as_ref() {
             tokens.extend(cfg::generate_i2c_master_peripehrals(i2c));
         };
+        if let Some(uart) = self.device.peri_config.uart.as_ref() {
+            tokens.extend(cfg::generate_uart_peripehrals(uart));
+        };
 
         save(out_dir.join(file_name), tokens);
     }

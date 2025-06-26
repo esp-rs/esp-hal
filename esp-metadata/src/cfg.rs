@@ -1,8 +1,10 @@
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod uart;
 
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use uart::*;
 
 /// Represents a value in the driver configuration.
 pub(crate) enum Value {
@@ -491,7 +493,7 @@ driver_configs![
         peripherals: &["twai0", "twai1"],
         properties: {}
     },
-    UartProperties {
+    UartProperties<UartInstanceConfig> {
         driver: uart,
         name: "UART",
         peripherals: &["uart0", "uart1", "uart2"],

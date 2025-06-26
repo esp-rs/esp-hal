@@ -9,10 +9,10 @@ pub(crate) struct I2cMasterInstanceConfig {
     /// The name of the instance in the `esp_hal::system::Peripheral` enum
     pub sys_instance: String,
 
-    /// IOMUX signal name of the instane's SCL signal.
+    /// IOMUX signal name of the instance's SCL signal.
     pub scl: String,
 
-    /// IOMUX signal name of the instane's SDA signal.
+    /// IOMUX signal name of the instance's SDA signal.
     pub sda: String,
 }
 
