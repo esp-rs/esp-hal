@@ -4,14 +4,14 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
-    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -42,6 +42,9 @@ enum Cli {
     CheckChangelog(CheckChangelogArgs),
     /// Re-generate the chip support table in the esp-hal README.
     UpdateChipSupportTable,
+    /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml, the
+    /// toolchain used in CI)
+    BumpMsrv(BumpMsrvArgs),
 }
 
 #[derive(Debug, Args)]
@@ -90,6 +93,13 @@ struct CheckChangelogArgs {
     /// Re-generate the changelog with consistent formatting.
     #[arg(long)]
     normalize: bool,
+}
+
+#[derive(Debug, Args)]
+struct BumpMsrvArgs {
+    /// The MSRV to be used
+    #[arg(long)]
+    msrv: String,
 }
 
 // ----------------------------------------------------------------------------
@@ -154,6 +164,7 @@ fn main() -> Result<()> {
             xtask::update_chip_support_table(&workspace)?;
             Ok(())
         }
+        Cli::BumpMsrv(args) => bump_msrv(&workspace, &args.msrv),
     }
 }
 
