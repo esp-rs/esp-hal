@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result, bail, ensure};
+use anyhow::{bail, ensure, Context as _, Result};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
@@ -53,7 +53,7 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
     let target = args.package.target_triple(&chip)?;
-    let features = vec![chip.to_string(), "unstable".to_string()];
+    let features = vec![chip.as_ref().to_string(), "unstable".to_string()];
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
@@ -91,7 +91,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
             .to_string_lossy()
             .to_string();
 
-        log::info!("Running test '{}' for '{}'", elf_name, args.chip);
+        log::info!("Running test '{elf_name}' for '{}'", args.chip);
 
         let mut command = Command::new("probe-rs");
         command.arg("run").arg(elf_path);

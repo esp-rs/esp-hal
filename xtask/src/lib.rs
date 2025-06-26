@@ -271,9 +271,7 @@ impl Package {
             Ok(())
         } else {
             Err(anyhow!(
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
+                "Invalid chip provided for package '{self}': '{chip}'",
             ))
         }
     }
@@ -307,7 +305,7 @@ pub fn execute_app(
     debug: bool,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
-    log::info!("Building example '{}' for '{}'", package.display(), chip);
+    log::info!("Building example '{}' for '{chip}'", package.display());
 
     if !app.configuration().is_empty() {
         log::info!("  Configuration: {}", app.configuration());
@@ -317,7 +315,7 @@ pub fn execute_app(
     if !features.is_empty() {
         log::info!("  Features:      {}", features.join(", "));
     }
-    features.push(chip.to_string());
+    features.push(chip.as_ref().to_string());
 
     let env_vars = app.env_vars();
     for (key, value) in env_vars {
@@ -377,7 +375,7 @@ pub fn execute_app(
         let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(chip.to_string());
+                let out_dir = out_dir.join(chip.as_ref().to_string());
                 std::fs::create_dir_all(&out_dir)?;
 
                 let output_file = out_dir.join(app.output_file_name());

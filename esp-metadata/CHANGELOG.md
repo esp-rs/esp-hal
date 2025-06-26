@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `Chip`'s `Display` implementation now prints the pretty name. (#3707)
 
 ### Fixed
 

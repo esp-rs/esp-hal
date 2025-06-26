@@ -247,12 +247,7 @@ fn lint_package(
     features: &[String],
     fix: bool,
 ) -> Result<()> {
-    log::info!(
-        "Linting package: {} ({}, features: {:?})",
-        package,
-        chip,
-        features
-    );
+    log::info!("Linting package: {package} ({chip}, features: {features:?})",);
 
     let path = workspace.join(package.to_string());
 
@@ -378,7 +373,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             let from_dir = PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
                 args.chip.target(),
-                args.chip
+                args.chip.as_ref()
             ));
             let to_dir = PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -417,7 +412,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         BuildPackageArgs {
             package: Package::EspHal,
             target: Some(args.chip.target().to_string()),
-            features: vec![args.chip.to_string()],
+            features: vec![args.chip.as_ref().to_string()],
             toolchain: None,
             no_default_features: true,
         },
@@ -429,7 +424,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (examples)
     println!("::group::Build examples");
 
-    // The `ota_example` expects a file named `examples/target/ota_image` - it doesn't care about the contents however
+    // The `ota_example` expects a file named `examples/target/ota_image` - it
+    // doesn't care about the contents however
     std::fs::create_dir_all("./examples/target")?;
     std::fs::write("./examples/target/ota_image", "DUMMY")?;
 

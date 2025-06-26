@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{chip}"), &out)?;
+    copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.as_ref()), &out)?;
 
     Ok(())
 }

@@ -60,8 +60,8 @@ pub mod checker {
     use esp_metadata::Chip;
 
     use crate::{
-        Package,
         semver_check::{build_doc_json, minimum_update, remove_unstable_items},
+        Package,
     };
 
     pub fn generate_baseline(
@@ -73,7 +73,7 @@ pub mod checker {
             log::info!("Generating API baseline for {package}");
 
             for chip in &chips {
-                log::info!("Chip = {}", chip.to_string());
+                log::info!("Chip = {chip}");
                 let package_name = package.to_string();
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
@@ -82,7 +82,7 @@ pub mod checker {
                 remove_unstable_items(&current_path)?;
 
                 let file_name = if package.chip_features_matter() {
-                    chip.to_string()
+                    chip.as_ref().to_string()
                 } else {
                     "api".to_string()
                 };
@@ -121,7 +121,11 @@ pub mod checker {
                     _ => unreachable!(),
                 }
             }
-            if index_of(b) > index_of(a) { b } else { a }
+            if index_of(b) > index_of(a) {
+                b
+            } else {
+                a
+            }
         }
 
         let mut highest_result = ReleaseType::Patch;

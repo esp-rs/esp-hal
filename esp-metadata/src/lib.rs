@@ -89,7 +89,6 @@ pub enum Cores {
     Hash,
     serde::Deserialize,
     serde::Serialize,
-    strum::Display,
     strum::EnumIter,
     strum::EnumString,
     strum::AsRefStr,
@@ -114,9 +113,17 @@ pub enum Chip {
     Esp32s3,
 }
 
+impl std::fmt::Display for Chip {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.pretty_name())
+    }
+}
+//
 impl Chip {
     pub fn from_cargo_feature() -> Result<Self> {
-        let all_chips = Chip::iter().map(|c| c.to_string()).collect::<Vec<_>>();
+        let all_chips = Chip::iter()
+            .map(|c| c.as_ref().to_string())
+            .collect::<Vec<_>>();
 
         let mut chip = None;
         for c in all_chips.iter() {
@@ -165,7 +172,7 @@ impl Chip {
         match self {
             Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
             Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
-            _ => bail!("Chip does not contain an LP core: '{}'", self),
+            _ => bail!("Chip does not contain an LP core: '{self}'"),
         }
     }
 
@@ -897,7 +904,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     // Header
     write!(output, "| {:driver_col_width$} |", "Driver")?;
     for chip in Chip::iter() {
-        write!(output, " {} |", chip.pretty_name())?;
+        write!(output, " {chip} |")?;
     }
     writeln!(output)?;
 
@@ -934,9 +941,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
                         matches!(status, SupportStatus::NotSupported)
                             || symbols.is_empty()
                             || symbols.iter().any(|p| config.contains(p)),
-                        "{} has configuration for {} but no compatible symbols have been defined",
-                        chip.pretty_name(),
-                        config_group
+                        "{chip} has configuration for {config_group} but no compatible symbols have been defined",
                     );
                 })
                 .or_else(|| {

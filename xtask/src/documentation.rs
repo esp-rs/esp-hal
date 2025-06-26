@@ -122,7 +122,7 @@ fn build_documentation_for_package(
         // Sometimes we need to specify a chip feature, but it does not affect the
         // public API; so, only append the chip name to the path if it is significant:
         if package.chip_features_matter() {
-            output_path = output_path.join(chip.to_string());
+            output_path = output_path.join(chip.as_ref().to_string());
         }
     }
 
@@ -195,7 +195,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
 
     let mut features = vec![];
     if let Some(chip) = &chip {
-        features.push(chip.to_string());
+        features.push(chip.as_ref().to_string());
         features.extend(package.feature_rules(Config::for_chip(chip)));
     } else {
         features.extend(package.feature_rules(&Config::empty()));
@@ -427,7 +427,7 @@ fn generate_documentation_meta_for_package(
         metadata.push(minijinja::context! {
             name => package,
             version => version,
-            chip => chip.to_string(),
+            chip => chip.as_ref().to_string(),
             chip_pretty => chip.pretty_name(),
             package => package.to_string().replace('-', "_"),
         });
