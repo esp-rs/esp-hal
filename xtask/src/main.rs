@@ -75,6 +75,10 @@ struct LintPackagesArgs {
     /// Automatically apply fixes
     #[arg(long)]
     fix: bool,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -231,6 +235,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     &["--no-default-features"],
                     &features,
                     args.fix,
+                    args.toolchain.as_deref(),
                 )?;
             }
         }
@@ -246,6 +251,7 @@ fn lint_package(
     args: &[&str],
     features: &[String],
     fix: bool,
+    mut toolchain: Option<&str>,
 ) -> Result<()> {
     log::info!(
         "Linting package: {} ({}, features: {:?})",
@@ -258,18 +264,20 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let mut builder = if !package.build_on_host() {
+    if !package.build_on_host() {
         if chip.is_xtensa() {
-            // We only overwrite Xtensas so that externally set nightly/stable toolchains
-            // are not overwritten.
-            builder = builder.arg("-Zbuild-std=core,alloc");
-            builder = builder.toolchain("esp");
+            // In case the user doesn't specify a toolchain, make sure we use +esp
+            toolchain.get_or_insert("esp");
         }
+        builder = builder.target(package.target_triple(chip)?);
+    }
 
-        builder.target(package.target_triple(chip)?)
-    } else {
-        builder
-    };
+    if let Some(toolchain) = toolchain {
+        if !package.build_on_host() && toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
+    }
 
     for arg in args {
         builder = builder.arg(arg.to_string());
@@ -317,6 +325,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             packages: Package::iter().collect(),
             chips: vec![args.chip],
             fix: false,
+            toolchain: None,
         },
     )
     .inspect_err(|_| failed.push("Lint"))
@@ -429,7 +438,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (examples)
     println!("::group::Build examples");
 
-    // The `ota_example` expects a file named `examples/target/ota_image` - it doesn't care about the contents however
+    // The `ota_example` expects a file named `examples/target/ota_image` - it
+    // doesn't care about the contents however
     std::fs::create_dir_all("./examples/target")?;
     std::fs::write("./examples/target/ota_image", "DUMMY")?;
 
