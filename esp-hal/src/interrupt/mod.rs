@@ -85,7 +85,10 @@ mod xtensa;
 
 pub mod software;
 
-#[unsafe(no_mangle)]
+// TODO make an empty module that shims the real arch specific module
+// when rt is not enabled, calls to these are noops
+
+#[cfg_attr(feature = "rt", unsafe(no_mangle))]
 extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
     panic!("Unhandled interrupt: {:?}", _interrupt);
 }

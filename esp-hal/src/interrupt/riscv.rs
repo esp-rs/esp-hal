@@ -209,6 +209,7 @@ pub static RESERVED_INTERRUPTS: &[usize] = PRIORITY_TO_INTERRUPT;
 /// # Safety
 ///
 /// This function is called from an assembly trap handler.
+#[cfg(feature = "rt")]
 #[doc(hidden)]
 #[unsafe(link_section = ".trap.rust")]
 #[unsafe(export_name = "_start_trap_rust_hal")]
@@ -226,7 +227,7 @@ pub unsafe extern "C" fn start_trap_rust_hal(trap_frame: *mut TrapFrame) {
 }
 
 #[doc(hidden)]
-#[unsafe(no_mangle)]
+#[cfg_attr(feature = "rt", unsafe(no_mangle))]
 pub fn _setup_interrupts() {
     unsafe extern "C" {
         static _vector_table: *const u32;
@@ -469,7 +470,7 @@ mod vectored {
         }
     }
 
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
         let core = Cpu::current();
@@ -677,7 +678,7 @@ mod classic {
             )
         }
     }
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         use super::mcause;
@@ -701,7 +702,7 @@ mod classic {
         }
         prev_interrupt_priority
     }
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
@@ -842,7 +843,7 @@ mod plic {
             .bits();
         unsafe { core::mem::transmute::<u8, Priority>(prio) }
     }
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
         let interrupt_id: usize = super::mcause::read().code(); // MSB is whether its exception or interrupt.
@@ -869,7 +870,7 @@ mod plic {
         }
         prev_interrupt_priority as u32
     }
-    #[unsafe(no_mangle)]
+    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
     #[unsafe(link_section = ".trap")]
     pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
         riscv::interrupt::disable();
