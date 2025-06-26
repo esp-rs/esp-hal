@@ -456,7 +456,10 @@ driver_configs![
         driver: spi_master,
         name: "SPI master",
         peripherals: &["spi2", "spi3"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_octal: bool,
+        }
     },
     SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
