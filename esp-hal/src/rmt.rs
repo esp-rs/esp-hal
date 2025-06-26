@@ -557,11 +557,17 @@ pub trait RawChannelAccess: Clone + Copy + core::fmt::Debug + crate::private::Se
     #[doc(hidden)]
     #[inline]
     fn channel(&self) -> u8 {
-        chip_specific::channel_for_idx::<Self::Dir>(self.ch_idx())
+        chip_specific::channel_for_idx::<Self::Dir>(self.ch_idx_enum())
     }
 
     #[doc(hidden)]
-    fn ch_idx(&self) -> u8;
+    #[inline]
+    fn ch_idx(&self) -> u8 {
+        self.ch_idx_enum() as u8
+    }
+
+    #[doc(hidden)]
+    fn ch_idx_enum(&self) -> ChannelIndex;
 }
 
 /// A compile-time constant identifier for one channel of the RMT peripherial.
@@ -575,7 +581,7 @@ pub struct ConstChannelAccess<Dir: Direction, const CH_IDX: u8> {
 /// Type-erased equivalent of ConstChannelAccess.
 #[derive(Clone, Copy, Debug)]
 pub struct DynChannelAccess<Dir: Direction> {
-    ch_idx: u8,
+    ch_idx: ChannelIndex,
     _direction: PhantomData<Dir>,
 }
 
@@ -596,7 +602,7 @@ where
 
 impl<Dir: Direction> DynChannelAccess<Dir> {
     #[inline]
-    unsafe fn conjure(ch_idx: u8) -> Self {
+    unsafe fn conjure(ch_idx: ChannelIndex) -> Self {
         Self {
             ch_idx,
             _direction: PhantomData,
@@ -608,8 +614,9 @@ impl<const CH_IDX: u8, Dir: Direction> RawChannelAccess for ConstChannelAccess<D
     type Dir = Dir;
 
     #[inline]
-    fn ch_idx(&self) -> u8 {
-        CH_IDX
+    fn ch_idx_enum(&self) -> ChannelIndex {
+        debug_assert!(CH_IDX < CHANNEL_INDEX_COUNT);
+        unsafe { ChannelIndex::from_u8_unchecked(CH_IDX) }
     }
 }
 
@@ -617,8 +624,8 @@ impl<Dir: Direction> RawChannelAccess for DynChannelAccess<Dir> {
     type Dir = Dir;
 
     #[inline]
-    fn ch_idx(&self) -> u8 {
-        self.ch_idx as u8
+    fn ch_idx_enum(&self) -> ChannelIndex {
+        self.ch_idx
     }
 }
 
@@ -745,6 +752,25 @@ macro_rules! declare_channels {
 macro_rules! declare_tx_channels {
     ($([$num:literal, $idx:literal]),+ $(,)?) => {
         paste::paste! {
+            // Enum of valid channel indices: For the given chip, tx/rx channels for all of these indices
+            // exist. (Note that channel index == channel number for esp32 and esp32s2, but not for other
+            // chips.)
+            //
+            // This type is useful to inform the compiler of possible values of an u8 (i.e. we use this as
+            // homemade refinement type) which allows it to elide bounds checks in register/field
+            // accessors of the PAC even when using DynChannelAccess.
+            //
+            // Cf. https://github.com/rust-lang/rust/issues/109958 regarding rustc's capabilities here.
+            #[doc(hidden)]
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            #[repr(u8)]
+            #[allow(unused)]
+            pub enum ChannelIndex {
+                $(
+                    [< Ch $idx>] = $idx,
+                )+
+            }
+
             #[allow(clippy::no_effect)]
             const CHANNEL_INDEX_COUNT: u8 = const { 0 $( + {$idx; 1} )+ };
 
@@ -787,6 +813,33 @@ macro_rules! declare_rx_channels {
             )+
         }
     };
+}
+
+struct ChannelIndexIter(u8);
+
+impl Iterator for ChannelIndexIter {
+    type Item = ChannelIndex;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ch_idx = self.0;
+        if ch_idx < CHANNEL_INDEX_COUNT {
+            self.0 = ch_idx + 1;
+            Some(unsafe { ChannelIndex::from_u8_unchecked(ch_idx) })
+        } else {
+            None
+        }
+    }
+}
+
+impl ChannelIndex {
+    fn iter_all() -> ChannelIndexIter {
+        ChannelIndexIter(0)
+    }
+
+    unsafe fn from_u8_unchecked(ch_idx: u8) -> Self {
+        debug_assert!(ch_idx < CHANNEL_INDEX_COUNT);
+        unsafe { core::mem::transmute(ch_idx) }
+    }
 }
 
 cfg_if::cfg_if! {
@@ -1139,7 +1192,7 @@ where
         let old = ManuallyDrop::new(self);
         Channel {
             raw: DynChannelAccess {
-                ch_idx: old.raw.ch_idx(),
+                ch_idx: old.raw.ch_idx_enum(),
                 _direction: PhantomData,
             },
             _mode: PhantomData,
@@ -1906,7 +1959,7 @@ mod chip_specific {
     use enumset::EnumSet;
 
     use super::{
-        CHANNEL_INDEX_COUNT,
+        ChannelIndex,
         ChannelInternal,
         Direction,
         DynChannelAccess,
@@ -1980,7 +2033,7 @@ mod chip_specific {
     ) {
         let st = RMT::regs().int_st().read();
 
-        for ch_idx in 0..CHANNEL_INDEX_COUNT {
+        for ch_idx in ChannelIndex::iter_all() {
             if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
                 let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
                 on_tx(raw);
@@ -1995,11 +2048,11 @@ mod chip_specific {
     }
 
     #[inline]
-    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
+    pub(super) const fn channel_for_idx<Dir: Direction>(idx: ChannelIndex) -> u8 {
         if Dir::IS_TX {
-            idx
+            idx as u8
         } else {
-            idx + NUM_CHANNELS as u8 / 2
+            idx as u8 + NUM_CHANNELS as u8 / 2
         }
     }
 
@@ -2345,6 +2398,7 @@ mod chip_specific {
     use portable_atomic::Ordering;
 
     use super::{
+        ChannelIndex,
         ChannelInternal,
         Direction,
         DynChannelAccess,
@@ -2390,7 +2444,7 @@ mod chip_specific {
     ) {
         let st = RMT::regs().int_st().read();
 
-        for ch_idx in 0..CHANNEL_INDEX_COUNT {
+        for ch_idx in ChannelIndex::iter_all() {
             if st.ch_rx_end(ch_idx).bit() {
                 let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
                 on_rx(raw);
@@ -2418,8 +2472,8 @@ mod chip_specific {
 
     #[inline]
     #[allow(clippy::extra_unused_type_parameters)]
-    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
-        idx
+    pub(super) const fn channel_for_idx<Dir: Direction>(idx: ChannelIndex) -> u8 {
+        idx as u8
     }
 
     impl<A> ChannelInternal for A
