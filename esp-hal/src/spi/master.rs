@@ -3897,31 +3897,27 @@ master_instance!(SPI2);
 master_instance!(SPI3);
 
 impl Instance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(spi) => spi,
-        } {
-            fn state(&self) -> &'static State;
-            fn handler(&self) -> InterruptHandler;
-        }
+    #[inline]
+    fn state(&self) -> &'static State {
+        any::delegate!(self, spi => { spi.state() })
+    }
+    #[inline]
+    fn handler(&self) -> InterruptHandler {
+        any::delegate!(self, spi => { spi.handler() })
     }
 }
 
 impl AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(spi) => spi,
-        } {
-            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
-            fn disable_peri_interrupt(&self);
-            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
-        }
+    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+        any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt(&self) {
+        any::delegate!(self, spi => { spi.disable_peri_interrupt() })
+    }
+
+    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
+        any::delegate!(self, spi => { spi.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {

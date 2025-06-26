@@ -850,15 +850,8 @@ cfg_if::cfg_if! {
 }
 
 impl Instance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            any::Inner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            any::Inner::Spi3(spi) => spi,
-        } {
-            fn info(&self) -> &'static Info;
-        }
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, spi => { spi.info() })
     }
 }
 
