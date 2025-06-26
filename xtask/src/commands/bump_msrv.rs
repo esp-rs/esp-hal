@@ -3,15 +3,16 @@ use std::path::Path;
 use anyhow::Result;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
-use toml_edit::{Formatted, Item, Value};
+use toml_edit::value;
 
 use crate::{Package, cargo::CargoToml};
 
 /// Bump the MSRV
 ///
 /// This will process
-/// - `Cargo.toml` for each package (adjust "rust-version")
-/// - `README.md` for each package (adjusts the MSRV badge)
+/// - `Cargo.toml` for each package (adjust (or add if not present) the
+///   "rust-version")
+/// - `README.md` for each package if it exists (adjusts the MSRV badge)
 /// - .github/workflows/ci.yml (adapts the `MSRV: "<msrv>"` entry)
 pub fn bump_msrv(workspace: &Path, msrv: &str) -> Result<()> {
     // process all packages
@@ -30,16 +31,14 @@ pub fn bump_msrv(workspace: &Path, msrv: &str) -> Result<()> {
             .and_then(|pkg| pkg.as_table_mut());
 
         if let Some(package_table) = package_table {
-            if let Some(rust_version) = package_table.get_mut("rust-version") {
-                *rust_version = Item::Value(Value::String(Formatted::new(msrv.to_string())));
-            }
+            package_table["rust-version"] = value(msrv);
             cargo_toml.save()?;
 
             let readme_path = package_path.join("README.md");
             if readme_path.exists() {
                 let readme = std::fs::read_to_string(&readme_path)?;
                 let readme = badge_re.replace(&readme, |caps: &Captures| {
-                    format!("{}{msrv}{}", &caps[1], &caps[3])
+                    format!("{}{msrv}{}", &caps["prefix"], &caps["postfix"])
                 });
                 std::fs::write(readme_path, readme.as_bytes())?;
             }
@@ -55,6 +54,6 @@ pub fn bump_msrv(workspace: &Path, msrv: &str) -> Result<()> {
         });
     std::fs::write(".github/workflows/ci.yml", ci_yml.as_bytes())?;
 
-    println!("Please review the changes before committing.");
+    println!("\nPlease review the changes before committing.");
     Ok(())
 }
