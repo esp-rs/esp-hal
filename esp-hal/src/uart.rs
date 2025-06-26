@@ -2421,7 +2421,7 @@ pub mod lp_uart {
 }
 
 /// A peripheral singleton compatible with the UART driver.
-pub trait Instance: crate::private::Sealed + IntoAnyUart {
+pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -3253,11 +3253,11 @@ impl Instance for AnyUart<'_> {
     fn parts(&self) -> (&'static Info, &'static State) {
         match &self.0 {
             #[cfg(soc_has_uart0)]
-            AnyUartInner::Uart0(uart) => uart.parts(),
+            any::Inner::Uart0(uart) => uart.parts(),
             #[cfg(soc_has_uart1)]
-            AnyUartInner::Uart1(uart) => uart.parts(),
+            any::Inner::Uart1(uart) => uart.parts(),
             #[cfg(soc_has_uart2)]
-            AnyUartInner::Uart2(uart) => uart.parts(),
+            any::Inner::Uart2(uart) => uart.parts(),
         }
     }
 }
@@ -3266,11 +3266,11 @@ impl AnyUart<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(soc_has_uart0)]
-            AnyUartInner::Uart0(uart) => uart,
+            any::Inner::Uart0(uart) => uart,
             #[cfg(soc_has_uart1)]
-            AnyUartInner::Uart1(uart) => uart,
+            any::Inner::Uart1(uart) => uart,
             #[cfg(soc_has_uart2)]
-            AnyUartInner::Uart2(uart) => uart,
+            any::Inner::Uart2(uart) => uart,
         } {
             fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
             fn disable_peri_interrupt(&self);

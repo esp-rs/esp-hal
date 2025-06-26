@@ -668,7 +668,7 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: RegisterAccessPrivate + super::IntoAnyI2s {}
+pub trait Instance: RegisterAccessPrivate + super::any::Degrade {}
 #[cfg(soc_has_i2s0)]
 impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
@@ -691,7 +691,7 @@ mod private {
             OutputSignal,
             interconnect::{PeripheralInput, PeripheralOutput},
         },
-        i2s::AnyI2sInner,
+        i2s::any::Inner as AnyI2sInner,
         interrupt::InterruptHandler,
         peripherals::I2S0,
     };

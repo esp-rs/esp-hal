@@ -26,9 +26,9 @@ impl<'d> DmaEligible for AnyI2s<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(soc_has_i2s0)]
-            AnyI2sInner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
+            any::Inner::I2s0(_) => crate::dma::DmaPeripheral::I2s0,
             #[cfg(soc_has_i2s1)]
-            AnyI2sInner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
+            any::Inner::I2s1(_) => crate::dma::DmaPeripheral::I2s1,
         }
     }
 }

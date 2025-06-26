@@ -3770,9 +3770,9 @@ impl PeripheralInstance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn info(&self) -> &'static Info;
         }
@@ -3811,7 +3811,7 @@ fn handle_async(instance: impl Instance) {
 }
 
 /// A peripheral singleton compatible with the SPI master driver.
-pub trait Instance: PeripheralInstance + IntoAnySpi {
+pub trait Instance: PeripheralInstance + any::Degrade {
     #[doc(hidden)]
     fn state(&self) -> &'static State;
     #[doc(hidden)]
@@ -3884,9 +3884,9 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
@@ -3900,9 +3900,9 @@ impl Instance for AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn state(&self) -> &'static State;
             fn handler(&self) -> InterruptHandler;
@@ -3914,9 +3914,9 @@ impl AnySpi<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
+            any::Inner::Spi2(spi) => spi,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
+            any::Inner::Spi3(spi) => spi,
         } {
             fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
             fn disable_peri_interrupt(&self);

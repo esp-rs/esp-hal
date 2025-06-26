@@ -1584,9 +1584,9 @@ impl PrivateInstance for AnyTwai<'_> {
     delegate::delegate! {
         to match &self.0 {
             #[cfg(soc_has_twai0)]
-            AnyTwaiInner::Twai0(twai) => twai,
+            any::Inner::Twai0(twai) => twai,
             #[cfg(soc_has_twai1)]
-            AnyTwaiInner::Twai1(twai) => twai,
+            any::Inner::Twai1(twai) => twai,
         } {
             fn peripheral(&self) -> crate::system::Peripheral;
             fn input_signal(&self) -> InputSignal;
@@ -1600,7 +1600,7 @@ impl PrivateInstance for AnyTwai<'_> {
 }
 
 /// A peripheral singleton compatible with the TWAI driver.
-pub trait Instance: PrivateInstance + IntoAnyTwai {}
+pub trait Instance: PrivateInstance + any::Degrade {}
 
 #[cfg(soc_has_twai0)]
 impl Instance for crate::peripherals::TWAI0<'_> {}
