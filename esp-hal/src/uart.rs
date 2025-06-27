@@ -474,6 +474,8 @@ where
 
 /// UART (Full-duplex)
 ///
+/// ## Example
+///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::uart::{Config, Uart};
@@ -1253,6 +1255,22 @@ impl<'d> Uart<'d, Blocking> {
     }
 
     /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn into_async(self) -> Uart<'d, Async> {
         Uart {
             rx: self.rx.into_async(),
@@ -1371,6 +1389,23 @@ impl<'d> Uart<'d, Blocking> {
 
 impl<'d> Uart<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let blocking_uart1 = uart1.into_blocking();
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn into_blocking(self) -> Uart<'d, Blocking> {
         Uart {
             rx: self.rx.into_blocking(),
@@ -1393,6 +1428,24 @@ impl<'d> Uart<'d, Async> {
     /// ## Cancellation
     ///
     /// This function is cancellation safe.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?
+    /// # .with_rx(peripherals.GPIO1)
+    /// # .with_tx(peripherals.GPIO2)
+    /// # .into_async();
+    ///
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart1.write_async(&MESSAGE).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(words).await
     }
@@ -1406,6 +1459,25 @@ impl<'d> Uart<'d, Async> {
     /// ## Cancellation
     ///
     /// This function is cancellation safe.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?
+    /// # .with_rx(peripherals.GPIO1)
+    /// # .with_tx(peripherals.GPIO2)
+    /// # .into_async();
+    ///
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart1.write_async(&MESSAGE).await?;
+    /// uart1.flush_async().await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
@@ -1428,6 +1500,29 @@ impl<'d> Uart<'d, Async> {
     /// ## Cancellation
     ///
     /// This function is cancellation safe.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?
+    /// # .with_rx(peripherals.GPIO1)
+    /// # .with_tx(peripherals.GPIO2)
+    /// # .into_async();
+    ///
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart1.write_async(&MESSAGE).await?;
+    /// uart1.flush_async().await?;
+    ///
+    /// let mut buf = [0u8; MESSAGE.len()];
+    /// uart1.read_async(&mut buf[..]).await.unwrap();
+
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
     }
@@ -1486,6 +1581,21 @@ where
     /// configure the driver side (i.e. the TX pin), or ensure that the line is
     /// initially high, to avoid receiving a non-data byte caused by an
     /// initial low signal level.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_rx(mut self, rx: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_rx(rx);
         self
@@ -1495,18 +1605,65 @@ where
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
     /// TX signal.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_tx(tx);
         self
     }
 
     /// Configure CTS pin
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .with_cts(peripherals.GPIO3);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_cts(mut self, cts: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_cts(cts);
         self
     }
 
     /// Configure RTS pin
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// let mut uart1 = Uart::new(
+    ///     peripherals.UART1,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .with_rts(peripherals.GPIO3);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_rts(rts);
         self
@@ -1557,6 +1714,22 @@ where
     }
 
     /// Flush the transmit buffer of the UART
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?;
+    ///
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart1.write(&MESSAGE)?;
+    /// uart1.flush()?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
     }
@@ -1586,6 +1759,26 @@ where
     ///
     /// If the error occurred before this function was called, the contents of
     /// the FIFO are not modified.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?;
+    ///
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart1.write(&MESSAGE)?;
+    /// uart1.flush()?;
+    ///
+    /// let mut buf = [0u8; MESSAGE.len()];
+    /// uart1.read(&mut buf[..])?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
     }
@@ -1596,6 +1789,21 @@ where
     ///
     /// This function returns a [`ConfigError`] if the configuration is not
     /// supported by the hardware.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::uart::{Config, Uart};
+    /// # let mut uart1 = Uart::new(
+    /// #     peripherals.UART1,
+    /// #     Config::default())?;
+    ///
+    /// let config = Config::default().with_baudrate(19_200);
+    /// uart1.apply_config(&config)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         // Must apply the common settings first, as `rx.apply_config` reads back symbol
         // size.
