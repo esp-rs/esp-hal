@@ -28,7 +28,20 @@ impl PeripheralInstance for AnySlc<'_> {
     }
 }
 
+impl PeripheralInstance for crate::peripherals::SLC<'_> {
+    type Info = SlcInfo;
+
+    fn info(&self) -> &'static Self::Info {
+        static INFO: SlcInfo = SlcInfo {
+            register_block: crate::peripherals::SLC::ptr(),
+        };
+
+        &INFO
+    }
+}
+
 /// A peripheral singleton compatible with the SDIO SLC driver.
 pub trait SlcInstance: PeripheralInstance + IntoAnySlc {}
 
 impl SlcInstance for AnySlc<'_> {}
+impl SlcInstance for crate::peripherals::SLC<'_> {}
