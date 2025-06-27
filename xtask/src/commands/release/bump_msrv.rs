@@ -50,19 +50,7 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
 
     // add crates which depend on any of the packages to bump
     if !args.non_recursive {
-        while {
-            let mut added = false;
-            for package in Package::iter() {
-                let mut cargo_toml = CargoToml::new(workspace, package.clone())?;
-                for dep in cargo_toml.repo_dependencies() {
-                    if to_process.contains(&dep) && !to_process.contains(&package) {
-                        added = true;
-                        to_process.push(package);
-                    }
-                }
-            }
-            added
-        } {}
+        add_dependent_crates(workspace, &mut to_process)?;
     }
 
     // don't process crates which are not published
@@ -144,6 +132,36 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
 
     println!("\nPlease review the changes before committing.");
     Ok(())
+}
+
+/// Add all crates in the repo which depend on the given packages
+fn add_dependent_crates(
+    workspace: &Path,
+    pkgs_to_process: &mut Vec<Package>,
+) -> Result<(), anyhow::Error> {
+    Ok(
+        while {
+            let mut added = false;
+
+            // iterate over ALL known crates
+            for package in Package::iter() {
+                let mut cargo_toml = CargoToml::new(workspace, package.clone())?;
+
+                // iterate the dependencies in the repo
+                for dep in cargo_toml.repo_dependencies() {
+                    let dependency_should_be_processed = pkgs_to_process.contains(&dep);
+                    let current_package_already_contained = pkgs_to_process.contains(&package);
+                    if dependency_should_be_processed && !current_package_already_contained {
+                        added = true;
+                        pkgs_to_process.push(package);
+                    }
+                }
+            }
+
+            // break once we haven't added any more crates the to be processed list
+            added
+        } {},
+    )
 }
 
 /// Check files in the package and show if we find the version string in any
