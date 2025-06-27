@@ -8,6 +8,34 @@ use quote::format_ident;
 
 use crate::number;
 
+/// Additional properties (besides those defined in cfg.rs) for [device.gpio].
+/// These don't get turned into symbols, but are used to generate code.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct GpioPinsAndSignals {
+    /// The list of GPIO pins and their properties.
+    pub pins: Vec<PinConfig>,
+
+    /// The list of peripheral input signals.
+    pub input_signals: Vec<IoMuxSignal>,
+
+    /// The list of peripheral output signals.
+    pub output_signals: Vec<IoMuxSignal>,
+}
+
+/// Properties of a single GPIO pin.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct PinConfig {
+    /// The GPIO pin number.
+    pub pin: usize,
+
+    /// Different capabilities implemented by this pin.
+    pub kind: Vec<PinCapability>,
+
+    /// Available alternate functions for this pin.
+    #[serde(default)]
+    pub alternate_functions: AfMap,
+}
+
 /// Pin capabilities. Some of these will cause a trait to be implemented for the
 /// given pin singleton. `UsbDevice` currently only changes what happens on GPIO
 /// driver initialization.
@@ -25,11 +53,17 @@ pub(crate) enum PinCapability {
     UsbDevice,
 }
 
-/// A row in the IO MUX Pad List table. Used in
-/// [device.gpio.pins[X].alternate_functions]. The GPIO function is not written
-/// here as that is common to all pins. The values are signal names listed in
-/// [device.gpio.input_signals] or [device.gpio.output_signals]. `None` means
-/// the pin does not provide the given alternate function.
+/// Available alternate functions for a given GPIO pin.
+///
+/// Alternate functions allow bypassing the GPIO matrix by selecting a different
+/// path in the multiplexers controlled by MCU_SEL.
+///
+/// Values of this struct correspond to rows in the IO MUX Pad List table.
+///
+/// Used in [device.gpio.pins[X].alternate_functions]. The GPIO function is not
+/// written here as that is common to all pins. The values are signal names
+/// listed in [device.gpio.input_signals] or [device.gpio.output_signals].
+/// `None` means the pin does not provide the given alternate function.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct AfMap {
     #[serde(rename = "0")]
@@ -47,6 +81,11 @@ pub(crate) struct AfMap {
 }
 
 impl AfMap {
+    /// Returns the signal associated with the nth alternate function.
+    ///
+    /// Note that not all alternate functions are defined. The number of the
+    /// GPIO function is available separately. Not all alternate function have
+    /// IO signals.
     pub fn get(&self, af: usize) -> Option<&str> {
         match af {
             0 => self.af0.as_deref(),
@@ -60,35 +99,18 @@ impl AfMap {
     }
 }
 
-/// Properties of a single GPIO pin.
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct PinConfig {
-    /// The GPIO pin number.
-    pub pin: usize,
-    /// Different capabilities implemented by this pin.
-    pub kind: Vec<PinCapability>,
-    /// Pin => Input/OutputSignal
-    #[serde(default)]
-    pub alternate_functions: AfMap,
-}
-
 /// An input or output peripheral signal. The names usually match the signal
 /// name in the Peripheral Signal List table, without the `in` or `out` suffix.
 /// If the `id` is `None`, the signal cannot be routed through the GPIO matrix.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct IoMuxSignal {
+    /// The name of the signal.
     pub name: String,
+
+    /// The numeric ID of the signal, if the signal can be routed through the
+    /// GPIO matrix.
     #[serde(default)]
     pub id: Option<usize>,
-}
-
-/// Additional properties (besides those defined in cfg.rs) for [device.gpio].
-/// These don't get turned into symbols, but are used to generate code.
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct GpioPinsAndSignals {
-    pub pins: Vec<PinConfig>,
-    pub input_signals: Vec<IoMuxSignal>,
-    pub output_signals: Vec<IoMuxSignal>,
 }
 
 pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {

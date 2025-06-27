@@ -8,10 +8,13 @@ use crate::{cfg::I2cMasterProperties, generate_for_each_macro};
 pub(crate) struct I2cMasterInstanceConfig {
     /// The name of the instance in the `esp_hal::system::Peripheral` enum
     pub sys_instance: String,
+
     /// IOMUX signal name of the instane's SCL signal.
     pub scl: String,
+
     /// IOMUX signal name of the instane's SDA signal.
     pub sda: String,
+
     /// The name of the instance's interrupt handler.
     pub interrupt: String,
 }
