@@ -1,4 +1,4 @@
-#![cfg_attr(not(feature = "rt"), allow(unused))]
+#![cfg_attr(not(feature = "rt"), expect(unused))]
 
 use core::ops::Range;
 
