@@ -94,11 +94,12 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
+        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
 
       - name: Semver-Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xcheck semver-check --chips ${{ matrix.device.soc }} check
+        # always invokes +esp internally
+        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
 
   extras:
     runs-on: macos-m1-self-hosted

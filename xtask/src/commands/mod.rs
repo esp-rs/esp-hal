@@ -30,6 +30,10 @@ pub struct ExamplesArgs {
     /// Optional example to act on (all examples used if omitted)
     #[arg(long)]
     pub example: Option<String>,
+
+    /// The toolchain used to build the examples
+    #[arg(long)]
+    pub toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -44,6 +48,10 @@ pub struct TestsArgs {
     /// Optional test to act on (all tests used if omitted)
     #[arg(long, short = 't')]
     pub test: Option<String>,
+
+    /// The toolchain used to build the tests
+    #[arg(long)]
+    pub toolchain: Option<String>,
 }
 
 // ----------------------------------------------------------------------------
@@ -116,6 +124,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 action.clone(),
                 args.repeat,
                 false,
+                args.toolchain.as_deref(),
             )?;
         }
         Ok(())
@@ -132,6 +141,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 action.clone(),
                 args.repeat,
                 false,
+                args.toolchain.as_deref(),
             )
             .is_err()
             {

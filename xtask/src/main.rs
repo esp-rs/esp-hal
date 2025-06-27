@@ -4,14 +4,14 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
-    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -49,6 +49,10 @@ struct CiArgs {
     /// Chip to target.
     #[arg(value_enum)]
     chip: Chip,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -325,7 +329,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             packages: Package::iter().collect(),
             chips: vec![args.chip],
             fix: false,
-            toolchain: None,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Lint"))
@@ -341,6 +345,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -376,6 +381,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 chip: args.chip,
                 example: None,
                 debug: false,
+                toolchain: args.toolchain.clone(),
             },
             CargoAction::Build(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -427,8 +433,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             package: Package::EspHal,
             target: Some(args.chip.target().to_string()),
             features: vec![args.chip.to_string()],
-            toolchain: None,
             no_default_features: true,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Build HAL"))
@@ -450,6 +456,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
@@ -466,6 +473,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )
