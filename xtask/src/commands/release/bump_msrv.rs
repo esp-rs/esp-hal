@@ -93,10 +93,13 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
             .and_then(|pkg| pkg.as_table_mut());
 
         if let Some(package_table) = package_table {
+            let mut previous_rust_version = None;
             if let Some(rust_version) = package_table.get_mut("rust-version") {
-                if semver::Version::parse(&rust_version.as_str().unwrap())? > new_msrv {
+                let rust_version = rust_version.as_str().unwrap();
+                if semver::Version::parse(&rust_version)? > new_msrv {
                     bail!("Downgrading rust-version is not supported");
                 }
+                previous_rust_version = Some(rust_version.to_string())
             }
 
             package_table["rust-version"] = value(&new_msrv.to_string());
@@ -113,6 +116,12 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
 
                 if !args.dry_run {
                     std::fs::write(readme_path, readme.as_bytes())?;
+                }
+            }
+
+            if !args.dry_run {
+                if let Some(previous_rust_version) = previous_rust_version {
+                    check_mentions(&package_path, &previous_rust_version)?;
                 }
             }
         }
@@ -134,5 +143,36 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
     }
 
     println!("\nPlease review the changes before committing.");
+    Ok(())
+}
+
+/// Check files in the package and show if we find the version string in any
+/// file. Most probably it will report false positives but maybe not.
+fn check_mentions(package_path: &std::path::PathBuf, previous_rust_version: &str) -> Result<()> {
+    for entry in walkdir::WalkDir::new(package_path)
+        .into_iter()
+        .filter_map(|entry| {
+            let path = entry.unwrap().into_path();
+
+            if !path.is_file() {
+                return None;
+            }
+
+            if path.components().any(|c| c.as_os_str() == "target") {
+                return None;
+            }
+
+            Some(path)
+        })
+    {
+        let contents = std::fs::read_to_string(&entry)?;
+        if contents.contains(previous_rust_version) {
+            println!(
+                "⚠️ '{previous_rust_version}' found in file {} - might be a false positive, otherwise consider adjusting the xtask.",
+                entry.display()
+            );
+        }
+    }
+
     Ok(())
 }
