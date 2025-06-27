@@ -226,6 +226,8 @@ use core::{
 
 use enumset::{EnumSet, EnumSetType};
 use portable_atomic::{AtomicU8, Ordering};
+#[cfg(place_rmt_driver_in_ram)]
+use procmacros::ram;
 
 use crate::{
     Async,
@@ -434,6 +436,7 @@ where
 }
 
 impl<Dir: Direction> DynChannelAccess<Dir> {
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     unsafe fn conjure(channel: u8) -> Self {
         Self {
             channel,
@@ -445,6 +448,7 @@ impl<Dir: Direction> DynChannelAccess<Dir> {
 impl<const CHANNEL: u8> RawChannelAccess for ConstChannelAccess<Tx, CHANNEL> {
     type Dir = Tx;
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn channel(&self) -> u8 {
         CHANNEL
     }
@@ -927,6 +931,7 @@ where
     Dm: crate::DriverMode,
     Raw: ChannelInternal,
 {
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn drop(&mut self) {
         let memsize = self.raw.memsize();
 
@@ -1016,6 +1021,7 @@ where
     Raw: TxChannelInternal,
 {
     /// Wait for the transaction to complete
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn wait(mut self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
         let raw = self.channel.raw;
         let memsize = raw.memsize().codes();
@@ -1081,6 +1087,7 @@ pub struct ContinuousTxTransaction<Raw: TxChannelInternal> {
 
 impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
     /// Stop transaction when the current iteration ends.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn stop_next(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
         let raw = self.channel.raw;
 
@@ -1101,6 +1108,7 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
     }
 
     /// Stop transaction as soon as possible.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn stop(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
         let raw = self.channel.raw;
 
@@ -1175,6 +1183,7 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     ///
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
         ChannelCreator {
             _mode: PhantomData,
@@ -1275,6 +1284,7 @@ where
 {
     type Raw = Raw;
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Raw>, Error> {
         let index = self.raw.start_send(data, false, 0)?;
         Ok(SingleShotTxTransaction {
@@ -1285,10 +1295,12 @@ where
         })
     }
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit_continuously(self, data: &[u32]) -> Result<ContinuousTxTransaction<Raw>, Error> {
         self.transmit_continuously_with_loopcount(0, data)
     }
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn transmit_continuously_with_loopcount(
         self,
         loopcount: u16,
@@ -1311,6 +1323,7 @@ pub struct RxTransaction<'a, Raw: RxChannelInternal> {
 
 impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
     /// Wait for the transaction to complete
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn wait(self) -> Result<Channel<Blocking, Raw>, (Error, Channel<Blocking, Raw>)> {
         let raw = self.channel.raw;
 
@@ -1357,6 +1370,7 @@ where
 {
     type Raw = Raw;
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self::Raw>, Error>
     where
         Self: Sized,
@@ -1389,6 +1403,7 @@ where
 {
     type Output = ();
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
 
@@ -1414,6 +1429,7 @@ impl<Raw> TxChannelAsync for Channel<Async, Raw>
 where
     Raw: TxChannelInternal,
 {
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     async fn transmit(&mut self, data: &[u32]) -> Result<(), Error>
     where
         Self: Sized,
@@ -1452,6 +1468,7 @@ where
 {
     type Output = ();
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
         if self.raw.is_error() || self.raw.is_rx_done() {
@@ -1476,6 +1493,7 @@ impl<Raw> RxChannelAsync for Channel<Async, Raw>
 where
     Raw: RxChannelInternal,
 {
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
@@ -1602,6 +1620,7 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn start_send(&self, data: &[u32], continuous: bool, repeat: u16) -> Result<usize, Error> {
         self.clear_tx_interrupts();
 
@@ -1688,6 +1707,8 @@ pub trait RxChannelInternal: ChannelInternal {
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
+    #[cfg(place_rmt_driver_in_ram)]
+    use procmacros::ram;
 
     use super::{
         ChannelInternal,
@@ -1755,6 +1776,7 @@ mod chip_specific {
     }
 
     #[allow(unused)]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn pending_interrupt_for_channel() -> Option<(u8, bool)> {
         let st = RMT::regs().int_st().read();
 
@@ -1789,6 +1811,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir: Direction>,
     {
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn update(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self) as usize;
@@ -1815,6 +1838,7 @@ mod chip_specific {
             }
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn memsize(&self) -> MemSize {
             let rmt = RMT::regs();
             let ch_idx = ch_idx(self) as usize;
@@ -1842,6 +1866,7 @@ mod chip_specific {
             }
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_error(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let int_raw = rmt.int_raw().read();
@@ -1859,6 +1884,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir = Tx>,
     {
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_generate_repeat_interrupt(&self, repeats: u16) {
             let rmt = crate::peripherals::RMT::regs();
             if repeats > 1 {
@@ -1879,6 +1905,7 @@ mod chip_specific {
                 .modify(|_, w| w.loop_count_reset().clear_bit());
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn clear_tx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
 
@@ -1890,6 +1917,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_continuous(&self, continuous: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
@@ -1897,6 +1925,7 @@ mod chip_specific {
                 .modify(|_, w| w.tx_conti_mode().bit(continuous));
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_wrap_mode(&self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
@@ -1923,6 +1952,7 @@ mod chip_specific {
                 .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn start_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
 
@@ -1934,33 +1964,39 @@ mod chip_specific {
             self.update();
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_threshold_set(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_thr_event(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn reset_tx_threshold_set(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_clr()
                 .write(|w| w.ch_tx_thr_event(self.channel()).set_bit());
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_threshold(&self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_lim(self.channel().into())
                 .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_loopcount_interrupt_set(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_loop(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn stop_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_conf0(self.channel().into())
@@ -1968,6 +2004,7 @@ mod chip_specific {
             self.update();
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_ena().modify(|_, w| {
@@ -1994,6 +2031,7 @@ mod chip_specific {
             super::INPUT_SIGNALS[ch_idx]
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn clear_rx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
@@ -2005,6 +2043,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_rx_wrap_mode(&self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self) as usize;
@@ -2030,6 +2069,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn start_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
@@ -2046,12 +2086,14 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_rx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
             rmt.int_raw().read().ch_rx_end(ch_idx).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn stop_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self) as usize;
@@ -2076,6 +2118,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = ch_idx(self);
@@ -2137,6 +2180,7 @@ mod chip_specific {
     }
 
     #[allow(unused)]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
         let rmt = RMT::regs();
         let st = rmt.int_st().read();
@@ -2150,6 +2194,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir: Direction>,
     {
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn update(&self) {
             // no-op
         }
@@ -2160,6 +2205,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn memsize(&self) -> MemSize {
             let rmt = crate::peripherals::RMT::regs();
             let blocks = rmt
@@ -2176,6 +2222,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_error(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_err(self.channel()).bit()
@@ -2187,6 +2234,7 @@ mod chip_specific {
         A: RawChannelAccess<Dir = Tx>,
     {
         #[cfg(not(esp32))]
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_generate_repeat_interrupt(&self, repeats: u16) {
             let rmt = crate::peripherals::RMT::regs();
             if repeats > 1 {
@@ -2199,10 +2247,12 @@ mod chip_specific {
         }
 
         #[cfg(esp32)]
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_generate_repeat_interrupt(&self, _repeats: u16) {
             // unsupported
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn clear_tx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -2214,6 +2264,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_continuous(&self, continuous: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
@@ -2221,6 +2272,7 @@ mod chip_specific {
                 .modify(|_, w| w.tx_conti_mode().bit(continuous));
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_wrap_mode(&self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
             // this is "okay", because we use all TX channels always in wrap mode
@@ -2248,6 +2300,7 @@ mod chip_specific {
                 .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn start_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -2265,34 +2318,40 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_end(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_threshold_set(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_tx_thr_event(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn reset_tx_threshold_set(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_clr()
                 .write(|w| w.ch_tx_thr_event(self.channel()).set_bit());
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_threshold(&self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_lim(self.channel() as usize)
                 .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_tx_loopcount_interrupt_set(&self) -> bool {
             // no-op
             false
         }
 
         #[cfg(esp32s2)]
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn stop_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.chconf1(self.channel() as usize)
@@ -2300,8 +2359,10 @@ mod chip_specific {
         }
 
         #[cfg(esp32)]
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn stop_tx(&self) {}
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -2324,6 +2385,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir = Rx>,
     {
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn clear_rx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -2335,6 +2397,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_rx_wrap_mode(&self, _wrap: bool) {
             // no-op
         }
@@ -2354,6 +2417,7 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn start_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();
@@ -2371,11 +2435,13 @@ mod chip_specific {
             });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn is_rx_done(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_raw().read().ch_rx_end(self.channel()).bit()
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn stop_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.chconf1(self.channel() as usize)
@@ -2396,6 +2462,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch = self.channel();

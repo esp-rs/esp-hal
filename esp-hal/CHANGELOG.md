@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The functions of the `RadioClockController` have been split up to the modem peripheral structs. The clock management is now provided by the `ModemClockController`. (#3687)
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
 - Added the feature `requires-unstable` (#3772)
+- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM.
 
 ### Changed
 
