@@ -121,7 +121,7 @@ use crate::{
         OutputSignal,
         interconnect::{self, PeripheralOutput},
     },
-    i2s::{AnyI2s, AnyI2sInner},
+    i2s::AnyI2s,
     pac::i2s0::RegisterBlock,
     peripherals::{I2S0, I2S1},
     system::PeripheralGuard,
@@ -778,8 +778,8 @@ impl PrivateInstance for I2S1<'_> {
 impl PrivateInstance for AnyI2s<'_> {
     delegate::delegate! {
         to match &self.0 {
-            AnyI2sInner::I2s0(i2s) => i2s,
-            AnyI2sInner::I2s1(i2s) => i2s,
+            super::any::Inner::I2s0(i2s) => i2s,
+            super::any::Inner::I2s1(i2s) => i2s,
         } {
             fn regs(&self) -> &RegisterBlock;
             fn peripheral(&self) -> crate::system::Peripheral;
@@ -790,7 +790,7 @@ impl PrivateInstance for AnyI2s<'_> {
 }
 
 /// A peripheral singleton compatible with the I2S parallel driver.
-pub trait Instance: PrivateInstance + super::IntoAnyI2s {}
+pub trait Instance: PrivateInstance + super::any::Degrade {}
 
 impl Instance for I2S0<'_> {}
 #[cfg(soc_has_i2s1)]

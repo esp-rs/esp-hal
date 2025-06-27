@@ -133,8 +133,8 @@ pins = [
     { pin =  9, kind = ["input", "output"] },
     { pin = 10, kind = ["input", "output"] },
     { pin = 11, kind = ["input", "output"] },
-    { pin = 12, kind = ["input", "output"] },
-    { pin = 13, kind = ["input", "output"] },
+    { pin = 12, kind = ["input", "output", "usb_device"] },
+    { pin = 13, kind = ["input", "output", "usb_device"] },
     { pin = 14, kind = ["input", "output"] },
     { pin = 15, kind = ["input", "output"] },
     { pin = 16, kind = ["input", "output"], alternate_functions = { 0 = "U0RXD", 2 = "FSPICS0" } },
@@ -368,7 +368,7 @@ output_signals = [
 [device.i2c_master]
 support_status = "supported"
 instances = [
-    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
@@ -401,6 +401,10 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
 support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 [device.ds]
 support_status = "not_supported"
