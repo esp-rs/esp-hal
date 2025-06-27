@@ -28,7 +28,20 @@ impl PeripheralInstance for AnySlchost<'_> {
     }
 }
 
+impl PeripheralInstance for crate::peripherals::SLCHOST<'_> {
+    type Info = SlchostInfo;
+
+    fn info(&self) -> &'static Self::Info {
+        static INFO: SlchostInfo = SlchostInfo {
+            register_block: crate::peripherals::SLCHOST::ptr(),
+        };
+
+        &INFO
+    }
+}
+
 /// A peripheral singleton compatible with the SDIO SLCHOST driver.
 pub trait SlchostInstance: PeripheralInstance + IntoAnySlchost {}
 
 impl SlchostInstance for AnySlchost<'_> {}
+impl SlchostInstance for crate::peripherals::SLCHOST<'_> {}
