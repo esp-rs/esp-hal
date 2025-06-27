@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
+- SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
 
 ### Changed
 
