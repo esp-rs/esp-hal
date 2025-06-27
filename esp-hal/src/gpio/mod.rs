@@ -87,6 +87,9 @@ use crate::{
     private::{self, Sealed},
     sync::RawMutex,
 };
+#[cfg(feature = "rt")]
+use crate::peripherals::Interrupt;
+
 
 pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 
@@ -677,7 +680,7 @@ impl<'d> Io<'d> {
     #[instability::unstable]
     pub fn set_interrupt_priority(&self, _prio: Priority) {
         #[cfg(feature = "rt")]
-        interrupt::set_interrupt_priority(crate::interrupt::Interrupt::GPIO, _prio);
+        interrupt::set_interrupt_priority(crate::peripherals::Interrupt::GPIO, _prio);
     }
 
     #[cfg_attr(
