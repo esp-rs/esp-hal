@@ -21,7 +21,7 @@ MEMORY
   dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 184k - RESERVE_CACHES - VECTORS_SIZE
 
   /* memory available after the 2nd stage bootloader is finished */
-  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 0x3ffffa10 - (ORIGIN(dram_seg) + LENGTH(dram_seg))
+  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 136K
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
