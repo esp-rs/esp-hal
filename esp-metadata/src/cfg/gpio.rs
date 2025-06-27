@@ -72,7 +72,7 @@ pub(crate) struct PinConfig {
     pub alternate_functions: AfMap,
 }
 
-/// An input or output peripheral signal. THe names usually match the signal
+/// An input or output peripheral signal. The names usually match the signal
 /// name in the Peripheral Signal List table, without the `in` or `out` suffix.
 /// If the `id` is `None`, the signal cannot be routed through the GPIO matrix.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
