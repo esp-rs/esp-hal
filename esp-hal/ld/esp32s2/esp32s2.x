@@ -34,6 +34,7 @@ INCLUDE "rtc_fast.x"
 INCLUDE "rtc_slow.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
+INCLUDE "metadata.x"
 /* End of Shared sections */
 
 EXTERN(DefaultHandler);
