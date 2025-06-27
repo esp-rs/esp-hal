@@ -62,16 +62,13 @@ use procmacros::ram;
 use strum::EnumCount;
 
 use crate::{
-    gpio::{AnyPin, GpioBank, InputPin, set_int_enable},
+    gpio::{AnyPin, GpioBank, InputPin, set_int_enable, GPIO_LOCK},
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
     peripherals::{GPIO, Interrupt},
-    sync::RawMutex,
 };
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
-
-pub(super) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 pub(super) struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {

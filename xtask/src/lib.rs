@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -164,6 +164,7 @@ impl Package {
             Package::EspConfig => features.push("build".to_owned()),
             Package::EspHal => {
                 features.push("unstable".to_owned());
+                features.push("rt".to_owned());
                 if config.contains("psram") {
                     // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
                     // defaults to `quad`) as it would require a separate build
@@ -239,6 +240,11 @@ impl Package {
                 "esp-hal/unstable".to_owned(),
                 "builtin-scheduler".to_owned(),
             ]);
+        }
+        if self == &Package::EspHal {
+            // This checks if the `esp-hal` crate compiles with the no features (other than the chip selection)
+            // Primarily, this tests that disabling the `rt` feature works
+            cases.push(vec![]);
         }
 
         cases

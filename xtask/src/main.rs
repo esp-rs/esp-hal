@@ -4,14 +4,14 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
-    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -283,7 +283,9 @@ fn lint_package(
         builder = builder.arg(arg.to_string());
     }
 
-    builder = builder.arg(format!("--features={}", features.join(",")));
+    if !features.is_empty() {
+        builder = builder.arg(format!("--features={}", features.join(",")));
+    }
 
     let builder = if fix {
         builder.arg("--fix").arg("--lib").arg("--allow-dirty")

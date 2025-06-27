@@ -66,12 +66,15 @@ crate::unstable_module! {
 
 mod asynch;
 mod embedded_hal_impls;
+#[cfg(feature = "rt")]
 pub(crate) mod interrupt;
+#[cfg(feature = "rt")]
+use interrupt::*;
+
 mod placeholder;
 
 use core::fmt::Display;
 
-use interrupt::*;
 pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
@@ -80,9 +83,15 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
+    peripherals::{GPIO, IO_MUX, impl_for_pin_type, io_mux_reg},
     private::{self, Sealed},
+    sync::RawMutex,
 };
+#[cfg(feature = "rt")]
+use crate::peripherals::Interrupt;
+
+
+pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
@@ -506,6 +515,7 @@ impl GpioBank {
         &FLAGS[self as usize]
     }
 
+    #[cfg_attr(not(feature = "rt"), expect(dead_code))]
     fn offset(self) -> u8 {
         match self {
             Self::_0 => 0,
@@ -637,8 +647,9 @@ impl<'d> Io<'d> {
     /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
-    pub fn set_interrupt_priority(&self, prio: Priority) {
-        interrupt::set_interrupt_priority(Interrupt::GPIO, prio);
+    pub fn set_interrupt_priority(&self, _prio: Priority) {
+        #[cfg(feature = "rt")]
+        interrupt::set_interrupt_priority(crate::peripherals::Interrupt::GPIO, _prio);
     }
 
     #[cfg_attr(
@@ -673,13 +684,18 @@ impl<'d> Io<'d> {
     /// Panics if passed interrupt handler is invalid (e.g. has priority
     /// `None`)
     #[instability::unstable]
-    pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::GPIO);
+    pub fn set_interrupt_handler(&mut self, _handler: InterruptHandler) {
+        #[cfg(feature = "rt")]
+        {
+            for core in crate::system::Cpu::other() {
+                crate::interrupt::disable(core, Interrupt::GPIO);
+            }
+            self.set_interrupt_priority(_handler.priority());
+            unsafe {
+                crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler)
+            };
+            USER_INTERRUPT_HANDLER.store(_handler.handler());
         }
-        self.set_interrupt_priority(handler.priority());
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
     }
 }
 

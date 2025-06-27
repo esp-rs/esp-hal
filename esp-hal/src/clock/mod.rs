@@ -43,6 +43,7 @@
 //! # Ok(())
 //! # }
 //! ```
+#![cfg_attr(not(feature = "rt"), expect(unused))]
 
 #[cfg(any(esp32, esp32c2))]
 use crate::rtc_cntl::RtcClock;
