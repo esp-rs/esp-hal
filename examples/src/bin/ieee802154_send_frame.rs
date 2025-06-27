@@ -26,7 +26,7 @@ fn main() -> ! {
 
     let delay = Delay::new();
 
-    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154, peripherals.RADIO_CLK);
+    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154);
 
     ieee802154.set_config(Config {
         channel: 15,
