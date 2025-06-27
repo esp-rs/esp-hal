@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::Args;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
@@ -13,21 +13,75 @@ pub struct BumpMsrvArgs {
     /// The MSRV to be used
     #[arg(long)]
     pub msrv: String,
+
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    pub packages: Vec<Package>,
+
+    /// Don't actually change any files
+    #[arg(long)]
+    pub dry_run: bool,
+
+    /// Don't automatically include crates which depend on the given crates
+    #[arg(long)]
+    pub non_recursive: bool,
 }
 
 /// Bump the MSRV
 ///
 /// This will process
-/// - `Cargo.toml` for each package (adjust (or add if not present) the
+/// - `Cargo.toml` for the packages (adjust (or add if not present) the
 ///   "rust-version")
-/// - `README.md` for each package if it exists (adjusts the MSRV badge)
-/// - .github/workflows/ci.yml (adapts the `MSRV: "<msrv>"` entry)
-pub fn bump_msrv(workspace: &Path, msrv: &str) -> Result<()> {
-    // process all packages
+/// - `README.md` for the packages if it exists (adjusts the MSRV badge)
+/// - IF the esp-hal package was touched: .github/workflows/ci.yml (adapts the
+///   `MSRV: "<msrv>"` entry)
+///
+/// Non-published packages are not touched.
+///
+/// If it detects a package which other packages in the repo depend on it will
+/// also apply the changes there. (Can be disabled)
+pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
+    let new_msrv = semver::Version::parse(&args.msrv)?;
+    if !new_msrv.pre.is_empty() || !new_msrv.build.is_empty() {
+        bail!("Invalid MSRV: {}", args.msrv);
+    }
+
+    let mut to_process = args.packages.clone();
+
+    // add crates which depend on any of the packages to bump
+    if !args.non_recursive {
+        while {
+            let mut added = false;
+            for package in Package::iter() {
+                let mut cargo_toml = CargoToml::new(workspace, package.clone())?;
+                for dep in cargo_toml.repo_dependencies() {
+                    if to_process.contains(&dep) && !to_process.contains(&package) {
+                        added = true;
+                        to_process.push(package);
+                    }
+                }
+            }
+            added
+        } {}
+    }
+
+    // don't process crates which are not published
+    let to_process: Vec<Package> = to_process
+        .iter()
+        .filter(|pkg| {
+            let cargo_toml = CargoToml::new(workspace, **pkg).unwrap();
+            cargo_toml.is_published()
+        })
+        .copied()
+        .collect();
+
+    let adjust_ci = to_process.contains(&Package::EspHal);
+
+    // process packages
     let badge_re = Regex::new(
         r"(?<prefix>https://img.shields.io/badge/MSRV-)(?<msrv>[0123456789.]*)(?<postfix>-)",
     )?;
-    for package in Package::iter() {
+    for package in to_process {
         println!("Processing {package}");
         let mut cargo_toml = CargoToml::new(workspace, package)?;
         let package_path = cargo_toml.package_path();
@@ -39,28 +93,45 @@ pub fn bump_msrv(workspace: &Path, msrv: &str) -> Result<()> {
             .and_then(|pkg| pkg.as_table_mut());
 
         if let Some(package_table) = package_table {
-            package_table["rust-version"] = value(msrv);
-            cargo_toml.save()?;
+            if let Some(rust_version) = package_table.get_mut("rust-version") {
+                if semver::Version::parse(&rust_version.as_str().unwrap())? > new_msrv {
+                    bail!("Downgrading rust-version is not supported");
+                }
+            }
+
+            package_table["rust-version"] = value(&new_msrv.to_string());
+            if !args.dry_run {
+                cargo_toml.save()?;
+            }
 
             let readme_path = package_path.join("README.md");
             if readme_path.exists() {
                 let readme = std::fs::read_to_string(&readme_path)?;
                 let readme = badge_re.replace(&readme, |caps: &Captures| {
-                    format!("{}{msrv}{}", &caps["prefix"], &caps["postfix"])
+                    format!("{}{new_msrv}{}", &caps["prefix"], &caps["postfix"])
                 });
-                std::fs::write(readme_path, readme.as_bytes())?;
+
+                if !args.dry_run {
+                    std::fs::write(readme_path, readme.as_bytes())?;
+                }
             }
         }
     }
 
-    // process ".github/workflows/ci.yml"
-    println!("Processing .github/workflows/ci.yml");
-    let ci_yml = std::fs::read_to_string(".github/workflows/ci.yml")?;
-    let ci_yml = Regex::new("(MSRV:.*\\\")([0123456789.]*)(\\\")")?
-        .replace(&ci_yml, |caps: &Captures| {
-            format!("{}{msrv}{}", &caps[1], &caps[3])
-        });
-    std::fs::write(".github/workflows/ci.yml", ci_yml.as_bytes())?;
+    if adjust_ci {
+        // process ".github/workflows/ci.yml"
+        println!("Processing .github/workflows/ci.yml");
+        let ci_yml_path = workspace.join(".github/workflows/ci.yml");
+
+        let ci_yml = std::fs::read_to_string(&ci_yml_path)?;
+        let ci_yml = Regex::new("(MSRV:.*\\\")([0123456789.]*)(\\\")")?
+            .replace(&ci_yml, |caps: &Captures| {
+                format!("{}{new_msrv}{}", &caps[1], &caps[3])
+            });
+        if !args.dry_run {
+            std::fs::write(ci_yml_path, ci_yml.as_bytes())?;
+        }
+    }
 
     println!("\nPlease review the changes before committing.");
     Ok(())

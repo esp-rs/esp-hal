@@ -142,7 +142,7 @@ fn main() -> Result<()> {
             #[cfg(feature = "release")]
             Release::PostRelease => post_release(&workspace),
             #[cfg(feature = "release")]
-            Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, &args.msrv),
+            Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
