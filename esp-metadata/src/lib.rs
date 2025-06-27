@@ -540,7 +540,7 @@ impl Config {
             gpio.pins_and_signals
                 .pins
                 .iter()
-                .map(|pin| number(pin.pin))
+                .map(|pin| format_ident!("GPIO{}", pin.pin))
                 .collect::<Vec<_>>()
         } else {
             vec![]

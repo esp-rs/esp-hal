@@ -24,7 +24,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    sync::{lock, RawMutex},
+    sync::{RawMutex, lock},
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };

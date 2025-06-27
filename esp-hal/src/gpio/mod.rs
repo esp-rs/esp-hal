@@ -80,7 +80,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{impl_for_pin_type, io_mux_reg, Interrupt, GPIO, IO_MUX},
+    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
     private::{self, Sealed},
 };
 
