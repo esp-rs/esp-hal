@@ -1,3 +1,9 @@
+pub(crate) mod gpio;
+pub(crate) mod i2c_master;
+
+pub(crate) use gpio::*;
+pub(crate) use i2c_master::*;
+
 /// Represents a value in the driver configuration.
 pub(crate) enum Value {
     Unset,
@@ -17,6 +23,10 @@ impl From<Option<u32>> for Value {
     }
 }
 
+/// The support status of a given peripheral driver.
+///
+/// This is defined in device metadata, and is used to generate the peripheral
+/// support table.
 #[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SupportStatus {
@@ -49,82 +59,6 @@ impl SupportStatus {
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct EmptyInstanceConfig {}
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct I2cMasterInstanceConfig {
-    pub sys_instance: String,
-    pub scl: String,
-    pub sda: String,
-    pub interrupt: String,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PinCapability {
-    Input,
-    Output,
-    Analog,
-    Rtc,
-    Touch,
-    UsbDm,
-    UsbDp,
-    // Pin has USB pullup according to the IO MUX Function list
-    UsbDevice,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct AfMap {
-    #[serde(rename = "0")]
-    af0: Option<String>,
-    #[serde(rename = "1")]
-    af1: Option<String>,
-    #[serde(rename = "2")]
-    af2: Option<String>,
-    #[serde(rename = "3")]
-    af3: Option<String>,
-    #[serde(rename = "4")]
-    af4: Option<String>,
-    #[serde(rename = "5")]
-    af5: Option<String>,
-}
-
-impl AfMap {
-    pub fn get(&self, af: usize) -> Option<&str> {
-        match af {
-            0 => self.af0.as_deref(),
-            1 => self.af1.as_deref(),
-            2 => self.af2.as_deref(),
-            3 => self.af3.as_deref(),
-            4 => self.af4.as_deref(),
-            5 => self.af5.as_deref(),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct PinConfig {
-    /// The GPIO pin number.
-    pub pin: usize,
-    pub kind: Vec<PinCapability>,
-    // Pin => Input/OutputSignal
-    #[serde(default)]
-    pub alternate_functions: AfMap,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct IoMuxSignal {
-    pub name: String,
-    #[serde(default)]
-    pub id: Option<usize>,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct GpioPinsAndSignals {
-    pub pins: Vec<PinConfig>,
-    pub input_signals: Vec<IoMuxSignal>,
-    pub output_signals: Vec<IoMuxSignal>,
-}
-
 /// A peripheral instance for which a driver is implemented.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
@@ -134,9 +68,17 @@ pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
     pub instance_config: I,
 }
 
+/// A single cell in the peripheral support table.
 pub(crate) struct SupportItem {
+    /// The human-readable name of the driver in the table (leftmost cell.)
     pub name: &'static str,
+    /// The ID of the driver ([device.<config_group>]) in the TOML, that this
+    /// item corresponds to.
     pub config_group: &'static str,
+    /// When the driver's configuration is not present in the device's TOML,
+    /// these symbols decide whether to generate a Not Available or a Not
+    /// Supported cell. If the device has one of these symbols, the support
+    /// status will be Not Supported (i.e. yet to be implemented).
     pub symbols: &'static [&'static str],
 }
 
