@@ -482,61 +482,22 @@ impl Config {
             .pins
             .iter()
             .map(|pin| {
-                struct PinAttrs {
-                    input: bool,
-                    output: bool,
-                    analog: bool,
-                    rtc_io: bool,
-                    touch: bool,
-                    usb_dm: bool,
-                    usb_dp: bool,
-                }
-
-                let mut pin_attrs = PinAttrs {
-                    input: false,
-                    output: false,
-                    analog: false,
-                    rtc_io: false,
-                    touch: false,
-                    usb_dm: false,
-                    usb_dp: false,
-                };
-                pin.kind.iter().for_each(|kind| match kind {
-                    cfg::PinCapability::Input => pin_attrs.input = true,
-                    cfg::PinCapability::Output => pin_attrs.output = true,
-                    cfg::PinCapability::Analog => pin_attrs.analog = true,
-                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                    cfg::PinCapability::Touch => pin_attrs.touch = true,
-                    cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
-                    cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
-                });
-
                 let mut attrs = vec![];
-
-                if pin_attrs.input {
-                    attrs.push(quote::quote! { Input });
-                }
-                if pin_attrs.output {
-                    attrs.push(quote::quote! { Output });
-                }
-                if pin_attrs.analog {
-                    attrs.push(quote::quote! { Analog });
-                }
-                if pin_attrs.rtc_io {
-                    attrs.push(quote::quote! { RtcIo });
-                    if pin_attrs.output {
-                        attrs.push(quote::quote! { RtcIoOutput });
+                pin.kind.iter().for_each(|kind| match kind {
+                    cfg::PinCapability::Input => attrs.push(quote::quote! { Input }),
+                    cfg::PinCapability::Output => attrs.push(quote::quote! { Output }),
+                    cfg::PinCapability::Analog => attrs.push(quote::quote! { Analog }),
+                    cfg::PinCapability::Rtc => {
+                        attrs.push(quote::quote! { RtcIo });
+                        if pin.kind.contains(&cfg::PinCapability::Output) {
+                            attrs.push(quote::quote! { RtcIoOutput });
+                        }
                     }
-                }
-                if pin_attrs.touch {
-                    attrs.push(quote::quote! { Touch });
-                }
-                if pin_attrs.usb_dm {
-                    attrs.push(quote::quote! { UsbDm });
-                }
-                if pin_attrs.usb_dp {
-                    attrs.push(quote::quote! { UsbDp });
-                }
+                    cfg::PinCapability::Touch => attrs.push(quote::quote! { Touch }),
+                    cfg::PinCapability::UsbDm => attrs.push(quote::quote! { UsbDm }),
+                    cfg::PinCapability::UsbDp => attrs.push(quote::quote! { UsbDp }),
+                    cfg::PinCapability::UsbDevice => attrs.push(quote::quote! { UsbDevice }),
+                });
 
                 attrs
             })
@@ -645,11 +606,11 @@ impl Config {
 
             for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
                 branches.push(quote::quote! {
-                            #( (#pin, #attr, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($then_tt)* }; )*
-                        });
+                    #( (#pin, #attr, $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
+                });
 
                 branches.push(quote::quote! {
-                    (#pin, $t:tt, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($else_tt)* };
+                    (#pin, $t:tt, $then_tt:tt else $else_tt:tt ) => { $else_tt };
                 });
             }
 
@@ -674,21 +635,25 @@ impl Config {
                     #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
                         #[allow(unused_unsafe, unused_mut)]
                         let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
-                        $($code)*
-                    }} else {{
-                        panic!("Unsupported")
-                    }}),
+                        #[allow(unused_braces)]
+                        $code
+                    }} else {
+                        $otherwise
+                    }),
                 });
             }
 
             quote::quote! {
                 macro_rules! impl_for_pin_type {
-                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $($code:tt)*) => {
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
                         match $any_pin.number() {
                             #(#impl_branches)*
-                            _ => unreachable!(),
+                            _ => $otherwise,
                         }
-                    }
+                    };
+                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt) => {
+                        impl_for_pin_type!($any_pin, $inner_ident, $on_type, $code else { panic!("Unsupported") })
+                    };
                 }
                 pub(crate) use impl_for_pin_type;
             }
