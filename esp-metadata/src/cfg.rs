@@ -29,11 +29,7 @@ impl From<Option<u32>> for Value {
     }
 }
 
-/// The support status of a given peripheral driver.
-///
-/// This is defined in device metadata, and is used to generate the peripheral
-/// support table.
-#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SupportStatus {
     NotSupported,

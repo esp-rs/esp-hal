@@ -16,13 +16,13 @@ macro_rules! peripherals {
     (
         peripherals: [
             $(
-                $name:ident <= $from_pac:tt $(($($interrupt_name:ident => $interrupt:ident),*))?
-            ),* $(,)?
+                $name:ident <= $from_pac:tt ($($interrupt_name:ident => $interrupt:ident),*),
+            )*
         ],
         unstable_peripherals: [
             $(
-                $unstable_name:ident <= $unstable_from_pac:tt $(($($unstable_interrupt_name:ident => $unstable_interrupt:ident),*))?
-            ),* $(,)?
+                $unstable_name:ident <= $unstable_from_pac:tt ($($unstable_interrupt_name:ident => $unstable_interrupt:ident),*),
+            )*
         ],
         pins: [
             $( $pin:literal, )*
@@ -138,23 +138,19 @@ macro_rules! peripherals {
         }
 
         $(
-            $(
-                impl $name<'_> {
-                    $(
-                        generate_interrupt_fns!($interrupt_name, $interrupt);
-                    )*
-                }
-            )*
+            impl $name<'_> {
+                $(
+                    generate_interrupt_fns!($interrupt_name, $interrupt);
+                )*
+            }
         )*
 
         $(
-            $(
-                impl $unstable_name<'_> {
-                    $(
-                        generate_interrupt_fns!($unstable_interrupt_name, $unstable_interrupt);
-                    )*
-                }
-            )*
+            impl $unstable_name<'_> {
+                $(
+                    generate_interrupt_fns!($unstable_interrupt_name, $unstable_interrupt);
+                )*
+            }
         )*
     };
 }

@@ -202,7 +202,7 @@ pub struct PeripheralDef {
     /// The name of the esp-hal peripheral singleton
     name: String,
     /// When omitted, same as `name`
-    #[serde(default)]
+    #[serde(default, rename = "pac")]
     pac_name: Option<String>,
     /// Whether or not the peripheral has a PAC counterpart
     #[serde(default, rename = "virtual")]
@@ -513,7 +513,78 @@ impl Config {
             tokens.extend(cfg::generate_spi_slave_peripherals(peri));
         };
 
+        tokens.extend(self.generate_peripherals_macro());
+
         save(out_dir.join(file_name), tokens);
+    }
+
+    fn generate_peripherals_macro(&self) -> TokenStream {
+        let mut stable = vec![];
+        let mut unstable = vec![];
+
+        let mut stable_peris = vec![];
+
+        for item in PeriConfig::drivers() {
+            if self.device.peri_config.support_status(item.config_group)
+                == Some(SupportStatus::Supported)
+            {
+                for p in item.symbols.iter() {
+                    if !stable_peris.contains(&p) {
+                        stable_peris.push(p);
+                    }
+                }
+            }
+        }
+
+        let gpios = if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
+            gpio.pins_and_signals
+                .pins
+                .iter()
+                .map(|pin| number(pin.pin))
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
+        for peri in self.device.peripherals.iter() {
+            let hal = format_ident!("{}", peri.name);
+            let pac = if peri.is_virtual {
+                format_ident!("virtual")
+            } else {
+                format_ident!("{}", peri.pac_name.as_deref().unwrap_or(peri.name.as_str()))
+            };
+            // Make sure we have a stable order
+            let mut interrupts = peri.interrupts.iter().collect::<Vec<_>>();
+            interrupts.sort_by_key(|(k, _)| k.as_str());
+            let interrupts = interrupts.iter().map(|(k, v)| {
+                let k = format_ident!("{k}");
+                let v = format_ident!("{v}");
+                quote::quote! { #k => #v }
+            });
+            let tokens = quote::quote! {
+                #hal <= #pac ( #(#interrupts),* )
+            };
+            if stable_peris
+                .iter()
+                .any(|p| peri.name.eq_ignore_ascii_case(p))
+            {
+                stable.push(tokens);
+            } else {
+                unstable.push(tokens);
+            }
+        }
+
+        quote::quote! {
+            crate::peripherals! {
+                peripherals: [
+                    #(#stable,)*
+                ],
+                unstable_peripherals: [
+                    #(#unstable,)*
+                ],
+                pins: [#(#gpios,)*]
+            }
+        }
     }
 }
 
