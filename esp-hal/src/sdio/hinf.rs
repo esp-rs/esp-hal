@@ -28,7 +28,20 @@ impl PeripheralInstance for AnyHinf<'_> {
     }
 }
 
+impl PeripheralInstance for crate::peripherals::HINF<'_> {
+    type Info = HinfInfo;
+
+    fn info(&self) -> &'static Self::Info {
+        static INFO: HinfInfo = HinfInfo {
+            register_block: crate::peripherals::HINF::ptr(),
+        };
+
+        &INFO
+    }
+}
+
 /// A peripheral singleton compatible with the SDIO HINF driver.
 pub trait HinfInstance: PeripheralInstance + IntoAnyHinf {}
 
 impl HinfInstance for AnyHinf<'_> {}
+impl HinfInstance for crate::peripherals::HINF<'_> {}
