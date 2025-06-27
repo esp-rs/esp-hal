@@ -92,14 +92,12 @@ options:
   description: The stack guard variable will be placed this many bytes from the stack's end.
   default:
     - value: 4096
-  stability: !Stable '1.0.0-beta.0'
   active: 'true'
 
 - name: stack-guard-value
   description: The value to be written to the stack guard variable.
   default:
     - value: 3740121773
-  stability: !Stable '1.0.0-beta.0'
   display_hint: Hex
 
 - name: impl-critical-section
