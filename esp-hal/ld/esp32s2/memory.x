@@ -16,12 +16,12 @@ VECTORS_SIZE = 0x400;
 MEMORY
 {
   vectors_seg ( RX )     : ORIGIN = 0x40020000 + RESERVE_CACHES, len = VECTORS_SIZE
-  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 188k - RESERVE_CACHES - VECTORS_SIZE
+  iram_seg ( RX )        : ORIGIN = 0x40020000 + RESERVE_CACHES + VECTORS_SIZE, len = 184k - RESERVE_CACHES - VECTORS_SIZE
 
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 188k - RESERVE_CACHES - VECTORS_SIZE
+  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_CACHES + VECTORS_SIZE, len = 184k - RESERVE_CACHES - VECTORS_SIZE
 
   /* memory available after the 2nd stage bootloader is finished */
-  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 0x3ffffa10 - (ORIGIN(dram_seg) + LENGTH(dram_seg))
+  dram2_seg ( RW )       : ORIGIN = ORIGIN(dram_seg) + LENGTH(dram_seg), len = 136K
 
   /* external flash 
      The 0x20 offset is a convenience for the app binary image generation.
@@ -32,7 +32,6 @@ MEMORY
   */
   irom_seg ( RX )        : ORIGIN = 0x40080020, len = 3M - 0x20
   drom_seg ( R )         : ORIGIN = 0x3F000020, len = 4M - 0x20
-
 
   /* RTC fast memory (executable). Persists over deep sleep. Only for core 0 (PRO_CPU) */
   rtc_fast_iram_seg(RWX) : ORIGIN = 0x40070000, len = 8k

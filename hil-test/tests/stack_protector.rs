@@ -28,7 +28,7 @@ fn trigger_overflow() {
     } else if cfg!(esp32h2) {
         235 * 1024
     } else if cfg!(esp32s2) {
-        173 * 1024
+        169 * 1024
     } else if cfg!(esp32s3) {
         322 * 1024
     } else {
