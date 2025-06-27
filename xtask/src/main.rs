@@ -42,10 +42,6 @@ enum Cli {
     CheckChangelog(CheckChangelogArgs),
     /// Re-generate the chip support table in the esp-hal README.
     UpdateChipSupportTable,
-    /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml, the
-    /// toolchain used in CI)
-    #[cfg(feature = "msrv")]
-    BumpMsrv(BumpMsrvArgs),
 }
 
 #[derive(Debug, Args)]
@@ -94,13 +90,6 @@ struct CheckChangelogArgs {
     /// Re-generate the changelog with consistent formatting.
     #[arg(long)]
     normalize: bool,
-}
-
-#[derive(Debug, Args)]
-struct BumpMsrvArgs {
-    /// The MSRV to be used
-    #[arg(long)]
-    msrv: String,
 }
 
 // ----------------------------------------------------------------------------
@@ -152,6 +141,8 @@ fn main() -> Result<()> {
             Release::PublishPlan(args) => publish_plan(&workspace, args),
             #[cfg(feature = "release")]
             Release::PostRelease => post_release(&workspace),
+            #[cfg(feature = "release")]
+            Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, &args.msrv),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
@@ -165,8 +156,6 @@ fn main() -> Result<()> {
             xtask::update_chip_support_table(&workspace)?;
             Ok(())
         }
-        #[cfg(feature = "msrv")]
-        Cli::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, &args.msrv),
     }
 }
 

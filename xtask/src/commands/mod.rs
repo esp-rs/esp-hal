@@ -8,8 +8,6 @@ pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{Package, cargo::CargoAction};
 
 mod build;
-#[cfg(feature = "msrv")]
-pub mod bump_msrv;
 mod check_changelog;
 mod release;
 mod run;

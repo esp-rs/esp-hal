@@ -1,11 +1,19 @@
 use std::path::Path;
 
 use anyhow::Result;
+use clap::Args;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
 use toml_edit::value;
 
 use crate::{Package, cargo::CargoToml};
+
+#[derive(Debug, Args)]
+pub struct BumpMsrvArgs {
+    /// The MSRV to be used
+    #[arg(long)]
+    pub msrv: String,
+}
 
 /// Bump the MSRV
 ///
