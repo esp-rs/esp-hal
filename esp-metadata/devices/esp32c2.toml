@@ -14,6 +14,7 @@ trm   = "https://www.espressif.com/sites/default/files/documentation/esp8684_tec
 peripherals = [
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
+    { name = "BB" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
     { name = "ECC" },

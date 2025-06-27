@@ -74,7 +74,7 @@ peripherals = [
     { name = "TEE" },
     { name = "TIMG0" },
     { name = "TIMG1" },
-    { name = "TRACE0" },
+    { name = "TRACE" },
     { name = "TWAI0" },
     { name = "TWAI1" },
     { name = "UART0", interrupts = { peri = "UART0" } },

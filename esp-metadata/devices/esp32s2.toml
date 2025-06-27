@@ -56,6 +56,7 @@ peripherals = [
     { name = "USB0" },
     { name = "USB_WRAP" },
     { name = "XTS_AES" },
+    { name = "WIFI" },
 
     { name = "DMA_SPI2", pac = "SPI2" },
     { name = "DMA_SPI3", pac = "SPI3" },

@@ -16,6 +16,7 @@ peripherals = [
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
+    { name = "BB" },
     { name = "DMA" },
     { name = "DS" },
     { name = "EFUSE" },
