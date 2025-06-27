@@ -171,7 +171,7 @@ impl<'d> Sdio<'d> {
         self.hinf.info()
     }
 
-    /// Convenience function to get a reference to the SLCHOST register block.
+    /// Convenience function to get a reference to the HINF register block.
     fn hinf_block(&self) -> &'_ pac::hinf::RegisterBlock {
         unsafe { &*self.hinf().register_block }
     }
@@ -282,89 +282,45 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets the communication timing.
-    #[cfg(feature = "esp32")]
     fn pac_set_timing(&mut self) -> Result<(), Error> {
-        let host = self.slchost_block();
-
         match self.config.timing() {
             Timing::PsendPsample => {
-                host.host_slchost_conf().modify(|_, w| unsafe {
-                    w.host_frc_sdio20().bits(0x1f);
-                    w.host_frc_sdio11().bits(0x0);
-                    w.host_frc_pos_samp().bits(0x1f);
-                    w.host_frc_neg_samp().bits(0x0)
-                });
+                self.set_timing_registers(0x1f, 0x0, 0x1f, 0x0);
             }
             Timing::PsendNsample => {
-                host.host_slchost_conf().modify(|_, w| unsafe {
-                    w.host_frc_sdio20().bits(0x1f);
-                    w.host_frc_sdio11().bits(0x0);
-                    w.host_frc_pos_samp().bits(0x0);
-                    w.host_frc_neg_samp().bits(0x1f)
-                });
+                self.set_timing_registers(0x1f, 0x0, 0x0, 0x1f);
             }
             Timing::NsendPsample => {
-                host.host_slchost_conf().modify(|_, w| unsafe {
-                    w.host_frc_sdio20().bits(0x0);
-                    w.host_frc_sdio11().bits(0x1f);
-                    w.host_frc_pos_samp().bits(0x1f);
-                    w.host_frc_neg_samp().bits(0x0)
-                });
+                self.set_timing_registers(0x0, 0x1f, 0x1f, 0x0);
             }
             Timing::NsendNsample => {
-                host.host_slchost_conf().modify(|_, w| unsafe {
-                    w.host_frc_sdio20().bits(0x0);
-                    w.host_frc_sdio11().bits(0x1f);
-                    w.host_frc_pos_samp().bits(0x0);
-                    w.host_frc_neg_samp().bits(0x1f)
-                });
+                self.set_timing_registers(0x0, 0x1f, 0x0, 0x1f);
             }
         }
 
         Ok(())
     }
 
-    /// Sets the communication timing.
-    #[cfg(feature = "esp32c6")]
-    fn pac_set_timing(&mut self) -> Result<(), Error> {
-        let host = self.slchost_block();
+    #[cfg(esp32)]
+    fn set_timing_registers(&self, sdio20: u8, sdio11: u8, pos_samp: u8, neg_samp: u8) {
+        self.slchost_block()
+            .host_slchost_conf()
+            .modify(|_, w| unsafe {
+                w.host_frc_sdio20().bits(sdio20);
+                w.host_frc_sdio11().bits(sdio11);
+                w.host_frc_pos_samp().bits(pos_samp);
+                w.host_frc_neg_samp().bits(neg_samp)
+            });
+    }
 
-        match self.config.timing() {
-            Timing::PsendPsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x1f);
-                    w.frc_sdio11().bits(0x0);
-                    w.frc_pos_samp().bits(0x1f);
-                    w.frc_neg_samp().bits(0x0)
-                });
-            }
-            Timing::PsendNsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x1f);
-                    w.frc_sdio11().bits(0x0);
-                    w.frc_pos_samp().bits(0x0);
-                    w.frc_neg_samp().bits(0x1f)
-                });
-            }
-            Timing::NsendPsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x0);
-                    w.frc_sdio11().bits(0x1f);
-                    w.frc_pos_samp().bits(0x1f);
-                    w.frc_neg_samp().bits(0x0)
-                });
-            }
-            Timing::NsendNsample => {
-                host.conf().modify(|_, w| unsafe {
-                    w.frc_sdio20().bits(0x0);
-                    w.frc_sdio11().bits(0x1f);
-                    w.frc_pos_samp().bits(0x0);
-                    w.frc_neg_samp().bits(0x1f)
-                });
-            }
-        }
-
-        Ok(())
+    #[cfg(esp32c6)]
+    fn set_timing_registers(&self, sdio20: u8, sdio11: u8, pos_samp: u8, neg_samp: u8) {
+        self.slchost_block().conf().modify(|_, w| unsafe {
+            w.frc_sdio20().bits(sdio20);
+            w.frc_sdio11().bits(sdio11);
+            w.frc_pos_samp().bits(pos_samp);
+            w.frc_neg_samp().bits(neg_samp)
+        });
     }
 
     /// Sets which device interrupts to enable based on the provided mask.
@@ -526,7 +482,6 @@ impl Common for Sdio<'_> {
         self.pins.dat3_cs.apply_input_config(&input_pullup);
         self.pins.dat3_cs.apply_output_config(&output_pullup);
 
-        // TODO: implement HAL hardware init
         self.hardware_init()?;
 
         self.state_transition(State::Standby)
