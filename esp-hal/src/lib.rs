@@ -201,16 +201,15 @@ use esp_rom_sys as _;
 
 metadata!("build_info", CHIP_NAME, chip!());
 
-#[cfg(riscv)]
+#[cfg(all(riscv, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
-#[cfg(feature = "rt")]
 pub use esp_riscv_rt::{self, riscv};
 pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
+#[cfg(all(xtensa, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
-#[cfg(feature = "rt")]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
 #[cfg(soc_has_efuse)]
@@ -247,6 +246,7 @@ pub mod uart;
 
 mod macros;
 
+#[cfg(feature = "rt")]
 pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
 #[cfg(feature = "unstable")]

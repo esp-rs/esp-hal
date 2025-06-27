@@ -85,13 +85,14 @@ mod xtensa;
 
 pub mod software;
 
-#[cfg_attr(feature = "rt", unsafe(no_mangle))]
-#[cfg_attr(not(feature = "rt"), allow(non_snake_case))]
+#[cfg(feature = "rt")]
+#[unsafe(no_mangle)]
 extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
     panic!("Unhandled interrupt: {:?}", _interrupt);
 }
 
 /// Default (unhandled) interrupt handler
+#[cfg(feature = "rt")]
 pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
     unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
     Priority::min(),

@@ -59,7 +59,7 @@ use procmacros::ram;
 use strum::EnumCount;
 
 use crate::{
-    gpio::{AnyPin, GpioBank, InputPin, set_int_enable},
+    gpio::{AnyPin, GpioBank, InputPin, set_int_enable, GPIO_LOCK},
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
     peripherals::{GPIO, Interrupt},
 };
