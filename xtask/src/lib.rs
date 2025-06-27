@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -305,6 +305,7 @@ pub fn execute_app(
     action: CargoAction,
     repeat: usize,
     debug: bool,
+    toolchain: Option<&str>,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -358,10 +359,9 @@ pub fn execute_app(
         builder.add_arg("--release");
     }
 
-    let tc = std::env::var("RUSTUP_TOOLCHAIN");
-    let toolchain = match tc {
+    let toolchain = match toolchain {
         // Preserve user choice
-        Ok(ref tc) => Some(tc.as_str()),
+        Some(tc) => Some(tc),
         // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
         _ if target.starts_with("xtensa") => Some("esp"),
         _ => None,
