@@ -198,15 +198,40 @@ pub struct MemoryRegion {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct PeripheralDef {
+    /// The name of the esp-hal peripheral singleton
+    name: String,
+    /// When omitted, same as `name`
+    #[serde(default)]
+    pac_name: Option<String>,
+    /// Whether or not the peripheral has a PAC counterpart
+    #[serde(default, rename = "virtual")]
+    is_virtual: bool,
+    /// List of related interrupt signals
+    #[serde(default)]
+    interrupts: HashMap<String, String>,
+}
+
+impl PeripheralDef {
+    fn symbol_name(&self) -> String {
+        format!(
+            "soc_has_{}",
+            self.pac_name
+                .as_deref()
+                .unwrap_or(self.name.as_str())
+                .to_lowercase()
+        )
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
     name: String,
     arch: Arch,
     cores: usize,
     trm: String,
 
-    peripherals: Vec<String>,
-    // For now, this is only used to double-check the configuration.
-    virtual_peripherals: Vec<String>,
+    peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
     memory: Vec<MemoryRegion>,
 
@@ -252,7 +277,6 @@ impl Config {
                 cores: 1,
                 trm: "".to_owned(),
                 peripherals: Vec::new(),
-                virtual_peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
                 peri_config: PeriConfig::default(),
@@ -265,8 +289,10 @@ impl Config {
         for instance in self.device.peri_config.driver_instances() {
             let (driver, peri) = instance.split_once('.').unwrap();
             ensure!(
-                self.device.peripherals.iter().any(|p| p == peri)
-                    || self.device.virtual_peripherals.iter().any(|p| p == peri),
+                self.device
+                    .peripherals
+                    .iter()
+                    .any(|p| p.name.eq_ignore_ascii_case(peri)),
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );
@@ -295,7 +321,7 @@ impl Config {
     }
 
     /// The peripherals of the device.
-    pub fn peripherals(&self) -> &[String] {
+    pub fn peripherals(&self) -> &[PeripheralDef] {
         &self.device.peripherals
     }
 
@@ -323,12 +349,7 @@ impl Config {
                     Cores::Multi => String::from("multi_core"),
                 },
             ];
-            all.extend(
-                self.device
-                    .peripherals
-                    .iter()
-                    .map(|p| format!("soc_has_{p}")),
-            );
+            all.extend(self.device.peripherals.iter().map(|p| p.symbol_name()));
             all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device

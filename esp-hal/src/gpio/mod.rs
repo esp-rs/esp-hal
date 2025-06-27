@@ -5,7 +5,7 @@
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
 #![cfg_attr(
-    soc_has_etm,
+    soc_has_soc_etm,
     doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
 )]
 #![doc = ""]
@@ -54,7 +54,7 @@
 crate::unstable_module! {
     pub mod interconnect;
 
-    #[cfg(soc_has_etm)]
+    #[cfg(soc_has_soc_etm)]
     pub mod etm;
 
     #[cfg(soc_has_lp_io)]
@@ -80,7 +80,7 @@ pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
+    peripherals::{impl_for_pin_type, io_mux_reg, Interrupt, GPIO, IO_MUX},
     private::{self, Sealed},
 };
 

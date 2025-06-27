@@ -24,7 +24,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    sync::{RawMutex, lock},
+    sync::{lock, RawMutex},
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
@@ -99,7 +99,7 @@ impl<'d> SystemTimer<'d> {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
-        #[cfg(soc_has_etm)]
+        #[cfg(soc_has_soc_etm)]
         etm::enable_etm();
 
         Self {
@@ -661,7 +661,7 @@ mod asynch {
     }
 }
 
-#[cfg(soc_has_etm)]
+#[cfg(soc_has_soc_etm)]
 pub mod etm {
     //! # Event Task Matrix Function
     //!
