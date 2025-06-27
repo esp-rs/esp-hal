@@ -21,6 +21,8 @@ pub struct Pins<'d> {
 impl<'d> Pins<'d> {
     /// Creates a new [Pins] from the provided GPIO pins.
     ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// use esp_hal::sdio::{Mode, Pins};
@@ -34,6 +36,8 @@ impl<'d> Pins<'d> {
     ///     peripherals.GPIO22, // DAT2
     ///     peripherals.GPIO23, // DAT3/#CS
     /// );
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(
         mode: Mode,
