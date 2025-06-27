@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `log` feature has been renamed to `log-04` (#3675)
 - `defmt` and `log-04` can no longer be selected at the same time (#3675)
+- A chip feature (e.g. `esp32`) is now required (#3688)
 
 ### Fixed
 
