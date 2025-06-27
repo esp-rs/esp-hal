@@ -17,8 +17,9 @@ MEMORY
   vectors_seg ( RX )     : ORIGIN = 0x40080000, len =  1k /* SRAM0 */
   iram_seg ( RX )        : ORIGIN = 0x40080400, len = 128k-0x400 /* SRAM0 */
 
-  reserved_for_rom_seg   : ORIGIN = 0x3FFAE000, len = 8k /* SRAM2; reserved for usage by the ROM */
-  dram_seg ( RW )        : ORIGIN = 0x3FFB0000 + RESERVE_DRAM, len = 176k - RESERVE_DRAM /* SRAM2+1; first 64kB used by BT if enable */
+  /* 8K reserved for usage by the ROM */
+  /* first 64kB used by BT if enable */
+  dram_seg ( RW )        : ORIGIN = 0x3FFAE000 + 8K + RESERVE_DRAM, len = 192K - RESERVE_DRAM
 
   /*
   * The following values come from the heap allocator in esp-idf: https://github.com/espressif/esp-idf/blob/ab63aaa4a24a05904da2862d627f3987ecbeafd0/components/heap/port/esp32/memory_layout.c#L137-L157
