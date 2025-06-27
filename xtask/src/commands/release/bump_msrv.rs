@@ -21,10 +21,6 @@ pub struct BumpMsrvArgs {
     /// Don't actually change any files
     #[arg(long)]
     pub dry_run: bool,
-
-    /// Don't automatically include crates which depend on the given crates
-    #[arg(long)]
-    pub non_recursive: bool,
 }
 
 /// Bump the MSRV
@@ -49,9 +45,7 @@ pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
     let mut to_process = args.packages.clone();
 
     // add crates which depend on any of the packages to bump
-    if !args.non_recursive {
-        add_dependent_crates(workspace, &mut to_process)?;
-    }
+    add_dependent_crates(workspace, &mut to_process)?;
 
     // don't process crates which are not published
     let to_process: Vec<Package> = to_process
