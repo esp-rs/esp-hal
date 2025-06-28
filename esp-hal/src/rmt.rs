@@ -1585,8 +1585,6 @@ pub trait ChannelInternal: RawChannelAccess {
 
     fn set_memsize(&self, value: MemSize);
 
-    fn is_error(&self) -> bool;
-
     #[inline]
     fn channel_ram_start(&self) -> *mut u32 {
         unsafe {
@@ -1619,10 +1617,6 @@ pub trait TxChannelInternal: ChannelInternal {
     // Return the first flag that is set of, in order of decreasing priority,
     // Event::Error, Event::End, Event::Threshold
     fn get_tx_status(&self) -> Option<Event>;
-
-    fn is_tx_done(&self) -> bool;
-
-    fn is_tx_threshold_set(&self) -> bool;
 
     fn reset_tx_threshold_set(&self);
 
@@ -1690,8 +1684,6 @@ pub trait RxChannelInternal: ChannelInternal {
     // Return the first flag that is set of, in order of decreasing priority,
     // Event::Error, Event::End, Event::Threshold
     fn get_rx_status(&self) -> Option<Event>;
-
-    fn is_rx_done(&self) -> bool;
 
     fn start_receive(&self) {
         self.clear_rx_interrupts();
@@ -1873,18 +1865,6 @@ mod chip_specific {
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             }
         }
-
-        fn is_error(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            let int_raw = rmt.int_raw().read();
-            let ch_idx = ch_idx(self);
-
-            if A::Dir::is_tx() {
-                int_raw.ch_tx_err(ch_idx).bit()
-            } else {
-                int_raw.ch_rx_err(ch_idx).bit()
-            }
-        }
     }
 
     impl<A> TxChannelInternal for A
@@ -1981,16 +1961,6 @@ mod chip_specific {
             } else {
                 None
             }
-        }
-
-        fn is_tx_done(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_tx_end(self.channel()).bit()
-        }
-
-        fn is_tx_threshold_set(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_tx_thr_event(self.channel()).bit()
         }
 
         fn reset_tx_threshold_set(&self) {
@@ -2110,12 +2080,6 @@ mod chip_specific {
             } else {
                 None
             }
-        }
-
-        fn is_rx_done(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self);
-            rmt.int_raw().read().ch_rx_end(ch_idx).bit()
         }
 
         fn stop_rx(&self) {
@@ -2241,11 +2205,6 @@ mod chip_specific {
             rmt.chconf0(self.channel() as usize)
                 .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
         }
-
-        fn is_error(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_err(self.channel()).bit()
-        }
     }
 
     impl<A> TxChannelInternal for A
@@ -2346,16 +2305,6 @@ mod chip_specific {
             } else {
                 None
             }
-        }
-
-        fn is_tx_done(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_tx_end(self.channel()).bit()
-        }
-
-        fn is_tx_threshold_set(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_tx_thr_event(self.channel()).bit()
         }
 
         fn reset_tx_threshold_set(&self) {
@@ -2467,11 +2416,6 @@ mod chip_specific {
             } else {
                 None
             }
-        }
-
-        fn is_rx_done(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_rx_end(self.channel()).bit()
         }
 
         fn stop_rx(&self) {
