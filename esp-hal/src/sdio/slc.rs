@@ -1,4 +1,3 @@
-use super::PeripheralInstance;
 use crate::pac::slc;
 
 crate::any_peripheral! {
@@ -16,32 +15,17 @@ pub struct SlcInfo {
 
 unsafe impl Sync for SlcInfo {}
 
-impl PeripheralInstance for AnySlc<'_> {
-    type Info = SlcInfo;
-
-    fn info(&self) -> &'static Self::Info {
-        static INFO: SlcInfo = SlcInfo {
-            register_block: crate::peripherals::SLC::ptr(),
-        };
-
-        &INFO
-    }
-}
-
-impl PeripheralInstance for crate::peripherals::SLC<'_> {
-    type Info = SlcInfo;
-
-    fn info(&self) -> &'static Self::Info {
-        static INFO: SlcInfo = SlcInfo {
-            register_block: crate::peripherals::SLC::ptr(),
-        };
-
-        &INFO
-    }
-}
-
 /// A peripheral singleton compatible with the SDIO SLC driver.
-pub trait SlcInstance: PeripheralInstance + IntoAnySlc {}
+pub trait SlcInstance: IntoAnySlc {
+    /// Gets a static reference the the [SlcInfo].
+    fn info(&self) -> &'static SlcInfo {
+        static INFO: SlcInfo = SlcInfo {
+            register_block: crate::peripherals::SLC::ptr(),
+        };
+
+        &INFO
+    }
+}
 
 impl SlcInstance for AnySlc<'_> {}
 impl SlcInstance for crate::peripherals::SLC<'_> {}

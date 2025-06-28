@@ -1,4 +1,3 @@
-use super::PeripheralInstance;
 use crate::pac::hinf;
 
 crate::any_peripheral! {
@@ -16,32 +15,17 @@ pub struct HinfInfo {
 
 unsafe impl Sync for HinfInfo {}
 
-impl PeripheralInstance for AnyHinf<'_> {
-    type Info = HinfInfo;
-
-    fn info(&self) -> &'static Self::Info {
-        static INFO: HinfInfo = HinfInfo {
-            register_block: crate::peripherals::HINF::ptr(),
-        };
-
-        &INFO
-    }
-}
-
-impl PeripheralInstance for crate::peripherals::HINF<'_> {
-    type Info = HinfInfo;
-
-    fn info(&self) -> &'static Self::Info {
-        static INFO: HinfInfo = HinfInfo {
-            register_block: crate::peripherals::HINF::ptr(),
-        };
-
-        &INFO
-    }
-}
-
 /// A peripheral singleton compatible with the SDIO HINF driver.
-pub trait HinfInstance: PeripheralInstance + IntoAnyHinf {}
+pub trait HinfInstance: IntoAnyHinf {
+    /// Gets a static reference the the [HinfInfo].
+    fn info(&self) -> &'static HinfInfo {
+        static INFO: HinfInfo = HinfInfo {
+            register_block: crate::peripherals::HINF::ptr(),
+        };
+
+        &INFO
+    }
+}
 
 impl HinfInstance for AnyHinf<'_> {}
 impl HinfInstance for crate::peripherals::HINF<'_> {}
