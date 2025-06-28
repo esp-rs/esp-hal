@@ -4,12 +4,6 @@
 PROVIDE(interrupt0 = DefaultHandler);
 
 SECTIONS {
-  .trap : ALIGN(4)
-  {
-    KEEP(*(.trap));
-    *(.trap.*);
-  } > RWTEXT
-
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
