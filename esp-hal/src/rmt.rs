@@ -1004,13 +1004,17 @@ where
         let raw = self.channel.raw;
         let memsize = raw.memsize().codes();
 
-        while !self.remaining_data.is_empty() {
+        loop {
             // wait for TX-THR
             while !raw.is_tx_threshold_set() {
                 if raw.is_tx_done() {
-                    // Unexpectedly done, even though we have data left: For example, this could
-                    // happen if there is a stop code inside the data and not just at the end.
-                    return Err((Error::TransmissionError, self.channel));
+                    if !self.remaining_data.is_empty() {
+                        // Unexpectedly done, even though we have data left: For example, this could
+                        // happen if there is a stop code inside the data and not just at the end.
+                        return Err((Error::TransmissionError, self.channel));
+                    } else {
+                        return Ok(self.channel);
+                    }
                 }
                 if raw.is_error() {
                     // Not sure that this can happen? In any case, be sure that we don't lock up
@@ -1020,41 +1024,31 @@ where
             }
             raw.reset_tx_threshold_set();
 
-            // re-fill TX RAM
-            let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
-            let count = self.remaining_data.len().min(memsize / 2);
-            let (chunk, remaining) = self.remaining_data.split_at(count);
-            for (idx, entry) in chunk.iter().enumerate() {
-                unsafe {
-                    ptr.add(idx).write_volatile(*entry);
+            if !self.remaining_data.is_empty() {
+                // re-fill TX RAM
+                let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
+                let count = self.remaining_data.len().min(memsize / 2);
+                let (chunk, remaining) = self.remaining_data.split_at(count);
+                for (idx, entry) in chunk.iter().enumerate() {
+                    unsafe {
+                        ptr.add(idx).write_volatile(*entry);
+                    }
                 }
-            }
 
-            // If count == memsize / 2 codes were written, update ram_index as
-            // - 0 -> memsize / 2
-            // - memsize / 2 -> 0
-            // Otherwise, for count < memsize / 2, the new position is invalid but the new
-            // slice is empty and we won't use ram_index again.
-            self.ram_index = memsize / 2 - self.ram_index;
-            self.remaining_data = remaining;
-            debug_assert!(
-                self.ram_index == 0
-                    || self.ram_index == memsize / 2
-                    || self.remaining_data.is_empty()
-            );
-        }
-
-        loop {
-            if raw.is_error() {
-                return Err((Error::TransmissionError, self.channel));
-            }
-
-            if raw.is_tx_done() {
-                break;
+                // If count == memsize / 2 codes were written, update ram_index as
+                // - 0 -> memsize / 2
+                // - memsize / 2 -> 0
+                // Otherwise, for count < memsize / 2, the new position is invalid but the new
+                // slice is empty and we won't use ram_index again.
+                self.ram_index = memsize / 2 - self.ram_index;
+                self.remaining_data = remaining;
+                debug_assert!(
+                    self.ram_index == 0
+                        || self.ram_index == memsize / 2
+                        || self.remaining_data.is_empty()
+                );
             }
         }
-
-        Ok(self.channel)
     }
 }
 
