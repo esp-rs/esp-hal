@@ -1398,14 +1398,8 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
         let raw = self.channel.raw;
 
         raw.set_tx_continuous(false);
+        raw.stop_tx();
         raw.update();
-
-        let ptr = raw.channel_ram_start();
-        for idx in 0..raw.memsize().codes() {
-            unsafe {
-                ptr.add(idx).write_volatile(PulseCode::end_marker());
-            }
-        }
 
         loop {
             match raw.get_tx_status() {
@@ -2184,7 +2178,6 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.tx_start().set_bit()
             });
-            self.update();
         }
 
         #[inline]
@@ -2225,7 +2218,6 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_conf0(self.channel().into())
                 .modify(|_, w| w.tx_stop().set_bit());
-            self.update();
         }
 
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
@@ -2573,7 +2565,14 @@ mod chip_specific {
         }
 
         #[cfg(esp32)]
-        fn stop_tx(&self) {}
+        fn stop_tx(&self) {
+            let ptr = self.channel_ram_start();
+            for idx in 0..self.memsize().codes() {
+                unsafe {
+                    ptr.add(idx).write_volatile(super::PulseCode::end_marker());
+                }
+            }
+        }
 
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
