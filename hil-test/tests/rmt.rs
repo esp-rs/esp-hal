@@ -119,7 +119,11 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
     };
 
     if let Some(rx_count) = rx_count {
-        assert_eq!(rx_count, expected_rx_len, "unexpected rx count");
+        assert_eq!(
+            rx_count, expected_rx_len,
+            "unexpected rx count {} != {}",
+            rx_count, expected_rx_len,
+        );
     }
 
     let mut errors: usize = 0;
@@ -162,9 +166,11 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
 
     assert!(
         errors == 0,
-        "rx/tx code mismatch at {}/{} indices",
+        "rx/tx code mismatch at {}/{} indices (First: tx={:?}, rx={:?})",
         errors,
-        tx.len() - 2
+        tx.len() - 2,
+        tx.first(),
+        rx.first(),
     );
 }
 
