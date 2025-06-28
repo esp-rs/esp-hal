@@ -41,16 +41,6 @@ pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
 pub use state::State;
 pub use timing::Timing;
 
-/// SDIO peripheral instance.
-pub trait PeripheralInstance: crate::private::Sealed {
-    /// Represents the peripheral information type containing the register
-    /// block.
-    type Info;
-
-    /// Gets a static shared reference to the peripheral information.
-    fn info(&self) -> &'static Self::Info;
-}
-
 /// Represents the transmission modes for the SDIO peripheral.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
