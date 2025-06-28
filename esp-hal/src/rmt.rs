@@ -1438,15 +1438,16 @@ impl<Raw> core::future::Future for RmtRxFuture<Raw>
 where
     Raw: RxChannelInternal,
 {
-    type Output = ();
+    type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         WAKER[self.raw.channel() as usize].register(ctx.waker());
-        if self.raw.is_error() || self.raw.is_rx_done() {
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+
+        match self.raw.get_rx_status() {
+            Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
+            Some(Event::End) => Poll::Ready(Ok(())),
+            _ => Poll::Pending,
         }
     }
 }
@@ -1480,11 +1481,9 @@ where
         raw.listen_rx_interrupt(Event::End | Event::Error);
         raw.start_receive();
 
-        (RmtRxFuture { raw }).await;
+        let result = (RmtRxFuture { raw }).await;
 
-        if raw.is_error() {
-            Err(Error::ReceiverError)
-        } else {
+        if result.is_ok() {
             raw.stop_rx();
             raw.clear_rx_interrupts();
             raw.update();
@@ -1494,9 +1493,9 @@ where
             for (idx, entry) in data.iter_mut().take(len).enumerate() {
                 *entry = unsafe { ptr.add(idx).read_volatile().into() };
             }
-
-            Ok(())
         }
+
+        result
     }
 }
 
