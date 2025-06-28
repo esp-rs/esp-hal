@@ -1312,13 +1312,11 @@ impl ContinuousTxTransaction {
         let raw = self.channel.raw;
 
         raw.set_tx_continuous(false);
+        let immediate = raw.stop_tx();
         raw.update();
 
-        let ptr = raw.channel_ram_start();
-        for idx in 0..raw.memsize().codes() {
-            unsafe {
-                ptr.add(idx).write_volatile(PulseCode::end_marker());
-            }
+        if immediate {
+            return Ok(self.channel);
         }
 
         loop {
@@ -1972,7 +1970,6 @@ mod chip_specific {
                 w.apb_mem_rst().set_bit();
                 w.tx_start().set_bit()
             });
-            self.update();
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -2014,13 +2011,17 @@ mod chip_specific {
             rmt.int_raw().read().ch_tx_loop(self.channel()).bit()
         }
 
-        #[allow(unused)]
+        // Returns whether stopping was immediate, or needs to wait for tx end.
+        // Due to inlining, the compiler should be able to eliminate code in the caller that
+        // depends on this.
+        //
+        // Requires an update() call
         #[inline]
-        pub fn stop_tx(&self) {
+        pub fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.ch_tx_conf0(self.channel().into())
                 .modify(|_, w| w.tx_stop().set_bit());
-            self.update();
+            true
         }
 
         #[inline]
@@ -2398,19 +2399,29 @@ mod chip_specific {
             false
         }
 
+        // Returns whether stopping was immediate, or needs to wait for tx end
+        // Due to inlining, the compiler should be able to eliminate code in the caller that
+        // depends on this.
         #[cfg(esp32s2)]
-        #[allow(unused)]
         #[inline]
-        pub fn stop_tx(&self) {
+        pub fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
             rmt.chconf1(self.ch_idx as usize)
                 .modify(|_, w| w.tx_stop().set_bit());
+            true
         }
 
         #[cfg(esp32)]
-        #[allow(unused)]
         #[inline]
-        pub fn stop_tx(&self) {}
+        pub fn stop_tx(&self) -> bool {
+            let ptr = self.channel_ram_start();
+            for idx in 0..self.memsize().codes() {
+                unsafe {
+                    ptr.add(idx).write_volatile(super::PulseCode::end_marker());
+                }
+            }
+            false
+        }
 
         #[inline]
         pub fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
