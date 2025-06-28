@@ -24,7 +24,6 @@ INCLUDE "fixups/rtc_fast_rwdata_dummy.x"
 
 /* Shared sections - ordering matters */
 SECTIONS {
-  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }

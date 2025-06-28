@@ -1,3 +1,11 @@
+#IF riscv
+.trap : ALIGN(4)
+{
+  KEEP(*(.trap));
+  *(.trap.*);
+} > RWTEXT
+#ENDIF
+
 .rwtext : ALIGN(4)
 {
   . = ALIGN (4);
