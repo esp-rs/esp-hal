@@ -2307,6 +2307,7 @@ impl Channel<'_, Blocking, Tx> {
 }
 
 /// RX transaction instance
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 pub struct RxTransaction<'ch, 'a, D, T>
 where
     D: Iterator<Item = &'a mut T>,
