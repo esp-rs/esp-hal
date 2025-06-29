@@ -1433,6 +1433,7 @@ impl Channel<Blocking, Tx> {
 }
 
 /// RX transaction instance
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 pub struct RxTransaction<'a, T>
 where
     T: From<PulseCode>,
