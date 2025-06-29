@@ -303,6 +303,7 @@ input_signals = [
     { name = "PCMCLK",               id = 205 },
     { name = "PCMDIN",               id = 206 },
 
+    { name = "SD_CMD" },
     { name = "SD_DATA0" },
     { name = "SD_DATA1" },
     { name = "SD_DATA2" },
