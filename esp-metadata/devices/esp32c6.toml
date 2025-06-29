@@ -65,6 +65,7 @@ peripherals = [
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "SHA", interrupts = { peri = "SHA" } },
+    { name = "SLC" },
     { name = "SLCHOST" },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
