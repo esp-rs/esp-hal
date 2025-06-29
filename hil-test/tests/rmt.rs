@@ -141,8 +141,8 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     )
     .await;
 
-    assert!(tx_res.is_ok());
-    assert!(rx_res.is_ok());
+    tx_res.unwrap();
+    rx_res.unwrap();
 
     // the last two pulse-codes are the ones which wait for the timeout so
     // they can't be equal
