@@ -113,7 +113,7 @@ impl PinGuard {
         }
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(any(esp32, esp32s2, esp32c6))]
     pub(crate) fn pin_number(&self) -> Option<u8> {
         if self.pin == u8::MAX {
             None
