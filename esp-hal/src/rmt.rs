@@ -273,12 +273,12 @@ pub enum Error {
 
 ///  Convenience newtype to work with pulse codes.
 // FIXME: Add More derives
-#[derive(Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Default, Eq, PartialEq)]
 #[repr(transparent)]
 pub struct PulseCode(u32);
 
-const LEVEL2_SHIFT: usize = 16;
 const LEVEL1_SHIFT: usize = 0;
+const LEVEL2_SHIFT: usize = 16;
 
 impl PulseCode {
     /// Create a new instance.
@@ -295,15 +295,15 @@ impl PulseCode {
     ) -> Self {
         let mut code = 0;
 
-        if matches!(level2, Level::High) {
-            code |= 1 << (LEVEL2_SHIFT + 15);
-        }
-        code |= (length2 as u32) << LEVEL2_SHIFT;
-
         if matches!(level1, Level::High) {
             code |= 1 << (LEVEL1_SHIFT + 15);
         }
         code |= (length1 as u32) << LEVEL1_SHIFT;
+
+        if matches!(level2, Level::High) {
+            code |= 1 << (LEVEL2_SHIFT + 15);
+        }
+        code |= (length2 as u32) << LEVEL2_SHIFT;
 
         Self(code)
     }
@@ -314,16 +314,10 @@ impl PulseCode {
     /// will be clamped.
     #[inline]
     pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        let length1 = if 0 != (length1 & 0x8000) {
-            0x7FFF
-        } else {
-            length1
-        };
-        let length2 = if 0 != (length2 & 0x8000) {
-            0x7FFF
-        } else {
-            length2
-        };
+        // Can't use lengthX.min(0x7FFF) since it is not const
+        let length1 = if length1 >= 0x8000 { 0x7FFF } else { length1 };
+        let length2 = if length2 >= 0x8000 { 0x7FFF } else { length2 };
+
         // SAFETY:
         // - We just clamped length1 and length2 to the required intervals
         unsafe { Self::new_unchecked(level1, length1, level2, length2) }
@@ -335,7 +329,7 @@ impl PulseCode {
     /// will return `None`.
     #[inline]
     pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
-        if 0 != (length1 & 0x8000) || 0 != (length2 & 0x8000) {
+        if length1 >= 0x8000 || length2 >= 0x8000 {
             return None;
         }
 
@@ -345,7 +339,7 @@ impl PulseCode {
     }
 
     /// Create a new empty instance
-    // FIXME: add level argument
+    // FIXME: Consider adding a `level` argument
     #[inline]
     pub const fn end_marker() -> Self {
         Self(0)
@@ -355,23 +349,6 @@ impl PulseCode {
     #[inline]
     pub fn reset(&mut self) {
         self.0 = 0
-    }
-
-    /// Logical output level in the second pulse code interval
-    #[inline]
-    pub const fn level2(&self) -> Level {
-        // Can't use Level::from(bool) since it is non-const
-        if 0 != (self.0 & (1 << (LEVEL2_SHIFT + 15))) {
-            Level::High
-        } else {
-            Level::Low
-        }
-    }
-
-    /// Length of the second pulse code interval (in clock cycles)
-    #[inline]
-    pub const fn length2(&self) -> u16 {
-        ((self.0 >> LEVEL2_SHIFT) & 0x7FFF) as u16
     }
 
     /// Logical output level in the first pulse code interval
@@ -385,21 +362,27 @@ impl PulseCode {
         }
     }
 
+    /// Logical output level in the second pulse code interval
+    #[inline]
+    pub const fn level2(&self) -> Level {
+        // Can't use Level::from(bool) since it is non-const
+        if 0 != (self.0 & (1 << (LEVEL2_SHIFT + 15))) {
+            Level::High
+        } else {
+            Level::Low
+        }
+    }
+
     /// Length of the first pulse code interval (in clock cycles)
     #[inline]
     pub const fn length1(&self) -> u16 {
         ((self.0 >> LEVEL1_SHIFT) & 0x7FFF) as u16
     }
 
-    /// Set level2
+    /// Length of the second pulse code interval (in clock cycles)
     #[inline]
-    pub const fn with_level2(mut self, level: Level) -> Self {
-        if matches!(level, Level::High) {
-            self.0 |= 1 << (LEVEL2_SHIFT + 15);
-        } else {
-            self.0 &= !(1 << (LEVEL2_SHIFT + 15));
-        }
-        self
+    pub const fn length2(&self) -> u16 {
+        ((self.0 >> LEVEL2_SHIFT) & 0x7FFF) as u16
     }
 
     /// Set level1
@@ -413,28 +396,39 @@ impl PulseCode {
         self
     }
 
-    /// Set length2
+    /// Set level2
     #[inline]
-    pub const fn with_length2(mut self, length: u16) -> Option<Self> {
-        if 0 != (length & 0x8000) {
-            None
+    pub const fn with_level2(mut self, level: Level) -> Self {
+        if matches!(level, Level::High) {
+            self.0 |= 1 << (LEVEL2_SHIFT + 15);
         } else {
-            self.0 &= !(0x7FFF << LEVEL2_SHIFT);
-            self.0 |= (length as u32) << LEVEL2_SHIFT;
-            Some(self)
+            self.0 &= !(1 << (LEVEL2_SHIFT + 15));
         }
+        self
     }
 
     /// Set length1
     #[inline]
     pub const fn with_length1(mut self, length: u16) -> Option<Self> {
-        if 0 != (length & 0x8000) {
-            None
-        } else {
-            self.0 &= !(0x7FFF << LEVEL1_SHIFT);
-            self.0 |= (length as u32) << LEVEL1_SHIFT;
-            Some(self)
+        if length >= 0x8000 {
+            return None;
         }
+
+        self.0 &= !(0x7FFF << LEVEL1_SHIFT);
+        self.0 |= (length as u32) << LEVEL1_SHIFT;
+        Some(self)
+    }
+
+    /// Set length2
+    #[inline]
+    pub const fn with_length2(mut self, length: u16) -> Option<Self> {
+        if length >= 0x8000 {
+            return None;
+        }
+
+        self.0 &= !(0x7FFF << LEVEL2_SHIFT);
+        self.0 |= (length as u32) << LEVEL2_SHIFT;
+        Some(self)
     }
 
     /// Convert to u32
