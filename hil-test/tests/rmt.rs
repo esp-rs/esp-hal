@@ -152,7 +152,10 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
-    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let tx_config = TxChannelConfig::default()
+        .with_idle_output_level(Level::Low)
+        .with_idle_output(true)
+        .with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
@@ -188,7 +191,10 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
 
-    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let tx_config = TxChannelConfig::default()
+        .with_idle_output_level(Level::Low)
+        .with_idle_output(true)
+        .with_memsize(tx_memsize);
     let rx_config = RxChannelConfig::default()
         .with_idle_threshold(1000)
         .with_memsize(rx_memsize);
