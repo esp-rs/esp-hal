@@ -77,7 +77,7 @@ async fn main(spawner: Spawner) {
         )))
         .unwrap();
 
-    let mut data: [PulseCode; 48] = [PulseCode::end_marker(); 48];
+    let mut data = [PulseCode::end_marker(); 48];
 
     loop {
         println!("receive");

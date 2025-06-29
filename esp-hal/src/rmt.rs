@@ -1164,9 +1164,10 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
-pub struct SingleShotTxTransaction<'a, Raw>
+pub struct SingleShotTxTransaction<'a, Raw, T>
 where
     Raw: TxChannelInternal,
+    T: Into<PulseCode> + Copy,
 {
     channel: Channel<Blocking, Raw>,
 
@@ -1176,12 +1177,13 @@ where
     ram_index: usize,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'a [PulseCode],
+    remaining_data: &'a [T],
 }
 
-impl<Raw> SingleShotTxTransaction<'_, Raw>
+impl<Raw, T> SingleShotTxTransaction<'_, Raw, T>
 where
     Raw: TxChannelInternal,
+    T: Into<PulseCode> + Copy,
 {
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
@@ -1198,7 +1200,7 @@ where
                 let (chunk, remaining) = self.remaining_data.split_at(count);
                 for (idx, entry) in chunk.iter().enumerate() {
                     unsafe {
-                        ptr.add(idx).write_volatile(*entry);
+                        ptr.add(idx).write_volatile((*entry).into());
                     }
                 }
 
@@ -1286,7 +1288,7 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
         let ptr = raw.channel_ram_start();
         for idx in 0..raw.memsize().codes() {
             unsafe {
-                ptr.add(idx).write_volatile(0);
+                ptr.add(idx).write_volatile(PulseCode::end_marker());
             }
         }
 
@@ -1420,25 +1422,31 @@ pub trait TxChannel: Sized {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit(self, data: &[PulseCode]) -> Result<SingleShotTxTransaction<'_, Self::Raw>, Error>;
+    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Self::Raw, T>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 
     /// Start transmitting the given pulse code continuously.
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously(
+    fn transmit_continuously<T>(
         self,
-        data: &[PulseCode],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>;
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount(
+    fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
-        data: &[PulseCode],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>;
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 }
 
 impl<Raw> TxChannel for Channel<Blocking, Raw>
@@ -1447,7 +1455,10 @@ where
 {
     type Raw = Raw;
 
-    fn transmit(self, data: &[PulseCode]) -> Result<SingleShotTxTransaction<'_, Raw>, Error> {
+    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Raw, T>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         let index = self.raw.start_send(data, false, 0)?;
         Ok(SingleShotTxTransaction {
             channel: self,
@@ -1457,15 +1468,21 @@ where
         })
     }
 
-    fn transmit_continuously(self, data: &[PulseCode]) -> Result<ContinuousTxTransaction<Raw>, Error> {
+    fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction<Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         self.transmit_continuously_with_loopcount(0, data)
     }
 
-    fn transmit_continuously_with_loopcount(
+    fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
-        data: &[PulseCode],
-    ) -> Result<ContinuousTxTransaction<Raw>, Error> {
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         if data.len() > self.raw.memsize().codes() {
             return Err(Error::Overflow);
         }
@@ -1476,12 +1493,19 @@ where
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, Raw: RxChannelInternal> {
+pub struct RxTransaction<'a, Raw: RxChannelInternal, T>
+where
+    T: From<PulseCode>,
+{
     channel: Channel<Blocking, Raw>,
-    data: &'a mut [PulseCode],
+    data: &'a mut [T],
 }
 
-impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
+impl<Raw, T> RxTransaction<'_, Raw, T>
+where
+    Raw: RxChannelInternal,
+    T: From<PulseCode>,
+{
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
 
@@ -1496,7 +1520,7 @@ impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
             // SAFETY: RxChannel.receive() verifies that the length of self.data does not
             // exceed the channel RAM size.
             for (idx, entry) in self.data.iter_mut().enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile() };
+                *entry = unsafe { ptr.add(idx).read_volatile() }.into();
             }
         }
 
@@ -1541,7 +1565,9 @@ pub trait RxChannel: Sized {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive(self, data: &mut [PulseCode]) -> Result<RxTransaction<'_, Self::Raw>, Error>;
+    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, Self::Raw, T>, Error>
+    where
+        T: From<PulseCode>;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
@@ -1550,9 +1576,10 @@ where
 {
     type Raw = Raw;
 
-    fn receive(self, data: &mut [PulseCode]) -> Result<RxTransaction<'_, Self::Raw>, Error>
+    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, Self::Raw, T>, Error>
     where
         Self: Sized,
+        T: From<PulseCode>,
     {
         if data.len() > self.raw.memsize().codes() {
             return Err(Error::InvalidDataLength);
@@ -1786,11 +1813,14 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
-    fn start_send(&self, data: &[PulseCode], continuous: bool, repeat: u16) -> Result<usize, Error> {
+    fn start_send<T>(&self, data: &[T], continuous: bool, repeat: u16) -> Result<usize, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         self.clear_tx_interrupts();
 
         if let Some(last) = data.last() {
-            if !continuous && last.length2() != 0 && last.length1() != 0 {
+            if !continuous && !(*last).into().is_end_marker() {
                 return Err(Error::EndMarkerMissing);
             }
         } else {
@@ -1801,7 +1831,7 @@ pub trait TxChannelInternal: ChannelInternal {
         let memsize = self.memsize().codes();
         for (idx, entry) in data.iter().take(memsize).enumerate() {
             unsafe {
-                ptr.add(idx).write_volatile(*entry);
+                ptr.add(idx).write_volatile((*entry).into());
             }
         }
 
