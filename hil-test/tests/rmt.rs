@@ -199,8 +199,8 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     )
     .await;
 
-    assert!(tx_res.is_ok());
-    assert!(rx_res.is_ok());
+    tx_res.unwrap();
+    rx_res.unwrap();
 
     check_data_eq(&tx_data, &rcv_data);
 }
