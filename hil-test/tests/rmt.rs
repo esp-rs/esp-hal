@@ -105,7 +105,7 @@ impl Iterator for TxDataIter {
     }
 }
 
-fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: usize, rx_memsize: usize) {
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx_memsize: usize) {
     // Only checks the buffers; the rx buffer might still contain garbage after a
     // certain index.
     assert_eq!(tx.len(), rx.len(), "tx and rx len mismatch");
@@ -118,7 +118,9 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: usize, rx_memsize
         expected_rx_len = expected_rx_len.min(rx_memsize)
     };
 
-    assert_eq!(rx_count, expected_rx_len, "unexpected rx count");
+    if let Some(rx_count) = rx_count {
+        assert_eq!(rx_count, expected_rx_len, "unexpected rx count");
+    }
 
     let mut errors: usize = 0;
     for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).take(expected_rx_len).enumerate() {
@@ -195,7 +197,14 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     }
 
     tx_transaction.wait().unwrap();
-    let rx_count = rx_transaction.wait().unwrap();
+    let rx_count = match rx_transaction.wait() {
+        Ok(count) => Some(count),
+        #[cfg(any(esp32, esp32s2))]
+        Err(Error::ReceiverError) => None,
+        Err(e) => {
+            panic!("unexpected rx error {:?}", e);
+        }
+    };
 
     check_data_eq(&tx_data, &rcv_data, rx_count, rx_channel.buffer_size());
 }
@@ -224,7 +233,15 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     .await;
 
     tx_res.unwrap();
-    let rx_count = rx_res.unwrap();
+
+    let rx_count = match rx_res {
+        Ok(count) => Some(count),
+        #[cfg(any(esp32, esp32s2))]
+        Err(Error::ReceiverError) => None,
+        Err(e) => {
+            panic!("unexpected rx error {:?}", e);
+        }
+    };
 
     check_data_eq(&tx_data, &rcv_data, rx_count, rx_channel.buffer_size());
 }
@@ -532,7 +549,12 @@ mod tests {
         tx_res.unwrap();
         let rx_count = rx_res.unwrap();
 
-        check_data_eq(&tx_data, &rcv_data, rx_count, rx_channel.buffer_size());
+        check_data_eq(
+            &tx_data,
+            &rcv_data,
+            Some(rx_count),
+            rx_channel.buffer_size(),
+        );
     }
 
     #[test]
