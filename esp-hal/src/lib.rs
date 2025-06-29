@@ -235,6 +235,8 @@ pub mod i2c;
 pub mod peripheral;
 #[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
+#[cfg(all(feature = "unstable", sd_slave))]
+pub mod sdio;
 #[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
 pub mod spi;
 pub mod system;

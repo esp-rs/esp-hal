@@ -79,6 +79,7 @@ crate::peripherals! {
         RNG <= RNG,
         RSA <= RSA,
         SHA <= SHA,
+        SLC <= SLC,
         SLCHOST <= SLCHOST,
         SOC_ETM <= SOC_ETM,
         SPI0 <= SPI0,
