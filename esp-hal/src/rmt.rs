@@ -557,6 +557,8 @@ impl RmtWriter {
 
     // TODO: better check that hw ptr matches expectation when done! that also helps
     // with underruns
+    // FIXME: degrade, then no inline
+    #[inline(never)]
     fn write(
         &mut self,
         data: &mut impl Iterator<Item: Borrow<PulseCode>>,
