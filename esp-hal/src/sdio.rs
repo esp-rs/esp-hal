@@ -207,7 +207,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn pac_init(&mut self) -> Result<(), Error> {
         let slc = self.slc_block();
 
@@ -233,7 +233,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    #[cfg(feature = "esp32c6")]
+    #[cfg(esp32c6)]
     fn pac_init(&mut self) -> Result<(), Error> {
         let slc = self.slc_block();
 
@@ -259,7 +259,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets the high-speed supported bit to be read by the host.
-    #[cfg(any(feature = "esp32", feature = "esp32c6"))]
+    #[cfg(any(esp32, esp32c6))]
     fn pac_enable_hs(&mut self) -> Result<(), Error> {
         self.hinf_block()
             .cfg_data1()
@@ -311,7 +311,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets which device interrupts to enable based on the provided mask.
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
         self.slc_block()._0int_ena().modify(|_, w| {
             w.frhost_bit0_int_ena().variant(mask.general0());
@@ -328,7 +328,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets which device interrupts to enable based on the provided mask.
-    #[cfg(feature = "esp32c6")]
+    #[cfg(esp32c6)]
     fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
         self.slc_block().slc0int_ena().modify(|_, w| {
             w.sdio_slc_frhost_bit0_int_ena().variant(mask.general0());
