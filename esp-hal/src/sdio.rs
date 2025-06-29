@@ -18,10 +18,7 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
-use crate::{
-    gpio::{InputConfig, OutputConfig, Pull},
-    pac,
-};
+use crate::pac;
 
 mod config;
 mod hinf;
@@ -83,7 +80,7 @@ pub struct Sdio<'d> {
     slc: AnySlc<'d>,
     slchost: AnySlchost<'d>,
     hinf: AnyHinf<'d>,
-    pins: Pins<'d>,
+    pins: Pins,
     config: Config,
     state: State,
 }
@@ -123,7 +120,7 @@ impl<'d> Sdio<'d> {
         slc: impl SlcInstance + 'd,
         slchost: impl SlchostInstance + 'd,
         hinf: impl HinfInstance + 'd,
-        pins: Pins<'d>,
+        pins: Pins,
         config: Config,
     ) -> Self {
         Self {
@@ -167,7 +164,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Gets a reference to the [Pins] information.
-    pub const fn pins(&self) -> &Pins<'_> {
+    pub const fn pins(&self) -> &Pins {
         &self.pins
     }
 
@@ -210,7 +207,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn pac_init(&mut self) -> Result<(), Error> {
         let slc = self.slc_block();
 
@@ -236,7 +233,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
-    #[cfg(feature = "esp32c6")]
+    #[cfg(esp32c6)]
     fn pac_init(&mut self) -> Result<(), Error> {
         let slc = self.slc_block();
 
@@ -262,7 +259,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets the high-speed supported bit to be read by the host.
-    #[cfg(any(feature = "esp32", feature = "esp32c6"))]
+    #[cfg(any(esp32, esp32c6))]
     fn pac_enable_hs(&mut self) -> Result<(), Error> {
         self.hinf_block()
             .cfg_data1()
@@ -314,7 +311,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets which device interrupts to enable based on the provided mask.
-    #[cfg(feature = "esp32")]
+    #[cfg(esp32)]
     fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
         self.slc_block()._0int_ena().modify(|_, w| {
             w.frhost_bit0_int_ena().variant(mask.general0());
@@ -331,7 +328,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Sets which device interrupts to enable based on the provided mask.
-    #[cfg(feature = "esp32c6")]
+    #[cfg(esp32c6)]
     fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
         self.slc_block().slc0int_ena().modify(|_, w| {
             w.sdio_slc_frhost_bit0_int_ena().variant(mask.general0());
@@ -445,33 +442,6 @@ impl Common for Sdio<'_> {
     fn init(&mut self) -> Result<(), Error> {
         // This implementation is based on the `esp-idf` driver:
         // <https://github.com/espressif/esp-idf/blob/release/v5.5/components/esp_driver_sdio/src/sdio_slave.c#L299>
-        self.pins.clk_sclk.apply_config(&OutputConfig::default());
-
-        let input_pullup = InputConfig::default().with_pull(Pull::Up);
-        let output_pullup = OutputConfig::default().with_pull(Pull::Up);
-
-        self.pins.cmd_mosi.apply_input_config(&input_pullup);
-        self.pins.cmd_mosi.apply_output_config(&output_pullup);
-
-        self.pins.dat0_miso.apply_input_config(&input_pullup);
-        self.pins.dat0_miso.apply_output_config(&output_pullup);
-
-        // TODO: Add an Configuration struct, and a SdioDevice::config member
-        // TODO: test config host_intr disabled
-        // if self.config.host_intr() {
-        self.pins.dat1_irq.apply_input_config(&input_pullup);
-        self.pins.dat1_irq.apply_output_config(&output_pullup);
-        // }
-        //
-        // TODO: test config dat2 disabled
-        // if self.config.dat2() {
-        self.pins.dat2.apply_input_config(&input_pullup);
-        self.pins.dat2.apply_output_config(&output_pullup);
-        // }
-
-        self.pins.dat3_cs.apply_input_config(&input_pullup);
-        self.pins.dat3_cs.apply_output_config(&output_pullup);
-
         self.hardware_init()?;
 
         self.state_transition(State::Standby)
