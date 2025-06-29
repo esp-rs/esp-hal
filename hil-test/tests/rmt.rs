@@ -105,6 +105,43 @@ impl Iterator for TxDataIter {
     }
 }
 
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode]) {
+    assert_eq!(tx.len(), rx.len(), "tx and rx len mismatch");
+
+    let mut errors: usize = 0;
+    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        if code_tx != code_rx {
+            if idx >= tx.len() - 2 {
+                // the last two pulse-codes are the ones which wait for the timeout so they
+                // can't be equal
+                #[cfg(feature = "defmt")]
+                defmt::info!(
+                    "rx code mismatch at index {}: {:?} (tx) != {:?} (rx)",
+                    idx,
+                    code_tx,
+                    code_rx
+                );
+            } else {
+                #[cfg(feature = "defmt")]
+                defmt::error!(
+                    "rx code mismatch at index {}: {:?} (tx) != {:?} (rx)",
+                    idx,
+                    code_tx,
+                    code_rx
+                );
+                errors += 1;
+            }
+        }
+    }
+
+    assert!(
+        errors == 0,
+        "rx/tx code mismatch at {}/{} indices",
+        errors,
+        tx.len() - 2
+    );
+}
+
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
@@ -136,9 +173,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     tx_transaction.wait().unwrap();
     rx_transaction.wait().unwrap();
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data);
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -167,9 +202,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     assert!(tx_res.is_ok());
     assert!(rx_res.is_ok());
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data);
 }
 
 // Run a test that just sends some data, without trying to receive it. This uses
