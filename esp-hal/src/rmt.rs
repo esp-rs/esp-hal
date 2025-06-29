@@ -2569,6 +2569,7 @@ where
 }
 
 /// RX transaction instance
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 pub struct RxTransaction<'ch, 'a, Raw, D, T>
 where
     Raw: RxChannelInternal,
