@@ -2822,13 +2822,9 @@ mod bus_clear {
         }
 
         pub fn poll_completion(&mut self) -> Poll<()> {
-            if self
-                .driver
-                .regs()
-                .scl_sp_conf()
-                .read()
-                .scl_rst_slv_en()
-                .bit_is_set()
+            let regs = self.driver.regs();
+            if regs.scl_sp_conf().read().scl_rst_slv_en().bit_is_set()
+                || regs.sr().read().bus_busy().bit_is_set()
             {
                 Poll::Pending
             } else {
@@ -2934,7 +2930,12 @@ mod bus_clear {
             let now = Instant::now();
 
             match self.state {
-                State::Idle => return Poll::Ready(()),
+                State::Idle => {
+                    if self.driver.regs().sr().read().bus_busy().bit_is_set() {
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(());
+                }
                 _ if now < self.wait => {
                     // Still waiting for the end of the SCL pulse
                     return Poll::Pending;
@@ -2944,7 +2945,7 @@ mod bus_clear {
                         sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
                     }
                     self.state = State::Idle;
-                    return Poll::Ready(());
+                    return Poll::Pending;
                 }
                 State::SendClock(0, false) => {
                     if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
