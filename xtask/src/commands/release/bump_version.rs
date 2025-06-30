@@ -13,7 +13,7 @@ use toml_edit::{Item, TableLike, Value};
 
 use crate::{cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER, Package, Version};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {
     PreRelease(String),
     Patch,
@@ -54,13 +54,7 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
             }
         };
         let mut pkg = CargoToml::new(workspace, package)?;
-        let updated_version = update_package(&mut pkg, &version, false)?;
-
-        if !package.is_version_acceptable(&updated_version) {
-            return Err(anyhow::anyhow!(
-                "Unacceptable version ({updated_version}) for package {package}"
-            ));
-        }
+        update_package(&mut pkg, &version, false)?;
     }
 
     Ok(())
@@ -71,6 +65,10 @@ pub fn update_package(
     version: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
+    if !package.package().is_version_bump_acceptable(version) {
+        return Err(anyhow::anyhow!("Bump '{:?}' is not acceptable for package {}", version, package.package()));
+    }
+
     check_crate_before_bumping(package)?;
     let new_version = bump_crate_version(package, version, dry_run)?;
     finalize_changelog(package, &new_version, dry_run)?;

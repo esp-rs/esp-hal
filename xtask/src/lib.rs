@@ -285,15 +285,9 @@ impl Package {
         format!("{self}-v{version}")
     }
 
-    pub fn is_version_acceptable(&self, version: &semver::Version) -> bool {
+    pub fn is_version_bump_acceptable(&self, version: &commands::VersionBump) -> bool {
         match self {
-            Package::EspRomSys => {
-                if version.major != 0 || !((0..=1).contains(&version.minor)) {
-                    false
-                } else {
-                    true
-                }
-            }
+            Package::EspRomSys if version != &commands::VersionBump::Patch => false,
             _ => true,
         }
     }
