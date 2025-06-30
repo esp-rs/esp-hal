@@ -197,6 +197,7 @@ use core::{
     marker::PhantomData,
     mem::ManuallyDrop,
     num::NonZeroU16,
+    ops::ControlFlow,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -595,7 +596,7 @@ impl RmtWriterInner {
 /// FIXME: Docs
 pub trait Encoder {
     /// FIXME: docs
-    fn encode(&mut self, writer: &mut RmtWriterInner) -> bool;
+    fn encode(&mut self, writer: &mut RmtWriterInner) -> ControlFlow<()>;
 }
 
 #[derive(Debug)]
@@ -622,7 +623,7 @@ where
     T: Into<PulseCode> + Copy,
 {
     #[inline(always)]
-    fn encode(&mut self, writer: &mut RmtWriterInner) -> bool {
+    fn encode(&mut self, writer: &mut RmtWriterInner) -> ControlFlow<()> {
         let count = self
             .data
             .len()
@@ -641,10 +642,10 @@ where
 
             writer.ptr = ptr;
             writer.last_code = last_code;
-            self.data = &self.data[count..];
+            self.data.split_off(..count).unwrap();
         }
 
-        self.data.is_empty()
+        if self.data.is_empty() { ControlFlow::Break(()) } else { ControlFlow::Continue(()) }
     }
 }
 
@@ -684,16 +685,16 @@ where
     D: Iterator<Item = PulseCode>,
 {
     #[inline(always)]
-    fn encode(&mut self, writer: &mut RmtWriterInner) -> bool {
+    fn encode(&mut self, writer: &mut RmtWriterInner) -> ControlFlow<()> {
         while let Some(slot) = writer.next() {
             if let Some(code) = self.data.next() {
                 slot.write(code);
             } else {
-                return true;
+                return ControlFlow::Break(());
             }
         }
 
-        false
+        return ControlFlow::Continue(())
     }
 }
 
@@ -807,7 +808,7 @@ impl RmtWriterOuter {
                 let written = unsafe { internal.ptr.offset_from(internal.start) } as usize;
                 this.written += written;
 
-                if done || internal.ptr < internal.end {
+                if done.is_break() || internal.ptr < internal.end {
                     // Data iterator is exhausted (either it stated so by returning false, or it
                     // didn't fill the entire requested buffer).
                     // FIXME: The is_end_marker check should be in slot.write, maybe?
@@ -863,6 +864,163 @@ impl RmtWriterOuter {
     }
 }
 
+/// FIXME: Docs
+pub struct RmtReaderInner {
+    has_end: bool,
+    ptr: *mut PulseCode,
+    start: *mut PulseCode,
+    end: *mut PulseCode,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for RmtReaderInner {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        fn get_ch(ptr: *mut PulseCode) -> i32 {
+            let diff = unsafe { ptr.offset_from(property!("rmt.ram_start") as *mut PulseCode) };
+            (diff / property!("rmt.channel_ram_size") as isize) as i32
+        }
+
+        fn get_offset(ptr: *mut PulseCode) -> i32 {
+            let diff = unsafe { ptr.offset_from(property!("rmt.ram_start") as *mut PulseCode) };
+            (diff % property!("rmt.channel_ram_size") as isize) as i32
+        }
+
+        defmt::write!(
+            fmt,
+            "RmtReaderInner {{ has_end: {}, ptr: CH{} + {:#x}, start: CH{} + {:#x}, end: CH{} + {:#x} }}",
+            self.has_end,
+            get_ch(self.ptr),
+            get_offset(self.ptr),
+            get_ch(self.start),
+            get_offset(self.start),
+            get_ch(self.end),
+            get_offset(self.end),
+        )
+    }
+}
+
+impl RmtReaderInner {
+    /// FIXME: docs
+    #[inline(always)]
+    pub fn next(&mut self) -> Option<PulseCode>
+    {
+        if self.has_end || self.ptr >= self.end {
+            return None;
+        }
+
+        let code = unsafe { self.ptr.read_volatile() };
+        self.ptr = unsafe { self.ptr.add(1) };
+
+        if code.is_end_marker() {
+            // Maybe instead set self.end = self.ptr?
+            self.has_end = true;
+        }
+
+        Some(code)
+    }
+}
+
+/// FIXME: Docs
+pub trait Decoder {
+    /// FIXME: Docs
+    fn decode(&mut self, reader: &mut RmtReaderInner) -> ControlFlow<()>;
+}
+
+#[derive(Debug)]
+#[doc(hidden)]
+pub struct SliceDecoder<'a, T>
+where
+    T: From<PulseCode>,
+{
+    data: &'a mut [T],
+}
+
+impl<'a, T> SliceDecoder<'a, T>
+where
+    T: From<PulseCode>,
+{
+    fn new(data: &'a mut [T]) -> Self {
+        Self { data }
+    }
+}
+
+impl<'a, T> Decoder for SliceDecoder<'a, T>
+where
+    T: From<PulseCode>,
+{
+    #[inline(always)]
+    fn decode(&mut self, reader: &mut RmtReaderInner) -> ControlFlow<()> {
+        let count = self
+            .data
+            .len()
+            .min(unsafe { reader.end.offset_from(reader.ptr) } as usize);
+
+        if count > 0 {
+            let mut ptr = reader.ptr;
+
+            for slot in &mut self.data[..count] {
+                let code = unsafe { ptr.read_volatile() };
+                *slot = code.into();
+                ptr = unsafe { ptr.add(1) };
+
+                if code.is_end_marker() {
+                    reader.has_end = true;
+                    break;
+                }
+            }
+
+            debug_assert!(reader.ptr <= reader.end);
+
+            reader.ptr = ptr;
+            self.data.split_off_mut(..count).unwrap();
+        }
+
+        if reader.has_end || self.data.is_empty() { ControlFlow::Break(()) } else { ControlFlow::Continue(()) }
+    }
+}
+
+#[derive(Debug)]
+#[doc(hidden)]
+pub struct IterDecoder<'a, D, T>
+where
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'a,
+{
+    data: D,
+}
+
+impl<'a, D, T> IterDecoder<'a, D, T>
+where
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'a,
+{
+    fn new(data: impl IntoIterator<IntoIter = D>) -> Self {
+        Self {
+            data: data.into_iter(),
+        }
+    }
+}
+
+impl<'a, D, T> Decoder for IterDecoder<'a, D, T>
+where
+    D: Iterator<Item = &'a mut T>,
+    T: From<PulseCode> + 'a,
+{
+    #[inline(always)]
+    fn decode(&mut self, reader: &mut RmtReaderInner) -> ControlFlow<()> {
+        while let Some(slot) = self.data.next() {
+            if let Some(code) = reader.next() {
+                *slot = code.into();
+            } else {
+                return ControlFlow::Continue(());
+            }
+        }
+
+        // -> ReaderState::Overflow
+        return ControlFlow::Break(())
+    }
+}
+
 #[derive(Copy, Clone, PartialEq)]
 enum ReaderState {
     // Ready to continue reading data from the hardware buffer
@@ -876,10 +1034,10 @@ enum ReaderState {
 }
 
 /// docs
-struct RmtReader {
+struct RmtReaderOuter {
     // Offset in RMT RAM section to continue reading from (number of u32!)
     // u16 is sufficient to store this for all devices, and should be small enough such that
-    // size_of::<RmtReader>() == 2 * size_of::<u32>()
+    // size_of::<RmtReaderOuter>() == 2 * size_of::<u32>()
     offset: u16,
 
     // ...
@@ -889,7 +1047,7 @@ struct RmtReader {
     state: ReaderState,
 }
 
-impl RmtReader {
+impl RmtReaderOuter {
     fn new() -> Self {
         Self {
             offset: 0,
@@ -898,9 +1056,9 @@ impl RmtReader {
         }
     }
 
-    fn read<'a, T: From<PulseCode> + 'static>(
+    fn read(
         &mut self,
-        data: &mut impl Iterator<Item = &'a mut T>,
+        data: &mut impl Decoder,
         raw: impl RxChannelInternal,
         final_: bool,
     ) {
@@ -909,9 +1067,9 @@ impl RmtReader {
             return;
         }
 
-        let start = raw.channel_ram_start();
+        let ram_start = raw.channel_ram_start();
         let memsize = raw.memsize().codes();
-        let end = unsafe { start.add(memsize) };
+        let ram_end = unsafe { ram_start.add(memsize) };
         let initial_offset = self.offset as usize;
 
         // This is only used to read the entire RAM from its start, or to read
@@ -922,48 +1080,56 @@ impl RmtReader {
 
         // Read in up to 2 chunks
         let count = if final_ { memsize } else { memsize / 2 };
-        let mut count0 = count.min(memsize - initial_offset);
+        let count0 = count.min(memsize - initial_offset);
         let mut count1 = count - count0;
 
-        let mut ptr = unsafe { start.add(initial_offset) };
-        'outer: loop {
-            while count0 > 0 {
-                if let Some(value) = data.next() {
-                    let code = unsafe { ptr.read_volatile() };
-                    *value = code.into();
-                    ptr = unsafe { ptr.add(1) };
-                    debug_assert!(ptr.addr() <= end.addr());
+        let start0 = unsafe { ram_start.add(initial_offset) };
+        let mut internal = RmtReaderInner {
+            has_end: false,
+            ptr: start0,
+            start: start0,
+            end: unsafe { start0.add(count0) },
+        };
+        loop {
+            let done = data.decode(&mut internal);
 
-                    count0 -= 1;
+            debug_assert!(internal.ptr.addr() >= internal.start.addr());
+            debug_assert!(internal.ptr.addr() <= internal.end.addr());
 
-                    if code.is_end_marker() {
-                        self.state = ReaderState::Done;
-                        break 'outer;
-                    }
-                } else {
-                    self.state = ReaderState::Overflow;
-                    break 'outer;
-                }
-            }
+            let read_count = unsafe { internal.ptr.offset_from(internal.start) } as usize;
+            self.total += read_count;
 
-            if count1 == 0 {
+            if internal.has_end {
+                self.state = ReaderState::Done;
+                break;
+            } else if done.is_break() || internal.ptr < internal.end {
+                self.state = ReaderState::Overflow;
                 break;
             }
 
-            count0 = count1;
+            if count1 == 0 {
+                // Wrap around such that self.offset update below is correct.
+                if internal.ptr == ram_end {
+                    internal.ptr = ram_start;
+                }
+                break;
+            }
+
+            debug_assert!(internal.ptr == ram_end);
+            internal.ptr = ram_start;
+            internal.start = ram_start;
+            internal.end = unsafe { ram_start.add(count1) };
             count1 = 0;
-            ptr = start;
         }
 
-        if ptr == end {
-            // Wrap around
-            ptr = start;
+        if self.state == ReaderState::Active {
+            debug_assert!(self.total % (memsize / 2) == 0);
         }
 
-        debug_assert!(ptr.addr() >= start.addr() && ptr.addr() < end.addr());
-
-        self.total += count - count0 - count1;
-        self.offset = unsafe { ptr.offset_from(start) } as u16;
+        self.offset = unsafe { internal.ptr.offset_from(ram_start) } as u16;
+        debug_assert!(self.state != ReaderState::Active
+            || self.offset == 0
+            || usize::from(self.offset) == memsize / 2);
     }
 }
 
@@ -2288,23 +2454,21 @@ impl Channel<'_, Blocking, Tx> {
 
 /// RX transaction instance
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-pub struct RxTransaction<'ch, 'a, D, T>
+pub struct RxTransaction<'ch, D>
 where
-    D: Iterator<Item = &'a mut T>,
-    T: From<PulseCode> + 'static,
+    D: Decoder,
 {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'ch mut DynChannelAccess<Rx>>,
 
-    reader: RmtReader,
+    reader: RmtReaderOuter,
 
     data: D,
 }
 
-impl<'a, D, T> RxTransaction<'_, 'a, D, T>
+impl<D> RxTransaction<'_, D>
 where
-    D: Iterator<Item = &'a mut T>,
-    T: From<PulseCode> + 'static,
+    D: Decoder,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
@@ -2371,10 +2535,9 @@ where
     }
 }
 
-impl<'a, D, T> Drop for RxTransaction<'_, 'a, D, T>
+impl<D> Drop for RxTransaction<'_, D>
 where
-    D: Iterator<Item = &'a mut T>,
-    T: From<PulseCode> + 'static,
+    D: Decoder,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
@@ -2404,19 +2567,39 @@ impl Channel<'_, Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<'ch, 'a, D, T>(
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn receive<'ch, 'a, T>(
+        &'ch mut self,
+        data: &'a mut [T],
+    ) -> Result<RxTransaction<'ch, SliceDecoder<'a, T>>, Error>
+    where
+        T: From<PulseCode> + 'a
+    {
+        self.receive_dec(SliceDecoder::new(data))
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn receive_iter<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, 'a, D::IntoIter, T>, Error>
+    ) -> Result<RxTransaction<'ch, IterDecoder<'a, D::IntoIter, T>>, Error>
     where
         D: IntoIterator<Item = &'a mut T>,
-        T: From<PulseCode> + 'static,
+        T: From<PulseCode> + 'a
+    {
+        self.receive_dec(IterDecoder::new(data))
+    }
+
+    /// FIXME: Docs
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub fn receive_dec<D>(&mut self, data: D) -> Result<RxTransaction<'_, D>, Error>
+    where
+        D: Decoder,
     {
         let raw = self.raw;
 
-        let data = data.into_iter();
-        let reader = RmtReader::new();
+        let reader = RmtReaderOuter::new();
 
         RmtState::store(RmtState::RxBlocking, raw, Ordering::Relaxed);
 
@@ -2632,23 +2815,21 @@ impl Channel<'_, Async, Tx> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a, D, T>
+struct RmtRxFuture<'a, D>
 where
-    D: Iterator<Item = &'a mut T> + Unpin,
-    T: From<PulseCode> + 'static,
+    D: Decoder + Unpin,
 {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'a mut DynChannelAccess<Rx>>,
 
-    reader: RmtReader,
+    reader: RmtReaderOuter,
 
     data: D,
 }
 
-impl<'a, D, T> Future for RmtRxFuture<'a, D, T>
+impl<'a, D> Future for RmtRxFuture<'a, D>
 where
-    D: Iterator<Item = &'a mut T> + Unpin,
-    T: From<PulseCode> + 'static,
+    D: Decoder + Unpin,
 {
     type Output = Result<usize, Error>;
 
@@ -2694,10 +2875,9 @@ where
     }
 }
 
-impl<'a, D, T> Drop for RmtRxFuture<'a, D, T>
+impl<'a, D> Drop for RmtRxFuture<'a, D>
 where
-    D: Iterator<Item = &'a mut T> + Unpin,
-    T: From<PulseCode> + 'static,
+    D: Decoder + Unpin,
 {
     fn drop(&mut self) {
         let raw = self.raw;
@@ -2723,18 +2903,46 @@ impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<'a, D, T>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn receive<'a, T>(&'a mut self, data: &'a mut [T]) -> Result<usize, Error>
+    where
+        Self: Sized,
+        T: From<PulseCode> + 'a
+    {
+        self.receive_inner(SliceDecoder::new(data)).await
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn receive_iter<'a, D, T>(&'a mut self, data: D) -> Result<usize, Error>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
         D::IntoIter: Unpin,
-        T: From<PulseCode> + 'static,
+        T: From<PulseCode> + 'a
+    {
+        self.receive_inner(IterDecoder::new(data)).await
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn receive_dec<'a, D>(&'a mut self, data: D) -> Result<usize, Error>
+    where
+        Self: Sized,
+        D: Decoder + Unpin
+    {
+        self.receive_inner(data).await
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn receive_inner<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
+    where
+        Self: Sized,
+        D: Decoder + Unpin,
     {
         let raw = self.raw;
 
-        let data = data.into_iter();
-        let reader = RmtReader::new();
+        let reader = RmtReaderOuter::new();
 
         RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
