@@ -320,8 +320,7 @@ impl<'d, PWM: PwmPeripheral, const OP: u8, const IS_A: bool> PwmPin<'d, PWM, OP,
 
         // SAFETY:
         // `bits` is a valid bit pattern
-        ch.r#gen((!IS_A) as usize)
-            .write(|w| unsafe { w.bits(bits) });
+        ch.gen_((!IS_A) as usize).write(|w| unsafe { w.bits(bits) });
     }
 
     /// Set how a new timestamp syncs with the timer

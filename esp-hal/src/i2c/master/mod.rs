@@ -2379,7 +2379,7 @@ impl Driver<'_> {
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
-        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
@@ -2446,7 +2446,7 @@ impl Driver<'_> {
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
-        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
