@@ -869,10 +869,6 @@ fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         Peripheral::Mcpwm0 => {
             system.pwm_conf().modify(|_, w| w.pwm_rst_en().bit(reset));
         }
-        #[cfg(soc_has_mcpwm1)]
-        Peripheral::Mcpwm1 => {
-            system.pwm_conf.modify(|_, w| w.pwm_rst_en().bit(reset));
-        }
         #[cfg(soc_has_apb_saradc)]
         Peripheral::ApbSarAdc => {
             system
