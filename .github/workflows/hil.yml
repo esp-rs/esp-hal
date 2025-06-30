@@ -120,7 +120,7 @@ jobs:
 
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
-        uses: esp-rs/xtensa-toolchain@main
+        uses: esp-rs/xtensa-toolchain@v1.6
         with:
           buildtargets: ${{ matrix.target.soc }}
           default: true
