@@ -72,7 +72,7 @@ fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
             .strip_prefix("lib")
             .and_then(|f| f.strip_suffix(".a"))
         {
-            println!("cargo:rustc-link-lib=static={}", lib_name);
+            println!("cargo:rustc-link-lib=static={lib_name}");
         }
     }
 
