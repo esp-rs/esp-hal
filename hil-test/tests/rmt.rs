@@ -338,7 +338,7 @@ mod tests {
     // However, the problem already exists exists in the original code that added
     // support for extended channel RAM, so we can't bisect to find a
     // regression. Skip the test for now.
-    #[cfg(not(esp32))]
+    // #[cfg(not(esp32))]
     #[test]
     fn rmt_loopback_tx_wrap() {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
