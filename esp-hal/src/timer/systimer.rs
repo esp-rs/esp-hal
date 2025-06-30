@@ -686,7 +686,7 @@ pub mod etm {
     //! #     Pull,
     //! # };
     //! let syst = SystemTimer::new(peripherals.SYSTIMER);
-    //! let etm = Etm::new(peripherals.SOC_ETM);
+    //! let etm = Etm::new(peripherals.ETM);
     //! let gpio_ext = Channels::new(peripherals.GPIO_SD);
     //! let alarm0 = syst.alarm0;
     //! let mut led = peripherals.GPIO1;

@@ -214,13 +214,7 @@ pub struct PeripheralDef {
 
 impl PeripheralDef {
     fn symbol_name(&self) -> String {
-        format!(
-            "soc_has_{}",
-            self.pac_name
-                .as_deref()
-                .unwrap_or(self.name.as_str())
-                .to_lowercase()
-        )
+        format!("soc_has_{}", self.name.to_lowercase())
     }
 }
 
