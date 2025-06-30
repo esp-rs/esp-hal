@@ -1587,11 +1587,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// let mut uart1 = Uart::new(
-    ///     peripherals.UART1,
+    /// let uart = Uart::new(
+    ///     peripherals.UART0,
     ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2);
+    /// .with_rx(peripherals.GPIO1);
     ///
     /// # Ok(())
     /// # }
@@ -1611,10 +1610,9 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// let mut uart1 = Uart::new(
-    ///     peripherals.UART1,
+    /// let uart = Uart::new(
+    ///     peripherals.UART0,
     ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
     /// .with_tx(peripherals.GPIO2);
     ///
     /// # Ok(())
@@ -1632,11 +1630,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// let mut uart1 = Uart::new(
-    ///     peripherals.UART1,
+    /// let uart = Uart::new(
+    ///     peripherals.UART0,
     ///     Config::default())?
     /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
     /// .with_cts(peripherals.GPIO3);
     ///
     /// # Ok(())
@@ -1654,10 +1651,9 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// let mut uart1 = Uart::new(
-    ///     peripherals.UART1,
+    /// let uart = Uart::new(
+    ///     peripherals.UART0,
     ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
     /// .with_tx(peripherals.GPIO2)
     /// .with_rts(peripherals.GPIO3);
     ///
@@ -1795,12 +1791,11 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart1 = Uart::new(
-    /// #     peripherals.UART1,
+    /// # let mut uart = Uart::new(
+    /// #     peripherals.UART0,
     /// #     Config::default())?;
     ///
-    /// let config = Config::default().with_baudrate(19_200);
-    /// uart1.apply_config(&config)?;
+    /// uart.apply_config(&Config::default().with_baudrate(19_200))?;
     /// # Ok(())
     /// # }
     /// ```
