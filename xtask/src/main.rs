@@ -145,6 +145,8 @@ fn main() -> Result<()> {
             Release::PublishPlan(args) => publish_plan(&workspace, args),
             #[cfg(feature = "release")]
             Release::PostRelease => post_release(&workspace),
+            #[cfg(feature = "release")]
+            Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
