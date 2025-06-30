@@ -486,10 +486,10 @@ impl Config {
             tokens.extend(cfg::generate_uart_peripherals(peri));
         }
         if let Some(peri) = self.device.peri_config.spi_master.as_ref() {
-            tokens.extend(cfg::generate_spi_master_peripehrals(peri));
+            tokens.extend(cfg::generate_spi_master_peripherals(peri));
         };
         if let Some(peri) = self.device.peri_config.spi_slave.as_ref() {
-            tokens.extend(cfg::generate_spi_slave_peripehrals(peri));
+            tokens.extend(cfg::generate_spi_slave_peripherals(peri));
         };
 
         save(out_dir.join(file_name), tokens);

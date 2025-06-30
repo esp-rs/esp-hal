@@ -17,7 +17,7 @@ pub(crate) struct SpiMasterInstanceConfig {
 /// Generates `for_each_spi_slave!` which can be used to implement the SPI
 /// master Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.spi_master.instances[X]] instance.
-pub(crate) fn generate_spi_master_peripehrals(spi_slave: &SpiMasterProperties) -> TokenStream {
+pub(crate) fn generate_spi_master_peripherals(spi_slave: &SpiMasterProperties) -> TokenStream {
     let instance_cfgs = spi_slave
         .instances
         .iter()
