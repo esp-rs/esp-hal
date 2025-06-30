@@ -20,11 +20,11 @@ pub(crate) fn ensure_randomness() {
         // periph_module_enable(PERIPH_I2S0_MODULE);
         dport
             .perip_clk_en()
-            .modify(|_, w| w.i2c0_ext0_clk_en().set_bit());
+            .modify(|_, w| w.i2c_ext0_clk_en().set_bit());
 
         dport
             .perip_rst_en()
-            .modify(|_, w| w.i2c0_ext0_rst().clear_bit());
+            .modify(|_, w| w.i2c_ext0_rst().clear_bit());
 
         sens.sar_start_force()
             .modify(|_, w| w.ulp_cp_force_start_top().clear_bit());

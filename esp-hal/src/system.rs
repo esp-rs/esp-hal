@@ -321,7 +321,7 @@ impl PeripheralClockControl {
         let system = SYSTEM::regs();
 
         #[cfg(esp32)]
-        let (perip_clk_en0, peri_clk_en) = { (&system.perip_clk_en(), &system.peri_clk_en()) };
+        let (perip_clk_en0, perip_clk_en1) = { (&system.perip_clk_en(), &system.peri_clk_en()) };
         #[cfg(not(esp32))]
         let perip_clk_en0 = &system.perip_clk_en0();
 
@@ -337,11 +337,7 @@ impl PeripheralClockControl {
             Peripheral::Spi3 => {
                 perip_clk_en0.modify(|_, w| w.spi3_clk_en().bit(enable));
             }
-            #[cfg(all(soc_has_i2c0, esp32))]
-            Peripheral::I2cExt0 => {
-                perip_clk_en0.modify(|_, w| w.i2c0_ext0_clk_en().bit(enable));
-            }
-            #[cfg(all(soc_has_i2c0, not(esp32)))]
+            #[cfg(soc_has_i2c0)]
             Peripheral::I2cExt0 => {
                 perip_clk_en0.modify(|_, w| w.i2c_ext0_clk_en().bit(enable));
             }
@@ -387,16 +383,11 @@ impl PeripheralClockControl {
                 perip_clk_en0.modify(|_, w| w.spi3_dma_clk_en().bit(enable));
                 perip_clk_en1.modify(|_, w| w.crypto_dma_clk_en().bit(enable));
             }
-            #[cfg(esp32c3)]
-            Peripheral::I2s0 => {
-                // on ESP32-C3 note that i2s1_clk_en / rst is really I2s0
-                perip_clk_en0.modify(|_, w| w.i2s1_clk_en().bit(enable));
-            }
-            #[cfg(any(esp32s3, esp32, esp32s2))]
+            #[cfg(soc_has_i2s0)]
             Peripheral::I2s0 => {
                 perip_clk_en0.modify(|_, w| w.i2s0_clk_en().bit(enable));
             }
-            #[cfg(any(esp32s3, esp32))]
+            #[cfg(soc_has_i2s1)]
             Peripheral::I2s1 => {
                 perip_clk_en0.modify(|_, w| w.i2s1_clk_en().bit(enable));
             }
@@ -408,11 +399,7 @@ impl PeripheralClockControl {
             Peripheral::Twai0 => {
                 perip_clk_en0.modify(|_, w| w.twai_clk_en().bit(enable));
             }
-            #[cfg(esp32)]
-            Peripheral::Aes => {
-                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | enable as u32) });
-            }
-            #[cfg(any(esp32c3, esp32s2, esp32s3))]
+            #[cfg(soc_has_aes)]
             Peripheral::Aes => {
                 perip_clk_en1.modify(|_, w| w.crypto_aes_clk_en().bit(enable));
             }
@@ -430,7 +417,6 @@ impl PeripheralClockControl {
             }
             #[cfg(soc_has_sha)]
             Peripheral::Sha => {
-                #[cfg(not(esp32))]
                 perip_clk_en1.modify(|_, w| w.crypto_sha_clk_en().bit(enable));
             }
             #[cfg(esp32c3)]
@@ -459,7 +445,7 @@ impl PeripheralClockControl {
             }
             #[cfg(all(rsa, esp32))]
             Peripheral::Rsa => {
-                peri_clk_en.modify(|r, w| unsafe { w.bits(r.bits() | ((enable as u32) << 2)) });
+                perip_clk_en1.modify(|_, w| w.crypto_rsa_clk_en().bit(enable));
             }
             #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
             Peripheral::Rsa => {
@@ -683,7 +669,7 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
     let system = SYSTEM::regs();
 
     #[cfg(esp32)]
-    let (perip_rst_en0, peri_rst_en) = (system.perip_rst_en(), system.peri_rst_en());
+    let (perip_rst_en0, perip_rst_en1) = (system.perip_rst_en(), system.peri_rst_en());
     #[cfg(not(esp32))]
     let perip_rst_en0 = system.perip_rst_en0();
 
