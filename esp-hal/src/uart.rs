@@ -1434,12 +1434,13 @@ impl<'d> Uart<'d, Async> {
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2)
-    /// # .into_async();
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .into_async();
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// # Ok(())
@@ -1464,12 +1465,13 @@ impl<'d> Uart<'d, Async> {
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2)
-    /// # .into_async();
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .into_async();
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// uart.flush_async().await?;
@@ -1504,12 +1506,13 @@ impl<'d> Uart<'d, Async> {
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2)
-    /// # .into_async();
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2)
+    /// .into_async();
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// uart.flush_async().await?;
@@ -1694,9 +1697,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?;
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?;
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// # Ok(())
@@ -1713,9 +1717,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?;
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?;
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// uart.flush()?;
@@ -1757,9 +1762,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?;
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?;
+    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// uart.flush()?;
@@ -1786,9 +1792,10 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?;
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?;
+    ///
     /// uart.apply_config(&Config::default().with_baudrate(19_200))?;
     /// # Ok(())
     /// # }
@@ -1812,11 +1819,12 @@ where
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::uart::{Config, Uart};
-    /// # let mut uart = Uart::new(
-    /// #     peripherals.UART0,
-    /// #     Config::default())?
-    /// # .with_rx(peripherals.GPIO1)
-    /// # .with_tx(peripherals.GPIO2);
+    /// let mut uart = Uart::new(
+    ///     peripherals.UART0,
+    ///     Config::default())?
+    /// .with_rx(peripherals.GPIO1)
+    /// .with_tx(peripherals.GPIO2);
+    ///
     /// // The UART can be split into separate Transmit and Receive components:
     /// let (mut rx, mut tx) = uart.split();
     ///
