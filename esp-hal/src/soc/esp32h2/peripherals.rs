@@ -19,11 +19,11 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        I2C1 <= I2C1,
-        SPI2 <= SPI2 (SPI2),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        I2C1 <= I2C1 (peri => I2C_EXT1),
+        SPI2 <= SPI2 (peri => SPI2),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -41,7 +41,7 @@ crate::peripherals! {
         HP_APM <= HP_APM,
         HP_SYS <= HP_SYS,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         IEEE802154 <= IEEE802154,
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         INTPRI <= INTPRI,
@@ -60,7 +60,7 @@ crate::peripherals! {
         MODEM_LPCON <= MODEM_LPCON,
         MODEM_SYSCON <= MODEM_SYSCON,
         OTP_DEBUG <= OTP_DEBUG,
-        PARL_IO <= PARL_IO (PARL_IO_TX, PARL_IO_RX),
+        PARL_IO <= PARL_IO (tx => PARL_IO_TX, rx => PARL_IO_RX),
         PAU <= PAU,
         PCNT <= PCNT,
         PCR <= PCR,
@@ -83,7 +83,7 @@ crate::peripherals! {
         TRACE0 <= TRACE,
         TWAI0 <= TWAI0,
         UHCI0 <= UHCI0,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         MEM2MEM1 <= virtual,
         MEM2MEM4 <= virtual,
         MEM2MEM5 <= virtual,

@@ -65,7 +65,6 @@ use crate::{
     },
     interrupt::InterruptHandler,
     pac::uart0::RegisterBlock,
-    peripherals::Interrupt,
     private::OnDrop,
     system::{PeripheralClockControl, PeripheralGuard},
 };
@@ -636,7 +635,6 @@ impl<'d> UartTx<'d, Blocking> {
     pub fn into_async(self) -> UartTx<'d, Async> {
         if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
             self.uart
-                .info()
                 .set_interrupt_handler(self.uart.info().async_handler);
         }
         self.uart.state().is_tx_async.store(true, Ordering::Release);
@@ -660,7 +658,7 @@ impl<'d> UartTx<'d, Async> {
             .is_tx_async
             .store(false, Ordering::Release);
         if !self.uart.state().is_rx_async.load(Ordering::Acquire) {
-            self.uart.info().disable_interrupts();
+            self.uart.disable_peri_interrupt();
         }
 
         UartTx {
@@ -931,7 +929,6 @@ impl<'d> UartRx<'d, Blocking> {
     pub fn into_async(self) -> UartRx<'d, Async> {
         if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
             self.uart
-                .info()
                 .set_interrupt_handler(self.uart.info().async_handler);
         }
         self.uart.state().is_rx_async.store(true, Ordering::Release);
@@ -953,7 +950,7 @@ impl<'d> UartRx<'d, Async> {
             .is_rx_async
             .store(false, Ordering::Release);
         if !self.uart.state().is_tx_async.load(Ordering::Acquire) {
-            self.uart.info().disable_interrupts();
+            self.uart.disable_peri_interrupt();
         }
 
         UartRx {
@@ -1277,7 +1274,7 @@ impl<'d> Uart<'d, Blocking> {
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
-        self.tx.uart.info().set_interrupt_handler(handler);
+        self.tx.uart.set_interrupt_handler(handler);
     }
 
     /// Listen for the given interrupts
@@ -1784,7 +1781,7 @@ impl crate::private::Sealed for Uart<'_, Blocking> {}
 impl crate::interrupt::InterruptConfigurable for Uart<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         // `self.tx.uart` and `self.rx.uart` are the same
-        self.tx.uart.info().set_interrupt_handler(handler);
+        self.tx.uart.set_interrupt_handler(handler);
     }
 }
 
@@ -2459,9 +2456,6 @@ pub struct Info {
     /// Interrupt handler for the asynchronous operations of this UART instance.
     pub async_handler: InterruptHandler,
 
-    /// Interrupt for this UART instance.
-    pub interrupt: Interrupt,
-
     /// TX pin
     pub tx_signal: OutputSignal,
 
@@ -2557,20 +2551,6 @@ impl Info {
             }
             w
         });
-    }
-
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, self.interrupt);
-        }
-        self.enable_listen(EnumSet::all(), false);
-        self.clear_interrupts(EnumSet::all());
-        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
-    }
-
-    fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::system::Cpu::current(), self.interrupt);
     }
 
     fn apply_config(&self, config: &Config) -> Result<(), ConfigError> {
@@ -3245,7 +3225,6 @@ macro_rules! impl_instance {
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
-                    interrupt: Interrupt::$inst,
                     tx_signal: OutputSignal::$txd,
                     rx_signal: InputSignal::$rxd,
                     cts_signal: InputSignal::$cts,
@@ -3287,5 +3266,32 @@ impl Instance for AnyUart<'_> {
             #[cfg(soc_has_uart2)]
             AnyUartInner::Uart2(uart) => uart.parts(),
         }
+    }
+}
+
+impl AnyUart<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(soc_has_uart0)]
+            AnyUartInner::Uart0(uart) => uart,
+            #[cfg(soc_has_uart1)]
+            AnyUartInner::Uart1(uart) => uart,
+            #[cfg(soc_has_uart2)]
+            AnyUartInner::Uart2(uart) => uart,
+        } {
+            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+            fn disable_peri_interrupt(&self);
+            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
+        }
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.disable_peri_interrupt();
+
+        self.info().enable_listen(EnumSet::all(), false);
+        self.info().clear_interrupts(EnumSet::all());
+
+        self.bind_peri_interrupt(handler.handler());
+        self.enable_peri_interrupt(handler.priority());
     }
 }

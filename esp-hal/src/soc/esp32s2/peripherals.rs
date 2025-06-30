@@ -19,12 +19,12 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        I2C1 <= I2C1,
-        SPI2 <= SPI2 (SPI2_DMA, SPI2),
-        SPI3 <= SPI3 (SPI3_DMA, SPI3),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        I2C1 <= I2C1 (peri => I2C_EXT1),
+        SPI2 <= SPI2 (dma => SPI2_DMA, peri => SPI2),
+        SPI3 <= SPI3 (dma => SPI3_DMA, peri => SPI3),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -41,7 +41,7 @@ crate::peripherals! {
         GPIO_SD <= GPIO_SD,
         HMAC <= HMAC,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         IO_MUX <= IO_MUX,
         LEDC <= LEDC,

@@ -14,9 +14,6 @@ pub(crate) struct I2cMasterInstanceConfig {
 
     /// IOMUX signal name of the instane's SDA signal.
     pub sda: String,
-
-    /// The name of the instance's interrupt handler.
-    pub interrupt: String,
 }
 
 /// Generates `for_each_i2c_master!` which can be used to implement the I2C
@@ -34,12 +31,11 @@ pub(crate) fn generate_i2c_master_peripehrals(i2c: &I2cMasterProperties) -> Toke
             let sys = format_ident!("{}", instance_config.sys_instance);
             let sda = format_ident!("{}", instance_config.sda);
             let scl = format_ident!("{}", instance_config.scl);
-            let int = format_ident!("{}", instance_config.interrupt);
 
             // The order and meaning of these tokens must match their use in the
             // `for_each_i2c_master!` call.
             quote::quote! {
-                #instance, #sys, #scl, #sda, #int
+                #instance, #sys, #scl, #sda
             }
         })
         .collect::<Vec<_>>();

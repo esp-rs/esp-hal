@@ -64,7 +64,7 @@ use crate::{
     interrupt::InterruptHandler,
     pac::spi2::RegisterBlock,
     private::{self, OnDrop, Sealed},
-    system::{Cpu, PeripheralGuard},
+    system::PeripheralGuard,
     time::Rate,
 };
 
@@ -797,12 +797,7 @@ impl<'d> Spi<'d, Blocking> {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        let interrupt = self.driver().info.interrupt;
-        for core in Cpu::other() {
-            crate::interrupt::disable(core, interrupt);
-        }
-        unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+        self.spi.set_interrupt_handler(handler);
     }
 }
 
@@ -812,14 +807,14 @@ impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
     ///
     /// Interrupts are not enabled at the peripheral level here.
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        Spi::set_interrupt_handler(self, handler);
+        self.set_interrupt_handler(handler);
     }
 }
 
 impl<'d> Spi<'d, Async> {
     /// Converts the SPI instance into blocking mode.
     pub fn into_blocking(self) -> Spi<'d, Blocking> {
-        crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+        self.spi.disable_peri_interrupt();
         Spi {
             spi: self.spi,
             _mode: PhantomData,
@@ -1358,12 +1353,7 @@ mod dma {
         /// `None`)
         #[instability::unstable]
         pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            let interrupt = self.driver().info.interrupt;
-            for core in Cpu::other() {
-                crate::interrupt::disable(core, interrupt);
-            }
-            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+            self.spi.set_interrupt_handler(handler);
         }
     }
 
@@ -1371,7 +1361,7 @@ mod dma {
         /// Converts the SPI instance into async mode.
         #[instability::unstable]
         pub fn into_blocking(self) -> SpiDma<'d, Blocking> {
-            crate::interrupt::disable(Cpu::current(), self.driver().info.interrupt);
+            self.spi.disable_peri_interrupt();
             SpiDma {
                 spi: self.spi,
                 channel: self.channel.into_blocking(),
@@ -1453,12 +1443,7 @@ mod dma {
         ///
         /// Interrupts are not enabled at the peripheral level here.
         fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-            let interrupt = self.driver().info.interrupt;
-            for core in crate::system::Cpu::other() {
-                crate::interrupt::disable(core, interrupt);
-            }
-            unsafe { crate::interrupt::bind_interrupt(interrupt, handler.handler()) };
-            unwrap!(crate::interrupt::enable(interrupt, handler.priority()));
+            self.set_interrupt_handler(handler);
         }
     }
 
@@ -2687,9 +2672,6 @@ pub struct Info {
     /// The system peripheral marker.
     pub peripheral: crate::system::Peripheral,
 
-    /// Interrupt for this SPI instance.
-    pub interrupt: crate::peripherals::Interrupt,
-
     /// SCLK signal.
     pub sclk: OutputSignal,
 
@@ -3721,7 +3703,6 @@ macro_rules! spi_instance {
                     static INFO: Info = Info {
                         register_block: crate::peripherals::[<SPI $num>]::regs(),
                         peripheral: crate::system::Peripheral::[<Spi $num>],
-                        interrupt: crate::peripherals::Interrupt::[<SPI $num>],
                         sclk: OutputSignal::$sclk,
                         mosi: OutputSignal::$mosi,
                         miso: InputSignal::$miso,
@@ -3926,6 +3907,27 @@ impl Instance for AnySpi<'_> {
             fn state(&self) -> &'static State;
             fn handler(&self) -> InterruptHandler;
         }
+    }
+}
+
+impl AnySpi<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(spi_master_spi2)]
+            AnySpiInner::Spi2(spi) => spi,
+            #[cfg(spi_master_spi3)]
+            AnySpiInner::Spi3(spi) => spi,
+        } {
+            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+            fn disable_peri_interrupt(&self);
+            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
+        }
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.disable_peri_interrupt();
+        self.bind_peri_interrupt(handler.handler());
+        self.enable_peri_interrupt(handler.priority());
     }
 }
 
