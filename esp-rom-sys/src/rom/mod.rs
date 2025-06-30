@@ -1,29 +1,8 @@
-//! # ESP ROM libraries
+//! # Wrappers for selected ROM functions
 //!
 //! ## Overview
-//! The `rom` driver provides functionality related to the ROM (Read-Only
-//! Memory) on ESP chips. It includes implementations for the [CRC (Cyclic
-//! Redundancy Check)] and [MD5 (Message Digest 5)] algorithms.
 //!
-//! The driver's functionality allows users to perform CRC calculations and MD5
-//! hashing using the ROM functions provided by the ESP chip. This can be useful
-//! for various applications that require data integrity checks or cryptographic
-//! operations.
-//!
-//! It uses `CRC` error-checking techniques to detect changes in data during
-//! transmission or storage.
-//!
-//! This module also implements the `MD5` algorithm, which is widely used for
-//! cryptographic hash function. It's commonly used to verify data integrity and
-//! to check whether the data has been modified.
-//!
-//! Safe abstractions to the additional libraries provided in the ESP's
-//! Read-Only Memory.
-//!
-//! [CRC (Cyclic Redundancy Check)]: ./crc/index.html
-//! [MD5 (Message Digest 5)]: ./md5/index.html
-
-#![allow(unused_macros)]
+//! For some selected ROM functions safe wrappers are provided for convenience.
 
 #[cfg(any(rom_crc_be, rom_crc_le))]
 pub mod crc;
@@ -31,6 +10,7 @@ pub mod crc;
 pub mod md5;
 pub mod spiflash;
 
+/// Busy-loop CPU for the given about of us.
 #[inline(always)]
 pub fn ets_delay_us(us: u32) {
     unsafe extern "C" {
@@ -40,6 +20,8 @@ pub fn ets_delay_us(us: u32) {
     unsafe { ets_delay_us(us) };
 }
 
+/// Set the real CPU ticks per us to the ets, so that ets_delay_us will be
+/// accurate. Call this function when CPU frequency is changed.
 #[inline(always)]
 pub fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
     unsafe extern "C" {
@@ -49,6 +31,7 @@ pub fn ets_update_cpu_frequency_rom(ticks_per_us: u32) {
     unsafe { ets_update_cpu_frequency(ticks_per_us) };
 }
 
+/// Get the reset reason for CPU.
 #[inline(always)]
 pub fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
     unsafe extern "C" {
@@ -58,6 +41,7 @@ pub fn rtc_get_reset_reason(cpu_num: u32) -> u32 {
     unsafe { rtc_get_reset_reason(cpu_num) }
 }
 
+/// Software Reset digital core.
 #[inline(always)]
 pub fn software_reset_cpu(cpu_num: u32) {
     unsafe extern "C" {
@@ -67,6 +51,7 @@ pub fn software_reset_cpu(cpu_num: u32) {
     unsafe { software_reset_cpu(cpu_num) };
 }
 
+/// Software Reset digital core.
 #[inline(always)]
 pub fn software_reset() -> ! {
     unsafe extern "C" {
@@ -76,6 +61,7 @@ pub fn software_reset() -> ! {
     unsafe { software_reset() }
 }
 
+/// Set App cpu Entry code, code can be called in PRO CPU.
 #[cfg(esp32s3)]
 #[inline(always)]
 pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
