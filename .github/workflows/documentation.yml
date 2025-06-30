@@ -83,10 +83,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           default: true
-          ldproxy: false
           version: 1.87.0.0
 
       # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
