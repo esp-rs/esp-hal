@@ -699,7 +699,7 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         Peripheral::Spi3 => {
             perip_rst_en0.modify(|_, w| w.spi3_rst().bit(reset));
         }
-        #[cfg(all(soc_has_i2c0))]
+        #[cfg(soc_has_i2c0)]
         Peripheral::I2cExt0 => {
             perip_rst_en0.modify(|_, w| w.i2c_ext0_rst().bit(reset));
         }
@@ -761,17 +761,7 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         Peripheral::Twai0 => {
             perip_rst_en0.modify(|_, w| w.twai_rst().bit(reset));
         }
-        #[cfg(esp32)]
-        Peripheral::Aes => {
-            peri_rst_en.modify(|r, w| unsafe {
-                if reset {
-                    w.bits(r.bits() | 1)
-                } else {
-                    w.bits(r.bits() & (!1))
-                }
-            });
-        }
-        #[cfg(any(esp32c3, esp32s2, esp32s3))]
+        #[cfg(soc_has_aes)]
         Peripheral::Aes => {
             perip_rst_en1.modify(|_, w| w.crypto_aes_rst().bit(reset));
         }
@@ -789,16 +779,17 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         }
         #[cfg(soc_has_sha)]
         Peripheral::Sha => {
-            #[cfg(not(esp32))]
             perip_rst_en1.modify(|_, w| w.crypto_sha_rst().bit(reset));
         }
-        #[cfg(esp32c3)]
+        #[cfg(soc_has_usb_device)]
         Peripheral::UsbDevice => {
-            perip_rst_en0.modify(|_, w| w.usb_device_rst().bit(reset));
-        }
-        #[cfg(esp32s3)]
-        Peripheral::UsbDevice => {
-            perip_rst_en1.modify(|_, w| w.usb_device_rst().bit(reset));
+            cfg_if::cfg_if! {
+                if #[cfg(esp32c3)] {
+                    perip_rst_en0.modify(|_, w| w.usb_device_rst().bit(reset));
+                } else {
+                    perip_rst_en1.modify(|_, w| w.usb_device_rst().bit(reset));
+                }
+            }
         }
         #[cfg(soc_has_uart0)]
         Peripheral::Uart0 => {
@@ -808,25 +799,17 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         Peripheral::Uart1 => {
             perip_rst_en0.modify(|_, w| w.uart1_rst().bit(reset));
         }
-        #[cfg(all(soc_has_uart2, esp32s3))]
+        #[cfg(soc_has_uart2)]
         Peripheral::Uart2 => {
-            perip_rst_en1.modify(|_, w| w.uart2_rst().bit(reset));
-        }
-        #[cfg(all(soc_has_uart2, esp32))]
-        Peripheral::Uart2 => {
-            perip_rst_en0.modify(|_, w| w.uart2_rst().bit(reset));
-        }
-        #[cfg(all(rsa, esp32))]
-        Peripheral::Rsa => {
-            peri_rst_en.modify(|r, w| unsafe {
-                if reset {
-                    w.bits(r.bits() | (1 << 2))
+            cfg_if::cfg_if! {
+                if #[cfg(esp32)] {
+                    perip_rst_en0.modify(|_, w| w.uart2_rst().bit(reset));
                 } else {
-                    w.bits(r.bits() & !(1 << 2))
+                    perip_rst_en1.modify(|_, w| w.uart2_rst().bit(reset));
                 }
-            });
+            }
         }
-        #[cfg(all(rsa, any(esp32c3, esp32s2, esp32s3)))]
+        #[cfg(soc_has_rsa)]
         Peripheral::Rsa => {
             perip_rst_en1.modify(|_, w| w.crypto_rsa_rst().bit(reset));
         }
