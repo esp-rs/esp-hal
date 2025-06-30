@@ -14,6 +14,12 @@ macro_rules! assert_unique_features {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let self_version = std::env::var("CARGO_PKG_VERSION")?;
+    let self_version: Vec<&str> = self_version.split('.').collect();
+    if self_version[0] != "0" || self_version[1] != "0" && self_version[1] != "1" {
+        panic!("The 'esp-rom-sys' crate is not allowed to get bumped to anything above 0.1.x");
+    }
+
     // Ensure that exactly one chip has been specified:
     let chip = Chip::from_cargo_feature()?;
 
