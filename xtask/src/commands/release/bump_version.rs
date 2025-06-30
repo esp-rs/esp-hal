@@ -53,8 +53,14 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
                 Version::Patch => VersionBump::Patch,
             }
         };
-        let mut package = CargoToml::new(workspace, package)?;
-        update_package(&mut package, &version, false)?;
+        let mut pkg = CargoToml::new(workspace, package)?;
+        let updated_version = update_package(&mut pkg, &version, false)?;
+
+        if !package.is_version_acceptable(&updated_version) {
+            return Err(anyhow::anyhow!(
+                "Unacceptable version ({updated_version}) for package {package}"
+            ));
+        }
     }
 
     Ok(())

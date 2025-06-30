@@ -285,6 +285,19 @@ impl Package {
         format!("{self}-v{version}")
     }
 
+    pub fn is_version_acceptable(&self, version: &semver::Version) -> bool {
+        match self {
+            Package::EspRomSys => {
+                if version.major != 0 || !((0..=1).contains(&version.minor)) {
+                    false
+                } else {
+                    true
+                }
+            }
+            _ => true,
+        }
+    }
+
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
         [Self::EspHal].contains(self)
