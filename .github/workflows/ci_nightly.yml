@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [ "esp32c2", "esp32c3", "esp32c6", "esp32h2" ]
+        device: ["esp32c2", "esp32c3", "esp32c6", "esp32h2"]
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +41,7 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo +nightly xtask ci ${{ matrix.device }}
+        run: cargo xtask ci ${{ matrix.device }} --toolchain nightly
 
       - if: failure()
         name: Create or Update GitHub Issue

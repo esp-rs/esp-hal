@@ -140,6 +140,7 @@ pub fn build_examples(
                 CargoAction::Build(out_path.to_path_buf()),
                 1,
                 args.debug,
+                args.toolchain.as_deref(),
             )?;
         }
         Ok(())
@@ -157,6 +158,7 @@ pub fn build_examples(
                 CargoAction::Build(out_path.to_path_buf()),
                 1,
                 args.debug,
+                args.toolchain.as_deref(),
             )
         })
     }
