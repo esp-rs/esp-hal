@@ -3205,8 +3205,8 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-macro_rules! impl_instance {
-    ($inst:ident, $peri:ident, $txd:ident, $rxd:ident, $cts:ident, $rts:ident) => {
+crate::peripherals::for_each_uart! {
+    ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
                 #[crate::handler]
@@ -3235,13 +3235,6 @@ macro_rules! impl_instance {
         }
     };
 }
-
-#[cfg(soc_has_uart0)]
-impl_instance!(UART0, Uart0, U0TXD, U0RXD, U0CTS, U0RTS);
-#[cfg(soc_has_uart1)]
-impl_instance!(UART1, Uart1, U1TXD, U1RXD, U1CTS, U1RTS);
-#[cfg(soc_has_uart2)]
-impl_instance!(UART2, Uart2, U2TXD, U2RXD, U2CTS, U2RTS);
 
 crate::any_peripheral! {
     /// Any UART peripheral.

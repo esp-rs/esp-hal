@@ -9,17 +9,17 @@ pub(crate) struct I2cMasterInstanceConfig {
     /// The name of the instance in the `esp_hal::system::Peripheral` enum
     pub sys_instance: String,
 
-    /// IOMUX signal name of the instane's SCL signal.
+    /// IOMUX signal name of the instance's SCL signal.
     pub scl: String,
 
-    /// IOMUX signal name of the instane's SDA signal.
+    /// IOMUX signal name of the instance's SDA signal.
     pub sda: String,
 }
 
 /// Generates `for_each_i2c_master!` which can be used to implement the I2C
 /// master Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.i2c_master.instances[X]] instance.
-pub(crate) fn generate_i2c_master_peripehrals(i2c: &I2cMasterProperties) -> TokenStream {
+pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> TokenStream {
     let i2c_master_instance_cfgs = i2c
         .instances
         .iter()
