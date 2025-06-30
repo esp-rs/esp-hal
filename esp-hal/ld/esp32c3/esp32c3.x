@@ -1,15 +1,6 @@
 /* esp32c3 fixups */
 
 SECTIONS {
-  .trap : ALIGN(4)
-  {
-    KEEP(*(.trap));
-    *(.trap.*);
-  } > RWTEXT
-}
-INSERT BEFORE .rwtext;
-
-SECTIONS {
   .rotext_dummy (NOLOAD) :
   {
     /* This dummy section represents the .rodata section within ROTEXT.
@@ -52,7 +43,6 @@ INSERT BEFORE .data;
 
 /* Shared sections - ordering matters */
 SECTIONS {
-  INCLUDE "rodata_desc.x"
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
 }
