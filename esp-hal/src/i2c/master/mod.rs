@@ -137,10 +137,12 @@ use crate::{
         Pull,
         interconnect::{self, PeripheralOutput},
     },
+    handler,
     interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
     peripherals::Interrupt,
     private,
+    ram,
     system::PeripheralGuard,
     time::{Duration, Instant, Rate},
 };
@@ -1210,6 +1212,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
     }
 }
 
+#[ram]
 fn async_handler(info: &Info, state: &State) {
     // Disable all interrupts. The I2C Future will check events based on the
     // interrupt status bits.
@@ -3118,7 +3121,8 @@ crate::peripherals::for_each_i2c_master!(
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::handler]
+                #[handler]
+                #[ram]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }
