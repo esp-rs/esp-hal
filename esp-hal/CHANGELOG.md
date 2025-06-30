@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT `ChannelCreator` methods have been renamed from `configure` to `configure_tx` and `configure_rx` to avoid trait disambiguation issues. (#3505)
 - The RMT `Error` type has been marked `non_exhaustive` (#3701)
 - Increase ESP32 DRAM memory region by 16K (#3703)
+- The I2C async interrupt handler is now placed into IRAM (#3722)
 
 ### Fixed
 
