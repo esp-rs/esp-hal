@@ -137,9 +137,11 @@ use crate::{
         Pull,
         interconnect::{self, PeripheralOutput},
     },
+    handler,
     interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
     private,
+    ram,
     system::PeripheralGuard,
     time::{Duration, Instant, Rate},
 };
@@ -1209,6 +1211,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
     }
 }
 
+#[ram]
 fn async_handler(info: &Info, state: &State) {
     // Disable all interrupts. The I2C Future will check events based on the
     // interrupt status bits.
@@ -2801,13 +2804,9 @@ mod bus_clear {
         }
 
         pub fn poll_completion(&mut self) -> Poll<()> {
-            if self
-                .driver
-                .regs()
-                .scl_sp_conf()
-                .read()
-                .scl_rst_slv_en()
-                .bit_is_set()
+            let regs = self.driver.regs();
+            if regs.scl_sp_conf().read().scl_rst_slv_en().bit_is_set()
+                || regs.sr().read().bus_busy().bit_is_set()
             {
                 Poll::Pending
             } else {
@@ -2913,7 +2912,12 @@ mod bus_clear {
             let now = Instant::now();
 
             match self.state {
-                State::Idle => return Poll::Ready(()),
+                State::Idle => {
+                    if self.driver.regs().sr().read().bus_busy().bit_is_set() {
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(());
+                }
                 _ if now < self.wait => {
                     // Still waiting for the end of the SCL pulse
                     return Poll::Pending;
@@ -2923,7 +2927,7 @@ mod bus_clear {
                         sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
                     }
                     self.state = State::Idle;
-                    return Poll::Ready(());
+                    return Poll::Pending;
                 }
                 State::SendClock(0, false) => {
                     if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
@@ -3100,7 +3104,8 @@ crate::peripherals::for_each_i2c_master!(
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::handler]
+                #[handler]
+                #[ram]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }
