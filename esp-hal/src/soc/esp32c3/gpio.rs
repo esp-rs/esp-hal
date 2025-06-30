@@ -27,7 +27,7 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-include!(concat!(env!("OUT_DIR"), "/_generated_gpio_extras.rs"));
+include!(concat!(env!("OUT_DIR"), "/_generated_iomux_signals.rs"));
 
 macro_rules! rtc_pins {
     ( $( $pin_num:expr )+ ) => {
