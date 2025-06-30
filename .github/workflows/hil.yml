@@ -75,22 +75,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # RISC-V devices:
-          - soc: esp32c2
-            rust-target: riscv32imc-unknown-none-elf
-          - soc: esp32c3
-            rust-target: riscv32imc-unknown-none-elf
           - soc: esp32c6
             rust-target: riscv32imac-unknown-none-elf
-          - soc: esp32h2
-            rust-target: riscv32imac-unknown-none-elf
-          # # Xtensa devices:
-          - soc: esp32
-            rust-target: xtensa-esp32-none-elf
-          - soc: esp32s2
-            rust-target: xtensa-esp32s2-none-elf
-          - soc: esp32s3
-            rust-target: xtensa-esp32s3-none-elf
 
     steps:
       - uses: actions/checkout@v4
@@ -146,28 +132,8 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          # RISC-V devices:
-          - soc: esp32c2
-            runner: esp32c2-jtag
-            host: aarch64
-          - soc: esp32c3
-            runner: esp32c3-usb
-            host: armv7
           - soc: esp32c6
             runner: esp32c6-usb
-            host: armv7
-          - soc: esp32h2
-            runner: esp32h2-usb
-            host: armv7
-          # Xtensa devices:
-          - soc: esp32
-            runner: esp32-jtag
-            host: aarch64
-          - soc: esp32s2
-            runner: esp32s2-jtag
-            host: armv7
-          - soc: esp32s3
-            runner: esp32s3-usb
             host: armv7
     steps:
       - uses: actions/download-artifact@v4

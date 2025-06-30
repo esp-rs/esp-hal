@@ -879,6 +879,7 @@ impl<'a> I2cFuture<'a> {
             if let Some(deadline) = self.deadline {
                 if now > deadline {
                     // If the deadline is reached, we return an error.
+                    panic!();
                     return Poll::Ready(Err(Error::Timeout));
                 }
             }
@@ -2214,13 +2215,16 @@ impl Driver<'_> {
         #[cfg(i2c_master_has_fsm_timeouts)]
         {
             if r.scl_st_to().bit_is_set() {
+                panic!();
                 return Err(Error::Timeout);
             }
             if r.scl_main_st_to().bit_is_set() {
+                panic!();
                 return Err(Error::Timeout);
             }
         }
         if r.time_out().bit_is_set() {
+            panic!();
             return Err(Error::Timeout);
         }
 
