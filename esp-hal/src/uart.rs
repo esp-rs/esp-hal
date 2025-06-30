@@ -1440,7 +1440,6 @@ impl<'d> Uart<'d, Async> {
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2)
     /// # .into_async();
-    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// # Ok(())
@@ -1471,7 +1470,6 @@ impl<'d> Uart<'d, Async> {
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2)
     /// # .into_async();
-    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// uart.flush_async().await?;
@@ -1512,7 +1510,6 @@ impl<'d> Uart<'d, Async> {
     /// # .with_rx(peripherals.GPIO1)
     /// # .with_tx(peripherals.GPIO2)
     /// # .into_async();
-    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// uart.flush_async().await?;
@@ -1700,8 +1697,8 @@ where
     /// # let mut uart = Uart::new(
     /// #     peripherals.UART0,
     /// #     Config::default())?;
-    /// // Write bytes out over the UART:
-    /// uart.write(b"Hello, world!")?;
+    /// const MESSAGE: &[u8] = b"Hello, world!";
+    /// uart.write(&MESSAGE)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -1719,7 +1716,6 @@ where
     /// # let mut uart = Uart::new(
     /// #     peripherals.UART0,
     /// #     Config::default())?;
-    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// uart.flush()?;
@@ -1764,7 +1760,6 @@ where
     /// # let mut uart = Uart::new(
     /// #     peripherals.UART0,
     /// #     Config::default())?;
-    ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// uart.flush()?;
@@ -1794,7 +1789,6 @@ where
     /// # let mut uart = Uart::new(
     /// #     peripherals.UART0,
     /// #     Config::default())?;
-    ///
     /// uart.apply_config(&Config::default().with_baudrate(19_200))?;
     /// # Ok(())
     /// # }
