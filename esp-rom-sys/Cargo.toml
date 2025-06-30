@@ -10,10 +10,6 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
-# this is commonly used to force a single version of a crate (with mediocre DX)
-# but we also use this to make Cargo metadata passing to a dependent crate
-# work: see https://doc.rust-lang.org/cargo/reference/build-scripts.html#the-links-manifest-key
-# and only allowing one version of the ROM functions is a wanted side effect
 links         = "esp_rom_sys"
 
 [package.metadata.docs.rs]

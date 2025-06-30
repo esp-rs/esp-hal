@@ -62,20 +62,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-hal");
-    let mut cfg =
+    let cfg =
         generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
-
-    // esp-rom-sys might wish to contribute to .rwtext
-    cfg.insert(
-        "RWTEXT_ADDITION".to_string(),
-        Value::String(
-            if let Ok(rwtext_addition) = std::env::var("DEP_ESP_ROM_SYS_RWTEXT_ROM_FUNCTIONS") {
-                rwtext_addition.replace("\\n", "\n")
-            } else {
-                "".to_string()
-            },
-        ),
-    );
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
