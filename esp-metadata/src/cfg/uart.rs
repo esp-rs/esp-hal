@@ -3,7 +3,7 @@ use quote::format_ident;
 
 use crate::{cfg::UartProperties, generate_for_each_macro};
 
-/// Instance configuration, used in [device.i2c_master.instances]
+/// Instance configuration, used in [device.uart.instances]
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct UartInstanceConfig {
     /// The name of the instance in the `esp_hal::system::Peripheral` enum
@@ -25,7 +25,7 @@ pub(crate) struct UartInstanceConfig {
 /// Generates `for_each_uart!` which can be used to implement the UART
 /// Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.uart.instances[X]] instance.
-pub(crate) fn generate_uart_peripehrals(uart: &UartProperties) -> TokenStream {
+pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
     let uart_instance_cfgs = uart
         .instances
         .iter()

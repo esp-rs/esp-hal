@@ -19,7 +19,7 @@ pub(crate) struct I2cMasterInstanceConfig {
 /// Generates `for_each_i2c_master!` which can be used to implement the I2C
 /// master Instance trait for the relevant peripherals. The macro generates code
 /// for each [device.i2c_master.instances[X]] instance.
-pub(crate) fn generate_i2c_master_peripehrals(i2c: &I2cMasterProperties) -> TokenStream {
+pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> TokenStream {
     let i2c_master_instance_cfgs = i2c
         .instances
         .iter()
