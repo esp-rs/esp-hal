@@ -75,11 +75,5 @@ fn include_libs(path: impl AsRef<Path>) -> std::io::Result<()> {
             println!("cargo:rustc-link-lib=static={lib_name}");
         }
     }
-
-    let add_rwtext_file = std::path::PathBuf::from(path.as_ref()).join("add_rwtext");
-    if std::fs::exists(&add_rwtext_file)? {
-        let contents = std::fs::read_to_string(add_rwtext_file)?.replace("\n", "\\n");
-        println!("cargo::metadata=RWTEXT_ROM_FUNCTIONS={contents}");
-    }
     Ok(())
 }

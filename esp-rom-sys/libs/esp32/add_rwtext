@@ -1,1 +1,0 @@
-*:esp_rom_spiflash.*(.literal .literal.* .text .text.*)
