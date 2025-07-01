@@ -69,9 +69,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          ldproxy: false
           version: 1.87.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
@@ -94,11 +93,12 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
+        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
 
       - name: Semver-Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xcheck semver-check --chips ${{ matrix.device.soc }} check
+        # always invokes +esp internally
+        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
 
   extras:
     runs-on: macos-m1-self-hosted
@@ -126,9 +126,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          ldproxy: false
           version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -138,36 +137,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Stable toolchain checks
-        run: rustc +stable --version --verbose
+        run: rustc +${{ env.MSRV }} --version --verbose
       - name: esp toolchain checks
         run: rustc +esp --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
         run: |
-          cargo +stable xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
       - name: msrv Xtensa (esp-hal)
         run: |
-          cargo +esp xtask lint-packages --chips esp32,esp32s2,esp32s3
-
-  # --------------------------------------------------------------------------
-  # Format
-
-  rustfmt:
-    runs-on: macos-m1-self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
-      # release channel:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: nightly
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-
-      # Check the formatting of all packages:
-      - run: cargo xtask fmt-packages --check
+          cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
@@ -177,13 +157,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
+      # release channel, MIRI is only available in nightly
       - uses: dtolnay/rust-toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
+          components: rustfmt,miri
       - uses: Swatinem/rust-cache@v2
+
+      # Check the formatting of all packages:
+      - run: cargo xtask fmt-packages --check
 
       # Run tests in esp-config
       - run: cd esp-config && cargo test --features build
 
       # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test --features=std
+
+      # Run tests in esp-storage
+      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
+      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
+
+      # Miri tests in esp-storage
+      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
+      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1

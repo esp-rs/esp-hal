@@ -19,10 +19,10 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        SPI2 <= SPI2 (SPI2),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        SPI2 <= SPI2 (peri => SPI2),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -65,19 +65,22 @@ crate::peripherals! {
         DMA_CH0 <= virtual,
     ],
     pins: [
-        (0, [Input, Output, Analog, RtcIo])
-        (1, [Input, Output, Analog, RtcIo])
-        (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-        (3, [Input, Output, Analog, RtcIo])
-        (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (2 => FSPIHD))
-        (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (2 => FSPIWP))
-        (6, [Input, Output] (2 => FSPICLK) (2 => FSPICLK_MUX))
-        (7, [Input, Output] (2 => FSPID) (2 => FSPID))
-        (8, [Input, Output])
-        (9, [Input, Output])
-        (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-        (18, [Input, Output])
-        (19, [Input, Output])
-        (20, [Input, Output] (0 => U0RXD) ())
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        18,
+        19,
+        20,
     ]
 }
+
+include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
+include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));

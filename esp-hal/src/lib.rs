@@ -160,14 +160,14 @@
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
-//! [documentation]: https://docs.esp-rs.org/esp-hal
+//! [documentation]: https://docs.espressif.com/projects/rust/esp-hal/latest/
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/
 //! [xtask]: https://github.com/matklad/cargo-xtask
 //! [esp-generate]: https://github.com/esp-rs/esp-generate
-//! [book]: https://docs.esp-rs.org/book/
-//! [training]: https://docs.esp-rs.org/no_std-training/
+//! [book]: https://docs.espressif.com/projects/rust/book/
+//! [training]: https://docs.espressif.com/projects/rust/no_std-training/
 //!
 //! ## Feature Flags
 #![doc = document_features::document_features!(feature_label = r#"<span class="stab portability"><code>{feature}</code></span>"#)]
@@ -208,7 +208,7 @@ pub use esp_riscv_rt::{self, riscv};
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
-#[cfg(efuse)]
+#[cfg(soc_has_efuse)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::efuse;
@@ -226,20 +226,20 @@ pub use self::soc::psram;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::ulp_core;
 
-#[cfg(any(dport, hp_sys, pcr, system))]
+#[cfg(any(soc_has_dport, soc_has_hp_sys, soc_has_pcr, soc_has_system))]
 pub mod clock;
-#[cfg(gpio)]
+#[cfg(soc_has_gpio)]
 pub mod gpio;
-#[cfg(any(i2c0, i2c1))]
+#[cfg(any(soc_has_i2c0, soc_has_i2c1))]
 pub mod i2c;
 pub mod peripheral;
-#[cfg(all(feature = "unstable", any(hmac, sha)))]
+#[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
-#[cfg(any(spi0, spi1, spi2, spi3))]
+#[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
 pub mod spi;
 pub mod system;
 pub mod time;
-#[cfg(any(uart0, uart1, uart2))]
+#[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
 pub mod uart;
 
 mod macros;
@@ -300,66 +300,65 @@ unstable_module! {
     pub mod asynch;
     pub mod config;
     pub mod debugger;
-    #[cfg(any(dport, interrupt_core0, interrupt_core1))]
+    #[cfg(any(soc_has_dport, soc_has_interrupt_core0, soc_has_interrupt_core1))]
     pub mod interrupt;
     pub mod rom;
     #[doc(hidden)]
     pub mod sync;
     // Drivers needed for initialization or they are tightly coupled to something else.
-    #[cfg(any(adc1, adc2, dac))]
+    #[cfg(any(adc, dac))]
     pub mod analog;
-    #[cfg(any(systimer, timg0, timg1))]
+    #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(any(lp_clkrst, rtc_cntl))]
+    #[cfg(any(soc_has_lp_clkrst, soc_has_rtc_cntl))]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
-    #[cfg(soc_etm)]
+    #[cfg(soc_has_etm)]
     pub mod etm;
-    #[cfg(usb0)]
+    #[cfg(soc_has_usb0)]
     pub mod otg_fs;
 }
 
 unstable_driver! {
-    #[cfg(aes)]
+    #[cfg(soc_has_aes)]
     pub mod aes;
-    #[cfg(assist_debug)]
+    #[cfg(soc_has_assist_debug)]
     pub mod assist_debug;
-    #[cfg(any(xtensa, all(riscv, systimer)))]
     pub mod delay;
-    #[cfg(ecc)]
+    #[cfg(soc_has_ecc)]
     pub mod ecc;
-    #[cfg(hmac)]
+    #[cfg(soc_has_hmac)]
     pub mod hmac;
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub mod i2s;
-    #[cfg(lcd_cam)]
+    #[cfg(soc_has_lcd_cam)]
     pub mod lcd_cam;
-    #[cfg(ledc)]
+    #[cfg(soc_has_ledc)]
     pub mod ledc;
-    #[cfg(any(mcpwm0, mcpwm1))]
+    #[cfg(any(soc_has_mcpwm0, soc_has_mcpwm1))]
     pub mod mcpwm;
-    #[cfg(parl_io)]
+    #[cfg(soc_has_parl_io)]
     pub mod parl_io;
-    #[cfg(pcnt)]
+    #[cfg(soc_has_pcnt)]
     pub mod pcnt;
-    #[cfg(rmt)]
+    #[cfg(soc_has_rmt)]
     pub mod rmt;
-    #[cfg(rng)]
+    #[cfg(soc_has_rng)]
     pub mod rng;
-    #[cfg(rsa)]
+    #[cfg(soc_has_rsa)]
     pub mod rsa;
-    #[cfg(sha)]
+    #[cfg(soc_has_sha)]
     pub mod sha;
     #[cfg(touch)]
     pub mod touch;
-    #[cfg(trace0)]
+    #[cfg(soc_has_trace0)]
     pub mod trace;
     #[cfg(tsens)]
     pub mod tsens;
-    #[cfg(any(twai0, twai1))]
+    #[cfg(any(soc_has_twai0, soc_has_twai1))]
     pub mod twai;
-    #[cfg(usb_device)]
+    #[cfg(soc_has_usb_device)]
     pub mod usb_serial_jtag;
 }
 
@@ -378,7 +377,7 @@ pub mod trapframe {
 mod soc;
 
 #[cfg(is_debug_build)]
-esp_build::warning! {"
+procmacros::warning! {"
 WARNING: use --release
   We *strongly* recommend using release profile when building esp-hal.
   The dev profile can potentially be one or more orders of magnitude
@@ -533,36 +532,6 @@ pub mod __macro_implementation {
     pub use xtensa_lx_rt::entry as __entry;
 }
 
-#[cfg(riscv)]
-#[unsafe(export_name = "hal_main")]
-fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
-    unsafe extern "Rust" {
-        // This symbol will be provided by the user via `#[entry]`
-        fn main(a0: usize, a1: usize, a2: usize) -> !;
-    }
-
-    unsafe extern "C" {
-        static mut __stack_chk_guard: u32;
-    }
-
-    unsafe {
-        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
-        // we _should_ use a random value but we don't have a good source for random
-        // numbers here
-        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
-            u32,
-            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
-        ));
-
-        main(a0, a1, a2);
-    }
-}
-
-#[unsafe(export_name = "__stack_chk_fail")]
-unsafe extern "C" fn stack_chk_fail() {
-    panic!("Stack corruption detected");
-}
-
 #[cfg(feature = "unstable")]
 use crate::config::{WatchdogConfig, WatchdogStatus};
 use crate::{
@@ -634,6 +603,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
+            #[cfg(timergroup_timg0)]
             match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
@@ -645,7 +615,7 @@ pub fn init(config: Config) -> Peripherals {
                 }
             }
 
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
@@ -664,9 +634,10 @@ pub fn init(config: Config) -> Peripherals {
 
             rtc.rwdt.disable();
 
+            #[cfg(timergroup_timg0)]
             crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
 
-            #[cfg(timg1)]
+            #[cfg(timergroup_timg1)]
             crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
         }
     }

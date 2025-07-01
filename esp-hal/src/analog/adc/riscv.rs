@@ -14,7 +14,7 @@ use core::{
 };
 
 // We only have to count on devices that have multiple ADCs sharing the same interrupt
-#[cfg(all(adc1, adc2))]
+#[cfg(all(adc_adc1, adc_adc2))]
 use portable_atomic::{AtomicU32, Ordering};
 use procmacros::handler;
 
@@ -41,7 +41,7 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h4/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
-    if #[cfg(adc1)] {
+    if #[cfg(adc_adc1)] {
         const ADC_VAL_MASK: u16 = 0xfff;
         const ADC_CAL_CNT_MAX: u16 = 32;
         const ADC_CAL_CHANNEL: u16 = 15;
@@ -137,7 +137,7 @@ pub trait RegisterAccess {
     fn set_init_code(data: u16);
 }
 
-#[cfg(adc1)]
+#[cfg(adc_adc1)]
 impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
@@ -186,7 +186,7 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc1)]
+#[cfg(adc_adc1)]
 impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -211,7 +211,7 @@ impl super::CalibrationAccess for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc2)]
+#[cfg(adc_adc2)]
 impl RegisterAccess for crate::peripherals::ADC2<'_> {
     fn config_onetime_sample(channel: u8, attenuation: u8) {
         APB_SARADC::regs().onetime_sample().modify(|_, w| unsafe {
@@ -258,7 +258,7 @@ impl RegisterAccess for crate::peripherals::ADC2<'_> {
     }
 }
 
-#[cfg(adc2)]
+#[cfg(adc_adc2)]
 impl super::CalibrationAccess for crate::peripherals::ADC2<'_> {
     const ADC_CAL_CNT_MAX: u16 = ADC_CAL_CNT_MAX;
     const ADC_CAL_CHANNEL: u16 = ADC_CAL_CHANNEL;
@@ -419,7 +419,7 @@ impl<ADCI> InterruptConfigurable for Adc<'_, ADCI, Blocking> {
     }
 }
 
-#[cfg(adc1)]
+#[cfg(adc_adc1)]
 impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(1, atten)
@@ -434,7 +434,7 @@ impl super::AdcCalEfuse for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc2)]
+#[cfg(adc_adc2)]
 impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     fn init_code(atten: Attenuation) -> Option<u16> {
         Efuse::rtc_calib_init_code(2, atten)
@@ -575,17 +575,17 @@ where
     }
 }
 
-#[cfg(all(adc1, adc2))]
+#[cfg(all(adc_adc1, adc_adc2))]
 static ASYNC_ADC_COUNT: AtomicU32 = AtomicU32::new(0);
 
 pub(super) fn acquire_async_adc() {
-    #[cfg(all(adc1, adc2))]
+    #[cfg(all(adc_adc1, adc_adc2))]
     ASYNC_ADC_COUNT.fetch_add(1, Ordering::Relaxed);
 }
 
 pub(super) fn release_async_adc() -> bool {
     cfg_if::cfg_if! {
-        if #[cfg(all(adc1, adc2))] {
+        if #[cfg(all(adc_adc1, adc_adc2))] {
             ASYNC_ADC_COUNT.fetch_sub(1, Ordering::Relaxed) == 1
         } else {
             true
@@ -598,12 +598,12 @@ pub(crate) fn adc_interrupt_handler() {
     let saradc = APB_SARADC::regs();
     let interrupt_status = saradc.int_st().read();
 
-    #[cfg(adc1)]
+    #[cfg(adc_adc1)]
     if interrupt_status.adc1_done().bit_is_set() {
         unsafe { handle_async(crate::peripherals::ADC1::steal()) }
     }
 
-    #[cfg(adc2)]
+    #[cfg(adc_adc2)]
     if interrupt_status.adc2_done().bit_is_set() {
         unsafe { handle_async(crate::peripherals::ADC2::steal()) }
     }
@@ -629,7 +629,7 @@ pub trait Instance: crate::private::Sealed {
     fn waker() -> &'static AtomicWaker;
 }
 
-#[cfg(adc1)]
+#[cfg(adc_adc1)]
 impl Instance for crate::peripherals::ADC1<'_> {
     fn enable_interrupt() {
         APB_SARADC::regs()
@@ -656,7 +656,7 @@ impl Instance for crate::peripherals::ADC1<'_> {
     }
 }
 
-#[cfg(adc2)]
+#[cfg(adc_adc2)]
 impl Instance for crate::peripherals::ADC2<'_> {
     fn enable_interrupt() {
         APB_SARADC::regs()

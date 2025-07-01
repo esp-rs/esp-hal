@@ -19,10 +19,10 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        SPI2 <= SPI2 (SPI2),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        SPI2 <= SPI2 (peri => SPI2),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -43,7 +43,7 @@ crate::peripherals! {
         HP_APM <= HP_APM,
         HP_SYS <= HP_SYS,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         IEEE802154 <= IEEE802154,
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         INTPRI <= INTPRI,
@@ -68,7 +68,7 @@ crate::peripherals! {
         MODEM_LPCON <= MODEM_LPCON,
         MODEM_SYSCON <= MODEM_SYSCON,
         OTP_DEBUG <= OTP_DEBUG,
-        PARL_IO <= PARL_IO (PARL_IO),
+        PARL_IO <= PARL_IO (peri => PARL_IO),
         PAU <= PAU,
         PCR <= PCR,
         PCNT <= PCNT,
@@ -94,7 +94,7 @@ crate::peripherals! {
         TWAI0 <= TWAI0,
         TWAI1 <= TWAI1,
         UHCI0 <= UHCI0,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         WIFI <= virtual,
         MEM2MEM1 <= virtual,
         MEM2MEM4 <= virtual,
@@ -111,36 +111,39 @@ crate::peripherals! {
         DMA_CH2 <= virtual,
     ],
     pins: [
-        (0, [Input, Output, Analog, RtcIo])
-        (1, [Input, Output, Analog, RtcIo])
-        (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-        (3, [Input, Output, Analog, RtcIo])
-        (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-        (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-        (6, [Input, Output, Analog, RtcIo] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-        (7, [Input, Output, Analog, RtcIo] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-        (8, [Input, Output])
-        (9, [Input, Output])
-        (10, [Input, Output])
-        (11, [Input, Output])
-        (12, [Input, Output])
-        (13, [Input, Output])
-        (14, [Input, Output])
-        (15, [Input, Output])
-        (16, [Input, Output] (0 => U0RXD) (2 => FSPICS0))
-        (17, [Input, Output] () (0 => U0TXD 2 => FSPICS1))
-        (18, [Input, Output] () (2 => FSPICS2)) //  0 => SDIO_CMD but there are no signals since it's a fixed pin
-        (19, [Input, Output] () (2 => FSPICS3)) //  0 => SDIO_CLK but there are no signals since it's a fixed pin
-        (20, [Input, Output] () (2 => FSPICS4)) // 0 => SDIO_DATA0 but there are no signals since it's a fixed pin
-        (21, [Input, Output] () (2 => FSPICS5)) // 0 => SDIO_DATA1 but there are no signals since it's a fixed pin
-        (22, [Input, Output] () ()) // 0 => SDIO_DATA2 but there are no signals since it's a fixed pin
-        (23, [Input, Output] () ()) // 0 => SDIO_DATA3 but there are no signals since it's a fixed pin
-        (24, [Input, Output] () (0 => SPICS0))
-        (25, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-        (26, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-        (27, [Input, Output])
-        (28, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-        (29, [Input, Output] () (0 => SPICLK_MUX))
-        (30, [Input, Output] (0 => SPID) (0 => SPID))
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
     ]
 }
+
+include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
+include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));

@@ -62,9 +62,9 @@ use procmacros::ram;
 use strum::EnumCount;
 
 use crate::{
-    gpio::{GpioBank, InterruptStatusRegisterAccess, asynch, set_int_enable},
+    gpio::{AnyPin, GpioBank, InputPin, set_int_enable},
     interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
-    peripherals::Interrupt,
+    peripherals::{GPIO, Interrupt},
     sync::RawMutex,
 };
 
@@ -94,11 +94,9 @@ impl CFnPtr {
 pub(crate) fn bind_default_interrupt_handler() {
     // We first check if a handler is set in the vector table.
     if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
-        let handler = handler as *const unsafe extern "C" fn();
-
         // We only allow binding the default handler if nothing else is bound.
         // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-        if !core::ptr::eq(handler, DEFAULT_INTERRUPT_HANDLER.handler() as _) {
+        if !core::ptr::fn_addr_eq(handler, DEFAULT_INTERRUPT_HANDLER.handler()) {
             // The user has configured an interrupt handler they wish to use.
             info!("Not using default GPIO interrupt handler: already bound in vector table");
             return;
@@ -204,15 +202,44 @@ pub(super) extern "C" fn user_gpio_interrupt_handler() {
     });
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum InterruptStatusRegisterAccess {
+    Bank0,
+    #[cfg(gpio_has_bank_1)]
+    Bank1,
+}
+
+impl InterruptStatusRegisterAccess {
+    pub(crate) fn interrupt_status_read(self) -> u32 {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                match self {
+                    Self::Bank0 => GPIO::regs().status().read().bits(),
+                    Self::Bank1 => GPIO::regs().status1().read().bits(),
+                }
+            } else if #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2))] {
+                GPIO::regs().pcpu_int().read().bits()
+            } else if #[cfg(any(esp32s2, esp32s3))] {
+                // Whilst the S3 is a dual core chip, it shares the enable registers between
+                // cores so treat it as a single core device
+                match self {
+                    Self::Bank0 => GPIO::regs().pcpu_int().read().bits(),
+                    Self::Bank1 => GPIO::regs().pcpu_int1().read().bits(),
+                }
+            }
+        }
+    }
+}
+
 fn interrupt_status() -> [(GpioBank, u32); GpioBank::COUNT] {
     let intrs_bank0 = InterruptStatusRegisterAccess::Bank0.interrupt_status_read();
 
-    #[cfg(gpio_bank_1)]
+    #[cfg(gpio_has_bank_1)]
     let intrs_bank1 = InterruptStatusRegisterAccess::Bank1.interrupt_status_read();
 
     [
         (GpioBank::_0, intrs_bank0),
-        #[cfg(gpio_bank_1)]
+        #[cfg(gpio_has_bank_1)]
         (GpioBank::_1, intrs_bank1),
     ]
 }
@@ -236,7 +263,7 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
         // Disable the interrupt for this pin.
         set_int_enable(pin_nr, Some(0), 0, false);
 
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
+        unsafe { AnyPin::steal(pin_nr) }.waker().wake();
     }
 
     // This is an optimization (in case multiple pin interrupts are handled at once)
@@ -292,6 +319,6 @@ fn handle_async_pins(bank: GpioBank, async_pins: u32, intrs: u32) {
 
         let pin_nr = pin_pos as u8 + bank.offset();
 
-        asynch::PIN_WAKERS[pin_nr as usize].wake();
+        unsafe { AnyPin::steal(pin_nr) }.waker().wake();
     }
 }

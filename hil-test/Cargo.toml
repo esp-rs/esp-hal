@@ -129,6 +129,10 @@ name    = "storage_read_app_desc"
 harness = false
 
 [[test]]
+name    = "stack_protector"
+harness = false
+
+[[test]]
 name    = "parl_io"
 harness = false
 
@@ -219,6 +223,10 @@ name              = "esp_wifi_init"
 harness           = false
 required-features = ["esp-wifi", "esp-alloc"]
 
+[[test]]
+name    = "otadata"
+harness = false
+
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 cfg-if             = "1.0.0"
@@ -244,7 +252,7 @@ esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-wifi           = { path = "../esp-wifi", optional = true }
 portable-atomic    = "1.11.0"
-static_cell        = { version = "2.1.0", features = ["nightly"] }
+static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 xtensa-lx-rt       = { path = "../xtensa-lx-rt", optional = true }
 
@@ -254,7 +262,7 @@ digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 embassy-executor    = { version = "0.7.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.6.1", default-features = false, features = ["embassy", "external-executor", "semihosting"] }
+embedded-test       = { version = "0.6.2", default-features = false, features = ["embassy", "external-executor", "semihosting"] }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
@@ -263,14 +271,13 @@ sha1                = { version = "0.10.6", default-features = false }
 sha2                = { version = "0.10.8", default-features = false }
 
 [build-dependencies]
-esp-build    = { path = "../esp-build" }
 esp-metadata = { path = "../esp-metadata" }
 
 [features]
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-wifi/defmt", "esp-hal-embassy/defmt"]
+defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-wifi?/defmt", "esp-hal-embassy?/defmt"]
 
 # Device support (required!):
 esp32 = [

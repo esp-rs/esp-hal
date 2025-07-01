@@ -141,3 +141,116 @@ fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
 pub(crate) fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
     range.contains(&addr)
 }
+
+#[cfg(riscv)]
+#[unsafe(export_name = "hal_main")]
+fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
+    unsafe extern "Rust" {
+        // This symbol will be provided by the user via `#[entry]`
+        fn main(a0: usize, a1: usize, a2: usize) -> !;
+    }
+
+    setup_stack_guard();
+
+    unsafe {
+        main(a0, a1, a2);
+    }
+}
+
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+#[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
+unsafe extern "C" fn ESP32Reset() -> ! {
+    unsafe {
+        configure_cpu_caches();
+    }
+
+    /// The ESP32 has a first stage bootloader that handles loading program data
+    /// into the right place therefore we skip loading it again. This function
+    /// is called by xtensa-lx-rt in Reset.
+    #[doc(hidden)]
+    #[unsafe(no_mangle)]
+    pub extern "Rust" fn __init_data() -> bool {
+        false
+    }
+
+    // These symbols come from `memory.x`
+    unsafe extern "C" {
+        static mut _rtc_fast_bss_start: u32;
+        static mut _rtc_fast_bss_end: u32;
+        static mut _rtc_fast_persistent_start: u32;
+        static mut _rtc_fast_persistent_end: u32;
+
+        static mut _rtc_slow_bss_start: u32;
+        static mut _rtc_slow_bss_end: u32;
+        static mut _rtc_slow_persistent_start: u32;
+        static mut _rtc_slow_persistent_end: u32;
+
+        static mut _stack_start_cpu0: u32;
+
+        static mut __stack_chk_guard: u32;
+    }
+
+    // set stack pointer to end of memory: no need to retain stack up to this point
+    unsafe {
+        xtensa_lx::set_stack_pointer(core::ptr::addr_of_mut!(_stack_start_cpu0));
+    }
+
+    // copying data from flash to various data segments is done by the bootloader
+    // initialization to zero needs to be done by the application
+
+    // Initialize RTC RAM
+    unsafe {
+        xtensa_lx_rt::zero_bss(
+            core::ptr::addr_of_mut!(_rtc_fast_bss_start),
+            core::ptr::addr_of_mut!(_rtc_fast_bss_end),
+        );
+        xtensa_lx_rt::zero_bss(
+            core::ptr::addr_of_mut!(_rtc_slow_bss_start),
+            core::ptr::addr_of_mut!(_rtc_slow_bss_end),
+        );
+    }
+    if matches!(
+        crate::system::reset_reason(),
+        None | Some(crate::rtc_cntl::SocResetReason::ChipPowerOn)
+    ) {
+        unsafe {
+            xtensa_lx_rt::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_fast_persistent_start),
+                core::ptr::addr_of_mut!(_rtc_fast_persistent_end),
+            );
+            xtensa_lx_rt::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_slow_persistent_start),
+                core::ptr::addr_of_mut!(_rtc_slow_persistent_end),
+            );
+        }
+    }
+
+    setup_stack_guard();
+
+    crate::interrupt::setup_interrupts();
+
+    // continue with default reset handler
+    unsafe { xtensa_lx_rt::Reset() }
+}
+
+#[unsafe(export_name = "__stack_chk_fail")]
+unsafe extern "C" fn stack_chk_fail() {
+    panic!("Stack corruption detected");
+}
+
+fn setup_stack_guard() {
+    unsafe extern "C" {
+        static mut __stack_chk_guard: u32;
+    }
+
+    unsafe {
+        let stack_chk_guard = core::ptr::addr_of_mut!(__stack_chk_guard);
+        // we _should_ use a random value but we don't have a good source for random
+        // numbers here
+        stack_chk_guard.write_volatile(esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        ));
+    }
+}

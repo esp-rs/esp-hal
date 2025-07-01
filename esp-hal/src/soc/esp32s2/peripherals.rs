@@ -19,12 +19,12 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        I2C1 <= I2C1,
-        SPI2 <= SPI2 (SPI2_DMA, SPI2),
-        SPI3 <= SPI3 (SPI3_DMA, SPI3),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        I2C1 <= I2C1 (peri => I2C_EXT1),
+        SPI2 <= SPI2 (dma => SPI2_DMA, peri => SPI2),
+        SPI3 <= SPI3 (dma => SPI3_DMA, peri => SPI3),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -41,7 +41,7 @@ crate::peripherals! {
         GPIO_SD <= GPIO_SD,
         HMAC <= HMAC,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         IO_MUX <= IO_MUX,
         LEDC <= LEDC,
@@ -83,49 +83,51 @@ crate::peripherals! {
         DMA_COPY <= COPY_DMA,
     ],
     pins: [
-        (0, [Input, Output, Analog, RtcIo])
-        (1, [Input, Output, Analog, RtcIo])
-        (2, [Input, Output, Analog, RtcIo])
-        (3, [Input, Output, Analog, RtcIo])
-        (4, [Input, Output, Analog, RtcIo])
-        (5, [Input, Output, Analog, RtcIo])
-        (6, [Input, Output, Analog, RtcIo])
-        (7, [Input, Output, Analog, RtcIo])
-        (8, [Input, Output, Analog, RtcIo]  (                                       ) (              3 => SUBSPICS1             ))
-        (9, [Input, Output, Analog, RtcIo]  (             3 => SUBSPIHD 4 => FSPIHD ) (              3 => SUBSPIHD  4 => FSPIHD ))
-        (10, [Input, Output, Analog, RtcIo] (2 => FSPIIO4               4 => FSPICS0) (2 => FSPIIO4  3 => SUBSPICS0 4 => FSPICS0))
-        (11, [Input, Output, Analog, RtcIo] (2 => FSPIIO5 3 => SUBSPID  4 => FSPID  ) (2 => FSPIIO5  3 => SUBSPID   4 => FSPID  ))
-        (12, [Input, Output, Analog, RtcIo] (2 => FSPIIO6               4 => FSPICLK) (2 => FSPIIO6  3 => SUBSPICLK 4 => FSPICLK))
-        (13, [Input, Output, Analog, RtcIo] (2 => FSPIIO7 3 => SUBSPIQ  4 => FSPIQ  ) (2 => FSPIIO7  3 => SUBSPIQ   4 => FSPIQ  ))
-        (14, [Input, Output, Analog, RtcIo] (             3 => SUBSPIWP 4 => FSPIWP ) (2 => FSPIDQS  3 => SUBSPIWP  4 => FSPIWP ))
-        (15, [Input, Output, Analog, RtcIo] (          ) (2 => U0RTS))
-        (16, [Input, Output, Analog, RtcIo] (2 => U0CTS) (          ))
-        (17, [Input, Output, Analog, RtcIo] (          ) (2 => U1TXD))
-        (18, [Input, Output, Analog, RtcIo] (2 => U1RXD) (          ))
-        (19, [Input, Output, Analog, RtcIo] (          ) (2 => U1RTS))
-        (20, [Input, Output, Analog, RtcIo] (2 => U1CTS) (          ))
-        (21, [Input, Output, Analog, RtcIo])
-
-        (26, [Input, Output])
-        (27, [Input, Output])
-        (28, [Input, Output])
-        (29, [Input, Output])
-        (30, [Input, Output])
-        (31, [Input, Output])
-        (32, [Input, Output])
-        (33, [Input, Output] (2 => FSPIHD  3 => SUBSPIHD            ) (2 => FSPIHD  3 => SUBSPIHD             ))
-        (34, [Input, Output] (2 => FSPICS0                          ) (2 => FSPICS0 3 => SUBSPICS0            ))
-        (35, [Input, Output] (2 => FSPID   3 => SUBSPID             ) (2 => FSPID   3 => SUBSPID              ))
-        (36, [Input, Output] (2 => FSPICLK                          ) (2 => FSPICLK 3 => SUBSPICLK            ))
-        (37, [Input, Output] (2 => FSPIQ   3 => SUBSPIQ  4 => SPIDQS) (2 => FSPIQ   3 => SUBSPIQ   4 => SPIDQS))
-        (38, [Input, Output] (2 => FSPIWP  3 => SUBSPIWP            ) (2 => FSPIWP  3 => SUBSPIWP             ))
-        (39, [Input, Output] (                                      ) (             3 => SUBSPICS1            ))
-        (40, [Input, Output])
-        (41, [Input, Output])
-        (42, [Input, Output])
-        (43, [Input, Output])
-        (44, [Input, Output])
-        (45, [Input, Output])
-        (46, [Input, Output])
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
     ]
 }
+
+include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
+include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));

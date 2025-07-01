@@ -99,7 +99,7 @@ impl<'d> SystemTimer<'d> {
         // Don't reset Systimer as it will break `time::Instant::now`, only enable it
         PeripheralClockControl::enable(PeripheralEnable::Systimer);
 
-        #[cfg(soc_etm)]
+        #[cfg(soc_has_etm)]
         etm::enable_etm();
 
         Self {
@@ -661,7 +661,7 @@ mod asynch {
     }
 }
 
-#[cfg(soc_etm)]
+#[cfg(soc_has_etm)]
 pub mod etm {
     //! # Event Task Matrix Function
     //!

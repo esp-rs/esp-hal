@@ -55,20 +55,20 @@ peripherals = [
     "xts_aes",
 ]
 
-symbols = [
-    # Additional peripherals defined by us (the developers):
+virtual_peripherals = [
     "adc1",
     "adc2",
-    "dac",
+    "dac1",
+    "dac2",
+]
+
+symbols = [
+    # Additional peripherals defined by us (the developers):
     "pdma",
     "phy",
-    "wifi",
     "psram",
     "psram_dma",
     "ulp_riscv_core",
-    "timg_timer1",
-    "large_intr_status",
-    "gpio_bank_1",
     "spi_octal",
 
     # ROM capabilities
@@ -87,11 +87,260 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
 
-[device.gpio]
-status = "supported"
+[device.adc]
+support_status = "partial"
+instances = [
+    { name = "adc1" },
+    { name = "adc2" },
+]
 
+[device.dac]
+support_status = "partial"
+instances = [
+    { name = "dac1" },
+    { name = "dac2" },
+]
+
+[device.gpio]
+support_status = "supported"
+has_bank_1 = true
+gpio_function = 1
+input_signal_max = 204
+output_signal_max = 256
+constant_0_input = 0x3c
+constant_1_input = 0x38
+pins = [
+    { pin =  0, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  1, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  2, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  3, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  4, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  5, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  6, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  7, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  8, kind = ["input", "output", "analog", "rtc"], alternate_functions = {                3 = "SUBSPICS1"                } },
+    { pin =  9, kind = ["input", "output", "analog", "rtc"], alternate_functions = {                3 = "SUBSPIHD",  4 = "FSPIHD"  } },
+    { pin = 10, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIIO4", 3 = "SUBSPICS0", 4 = "FSPICS0" } },
+    { pin = 11, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIIO5", 3 = "SUBSPID",   4 = "FSPID"   } },
+    { pin = 12, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIIO6", 3 = "SUBSPICLK", 4 = "FSPICLK" } },
+    { pin = 13, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIIO7", 3 = "SUBSPIQ",   4 = "FSPIQ"   } },
+    { pin = 14, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIDQS", 3 = "SUBSPIWP",  4 = "FSPIWP"  } },
+    { pin = 15, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "U0RTS" } },
+    { pin = 16, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "U0CTS" } },
+    { pin = 17, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "U1TXD" } },
+    { pin = 18, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "U1RXD" } },
+    { pin = 19, kind = ["input", "output", "analog", "rtc", "usb_dm"], alternate_functions = { 2 = "U1RTS" } },
+    { pin = 20, kind = ["input", "output", "analog", "rtc", "usb_dp"], alternate_functions = { 2 = "U1CTS" } },
+    { pin = 21, kind = ["input", "output", "analog", "rtc"] },
+
+    { pin = 26, kind = ["input", "output"] },
+    { pin = 27, kind = ["input", "output"] },
+    { pin = 28, kind = ["input", "output"] },
+    { pin = 29, kind = ["input", "output"] },
+    { pin = 30, kind = ["input", "output"] },
+    { pin = 31, kind = ["input", "output"] },
+    { pin = 32, kind = ["input", "output"] },
+    { pin = 33, kind = ["input", "output"], alternate_functions = { 2 = "FSPIHD",  3 = "SUBSPIHD"              } },
+    { pin = 34, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS0", 3 = "SUBSPICS0"             } },
+    { pin = 35, kind = ["input", "output"], alternate_functions = { 2 = "FSPID",   3 = "SUBSPID"               } },
+    { pin = 36, kind = ["input", "output"], alternate_functions = { 2 = "FSPICLK", 3 = "SUBSPICLK"             } },
+    { pin = 37, kind = ["input", "output"], alternate_functions = { 2 = "FSPIQ",   3 = "SUBSPIQ", 4 = "SPIDQS" } },
+    { pin = 38, kind = ["input", "output"], alternate_functions = { 2 = "FSPIWP",  3 = "SUBSPIWP"              } },
+    { pin = 39, kind = ["input", "output"], alternate_functions = {                3 = "SUBSPICS1"             } },
+    { pin = 40, kind = ["input", "output"] },
+    { pin = 41, kind = ["input", "output"] },
+    { pin = 42, kind = ["input", "output"] },
+    { pin = 43, kind = ["input", "output"] },
+    { pin = 44, kind = ["input", "output"] },
+    { pin = 45, kind = ["input", "output"] },
+    { pin = 46, kind = ["input", "output"] },
+]
+input_signals = [
+    { name = "SPIQ",              id = 0 },
+    { name = "SPID",              id = 1 },
+    { name = "SPIHD",             id = 2 },
+    { name = "SPIWP",             id = 3 },
+    { name = "SPID4",             id = 7 },
+    { name = "SPID5",             id = 8 },
+    { name = "SPID6",             id = 9 },
+    { name = "SPID7",             id = 10 },
+    { name = "SPIDQS",            id = 11 },
+    { name = "U0RXD",             id = 14 },
+    { name = "U0CTS",             id = 15 },
+    { name = "U0DSR",             id = 16 },
+    { name = "U1RXD",             id = 17 },
+    { name = "U1CTS",             id = 18 },
+    { name = "U1DSR",             id = 21 },
+    { name = "I2S0O_BCK",         id = 23 },
+    { name = "I2S0O_WS",          id = 25 },
+    { name = "I2S0I_BCK",         id = 27 },
+    { name = "I2S0I_WS",          id = 28 },
+    { name = "I2CEXT0_SCL",       id = 29 },
+    { name = "I2CEXT0_SDA",       id = 30 },
+    { name = "PCNT0_SIG_CH0",     id = 39 },
+    { name = "PCNT0_SIG_CH1",     id = 40 },
+    { name = "PCNT0_CTRL_CH0",    id = 41 },
+    { name = "PCNT0_CTRL_CH1",    id = 42 },
+    { name = "PCNT1_SIG_CH0",     id = 43 },
+    { name = "PCNT1_SIG_CH1",     id = 44 },
+    { name = "PCNT1_CTRL_CH0",    id = 45 },
+    { name = "PCNT1_CTRL_CH1",    id = 46 },
+    { name = "PCNT2_SIG_CH0",     id = 47 },
+    { name = "PCNT2_SIG_CH1",     id = 48 },
+    { name = "PCNT2_CTRL_CH0",    id = 49 },
+    { name = "PCNT2_CTRL_CH1",    id = 50 },
+    { name = "PCNT3_SIG_CH0",     id = 51 },
+    { name = "PCNT3_SIG_CH1",     id = 52 },
+    { name = "PCNT3_CTRL_CH0",    id = 53 },
+    { name = "PCNT3_CTRL_CH1",    id = 54 },
+    { name = "USB_EXTPHY_VP",     id = 61 },
+    { name = "USB_EXTPHY_VM",     id = 62 },
+    { name = "USB_EXTPHY_RCV",    id = 63 },
+    { name = "USB_OTG_IDDIG",     id = 64 },
+    { name = "USB_OTG_AVALID",    id = 65 },
+    { name = "USB_SRP_BVALID",    id = 66 },
+    { name = "USB_OTG_VBUSVALID", id = 67 },
+    { name = "USB_SRP_SESSEND",   id = 68 },
+    { name = "SPI3_CLK",          id = 72 },
+    { name = "SPI3_Q",            id = 73 },
+    { name = "SPI3_D",            id = 74 },
+    { name = "SPI3_HD",           id = 75 },
+    { name = "SPI3_CS0",          id = 76 },
+    { name = "RMT_SIG_0",         id = 83 },
+    { name = "RMT_SIG_1",         id = 84 },
+    { name = "RMT_SIG_2",         id = 85 },
+    { name = "RMT_SIG_3",         id = 86 },
+    { name = "I2CEXT1_SCL",       id = 95 },
+    { name = "I2CEXT1_SDA",       id = 96 },
+    { name = "FSPICLK",           id = 108 },
+    { name = "FSPIQ",             id = 109 },
+    { name = "FSPID",             id = 110 },
+    { name = "FSPIHD",            id = 111 },
+    { name = "FSPIWP",            id = 112 },
+    { name = "FSPIIO4",           id = 113 },
+    { name = "FSPIIO5",           id = 114 },
+    { name = "FSPIIO6",           id = 115 },
+    { name = "FSPIIO7",           id = 116 },
+    { name = "FSPICS0",           id = 117 },
+    { name = "TWAI_RX",           id = 123 },
+    { name = "SUBSPIQ",           id = 127 },
+    { name = "SUBSPID",           id = 128 },
+    { name = "SUBSPIHD",          id = 129 },
+    { name = "SUBSPIWP",          id = 130 },
+    { name = "I2S0I_DATA_IN15",   id = 158 },
+    { name = "SUBSPID4",          id = 167 },
+    { name = "SUBSPID5",          id = 168 },
+    { name = "SUBSPID6",          id = 169 },
+    { name = "SUBSPID7",          id = 170 },
+    { name = "SUBSPIDQS",         id = 171 },
+    { name = "PCMFSYNC",          id = 203 },
+    { name = "PCMCLK",            id = 204 },
+]
+output_signals = [
+    { name = "SPIQ",             id = 0 },
+    { name = "SPID",             id = 1 },
+    { name = "SPIHD",            id = 2 },
+    { name = "SPIWP",            id = 3 },
+    { name = "SPICLK",           id = 4 },
+    { name = "SPICS0",           id = 5 },
+    { name = "SPICS1",           id = 6 },
+    { name = "SPID4",            id = 7 },
+    { name = "SPID5",            id = 8 },
+    { name = "SPID6",            id = 9 },
+    { name = "SPID7",            id = 10 },
+    { name = "SPIDQS",           id = 11 },
+    { name = "U0TXD",            id = 14 },
+    { name = "U0RTS",            id = 15 },
+    { name = "U0DTR",            id = 16 },
+    { name = "U1TXD",            id = 17 },
+    { name = "U1RTS",            id = 18 },
+    { name = "U1DTR",            id = 21 },
+    { name = "I2S0O_BCK",        id = 23 },
+    { name = "I2S0O_WS",         id = 25 },
+    { name = "I2S0I_BCK",        id = 27 },
+    { name = "I2S0I_WS",         id = 28 },
+    { name = "I2CEXT0_SCL",      id = 29 },
+    { name = "I2CEXT0_SDA",      id = 30 },
+    { name = "SDIO_TOHOST_INT",  id = 31 },
+    { name = "USB_EXTPHY_OEN",   id = 61 },
+    { name = "USB_EXTPHY_VPO",   id = 63 },
+    { name = "USB_EXTPHY_VMO",   id = 64 },
+    { name = "SPI3_CLK",         id = 72 },
+    { name = "SPI3_Q",           id = 73 },
+    { name = "SPI3_D",           id = 74 },
+    { name = "SPI3_HD",          id = 75 },
+    { name = "SPI3_CS0",         id = 76 },
+    { name = "SPI3_CS1",         id = 77 },
+    { name = "SPI3_CS2",         id = 78 },
+    { name = "LEDC_LS_SIG0",     id = 79 },
+    { name = "LEDC_LS_SIG1",     id = 80 },
+    { name = "LEDC_LS_SIG2",     id = 81 },
+    { name = "LEDC_LS_SIG3",     id = 82 },
+    { name = "LEDC_LS_SIG4",     id = 83 },
+    { name = "LEDC_LS_SIG5",     id = 84 },
+    { name = "LEDC_LS_SIG6",     id = 85 },
+    { name = "LEDC_LS_SIG7",     id = 86 },
+    { name = "RMT_SIG_0",        id = 87 },
+    { name = "RMT_SIG_1",        id = 88 },
+    { name = "RMT_SIG_2",        id = 89 },
+    { name = "RMT_SIG_3",        id = 90 },
+    { name = "I2CEXT1_SCL",      id = 95 },
+    { name = "I2CEXT1_SDA",      id = 96 },
+    { name = "GPIO_SD0",         id = 100 },
+    { name = "GPIO_SD1",         id = 101 },
+    { name = "GPIO_SD2",         id = 102 },
+    { name = "GPIO_SD3",         id = 103 },
+    { name = "GPIO_SD4",         id = 104 },
+    { name = "GPIO_SD5",         id = 105 },
+    { name = "GPIO_SD6",         id = 106 },
+    { name = "GPIO_SD7",         id = 107 },
+    { name = "FSPICLK",          id = 108 },
+    { name = "FSPIQ",            id = 109 },
+    { name = "FSPID",            id = 110 },
+    { name = "FSPIHD",           id = 111 },
+    { name = "FSPIWP",           id = 112 },
+    { name = "FSPIIO4",          id = 113 },
+    { name = "FSPIIO5",          id = 114 },
+    { name = "FSPIIO6",          id = 115 },
+    { name = "FSPIIO7",          id = 116 },
+    { name = "FSPICS0",          id = 117 },
+    { name = "FSPICS1",          id = 118 },
+    { name = "FSPICS2",          id = 119 },
+    { name = "FSPICS3",          id = 120 },
+    { name = "FSPICS4",          id = 121 },
+    { name = "FSPICS5",          id = 122 },
+    { name = "TWAI_TX",          id = 123 },
+    { name = "SUBSPICLK",        id = 126 },
+    { name = "SUBSPIQ",          id = 127 },
+    { name = "SUBSPID",          id = 128 },
+    { name = "SUBSPIHD",         id = 129 },
+    { name = "SUBSPIWP",         id = 130 },
+    { name = "SUBSPICS0",        id = 131 },
+    { name = "SUBSPICS1",        id = 132 },
+    { name = "FSPIDQS",          id = 133 },
+    { name = "FSPI_HSYNC",       id = 134 },
+    { name = "FSPI_VSYNC",       id = 135 },
+    { name = "FSPI_DE",          id = 136 },
+    { name = "FSPICD",           id = 137 },
+    { name = "SPI3_CD",          id = 139 },
+    { name = "SPI3_DQS",         id = 140 },
+    { name = "I2S0O_DATA_OUT23", id = 166 },
+    { name = "SUBSPID4",         id = 167 },
+    { name = "SUBSPID5",         id = 168 },
+    { name = "SUBSPID6",         id = 169 },
+    { name = "SUBSPID7",         id = 170 },
+    { name = "SUBSPIDQS",        id = 171 },
+    { name = "PCMFSYNC",         id = 209 },
+    { name = "PCMCLK",           id = 210 },
+    { name = "CLK_I2S",          id = 251 },
+    { name = "GPIO",             id = 256 },
+]
 [device.i2c_master]
-status = "supported"
+support_status = "supported"
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
+]
 ll_intr_mask = 0x1ffff
 fifo_size = 32
 has_bus_timeout_enable = true
@@ -100,28 +349,41 @@ separate_filter_config_registers = true
 has_arbitration_en = true
 i2c0_data_register_ahb_address = 0x6001301c
 
+[device.interrupts]
+support_status = "partial"
+status_registers = 3
+
 [device.rmt]
-status = "partial"
+support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
 
 [device.spi_master]
-status = "supported"
+support_status = "supported"
+instances = [{ name = "spi2" }, { name = "spi3" }]
+
+[device.timergroup]
+timg_has_timer1 = true
+instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-status = "supported"
+support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 [device.rgb_display] # via SPI and I2S
-status = "not_supported"
+support_status = "not_supported"
 
 [device.camera] # via I2S
-status = "not_supported"
+support_status = "not_supported"
 
 [device.touch]
-status = "not_supported"
+support_status = "not_supported"
 
 [device.ds]
-status = "not_supported"
+support_status = "not_supported"
 
 # Other drivers which are partially supported but have no other configuration:
 
@@ -141,15 +403,11 @@ status = "not_supported"
 [device.usb_otg]
 
 ## Miscellaneous
-[device.adc]
-[device.dac]
 [device.dma]
-[device.interrupts]
 [device.io_mux]
 [device.psram]
 [device.sleep]
 [device.systimer]
-[device.timers]
 [device.temp_sensor]
 [device.ulp_fsm]
 [device.ulp_riscv]

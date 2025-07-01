@@ -12,9 +12,8 @@ use esp_hal::{
     dma_buffers,
     gpio::{Level, Output, OutputConfig},
     spi::{
-        DataMode,
         Mode,
-        master::{Address, Command, Config, Spi, SpiDma},
+        master::{Address, Command, Config, DataMode, Spi, SpiDma},
     },
     time::Rate,
 };

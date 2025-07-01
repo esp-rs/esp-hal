@@ -1,10 +1,16 @@
 use core::fmt::Display;
 use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
+use evalexpr::{ContextWithMutableFunctions, ContextWithMutableVariables};
 use serde::{Deserialize, Serialize};
 
-use crate::generate::{validator::Validator, value::Value};
+use crate::generate::{
+    evalexpr_extensions::{I128, I128NumericTypes},
+    validator::Validator,
+    value::Value,
+};
 
+pub(crate) mod evalexpr_extensions;
 mod markdown;
 pub(crate) mod validator;
 pub(crate) mod value;
@@ -45,8 +51,287 @@ impl fmt::Display for Error {
     }
 }
 
-/// Generate and parse config from a prefix, and an array tuples containing the
-/// name, description, default value, and an optional validator.
+/// The root node of a configuration.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Config {
+    /// The crate name.
+    #[serde(rename = "crate")]
+    pub krate: String,
+    /// The config options for this crate.
+    pub options: Vec<CfgOption>,
+    /// Optionally additional checks.
+    pub checks: Option<Vec<String>>,
+}
+
+fn true_default() -> String {
+    "true".to_string()
+}
+
+fn unstable_default() -> Stability {
+    Stability::Unstable
+}
+
+/// A default value for a configuration option.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CfgDefaultValue {
+    /// Condition which makes this default value used.
+    /// You can and have to have exactly one active default value.
+    #[serde(rename = "if")]
+    #[serde(default = "true_default")]
+    pub if_: String,
+    /// The default value.
+    pub value: Value,
+}
+
+/// A configuration option.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CfgOption {
+    /// Name of the configuration option
+    pub name: String,
+    /// Description of the configuration option.
+    /// This will be visible in the documentation and in the tooling.
+    pub description: String,
+    /// A condition which specified when this option is active.
+    #[serde(default = "true_default")]
+    pub active: String,
+    /// The default value.
+    /// Exactly one of the items needs to be active at any time.
+    pub default: Vec<CfgDefaultValue>,
+    /// Constraints (Validators) to use.
+    /// If given at most one item is allowed to be active at any time.
+    pub constraints: Option<Vec<CfgConstraint>>,
+    /// A display hint for the value.
+    /// This is meant for tooling and/or documentation.
+    pub display_hint: Option<DisplayHint>,
+    /// The stability guarantees of this option.
+    #[serde(default = "unstable_default")]
+    pub stability: Stability,
+}
+
+/// A conditional constraint / validator for a config option.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CfgConstraint {
+    /// Condition which makes this validator used.
+    #[serde(rename = "if")]
+    #[serde(default = "true_default")]
+    if_: String,
+    /// The validator to be used.
+    #[serde(rename = "type")]
+    type_: Validator,
+}
+
+/// Generate the config from a YAML definition.
+///
+/// The YAML follows the format outlined by [Config].
+///
+/// After deserializing the config and normalizing it, this will call
+/// [generate_config] to finally get the currently active configuration.
+pub fn generate_config_from_yaml_definition(
+    yaml: &str,
+    enable_unstable: bool,
+    emit_md_tables: bool,
+    chip: Option<esp_metadata::Config>,
+) -> Result<HashMap<String, Value>, Error> {
+    let features: Vec<String> = env::vars()
+        .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
+        .map(|(k, _)| k)
+        .map(|v| {
+            v.strip_prefix("CARGO_FEATURE_")
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect();
+
+    let (config, options) = evaluate_yaml_config(yaml, chip, features, false)?;
+
+    let cfg = generate_config(&config.krate, &options, enable_unstable, emit_md_tables);
+
+    if let Some(checks) = config.checks {
+        let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
+        for (k, v) in cfg.iter() {
+            eval_ctx
+                .set_value(
+                    k.clone(),
+                    match v {
+                        Value::Bool(v) => evalexpr::Value::Boolean(*v),
+                        Value::Integer(v) => evalexpr::Value::Int(I128(*v)),
+                        Value::String(v) => evalexpr::Value::String(v.clone()),
+                    },
+                )
+                .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
+        }
+        for check in checks {
+            if !evalexpr::eval_with_context(&check, &eval_ctx)
+                .and_then(|v| v.as_boolean())
+                .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
+            {
+                return Err(Error::Validation(format!("Validation error: '{check}'")));
+            }
+        }
+    }
+
+    Ok(cfg)
+}
+
+/// Evaluate the given YAML representation of a config definition.
+pub fn evaluate_yaml_config(
+    yaml: &str,
+    chip: Option<esp_metadata::Config>,
+    features: Vec<String>,
+    ignore_feature_gates: bool,
+) -> Result<(Config, Vec<ConfigOption>), Error> {
+    let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
+    let mut options = Vec::new();
+    let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
+    if let Some(config) = chip {
+        eval_ctx
+            .set_value("chip".into(), evalexpr::Value::String(config.name()))
+            .map_err(|err| Error::Parse(err.to_string()))?;
+
+        eval_ctx
+            .set_function(
+                "feature".into(),
+                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
+                    if let evalexpr::Value::String(which) = arg {
+                        let res = config.contains(which);
+                        Ok(evalexpr::Value::Boolean(res))
+                    } else {
+                        Err(evalexpr::EvalexprError::CustomMessage(format!(
+                            "Bad argument: {arg:?}"
+                        )))
+                    }
+                }),
+            )
+            .map_err(|err| Error::Parse(err.to_string()))?;
+
+        eval_ctx
+            .set_function(
+                "cargo_feature".into(),
+                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
+                    if let evalexpr::Value::String(which) = arg {
+                        let res = features.contains(&which.to_uppercase().replace("-", "_"));
+                        Ok(evalexpr::Value::Boolean(res))
+                    } else {
+                        Err(evalexpr::EvalexprError::CustomMessage(format!(
+                            "Bad argument: {arg:?}"
+                        )))
+                    }
+                }),
+            )
+            .map_err(|err| Error::Parse(err.to_string()))?;
+
+        eval_ctx
+            .set_function(
+                "ignore_feature_gates".into(),
+                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
+                    if let evalexpr::Value::Empty = arg {
+                        Ok(evalexpr::Value::Boolean(ignore_feature_gates))
+                    } else {
+                        Err(evalexpr::EvalexprError::CustomMessage(format!(
+                            "Bad argument: {arg:?}"
+                        )))
+                    }
+                }),
+            )
+            .map_err(|err| Error::Parse(err.to_string()))?;
+    }
+    for option in config.options.clone() {
+        let active = evalexpr::eval_with_context(&option.active, &eval_ctx)
+            .map_err(|err| {
+                Error::Parse(format!(
+                    "Error evaluating '{}', error = {:?}",
+                    option.active, err
+                ))
+            })?
+            .as_boolean()
+            .map_err(|err| {
+                Error::Parse(format!(
+                    "Error evaluating '{}', error = {:?}",
+                    option.active, err
+                ))
+            })?;
+
+        let constraint = {
+            let mut active_constraint = None;
+            if let Some(constraints) = &option.constraints {
+                for constraint in constraints {
+                    if evalexpr::eval_with_context(&constraint.if_, &eval_ctx)
+                        .map_err(|err| {
+                            Error::Parse(format!(
+                                "Error evaluating '{}', error = {err:?}",
+                                constraint.if_
+                            ))
+                        })?
+                        .as_boolean()
+                        .map_err(|err| {
+                            Error::Parse(format!(
+                                "Error evaluating '{}', error = {:?}",
+                                constraint.if_, err
+                            ))
+                        })?
+                    {
+                        active_constraint = Some(constraint.type_.clone());
+                        break;
+                    }
+                }
+            };
+
+            if option.constraints.is_some() && active_constraint.is_none() {
+                panic!(
+                    "No constraint active for crate {}, option {}",
+                    config.krate, option.name
+                );
+            }
+
+            active_constraint
+        };
+
+        let default_value = {
+            let mut default_value = None;
+            for value in option.default.clone() {
+                if evalexpr::eval_with_context(&value.if_, &eval_ctx)
+                    .and_then(|v| v.as_boolean())
+                    .map_err(|err| {
+                        Error::Parse(format!("Error evaluating '{}', error = {err:?}", value.if_))
+                    })?
+                {
+                    default_value = Some(value.value);
+                    break;
+                }
+            }
+
+            if default_value.is_none() {
+                panic!(
+                    "No default value active for crate {}, option {}",
+                    config.krate, option.name
+                );
+            }
+
+            default_value
+        };
+
+        let option = ConfigOption {
+            name: option.name.clone(),
+            description: option.description,
+            default_value: default_value.ok_or(Error::Parse(format!(
+                "No default value found for {}",
+                option.name
+            )))?,
+            constraint,
+            stability: option.stability,
+            active,
+            display_hint: option.display_hint.unwrap_or(DisplayHint::None),
+        };
+        options.push(option);
+    }
+    Ok((config, options))
+}
+
+/// Generate and parse config from a prefix, and an array of [ConfigOption].
 ///
 /// This function will parse any `SCREAMING_SNAKE_CASE` environment variables
 /// that match the given prefix. It will then attempt to parse the [`Value`] and
@@ -125,35 +410,7 @@ pub fn generate_config_internal<'a>(
 
     emit_configuration(&mut stdout, &configs);
 
-    #[cfg(not(test))]
-    {
-        let config_json = config_json(&configs, false);
-        write_out_file(format!("{crate_name}_config_data.json"), config_json);
-    }
-
     configs
-}
-
-fn config_json(config: &[(String, &ConfigOption, Value)], pretty: bool) -> String {
-    #[derive(Serialize)]
-    struct Item<'a> {
-        option: &'a ConfigOption,
-        actual_value: Value,
-    }
-
-    let mut to_write = Vec::new();
-    for (_, option, value) in config.iter() {
-        to_write.push(Item {
-            actual_value: value.clone(),
-            option,
-        })
-    }
-
-    if pretty {
-        serde_json::to_string_pretty(&to_write).unwrap()
-    } else {
-        serde_json::to_string(&to_write).unwrap()
-    }
 }
 
 /// The stability of the configuration option.
@@ -224,51 +481,6 @@ pub struct ConfigOption {
 }
 
 impl ConfigOption {
-    /// Create a new config option.
-    ///
-    /// Unstable, active, no display-hint and not constrained by default.
-    pub fn new(name: &str, description: &str, default_value: impl Into<Value>) -> Self {
-        Self {
-            name: name.to_string(),
-            description: description.to_string(),
-            default_value: default_value.into(),
-            constraint: None,
-            stability: Stability::Unstable,
-            active: true,
-            display_hint: DisplayHint::None,
-        }
-    }
-
-    /// Constrain the config option
-    pub fn constraint(mut self, validator: Validator) -> Self {
-        self.constraint = Some(validator);
-        self
-    }
-
-    /// Constrain the config option
-    pub fn constraint_by(mut self, validator: Option<Validator>) -> Self {
-        self.constraint = validator;
-        self
-    }
-
-    /// Mark this config option as stable
-    pub fn stable(mut self, version: &str) -> Self {
-        self.stability = Stability::Stable(version.to_string());
-        self
-    }
-
-    /// Sets the active flag of this config option
-    pub fn active(mut self, active: bool) -> Self {
-        self.active = active;
-        self
-    }
-
-    /// Sets the display hint
-    pub fn display_hint(mut self, display_hint: DisplayHint) -> Self {
-        self.display_hint = display_hint;
-        self
-    }
-
     fn env_var(&self, prefix: &str) -> String {
         format!("{}{}", prefix, screaming_snake_case(&self.name))
     }
@@ -709,85 +921,6 @@ mod test {
     }
 
     #[test]
-    fn json_output() {
-        let mut stdout = Vec::new();
-        let config = [
-            ConfigOption {
-                name: String::from("some-key"),
-                description: String::from("NA"),
-                default_value: Value::String("variant-0".to_string()),
-                constraint: Some(Validator::Enumeration(vec![
-                    "variant-0".to_string(),
-                    "variant-1".to_string(),
-                ])),
-                stability: Stability::Stable(String::from("testing")),
-                active: true,
-                display_hint: DisplayHint::None,
-            },
-            ConfigOption {
-                name: String::from("some-key2"),
-                description: String::from("NA"),
-                default_value: Value::Bool(true),
-                constraint: None,
-                stability: Stability::Unstable,
-                active: true,
-                display_hint: DisplayHint::None,
-            },
-        ];
-        let configs =
-            temp_env::with_vars([("ESP_TEST_CONFIG_SOME_KEY", Some("variant-0"))], || {
-                generate_config_internal(&mut stdout, "esp-test", &config, false)
-            });
-
-        let json_output = config_json(&configs, true);
-        println!("{json_output}");
-        pretty_assertions::assert_eq!(
-            r#"[
-  {
-    "option": {
-      "name": "some-key",
-      "description": "NA",
-      "default_value": {
-        "String": "variant-0"
-      },
-      "constraint": {
-        "Enumeration": [
-          "variant-0",
-          "variant-1"
-        ]
-      },
-      "stability": {
-        "Stable": "testing"
-      },
-      "active": true,
-      "display_hint": "None"
-    },
-    "actual_value": {
-      "String": "variant-0"
-    }
-  },
-  {
-    "option": {
-      "name": "some-key2",
-      "description": "NA",
-      "default_value": {
-        "Bool": true
-      },
-      "constraint": null,
-      "stability": "Unstable",
-      "active": true,
-      "display_hint": "None"
-    },
-    "actual_value": {
-      "Bool": true
-    }
-  }
-]"#,
-            json_output
-        );
-    }
-
-    #[test]
     #[should_panic]
     fn unstable_option_panics_unless_enabled() {
         let mut stdout = Vec::new();
@@ -838,61 +971,190 @@ mod test {
     }
 
     #[test]
-    fn convenience_constructors() {
+    fn deserialization() {
+        let yml = r#"
+crate: esp-bootloader-esp-idf
+
+options:
+- name: mmu_page_size
+  description: ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. This is currently only used to populate the app descriptor.
+  default:
+    - value: '"64k"'
+  stability: !Stable xxxx
+  constraints:
+  - if: true
+    type:
+      validator: enumeration
+      value:
+      - 8k
+      - 16k
+      - 32k
+      - 64k
+
+- name: esp_idf_version
+  description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
+  default:
+    - if: 'chip == "esp32c6"'
+      value: '"esp32c6"'
+    - if: 'chip == "esp32"'
+      value: '"other"'
+  active: true
+
+- name: partition-table-offset
+  description: "The address of partition table (by default 0x8000). Allows you to \
+    move the partition table, it gives more space for the bootloader. Note that the \
+    bootloader and app will both need to be compiled with the same \
+    PARTITION_TABLE_OFFSET value."
+  default:
+    - if: true
+      value: 32768
+  stability: Unstable
+  active: 'chip == "esp32c6"'
+"#;
+
+        let (cfg, options) = evaluate_yaml_config(
+            yml,
+            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c6).clone()),
+            vec![],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!("esp-bootloader-esp-idf", cfg.krate);
+
         assert_eq!(
-            ConfigOption {
-                name: String::from("number"),
-                description: String::from("NA"),
-                default_value: Value::Integer(999),
-                constraint: None,
+            vec![
+                    ConfigOption {
+                        name: "mmu_page_size".to_string(),
+                        description: "ESP32-C2, ESP32-C6 and ESP32-H2 support configurable page sizes. This is currently only used to populate the app descriptor.".to_string(),
+                        default_value: Value::String("64k".to_string()),
+                        constraint: Some(
+                            Validator::Enumeration(
+                                vec![
+                                    "8k".to_string(),
+                                    "16k".to_string(),
+                                    "32k".to_string(),
+                                    "64k".to_string(),
+                                ],
+                            ),
+                        ),
+                        stability: Stability::Stable("xxxx".to_string()),
+                        active: true,
+                        display_hint: DisplayHint::None,
+                    },
+                    ConfigOption {
+                        name: "esp_idf_version".to_string(),
+                        description: "ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.".to_string(),
+                        default_value: Value::String("esp32c6".to_string()),
+                        constraint: None,
+                        stability: Stability::Unstable,
+                        active: true,
+                        display_hint: DisplayHint::None,
+                    },
+                    ConfigOption {
+                        name: "partition-table-offset".to_string(),
+                        description: "The address of partition table (by default 0x8000). Allows you to move the partition table, it gives more space for the bootloader. Note that the bootloader and app will both need to be compiled with the same PARTITION_TABLE_OFFSET value.".to_string(),
+                        default_value: Value::Integer(32768),
+                        constraint: None,
+                        stability: Stability::Unstable,
+                        active: true,
+                        display_hint: DisplayHint::None,
+                    },
+            ],
+            options
+        );
+    }
+
+    #[test]
+    fn deserialization_fallback_default() {
+        let yml = r#"
+crate: esp-bootloader-esp-idf
+
+options:
+- name: esp_idf_version
+  description: ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.
+  default:
+    - if: 'chip == "esp32c6"'
+      value: '"esp32c6"'
+    - if: 'chip == "esp32"'
+      value: '"other"'
+    - value: '"default"'
+  active: true
+"#;
+
+        let (cfg, options) = evaluate_yaml_config(
+            yml,
+            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c3).clone()),
+            vec![],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!("esp-bootloader-esp-idf", cfg.krate);
+
+        assert_eq!(
+            vec![
+                    ConfigOption {
+                        name: "esp_idf_version".to_string(),
+                        description: "ESP-IDF version used in the application descriptor. Currently it's not checked by the bootloader.".to_string(),
+                        default_value: Value::String("default".to_string()),
+                        constraint: None,
+                        stability: Stability::Unstable,
+                        active: true,
+                        display_hint: DisplayHint::None,
+                    },
+            ],
+            options
+        );
+    }
+
+    #[test]
+    fn deserialization_fallback_contraint() {
+        let yml = r#"
+crate: esp-bootloader-esp-idf
+
+options:
+- name: option
+  description: Desc
+  default:
+    - value: 100
+  constraints:
+    - if: 'chip == "esp32c6"'
+      type:
+        validator: integer_in_range
+        value:
+          start: 0
+          end: 100
+    - if: true
+      type:
+        validator: integer_in_range
+        value:
+          start: 0
+          end: 50
+  active: true
+"#;
+
+        let (cfg, options) = evaluate_yaml_config(
+            yml,
+            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32).clone()),
+            vec![],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!("esp-bootloader-esp-idf", cfg.krate);
+
+        assert_eq!(
+            vec![ConfigOption {
+                name: "option".to_string(),
+                description: "Desc".to_string(),
+                default_value: Value::Integer(100),
+                constraint: Some(Validator::IntegerInRange(0..50)),
                 stability: Stability::Unstable,
                 active: true,
                 display_hint: DisplayHint::None,
-            },
-            ConfigOption::new("number", "NA", 999)
-        );
-
-        assert_eq!(
-            ConfigOption {
-                name: String::from("string"),
-                description: String::from("descr"),
-                default_value: Value::String("some string".to_string()),
-                constraint: None,
-                stability: Stability::Stable("1.0.0".to_string()),
-                active: true,
-                display_hint: DisplayHint::None,
-            },
-            ConfigOption::new("string", "descr", "some string").stable("1.0.0")
-        );
-
-        assert_eq!(
-            ConfigOption {
-                name: String::from("number"),
-                description: String::from("NA"),
-                default_value: Value::Integer(999),
-                constraint: Some(Validator::PositiveInteger),
-                stability: Stability::Unstable,
-                active: false,
-                display_hint: DisplayHint::None,
-            },
-            ConfigOption::new("number", "NA", 999)
-                .active(false)
-                .constraint(Validator::PositiveInteger)
-        );
-
-        assert_eq!(
-            ConfigOption {
-                name: String::from("number"),
-                description: String::from("NA"),
-                default_value: Value::Integer(999),
-                constraint: Some(Validator::PositiveInteger),
-                stability: Stability::Unstable,
-                active: true,
-                display_hint: DisplayHint::Hex,
-            },
-            ConfigOption::new("number", "NA", 999)
-                .constraint_by(Some(Validator::PositiveInteger))
-                .display_hint(DisplayHint::Hex)
+            },],
+            options
         );
     }
 }

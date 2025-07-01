@@ -115,6 +115,19 @@ One environment variable is specified in a single line. The name and value are s
 This key is additive. The unnamed list is added to named lists, and multiple lists with the
 same name are merged.
 
+### `//% CARGO-CONFIG`
+
+The value of this key will be passed as a `--config` argument to `cargo`. Any amount
+of configuration can be specfied this way.
+
+```
+//% CARGO-CONFIG: target.'cfg(target_arch = "riscv32")'.rustflags = [ "-Z", "stack-protector=all" ]
+//% CARGO-CONFIG: target.'cfg(target_arch = "xtensa")'.rustflags = [ "-Z", "stack-protector=all" ]
+```
+
+This key is additive. The unnamed list is added to named lists, and multiple lists with the
+same name are merged.
+
 ### Working with multiple metadata configurations
 
 Processing a file will create one configuration, or however many names (that is, the list of

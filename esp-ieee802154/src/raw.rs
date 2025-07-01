@@ -351,7 +351,7 @@ fn next_operation() {
     }
 }
 
-#[handler(priority = "Priority::Priority1")]
+#[handler(priority = Priority::Priority1)]
 fn ZB_MAC() {
     trace!("ZB_MAC interrupt");
 

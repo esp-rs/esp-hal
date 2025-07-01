@@ -33,9 +33,8 @@ use esp_hal::{
     delay::Delay,
     main,
     spi::{
-        DataMode,
         Mode,
-        master::{Address, Command, Config, Spi},
+        master::{Address, Command, Config, DataMode, Spi},
     },
     time::Rate,
 };

@@ -22,6 +22,7 @@ pub struct Metadata {
     tag: Option<String>,
     description: Option<String>,
     env_vars: HashMap<String, String>,
+    cargo_config: Vec<String>,
 }
 
 impl Metadata {
@@ -72,6 +73,11 @@ impl Metadata {
         &self.env_vars
     }
 
+    /// A list of all cargo `--config` values to use.
+    pub fn cargo_config(&self) -> &[String] {
+        &self.cargo_config
+    }
+
     /// If the specified chip is in the list of chips, then it is supported.
     pub fn supports_chip(&self, chip: Chip) -> bool {
         self.chip == chip
@@ -100,6 +106,7 @@ impl Metadata {
 pub struct Configuration {
     chips: Vec<Chip>,
     name: String,
+    cargo_config: Vec<String>,
     features: Vec<String>,
     esp_config: HashMap<String, String>,
     tag: Option<String>,
@@ -227,6 +234,11 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                         .collect::<Vec<_>>();
                     relevant_metadata.apply(|meta| meta.chips = chips.clone());
                 }
+                // A list of cargo `--config` configurations.
+                "CARGO-CONFIG" => {
+                    relevant_metadata
+                        .apply(|meta| meta.cargo_config.push(meta_line.value.to_string()));
+                }
                 // Cargo features to enable for the current configuration.
                 "FEATURES" => {
                     let mut values = meta_line
@@ -278,6 +290,8 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
             // Other values are merged
             meta.features.extend_from_slice(&all_configuration.features);
             meta.esp_config.extend(all_configuration.esp_config.clone());
+            meta.cargo_config
+                .extend(all_configuration.cargo_config.clone());
         }
 
         // If no configurations are specified, fall back to the unnamed one. Otherwise
@@ -304,6 +318,7 @@ pub fn load(path: &Path) -> Result<Vec<Metadata>> {
                     features: configuration.features.clone(),
                     tag: configuration.tag.clone(),
                     env_vars: configuration.esp_config.clone(),
+                    cargo_config: configuration.cargo_config.clone(),
                 })
             }
         }

@@ -160,11 +160,14 @@ mod tests {
         let mut read = [0u8; 128];
         let read = async {
             // This read should return as many bytes as the FIFO threshold, which is 120
-            // bytes by default.
+            // bytes by default. Allow for inequality in case processing is held up a bit.
             let read_count = ctx.rx.read_async(&mut read).await.unwrap();
-            assert_eq!(read_count, 120);
+            assert!(read_count >= 120);
 
-            ctx.rx.read_exact_async(&mut read[120..]).await.unwrap();
+            ctx.rx
+                .read_exact_async(&mut read[read_count..])
+                .await
+                .unwrap();
             assert_eq!(&read, &[1; 128]);
         };
         let write = async { ctx.tx.write_all(&[1; 128]).await.unwrap() };

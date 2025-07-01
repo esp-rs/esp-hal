@@ -179,7 +179,10 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/system/mm.html#introduction
         let mmu_table_ptr = DR_REG_MMU_TABLE as *const u32;
         let mut mapped_pages = 0;
-        for i in (0..FLASH_MMU_TABLE_SIZE).rev() {
+
+        // the bootloader is using the last page to access flash internally
+        // (e.g. to read the app descriptor) so we just skip that
+        for i in (0..(FLASH_MMU_TABLE_SIZE - 1)).rev() {
             if mmu_table_ptr.add(i).read_volatile() != MMU_INVALID {
                 mapped_pages = (i + 1) as u32;
                 break;
@@ -205,17 +208,14 @@ pub(crate) fn init_psram(config: PsramConfig) {
             CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE,
         );
 
-        if cache_dbus_mmu_set(
+        let cache_dbus_mmu_set_res = cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,
             start,
             START_PAGE << 16,
             64,
             config.size.get() as u32 / 1024 / 64, // number of pages to map
             0,
-        ) != 0
-        {
-            panic!("cache_dbus_mmu_set failed");
-        }
+        );
 
         EXTMEM::regs().dcache_ctrl1().modify(|_, w| {
             w.dcache_shut_core0_bus()
@@ -225,6 +225,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
         });
 
         Cache_Resume_DCache(0);
+
+        // panic AFTER resuming the cache
+        if cache_dbus_mmu_set_res != 0 {
+            panic!("cache_dbus_mmu_set failed");
+        }
 
         start
     };

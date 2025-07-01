@@ -46,6 +46,7 @@
 
 use proc_macro::TokenStream;
 
+mod alert;
 mod blocking;
 mod builder;
 #[cfg(feature = "embassy")]
@@ -59,6 +60,7 @@ mod interrupt;
 ))]
 mod lp_core;
 mod ram;
+mod switch;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -115,9 +117,33 @@ mod ram;
 /// [`bytemuck::AnyBitPattern`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.AnyBitPattern.html
 /// [`bytemuck::Zeroable`]: https://docs.rs/bytemuck/1.9.0/bytemuck/trait.Zeroable.html
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     ram::ram(args, input)
+}
+
+/// Enables an alternative syntax to cfg-gate `#[doc]` comments.
+///
+/// The branches can be `cfg` conditions or a catch-all condition using `_`.
+/// Multiple branches may be active at the same time, and all active branches
+/// will be added to the documentation. The catch-all condition `_` is only
+/// used if no other branches are active.
+///
+/// # Example
+///
+/// ```rust, no_run
+/// #[enable_doc_switch]
+/// /// Untouched documentation.
+/// #[doc_switch(
+///     cfg(feature = "foo") => "Documentation for foo feature",
+///     cfg(feature = "bar") => "Documentation for bar feature",
+///     _ => "Documentation for cases where neither feature is enabled"
+/// )]
+/// /// More documentation.
+/// fn my_function() {}
+/// ```
+#[proc_macro_attribute]
+pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
+    switch::enable_doc_switch(args, input)
 }
 
 /// Mark a function as an interrupt handler.
@@ -127,7 +153,6 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// If no priority is given, `Priority::min()` is assumed
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn handler(args: TokenStream, input: TokenStream) -> TokenStream {
     interrupt::handler(args, input)
 }
@@ -148,7 +173,6 @@ pub fn load_lp_code(input: TokenStream) -> TokenStream {
 /// Marks the entry function of a LP core / ULP program.
 #[cfg(any(feature = "is-lp-core", feature = "is-ulp-core"))]
 #[proc_macro_attribute]
-#[proc_macro_error2::proc_macro_error]
 pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     lp_core::entry(args, input)
 }
@@ -244,4 +268,42 @@ pub fn blocking_main(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_derive(BuilderLite, attributes(builder_lite))]
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     builder::builder_lite_derive(item)
+}
+
+/// Print a build error and terminate the process.
+///
+/// It should be noted that the error will be printed BEFORE the main function
+/// is called, and as such this should NOT be thought analogous to `println!` or
+/// similar utilities.
+///
+/// ## Example
+///
+/// ```rust
+/// esp_hal_procmacros::error! {"
+/// ERROR: something really bad has happened!
+/// "}
+/// // Process exits with exit code 1
+/// ```
+#[proc_macro]
+pub fn error(input: TokenStream) -> TokenStream {
+    alert::do_alert(termcolor::Color::Red, input);
+    panic!("Build failed");
+}
+
+/// Print a build warning.
+///
+/// It should be noted that the warning will be printed BEFORE the main function
+/// is called, and as such this should NOT be thought analogous to `println!` or
+/// similar utilities.
+///
+/// ## Example
+///
+/// ```rust
+/// esp_hal_procmacros::warning! {"
+/// WARNING: something unpleasant has happened!
+/// "};
+/// ```
+#[proc_macro]
+pub fn warning(input: TokenStream) -> TokenStream {
+    alert::do_alert(termcolor::Color::Yellow, input)
 }

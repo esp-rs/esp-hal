@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -46,7 +46,6 @@ pub enum Package {
     EspAlloc,
     EspBacktrace,
     EspBootloaderEspIdf,
-    EspBuild,
     EspConfig,
     EspHal,
     EspHalEmbassy,
@@ -153,7 +152,7 @@ impl Package {
     pub fn build_on_host(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspBuild | EspConfig | EspMetadata)
+        matches!(self, EspConfig | EspMetadata)
     }
 
     /// Given a device config, return the features which should be enabled for
@@ -306,6 +305,7 @@ pub fn execute_app(
     action: CargoAction,
     repeat: usize,
     debug: bool,
+    toolchain: Option<&str>,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -347,14 +347,31 @@ pub fn execute_app(
     };
     builder = builder.subcommand(subcommand);
 
+    for config in app.cargo_config() {
+        log::info!(" Cargo --config: {config}");
+        builder.add_arg("--config").add_arg(config);
+        // Some configuration requires nightly rust, so let's just assume it. May be
+        // overwritten by the esp toolchain on xtensa.
+        builder = builder.toolchain("nightly");
+    }
+
     if !debug {
         builder.add_arg("--release");
     }
 
-    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    if target.starts_with("xtensa") {
-        builder = builder.toolchain("esp");
-        builder.add_arg("-Zbuild-std=core,alloc");
+    let toolchain = match toolchain {
+        // Preserve user choice
+        Some(tc) => Some(tc),
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        _ if target.starts_with("xtensa") => Some("esp"),
+        _ => None,
+    };
+
+    if let Some(toolchain) = toolchain {
+        if toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
     }
 
     let args = builder.build();

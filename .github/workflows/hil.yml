@@ -108,13 +108,22 @@ jobs:
           target: ${{ matrix.target.rust-target }}
           toolchain: stable
           components: rust-src
+
+        # -Zstack-protector=all tests need to be compiled with nightly.
+      - if: ${{ !contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc) }}
+        name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          target: ${{ matrix.target.rust-target }}
+          toolchain: nightly
+          components: rust-src
+
       # Install the Rust toolchain for Xtensa devices:
       - if: contains(fromJson('["esp32", "esp32s2", "esp32s3"]'), matrix.target.soc)
-        uses: esp-rs/xtensa-toolchain@v1.5
+        uses: esp-rs/xtensa-toolchain@v1.6
         with:
           buildtargets: ${{ matrix.target.soc }}
           default: true
-          ldproxy: false
           version: 1.87.0.0
 
       - name: Build tests

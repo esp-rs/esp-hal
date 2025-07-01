@@ -8,7 +8,6 @@ extern crate proc_macro;
 
 use std::collections::HashSet;
 
-use darling::ast::NestedMeta;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
@@ -23,9 +22,10 @@ use syn::{
     ReturnType,
     StaticMutability,
     Stmt,
+    Token,
     Type,
     Visibility,
-    parse,
+    parse::{self, Parser},
     parse_macro_input,
     spanned::Spanned,
 };
@@ -37,7 +37,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // check the function signature
     let valid_signature = f.sig.constness.is_none()
-        && f.vis == Visibility::Inherited
+        && matches!(f.vis, Visibility::Inherited)
         && f.sig.abi.is_none()
         && f.sig.inputs.is_empty()
         && f.sig.generics.params.is_empty()
@@ -93,7 +93,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
     let resource_args = statics
         .iter()
         .map(|statik| {
-            let (ref cfgs, ref attrs) = extract_cfgs(statik.attrs.clone());
+            let (ref cfgs, ref attrs) = extract_cfgs(&statik.attrs);
             let ident = &statik.ident;
             let ty = &statik.ty;
             let expr = &statik.expr;
@@ -112,7 +112,7 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
         return error;
     }
 
-    let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
+    let (ref cfgs, ref attrs) = extract_cfgs(&f.attrs);
 
     quote!(
         #(#cfgs)*
@@ -149,7 +149,7 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let valid_signature = f.sig.constness.is_none()
-        && f.vis == Visibility::Inherited
+        && matches!(f.vis, Visibility::Inherited)
         && f.sig.abi.is_none()
         && f.sig.inputs.len() <= 2
         && f.sig.generics.params.is_empty()
@@ -188,7 +188,7 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
     }));
     f.block.stmts = stmts;
 
-    let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
+    let (ref cfgs, ref attrs) = extract_cfgs(&f.attrs);
 
     quote!(
         #(#cfgs)*
@@ -211,11 +211,12 @@ pub fn exception(args: TokenStream, input: TokenStream) -> TokenStream {
 pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let mut f: ItemFn = syn::parse(input).expect("`#[interrupt]` must be applied to a function");
 
-    let attr_args = match NestedMeta::parse_meta_list(args.into()) {
+    let attr_args = match syn::punctuated::Punctuated::<syn::Lit, Token![,]>::parse_terminated
+        .parse2(args.into())
+        .map(|punctuated| punctuated.into_iter().collect::<Vec<_>>())
+    {
         Ok(v) => v,
-        Err(e) => {
-            return TokenStream::from(darling::Error::from(e).write_errors());
-        }
+        Err(e) => return e.into_compile_error().into(),
     };
 
     if attr_args.len() > 1 {
@@ -231,7 +232,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
 
     if attr_args.len() == 1 {
         match &attr_args[0] {
-            NestedMeta::Lit(syn::Lit::Int(lit_int)) => match lit_int.base10_parse::<u32>() {
+            syn::Lit::Int(lit_int) => match lit_int.base10_parse::<u32>() {
                 Ok(x) => level = x,
                 Err(_) => {
                     return parse::Error::new(
@@ -282,7 +283,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let valid_signature = f.sig.constness.is_none()
-        && f.vis == Visibility::Inherited
+        && matches!(f.vis, Visibility::Inherited)
         && f.sig.abi.is_none()
         && ((!naked && f.sig.inputs.len() <= 2) || (naked && f.sig.inputs.is_empty()))
         && f.sig.generics.params.is_empty()
@@ -315,7 +316,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
 
-    let (statics, stmts) = match extract_static_muts(f.block.stmts.iter().cloned()) {
+    let (statics, stmts) = match extract_static_muts(f.block.stmts.clone()) {
         Err(e) => return e.to_compile_error().into(),
         Ok(x) => x,
     };
@@ -346,7 +347,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let resource_args = statics
         .iter()
         .map(|statik| {
-            let (ref cfgs, ref attrs) = extract_cfgs(statik.attrs.clone());
+            let (ref cfgs, ref attrs) = extract_cfgs(&statik.attrs);
             let ident = &statik.ident;
             let ty = &statik.ty;
             let expr = &statik.expr;
@@ -361,7 +362,7 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
-    let (ref cfgs, ref attrs) = extract_cfgs(f.attrs.clone());
+    let (ref cfgs, ref attrs) = extract_cfgs(&f.attrs);
 
     if naked {
         quote!(
@@ -413,7 +414,7 @@ pub fn pre_init(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // check the function signature
     let valid_signature = f.sig.constness.is_none()
-        && f.vis == Visibility::Inherited
+        && matches!(f.vis, Visibility::Inherited)
         && f.sig.unsafety.is_some()
         && f.sig.abi.is_none()
         && f.sig.inputs.is_empty()
@@ -500,12 +501,12 @@ fn extract_static_muts(
     Ok((statics, stmts))
 }
 
-fn extract_cfgs(attrs: Vec<Attribute>) -> (Vec<Attribute>, Vec<Attribute>) {
+fn extract_cfgs(attrs: &[Attribute]) -> (Vec<&Attribute>, Vec<&Attribute>) {
     let mut cfgs = vec![];
     let mut not_cfgs = vec![];
 
     for attr in attrs {
-        if eq(&attr, "cfg") {
+        if eq(attr, "cfg") {
             cfgs.push(attr);
         } else {
             not_cfgs.push(attr);
@@ -569,5 +570,5 @@ fn check_attr_whitelist(attrs: &[Attribute], caller: WhiteListCaller) -> Result<
 
 /// Returns `true` if `attr.path` matches `name`
 fn eq(attr: &Attribute, name: &str) -> bool {
-    attr.style == AttrStyle::Outer && attr.path().is_ident(name)
+    matches!(attr.style, AttrStyle::Outer) && attr.path().is_ident(name)
 }

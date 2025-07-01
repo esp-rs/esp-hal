@@ -60,7 +60,7 @@ peripherals = [
     "rsa",
     "sha",
     "slchost",
-    "soc_etm",
+    "etm",
     "spi0",
     "spi1",
     "spi2",
@@ -77,19 +77,17 @@ peripherals = [
     "usb_device",
 ]
 
+virtual_peripherals = [
+    "adc1",
+]
+
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "adc1",
     "assist_debug_sp_monitor",
     "assist_debug_region_monitor",
     "gdma",
-    "large_intr_status",
     "plic",
     "phy",
-    "bt",
-    "wifi",
-    "wifi6",
-    "ieee802154",
     "lp_core",
     "tsens",
 
@@ -109,11 +107,269 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
 
+[device.adc]
+support_status = "partial"
+instances = [
+    { name = "adc1" },
+]
+
 [device.gpio]
-status = "supported"
+support_status = "supported"
+gpio_function = 1
+input_signal_max = 124
+output_signal_max = 128
+constant_0_input = 0x3c
+constant_1_input = 0x38
+pins = [
+    { pin =  0, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  1, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  2, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIQ" } },
+    { pin =  3, kind = ["input", "output", "analog", "rtc"] },
+    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TMS", 2 = "FSPIHD" } },
+    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TDI", 2 = "FSPIWP" } },
+    { pin =  6, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TCK", 2 = "FSPICLK" } },
+    { pin =  7, kind = ["input", "output", "rtc"],           alternate_functions = { 0 = "USB_JTAG_TDO", 2 = "FSPID" } },
+    { pin =  8, kind = ["input", "output"] },
+    { pin =  9, kind = ["input", "output"] },
+    { pin = 10, kind = ["input", "output"] },
+    { pin = 11, kind = ["input", "output"] },
+    { pin = 12, kind = ["input", "output", "usb_device"] },
+    { pin = 13, kind = ["input", "output", "usb_device"] },
+    { pin = 14, kind = ["input", "output"] },
+    { pin = 15, kind = ["input", "output"] },
+    { pin = 16, kind = ["input", "output"], alternate_functions = { 0 = "U0RXD", 2 = "FSPICS0" } },
+    { pin = 17, kind = ["input", "output"], alternate_functions = { 0 = "U0TXD", 2 = "FSPICS1" } },
+    { pin = 18, kind = ["input", "output"], alternate_functions = {              2 = "FSPICS2" } },
+    { pin = 19, kind = ["input", "output"], alternate_functions = {              2 = "FSPICS3" } },
+    { pin = 20, kind = ["input", "output"], alternate_functions = {              2 = "FSPICS4" } },
+    { pin = 21, kind = ["input", "output"], alternate_functions = {              2 = "FSPICS5" } },
+    { pin = 22, kind = ["input", "output"] },
+    { pin = 23, kind = ["input", "output"] },
+    { pin = 24, kind = ["input", "output"], alternate_functions = { 0 = "SPICS0" } },
+    { pin = 25, kind = ["input", "output"], alternate_functions = { 0 = "SPIQ" } },
+    { pin = 26, kind = ["input", "output"], alternate_functions = { 0 = "SPIWP" } },
+    { pin = 27, kind = ["input", "output"] },
+    { pin = 28, kind = ["input", "output"], alternate_functions = { 0 = "SPIHD" } },
+    { pin = 29, kind = ["input", "output"], alternate_functions = { 0 = "SPICLK_MUX" } },
+    { pin = 30, kind = ["input", "output"], alternate_functions = { 0 = "SPID" } },
+]
+input_signals = [
+    { name = "EXT_ADC_START",       id = 0 },
+    { name = "U0RXD",               id = 6 },
+    { name = "U0CTS",               id = 7 },
+    { name = "U0DSR",               id = 8 },
+    { name = "U1RXD",               id = 9 },
+    { name = "U1CTS",               id = 10 },
+    { name = "U1DSR",               id = 11 },
+    { name = "I2S_MCLK",            id = 12 },
+    { name = "I2SO_BCK",            id = 13 },
+    { name = "I2SO_WS",             id = 14 },
+    { name = "I2SI_SD",             id = 15 },
+    { name = "I2SI_BCK",            id = 16 },
+    { name = "I2SI_WS",             id = 17 },
+    { name = "USB_JTAG_TDO_BRIDGE", id = 19 },
+    { name = "CPU_TESTBUS0",        id = 20 },
+    { name = "CPU_TESTBUS1",        id = 21 },
+    { name = "CPU_TESTBUS2",        id = 22 },
+    { name = "CPU_TESTBUS3",        id = 23 },
+    { name = "CPU_TESTBUS4",        id = 24 },
+    { name = "CPU_TESTBUS5",        id = 25 },
+    { name = "CPU_TESTBUS6",        id = 26 },
+    { name = "CPU_TESTBUS7",        id = 27 },
+    { name = "CPU_GPIO_IN0",        id = 28 },
+    { name = "CPU_GPIO_IN1",        id = 29 },
+    { name = "CPU_GPIO_IN2",        id = 30 },
+    { name = "CPU_GPIO_IN3",        id = 31 },
+    { name = "CPU_GPIO_IN4",        id = 32 },
+    { name = "CPU_GPIO_IN5",        id = 33 },
+    { name = "CPU_GPIO_IN6",        id = 34 },
+    { name = "CPU_GPIO_IN7",        id = 35 },
+    { name = "USB_JTAG_TMS",        id = 37 },
+    { name = "USB_EXTPHY_OEN",      id = 40 },
+    { name = "USB_EXTPHY_VM",       id = 41 },
+    { name = "USB_EXTPHY_VPO",      id = 42 },
+    { name = "I2CEXT0_SCL",         id = 45 },
+    { name = "I2CEXT0_SDA",         id = 46 },
+    { name = "PARL_RX_DATA0",       id = 47 },
+    { name = "PARL_RX_DATA1",       id = 48 },
+    { name = "PARL_RX_DATA2",       id = 49 },
+    { name = "PARL_RX_DATA3",       id = 50 },
+    { name = "PARL_RX_DATA4",       id = 51 },
+    { name = "PARL_RX_DATA5",       id = 52 },
+    { name = "PARL_RX_DATA6",       id = 53 },
+    { name = "PARL_RX_DATA7",       id = 54 },
+    { name = "PARL_RX_DATA8",       id = 55 },
+    { name = "PARL_RX_DATA9",       id = 56 },
+    { name = "PARL_RX_DATA10",      id = 57 },
+    { name = "PARL_RX_DATA11",      id = 58 },
+    { name = "PARL_RX_DATA12",      id = 59 },
+    { name = "PARL_RX_DATA13",      id = 60 },
+    { name = "PARL_RX_DATA14",      id = 61 },
+    { name = "PARL_RX_DATA15",      id = 62 },
+    { name = "FSPICLK",             id = 63 },
+    { name = "FSPIQ",               id = 64 },
+    { name = "FSPID",               id = 65 },
+    { name = "FSPIHD",              id = 66 },
+    { name = "FSPIWP",              id = 67 },
+    { name = "FSPICS0",             id = 68 },
+    { name = "PARL_RX_CLK",         id = 69 },
+    { name = "PARL_TX_CLK",         id = 70 },
+    { name = "RMT_SIG_0",           id = 71 },
+    { name = "RMT_SIG_1",           id = 72 },
+    { name = "TWAI0_RX",            id = 73 },
+    { name = "TWAI1_RX",            id = 77 },
+    { name = "PWM0_SYNC0",          id = 87 },
+    { name = "PWM0_SYNC1",          id = 88 },
+    { name = "PWM0_SYNC2",          id = 89 },
+    { name = "PWM0_F0",             id = 90 },
+    { name = "PWM0_F1",             id = 91 },
+    { name = "PWM0_F2",             id = 92 },
+    { name = "PWM0_CAP0",           id = 93 },
+    { name = "PWM0_CAP1",           id = 94 },
+    { name = "PWM0_CAP2",           id = 95 },
+    { name = "SIG_IN_FUNC97",       id = 97 },
+    { name = "SIG_IN_FUNC98",       id = 98 },
+    { name = "SIG_IN_FUNC99",       id = 99 },
+    { name = "SIG_IN_FUNC100",      id = 100 },
+    { name = "PCNT0_SIG_CH0",       id = 101 },
+    { name = "PCNT0_SIG_CH1",       id = 102 },
+    { name = "PCNT0_CTRL_CH0",      id = 103 },
+    { name = "PCNT0_CTRL_CH1",      id = 104 },
+    { name = "PCNT1_SIG_CH0",       id = 105 },
+    { name = "PCNT1_SIG_CH1",       id = 106 },
+    { name = "PCNT1_CTRL_CH0",      id = 107 },
+    { name = "PCNT1_CTRL_CH1",      id = 108 },
+    { name = "PCNT2_SIG_CH0",       id = 109 },
+    { name = "PCNT2_SIG_CH1",       id = 110 },
+    { name = "PCNT2_CTRL_CH0",      id = 111 },
+    { name = "PCNT2_CTRL_CH1",      id = 112 },
+    { name = "PCNT3_SIG_CH0",       id = 113 },
+    { name = "PCNT3_SIG_CH1",       id = 114 },
+    { name = "PCNT3_CTRL_CH0",      id = 115 },
+    { name = "PCNT3_CTRL_CH1",      id = 116 },
+    { name = "SPIQ",                id = 121 },
+    { name = "SPID",                id = 122 },
+    { name = "SPIHD",               id = 123 },
+    { name = "SPIWP",               id = 124 },
+]
+output_signals = [
+    { name = "LEDC_LS_SIG0",          id = 0 },
+    { name = "LEDC_LS_SIG1",          id = 1 },
+    { name = "LEDC_LS_SIG2",          id = 2 },
+    { name = "LEDC_LS_SIG3",          id = 3 },
+    { name = "LEDC_LS_SIG4",          id = 4 },
+    { name = "LEDC_LS_SIG5",          id = 5 },
+    { name = "U0TXD",                 id = 6 },
+    { name = "U0RTS",                 id = 7 },
+    { name = "U0DTR",                 id = 8 },
+    { name = "U1TXD",                 id = 9 },
+    { name = "U1RTS",                 id = 10 },
+    { name = "U1DTR",                 id = 11 },
+    { name = "I2S_MCLK",              id = 12 },
+    { name = "I2SO_BCK",              id = 13 },
+    { name = "I2SO_WS",               id = 14 },
+    { name = "I2SO_SD",               id = 15 },
+    { name = "I2SI_BCK",              id = 16 },
+    { name = "I2SI_WS",               id = 17 },
+    { name = "I2SO_SD1",              id = 18 },
+    { name = "USB_JTAG_TDO_BRIDGE",   id = 19 },
+    { name = "CPU_TESTBUS0",          id = 20 },
+    { name = "CPU_TESTBUS1",          id = 21 },
+    { name = "CPU_TESTBUS2",          id = 22 },
+    { name = "CPU_TESTBUS3",          id = 23 },
+    { name = "CPU_TESTBUS4",          id = 24 },
+    { name = "CPU_TESTBUS5",          id = 25 },
+    { name = "CPU_TESTBUS6",          id = 26 },
+    { name = "CPU_TESTBUS7",          id = 27 },
+    { name = "CPU_GPIO_OUT0",         id = 28 },
+    { name = "CPU_GPIO_OUT1",         id = 29 },
+    { name = "CPU_GPIO_OUT2",         id = 30 },
+    { name = "CPU_GPIO_OUT3",         id = 31 },
+    { name = "CPU_GPIO_OUT4",         id = 32 },
+    { name = "CPU_GPIO_OUT5",         id = 33 },
+    { name = "CPU_GPIO_OUT6",         id = 34 },
+    { name = "CPU_GPIO_OUT7",         id = 35 },
+    { name = "USB_JTAG_TCK",          id = 36 },
+    { name = "USB_JTAG_TMS",          id = 37 },
+    { name = "USB_JTAG_TDI",          id = 38 },
+    { name = "USB_JTAG_TDO",          id = 39 },
+    { name = "I2CEXT0_SCL",           id = 45 },
+    { name = "I2CEXT0_SDA",           id = 46 },
+    { name = "PARL_TX_DATA0",         id = 47 },
+    { name = "PARL_TX_DATA1",         id = 48 },
+    { name = "PARL_TX_DATA2",         id = 49 },
+    { name = "PARL_TX_DATA3",         id = 50 },
+    { name = "PARL_TX_DATA4",         id = 51 },
+    { name = "PARL_TX_DATA5",         id = 52 },
+    { name = "PARL_TX_DATA6",         id = 53 },
+    { name = "PARL_TX_DATA7",         id = 54 },
+    { name = "PARL_TX_DATA8",         id = 55 },
+    { name = "PARL_TX_DATA9",         id = 56 },
+    { name = "PARL_TX_DATA10",        id = 57 },
+    { name = "PARL_TX_DATA11",        id = 58 },
+    { name = "PARL_TX_DATA12",        id = 59 },
+    { name = "PARL_TX_DATA13",        id = 60 },
+    { name = "PARL_TX_DATA14",        id = 61 },
+    { name = "PARL_TX_DATA15",        id = 62 },
+    { name = "FSPICLK",               id = 63 },
+    { name = "FSPIQ",                 id = 64 },
+    { name = "FSPID",                 id = 65 },
+    { name = "FSPIHD",                id = 66 },
+    { name = "FSPIWP",                id = 67 },
+    { name = "FSPICS0",               id = 68 },
+    { name = "SDIO_TOHOST_INT",       id = 69 },
+    { name = "PARL_TX_CLK",           id = 70 },
+    { name = "RMT_SIG_0",             id = 71 },
+    { name = "RMT_SIG_1",             id = 72 },
+    { name = "TWAI0_TX",              id = 73 },
+    { name = "TWAI0_BUS_OFF_ON",      id = 74 },
+    { name = "TWAI0_CLKOUT",          id = 75 },
+    { name = "TWAI0_STANDBY",         id = 76 },
+    { name = "TWAI1_TX",              id = 77 },
+    { name = "TWAI1_BUS_OFF_ON",      id = 78 },
+    { name = "TWAI1_CLKOUT",          id = 79 },
+    { name = "TWAI1_STANDBY",         id = 80 },
+    { name = "GPIO_SD0",              id = 83 },
+    { name = "GPIO_SD1",              id = 84 },
+    { name = "GPIO_SD2",              id = 85 },
+    { name = "GPIO_SD3",              id = 86 },
+    { name = "PWM0_0A",               id = 87 },
+    { name = "PWM0_0B",               id = 88 },
+    { name = "PWM0_1A",               id = 89 },
+    { name = "PWM0_1B",               id = 90 },
+    { name = "PWM0_2A",               id = 91 },
+    { name = "PWM0_2B",               id = 92 },
+    { name = "SIG_IN_FUNC97",         id = 97 },
+    { name = "SIG_IN_FUNC98",         id = 98 },
+    { name = "SIG_IN_FUNC99",         id = 99 },
+    { name = "SIG_IN_FUNC100",        id = 100 },
+    { name = "FSPICS1",               id = 101 },
+    { name = "FSPICS2",               id = 102 },
+    { name = "FSPICS3",               id = 103 },
+    { name = "FSPICS4",               id = 104 },
+    { name = "FSPICS5",               id = 105 },
+    { name = "SPICLK_MUX",            id = 114 },
+    { name = "SPICS0",                id = 115 },
+    { name = "SPICS1",                id = 116 },
+    { name = "GPIO_TASK_MATRIX_OUT0", id = 117 },
+    { name = "GPIO_TASK_MATRIX_OUT1", id = 118 },
+    { name = "GPIO_TASK_MATRIX_OUT2", id = 119 },
+    { name = "GPIO_TASK_MATRIX_OUT3", id = 120 },
+    { name = "SPIQ",                  id = 121 },
+    { name = "SPID",                  id = 122 },
+    { name = "SPIHD",                 id = 123 },
+    { name = "SPIWP",                 id = 124 },
+    { name = "CLK_OUT_OUT1",          id = 125 },
+    { name = "CLK_OUT_OUT2",          id = 126 },
+    { name = "CLK_OUT_OUT3",          id = 127 },
+    { name = "GPIO",                  id = 128 },
+]
 
 [device.i2c_master]
-status = "supported"
+support_status = "supported"
+instances = [
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
@@ -127,19 +383,35 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.interrupts]
+support_status = "partial"
+status_registers = 3
+
 [device.rmt]
-status = "partial"
+support_status = "partial"
 ram_start = 0x60006400
 channel_ram_size = 48
 
 [device.spi_master]
-status = "supported"
+support_status = "supported"
+instances = [{ name = "spi2" }]
+
+[device.timergroup]
+instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
-status = "supported"
+support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 [device.ds]
-status = "not_supported"
+support_status = "not_supported"
+
+[device.wifi]
+support_status = "partial"
+has_wifi6 = true
 
 # Other drivers which are partially supported but have no other configuration:
 
@@ -163,19 +435,15 @@ status = "not_supported"
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.adc]
 [device.assist_debug]
 [device.dma]
 [device.etm]
-[device.interrupts]
 [device.io_mux]
 [device.sleep]
 [device.temp_sensor]
 [device.systimer]
-[device.timers]
 [device.ulp_riscv]
 
 ## Radio
-[device.wifi]
 [device.bt]
 [device.ieee802154]

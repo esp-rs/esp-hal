@@ -19,10 +19,10 @@ pub use pac::Interrupt;
 // creating "virtual peripherals" for them.
 crate::peripherals! {
     peripherals: [
-        I2C0 <= I2C0,
-        SPI2 <= SPI2 (SPI2),
-        UART0 <= UART0,
-        UART1 <= UART1,
+        I2C0 <= I2C0 (peri => I2C_EXT0),
+        SPI2 <= SPI2 (peri => SPI2),
+        UART0 <= UART0 (peri => UART0),
+        UART1 <= UART1 (peri => UART1),
     ],
     unstable_peripherals: [
         ADC1 <= virtual,
@@ -43,7 +43,7 @@ crate::peripherals! {
         GPIO_SD <= GPIO_SD,
         HMAC <= HMAC,
         I2C_ANA_MST <= I2C_ANA_MST,
-        I2S0 <= I2S0 (I2S0),
+        I2S0 <= I2S0 (peri => I2S0),
         INTERRUPT_CORE0 <= INTERRUPT_CORE0,
         IO_MUX <= IO_MUX,
         LEDC <= LEDC,
@@ -66,7 +66,7 @@ crate::peripherals! {
         TWAI0 <= TWAI0,
         UHCI0 <= UHCI0,
         UHCI1 <= UHCI1,
-        USB_DEVICE <= USB_DEVICE,
+        USB_DEVICE <= USB_DEVICE (peri => USB_DEVICE),
         WIFI <= virtual,
         XTS_AES <= XTS_AES,
 
@@ -75,27 +75,30 @@ crate::peripherals! {
         DMA_CH2 <= virtual,
     ],
     pins: [
-        (0, [Input, Output, Analog, RtcIo])
-        (1, [Input, Output, Analog, RtcIo])
-        (2, [Input, Output, Analog, RtcIo] (2 => FSPIQ) (2 => FSPIQ))
-        (3, [Input, Output, Analog, RtcIo])
-        (4, [Input, Output, Analog, RtcIo] (2 => FSPIHD) (0 => USB_JTAG_TMS 2 => FSPIHD))
-        (5, [Input, Output, Analog, RtcIo] (2 => FSPIWP) (0 => USB_JTAG_TDI 2 => FSPIWP))
-        (6, [Input, Output] (2 => FSPICLK) (0 => USB_JTAG_TCK 2 => FSPICLK_MUX))
-        (7, [Input, Output] (2 => FSPID) (0 => USB_JTAG_TDO 2 => FSPID))
-        (8, [Input, Output])
-        (9, [Input, Output])
-        (10, [Input, Output] (2 => FSPICS0) (2 => FSPICS0))
-        (11, [Input, Output])
-        (12, [Input, Output] (0 => SPIHD) (0 => SPIHD))
-        (13, [Input, Output] (0 => SPIWP) (0 => SPIWP))
-        (14, [Input, Output] () (0 => SPICS0))
-        (15, [Input, Output] () (0 => SPICLK_MUX))
-        (16, [Input, Output] (0 => SPID) (0 => SPID))
-        (17, [Input, Output] (0 => SPIQ) (0 => SPIQ))
-        (18, [Input, Output])
-        (19, [Input, Output])
-        (20, [Input, Output] (0 => U0RXD) ())
-        (21, [Input, Output] () (0 => U0TXD))
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
     ]
 }
+
+include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
+include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));

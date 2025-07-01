@@ -5,15 +5,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context as _, Result, ensure};
+use anyhow::{ensure, Context as _, Result};
 use clap::ValueEnum;
 use esp_metadata::Config;
-use kuchikiki::traits::*;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{Chip, Package, cargo::CargoArgsBuilder};
+use crate::{cargo::CargoArgsBuilder, Chip, Package};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -82,6 +81,7 @@ pub fn build_documentation(
         )?;
 
         // Patch the generated documentation to include a select box for the version:
+        #[cfg(feature = "deploy-docs")]
         patch_documentation_index_for_package(workspace, package, &version, &base_url)?;
     }
 
@@ -247,12 +247,15 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     Ok(crate::windows_safe_path(&docs_path))
 }
 
+#[cfg(feature = "deploy-docs")]
 fn patch_documentation_index_for_package(
     workspace: &Path,
     package: &Package,
     version: &semver::Version,
     base_url: &Option<String>,
 ) -> Result<()> {
+    use kuchikiki::traits::*;
+
     let package_name = package.to_string().replace('-', "_");
     let package_path = workspace.join("docs").join(package.to_string());
     let version_path = package_path.join(version.to_string());
@@ -498,7 +501,7 @@ where
     let source = fs::read_to_string(resources.join(template))
         .context(format!("Failed to read {template}"))?;
 
-    let mut env = minijinja::Environment::new();
+    let mut env = minijinja::Environment::empty();
     env.add_template(template, &source)?;
 
     let tmpl = env.get_template(template)?;

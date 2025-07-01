@@ -1663,8 +1663,9 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///
 /// ```rust,no_run
 #[doc = crate::before_snippet!()]
-/// use esp_hal::spi::AnySpi;
-/// use esp_hal::spi::master::{Spi, SpiDma, Config, Instance as SpiInstance};
+/// use esp_hal::spi::master::{
+///     AnySpi, Spi, SpiDma, Config, Instance as SpiInstance
+/// };
 /// use esp_hal::dma::DmaChannelFor;
 /// use esp_hal::Blocking;
 ///
@@ -2951,7 +2952,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub struct DmaTxDoneChFuture<'a, CH>
     where
         CH: DmaTxChannel,
@@ -2960,7 +2961,7 @@ pub(crate) mod asynch {
         _a: (),
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<'a, CH> DmaTxDoneChFuture<'a, CH>
     where
         CH: DmaTxChannel,
@@ -2970,7 +2971,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<CH> core::future::Future for DmaTxDoneChFuture<'_, CH>
     where
         CH: DmaTxChannel,
@@ -3004,7 +3005,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<CH> Drop for DmaTxDoneChFuture<'_, CH>
     where
         CH: DmaTxChannel,
@@ -3015,7 +3016,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     pub struct DmaRxDoneChFuture<'a, CH>
     where
         CH: DmaRxChannel,
@@ -3024,7 +3025,7 @@ pub(crate) mod asynch {
         _a: (),
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<'a, CH> DmaRxDoneChFuture<'a, CH>
     where
         CH: DmaRxChannel,
@@ -3034,7 +3035,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<CH> core::future::Future for DmaRxDoneChFuture<'_, CH>
     where
         CH: DmaRxChannel,
@@ -3072,7 +3073,7 @@ pub(crate) mod asynch {
         }
     }
 
-    #[cfg(any(i2s0, i2s1))]
+    #[cfg(any(soc_has_i2s0, soc_has_i2s1))]
     impl<CH> Drop for DmaRxDoneChFuture<'_, CH>
     where
         CH: DmaRxChannel,

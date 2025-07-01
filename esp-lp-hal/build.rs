@@ -1,6 +1,15 @@
 use std::{env, error::Error, fs, path::PathBuf};
 
-use esp_build::assert_unique_used_features;
+#[macro_export]
+macro_rules! assert_unique_used_features {
+    ($($feature:literal),+ $(,)?) => {
+        assert!(
+            (0 $(+ cfg!(feature = $feature) as usize)+ ) == 1,
+            "Exactly one of the following features must be enabled: {}",
+            [$($feature),+].join(", ")
+        );
+    };
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     // NOTE: update when adding new device support!

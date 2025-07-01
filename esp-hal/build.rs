@@ -7,9 +7,19 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use esp_build::assert_unique_features;
-use esp_config::{ConfigOption, DisplayHint, Validator, Value, generate_config};
+use esp_config::{Value, generate_config_from_yaml_definition};
 use esp_metadata::{Chip, Config};
+
+#[macro_export]
+macro_rules! assert_unique_features {
+    ($($feature:literal),+ $(,)?) => {
+        assert!(
+            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
+            "Exactly zero or one of the following features must be enabled: {}",
+            [$($feature),+].join(", ")
+        );
+    };
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
@@ -49,126 +59,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
-    let cfg = generate_config(
-        "esp_hal",
-        &[
-            ConfigOption::new(
-                "place-spi-master-driver-in-ram",
-                "Places the SPI master driver in RAM for better performance",
-                false,
-            ),
-            ConfigOption::new(
-                "place-switch-tables-in-ram",
-                "Places switch-tables, some lookup tables and constants related to \
-                interrupt handling into RAM - resulting in better performance but slightly more \
-                RAM consumption.",
-                true,
-            )
-            .stable("1.0.0-beta.0"),
-            ConfigOption::new(
-                "place-anon-in-ram",
-                "Places anonymous symbols into RAM - resulting in better performance \
-                at the cost of significant more RAM consumption. Best to be combined with \
-                `place-switch-tables-in-ram`.",
-                false,
-            )
-            .stable("1.0.0-beta.0"),
-            // Ideally, we should be able to set any clock frequency for any chip. However,
-            // currently only the 32 and C2 implements any sort of configurability, and
-            // the rest have a fixed clock frequeny.
-            ConfigOption::new(
-                "xtal-frequency",
-                "The frequency of the crystal oscillator, in MHz. Set to `auto` to \
-                automatically detect the frequency. `auto` may not be able to identify the clock \
-                frequency in some cases. Also, configuring a specific frequency may increase \
-                performance slightly.",
-                match chip {
-                    Chip::Esp32 | Chip::Esp32c2 => "auto",
-                    // The rest has only one option
-                    Chip::Esp32c3 | Chip::Esp32c6 | Chip::Esp32s2 | Chip::Esp32s3 => "40",
-                    Chip::Esp32h2 => "32",
-                },
-            )
-            .constraint_by(match chip {
-                Chip::Esp32 | Chip::Esp32c2 => Some(Validator::Enumeration(vec![
-                    String::from("auto"),
-                    String::from("26"),
-                    String::from("40"),
-                ])),
-                // The rest has only one option
-                _ => None,
-            })
-            .active([Chip::Esp32, Chip::Esp32c2].contains(&chip)),
-            ConfigOption::new(
-                "spi-address-workaround",
-                "Enables a workaround for the issue where SPI in \
-                half-duplex mode incorrectly transmits the address on a single line if the \
-                data buffer is empty.",
-                true,
-            )
-            .active(chip == Chip::Esp32),
-            ConfigOption::new(
-                "flip-link",
-                "Move the stack to start of RAM to get zero-cost stack overflow protection.",
-                false,
-            )
-            .active([Chip::Esp32c6, Chip::Esp32h2].contains(&chip)),
-            // TODO: automate "enum of single choice" handling - they don't need
-            // to be presented to the user
-            ConfigOption::new("psram-mode", "SPIRAM chip mode", "quad")
-                .constraint(Validator::Enumeration(
-                    if config
-                        .symbols()
-                        .iter()
-                        .any(|s| s.eq_ignore_ascii_case("octal_psram"))
-                    {
-                        vec![String::from("quad"), String::from("octal")]
-                    } else {
-                        vec![String::from("quad")]
-                    },
-                ))
-                .active(
-                    config
-                        .symbols()
-                        .iter()
-                        .any(|s| s.eq_ignore_ascii_case("psram")),
-                ),
-            // Rust's stack smashing protection configuration
-            ConfigOption::new(
-                "stack-guard-offset",
-                "The stack guard variable will be placed this many bytes from \
-                the stack's end.",
-                4096,
-            )
-            .stable("1.0.0-beta.0"),
-            ConfigOption::new(
-                "stack-guard-value",
-                "The value to be written to the stack guard variable.",
-                0xDEED_BAAD,
-            )
-            .stable("1.0.0-beta.0")
-            .display_hint(DisplayHint::Hex),
-            ConfigOption::new(
-                "impl-critical-section",
-                "Provide a `critical-section` implementation. Note that if disabled, \
-                you will need to provide a `critical-section` implementation which is \
-                using `restore-state-u32`.",
-                true,
-            ),
-        ],
-        cfg!(feature = "unstable"),
-        true,
-    );
+    println!("cargo:rerun-if-changed=./esp_config.yml");
+    let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
+        .expect("Failed to read esp_config.yml for esp-hal");
+    let cfg =
+        generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
-    #[allow(unused_mut)]
-    let mut config_symbols = config.all().collect::<Vec<_>>();
+    let mut config_symbols = config.all().to_vec();
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {
-            config_symbols.push(key);
+            config_symbols.push(key.to_string());
         }
     }
 
@@ -207,12 +111,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         preprocess_file(
             &config_symbols,
             &cfg,
-            "ld/riscv/debug.x",
-            out.join("debug.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
             "ld/riscv/hal-defaults.x",
             out.join("hal-defaults.x"),
         )?;
@@ -230,7 +128,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 
 fn copy_dir_all(
-    config_symbols: &[&str],
+    config_symbols: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -260,7 +158,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &[&str],
+    config: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -279,7 +177,7 @@ fn preprocess_file(
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.contains(&condition);
+            let should_take = should_take && config.iter().any(|c| c.as_str() == condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {

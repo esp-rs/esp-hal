@@ -83,10 +83,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
           default: true
-          ldproxy: false
           version: 1.87.0.0
 
       # xtensa-toolchain installs rustup and a basic toolchain, but doesn't install rust-src
@@ -174,3 +173,15 @@ jobs:
           source: "docs/"
           strip_components: 1 # remove the docs prefix
           overwrite: true
+  docsrs:
+    runs-on: ubuntu-latest
+    if: ${{ (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'release-pr')) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: esp-rs/esp-hal
+
+      - name: Install cargo-docs-rs
+        run: cargo install cargo-docs-rs --locked
+      - name: Run cargo-docs-rs
+        run: cd esp-hal && cargo docs-rs

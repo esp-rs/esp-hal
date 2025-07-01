@@ -137,11 +137,11 @@ use crate::{
         Pull,
         interconnect::{self, PeripheralOutput},
     },
-    i2c::{AnyI2c, AnyI2cInner},
+    handler,
     interrupt::InterruptHandler,
     pac::i2c0::{COMD, RegisterBlock},
-    peripherals::Interrupt,
     private,
+    ram,
     system::PeripheralGuard,
     time::{Duration, Instant, Rate},
 };
@@ -746,7 +746,7 @@ impl<'d> I2c<'d, Blocking> {
     /// `None`)
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.i2c.info().set_interrupt_handler(handler);
+        self.i2c.set_interrupt_handler(handler);
     }
 
     /// Listen for the given interrupts
@@ -779,7 +779,7 @@ impl private::Sealed for I2c<'_, Blocking> {}
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for I2c<'_, Blocking> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
-        self.i2c.info().set_interrupt_handler(handler);
+        self.i2c.set_interrupt_handler(handler);
     }
 }
 
@@ -917,7 +917,7 @@ impl Drop for I2cFuture<'_> {
 impl<'d> I2c<'d, Async> {
     /// Configure the I2C peripheral to operate in blocking mode.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
-        self.i2c.info().disable_interrupts();
+        self.i2c.disable_peri_interrupt();
 
         I2c {
             i2c: self.i2c,
@@ -1211,6 +1211,7 @@ impl embedded_hal_async::i2c::I2c for I2c<'_, Async> {
     }
 }
 
+#[ram]
 fn async_handler(info: &Info, state: &State) {
     // Disable all interrupts. The I2C Future will check events based on the
     // interrupt status bits.
@@ -1351,9 +1352,6 @@ pub struct Info {
     /// Interrupt handler for the asynchronous operations of this I2C instance.
     pub async_handler: InterruptHandler,
 
-    /// Interrupt for this I2C instance.
-    pub interrupt: Interrupt,
-
     /// SCL output signal.
     pub scl_output: OutputSignal,
 
@@ -1424,20 +1422,6 @@ impl Info {
             }
             w
         });
-    }
-
-    fn set_interrupt_handler(&self, handler: InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, self.interrupt);
-        }
-        self.enable_listen(EnumSet::all(), false);
-        self.clear_interrupts(EnumSet::all());
-        unsafe { crate::interrupt::bind_interrupt(self.interrupt, handler.handler()) };
-        unwrap!(crate::interrupt::enable(self.interrupt, handler.priority()));
-    }
-
-    fn disable_interrupts(&self) {
-        crate::interrupt::disable(crate::system::Cpu::current(), self.interrupt);
     }
 }
 
@@ -2380,7 +2364,7 @@ impl Driver<'_> {
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
-        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
@@ -2447,7 +2431,7 @@ impl Driver<'_> {
         self.reset_before_transmission();
 
         // Short circuit for zero length writes without start or end as that would be an
-        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
+        // invalid operation write lengths in the TRM (at least for ESP32-S3) are 1-255
         if bytes.is_empty() && !start && !stop {
             return Ok(());
         }
@@ -2803,7 +2787,7 @@ mod bus_clear {
 
     impl<'a> ClearBusFuture<'a> {
         // Number of SCL pulses to clear the bus
-        const BUS_CLEAR_BITS: u8 = 9;
+        const BUS_CLEAR_BITS: u8 = 10;
 
         pub fn new(driver: Driver<'a>) -> Self {
             let mut this = Self { driver };
@@ -2820,13 +2804,9 @@ mod bus_clear {
         }
 
         pub fn poll_completion(&mut self) -> Poll<()> {
-            if self
-                .driver
-                .regs()
-                .scl_sp_conf()
-                .read()
-                .scl_rst_slv_en()
-                .bit_is_set()
+            let regs = self.driver.regs();
+            if regs.scl_sp_conf().read().scl_rst_slv_en().bit_is_set()
+                || regs.sr().read().bus_busy().bit_is_set()
             {
                 Poll::Pending
             } else {
@@ -2932,7 +2912,12 @@ mod bus_clear {
             let now = Instant::now();
 
             match self.state {
-                State::Idle => return Poll::Ready(()),
+                State::Idle => {
+                    if self.driver.regs().sr().read().bus_busy().bit_is_set() {
+                        return Poll::Pending;
+                    }
+                    return Poll::Ready(());
+                }
                 _ if now < self.wait => {
                     // Still waiting for the end of the SCL pulse
                     return Poll::Pending;
@@ -2942,7 +2927,7 @@ mod bus_clear {
                         sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
                     }
                     self.state = State::Idle;
-                    return Poll::Ready(());
+                    return Poll::Pending;
                 }
                 State::SendClock(0, false) => {
                     if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
@@ -3012,7 +2997,7 @@ pub struct State {
 }
 
 /// A peripheral singleton compatible with the I2C master driver.
-pub trait Instance: crate::private::Sealed + super::IntoAnyI2c {
+pub trait Instance: crate::private::Sealed + IntoAnyI2c {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&Info, &State);
@@ -3115,11 +3100,12 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
     }
 }
 
-macro_rules! instance {
-    ($inst:ident, $peri:ident, $scl:ident, $sda:ident, $interrupt:ident) => {
+crate::peripherals::for_each_i2c_master!(
+    ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {
-                #[crate::handler]
+                #[handler]
+                #[ram]
                 pub(super) fn irq_handler() {
                     async_handler(&PERIPHERAL, &STATE);
                 }
@@ -3132,7 +3118,6 @@ macro_rules! instance {
                     register_block: crate::peripherals::$inst::ptr(),
                     peripheral: crate::system::Peripheral::$peri,
                     async_handler: irq_handler,
-                    interrupt: Interrupt::$interrupt,
                     scl_output: OutputSignal::$scl,
                     scl_input: InputSignal::$scl,
                     sda_output: OutputSignal::$sda,
@@ -3142,21 +3127,52 @@ macro_rules! instance {
             }
         }
     };
-}
+);
 
-#[cfg(i2c0)]
-instance!(I2C0, I2cExt0, I2CEXT0_SCL, I2CEXT0_SDA, I2C_EXT0);
-#[cfg(i2c1)]
-instance!(I2C1, I2cExt1, I2CEXT1_SCL, I2CEXT1_SDA, I2C_EXT1);
+crate::any_peripheral! {
+    /// Any I2C peripheral.
+    pub peripheral AnyI2c<'d> {
+        #[cfg(i2c_master_i2c0)]
+        I2c0(crate::peripherals::I2C0<'d>),
+        #[cfg(i2c_master_i2c1)]
+        I2c1(crate::peripherals::I2C1<'d>),
+    }
+}
 
 impl Instance for AnyI2c<'_> {
     delegate::delegate! {
         to match &self.0 {
+            #[cfg(i2c_master_i2c0)]
             AnyI2cInner::I2c0(i2c) => i2c,
-            #[cfg(i2c1)]
+            #[cfg(i2c_master_i2c1)]
             AnyI2cInner::I2c1(i2c) => i2c,
         } {
             fn parts(&self) -> (&Info, &State);
         }
+    }
+}
+
+impl AnyI2c<'_> {
+    delegate::delegate! {
+        to match &self.0 {
+            #[cfg(i2c_master_i2c0)]
+            AnyI2cInner::I2c0(i2c) => i2c,
+            #[cfg(i2c_master_i2c1)]
+            AnyI2cInner::I2c1(i2c) => i2c,
+        } {
+            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+            fn disable_peri_interrupt(&self);
+            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
+        }
+    }
+
+    fn set_interrupt_handler(&self, handler: InterruptHandler) {
+        self.disable_peri_interrupt();
+
+        self.info().enable_listen(EnumSet::all(), false);
+        self.info().clear_interrupts(EnumSet::all());
+
+        self.bind_peri_interrupt(handler.handler());
+        self.enable_peri_interrupt(handler.priority());
     }
 }

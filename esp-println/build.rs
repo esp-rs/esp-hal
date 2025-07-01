@@ -1,8 +1,18 @@
 use std::{env, path::Path};
 
-use esp_build::assert_unique_used_features;
 use esp_metadata::Chip;
 use log_04::LevelFilter;
+
+#[macro_export]
+macro_rules! assert_unique_used_features {
+    ($($feature:literal),+ $(,)?) => {
+        assert!(
+            (0 $(+ cfg!(feature = $feature) as usize)+ ) == 1,
+            "Exactly one of the following features must be enabled: {}",
+            [$($feature),+].join(", ")
+        );
+    };
+}
 
 fn main() {
     // Ensure that only a single chip is specified

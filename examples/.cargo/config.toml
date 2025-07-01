@@ -8,14 +8,14 @@ esp32s2 = "run --release --features=esp32s2 --target=xtensa-esp32s2-none-elf"
 esp32s3 = "run --release --features=esp32s3 --target=xtensa-esp32s3-none-elf"
 
 [target.'cfg(target_arch = "riscv32")']
-runner    = "espflash flash --monitor"
+runner    = "espflash flash --monitor --partition-table=partitions.csv"
 rustflags = [
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 ]
 
 [target.'cfg(target_arch = "xtensa")']
-runner    = "espflash flash --monitor"
+runner    = "espflash flash --monitor --partition-table=partitions.csv"
 rustflags = [
   # GNU LD
   "-C", "link-arg=-Wl,-Tlinkall.x",

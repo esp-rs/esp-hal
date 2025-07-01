@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
+- `defmt` and `log-04` can no longer be selected at the same time (#3675)
 
 
 ### Fixed
