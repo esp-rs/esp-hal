@@ -71,7 +71,6 @@ symbols = [
     # Additional peripherals defined by us (the developers):
     "gdma",
     "phy",
-    "tsens",
 
     # ROM capabilities
     "rom_crc_le",

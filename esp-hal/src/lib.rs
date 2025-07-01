@@ -356,7 +356,7 @@ unstable_driver! {
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(tsens)]
+    #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(any(soc_has_twai0, soc_has_twai1))]
     pub mod twai;
