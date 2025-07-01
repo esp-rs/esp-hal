@@ -63,46 +63,28 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let mut configs = parse_configs(&work_dir, args.chip, args.config_file.as_deref())?;
+    let configs = parse_configs(&work_dir, args.chip, args.config_file.as_deref())?;
     let initial_configs = configs.clone();
-    let mut previous_config = initial_configs.clone();
-    let mut errors_to_show = None;
+    let previous_config = initial_configs.clone();
 
-    loop {
-        let repository = tui::Repository::new(configs.clone());
+    let repository = tui::Repository::new(configs.clone());
 
-        // TUI stuff ahead
-        let terminal = tui::init_terminal()?;
+    // TUI stuff ahead
+    let terminal = tui::init_terminal()?;
 
-        // create app and run it
-        let updated_cfg = tui::App::new(errors_to_show, repository).run(terminal)?;
+    // create app and run it
+    let updated_cfg = tui::App::new(None, repository).run(terminal)?;
 
-        tui::restore_terminal()?;
+    tui::restore_terminal()?;
 
-        // done with the TUI
-        if let Some(updated_cfg) = updated_cfg {
-            configs = updated_cfg.clone();
-            apply_config(
-                &work_dir,
-                updated_cfg.clone(),
-                previous_config.clone(),
-                args.config_file.clone(),
-            )?;
-            previous_config = updated_cfg;
-        } else {
-            println!("Reverted configuration...");
-            apply_config(&work_dir, initial_configs, vec![], args.config_file.clone())?;
-            break;
-        }
-
-        if let Some(errors) =
-            check_after_changes(&work_dir, args.chip, args.config_file.as_deref())?
-        {
-            errors_to_show = Some(errors);
-        } else {
-            println!("Updated configuration...");
-            break;
-        }
+    // done with the TUI
+    if let Some(updated_cfg) = updated_cfg {
+        apply_config(
+            &work_dir,
+            updated_cfg,
+            previous_config,
+            args.config_file.clone(),
+        )?;
     }
 
     Ok(())
@@ -283,20 +265,4 @@ fn parse_configs(
     }
 
     Ok(configs)
-}
-
-fn check_after_changes(
-    work_dir: &Path,
-    chip_from_args: Option<esp_metadata::Chip>,
-    config_file: Option<&str>,
-) -> Result<Option<String>, Box<dyn Error>> {
-    println!("Check configuration...");
-
-    let configs = parse_configs(work_dir, chip_from_args, config_file)?;
-
-    for config in configs {
-        tui::validate_config(&config)?;
-    }
-
-    Ok(None)
 }
