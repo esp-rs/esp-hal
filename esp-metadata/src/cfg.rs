@@ -77,11 +77,6 @@ pub(crate) struct SupportItem {
     /// The ID of the driver ([device.<config_group>]) in the TOML, that this
     /// item corresponds to.
     pub config_group: &'static str,
-    /// When the driver's configuration is not present in the device's TOML,
-    /// these symbols decide whether to generate a Not Available or a Not
-    /// Supported cell. If the device has one of these symbols, the support
-    /// status will be Not Supported (i.e. yet to be implemented).
-    pub symbols: &'static [&'static str],
 }
 
 /// Define driver configuration structs, and a PeriConfig struct
@@ -164,7 +159,6 @@ macro_rules! driver_configs {
                         SupportItem {
                             name: $name,
                             config_group: stringify!($driver),
-                            symbols: $symbols,
                         },
                     )+
                 ]
@@ -209,11 +203,18 @@ macro_rules! driver_configs {
             }
 
             /// Returns the support status of a peripheral by its name.
-            pub fn support_status(&self, peripheral: &str) -> Option<SupportStatus> {
-                // Find the driver by name and return its support status.
-                match peripheral {
+            pub fn support_status(&self, driver: &str) -> Option<SupportStatus> {
+                match driver {
                     $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
                     _ => None, // If the peripheral is not found, return None.
+                }
+            }
+
+            /// Returns the peripheral instances used by the given driver.
+            pub fn driver_peris<'a>(&'a self, driver: &str) -> Vec<&'a str> {
+                match driver {
+                    $(stringify!($driver) => self.$driver.iter().flat_map(|p| p.instances.iter().map(|i| i.name.as_str())).collect::<Vec<_>>(),)*
+                    _ => vec![],
                 }
             }
         }

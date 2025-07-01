@@ -522,7 +522,7 @@ impl Config {
             if self.device.peri_config.support_status(item.config_group)
                 == Some(SupportStatus::Supported)
             {
-                for p in item.symbols.iter() {
+                for p in self.device.peri_config.driver_peris(item.config_group) {
                     if !stable_peris.contains(&p) {
                         stable_peris.push(p);
                     }
@@ -683,34 +683,14 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     // Driver support status
     for SupportItem {
-        name,
-        config_group,
-        symbols,
+        name, config_group, ..
     } in PeriConfig::drivers()
     {
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
 
-            let status = config
-                .device
-                .peri_config
-                .support_status(config_group)
-                .inspect(|status| {
-                    // TODO: this is good for double-checking, but it should probably go the
-                    // other way around. Driver config should define what peripheral symbols exist.
-                    assert!(
-                        matches!(status, SupportStatus::NotSupported)
-                            || symbols.is_empty()
-                            || symbols.iter().any(|p| config
-                                .peripherals()
-                                .iter()
-                                .any(|peri| peri.name.eq_ignore_ascii_case(p))),
-                        "{} has configuration for {} but no compatible symbols have been defined",
-                        chip.pretty_name(),
-                        config_group
-                    );
-                });
+            let status = config.device.peri_config.support_status(config_group);
             let status_icon = match status {
                 None => " ",
                 Some(status) => status.icon(),
