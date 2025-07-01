@@ -13,17 +13,17 @@ use esp_backtrace as _;
 use esp_hal::{
     etm::Etm,
     gpio::{
-        etm::{Channels, OutputConfig as EtmOutputConfig},
         Level,
         Output,
         OutputConfig,
         Pull,
+        etm::{Channels, OutputConfig as EtmOutputConfig},
     },
     main,
     time::Duration,
     timer::{
-        systimer::{etm::Event, SystemTimer},
         PeriodicTimer,
+        systimer::{SystemTimer, etm::Event},
     },
 };
 
