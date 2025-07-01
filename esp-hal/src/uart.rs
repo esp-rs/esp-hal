@@ -1256,21 +1256,8 @@ impl<'d> Uart<'d, Blocking> {
 
     /// Reconfigures the driver to operate in [`Async`] mode.
     ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
-    /// .into_async();
-    ///
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// See the [`Async`] documentation for an example on how to use this
+    /// method.
     pub fn into_async(self) -> Uart<'d, Async> {
         Uart {
             rx: self.rx.into_async(),
@@ -1390,22 +1377,8 @@ impl<'d> Uart<'d, Blocking> {
 impl<'d> Uart<'d, Async> {
     /// Reconfigures the driver to operate in [`Blocking`] mode.
     ///
-    /// ## Example
-    ///
-    /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
-    /// .into_async();
-    ///
-    /// let blocking_uart = uart.into_blocking();
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// See the [`Blocking`] documentation for an example on how to use this
+    /// method.
     pub fn into_blocking(self) -> Uart<'d, Blocking> {
         Uart {
             rx: self.rx.into_blocking(),
@@ -1519,7 +1492,6 @@ impl<'d> Uart<'d, Async> {
     ///
     /// let mut buf = [0u8; MESSAGE.len()];
     /// uart.read_async(&mut buf[..]).await.unwrap();
-
     /// # Ok(())
     /// # }
     /// ```
