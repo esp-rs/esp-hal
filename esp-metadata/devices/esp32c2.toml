@@ -154,7 +154,7 @@ output_signals = [
     { name = "SPID",          id = 1 },
     { name = "SPIHD",         id = 2 },
     { name = "SPIWP",         id = 3 },
-    { name = "SPICLK_MUX",    id = 4 },
+    { name = "SPICLK",        id = 4 },
     { name = "SPICS0",        id = 5 },
     { name = "U0TXD",         id = 6 },
     { name = "U0RTS",         id = 7 },
