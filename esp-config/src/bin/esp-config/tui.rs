@@ -28,16 +28,10 @@ impl Item {
         match self {
             Item::TopLevel(crate_name) => crate_name.clone(),
             Item::CrateLevel(config_option) => {
-                let display_value = match &config_option.actual_value {
-                    Value::Bool(b) => b.to_string(),
-                    Value::Integer(i) => match config_option.option.display_hint {
-                        DisplayHint::None => format!("{}", i),
-                        DisplayHint::Binary => format!("0b{:0b}", i),
-                        DisplayHint::Hex => format!("0x{:x}", i),
-                    },
-                    Value::String(s) => s.clone(),
-                };
-
+                let display_value = format_using_display_hint(
+                    &config_option.actual_value,
+                    &config_option.option.display_hint,
+                );
                 let default_indicator =
                     if config_option.actual_value == config_option.option.default_value {
                         ui_elements.default_value
@@ -61,7 +55,7 @@ impl Item {
 
     fn help_text(&self) -> String {
         match self {
-            Item::TopLevel(crate_name) => format!("The `{crate_name}` crate").to_string(),
+            Item::TopLevel(crate_name) => format!("The `{crate_name}` crate"),
             Item::CrateLevel(config_option) => config_option.option.description.clone(),
         }
         .replace("<p>", "")
@@ -88,6 +82,19 @@ impl Item {
             Item::TopLevel(_) => unreachable!(),
             Item::CrateLevel(config_option) => config_option.option.display_hint.clone(),
         }
+    }
+}
+
+fn format_using_display_hint(value: &Value, hint: &DisplayHint) -> String {
+    match value {
+        Value::Bool(b) => b.to_string(),
+        Value::Integer(i) => match hint {
+            DisplayHint::None => format!("{}", i),
+            DisplayHint::Binary => format!("0b{:0b}", i),
+            DisplayHint::Hex => format!("0x{:x}", i),
+            DisplayHint::Octal => format!("0o{:o}", i),
+        },
+        Value::String(s) => s.clone(),
     }
 }
 
@@ -138,7 +145,7 @@ impl Repository {
         crate_config.options[index].actual_value = new_value;
 
         let res = validate_config(crate_config);
-        if let Some(error) = res {
+        if let Err(error) = res {
             crate_config.options[index].actual_value = previous;
             return Err(error.to_string());
         }
@@ -465,15 +472,12 @@ impl App<'_> {
                                             .set_current(selected, Value::Bool(!value));
                                         self.handle_error(set_res);
                                     }
-                                    Value::Integer(value) => {
-                                        let display_value = match self.repository.current_level()
-                                            [selected]
-                                            .display_hint()
-                                        {
-                                            DisplayHint::None => format!("{value}"),
-                                            DisplayHint::Binary => format!("0b{value:0b}"),
-                                            DisplayHint::Hex => format!("0x{value:x}"),
-                                        };
+                                    Value::Integer(_) => {
+                                        let display_value = format_using_display_hint(
+                                            &current,
+                                            &self.repository.current_level()[selected]
+                                                .display_hint(),
+                                        );
                                         self.textarea =
                                             make_text_area(&display_value, &self.colors);
                                         self.editing_constraints = constraint;
@@ -732,7 +736,7 @@ impl App<'_> {
     }
 }
 
-pub(super) fn validate_config(config: &CrateConfig) -> Option<String> {
+pub(super) fn validate_config(config: &CrateConfig) -> Result<(), String> {
     let cfg: HashMap<String, Value> = config
         .options
         .iter()
@@ -744,7 +748,7 @@ pub(super) fn validate_config(config: &CrateConfig) -> Option<String> {
         })
         .collect();
     if let Err(error) = esp_config::do_checks(config.checks.as_ref(), &cfg) {
-        return Some(error.to_string());
+        return Err(error.to_string());
     }
-    None
+    Ok(())
 }

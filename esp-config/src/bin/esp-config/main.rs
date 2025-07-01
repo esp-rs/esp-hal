@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     error::Error,
     path::{Path, PathBuf},
+    str::FromStr,
 };
 
 use clap::Parser;
@@ -62,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let mut configs = parse_configs(&work_dir, args.chip, args.config_file.clone())?;
+    let mut configs = parse_configs(&work_dir, args.chip, args.config_file.as_deref())?;
     let initial_configs = configs.clone();
     let mut previous_config = initial_configs.clone();
     let mut errors_to_show = None;
@@ -94,7 +95,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        if let Some(errors) = check_after_changes(&work_dir, args.chip, args.config_file.clone())? {
+        if let Some(errors) =
+            check_after_changes(&work_dir, args.chip, args.config_file.as_deref())?
+        {
             errors_to_show = Some(errors);
         } else {
             println!("Updated configuration...");
@@ -158,7 +161,7 @@ fn apply_config(
 fn parse_configs(
     path: &Path,
     chip_from_args: Option<esp_metadata::Chip>,
-    config_file: Option<String>,
+    config_file: Option<&str>,
 ) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
     let config_toml_path = path.join(config_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
     let config_toml_content = std::fs::read_to_string(config_toml_path)?;
@@ -197,21 +200,12 @@ fn parse_configs(
         let mut chip = None;
         for pkg in &meta.root_package().unwrap().dependencies {
             if pkg.name == "esp-hal" {
-                if pkg.features.contains(&"esp32c2".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32c2);
-                } else if pkg.features.contains(&"esp32c3".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32c3);
-                } else if pkg.features.contains(&"esp32c6".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32c6);
-                } else if pkg.features.contains(&"esp32h2".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32h2);
-                } else if pkg.features.contains(&"esp32".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32);
-                } else if pkg.features.contains(&"esp32s2".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32s2);
-                } else if pkg.features.contains(&"esp32s3".to_string()) {
-                    chip = Some(esp_metadata::Chip::Esp32s3);
-                }
+                let possible_chip_feature_matches: Vec<esp_metadata::Chip> = pkg
+                    .features
+                    .iter()
+                    .flat_map(|f| esp_metadata::Chip::from_str(f))
+                    .collect::<Vec<esp_metadata::Chip>>();
+                chip = possible_chip_feature_matches.first().cloned();
             }
         }
         chip
@@ -228,8 +222,8 @@ fn parse_configs(
     // - if we can infer it from metadata, use it
     // otherwise, fail
     let chip = chip_from_args
-        .or_else(|| chip_from_config())
-        .or_else(|| chip_from_meta());
+        .or_else(chip_from_config)
+        .or_else(chip_from_meta);
 
     if chip.is_none() {
         return Err("No chip given or inferred. Try using the `--chip` argument.".into());
@@ -292,18 +286,16 @@ fn parse_configs(
 }
 
 fn check_after_changes(
-    work_dir: &PathBuf,
+    work_dir: &Path,
     chip_from_args: Option<esp_metadata::Chip>,
-    config_file: Option<String>,
+    config_file: Option<&str>,
 ) -> Result<Option<String>, Box<dyn Error>> {
     println!("Check configuration...");
 
     let configs = parse_configs(work_dir, chip_from_args, config_file)?;
 
     for config in configs {
-        if let Some(value) = tui::validate_config(&config) {
-            return Err(value.into());
-        }
+        tui::validate_config(&config)?;
     }
 
     Ok(None)

@@ -450,6 +450,9 @@ pub enum DisplayHint {
 
     /// Use a hexadecimal representation
     Hex,
+
+    /// Use a octal representation
+    Octal,
 }
 
 /// A configuration option.
