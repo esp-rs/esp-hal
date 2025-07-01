@@ -198,15 +198,34 @@ pub struct MemoryRegion {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct PeripheralDef {
+    /// The name of the esp-hal peripheral singleton
+    name: String,
+    /// When omitted, same as `name`
+    #[serde(default, rename = "pac")]
+    pac_name: Option<String>,
+    /// Whether or not the peripheral has a PAC counterpart
+    #[serde(default, rename = "virtual")]
+    is_virtual: bool,
+    /// List of related interrupt signals
+    #[serde(default)]
+    interrupts: HashMap<String, String>,
+}
+
+impl PeripheralDef {
+    fn symbol_name(&self) -> String {
+        format!("soc_has_{}", self.name.to_lowercase())
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
     name: String,
     arch: Arch,
     cores: usize,
     trm: String,
 
-    peripherals: Vec<String>,
-    // For now, this is only used to double-check the configuration.
-    virtual_peripherals: Vec<String>,
+    peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
     memory: Vec<MemoryRegion>,
 
@@ -252,7 +271,6 @@ impl Config {
                 cores: 1,
                 trm: "".to_owned(),
                 peripherals: Vec::new(),
-                virtual_peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
                 peri_config: PeriConfig::default(),
@@ -265,8 +283,10 @@ impl Config {
         for instance in self.device.peri_config.driver_instances() {
             let (driver, peri) = instance.split_once('.').unwrap();
             ensure!(
-                self.device.peripherals.iter().any(|p| p == peri)
-                    || self.device.virtual_peripherals.iter().any(|p| p == peri),
+                self.device
+                    .peripherals
+                    .iter()
+                    .any(|p| p.name.eq_ignore_ascii_case(peri)),
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );
@@ -295,7 +315,7 @@ impl Config {
     }
 
     /// The peripherals of the device.
-    pub fn peripherals(&self) -> &[String] {
+    pub fn peripherals(&self) -> &[PeripheralDef] {
         &self.device.peripherals
     }
 
@@ -323,12 +343,7 @@ impl Config {
                     Cores::Multi => String::from("multi_core"),
                 },
             ];
-            all.extend(
-                self.device
-                    .peripherals
-                    .iter()
-                    .map(|p| format!("soc_has_{p}")),
-            );
+            all.extend(self.device.peripherals.iter().map(|p| p.symbol_name()));
             all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device
@@ -492,7 +507,78 @@ impl Config {
             tokens.extend(cfg::generate_spi_slave_peripherals(peri));
         };
 
+        tokens.extend(self.generate_peripherals_macro());
+
         save(out_dir.join(file_name), tokens);
+    }
+
+    fn generate_peripherals_macro(&self) -> TokenStream {
+        let mut stable = vec![];
+        let mut unstable = vec![];
+
+        let mut stable_peris = vec![];
+
+        for item in PeriConfig::drivers() {
+            if self.device.peri_config.support_status(item.config_group)
+                == Some(SupportStatus::Supported)
+            {
+                for p in self.device.peri_config.driver_peris(item.config_group) {
+                    if !stable_peris.contains(&p) {
+                        stable_peris.push(p);
+                    }
+                }
+            }
+        }
+
+        let gpios = if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
+            gpio.pins_and_signals
+                .pins
+                .iter()
+                .map(|pin| format_ident!("GPIO{}", pin.pin))
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+
+        for peri in self.device.peripherals.iter() {
+            let hal = format_ident!("{}", peri.name);
+            let pac = if peri.is_virtual {
+                format_ident!("virtual")
+            } else {
+                format_ident!("{}", peri.pac_name.as_deref().unwrap_or(peri.name.as_str()))
+            };
+            // Make sure we have a stable order
+            let mut interrupts = peri.interrupts.iter().collect::<Vec<_>>();
+            interrupts.sort_by_key(|(k, _)| k.as_str());
+            let interrupts = interrupts.iter().map(|(k, v)| {
+                let k = format_ident!("{k}");
+                let v = format_ident!("{v}");
+                quote::quote! { #k => #v }
+            });
+            let tokens = quote::quote! {
+                #hal <= #pac ( #(#interrupts),* )
+            };
+            if stable_peris
+                .iter()
+                .any(|p| peri.name.eq_ignore_ascii_case(p))
+            {
+                stable.push(tokens);
+            } else {
+                unstable.push(tokens);
+            }
+        }
+
+        quote::quote! {
+            crate::peripherals! {
+                peripherals: [
+                    #(#stable,)*
+                ],
+                unstable_peripherals: [
+                    #(#unstable,)*
+                ],
+                pins: [#(#gpios,)*]
+            }
+        }
     }
 }
 
@@ -596,40 +682,12 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    for SupportItem {
-        name,
-        symbols,
-        config_group,
-    } in PeriConfig::drivers()
-    {
+    for SupportItem { name, config_group } in PeriConfig::drivers() {
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
 
-            let status = config
-                .device
-                .peri_config
-                .support_status(config_group)
-                .inspect(|status| {
-                    // TODO: this is good for double-checking, but it should probably go the
-                    // other way around. Driver config should define what peripheral symbols exist.
-                    assert!(
-                        matches!(status, SupportStatus::NotSupported)
-                            || symbols.is_empty()
-                            || symbols.iter().any(|p| config.contains(p)),
-                        "{} has configuration for {} but no compatible symbols have been defined",
-                        chip.pretty_name(),
-                        config_group
-                    );
-                })
-                .or_else(|| {
-                    // If the driver is not supported by the chip, we return None.
-                    if symbols.iter().any(|p| config.contains(p)) {
-                        Some(SupportStatus::NotSupported)
-                    } else {
-                        None
-                    }
-                });
+            let status = config.device.peri_config.support_status(config_group);
             let status_icon = match status {
                 None => " ",
                 Some(status) => status.icon(),

@@ -118,7 +118,7 @@ pub enum Peripheral {
     #[cfg(soc_has_systimer)]
     Systimer,
     /// Temperature sensor peripheral.
-    #[cfg(tsens)]
+    #[cfg(soc_has_tsens)]
     Tsens,
 }
 
@@ -205,7 +205,7 @@ impl Peripheral {
         Self::LcdCam,
         #[cfg(soc_has_systimer)]
         Self::Systimer,
-        #[cfg(tsens)]
+        #[cfg(soc_has_tsens)]
         Self::Tsens,
     ];
 }
@@ -470,7 +470,7 @@ impl PeripheralClockControl {
             Peripheral::Systimer => {
                 perip_clk_en0.modify(|_, w| w.systimer_clk_en().bit(enable));
             }
-            #[cfg(tsens)]
+            #[cfg(soc_has_tsens)]
             Peripheral::Tsens => {
                 perip_clk_en1.modify(|_, w| w.tsens_clk_en().bit(enable));
             }
@@ -644,7 +644,7 @@ impl PeripheralClockControl {
                     .systimer_conf()
                     .modify(|_, w| w.systimer_clk_en().bit(enable));
             }
-            #[cfg(tsens)]
+            #[cfg(soc_has_tsens)]
             Peripheral::Tsens => {
                 system.tsens_clk_conf().modify(|_, w| {
                     w.tsens_clk_en().bit(enable);
@@ -815,13 +815,15 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
         Peripheral::Systimer => {
             perip_rst_en0.modify(|_, w| w.systimer_rst().bit(reset));
         }
-        #[cfg(all(tsens, esp32c6))]
+        #[cfg(soc_has_tsens)]
         Peripheral::Tsens => {
-            perip_rst_en0.modify(|_, w| w.tsens_rst().bit(reset));
-        }
-        #[cfg(all(tsens, esp32c3))]
-        Peripheral::Tsens => {
-            perip_rst_en1.modify(|_, w| w.tsens_rst().bit(reset));
+            cfg_if::cfg_if! {
+                if #[cfg(esp32c3)] {
+                    perip_rst_en1.modify(|_, w| w.tsens_rst().bit(reset));
+                } else {
+                    perip_rst_en0.modify(|_, w| w.tsens_rst().bit(reset));
+                }
+            }
         }
     });
 }
@@ -949,7 +951,7 @@ fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
                 .systimer_conf()
                 .modify(|_, w| w.systimer_rst_en().bit(reset));
         }
-        #[cfg(tsens)]
+        #[cfg(soc_has_tsens)]
         Peripheral::Tsens => {
             system
                 .tsens_clk_conf()

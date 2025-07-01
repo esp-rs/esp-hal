@@ -312,7 +312,7 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(any(soc_has_lp_clkrst, soc_has_rtc_cntl))]
+    #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
@@ -356,7 +356,7 @@ unstable_driver! {
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(tsens)]
+    #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(any(soc_has_twai0, soc_has_twai1))]
     pub mod twai;

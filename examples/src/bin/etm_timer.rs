@@ -52,7 +52,7 @@ fn main() -> ! {
         },
     );
 
-    let etm = Etm::new(peripherals.SOC_ETM);
+    let etm = Etm::new(peripherals.ETM);
     let channel0 = etm.channel0;
 
     // make sure the configured channel doesn't get dropped - dropping it will
