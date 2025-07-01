@@ -45,6 +45,7 @@ peripherals = [
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
     { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" } },
+    { name = "SYSCON" },
     { name = "SYSTEM" },
     { name = "SYSTIMER" },
     { name = "TIMG0" },
