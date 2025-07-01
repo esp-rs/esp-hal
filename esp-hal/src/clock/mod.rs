@@ -600,64 +600,41 @@ impl Clocks {
 }
 
 #[cfg(any(bt, ieee802154, wifi))]
-#[instability::unstable]
-#[derive(Clone, Copy, Debug)]
-#[doc(hidden)]
-/// These are all modems with bitmasks as their representation.
-pub enum Modem {
-    #[cfg(wifi)]
-    WiFi       = 0,
-    #[cfg(bt)]
-    Bt         = 1,
-    #[cfg(ieee802154)]
-    Ieee802154 = 2,
-}
-
-#[cfg(any(bt, ieee802154, wifi))]
 /// Tracks which modems currently request an active PHY clock.
-static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<[Cell<u8>; 3]> =
-    critical_section::Mutex::new([const { Cell::new(0) }; 3]);
+static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<Cell<u8>> =
+    critical_section::Mutex::new(Cell::new(0));
 
 // These functions are moved out of the trait to prevent monomorphization for
 // every modem clock controller. If that doens't really make sense, this can be
 // moved back.
 
 #[cfg(any(bt, ieee802154, wifi))]
-fn increase_phy_clock_ref_count_internal(modem: Modem) {
+fn increase_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
-        let modem_phy_clock_ref_counter = &PHY_CLOCK_REF_COUNTERS.borrow(cs)[modem as usize];
-        let modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
+        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTERS.borrow(cs);
+        let phy_clock_ref_count = phy_clock_ref_counter.get();
 
         // If other modems have reference to the PHY clock, but this one doesn't, the
         // PHY clock will just be set to enabled again, which shouldn't have any
         // effect.
-        if modem_phy_clock_ref_count == 0 {
+        if phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
 
-        modem_phy_clock_ref_counter.set(modem_phy_clock_ref_count + 1);
+        phy_clock_ref_counter.set(phy_clock_ref_count + 1);
     });
 }
 #[cfg(any(bt, ieee802154, wifi))]
-fn decrease_phy_clock_ref_count_internal(modem: Modem) {
+fn decrease_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
-        let mut phy_clock_refs_present = false;
+        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTERS.borrow(cs);
 
-        for (i, modem_phy_clock_ref_counter) in PHY_CLOCK_REF_COUNTERS.borrow(cs).iter().enumerate()
-        {
-            let mut modem_phy_clock_ref_count = modem_phy_clock_ref_counter.get();
+        let new_phy_clock_ref_count = phy_clock_ref_counter.get().checked_sub(1).expect("PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used ModemClockController::decrease_phy_clock_ref_count incorrectly.");
 
-            if i == modem as usize {
-                modem_phy_clock_ref_count = modem_phy_clock_ref_count.saturating_sub(1);
-                modem_phy_clock_ref_counter.set(modem_phy_clock_ref_count);
-            }
-            if modem_phy_clock_ref_count != 0 {
-                phy_clock_refs_present = true;
-            }
-        }
-        if !phy_clock_refs_present {
+        if new_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(false);
         }
+        phy_clock_ref_counter.set(new_phy_clock_ref_count);
     });
 }
 /// Do any common initial initialization needed for the radio clocks
@@ -674,7 +651,6 @@ pub fn init_radio_clocks() {
 /// active. To release this guard, you can either let it go out of scope or use
 /// [PhyClockGuard::release] to explicitly release it.
 pub struct PhyClockGuard<'d> {
-    modem: Modem,
     _phantom: PhantomData<&'d ()>,
 }
 #[cfg(any(bt, ieee802154, wifi))]
@@ -689,15 +665,13 @@ impl PhyClockGuard<'_> {
 #[cfg(any(bt, ieee802154, wifi))]
 impl Drop for PhyClockGuard<'_> {
     fn drop(&mut self) {
-        decrease_phy_clock_ref_count_internal(self.modem);
+        decrease_phy_clock_ref_count_internal();
     }
 }
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
 /// This trait provides common functionality for all
 pub trait ModemClockController<'d>: Sealed + 'd {
-    #[doc(hidden)]
-    const MODEM: Modem;
 
     /// Enable the modem clock for this controller.
     fn enable_modem_clock(&mut self, enable: bool);
@@ -707,9 +681,8 @@ pub trait ModemClockController<'d>: Sealed + 'd {
     /// The PHY clock will only be disabled, once all [PhyClockGuard]'s of all
     /// modems were dropped.
     fn enable_phy_clock(&self) -> PhyClockGuard<'d> {
-        increase_phy_clock_ref_count_internal(Self::MODEM);
+        increase_phy_clock_ref_count_internal();
         PhyClockGuard {
-            modem: Self::MODEM,
             _phantom: PhantomData,
         }
     }
@@ -717,18 +690,17 @@ pub trait ModemClockController<'d>: Sealed + 'd {
     /// Unsafely decrease the PHY clock reference count for this modem.
     ///
     /// # Safety
-    /// Calling this is only safe, if you previously [core::mem::forget] a
-    /// [PhyClockGuard], since otherwise the reference counting would be
-    /// left in an invalid state.
-    unsafe fn decrease_phy_clock_ref_count(&self) {
-        decrease_phy_clock_ref_count_internal(Self::MODEM);
+    /// Calling this is only safe, if you previously [core::mem::forget] a [PhyClockGuard], 
+    /// since otherwise the reference counting would be left in an invalid state. In practice 
+    /// this would mean, that any PhyClockGuard getting dropped could now panic.
+    fn decrease_phy_clock_ref_count(&self) {
+        decrease_phy_clock_ref_count_internal();
     }
 }
 
 #[cfg(wifi)]
 #[instability::unstable]
 impl<'d> ModemClockController<'d> for WIFI<'d> {
-    const MODEM: Modem = Modem::WiFi;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_wifi(enable);
     }
@@ -745,7 +717,6 @@ impl WIFI<'_> {
 #[cfg(bt)]
 #[instability::unstable]
 impl<'d> ModemClockController<'d> for BT<'d> {
-    const MODEM: Modem = Modem::Bt;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_bt(enable);
     }
@@ -770,7 +741,6 @@ impl BT<'_> {
 #[cfg(ieee802154)]
 #[instability::unstable]
 impl<'d> ModemClockController<'d> for IEEE802154<'d> {
-    const MODEM: Modem = Modem::Ieee802154;
     fn enable_modem_clock(&mut self, enable: bool) {
         clocks_ll::enable_ieee802154(enable);
     }
