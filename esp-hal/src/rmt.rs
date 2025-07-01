@@ -583,13 +583,40 @@ impl RmtWriterInner {
     /// FIXME: docs
     #[inline(always)]
     pub fn next<'s>(&'s mut self) -> Option<RmtSlot<'s>>
-// where 's: 'a
+    // where 's: 'a
     {
         if self.ptr >= self.end {
             return None;
         }
 
         Some(RmtSlot { writer: self })
+    }
+
+    /// FIXME: docs
+    // Note that this explicitly supports count = 0, thus callers can avoid that check
+    #[inline(always)]
+    pub fn write_many<F>(&mut self, count: usize, mut f: F) -> usize
+    where
+        F: FnMut() -> PulseCode,
+    {
+        let count = count.min(unsafe { self.end.offset_from(self.ptr) } as usize);
+
+        let mut last_code = self.last_code;
+        let mut ptr = self.ptr;
+        let end = unsafe { self.ptr.add(count) };
+
+        while ptr < end {
+            last_code = f();
+            unsafe { ptr.write_volatile(last_code) };
+            ptr = unsafe { ptr.add(1) };
+        }
+
+        debug_assert!(self.ptr <= self.end);
+
+        self.ptr = ptr;
+        self.last_code = last_code;
+
+        count
     }
 }
 
@@ -618,6 +645,7 @@ where
     }
 }
 
+// FIXME: Use write_many
 impl<'a, T> Encoder for SliceEncoder<'a, T>
 where
     T: Into<PulseCode> + Copy,
@@ -631,10 +659,12 @@ where
         if count > 0 {
             let mut ptr = writer.ptr;
 
+            // FIXME: The generated loop still isn't as tight as possible, since it uses an
+            // iteration coutner instead of simply comparing the currentl slice pointer to its end.
             let mut last_code = PulseCode::end_marker();
             for code in &self.data[..count] {
                 last_code = (*code).into();
-                unsafe { ptr.write_volatile(last_code) }
+                unsafe { ptr.write_volatile(last_code) };
                 ptr = unsafe { ptr.add(1) };
             }
 
@@ -743,18 +773,17 @@ impl RmtWriterOuter {
     // with underruns
     // Always inline the wrapper function...
     #[inline]
-    // #[crate::ram]
-    fn write(&mut self, data: &mut impl Encoder, raw: impl TxChannelInternal, initial: bool) {
+    fn write(&mut self, data: &mut impl Encoder, raw: impl TxChannelInternal) {
         // ...which calls the inner funciton with a type-erased DynChannelAccess, such
         // that it is only monomorphized for different `data` types: There
         // should be no significant benefit from statically knowing the channel
         // number here.
-        #[inline(never)]
+        #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+        #[cfg_attr(place_rmt_driver_in_ram, ram)]
         fn inner(
             this: &mut RmtWriterOuter,
             data: &mut impl Encoder,
             raw: DynChannelAccess<Tx>,
-            initial: bool,
         ) {
             if this.state != WriterState::Active {
                 // Don't call next() on data again!
@@ -770,26 +799,55 @@ impl RmtWriterOuter {
             // FIXME: debug_assert that the current hw read addr is in the part of RAM that
             // we don't overwrite
 
+            let offset = usize::from(this.offset);
+            debug_assert!(offset == 0 || offset == memsize / 2 - 1 || offset == memsize - 1);
+
             // This is only used to fill the entire RAM from its start, or to refill
             // either the first or second half. The code below may rely on this.
             // In particular, this implies that the offset might only need to be wrapped at
             // the end.
-            let (count0, mut count1) = if initial {
-                debug_assert!(this.offset == 0);
-                // Leave space for extra end marker
-                (memsize - 1, 0)
-            } else if usize::from(this.offset) == memsize / 2 - 1 {
-                // Overwrite previous extra end marker, then leave space for new extra end
-                // marker
-                (memsize / 2, 0)
-            } else if usize::from(this.offset) == memsize - 1 {
-                // Overwrite previous extra end marker, then leave space for new extra end
-                // marker
-                (1, memsize / 2 - 1)
-            } else {
-                debug_assert!(false);
-                unreachable!();
+
+            // FIXME: instead of the initial flag, initialize offset to a special value that will
+            // behave correctly with the below calculation! (also, note that we can replace initial
+            // with self.total == 0)
+            let (count0, mut count1) = {
+                // Generate sltu in RISC-V -> branchless
+                let mut s = if offset > memsize / 2 { 1 } else { 0 };
+                s += if offset == 0 { 1 } else { 0 };
+                let diff = offset as isize - memsize as isize / 2;
+                (
+                    // offset = 0               -> count0 = memsize - 1
+                    // offset = memsize - 1     -> count0 = 1
+                    // offset = memsize / 2 - 1 -> count0 = memsize / 2
+                    memsize - (offset + 1),
+                    // offset = 0               -> count1 = 0
+                    // offset = memsize - 1     -> count1 = memsize / 2 - 1
+                    // offset = memsize / 2 - 1 -> count1 = 0
+                    diff.max(0) as usize
+                )
             };
+
+            #[cfg(debug_assertions)]
+            {
+                let (count0_dbg, count1_dbg) = if this.written == 0 {
+                    debug_assert!(offset == 0);
+                    // Leave space for extra end marker
+                    (memsize - 1, 0)
+                } else if offset == memsize / 2 - 1 {
+                    // Overwrite previous extra end marker, then leave space for new extra end
+                    // marker
+                    (memsize / 2, 0)
+                } else if offset == memsize - 1 {
+                    // Overwrite previous extra end marker, then leave space for new extra end
+                    // marker
+                    (1, memsize / 2 - 1)
+                } else {
+                    panic!();
+                };
+
+                assert!(count0 == count0_dbg, "count0: o={}, w={}: {} != {}", offset, this.written, count0, count0_dbg);
+                assert!(count1 == count1_dbg, "count1: o={}, w={}: {} != {}", offset, this.written, count1, count1_dbg);
+            }
 
             let start0 = unsafe { ram_start.add(this.offset as usize) };
             let mut internal = RmtWriterInner {
@@ -860,7 +918,7 @@ impl RmtWriterOuter {
             );
         }
 
-        inner(self, data, raw.degrade(), initial)
+        inner(self, data, raw.degrade())
     }
 }
 
@@ -2019,7 +2077,7 @@ where
 
             if self.writer.state == WriterState::Active {
                 // re-fill TX RAM
-                self.writer.write(&mut self.data, raw, false);
+                self.writer.write(&mut self.data, raw);
                 // FIXME: Return if writer.state indicates an error (ensure
                 // to stop transmission first)
             }
@@ -2174,7 +2232,7 @@ impl Drop for ContinuousTxTransaction<'_> {
 }
 
 /// Docs
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct BenchmarkResult {
     written: u64,
     duration_nanos: u64,
@@ -2214,7 +2272,7 @@ impl defmt::Format for BenchmarkResult {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         let duration = self.duration_nanos / self.iterations;
         let cpu_clock = Clocks::get().cpu_clock;
-        defmt::write!(fmt, "RMT BenchmarkResult\n");
+        defmt::write!(fmt, "RMT BenchmarkResult {{\n");
         defmt::write!(fmt, "\tIterations: {}\n", self.iterations);
         defmt::write!(fmt, "\tCodes written: {}\n", self.written);
         defmt::write!(
@@ -2228,10 +2286,11 @@ impl defmt::Format for BenchmarkResult {
         );
         defmt::write!(
             fmt,
-            "\tEncoding time / code: {}ns ~ {} cycles",
+            "\tEncoding time / code: {}ns ~ {} cycles\n",
             duration / self.written,
             duration * cpu_clock.as_mhz() as u64 / (1000 * self.written),
         );
+        defmt::write!(fmt, "}}");
     }
 }
 
@@ -2288,11 +2347,8 @@ where
             }
         };
 
-        writer.write(&mut encoder, raw, true);
-        sum_codes(&writer);
-
         while writer.state == WriterState::Active {
-            writer.write(&mut encoder, raw, false);
+            writer.write(&mut encoder, raw);
             sum_codes(&writer);
         }
 
@@ -2313,10 +2369,9 @@ where
         for _ in 0..iterations {
             let mut encoder = data.clone();
             writer = RmtWriterOuter::new();
-            writer.write(&mut encoder, raw, true);
 
             while writer.state == WriterState::Active {
-                writer.write(&mut encoder, raw, false);
+                writer.write(&mut encoder, raw);
             }
             assert!(writer.written == total);
         }
@@ -2372,7 +2427,7 @@ impl Channel<'_, Blocking, Tx> {
         let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
+        writer.write(&mut data, raw);
 
         match writer.state {
             WriterState::Empty => return Err(Error::InvalidArgument),
@@ -2436,7 +2491,7 @@ impl Channel<'_, Blocking, Tx> {
         let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
+        writer.write(&mut data, raw);
 
         match writer.state {
             WriterState::Empty => return Err(Error::InvalidArgument),
@@ -2679,7 +2734,7 @@ where
 
                 if this.writer.state == WriterState::Active {
                     // re-fill TX RAM
-                    this.writer.write(&mut this.data, raw, false);
+                    this.writer.write(&mut this.data, raw);
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
@@ -2789,22 +2844,19 @@ impl Channel<'_, Async, Tx> {
             data,
         };
 
-        fut.writer.write(&mut fut.data, raw, true);
+        fut.writer.write(&mut fut.data, raw);
 
-        let wrap = match fut.writer.state {
-            WriterState::Empty | WriterState::DoneNoEnd => {
-                // Error cases; the future will return the error on the first call to poll()
-                return fut;
-            }
-            WriterState::Active => true,
-            WriterState::Done => false,
-        };
+        // Error cases; the future will return the error on the first call to poll()
+        if matches!(fut.writer.state, WriterState::Empty | WriterState::DoneNoEnd) {
+            return fut;
+        }
 
         RmtState::store(RmtState::TxAsync, fut.raw, Ordering::Relaxed);
 
         fut.raw.clear_tx_interrupts();
         let mut events = Event::End | Event::Error;
-        if wrap {
+        if fut.writer.state == WriterState::Active {
+            // Needs wrapping
             events |= Event::Threshold;
         }
         fut.raw.listen_tx_interrupt(events);
