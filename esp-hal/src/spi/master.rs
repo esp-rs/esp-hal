@@ -2656,7 +2656,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[cfg_attr(not(feature = "unstable"), expect(private_bounds))] // DmaEligible
-pub trait Instance: private::Sealed + IntoAnySpi + DmaEligible {
+pub trait Instance: private::Sealed + any::Degrade + DmaEligible {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -3793,38 +3793,31 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
 
 impl Instance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn parts(&self) -> (&'static Info, &'static State);
-        }
+    #[inline]
+    fn parts(&self) -> (&'static Info, &'static State) {
+        any::delegate!(self, spi => { spi.parts() })
     }
 }
 
 impl AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
-            fn disable_peri_interrupt(&self);
-            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
-        }
+    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+        any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt(&self) {
+        any::delegate!(self, spi => { spi.disable_peri_interrupt() })
+    }
+
+    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
+        any::delegate!(self, spi => { spi.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {

@@ -426,9 +426,9 @@ crate::any_peripheral! {
 impl Timer for AnyTimer<'_> {
     delegate::delegate! {
         to match &self.0 {
-            AnyTimerInner::TimgTimer(inner) => inner,
+            any::Inner::TimgTimer(inner) => inner,
             #[cfg(systimer)]
-            AnyTimerInner::SystimerAlarm(inner) => inner,
+            any::Inner::SystimerAlarm(inner) => inner,
         } {
             fn start(&self);
             fn stop(&self);

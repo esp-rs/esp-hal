@@ -271,7 +271,7 @@ impl private::Sealed for esp_hal::timer::systimer::Alarm<'_> {}
 
 impl<T> EspWifiTimerSource for T
 where
-    T: esp_hal::timer::IntoAnyTimer + private::Sealed,
+    T: esp_hal::timer::any::Degrade + private::Sealed,
 {
     unsafe fn timer(self) -> TimeBase {
         let any_timer: AnyTimer<'_> = self.degrade();

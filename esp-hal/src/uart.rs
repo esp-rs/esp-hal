@@ -2598,7 +2598,7 @@ pub mod lp_uart {
 }
 
 /// A peripheral singleton compatible with the UART driver.
-pub trait Instance: crate::private::Sealed + IntoAnyUart {
+pub trait Instance: crate::private::Sealed + any::Degrade {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this UART instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -3428,31 +3428,21 @@ crate::any_peripheral! {
 impl Instance for AnyUart<'_> {
     #[inline]
     fn parts(&self) -> (&'static Info, &'static State) {
-        match &self.0 {
-            #[cfg(soc_has_uart0)]
-            AnyUartInner::Uart0(uart) => uart.parts(),
-            #[cfg(soc_has_uart1)]
-            AnyUartInner::Uart1(uart) => uart.parts(),
-            #[cfg(soc_has_uart2)]
-            AnyUartInner::Uart2(uart) => uart.parts(),
-        }
+        any::delegate!(self, uart => { uart.parts() })
     }
 }
 
 impl AnyUart<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(soc_has_uart0)]
-            AnyUartInner::Uart0(uart) => uart,
-            #[cfg(soc_has_uart1)]
-            AnyUartInner::Uart1(uart) => uart,
-            #[cfg(soc_has_uart2)]
-            AnyUartInner::Uart2(uart) => uart,
-        } {
-            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
-            fn disable_peri_interrupt(&self);
-            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
-        }
+    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+        any::delegate!(self, uart => { uart.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt(&self) {
+        any::delegate!(self, uart => { uart.disable_peri_interrupt() })
+    }
+
+    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
+        any::delegate!(self, uart => { uart.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {
