@@ -408,6 +408,9 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.i2c_slave]
+support_status = "not_supported"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 3

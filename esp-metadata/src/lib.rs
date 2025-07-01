@@ -684,8 +684,8 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     // Driver support status
     for SupportItem {
         name,
-        symbols,
         config_group,
+        symbols,
     } in PeriConfig::drivers()
     {
         write!(output, "| {name:driver_col_width$} |")?;
@@ -702,19 +702,14 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
                     assert!(
                         matches!(status, SupportStatus::NotSupported)
                             || symbols.is_empty()
-                            || symbols.iter().any(|p| config.contains(p)),
+                            || symbols.iter().any(|p| config
+                                .peripherals()
+                                .iter()
+                                .any(|peri| peri.name.eq_ignore_ascii_case(p))),
                         "{} has configuration for {} but no compatible symbols have been defined",
                         chip.pretty_name(),
                         config_group
                     );
-                })
-                .or_else(|| {
-                    // If the driver is not supported by the chip, we return None.
-                    if symbols.iter().any(|p| config.contains(p)) {
-                        Some(SupportStatus::NotSupported)
-                    } else {
-                        None
-                    }
                 });
             let status_icon = match status {
                 None => " ",

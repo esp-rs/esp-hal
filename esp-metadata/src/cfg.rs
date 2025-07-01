@@ -225,7 +225,7 @@ driver_configs![
     AdcProperties {
         driver: adc,
         name: "ADC",
-        peripherals: &[],
+        peripherals: &["adc1", "adc2"],
         properties: {}
     },
     AesProperties {
@@ -248,13 +248,13 @@ driver_configs![
     DacProperties {
         driver: dac,
         name: "DAC",
-        peripherals: &["dac"],
+        peripherals: &["dac1", "dac2"],
         properties: {}
     },
     DmaProperties {
         driver: dma,
         name: "DMA",
-        peripherals: &["pdma", "gdma"],
+        peripherals: &[],
         properties: {}
     },
     DsProperties {

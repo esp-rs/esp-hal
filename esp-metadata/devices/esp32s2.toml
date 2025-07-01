@@ -363,6 +363,9 @@ separate_filter_config_registers = true
 has_arbitration_en = true
 i2c0_data_register_ahb_address = 0x6001301c
 
+[device.i2c_slave]
+support_status = "not_supported"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 3

@@ -64,7 +64,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | HMAC               |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
-| I2C slave          | ❌    | ❌       | ❌       | ❌       | ❌       | ❌       | ❌       |
+| I2C slave          | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | IOMUX              | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
