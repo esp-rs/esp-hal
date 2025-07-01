@@ -75,7 +75,6 @@ virtual_peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "assist_debug_region_monitor",
     "gdma",
     "phy",
     "psram",
@@ -107,6 +106,10 @@ instances = [
     { name = "adc1" },
     { name = "adc2" },
 ]
+
+[device.assist_debug]
+support_status = "partial"
+has_region_monitor = true
 
 [device.gpio]
 support_status = "supported"
@@ -563,7 +566,6 @@ support_status = "not_supported"
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.assist_debug]
 [device.dma]
 [device.io_mux]
 [device.psram]

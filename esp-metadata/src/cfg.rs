@@ -242,7 +242,12 @@ driver_configs![
         driver: assist_debug,
         name: "ASSIST_DEBUG",
         peripherals: &["assist_debug"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_sp_monitor: bool,
+            #[serde(default)]
+            has_region_monitor: bool,
+        }
     },
     DacProperties {
         driver: dac,

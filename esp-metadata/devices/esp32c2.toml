@@ -46,7 +46,6 @@ virtual_peripherals = [
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "assist_debug_sp_monitor",
     "gdma",
     "phy",
 
@@ -69,6 +68,10 @@ support_status = "partial"
 instances = [
     { name = "adc1" },
 ]
+
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
 
 [device.gpio]
 support_status = "supported"
@@ -246,7 +249,6 @@ instances = [
 [device.ledc]
 
 ## Miscellaneous
-[device.assist_debug]
 [device.dma]
 [device.io_mux]
 [device.temp_sensor]

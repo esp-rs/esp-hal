@@ -73,7 +73,7 @@ impl crate::interrupt::InterruptConfigurable for DebugAssist<'_> {
     }
 }
 
-#[cfg(assist_debug_sp_monitor)]
+#[cfg(assist_debug_has_sp_monitor)]
 impl DebugAssist<'_> {
     /// Enable SP monitoring on main core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` threshold, the module will record the PC
@@ -152,7 +152,7 @@ impl DebugAssist<'_> {
     }
 }
 
-#[cfg(all(assist_debug_sp_monitor, multi_core))]
+#[cfg(all(assist_debug_has_sp_monitor, multi_core))]
 impl<'d> DebugAssist<'d> {
     /// Enable SP monitoring on secondary core. When the SP exceeds the
     /// `lower_bound` or `upper_bound` threshold, the module will record the PC
@@ -231,7 +231,7 @@ impl<'d> DebugAssist<'d> {
     }
 }
 
-#[cfg(assist_debug_region_monitor)]
+#[cfg(assist_debug_has_region_monitor)]
 impl DebugAssist<'_> {
     /// Enable region monitoring of read/write performed by the main CPU in a
     /// certain memory region0. Whenever the bus reads or writes in the
@@ -394,7 +394,7 @@ impl DebugAssist<'_> {
     }
 }
 
-#[cfg(all(assist_debug_region_monitor, multi_core))]
+#[cfg(all(assist_debug_has_region_monitor, multi_core))]
 impl DebugAssist<'_> {
     /// Enable region monitoring of read/write performed by the secondary CPU in
     /// a certain memory region0. Whenever the bus reads or writes in the
