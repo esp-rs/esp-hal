@@ -8,10 +8,10 @@ use embassy_time::Instant;
 #[cfg(all(low_power_wait, multi_core))]
 use esp_hal::interrupt::software::SoftwareInterrupt;
 use esp_hal::{interrupt::Priority, system::Cpu};
-#[cfg(low_power_wait)]
-use portable_atomic::{AtomicBool, Ordering};
 #[cfg(all(low_power_wait, low_power_wait_stats))]
 use portable_atomic::AtomicU64;
+#[cfg(low_power_wait)]
+use portable_atomic::{AtomicBool, Ordering};
 
 use super::InnerExecutor;
 
@@ -235,6 +235,12 @@ pub mod thread_low_power_wait_stats {
             self.previous_sleep_tick = current_sleep_tick;
 
             usage * 100.0
+        }
+    }
+
+    impl Default for ThreadLowPowerWaitStats {
+        fn default() -> Self {
+            Self::new()
         }
     }
 }
