@@ -682,10 +682,7 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    for SupportItem {
-        name, config_group, ..
-    } in PeriConfig::drivers()
-    {
+    for SupportItem { name, config_group } in PeriConfig::drivers() {
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);

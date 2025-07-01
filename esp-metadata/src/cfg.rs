@@ -129,10 +129,6 @@ macro_rules! driver_configs {
             driver: $driver:ident,
             // Driver name, used in the generated documentation.
             name: $name:literal,
-            // The list of peripheral symbols that this driver supports. For now this is used to
-            // double-check the configuration.
-            // TODO: remove once the metadata encodes which instances are supported.
-            peripherals: $symbols:expr,
             properties: $tokens:tt
         },
     )+) => {
@@ -226,19 +222,16 @@ driver_configs![
     AdcProperties {
         driver: adc,
         name: "ADC",
-        peripherals: &["adc1", "adc2"],
         properties: {}
     },
     AesProperties {
         driver: aes,
         name: "AES",
-        peripherals: &["aes"],
         properties: {}
     },
     AssistDebugProperties {
         driver: assist_debug,
         name: "ASSIST_DEBUG",
-        peripherals: &["assist_debug"],
         properties: {
             #[serde(default)]
             has_sp_monitor: bool,
@@ -249,43 +242,36 @@ driver_configs![
     DacProperties {
         driver: dac,
         name: "DAC",
-        peripherals: &["dac1", "dac2"],
         properties: {}
     },
     DmaProperties {
         driver: dma,
         name: "DMA",
-        peripherals: &[],
         properties: {}
     },
     DsProperties {
         driver: ds,
         name: "DS",
-        peripherals: &["ds"],
         properties: {}
     },
     EccProperties {
         driver: ecc,
         name: "ECC",
-        peripherals: &["ecc"],
         properties: {}
     },
     EthernetProperties {
         driver: ethernet,
         name: "Ethernet",
-        peripherals: &["emac"],
         properties: {}
     },
     EtmProperties {
         driver: etm,
         name: "ETM",
-        peripherals: &["etm"],
         properties: {}
     },
     GpioProperties {
         driver: gpio,
         name: "GPIO",
-        peripherals: &[], // gpio omitted to prevent stabilizing the singleton
         properties: {
             #[serde(default)]
             has_bank_1: bool,
@@ -306,13 +292,11 @@ driver_configs![
     HmacProperties {
         driver: hmac,
         name: "HMAC",
-        peripherals: &["hmac"],
         properties: {}
     },
     I2cMasterProperties<I2cMasterInstanceConfig> {
         driver: i2c_master,
         name: "I2C master",
-        peripherals: &["i2c0", "i2c1"],
         properties: {
             #[serde(default)]
             has_fsm_timeouts: bool,
@@ -344,19 +328,16 @@ driver_configs![
     I2cSlaveProperties {
         driver: i2c_slave,
         name: "I2C slave",
-        peripherals: &["i2c0", "i2c1"],
         properties: {}
     },
     I2sProperties {
         driver: i2s,
         name: "I2S",
-        peripherals: &["i2s0", "i2s1"],
         properties: {}
     },
     InterruptProperties {
         driver: interrupts,
         name: "Interrupts",
-        peripherals: &[],
         properties: {
             status_registers: u32,
         }
@@ -364,55 +345,46 @@ driver_configs![
     IoMuxProperties {
         driver: io_mux,
         name: "IOMUX",
-        peripherals: &["io_mux"],
         properties: {}
     },
     CameraProperties {
         driver: camera,
         name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
-        peripherals: &[],
         properties: {}
     },
     RgbProperties {
         driver: rgb_display,
         name: "RGB display", // LCD_CAM, ESP32 I2S, S2 SPI
-        peripherals: &[],
         properties: {}
     },
     LedcProperties {
         driver: ledc,
         name: "LEDC",
-        peripherals: &["ledc"],
         properties: {}
     },
     McpwmProperties {
         driver: mcpwm,
         name: "MCPWM",
-        peripherals: &["mcpwm0", "mcpwm1"],
         properties: {}
     },
     ParlIoProperties {
         driver: parl_io,
         name: "PARL_IO",
-        peripherals: &["parl_io"],
         properties: {}
     },
     PcntProperties {
         driver: pcnt,
         name: "PCNT",
-        peripherals: &["pcnt"],
         properties: {}
     },
     PsramProperties {
         driver: psram,
         name: "PSRAM",
-        peripherals: &["psram"],
         properties: {}
     },
     RmtProperties {
         driver: rmt,
         name: "RMT",
-        peripherals: &["rmt"],
         properties: {
             ram_start: u32,
             channel_ram_size: u32,
@@ -421,43 +393,36 @@ driver_configs![
     RngProperties {
         driver: rng,
         name: "RNG",
-        peripherals: &["rng"],
         properties: {}
     },
     RsaProperties {
         driver: rsa,
         name: "RSA",
-        peripherals: &["rsa"],
         properties: {}
     },
     SdHostProperties {
         driver: sd_host,
         name: "SDIO host",
-        peripherals: &["sdhost"],
         properties: {}
     },
     SdSlaveProperties {
         driver: sd_slave,
         name: "SDIO slave",
-        peripherals: &["slchost"],
         properties: {}
     },
     SleepProperties {
         driver: sleep,
         name: "Light/deep sleep",
-        peripherals: &[],
         properties: {}
     },
     ShaProperties {
         driver: sha,
         name: "SHA",
-        peripherals: &["sha"],
         properties: {}
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,
         name: "SPI master",
-        peripherals: &["spi2", "spi3"],
         properties: {
             #[serde(default)]
             has_octal: bool,
@@ -466,25 +431,21 @@ driver_configs![
     SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
-        peripherals: &["spi2", "spi3"],
         properties: {}
     },
     SysTimerProperties {
         driver: systimer,
         name: "SYSTIMER",
-        peripherals: &["systimer"],
         properties: {}
     },
     TempProperties {
         driver: temp_sensor,
         name: "Temperature sensor",
-        peripherals: &[],
         properties: {}
     },
     TimersProperties {
         driver: timergroup,
         name: "Timers",
-        peripherals: &[],
         properties: {
             #[serde(default)]
             timg_has_timer1: bool,
@@ -493,49 +454,41 @@ driver_configs![
     TouchProperties {
         driver: touch,
         name: "Touch",
-        peripherals: &["touch"],
         properties: {}
     },
     TwaiProperties {
         driver: twai,
         name: "TWAI",
-        peripherals: &["twai0", "twai1"],
         properties: {}
     },
     UartProperties<UartInstanceConfig> {
         driver: uart,
         name: "UART",
-        peripherals: &["uart0", "uart1", "uart2"],
         properties: {}
     },
     UlpFsmProperties {
         driver: ulp_fsm,
         name: "ULP (FSM)",
-        peripherals: &["ulp_supported"],
         properties: {}
     },
     UlpRiscvProperties {
         driver: ulp_riscv,
         name: "ULP (RISC-V)",
-        peripherals: &["ulp_riscv_core", "lp_core"],
         properties: {}
     },
     UsbOtgProperties {
         driver: usb_otg,
         name: "USB OTG FS",
-        peripherals: &["usb0"],
         properties: {}
     },
     UsbSerialJtagProperties {
         driver: usb_serial_jtag,
         name: "USB Serial/JTAG",
-        peripherals: &["usb_device"],
         properties: {}
     },
     WifiProperties {
         driver: wifi,
         name: "WIFI",
-        peripherals: &["wifi"],
         properties: {
             #[serde(default)]
             has_wifi6: bool,
@@ -544,13 +497,11 @@ driver_configs![
     BluetoothProperties {
         driver: bt,
         name: "Bluetooth",
-        peripherals: &["bt"],
         properties: {}
     },
     IeeeProperties {
         driver: ieee802154,
         name: "IEEE 802.15.4",
-        peripherals: &["ieee802154"],
         properties: {}
     },
 ];
