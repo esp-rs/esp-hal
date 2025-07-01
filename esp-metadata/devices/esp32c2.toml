@@ -99,16 +99,16 @@ pins = [
     { pin =  1, kind = ["input", "output", "analog", "rtc"] },
     { pin =  2, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIQ" } },
     { pin =  3, kind = ["input", "output", "analog", "rtc"] },
-    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIHD" } },
-    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIWP" } },
-    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICLK" } },
-    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPID" } },
+    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "MTMS", 2 = "FSPIHD" } },
+    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "MTDI", 2 = "FSPIWP" } },
+    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 0 = "MTCK", 2 = "FSPICLK" } },
+    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 0 = "MTDO", 2 = "FSPID" } },
     { pin =  8, kind = ["input", "output"] },
     { pin =  9, kind = ["input", "output"] },
     { pin = 10, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICS0" } },
     { pin = 18, kind = ["input", "output"] },
-    { pin = 19, kind = ["input", "output"] },
-    { pin = 20, kind = ["input", "output"],                  alternate_functions = { 0 = "U0RXD" } },
+    { pin = 19, kind = ["input", "output"],                  alternate_functions = { 0 = "U0RXD" } },
+    { pin = 20, kind = ["input", "output"],                  alternate_functions = { 0 = "U0TXD" } },
 ]
 input_signals = [
     { name = "SPIQ",          id = 0 },
@@ -144,6 +144,10 @@ input_signals = [
     { name = "SIG_FUNC_98",   id = 98 },
     { name = "SIG_FUNC_99",   id = 99 },
     { name = "SIG_FUNC_100",  id = 100 },
+
+    { name = "MTCK" },
+    { name = "MTMS" },
+    { name = "MTDI" },
 ]
 output_signals = [
     { name = "SPIQ",          id = 0 },
@@ -208,6 +212,8 @@ output_signals = [
     { name = "CLK_OUT2",      id = 124 },
     { name = "CLK_OUT3",      id = 125 },
     { name = "GPIO",          id = 128 },
+
+    { name = "MTDO" },
 ]
 
 [device.i2c_master]
