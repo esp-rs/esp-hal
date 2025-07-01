@@ -329,6 +329,7 @@ impl TryFrom<usize> for AlternateFunction {
 #[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(esp32h2))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -338,6 +339,7 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
+#[cfg(not(esp32h2))] // H2 has no low-power mux, but it's not currently encoded in metadata.
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
@@ -364,7 +366,7 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     #[doc(hidden)]
@@ -1987,7 +1989,7 @@ impl InputPin for AnyPin<'_> {
 }
 impl OutputPin for AnyPin<'_> {}
 
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
     fn rtc_number(&self) -> u8 {
@@ -2015,7 +2017,7 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         impl_for_pin_type!(self, target, RtcIoOutput, {
