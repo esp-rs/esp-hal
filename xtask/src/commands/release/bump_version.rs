@@ -53,8 +53,8 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
                 Version::Patch => VersionBump::Patch,
             }
         };
-        let mut pkg = CargoToml::new(workspace, package)?;
-        update_package(&mut pkg, &version, false)?;
+        let mut package = CargoToml::new(workspace, package)?;
+        update_package(&mut package, &version, false)?;
     }
 
     Ok(())
@@ -65,9 +65,17 @@ pub fn update_package(
     version: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
-    if !package.package().is_version_bump_acceptable(version) {
-        return Err(anyhow::anyhow!("Bump '{:?}' is not acceptable for package {}", version, package.package()));
-    }
+    let version = {
+        if package.package() == Package::EspRomSys && version != &VersionBump::Minor {
+            log::warn!(
+                "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
+                version
+            );
+            &VersionBump::Patch
+        } else {
+            version
+        }
+    };
 
     check_crate_before_bumping(package)?;
     let new_version = bump_crate_version(package, version, dry_run)?;

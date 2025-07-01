@@ -285,13 +285,6 @@ impl Package {
         format!("{self}-v{version}")
     }
 
-    pub fn is_version_bump_acceptable(&self, version: &commands::VersionBump) -> bool {
-        match self {
-            Package::EspRomSys if version != &commands::VersionBump::Patch => false,
-            _ => true,
-        }
-    }
-
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
         [Self::EspHal].contains(self)
