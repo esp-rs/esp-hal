@@ -110,10 +110,10 @@ pins = [
     { pin =  1, kind = ["input", "output", "analog", "rtc"] },
     { pin =  2, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIQ" } },
     { pin =  3, kind = ["input", "output", "analog", "rtc"] },
-    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TMS", 2 = "FSPIHD" } },
-    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "USB_JTAG_TDI", 2 = "FSPIWP" } },
-    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 0 = "USB_JTAG_TCK", 2 = "FSPICLK" } },
-    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 0 = "USB_JTAG_TDO", 2 = "FSPID" } },
+    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "MTMS", 2 = "FSPIHD" } },
+    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 0 = "MTDI", 2 = "FSPIWP" } },
+    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 0 = "MTCK", 2 = "FSPICLK" } },
+    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 0 = "MTDO", 2 = "FSPID" } },
     { pin =  8, kind = ["input", "output"] },
     { pin =  9, kind = ["input", "output"] },
     { pin = 10, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICS0" } },
@@ -121,7 +121,7 @@ pins = [
     { pin = 12, kind = ["input", "output"],                  alternate_functions = { 0 = "SPIHD" } },
     { pin = 13, kind = ["input", "output"],                  alternate_functions = { 0 = "SPIWP" } },
     { pin = 14, kind = ["input", "output"],                  alternate_functions = { 0 = "SPICS0" } },
-    { pin = 15, kind = ["input", "output"],                  alternate_functions = { 0 = "SPICLK_MUX" } },
+    { pin = 15, kind = ["input", "output"],                  alternate_functions = { 0 = "SPICLK" } },
     { pin = 16, kind = ["input", "output"],                  alternate_functions = { 0 = "SPID" } },
     { pin = 17, kind = ["input", "output"],                  alternate_functions = { 0 = "SPIQ" } },
     { pin = 18, kind = ["input", "output", "usb_device"] },
@@ -172,13 +172,17 @@ input_signals = [
     { name = "SIG_FUNC_98",      id = 98 },
     { name = "SIG_FUNC_99",      id = 99 },
     { name = "SIG_FUNC_100",     id = 100 },
+
+    { name = "MTCK" },
+    { name = "MTMS" },
+    { name = "MTDI" },
 ]
 output_signals = [
     { name = "SPIQ",             id = 0 },
     { name = "SPID",             id = 1 },
     { name = "SPIHD",            id = 2 },
     { name = "SPIWP",            id = 3 },
-    { name = "SPICLK_MUX",       id = 4 },
+    { name = "SPICLK",           id = 4 },
     { name = "SPICS0",           id = 5 },
     { name = "U0TXD",            id = 6 },
     { name = "U0RTS",            id = 7 },
@@ -253,6 +257,8 @@ output_signals = [
     { name = "SPICS1",           id = 126 },
     { name = "USB_JTAG_TRST",    id = 127 },
     { name = "GPIO",             id = 128 },
+
+    { name = "MTDO" },
 ]
 
 [device.i2c_master]
