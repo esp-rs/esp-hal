@@ -49,7 +49,6 @@ crate::peripherals! {
         LEDC <= LEDC,
         LPWR <= RTC_CNTL,
         NRX <= NRX,
-        RADIO_CLK <= virtual,
         RMT <= RMT,
         RNG <= RNG,
         RSA <= RSA,

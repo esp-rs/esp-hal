@@ -42,7 +42,6 @@ crate::peripherals! {
         LEDC <= LEDC,
         LPWR <= RTC_CNTL,
         MODEM_CLKRST <= MODEM_CLKRST,
-        RADIO_CLK <= virtual,
         RNG <= RNG,
         SENSITIVE <= SENSITIVE,
         SHA <= SHA,

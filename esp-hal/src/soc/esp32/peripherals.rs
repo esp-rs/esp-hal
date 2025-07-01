@@ -54,7 +54,6 @@ crate::peripherals! {
         NRX <= NRX,
         PCNT <= PCNT,
         PSRAM <= virtual,
-        RADIO_CLK <= virtual,
         RMT <= RMT,
         RNG <= RNG,
         RSA <= RSA,

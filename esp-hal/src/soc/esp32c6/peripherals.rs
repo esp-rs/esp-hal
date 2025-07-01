@@ -74,7 +74,6 @@ crate::peripherals! {
         PCNT <= PCNT,
         PLIC_MX <= PLIC_MX,
         PMU <= PMU,
-        RADIO_CLK <= virtual,
         RMT <= RMT,
         RNG <= RNG,
         RSA <= RSA,
