@@ -36,7 +36,7 @@ peripherals = [
     { name = "RMT" },
     { name = "RNG" },
     { name = "RSA" },
-    { name = "RTC_CNTL" },
+    { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
