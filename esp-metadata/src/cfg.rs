@@ -284,7 +284,7 @@ driver_configs![
     GpioProperties {
         driver: gpio,
         name: "GPIO",
-        peripherals: &["gpio"],
+        peripherals: &[], // gpio omitted to prevent stabilizing the singleton
         properties: {
             #[serde(default)]
             has_bank_1: bool,
