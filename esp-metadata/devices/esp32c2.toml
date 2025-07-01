@@ -105,7 +105,14 @@ pins = [
     { pin =  7, kind = ["input", "output"],                  alternate_functions = { 0 = "MTDO", 2 = "FSPID" } },
     { pin =  8, kind = ["input", "output"] },
     { pin =  9, kind = ["input", "output"] },
-    { pin = 10, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICS0" } },
+    { pin = 10, kind = ["input", "output"] }, # Available without SiP flash
+    { pin = 11, kind = ["input", "output"], alternate_functions = { 0 = "SPIHD"  } }, # Available without SiP flash
+    { pin = 12, kind = ["input", "output"], alternate_functions = { 0 = "SPIHD"  } }, # Available without SiP flash
+    { pin = 13, kind = ["input", "output"], alternate_functions = { 0 = "SPIWP"  } }, # Available without SiP flash
+    { pin = 14, kind = ["input", "output"], alternate_functions = { 0 = "SPICS0" } }, # Available without SiP flash
+    { pin = 15, kind = ["input", "output"], alternate_functions = { 0 = "SPICLK" } }, # Available without SiP flash
+    { pin = 16, kind = ["input", "output"], alternate_functions = { 0 = "SPID"   } }, # Available without SiP flash
+    { pin = 17, kind = ["input", "output"], alternate_functions = { 0 = "SPIQ"   } }, # Available without SiP flash
     { pin = 18, kind = ["input", "output"] },
     { pin = 19, kind = ["input", "output"],                  alternate_functions = { 0 = "U0RXD" } },
     { pin = 20, kind = ["input", "output"],                  alternate_functions = { 0 = "U0TXD" } },
