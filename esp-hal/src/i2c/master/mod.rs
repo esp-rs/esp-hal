@@ -737,8 +737,8 @@ impl<'d> I2c<'d, Blocking> {
     /// Note that this will replace any previously registered interrupt
     /// handlers.
     ///
-    /// You can restore the default/unhandled interrupt handler by using
-    /// [crate::DEFAULT_INTERRUPT_HANDLER]
+    /// You can restore the default/unhandled interrupt handler by passing
+    /// [DEFAULT_INTERRUPT_HANDLER][crate::interrupt::DEFAULT_INTERRUPT_HANDLER].
     ///
     /// # Panics
     ///
