@@ -9,7 +9,9 @@ use embassy_time::Instant;
 use esp_hal::interrupt::software::SoftwareInterrupt;
 use esp_hal::{interrupt::Priority, system::Cpu};
 #[cfg(low_power_wait)]
-use portable_atomic::{AtomicBool, AtomicU64, Ordering};
+use portable_atomic::{AtomicBool, Ordering};
+#[cfg(all(low_power_wait, low_power_wait_stats))]
+use portable_atomic::AtomicU64;
 
 use super::InnerExecutor;
 
