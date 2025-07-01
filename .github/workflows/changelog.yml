@@ -52,6 +52,8 @@ jobs:
               - 'esp-println/**'
             esp-riscv-rt:
               - 'esp-riscv-rt/**'
+            esp-rom-sys:
+              - 'esp-rom-sys/**'
             esp-storage:
               - 'esp-storage/**'
             esp-wifi:
