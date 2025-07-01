@@ -17,6 +17,7 @@ use super::InnerExecutor;
 
 pub(crate) const THREAD_MODE_CONTEXT: usize = 16;
 
+// Count the ticks the CPU was in wait_impl
 #[cfg(all(low_power_wait, low_power_wait_stats))]
 static SLEEP_TICKS: AtomicU64 = AtomicU64::new(0);
 
@@ -195,6 +196,7 @@ impl Default for Executor {
     }
 }
 
+// Based on https://github.com/embassy-rs/embassy/pull/3920
 #[cfg(all(low_power_wait, low_power_wait_stats))]
 pub mod thread_low_power_wait_stats {
     use embassy_time::Instant;
