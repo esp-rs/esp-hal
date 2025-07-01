@@ -1,9 +1,13 @@
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod spi_master;
+pub(crate) mod spi_slave;
 pub(crate) mod uart;
 
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use spi_master::*;
+pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
 
 /// Represents a value in the driver configuration.
@@ -448,13 +452,16 @@ driver_configs![
         peripherals: &["sha"],
         properties: {}
     },
-    SpiMasterProperties {
+    SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,
         name: "SPI master",
         peripherals: &["spi2", "spi3"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_octal: bool,
+        }
     },
-    SpiSlaveProperties {
+    SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
         peripherals: &["spi2", "spi3"],

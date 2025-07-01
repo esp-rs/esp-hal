@@ -215,7 +215,14 @@ status_registers = 2
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+]
 
 [device.timergroup]
 instances = [{ name = "timg0" }]
@@ -237,7 +244,6 @@ instances = [
 
 ## Interfaces
 [device.ledc]
-[device.spi_slave]
 
 ## Miscellaneous
 [device.assist_debug]
