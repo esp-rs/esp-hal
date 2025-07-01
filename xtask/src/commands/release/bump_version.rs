@@ -13,7 +13,7 @@ use toml_edit::{Item, TableLike, Value};
 
 use crate::{cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER, Package, Version};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {
     PreRelease(String),
     Patch,
@@ -65,6 +65,18 @@ pub fn update_package(
     version: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
+    let version = {
+        if package.package() == Package::EspRomSys && version != &VersionBump::Patch {
+            log::warn!(
+                "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
+                version
+            );
+            &VersionBump::Patch
+        } else {
+            version
+        }
+    };
+
     check_crate_before_bumping(package)?;
     let new_version = bump_crate_version(package, version, dry_run)?;
     finalize_changelog(package, &new_version, dry_run)?;

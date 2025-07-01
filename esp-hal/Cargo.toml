@@ -31,6 +31,8 @@ enumset                  = "1.1.6"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11.0", default-features = false }
 
+esp-rom-sys              = { version = "0.1.0", path = "../esp-rom-sys" }
+
 # Unstable dependencies that are not (strictly) part of the public API
 bitfield                 = "0.19.0"
 delegate                 = "0.13.3"
@@ -118,28 +120,33 @@ __usb_otg = [
 esp32   = [
     "dep:esp32",
     "procmacros/rtc-slow",
+    "esp-rom-sys/esp32",
 ]
 # Target the ESP32-C2.
 esp32c2 = [
     "dep:esp32c2",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c2",
 ]
 # Target the ESP32-C3.
 esp32c3 = [
     "dep:esp32c3",
     "esp-riscv-rt/rtc-ram",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c3",
 ]
 # Target the ESP32-C6.
 esp32c6 = [
     "dep:esp32c6",
     "esp-riscv-rt/rtc-ram",
     "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c6",
 ]
 # Target the ESP32-H2.
 esp32h2 = [
     "dep:esp32h2",
     "esp-riscv-rt/rtc-ram",
+    "esp-rom-sys/esp32h2",
 ]
 # Target the ESP32-S2.
 esp32s2 = [
@@ -148,6 +155,7 @@ esp32s2 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s2",
 ]
 # Target the ESP32-S3.
 esp32s3 = [
@@ -155,6 +163,7 @@ esp32s3 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s3",
 ]
 
 

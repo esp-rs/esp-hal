@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, error::Error};
 
 use esp_config::generate_config_from_yaml_definition;
 use jiff::Timestamp;
@@ -14,7 +14,7 @@ macro_rules! assert_unique_features {
     };
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rustc-check-cfg=cfg(embedded_test)");
 
     // Log and defmt are mutually exclusive features. The main technical reason is
@@ -23,7 +23,7 @@ fn main() {
     assert_unique_features!("log-04", "defmt");
 
     let build_time = match env::var("SOURCE_DATE_EPOCH") {
-        Ok(val) => Timestamp::from_microsecond(val.parse::<i64>().unwrap()).unwrap(),
+        Ok(val) => Timestamp::from_microsecond(val.parse::<i64>()?).unwrap(),
         Err(_) => Timestamp::now(),
     };
 
@@ -38,4 +38,12 @@ fn main() {
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-bootloader-esp-idf");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, None).unwrap();
+
+    #[cfg(not(feature = "std"))]
+    {
+        // Ensure that exactly one chip has been specified:
+        let _chip = esp_metadata::Chip::from_cargo_feature()?;
+    }
+
+    Ok(())
 }
