@@ -66,7 +66,7 @@ pub fn update_package(
     dry_run: bool,
 ) -> Result<semver::Version> {
     let version = {
-        if package.package() == Package::EspRomSys && version != &VersionBump::Minor {
+        if package.package() == Package::EspRomSys && version != &VersionBump::Patch {
             log::warn!(
                 "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
                 version
