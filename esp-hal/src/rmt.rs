@@ -382,6 +382,12 @@ impl PulseCode {
         ((self.0 >> LENGTH2_SHIFT) & LENGTH_MASK) as u16
     }
 
+    /// Total length of the pulse code (in clock cycles)
+    #[inline]
+    pub const fn length(&self) -> u16 {
+        self.length1() + self.length2()
+    }
+
     /// Set `level1` and return the modified [`PulseCode`].
     #[inline]
     pub const fn with_level1(mut self, level: Level) -> Self {
@@ -2304,7 +2310,19 @@ where
     where
         T: Into<PulseCode> + Copy,
     {
-        self.bench_enc(SliceEncoder::new(data))
+        let mut total = 0;
+        let mut total_length = 0;
+        for code in data {
+            let code = (*code).into();
+            total += 1;
+            // FIXME: What about the final stop code?
+            if code.is_end_marker() {
+                break;
+            }
+            total_length += code.length() as u64;
+        }
+
+        self.bench_inner(SliceEncoder::new(data), total_length, total)
     }
 
     /// FIXME: docs
@@ -2313,7 +2331,20 @@ where
         I: IntoIterator<Item=PulseCode>,
         I::IntoIter: Clone,
     {
-        self.bench_enc(IterEncoder::new(data))
+        let enc = IterEncoder::new(data);
+
+        let mut total = 0;
+        let mut total_length = 0;
+        for code in enc.data.clone() {
+            total += 1;
+            // FIXME: What about the final stop code?
+            if code.is_end_marker() {
+                break;
+            }
+            total_length += code.length() as u64;
+        }
+
+        self.bench_inner(enc, total_length, total)
     }
 
     /// FIXME: docs
@@ -2322,8 +2353,6 @@ where
         E: Encoder + Clone,
     {
         let raw = self.raw;
-
-        let start = Instant::now();
 
         let ram_start = raw.channel_ram_start();
         let mut ptr = ram_start;
@@ -2336,9 +2365,10 @@ where
         let mut writer = RmtWriterOuter::new();
 
         let mut sum_codes = |writer: &RmtWriterOuter| {
-            while read < writer.written {
+            // -1 to not count the artifial end markers
+            while read < writer.written - 1 {
                 let code = unsafe { ptr.read_volatile() };
-                code_length += code.length1() as u64 + code.length2() as u64;
+                code_length += code.length() as u64;
                 ptr = unsafe { ptr.add(1) };
                 read += 1;
                 if ptr == ram_end {
@@ -2347,33 +2377,44 @@ where
             }
         };
 
+        // FIXME: Add WriterState.is_done() for this check!
+        // while !writer.is_done() {
         while writer.state == WriterState::Active {
-            writer.write(&mut encoder, raw);
+            writer.write(&mut encoder, raw.degrade());
             sum_codes(&writer);
         }
 
-        let duration = start.elapsed();
-        let total = writer.written;
+        self.bench_inner(data, code_length, writer.written)
+    }
+
+    fn bench_inner<E>(&mut self, data: E, total_length: u64, total: usize) -> BenchmarkResult
+    where
+        E: Encoder + Clone,
+    {
+        let raw = self.raw;
+
         let clock = chip_specific::get_clock().as_hz() as u64;
         let div = raw.divider() as u64;
-        let code_duration_nanos = code_length * div * 1_000_000_000 / clock;
+        let code_duration_nanos = total_length * div * 1_000_000_000 / clock;
 
-        // Target >= 5ms (we underestimate the number of iterations, since the loop
-        // above does extra work)
-        let iterations = u64::checked_div(5_000, duration.as_micros())
-            .unwrap_or(1)
-            .clamp(1, 100);
-
+        let mut iterations = 0;
         let start = Instant::now();
-        let mut writer = RmtWriterOuter::new();
-        for _ in 0..iterations {
+        let mut writer;
+        loop {
             let mut encoder = data.clone();
             writer = RmtWriterOuter::new();
 
+            // while !writer.is_done() {
             while writer.state == WriterState::Active {
-                writer.write(&mut encoder, raw);
+                writer.write(&mut encoder, raw.degrade());
             }
             assert!(writer.written == total);
+            iterations += 1;
+
+            // Target >= 5ms
+            if start.elapsed().as_micros() > 5_000 {
+                break;
+            }
         }
         let duration = start.elapsed();
 
