@@ -13,7 +13,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::{common::*, timer_compat::*},
-    hal::{self, clock::ModemClockController, peripherals::WIFI, ram},
+    hal::{self, clock::ModemClockController, ram},
 };
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
@@ -305,8 +305,13 @@ static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 pub(crate) unsafe fn phy_enable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
     if count == 0 {
-        // stealing WIFI is safe since it is passed into `init`
-        let clock_guard = unsafe { WIFI::steal() }.enable_phy_clock();
+        // stealing WIFI or BT is safe since it is passed into `init`
+        #[cfg(not(esp32h2))]
+        let mut peripheral = unsafe { esp_hal::peripheral::WIFI::steal() };
+        #[cfg(esp32h2)]
+        let mut peripheral = unsafe { esp_hal::peripheral::BT::steal() };
+
+        let clock_guard = peripheral.enable_phy_clock();
         core::mem::forget(clock_guard);
 
         trace!("phy_enable_clock done!");
@@ -317,8 +322,12 @@ pub(crate) unsafe fn phy_enable_clock() {
 pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
     if count == 1 {
-        // stealing WIFI is safe since it is passed into `init`
-        unsafe { WIFI::steal().decrease_phy_clock_ref_count() };
+        // stealing WIFI or BT is safe since it is passed into `init`
+        #[cfg(not(esp32h2))]
+        let mut peripheral = unsafe { esp_hal::peripheral::WIFI::steal() };
+        #[cfg(esp32h2)]
+        let mut peripheral = unsafe { esp_hal::peripheral::BT::steal() };
+        peripheral.decrease_phy_clock_ref_count();
         trace!("phy_disable_clock done!");
     }
 }
