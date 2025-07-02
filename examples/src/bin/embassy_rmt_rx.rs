@@ -14,7 +14,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreator},
+    rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -77,7 +77,7 @@ async fn main(spawner: Spawner) {
         )))
         .unwrap();
 
-    let mut data: [u32; 48] = [PulseCode::empty(); 48];
+    let mut data = [PulseCode::end_marker(); 48];
 
     loop {
         println!("receive");
