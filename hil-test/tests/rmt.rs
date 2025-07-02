@@ -411,7 +411,7 @@ mod tests {
     fn rmt_single_shot_fails_without_end_marker() {
         let result = do_rmt_single_shot_iter(20, 1, false);
 
-        assert!(matches!(result, Err(Error::EndMarkerMissing)));
+        assert_eq!(result, Err(Error::EndMarkerMissing));
     }
 
     #[test]
