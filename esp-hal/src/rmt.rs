@@ -3306,11 +3306,6 @@ where
     }
 }
 
-#[inline(never)]
-fn wake(ch_num: u8) {
-    WAKER[ch_num as usize].wake();
-}
-
 // #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
@@ -3322,7 +3317,7 @@ fn async_interrupt_handler() {
         };
         raw.unlisten_tx_interrupt(events_to_unlisten);
 
-        wake(raw.channel());
+        WAKER[raw.channel() as usize].wake();
     }
 
     fn on_rx(raw: &impl RawChannelAccess<Dir = Rx>, event: Event) {
@@ -3333,7 +3328,7 @@ fn async_interrupt_handler() {
         };
         raw.unlisten_rx_interrupt(events_to_unlisten);
 
-        wake(raw.channel());
+        WAKER[raw.channel() as usize].wake();
     }
 
     chip_specific::handle_channel_interrupts(on_tx, on_rx);
