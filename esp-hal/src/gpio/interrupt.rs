@@ -63,7 +63,7 @@ use strum::EnumCount;
 
 use crate::{
     gpio::{AnyPin, GpioBank, InputPin, set_int_enable},
-    interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
+    interrupt::{self, Priority},
     peripherals::{GPIO, Interrupt},
     sync::RawMutex,
 };
@@ -92,22 +92,10 @@ impl CFnPtr {
 }
 
 pub(crate) fn bind_default_interrupt_handler() {
-    // We first check if a handler is set in the vector table.
-    if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
-        // We only allow binding the default handler if nothing else is bound.
-        // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-        if !core::ptr::fn_addr_eq(handler, DEFAULT_INTERRUPT_HANDLER.handler()) {
-            // The user has configured an interrupt handler they wish to use.
-            info!("Not using default GPIO interrupt handler: already bound in vector table");
-            return;
-        }
-    }
-
-    // The vector table doesn't contain a custom entry. Still, the
-    // peripheral interrupt may already be bound to something else.
+    // The peripheral interrupt may already be bound to something else.
     for cpu in cores() {
         if interrupt::bound_cpu_interrupt_for(cpu, Interrupt::GPIO).is_some() {
-            info!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
+            warn!("Not using default GPIO interrupt handler: peripheral interrupt already in use");
             return;
         }
     }

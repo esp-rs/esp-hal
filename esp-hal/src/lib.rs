@@ -591,17 +591,20 @@ pub struct Config {
     cpu_clock: CpuClock,
 
     /// Enable watchdog timer(s).
-    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[builder_lite(unstable)]
     watchdog: WatchdogConfig,
 
     /// PSRAM configuration.
-    #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     #[cfg(feature = "psram")]
     #[builder_lite(unstable)]
     psram: psram::PsramConfig,
+
+    /// Set to `true` if you don't want esp-hal to bind its GPIO interrupt
+    /// handler.
+    #[builder_lite(unstable)]
+    custom_gpio_interrupt_handler: bool,
 }
 
 /// Initialize the system.
@@ -684,7 +687,9 @@ pub fn init(config: Config) -> Peripherals {
     #[cfg(esp32)]
     crate::time::time_init();
 
-    crate::gpio::interrupt::bind_default_interrupt_handler();
+    if !config.custom_gpio_interrupt_handler {
+        crate::gpio::interrupt::bind_default_interrupt_handler();
+    }
 
     #[cfg(feature = "psram")]
     crate::psram::init_psram(config.psram);
