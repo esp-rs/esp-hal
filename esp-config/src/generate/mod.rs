@@ -461,10 +461,10 @@ impl DisplayHint {
         match value {
             Value::Bool(b) => b.to_string(),
             Value::Integer(i) => match self {
-                DisplayHint::None => format!("{}", i),
-                DisplayHint::Binary => format!("0b{:0b}", i),
-                DisplayHint::Hex => format!("0x{:X}", i),
-                DisplayHint::Octal => format!("0o{:o}", i),
+                DisplayHint::None => format!("{i}"),
+                DisplayHint::Binary => format!("0b{i:0b}"),
+                DisplayHint::Hex => format!("0x{i:X}"),
+                DisplayHint::Octal => format!("0o{i:o}"),
             },
             Value::String(s) => s.clone(),
         }

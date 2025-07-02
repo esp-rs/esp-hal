@@ -81,7 +81,7 @@ impl Item {
     fn display_hint(&self) -> DisplayHint {
         match self {
             Item::TopLevel(_) => unreachable!(),
-            Item::CrateLevel(config_option) => config_option.option.display_hint.clone(),
+            Item::CrateLevel(config_option) => config_option.option.display_hint,
         }
     }
 }
