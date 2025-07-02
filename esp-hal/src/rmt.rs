@@ -1097,8 +1097,8 @@ impl RmtReaderOuter {
 
     fn read(
         &mut self,
-        data: &mut impl Decoder,
-        raw: impl RxChannelInternal,
+        data: &mut dyn Decoder,
+        raw: DynChannelAccess<Rx>,
         final_: bool,
     ) {
         if self.state != ReaderState::Active {
@@ -2829,22 +2829,16 @@ impl Channel<'_, Async, Tx> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a, D>
-where
-    D: Decoder + Unpin,
-{
+struct RmtRxFuture<'a> {
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'a mut DynChannelAccess<Rx>>,
 
     reader: RmtReaderOuter,
 
-    data: D,
+    data: &'a mut (dyn Decoder + Unpin),
 }
 
-impl<'a, D> Future for RmtRxFuture<'a, D>
-where
-    D: Decoder + Unpin,
-{
+impl<'a> Future for RmtRxFuture<'a> {
     type Output = Result<usize, Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -2860,7 +2854,7 @@ where
                 raw.update();
 
                 // TODO: Read at most up to the HW pointer!
-                this.reader.read(&mut this.data, raw, true);
+                this.reader.read(this.data, raw, true);
 
                 Ok(this.reader.total)
             }
@@ -2868,7 +2862,7 @@ where
                 raw.reset_rx_threshold_set();
 
                 if this.reader.state == ReaderState::Active {
-                    this.reader.read(&mut this.data, raw, false);
+                    this.reader.read(this.data, raw, false);
                     // FIXME: Return if reader.state indicates an error (ensure
                     // to stop rx first)
                 }
@@ -2889,10 +2883,7 @@ where
     }
 }
 
-impl<'a, D> Drop for RmtRxFuture<'a, D>
-where
-    D: Decoder + Unpin,
-{
+impl<'a> Drop for RmtRxFuture<'a> {
     fn drop(&mut self) {
         let raw = self.raw;
 
@@ -2923,7 +2914,7 @@ impl Channel<'_, Async, Rx> {
         Self: Sized,
         T: From<PulseCode> + 'a
     {
-        self.receive_inner(SliceDecoder::new(data)).await
+        self.receive_inner(&mut SliceDecoder::new(data)).await
     }
 
     /// FIXME: docs
@@ -2935,12 +2926,12 @@ impl Channel<'_, Async, Rx> {
         D::IntoIter: Unpin,
         T: From<PulseCode> + 'a
     {
-        self.receive_inner(IterDecoder::new(data)).await
+        self.receive_inner(&mut IterDecoder::new(data)).await
     }
 
     /// FIXME: docs
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub async fn receive_dec<'a, D>(&'a mut self, data: D) -> Result<usize, Error>
+    pub async fn receive_dec<'a, D>(&'a mut self, data: &mut D) -> Result<usize, Error>
     where
         Self: Sized,
         D: Decoder + Unpin
@@ -2949,10 +2940,9 @@ impl Channel<'_, Async, Rx> {
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn receive_inner<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
+    fn receive_inner<'a>(&'a mut self, data: &mut (dyn Decoder + Unpin)) -> impl Future<Output = Result<usize, Error>>
     where
         Self: Sized,
-        D: Decoder + Unpin,
     {
         let raw = self.raw;
 
