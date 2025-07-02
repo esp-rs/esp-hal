@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 - SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
+- Added GPIO11-GPIO17 to ESP32-C2. (#3726)
 
 ### Changed
 
@@ -39,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `InterruptHandler` no longer implements `PartialEq`, `Eq` or `Hash`. (#3650)
 - `gpio::NUM_PINS` (#3658)
+- Removed GPIO24 from ESP32. (#3726)
+- Removed GPIO15-GPIO21 from ESP32-H2. (#3726)
 
 ## [v1.0.0-beta.1] - 2025-06-03
 

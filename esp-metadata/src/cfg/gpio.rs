@@ -102,6 +102,10 @@ impl AfMap {
 /// An input or output peripheral signal. The names usually match the signal
 /// name in the Peripheral Signal List table, without the `in` or `out` suffix.
 /// If the `id` is `None`, the signal cannot be routed through the GPIO matrix.
+///
+/// If the TRM's signal table says "no" to Direct Input/Output via IO MUX, the
+/// signal does not have an Alternate Function and must be routed through the
+/// GPIO matrix.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct IoMuxSignal {
     /// The name of the signal.
