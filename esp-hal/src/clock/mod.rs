@@ -690,7 +690,7 @@ pub trait ModemClockController<'d>: Sealed + 'd {
         }
     }
 
-    /// Unsafely decrease the PHY clock reference count for this modem.
+    /// Decreases the PHY clock reference count for this modem ignoring currently alive [PhyClockGuard]s.
     ///
     /// # Panics
     /// If the ref count is lower than the number of [PhyClockGuard]s, dropping a guard can now panic.
