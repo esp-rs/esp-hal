@@ -9,8 +9,6 @@ keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
-links         = "esp-hal"
-
 exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.docs.rs]
@@ -32,6 +30,8 @@ embedded-hal-async       = "1.0.0"
 enumset                  = "1.1.6"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11.0", default-features = false }
+
+esp-rom-sys              = { version = "0.1.0", path = "../esp-rom-sys" }
 
 # Unstable dependencies that are not (strictly) part of the public API
 bitfield                 = "0.19.0"
@@ -72,13 +72,13 @@ ufmt-write               = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.37.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32c2 = { version = "0.26.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32c3 = { version = "0.29.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32c6 = { version = "0.20.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32h2 = { version = "0.16.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32s2 = { version = "0.28.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
-esp32s3 = { version = "0.32.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "7707ae7", optional = true }
+esp32   = { version = "0.37.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32c2 = { version = "0.26.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32c3 = { version = "0.29.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32c6 = { version = "0.20.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32h2 = { version = "0.16.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32s2 = { version = "0.28.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32s3 = { version = "0.32.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }
@@ -120,28 +120,33 @@ __usb_otg = [
 esp32   = [
     "dep:esp32",
     "procmacros/rtc-slow",
+    "esp-rom-sys/esp32",
 ]
 # Target the ESP32-C2.
 esp32c2 = [
     "dep:esp32c2",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c2",
 ]
 # Target the ESP32-C3.
 esp32c3 = [
     "dep:esp32c3",
     "esp-riscv-rt/rtc-ram",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c3",
 ]
 # Target the ESP32-C6.
 esp32c6 = [
     "dep:esp32c6",
     "esp-riscv-rt/rtc-ram",
     "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c6",
 ]
 # Target the ESP32-H2.
 esp32h2 = [
     "dep:esp32h2",
     "esp-riscv-rt/rtc-ram",
+    "esp-rom-sys/esp32h2",
 ]
 # Target the ESP32-S2.
 esp32s2 = [
@@ -150,6 +155,7 @@ esp32s2 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s2",
 ]
 # Target the ESP32-S3.
 esp32s3 = [
@@ -157,6 +163,7 @@ esp32s3 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s3",
 ]
 
 

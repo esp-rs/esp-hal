@@ -1,5 +1,7 @@
 use clap::Subcommand;
 
+#[cfg(feature = "release")]
+pub mod bump_msrv;
 pub mod bump_version;
 #[cfg(feature = "release")]
 pub mod execute_plan;
@@ -18,13 +20,13 @@ pub use bump_version::*;
 pub use execute_plan::*;
 #[cfg(feature = "release")]
 pub use plan::*;
+#[cfg(feature = "release")]
+pub use post_release::*;
 pub use publish::*;
 #[cfg(feature = "release")]
 pub use publish_plan::*;
 pub use semver_check::*;
 pub use tag_releases::*;
-#[cfg(feature = "release")]
-pub use post_release::*;
 
 pub const PLACEHOLDER: &str = "{{currentVersion}}";
 
@@ -73,4 +75,8 @@ pub enum Release {
     Publish(PublishArgs),
     /// Generate git tags for all new package releases.
     TagReleases(TagReleasesArgs),
+    /// Update the MSRV (Badges in README.md, "rust-version" in Cargo.toml, the
+    /// toolchain used in CI)
+    #[cfg(feature = "release")]
+    BumpMsrv(bump_msrv::BumpMsrvArgs),
 }

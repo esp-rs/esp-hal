@@ -69,9 +69,8 @@ jobs:
       - uses: actions/checkout@v4
 
       # Install the Rust toolchain for Xtensa devices:
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          ldproxy: false
           version: 1.87.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
@@ -94,11 +93,12 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xtask ci ${{ matrix.device.soc }}
+        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
 
       - name: Semver-Check
         shell: bash
-        run: cargo +${{ matrix.device.toolchain }} xcheck semver-check --chips ${{ matrix.device.soc }} check
+        # always invokes +esp internally
+        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
 
   extras:
     runs-on: macos-m1-self-hosted
@@ -126,9 +126,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.5
+      - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          ldproxy: false
           version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
@@ -138,17 +137,17 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Stable toolchain checks
-        run: rustc +stable --version --verbose
+        run: rustc +${{ env.MSRV }} --version --verbose
       - name: esp toolchain checks
         run: rustc +esp --version --verbose
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
         run: |
-          cargo +stable xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2
+          cargo xtask lint-packages --chips esp32c2,esp32c3,esp32c6,esp32h2 --toolchain ${{ env.MSRV }}
       - name: msrv Xtensa (esp-hal)
         run: |
-          cargo +esp xtask lint-packages --chips esp32,esp32s2,esp32s3
+          cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
@@ -170,7 +169,7 @@ jobs:
       - run: cargo xtask fmt-packages --check
 
       # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build
+      - run: cd esp-config && cargo test --features build,tui
 
       # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test --features=std

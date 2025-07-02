@@ -329,6 +329,7 @@ impl TryFrom<usize> for AlternateFunction {
 #[instability::unstable]
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(not(esp32h2))]
 pub enum RtcFunction {
     /// RTC mode.
     Rtc     = 0,
@@ -338,6 +339,7 @@ pub enum RtcFunction {
 
 /// Trait implemented by RTC pins
 #[instability::unstable]
+#[cfg(not(esp32h2))] // H2 has no low-power mux, but it's not currently encoded in metadata.
 pub trait RtcPin: Pin {
     /// RTC number of the pin
     #[cfg(xtensa)]
@@ -364,7 +366,7 @@ pub trait RtcPin: Pin {
 /// Trait implemented by RTC pins which supporting internal pull-up / pull-down
 /// resistors.
 #[instability::unstable]
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 pub trait RtcPinWithResistors: RtcPin {
     /// Enable/disable the internal pull-up resistor
     #[doc(hidden)]
@@ -613,37 +615,6 @@ impl GpioBank {
 pub struct AnyPin<'lt> {
     pub(crate) pin: u8,
     pub(crate) _lifetime: core::marker::PhantomData<&'lt mut ()>,
-}
-
-/// Workaround to make D+ and D- work on the ESP32-C3 and ESP32-S3, which by
-/// default are assigned to the `USB_SERIAL_JTAG` peripheral.
-#[cfg(soc_has_usb_device)]
-fn disable_usb_pads(gpionum: u8) {
-    cfg_if::cfg_if! {
-        if #[cfg(esp32c3)] {
-            let pins = [18, 19];
-        } else if #[cfg(esp32c6)] {
-            let pins = [12, 13];
-        } else if #[cfg(esp32h2)] {
-            let pins = [26, 27];
-        } else if #[cfg(esp32s3)] {
-            let pins = [19, 20];
-        } else {
-            compile_error!("Please define USB pins for this chip");
-        }
-    }
-
-    if pins.contains(&gpionum) {
-        crate::peripherals::USB_DEVICE::regs()
-            .conf0()
-            .modify(|_, w| {
-                w.usb_pad_enable().clear_bit();
-                w.dm_pullup().clear_bit();
-                w.dm_pulldown().clear_bit();
-                w.dp_pullup().clear_bit();
-                w.dp_pulldown().clear_bit()
-            });
-    }
 }
 
 /// General Purpose Input/Output driver
@@ -1689,7 +1660,25 @@ impl<'lt> AnyPin<'lt> {
     /// - Before using it as an input or output
     pub(crate) fn init_gpio(&self) {
         #[cfg(soc_has_usb_device)]
-        disable_usb_pads(self.number());
+        {
+            /// Workaround to make D+ and D- work when the pin is assigned to
+            /// the `USB_SERIAL_JTAG` peripheral by default.
+            fn disable_usb_pads(_gpionum: u8) {
+                crate::peripherals::USB_DEVICE::regs()
+                    .conf0()
+                    .modify(|_, w| {
+                        w.usb_pad_enable().clear_bit();
+                        w.dm_pullup().clear_bit();
+                        w.dm_pulldown().clear_bit();
+                        w.dp_pullup().clear_bit();
+                        w.dp_pulldown().clear_bit()
+                    });
+            }
+
+            impl_for_pin_type!(self, pin, UsbDevice, {
+                disable_usb_pads(pin.number());
+            } else {});
+        }
 
         self.set_output_enable(false);
 
@@ -1994,17 +1983,15 @@ impl Pin for AnyPin<'_> {
 }
 
 impl InputPin for AnyPin<'_> {
-    #[expect(unused_braces, reason = "False positive")]
     fn waker(&self) -> &'static AtomicWaker {
         impl_for_pin_type!(self, target, Input, { InputPin::waker(&target) })
     }
 }
 impl OutputPin for AnyPin<'_> {}
 
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
-    #[expect(unused_braces, reason = "False positive")]
     fn rtc_number(&self) -> u8 {
         impl_for_pin_type!(self, target, RtcIo, { RtcPin::rtc_number(&target) })
     }
@@ -2030,7 +2017,7 @@ impl RtcPin for AnyPin<'_> {
     }
 }
 
-#[cfg(any(soc_has_lp_io, soc_has_rtc_cntl))]
+#[cfg(not(esp32h2))]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
         impl_for_pin_type!(self, target, RtcIoOutput, {

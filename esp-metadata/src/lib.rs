@@ -10,7 +10,7 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use strum::IntoEnumIterator;
 
-use crate::cfg::{IoMuxSignal, SupportItem, SupportStatus, Value};
+use crate::cfg::{SupportItem, SupportStatus, Value};
 
 macro_rules! include_toml {
     (Config, $file:expr) => {{
@@ -198,15 +198,34 @@ pub struct MemoryRegion {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct PeripheralDef {
+    /// The name of the esp-hal peripheral singleton
+    name: String,
+    /// When omitted, same as `name`
+    #[serde(default, rename = "pac")]
+    pac_name: Option<String>,
+    /// Whether or not the peripheral has a PAC counterpart
+    #[serde(default, rename = "virtual")]
+    is_virtual: bool,
+    /// List of related interrupt signals
+    #[serde(default)]
+    interrupts: HashMap<String, String>,
+}
+
+impl PeripheralDef {
+    fn symbol_name(&self) -> String {
+        format!("soc_has_{}", self.name.to_lowercase())
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct Device {
     name: String,
     arch: Arch,
     cores: usize,
     trm: String,
 
-    peripherals: Vec<String>,
-    // For now, this is only used to double-check the configuration.
-    virtual_peripherals: Vec<String>,
+    peripherals: Vec<PeripheralDef>,
     symbols: Vec<String>,
     memory: Vec<MemoryRegion>,
 
@@ -252,7 +271,6 @@ impl Config {
                 cores: 1,
                 trm: "".to_owned(),
                 peripherals: Vec::new(),
-                virtual_peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
                 peri_config: PeriConfig::default(),
@@ -265,8 +283,10 @@ impl Config {
         for instance in self.device.peri_config.driver_instances() {
             let (driver, peri) = instance.split_once('.').unwrap();
             ensure!(
-                self.device.peripherals.iter().any(|p| p == peri)
-                    || self.device.virtual_peripherals.iter().any(|p| p == peri),
+                self.device
+                    .peripherals
+                    .iter()
+                    .any(|p| p.name.eq_ignore_ascii_case(peri)),
                 "Driver {driver} marks an implementation for '{peri}' but this peripheral is not defined for '{}'",
                 self.device.name
             );
@@ -295,7 +315,7 @@ impl Config {
     }
 
     /// The peripherals of the device.
-    pub fn peripherals(&self) -> &[String] {
+    pub fn peripherals(&self) -> &[PeripheralDef] {
         &self.device.peripherals
     }
 
@@ -323,12 +343,7 @@ impl Config {
                     Cores::Multi => String::from("multi_core"),
                 },
             ];
-            all.extend(
-                self.device
-                    .peripherals
-                    .iter()
-                    .map(|p| format!("soc_has_{p}")),
-            );
+            all.extend(self.device.peripherals.iter().map(|p| p.symbol_name()));
             all.extend_from_slice(&self.device.symbols);
             all.extend(
                 self.device
@@ -374,13 +389,11 @@ impl Config {
 
         self.generate_properties(out_dir, "_generated.rs");
         self.generate_gpios(out_dir, "_generated_gpio.rs");
-        self.generate_gpio_extras(out_dir, "_generated_gpio_extras.rs");
+        self.generate_iomux_signals(out_dir, "_generated_iomux_signals.rs");
         self.generate_peripherals(out_dir, "_generated_peris.rs");
     }
 
     fn generate_properties(&self, out_dir: &Path, file_name: &str) {
-        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
-
         let mut g = TokenStream::new();
 
         let chip_name = self.name();
@@ -452,7 +465,7 @@ impl Config {
             }
         });
 
-        save(&out_file, g);
+        save(out_dir.join(file_name), g);
     }
 
     fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
@@ -461,354 +474,110 @@ impl Config {
             return;
         };
 
-        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+        let tokens = cfg::generate_gpios(gpio);
 
-        let pin_numbers = gpio
-            .pins_and_signals
-            .pins
-            .iter()
-            .map(|pin| number(pin.pin))
-            .collect::<Vec<_>>();
-
-        let pin_peris = gpio
-            .pins_and_signals
-            .pins
-            .iter()
-            .map(|pin| format_ident!("GPIO{}", pin.pin))
-            .collect::<Vec<_>>();
-
-        let pin_attrs = gpio
-            .pins_and_signals
-            .pins
-            .iter()
-            .map(|pin| {
-                struct PinAttrs {
-                    input: bool,
-                    output: bool,
-                    analog: bool,
-                    rtc_io: bool,
-                    touch: bool,
-                    usb_dm: bool,
-                    usb_dp: bool,
-                }
-
-                let mut pin_attrs = PinAttrs {
-                    input: false,
-                    output: false,
-                    analog: false,
-                    rtc_io: false,
-                    touch: false,
-                    usb_dm: false,
-                    usb_dp: false,
-                };
-                pin.kind.iter().for_each(|kind| match kind {
-                    cfg::PinCapability::Input => pin_attrs.input = true,
-                    cfg::PinCapability::Output => pin_attrs.output = true,
-                    cfg::PinCapability::Analog => pin_attrs.analog = true,
-                    cfg::PinCapability::Rtc => pin_attrs.rtc_io = true,
-                    cfg::PinCapability::Touch => pin_attrs.touch = true,
-                    cfg::PinCapability::UsbDm => pin_attrs.usb_dm = true,
-                    cfg::PinCapability::UsbDp => pin_attrs.usb_dp = true,
-                });
-
-                let mut attrs = vec![];
-
-                if pin_attrs.input {
-                    attrs.push(quote::quote! { Input });
-                }
-                if pin_attrs.output {
-                    attrs.push(quote::quote! { Output });
-                }
-                if pin_attrs.analog {
-                    attrs.push(quote::quote! { Analog });
-                }
-                if pin_attrs.rtc_io {
-                    attrs.push(quote::quote! { RtcIo });
-                    if pin_attrs.output {
-                        attrs.push(quote::quote! { RtcIoOutput });
-                    }
-                }
-                if pin_attrs.touch {
-                    attrs.push(quote::quote! { Touch });
-                }
-                if pin_attrs.usb_dm {
-                    attrs.push(quote::quote! { UsbDm });
-                }
-                if pin_attrs.usb_dp {
-                    attrs.push(quote::quote! { UsbDp });
-                }
-
-                attrs
-            })
-            .collect::<Vec<_>>();
-
-        let pin_afs = gpio
-            .pins_and_signals
-            .pins
-            .iter()
-            .map(|pin| {
-                let mut input_afs = vec![];
-                let mut output_afs = vec![];
-
-                for af in 0..6 {
-                    let Some(signal) = pin.alternate_functions.get(af) else {
-                        continue;
-                    };
-
-                    let af_variant = quote::format_ident!("_{af}");
-                    let mut found = false;
-
-                    // Is the signal present among the input signals?
-                    if let Some(signal) = gpio
-                        .pins_and_signals
-                        .input_signals
-                        .iter()
-                        .find(|s| s.name == signal)
-                    {
-                        let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                        input_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                        found = true;
-                    }
-
-                    // Is the signal present among the output signals?
-                    if let Some(signal) = gpio
-                        .pins_and_signals
-                        .output_signals
-                        .iter()
-                        .find(|s| s.name == signal)
-                    {
-                        let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                        output_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                        found = true;
-                    }
-
-                    assert!(
-                        found,
-                        "Signal '{signal}' not found in input signals for GPIO pin {}",
-                        pin.pin
-                    );
-                }
-
-                quote::quote! {
-                    ( #(#input_afs)* ) ( #(#output_afs)* )
-                }
-            })
-            .collect::<Vec<_>>();
-
-        let io_mux_accessor = if gpio.remap_iomux_pin_registers {
-            let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
-                let pin = number(pin.pin);
-                let reg = format_ident!("GPIO{pin}");
-                let accessor = format_ident!("gpio{pin}");
-
-                quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
-            });
-
-            quote::quote! {
-                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
-                    use core::mem::transmute;
-
-                    use crate::{pac::io_mux, peripherals::IO_MUX};
-
-                    let iomux = IO_MUX::regs();
-                    unsafe {
-                        match gpio_num {
-                            #(#iomux_pin_regs)*
-                            other => panic!("GPIO {} does not exist", other),
-                        }
-                    }
-                }
-
-            }
-        } else {
-            quote::quote! {
-                pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
-                    crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
-                }
-            }
-        };
-
-        let mut io_type_macro_calls = vec![];
-        for (pin, attrs) in pin_peris.iter().zip(pin_attrs.iter()) {
-            io_type_macro_calls.push(quote::quote! {
-                #( crate::io_type!(#attrs, #pin); )*
-            })
-        }
-
-        // Generates a macro that can select between a `then` and an `else` branch based
-        // on whether a pin implement a certain attribute.
-        //
-        // In essence this expands to (in case of pin = GPIO5, attr = Analog):
-        // `if typeof(GPIO5) == Analog { then_tokens } else { else_tokens }`
-        let if_pin_is_type = {
-            let mut branches = vec![];
-
-            for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
-                branches.push(quote::quote! {
-                            #( (#pin, #attr, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($then_tt)* }; )*
-                        });
-
-                branches.push(quote::quote! {
-                    (#pin, $t:tt, { $($then_tt:tt)* } else { $($else_tt:tt)* }) => { $($else_tt)* };
-                });
-            }
-
-            quote::quote! {
-                macro_rules! if_pin_is_type {
-                    #(#branches)*
-                }
-
-                pub(crate) use if_pin_is_type;
-            }
-        };
-
-        // Delegates AnyPin functions to GPIOn functions when the pin implements a
-        // certain attribute.
-        //
-        // In essence this expands to (in case of attr = Analog):
-        // `if typeof(anypin's current value) == Analog { call $code } else { panic }`
-        let impl_for_pin_type = {
-            let mut impl_branches = vec![];
-            for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
-                impl_branches.push(quote::quote! {
-                    #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
-                        #[allow(unused_unsafe, unused_mut)]
-                        let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
-                        $($code)*
-                    }} else {{
-                        panic!("Unsupported")
-                    }}),
-                });
-            }
-
-            quote::quote! {
-                macro_rules! impl_for_pin_type {
-                    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $($code:tt)*) => {
-                        match $any_pin.number() {
-                            #(#impl_branches)*
-                            _ => unreachable!(),
-                        }
-                    }
-                }
-                pub(crate) use impl_for_pin_type;
-            }
-        };
-
-        let g = quote::quote! {
-            crate::gpio! {
-                #( (#pin_numbers, #pin_peris #pin_afs) )*
-            }
-
-            #( #io_type_macro_calls )*
-
-            #if_pin_is_type
-            #impl_for_pin_type
-
-            #io_mux_accessor
-        };
-
-        save(&out_file, g);
+        save(out_dir.join(file_name), tokens);
     }
 
-    // TODO temporary name, we likely don't want a new file for these
-    fn generate_gpio_extras(&self, out_dir: &Path, file_name: &str) {
+    fn generate_iomux_signals(&self, out_dir: &Path, file_name: &str) {
         let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
             // No GPIOs defined, nothing to do.
             return;
         };
 
-        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+        let tokens = cfg::generate_iomux_signals(gpio);
 
-        let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
-        let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
-
-        let g = quote::quote! {
-            #input_signals
-            #output_signals
-        };
-
-        save(&out_file, g);
+        save(out_dir.join(file_name), tokens);
     }
 
     fn generate_peripherals(&self, out_dir: &Path, file_name: &str) {
-        let out_file = out_dir.join(file_name).to_string_lossy().to_string();
+        let mut tokens = TokenStream::new();
 
-        let i2c_master_instance_cfgs = self
-            .device
-            .peri_config
-            .i2c_master
-            .iter()
-            .flat_map(|peri| {
-                peri.instances.iter().map(|instance| {
-                    let instance_config = &instance.instance_config;
+        // TODO: repeat for all drivers that have Instance traits
+        if let Some(peri) = self.device.peri_config.i2c_master.as_ref() {
+            tokens.extend(cfg::generate_i2c_master_peripherals(peri));
+        };
+        if let Some(peri) = self.device.peri_config.uart.as_ref() {
+            tokens.extend(cfg::generate_uart_peripherals(peri));
+        }
+        if let Some(peri) = self.device.peri_config.spi_master.as_ref() {
+            tokens.extend(cfg::generate_spi_master_peripherals(peri));
+        };
+        if let Some(peri) = self.device.peri_config.spi_slave.as_ref() {
+            tokens.extend(cfg::generate_spi_slave_peripherals(peri));
+        };
 
-                    let instance = format_ident!("{}", instance.name.to_uppercase());
+        tokens.extend(self.generate_peripherals_macro());
 
-                    let sys = format_ident!("{}", instance_config.sys_instance);
-                    let sda = format_ident!("{}", instance_config.sda);
-                    let scl = format_ident!("{}", instance_config.scl);
-                    let int = format_ident!("{}", instance_config.interrupt);
+        save(out_dir.join(file_name), tokens);
+    }
 
-                    // The order and meaning of these tokens must match their use in the
-                    // `for_each_i2c_master!` call.
-                    quote::quote! {
-                        #instance, #sys, #scl, #sda, #int
+    fn generate_peripherals_macro(&self) -> TokenStream {
+        let mut stable = vec![];
+        let mut unstable = vec![];
+
+        let mut stable_peris = vec![];
+
+        for item in PeriConfig::drivers() {
+            if self.device.peri_config.support_status(item.config_group)
+                == Some(SupportStatus::Supported)
+            {
+                for p in self.device.peri_config.driver_peris(item.config_group) {
+                    if !stable_peris.contains(&p) {
+                        stable_peris.push(p);
                     }
-                })
-            })
-            .collect::<Vec<_>>();
+                }
+            }
+        }
 
-        let for_each_i2c_master = generate_for_each_macro("i2c_master", &i2c_master_instance_cfgs);
-
-        let g = quote::quote! {
-            #for_each_i2c_master
+        let gpios = if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
+            gpio.pins_and_signals
+                .pins
+                .iter()
+                .map(|pin| format_ident!("GPIO{}", pin.pin))
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
         };
 
-        save(&out_file, g);
-    }
-}
+        for peri in self.device.peripherals.iter() {
+            let hal = format_ident!("{}", peri.name);
+            let pac = if peri.is_virtual {
+                format_ident!("virtual")
+            } else {
+                format_ident!("{}", peri.pac_name.as_deref().unwrap_or(peri.name.as_str()))
+            };
+            // Make sure we have a stable order
+            let mut interrupts = peri.interrupts.iter().collect::<Vec<_>>();
+            interrupts.sort_by_key(|(k, _)| k.as_str());
+            let interrupts = interrupts.iter().map(|(k, v)| {
+                let k = format_ident!("{k}");
+                let v = format_ident!("{v}");
+                quote::quote! { #k => #v }
+            });
+            let tokens = quote::quote! {
+                #hal <= #pac ( #(#interrupts),* )
+            };
+            if stable_peris
+                .iter()
+                .any(|p| peri.name.eq_ignore_ascii_case(p))
+            {
+                stable.push(tokens);
+            } else {
+                unstable.push(tokens);
+            }
+        }
 
-fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
-    if signals.is_empty() {
-        // If there are no signals, we don't need to generate an enum.
-        return quote::quote! {};
-    }
-    let mut variants = vec![];
-
-    for signal in signals {
-        // First, process only signals that have an ID.
-        let Some(id) = signal.id else {
-            continue;
-        };
-
-        let name = format_ident!("{}", signal.name);
-        let value = number(id);
-        variants.push(quote::quote! {
-            #name = #value,
-        });
-    }
-
-    for signal in signals {
-        // Now process signals that do not have an ID.
-        if signal.id.is_some() {
-            continue;
-        };
-
-        let name = format_ident!("{}", signal.name);
-        variants.push(quote::quote! {
-            #name,
-        });
-    }
-
-    let enum_name = format_ident!("{enum_name}");
-
-    quote::quote! {
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        #[derive(Debug, PartialEq, Copy, Clone)]
-        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)]
-        pub enum #enum_name {
-            #(#variants)*
+        quote::quote! {
+            crate::peripherals! {
+                peripherals: [
+                    #(#stable,)*
+                ],
+                unstable_peripherals: [
+                    #(#unstable,)*
+                ],
+                pins: [#(#gpios,)*]
+            }
         }
     }
 }
@@ -913,40 +682,12 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    for SupportItem {
-        name,
-        symbols,
-        config_group,
-    } in PeriConfig::drivers()
-    {
+    for SupportItem { name, config_group } in PeriConfig::drivers() {
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
 
-            let status = config
-                .device
-                .peri_config
-                .support_status(config_group)
-                .inspect(|status| {
-                    // TODO: this is good for double-checking, but it should probably go the
-                    // other way around. Driver config should define what peripheral symbols exist.
-                    assert!(
-                        matches!(status, SupportStatus::NotSupported)
-                            || symbols.is_empty()
-                            || symbols.iter().any(|p| config.contains(p)),
-                        "{} has configuration for {} but no compatible symbols have been defined",
-                        chip.pretty_name(),
-                        config_group
-                    );
-                })
-                .or_else(|| {
-                    // If the driver is not supported by the chip, we return None.
-                    if symbols.iter().any(|p| config.contains(p)) {
-                        Some(SupportStatus::NotSupported)
-                    } else {
-                        None
-                    }
-                });
+            let status = config.device.peri_config.support_status(config_group);
             let status_icon = match status {
                 None => " ",
                 Some(status) => status.icon(),

@@ -4,12 +4,6 @@
 PROVIDE(interrupt0 = DefaultHandler);
 
 SECTIONS {
-  .trap : ALIGN(4)
-  {
-    KEEP(*(.trap));
-    *(.trap.*);
-  } > RWTEXT
-
   /* Shared sections - ordering matters */
   INCLUDE "rwtext.x"
   INCLUDE "rwdata.x"
@@ -34,14 +28,12 @@ SECTIONS {
 INSERT BEFORE .text;
 
 /* Shared sections #2 - ordering matters */
-SECTIONS {
-  INCLUDE "rodata_desc.x"
-}
 INCLUDE "rodata.x"
 INCLUDE "text.x"
 INCLUDE "rtc_fast.x"
 INCLUDE "stack.x"
 INCLUDE "dram2.x"
+INCLUDE "metadata.x"
 /* End of Shared sections #2 */
 
 _dram_origin = ORIGIN( RAM );

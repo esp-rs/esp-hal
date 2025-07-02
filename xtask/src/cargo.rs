@@ -54,7 +54,9 @@ where
         envs
     );
 
-    let output = Command::new(get_cargo())
+    let mut command = Command::new(get_cargo());
+
+    command
         .args(args)
         .current_dir(cwd)
         .envs(envs)
@@ -67,16 +69,24 @@ where
             Stdio::piped()
         } else {
             Stdio::inherit()
-        })
-        .stdin(Stdio::inherit())
-        .output()?;
+        });
+
+    if args.iter().any(|a| a.starts_with('+')) {
+        // Make sure the right cargo runs
+        command.env_remove("CARGO");
+    }
+
+    let output = command.stdin(Stdio::inherit()).output()?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
     // requires this in order to function correctly:
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     } else {
-        bail!("Failed to execute cargo subcommand")
+        bail!(
+            "Failed to execute cargo subcommand `cargo {}`",
+            args.join(" "),
+        )
     }
 }
 

@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
 use esp_metadata::{Chip, Config};
@@ -50,6 +50,7 @@ pub enum Package {
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
+    EspRomSys,
     EspIeee802154,
     EspLpHal,
     EspMetadata,
@@ -73,8 +74,10 @@ impl Package {
         matches!(
             self,
             EspBacktrace
+                | EspBootloaderEspIdf
                 | EspHal
                 | EspHalEmbassy
+                | EspRomSys
                 | EspIeee802154
                 | EspLpHal
                 | EspPrintln
@@ -135,7 +138,7 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy)
+        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspRomSys | EspBootloaderEspIdf)
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -305,6 +308,7 @@ pub fn execute_app(
     action: CargoAction,
     repeat: usize,
     debug: bool,
+    toolchain: Option<&str>,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -358,9 +362,19 @@ pub fn execute_app(
         builder.add_arg("--release");
     }
 
-    // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-    if target.starts_with("xtensa") {
-        builder = builder.toolchain("esp");
+    let toolchain = match toolchain {
+        // Preserve user choice
+        Some(tc) => Some(tc),
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        _ if target.starts_with("xtensa") => Some("esp"),
+        _ => None,
+    };
+
+    if let Some(toolchain) = toolchain {
+        if toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
     }
 
     let args = builder.build();

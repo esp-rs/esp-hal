@@ -1,3 +1,15 @@
+pub(crate) mod gpio;
+pub(crate) mod i2c_master;
+pub(crate) mod spi_master;
+pub(crate) mod spi_slave;
+pub(crate) mod uart;
+
+pub(crate) use gpio::*;
+pub(crate) use i2c_master::*;
+pub(crate) use spi_master::*;
+pub(crate) use spi_slave::*;
+pub(crate) use uart::*;
+
 /// Represents a value in the driver configuration.
 pub(crate) enum Value {
     Unset,
@@ -17,7 +29,7 @@ impl From<Option<u32>> for Value {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum SupportStatus {
     NotSupported,
@@ -49,80 +61,6 @@ impl SupportStatus {
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct EmptyInstanceConfig {}
 
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct I2cMasterInstanceConfig {
-    pub sys_instance: String,
-    pub scl: String,
-    pub sda: String,
-    pub interrupt: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PinCapability {
-    Input,
-    Output,
-    Analog,
-    Rtc,
-    Touch,
-    UsbDm,
-    UsbDp,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct AfMap {
-    #[serde(rename = "0")]
-    af0: Option<String>,
-    #[serde(rename = "1")]
-    af1: Option<String>,
-    #[serde(rename = "2")]
-    af2: Option<String>,
-    #[serde(rename = "3")]
-    af3: Option<String>,
-    #[serde(rename = "4")]
-    af4: Option<String>,
-    #[serde(rename = "5")]
-    af5: Option<String>,
-}
-
-impl AfMap {
-    pub fn get(&self, af: usize) -> Option<&str> {
-        match af {
-            0 => self.af0.as_deref(),
-            1 => self.af1.as_deref(),
-            2 => self.af2.as_deref(),
-            3 => self.af3.as_deref(),
-            4 => self.af4.as_deref(),
-            5 => self.af5.as_deref(),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct PinConfig {
-    /// The GPIO pin number.
-    pub pin: usize,
-    pub kind: Vec<PinCapability>,
-    // Pin => Input/OutputSignal
-    #[serde(default)]
-    pub alternate_functions: AfMap,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct IoMuxSignal {
-    pub name: String,
-    #[serde(default)]
-    pub id: Option<usize>,
-}
-
-#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct GpioPinsAndSignals {
-    pub pins: Vec<PinConfig>,
-    pub input_signals: Vec<IoMuxSignal>,
-    pub output_signals: Vec<IoMuxSignal>,
-}
-
 /// A peripheral instance for which a driver is implemented.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
@@ -132,10 +70,13 @@ pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
     pub instance_config: I,
 }
 
+/// A single cell in the peripheral support table.
 pub(crate) struct SupportItem {
+    /// The human-readable name of the driver in the table (leftmost cell.)
     pub name: &'static str,
+    /// The ID of the driver ([device.<config_group>]) in the TOML, that this
+    /// item corresponds to.
     pub config_group: &'static str,
-    pub symbols: &'static [&'static str],
 }
 
 /// Define driver configuration structs, and a PeriConfig struct
@@ -188,10 +129,6 @@ macro_rules! driver_configs {
             driver: $driver:ident,
             // Driver name, used in the generated documentation.
             name: $name:literal,
-            // The list of peripheral symbols that this driver supports. For now this is used to
-            // double-check the configuration.
-            // TODO: remove once the metadata encodes which instances are supported.
-            peripherals: $symbols:expr,
             properties: $tokens:tt
         },
     )+) => {
@@ -218,7 +155,6 @@ macro_rules! driver_configs {
                         SupportItem {
                             name: $name,
                             config_group: stringify!($driver),
-                            symbols: $symbols,
                         },
                     )+
                 ]
@@ -263,11 +199,18 @@ macro_rules! driver_configs {
             }
 
             /// Returns the support status of a peripheral by its name.
-            pub fn support_status(&self, peripheral: &str) -> Option<SupportStatus> {
-                // Find the driver by name and return its support status.
-                match peripheral {
+            pub fn support_status(&self, driver: &str) -> Option<SupportStatus> {
+                match driver {
                     $(stringify!($driver) => self.$driver.as_ref().map(|p| p.support_status),)*
                     _ => None, // If the peripheral is not found, return None.
+                }
+            }
+
+            /// Returns the peripheral instances used by the given driver.
+            pub fn driver_peris<'a>(&'a self, driver: &str) -> Vec<&'a str> {
+                match driver {
+                    $(stringify!($driver) => self.$driver.iter().flat_map(|p| p.instances.iter().map(|i| i.name.as_str())).collect::<Vec<_>>(),)*
+                    _ => vec![],
                 }
             }
         }
@@ -279,61 +222,56 @@ driver_configs![
     AdcProperties {
         driver: adc,
         name: "ADC",
-        peripherals: &[],
         properties: {}
     },
     AesProperties {
         driver: aes,
         name: "AES",
-        peripherals: &["aes"],
         properties: {}
     },
     AssistDebugProperties {
         driver: assist_debug,
         name: "ASSIST_DEBUG",
-        peripherals: &["assist_debug"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_sp_monitor: bool,
+            #[serde(default)]
+            has_region_monitor: bool,
+        }
     },
     DacProperties {
         driver: dac,
         name: "DAC",
-        peripherals: &["dac"],
         properties: {}
     },
     DmaProperties {
         driver: dma,
         name: "DMA",
-        peripherals: &["pdma", "gdma"],
         properties: {}
     },
     DsProperties {
         driver: ds,
         name: "DS",
-        peripherals: &["ds"],
         properties: {}
     },
     EccProperties {
         driver: ecc,
         name: "ECC",
-        peripherals: &["ecc"],
         properties: {}
     },
     EthernetProperties {
         driver: ethernet,
         name: "Ethernet",
-        peripherals: &["emac"],
         properties: {}
     },
     EtmProperties {
         driver: etm,
         name: "ETM",
-        peripherals: &["etm"],
         properties: {}
     },
     GpioProperties {
         driver: gpio,
         name: "GPIO",
-        peripherals: &["gpio"],
         properties: {
             #[serde(default)]
             has_bank_1: bool,
@@ -354,13 +292,11 @@ driver_configs![
     HmacProperties {
         driver: hmac,
         name: "HMAC",
-        peripherals: &["hmac"],
         properties: {}
     },
     I2cMasterProperties<I2cMasterInstanceConfig> {
         driver: i2c_master,
         name: "I2C master",
-        peripherals: &["i2c0", "i2c1"],
         properties: {
             #[serde(default)]
             has_fsm_timeouts: bool,
@@ -392,19 +328,16 @@ driver_configs![
     I2cSlaveProperties {
         driver: i2c_slave,
         name: "I2C slave",
-        peripherals: &["i2c0", "i2c1"],
         properties: {}
     },
     I2sProperties {
         driver: i2s,
         name: "I2S",
-        peripherals: &["i2s0", "i2s1"],
         properties: {}
     },
     InterruptProperties {
         driver: interrupts,
         name: "Interrupts",
-        peripherals: &[],
         properties: {
             status_registers: u32,
         }
@@ -412,55 +345,46 @@ driver_configs![
     IoMuxProperties {
         driver: io_mux,
         name: "IOMUX",
-        peripherals: &["io_mux"],
         properties: {}
     },
     CameraProperties {
         driver: camera,
         name: "Camera interface", // LCD_CAM, ESP32 I2S, S2 SPI
-        peripherals: &[],
         properties: {}
     },
     RgbProperties {
         driver: rgb_display,
         name: "RGB display", // LCD_CAM, ESP32 I2S, S2 SPI
-        peripherals: &[],
         properties: {}
     },
     LedcProperties {
         driver: ledc,
         name: "LEDC",
-        peripherals: &["ledc"],
         properties: {}
     },
     McpwmProperties {
         driver: mcpwm,
         name: "MCPWM",
-        peripherals: &["mcpwm0", "mcpwm1"],
         properties: {}
     },
     ParlIoProperties {
         driver: parl_io,
         name: "PARL_IO",
-        peripherals: &["parl_io"],
         properties: {}
     },
     PcntProperties {
         driver: pcnt,
         name: "PCNT",
-        peripherals: &["pcnt"],
         properties: {}
     },
     PsramProperties {
         driver: psram,
         name: "PSRAM",
-        peripherals: &["psram"],
         properties: {}
     },
     RmtProperties {
         driver: rmt,
         name: "RMT",
-        peripherals: &["rmt"],
         properties: {
             ram_start: u32,
             channel_ram_size: u32,
@@ -469,67 +393,59 @@ driver_configs![
     RngProperties {
         driver: rng,
         name: "RNG",
-        peripherals: &["rng"],
         properties: {}
     },
     RsaProperties {
         driver: rsa,
         name: "RSA",
-        peripherals: &["rsa"],
         properties: {}
     },
     SdHostProperties {
         driver: sd_host,
         name: "SDIO host",
-        peripherals: &["sdhost"],
         properties: {}
     },
     SdSlaveProperties {
         driver: sd_slave,
         name: "SDIO slave",
-        peripherals: &["slchost"],
         properties: {}
     },
     SleepProperties {
         driver: sleep,
         name: "Light/deep sleep",
-        peripherals: &[],
         properties: {}
     },
     ShaProperties {
         driver: sha,
         name: "SHA",
-        peripherals: &["sha"],
         properties: {}
     },
-    SpiMasterProperties {
+    SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,
         name: "SPI master",
-        peripherals: &["spi2", "spi3"],
-        properties: {}
+        properties: {
+            #[serde(default)]
+            has_octal: bool,
+        }
     },
-    SpiSlaveProperties {
+    SpiSlaveProperties<SpiSlaveInstanceConfig> {
         driver: spi_slave,
         name: "SPI slave",
-        peripherals: &["spi2", "spi3"],
         properties: {}
     },
     SysTimerProperties {
         driver: systimer,
         name: "SYSTIMER",
-        peripherals: &["systimer"],
         properties: {}
     },
     TempProperties {
         driver: temp_sensor,
         name: "Temperature sensor",
-        peripherals: &[],
         properties: {}
     },
     TimersProperties {
         driver: timergroup,
         name: "Timers",
-        peripherals: &[],
         properties: {
             #[serde(default)]
             timg_has_timer1: bool,
@@ -538,49 +454,41 @@ driver_configs![
     TouchProperties {
         driver: touch,
         name: "Touch",
-        peripherals: &["touch"],
         properties: {}
     },
     TwaiProperties {
         driver: twai,
         name: "TWAI",
-        peripherals: &["twai0", "twai1"],
         properties: {}
     },
-    UartProperties {
+    UartProperties<UartInstanceConfig> {
         driver: uart,
         name: "UART",
-        peripherals: &["uart0", "uart1", "uart2"],
         properties: {}
     },
     UlpFsmProperties {
         driver: ulp_fsm,
         name: "ULP (FSM)",
-        peripherals: &["ulp_supported"],
         properties: {}
     },
     UlpRiscvProperties {
         driver: ulp_riscv,
         name: "ULP (RISC-V)",
-        peripherals: &["ulp_riscv_core", "lp_core"],
         properties: {}
     },
     UsbOtgProperties {
         driver: usb_otg,
         name: "USB OTG FS",
-        peripherals: &["usb0"],
         properties: {}
     },
     UsbSerialJtagProperties {
         driver: usb_serial_jtag,
         name: "USB Serial/JTAG",
-        peripherals: &["usb_device"],
         properties: {}
     },
     WifiProperties {
         driver: wifi,
         name: "WIFI",
-        peripherals: &["wifi"],
         properties: {
             #[serde(default)]
             has_wifi6: bool,
@@ -589,13 +497,11 @@ driver_configs![
     BluetoothProperties {
         driver: bt,
         name: "Bluetooth",
-        peripherals: &["bt"],
         properties: {}
     },
     IeeeProperties {
         driver: ieee802154,
         name: "IEEE 802.15.4",
-        peripherals: &["ieee802154"],
         properties: {}
     },
 ];

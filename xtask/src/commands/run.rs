@@ -184,6 +184,7 @@ pub fn run_examples(
                     CargoAction::Run,
                     1,
                     args.debug,
+                    args.toolchain.as_deref(),
                 )
                 .is_err()
             {

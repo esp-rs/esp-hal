@@ -1,6 +1,25 @@
+use enumset::EnumSet;
 use portable_atomic::{AtomicBool, Ordering};
 
-use crate::{asynch::AtomicWaker, dma::*, peripherals::Interrupt};
+use crate::{
+    asynch::AtomicWaker,
+    dma::{
+        BurstConfig,
+        DmaChannel,
+        DmaPeripheral,
+        DmaRxChannel,
+        DmaRxInterrupt,
+        DmaTxChannel,
+        DmaTxInterrupt,
+        InterruptAccess,
+        PdmaChannel,
+        RegisterAccess,
+        RxRegisterAccess,
+        TxRegisterAccess,
+    },
+    interrupt::InterruptHandler,
+    peripherals::Interrupt,
+};
 
 pub(super) type SpiRegisterBlock = crate::pac::spi2::RegisterBlock;
 
@@ -91,7 +110,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -99,7 +118,7 @@ impl RegisterAccess for AnySpiDmaTxChannel<'_> {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
+        matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
 }
 
@@ -271,7 +290,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
     }
 
     #[cfg(psram_dma)]
-    fn set_ext_mem_block_size(&self, size: DmaExtMemBKSize) {
+    fn set_ext_mem_block_size(&self, size: crate::dma::DmaExtMemBKSize) {
         self.regs()
             .dma_conf()
             .modify(|_, w| unsafe { w.ext_mem_bk_size().bits(size as u8) });
@@ -279,7 +298,7 @@ impl RegisterAccess for AnySpiDmaRxChannel<'_> {
 
     #[cfg(psram_dma)]
     fn can_access_psram(&self) -> bool {
-        matches!(self.0, AnySpiDmaChannel(AnySpiDmaChannelInner::Spi2(_)))
+        matches!(self.0, AnySpiDmaChannel(any::Inner::Spi2(_)))
     }
 }
 
@@ -386,8 +405,8 @@ impl InterruptAccess<DmaRxInterrupt> for AnySpiDmaRxChannel<'_> {
 crate::any_peripheral! {
     /// An SPI-compatible type-erased DMA channel.
     pub peripheral AnySpiDmaChannel<'d> {
-        Spi2(super::DMA_SPI2<'d>),
-        Spi3(super::DMA_SPI3<'d>),
+        Spi2(crate::peripherals::DMA_SPI2<'d>),
+        Spi3(crate::peripherals::DMA_SPI3<'d>),
     }
 }
 
@@ -408,8 +427,8 @@ impl PdmaChannel for AnySpiDmaChannel<'_> {
 
     delegate::delegate! {
         to match &self.0 {
-            AnySpiDmaChannelInner::Spi2(channel) => channel,
-            AnySpiDmaChannelInner::Spi3(channel) => channel,
+            any::Inner::Spi2(channel) => channel,
+            any::Inner::Spi3(channel) => channel,
         } {
             fn register_block(&self) -> &SpiRegisterBlock;
             fn tx_waker(&self) -> &'static AtomicWaker;

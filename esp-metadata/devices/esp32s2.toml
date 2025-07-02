@@ -12,54 +12,67 @@ cores = 1
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # Peripherals available in the PAC:
-    "aes",
-    "apb_saradc",
-    "dedicated_gpio",
-    "ds",
-    "efuse",
-    "extmem",
-    "gpio",
-    "gpio_sd",
-    "hmac",
-    "i2c0",
-    "i2c1",
-    "i2s0",
-    "interrupt_core0",
-    "io_mux",
-    "ledc",
-    "pcnt",
-    "pms",
-    "rmt",
-    "rng",
-    "rsa",
-    "rtc_cntl",
-    "rtc_i2c",
-    "rtc_io",
-    "sens",
-    "sha",
-    "spi0",
-    "spi1",
-    "spi2",
-    "spi3",
-    "system",
-    "systimer",
-    "timg0",
-    "timg1",
-    "twai0",
-    "uart0",
-    "uart1",
-    "uhci0",
-    "usb0",
-    "usb_wrap",
-    "xts_aes",
-]
+    { name = "AES" },
+    { name = "APB_SARADC" },
+    { name = "DEDICATED_GPIO" },
+    { name = "DS" },
+    { name = "EFUSE" },
+    { name = "EXTMEM" },
+    { name = "FE" },
+    { name = "FE2" },
+    { name = "GPIO" },
+    { name = "GPIO_SD" },
+    { name = "HMAC" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "INTERRUPT_CORE0" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "NRX" },
+    { name = "PCNT" },
+    { name = "PMS" },
+    { name = "RMT" },
+    { name = "RNG" },
+    { name = "RSA" },
+    { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "RTC_I2C" },
+    { name = "RTC_IO" },
+    { name = "SENS" },
+    { name = "SHA" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
+    { name = "SPI3", interrupts = { peri = "SPI3", dma = "SPI3_DMA" } },
+    { name = "SYSCON" },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0" },
+    { name = "TIMG1" },
+    { name = "TWAI0" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "UHCI0" },
+    { name = "USB0" },
+    { name = "USB_WRAP" },
+    { name = "XTS_AES" },
+    { name = "WIFI" },
 
-virtual_peripherals = [
-    "adc1",
-    "adc2",
-    "dac1",
-    "dac2",
+    { name = "DMA_SPI2", pac = "SPI2" },
+    { name = "DMA_SPI3", pac = "SPI3" },
+    { name = "DMA_I2S0", pac = "I2S0" },
+    { name = "DMA_CRYPTO", pac = "CRYPTO_DMA" },
+    { name = "DMA_COPY", pac = "COPY_DMA" },
+
+    { name = "ADC1", virtual = true },
+    { name = "ADC2", virtual = true },
+    { name = "DAC1", virtual = true },
+    { name = "DAC2", virtual = true },
+    { name = "PSRAM", virtual = true },
+    { name = "RADIO_CLK", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "ULP_RISCV_CORE", virtual = true },
 ]
 
 symbols = [
@@ -69,7 +82,8 @@ symbols = [
     "psram",
     "psram_dma",
     "ulp_riscv_core",
-    "spi_octal",
+    "soc_has_copy_dma",
+    "soc_has_crypto_dma",
 
     # ROM capabilities
     "rom_crc_le",
@@ -338,8 +352,8 @@ output_signals = [
 [device.i2c_master]
 support_status = "supported"
 instances = [
-    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
-    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA", interrupt = "I2C_EXT1" },
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 ll_intr_mask = 0x1ffff
 fifo_size = 32
@@ -348,6 +362,9 @@ max_bus_timeout = 0xFFFFFF
 separate_filter_config_registers = true
 has_arbitration_en = true
 i2c0_data_register_ahb_address = 0x6001301c
+
+[device.i2c_slave]
+support_status = "not_supported"
 
 [device.interrupts]
 support_status = "partial"
@@ -360,7 +377,17 @@ channel_ram_size = 64
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }, { name = "spi3" }]
+has_octal = true
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD", "FSPIIO4", "FSPIIO5", "FSPIIO6", "FSPIIO7"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", sio = ["SPI3_D", "SPI3_Q"], cs = ["SPI3_CS0", "SPI3_CS1", "SPI3_CS2"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+    { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },
+]
 
 [device.timergroup]
 timg_has_timer1 = true
@@ -368,6 +395,10 @@ instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
 support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 [device.rgb_display] # via SPI and I2S
 support_status = "not_supported"
@@ -393,7 +424,6 @@ support_status = "not_supported"
 ## Interfaces
 [device.i2s]
 [device.ledc]
-[device.spi_slave]
 [device.pcnt]
 [device.twai]
 [device.usb_otg]

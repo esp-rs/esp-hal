@@ -12,41 +12,54 @@ cores = 1
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # Peripherals available in the PAC:
-    "apb_ctrl",
-    "apb_saradc",
-    "assist_debug",
-    "dma",
-    "ecc",
-    "efuse",
-    "extmem",
-    "gpio",
-    "i2c0",
-    "interrupt_core0",
-    "io_mux",
-    "ledc",
-    "rng",
-    "rtc_cntl",
-    "sensitive",
-    "sha",
-    "spi0",
-    "spi1",
-    "spi2",
-    "system",
-    "systimer",
-    "timg0",
-    "uart0",
-    "uart1",
-    "xts_aes",
-]
+    { name = "APB_CTRL" },
+    { name = "APB_SARADC" },
+    { name = "BB" },
+    { name = "ASSIST_DEBUG" },
+    { name = "DMA" },
+    { name = "ECC" },
+    { name = "EFUSE" },
+    { name = "EXTMEM" },
+    { name = "GPIO" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "INTERRUPT_CORE0" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "RNG" },
+    { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "MODEM_CLKRST" },
+    { name = "SENSITIVE" },
+    { name = "SHA" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "XTS_AES" },
 
-virtual_peripherals = [
-    "adc1",
+    { name = "DMA_CH0", virtual = true },
+
+    { name = "ADC1", virtual = true },
+    { name = "BT", virtual = true },
+    { name = "RADIO_CLK", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "WIFI", virtual = true },
+    { name = "MEM2MEM1", virtual = true },
+    { name = "MEM2MEM2", virtual = true },
+    { name = "MEM2MEM3", virtual = true },
+    { name = "MEM2MEM4", virtual = true },
+    { name = "MEM2MEM5", virtual = true },
+    { name = "MEM2MEM6", virtual = true },
+    { name = "MEM2MEM7", virtual = true },
+    { name = "MEM2MEM8", virtual = true },
 ]
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "assist_debug_sp_monitor",
     "gdma",
     "phy",
 
@@ -69,6 +82,10 @@ support_status = "partial"
 instances = [
     { name = "adc1" },
 ]
+
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
 
 [device.gpio]
 support_status = "supported"
@@ -196,7 +213,7 @@ output_signals = [
 [device.i2c_master]
 support_status = "supported"
 instances = [
-    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
@@ -215,13 +232,24 @@ status_registers = 2
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+]
 
 [device.timergroup]
 instances = [{ name = "timg0" }]
 
 [device.uart]
 support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 # Other drivers which are partially supported but have no other configuration:
 
@@ -233,10 +261,8 @@ support_status = "supported"
 
 ## Interfaces
 [device.ledc]
-[device.spi_slave]
 
 ## Miscellaneous
-[device.assist_debug]
 [device.dma]
 [device.io_mux]
 [device.temp_sensor]

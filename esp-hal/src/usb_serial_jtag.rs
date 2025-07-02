@@ -133,8 +133,8 @@ use crate::{
     DriverMode,
     asynch::AtomicWaker,
     pac::usb_device::RegisterBlock,
-    peripherals::{Interrupt, USB_DEVICE},
-    system::{Cpu, PeripheralClockControl},
+    peripherals::USB_DEVICE,
+    system::PeripheralClockControl,
 };
 
 /// Custom USB serial error type
@@ -439,14 +439,9 @@ where
     /// handlers.
     #[instability::unstable]
     pub fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::USB_DEVICE);
-        }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::USB_DEVICE, handler.handler()) };
-        unwrap!(crate::interrupt::enable(
-            Interrupt::USB_DEVICE,
-            handler.priority()
-        ));
+        self.rx.peripheral.disable_peri_interrupt();
+        self.rx.peripheral.bind_peri_interrupt(handler.handler());
+        self.rx.peripheral.enable_peri_interrupt(handler.priority());
     }
 }
 
@@ -718,7 +713,7 @@ impl<'d> UsbSerialJtag<'d, Async> {
     /// Reconfigure the USB Serial JTAG peripheral to operate in blocking
     /// mode.
     pub fn into_blocking(self) -> UsbSerialJtag<'d, Blocking> {
-        crate::interrupt::disable(Cpu::current(), Interrupt::USB_DEVICE);
+        self.rx.peripheral.disable_peri_interrupt();
         UsbSerialJtag {
             rx: UsbSerialJtagRx {
                 peripheral: self.rx.peripheral,

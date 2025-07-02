@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
+- SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
 
 ### Changed
 
@@ -19,15 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AnySpi` has been moved from `esp_hal::spi` to `esp_hal::spi::master` and `esp_hal::spi::slave` (#3627)
 - `DataMode` has been moved from `esp_hal::spi` to `esp_hal::spi::master` (#3627)
 - The `handler` macro (reexported from `esp-hal-procmacros`) no longer accepts priority as a string (#3643)
-- Generic parameters of RMT `Channel`s have changed in preparation for type-erased channels. (#3505) 
+- Generic parameters of RMT `Channel`s have changed in preparation for type-erased channels. (#3505)
 - RMT `TxChannelCreator` and `RxChannelCreator` now have a `DriverMode` generic parameter; `TxChannelCreatorAsync` and `RxChannelCreatorAsync` have been removed. (#3505)
 - RMT `ChannelCreator` methods have been renamed from `configure` to `configure_tx` and `configure_rx` to avoid trait disambiguation issues. (#3505)
+- The RMT `Error` type has been marked `non_exhaustive` (#3701)
+- Increase ESP32 DRAM memory region by 16K (#3703)
+- The I2C async interrupt handler is now placed into IRAM (#3722)
+- Adjusted ESP32-S2 and ESP-S3 memory region lengths to reflect those defined in ESP-IDF. (#3709)
 
 ### Fixed
 
 - Fixed a typo in the ESP32-C3 memory linker script, causing ICACHE to not be defined (#3613)
 - Prevent bootloops when DRAM is close to being full. (#3635)
 - Fix PSRAM mapping on ESP32-S3 when the bootloader used the last page to access flash (#3637)
+- `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` are now unstable config options (#3711)
 
 ### Removed
 

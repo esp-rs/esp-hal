@@ -221,30 +221,6 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 #[unsafe(no_mangle)]
 static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
-// stuff needed by wpa-supplicant
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __assert_func(
-    file: *const c_char,
-    line: u32,
-    func: *const c_char,
-    failed_expr: *const c_char,
-) {
-    unsafe {
-        let file = str_from_c(file);
-        let (func_pre, func) = if func.is_null() {
-            ("", "")
-        } else {
-            (", function: ", str_from_c(func))
-        };
-        let expr = str_from_c(failed_expr);
-
-        panic!(
-            "assertion \"{}\" failed: file \"{}\", line {}{}{}",
-            expr, file, line, func_pre, func
-        );
-    }
-}
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
     compat_timer_disarm(timer.cast());

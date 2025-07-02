@@ -4,14 +4,14 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     commands::*,
-    Package,
 };
 
 // ----------------------------------------------------------------------------
@@ -49,6 +49,10 @@ struct CiArgs {
     /// Chip to target.
     #[arg(value_enum)]
     chip: Chip,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -75,6 +79,10 @@ struct LintPackagesArgs {
     /// Automatically apply fixes
     #[arg(long)]
     fix: bool,
+
+    /// The toolchain used to run the lints
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -137,6 +145,8 @@ fn main() -> Result<()> {
             Release::PublishPlan(args) => publish_plan(&workspace, args),
             #[cfg(feature = "release")]
             Release::PostRelease => post_release(&workspace),
+            #[cfg(feature = "release")]
+            Release::BumpMsrv(args) => bump_msrv::bump_msrv(&workspace, args),
         },
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
@@ -231,6 +241,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     &["--no-default-features"],
                     &features,
                     args.fix,
+                    args.toolchain.as_deref(),
                 )?;
             }
         }
@@ -246,6 +257,7 @@ fn lint_package(
     args: &[&str],
     features: &[String],
     fix: bool,
+    mut toolchain: Option<&str>,
 ) -> Result<()> {
     log::info!(
         "Linting package: {} ({}, features: {:?})",
@@ -258,18 +270,20 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    let mut builder = if !package.build_on_host() {
+    if !package.build_on_host() {
         if chip.is_xtensa() {
-            // We only overwrite Xtensas so that externally set nightly/stable toolchains
-            // are not overwritten.
-            builder = builder.arg("-Zbuild-std=core,alloc");
-            builder = builder.toolchain("esp");
+            // In case the user doesn't specify a toolchain, make sure we use +esp
+            toolchain.get_or_insert("esp");
         }
+        builder = builder.target(package.target_triple(chip)?);
+    }
 
-        builder.target(package.target_triple(chip)?)
-    } else {
-        builder
-    };
+    if let Some(toolchain) = toolchain {
+        if !package.build_on_host() && toolchain.starts_with("esp") {
+            builder = builder.arg("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
+    }
 
     for arg in args {
         builder = builder.arg(arg.to_string());
@@ -317,6 +331,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             packages: Package::iter().collect(),
             chips: vec![args.chip],
             fix: false,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Lint"))
@@ -332,6 +347,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -367,6 +383,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 chip: args.chip,
                 example: None,
                 debug: false,
+                toolchain: args.toolchain.clone(),
             },
             CargoAction::Build(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -418,8 +435,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             package: Package::EspHal,
             target: Some(args.chip.target().to_string()),
             features: vec![args.chip.to_string()],
-            toolchain: None,
             no_default_features: true,
+            toolchain: args.toolchain.clone(),
         },
     )
     .inspect_err(|_| failed.push("Build HAL"))
@@ -429,7 +446,8 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     // Build (examples)
     println!("::group::Build examples");
 
-    // The `ota_example` expects a file named `examples/target/ota_image` - it doesn't care about the contents however
+    // The `ota_example` expects a file named `examples/target/ota_image` - it
+    // doesn't care about the contents however
     std::fs::create_dir_all("./examples/target")?;
     std::fs::write("./examples/target/ota_image", "DUMMY")?;
 
@@ -440,6 +458,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
@@ -456,6 +475,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             chip: args.chip,
             example: None,
             debug: true,
+            toolchain: args.toolchain.clone(),
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )

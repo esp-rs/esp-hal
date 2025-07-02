@@ -56,11 +56,11 @@
 //!
 //! // initialize peripheral
 #![cfg_attr(
-    esp32h2,
+    not(esp32h2),
     doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
 )]
 #![cfg_attr(
-    not(esp32h2),
+    esp32h2,
     doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
 )]
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);

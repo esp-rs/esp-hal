@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fix incorrect usage of MaybeUninit (#3677)
+- Use `libesp_rom.a` from ESP-IDF on ESP32 as a replacement for our incomplete and less accurate port (#3688)
 
 ### Removed
 

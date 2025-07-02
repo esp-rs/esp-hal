@@ -12,75 +12,91 @@ cores = 1
 trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # Peripherals available in the PAC:
-    "aes",
-    "apb_saradc",
-    "assist_debug",
-    "dma",
-    "ds",
-    "ecc",
-    "efuse",
-    "gpio",
-    "gpio_sd",
-    "hmac",
-    "hp_apm",
-    "hp_sys",
-    "i2c0",
-    "i2c1",
-    "i2s0",
-    "interrupt_core0",
-    "intpri",
-    "io_mux",
-    "ledc",
-    "lp_ana",
-    "lp_aon",
-    "lp_apm",
-    "lp_clkrst",
-    "lp_peri",
-    "lp_timer",
-    "lp_wdt",
-    "mcpwm0",
-    "mem_monitor",
-    "modem_lpcon",
-    "modem_syscon",
-    "otp_debug",
-    "parl_io",
-    "pau",
-    "pcnt",
-    "pcr",
-    "pmu",
-    "rmt",
-    "rng",
-    "rsa",
-    "sha",
-    "etm",
-    "spi0",
-    "spi1",
-    "spi2",
-    "systimer",
-    "tee",
-    "timg0",
-    "timg1",
-    "trace0",
-    "twai0",
-    "uart0",
-    "uart1",
-    "uhci0",
-    "usb_device",
-]
+    { name = "AES" },
+    { name = "APB_SARADC" },
+    { name = "ASSIST_DEBUG" },
+    { name = "DMA" },
+    { name = "DS" },
+    { name = "ECC" },
+    { name = "EFUSE" },
+    { name = "GPIO" },
+    { name = "GPIO_SD" },
+    { name = "HMAC" },
+    { name = "HP_APM" },
+    { name = "HP_SYS" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "I2C1", interrupts = { peri = "I2C_EXT1" } },
+    { name = "I2S0", interrupts = { peri = "I2S0" } },
+    { name = "IEEE802154" },
+    { name = "INTERRUPT_CORE0" },
+    { name = "INTPRI" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "LPWR", pac = "LP_CLKRST" },
+    { name = "LP_ANA" },
+    { name = "LP_AON" },
+    { name = "LP_APM" },
+    { name = "LP_APM0" },
+    { name = "LP_CLKRST" },
+    { name = "LP_PERI" },
+    { name = "LP_TIMER" },
+    { name = "LP_WDT" },
+    { name = "MCPWM0" },
+    { name = "MEM_MONITOR" },
+    { name = "MODEM_LPCON" },
+    { name = "MODEM_SYSCON" },
+    { name = "OTP_DEBUG" },
+    { name = "PARL_IO", interrupts = { tx = "PARL_IO_TX", rx = "PARL_IO_RX" } },
+    { name = "PAU" },
+    { name = "PCNT" },
+    { name = "PCR" },
+    { name = "PLIC_MX" },
+    { name = "PMU" },
+    { name = "RMT" },
+    { name = "RNG" },
+    { name = "RSA" },
+    { name = "SHA" },
+    { name = "ETM", pac = "SOC_ETM" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SYSTEM", pac = "PCR" },
+    { name = "SYSTIMER" },
+    { name = "TEE" },
+    { name = "TIMG0" },
+    { name = "TIMG1" },
+    { name = "TRACE0", pac = "TRACE" },
+    { name = "TWAI0" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "UHCI0" },
+    { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
 
-virtual_peripherals = [
-    "adc1",
+    { name = "DMA_CH0", virtual = true },
+    { name = "DMA_CH1", virtual = true },
+    { name = "DMA_CH2", virtual = true },
+
+    { name = "ADC1", virtual = true },
+    { name = "BT", virtual = true },
+    { name = "RADIO_CLK", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "MEM2MEM1", virtual = true },
+    { name = "MEM2MEM4", virtual = true },
+    { name = "MEM2MEM5", virtual = true },
+    { name = "MEM2MEM10", virtual = true },
+    { name = "MEM2MEM11", virtual = true },
+    { name = "MEM2MEM12", virtual = true },
+    { name = "MEM2MEM13", virtual = true },
+    { name = "MEM2MEM14", virtual = true },
+    { name = "MEM2MEM15", virtual = true },
 ]
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "assist_debug_sp_monitor",
-    "assist_debug_region_monitor",
     "gdma",
     "plic",
     "phy",
-    "ieee802154",
 
     # ROM capabilities
     "rom_crc_le",
@@ -95,6 +111,11 @@ support_status = "partial"
 instances = [
     { name = "adc1" },
 ]
+
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
+has_region_monitor = true
 
 [device.gpio]
 support_status = "supported"
@@ -130,8 +151,8 @@ pins = [
     { pin = 23, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS1" } },
     { pin = 24, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS2" } },
     { pin = 25, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS3" } },
-    { pin = 26, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS4" } },
-    { pin = 27, kind = ["input", "output"], alternate_functions = { 2 = "FSPICS5" } },
+    { pin = 26, kind = ["input", "output", "usb_device"], alternate_functions = { 2 = "FSPICS4" } },
+    { pin = 27, kind = ["input", "output", "usb_device"], alternate_functions = { 2 = "FSPICS5" } },
 ]
 input_signals = [
     { name = "EXT_ADC_START",       id = 0 },
@@ -312,8 +333,8 @@ output_signals = [
 [device.i2c_master]
 support_status = "supported"
 instances = [
-    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA", interrupt = "I2C_EXT0" },
-    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA", interrupt = "I2C_EXT1" },
+    { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
+    { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 has_fsm_timeouts = true
 has_hw_bus_clear = true
@@ -328,6 +349,9 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.i2c_slave]
+support_status = "not_supported"
+
 [device.interrupts]
 support_status = "partial"
 status_registers = 2
@@ -339,13 +363,24 @@ channel_ram_size = 48
 
 [device.spi_master]
 support_status = "supported"
-instances = [{ name = "spi2" }]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK", sio = ["FSPID", "FSPIQ", "FSPIWP", "FSPIHD"], cs = ["FSPICS0", "FSPICS1", "FSPICS2", "FSPICS3", "FSPICS4", "FSPICS5"] },
+]
+
+[device.spi_slave]
+instances = [
+    { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
+]
 
 [device.timergroup]
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
 support_status = "supported"
+instances = [
+    { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
+    { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
+]
 
 [device.ds]
 support_status = "not_supported"
@@ -366,12 +401,10 @@ support_status = "not_supported"
 [device.mcpwm]
 [device.parl_io]
 [device.pcnt]
-[device.spi_slave]
 [device.twai]
 [device.usb_serial_jtag]
 
 ## Miscellaneous
-[device.assist_debug]
 [device.dma]
 [device.etm]
 [device.io_mux]

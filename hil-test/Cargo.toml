@@ -287,6 +287,7 @@ esp32 = [
     "esp-hal-embassy?/esp32",
     "esp-wifi?/esp32",
     "esp-storage?/esp32",
+    "esp-bootloader-esp-idf/esp32",
 ]
 esp32c2 = [
     "esp-backtrace/esp32c2",
@@ -294,6 +295,7 @@ esp32c2 = [
     "esp-hal-embassy?/esp32c2",
     "esp-wifi?/esp32c2",
     "esp-storage?/esp32c2",
+    "esp-bootloader-esp-idf/esp32c2",
 ]
 esp32c3 = [
     "esp-backtrace/esp32c3",
@@ -301,6 +303,7 @@ esp32c3 = [
     "esp-hal-embassy?/esp32c3",
     "esp-wifi?/esp32c3",
     "esp-storage?/esp32c3",
+    "esp-bootloader-esp-idf/esp32c3",
 ]
 esp32c6 = [
     "esp-backtrace/esp32c6",
@@ -308,6 +311,7 @@ esp32c6 = [
     "esp-hal-embassy?/esp32c6",
     "esp-wifi?/esp32c6",
     "esp-storage?/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
 ]
 esp32h2 = [
     "esp-backtrace/esp32h2",
@@ -315,6 +319,7 @@ esp32h2 = [
     "esp-hal-embassy?/esp32h2",
     "esp-wifi?/esp32h2",
     "esp-storage?/esp32h2",
+    "esp-bootloader-esp-idf/esp32h2",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
@@ -323,6 +328,7 @@ esp32s2 = [
     "esp-hal-embassy?/esp32s2",
     "esp-wifi?/esp32s2",
     "esp-storage?/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
@@ -331,6 +337,7 @@ esp32s3 = [
     "esp-hal-embassy?/esp32s3",
     "esp-wifi?/esp32s3",
     "esp-storage?/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
 ]
 # Async & Embassy:
 embassy = [

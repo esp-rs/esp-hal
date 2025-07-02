@@ -150,7 +150,14 @@ pub fn generate_config_from_yaml_definition(
 
     let cfg = generate_config(&config.krate, &options, enable_unstable, emit_md_tables);
 
-    if let Some(checks) = config.checks {
+    do_checks(config.checks.as_ref(), &cfg)?;
+
+    Ok(cfg)
+}
+
+/// Check the given actual values by applying checking the given checks
+pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> Result<(), Error> {
+    if let Some(checks) = checks {
         let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
         for (k, v) in cfg.iter() {
             eval_ctx
@@ -165,16 +172,15 @@ pub fn generate_config_from_yaml_definition(
                 .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
         }
         for check in checks {
-            if !evalexpr::eval_with_context(&check, &eval_ctx)
+            if !evalexpr::eval_with_context(check, &eval_ctx)
                 .and_then(|v| v.as_boolean())
                 .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
             {
                 return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
         }
-    }
-
-    Ok(cfg)
+    };
+    Ok(())
 }
 
 /// Evaluate the given YAML representation of a config definition.
@@ -444,6 +450,9 @@ pub enum DisplayHint {
 
     /// Use a hexadecimal representation
     Hex,
+
+    /// Use a octal representation
+    Octal,
 }
 
 /// A configuration option.
@@ -481,6 +490,11 @@ pub struct ConfigOption {
 }
 
 impl ConfigOption {
+    /// Get the corresponding ENV_VAR name given the crate-name
+    pub fn full_env_var(&self, crate_name: &str) -> String {
+        self.env_var(&format!("{}_CONFIG_", screaming_snake_case(crate_name)))
+    }
+
     fn env_var(&self, prefix: &str) -> String {
         format!("{}{}", prefix, screaming_snake_case(&self.name))
     }

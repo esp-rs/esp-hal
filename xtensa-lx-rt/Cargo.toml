@@ -9,6 +9,7 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 keywords      = ["lx", "peripheral", "register", "xtensa"]
 categories    = ["embedded", "hardware-support", "no-std"]
+links         = "xtensa-lx-rt"
 
 [lib]
 bench = false

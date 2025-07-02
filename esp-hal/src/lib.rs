@@ -197,6 +197,8 @@ mod _generated {
 
 use core::marker::PhantomData;
 
+use esp_rom_sys as _;
+
 metadata!("build_info", CHIP_NAME, chip!());
 
 #[cfg(riscv)]
@@ -310,7 +312,7 @@ unstable_module! {
     pub mod analog;
     #[cfg(any(systimer, timergroup))]
     pub mod timer;
-    #[cfg(any(soc_has_lp_clkrst, soc_has_rtc_cntl))]
+    #[cfg(soc_has_lpwr)]
     pub mod rtc_cntl;
     #[cfg(any(gdma, pdma))]
     pub mod dma;
@@ -354,7 +356,7 @@ unstable_driver! {
     pub mod touch;
     #[cfg(soc_has_trace0)]
     pub mod trace;
-    #[cfg(tsens)]
+    #[cfg(soc_has_tsens)]
     pub mod tsens;
     #[cfg(any(soc_has_twai0, soc_has_twai1))]
     pub mod twai;
@@ -397,6 +399,25 @@ pub trait DriverMode: crate::private::Sealed {}
 /// Drivers are constructed in blocking mode by default. To learn about the
 /// differences between blocking and async drivers, see the [`Async`] mode
 /// documentation.
+///
+/// [`Async`] drivers can be converted to a [`Blocking`] driver using the
+/// `into_blocking` method, for example:
+///
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::uart::{Config, Uart};
+/// let uart = Uart::new(
+///     peripherals.UART0,
+///     Config::default())?
+/// .with_rx(peripherals.GPIO1)
+/// .with_tx(peripherals.GPIO2)
+/// .into_async();
+///
+/// let blocking_uart = uart.into_blocking();
+///
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Blocking;
@@ -405,8 +426,24 @@ pub struct Blocking;
 ///
 /// Drivers are constructed in blocking mode by default. To set up an async
 /// driver, a [`Blocking`] driver must be converted to an `Async` driver using
-/// the `into_async` method. Drivers can be converted back to blocking mode
-/// using the `into_blocking` method.
+/// the `into_async` method, for example:
+///
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// # use esp_hal::uart::{Config, Uart};
+/// let uart = Uart::new(
+///     peripherals.UART0,
+///     Config::default())?
+/// .with_rx(peripherals.GPIO1)
+/// .with_tx(peripherals.GPIO2)
+/// .into_async();
+///
+/// # Ok(())
+/// # }
+/// ```
+/// 
+/// Drivers can be converted back to blocking mode using the `into_blocking`
+/// method, see [`Blocking`] documentation for more details.
 ///
 /// Async mode drivers offer most of the same features as blocking drivers, but
 /// with the addition of async APIs. Interrupt-related functions are not

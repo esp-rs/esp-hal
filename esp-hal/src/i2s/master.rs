@@ -668,7 +668,7 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: RegisterAccessPrivate + super::IntoAnyI2s {}
+pub trait Instance: RegisterAccessPrivate + super::any::Degrade {}
 #[cfg(soc_has_i2s0)]
 impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
@@ -691,9 +691,9 @@ mod private {
             OutputSignal,
             interconnect::{PeripheralInput, PeripheralOutput},
         },
-        i2s::AnyI2sInner,
+        i2s::any::Inner as AnyI2sInner,
         interrupt::InterruptHandler,
-        peripherals::{I2S0, Interrupt},
+        peripherals::I2S0,
     };
     // on ESP32-S3 I2S1 doesn't support all features - use that to avoid using those features
     // by accident
@@ -832,8 +832,6 @@ mod private {
 
     #[cfg(any(esp32, esp32s2))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        fn set_interrupt_handler(&self, handler: InterruptHandler);
-
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -1065,8 +1063,6 @@ mod private {
 
     #[cfg(any(esp32c3, esp32c6, esp32h2, esp32s3))]
     pub trait RegisterAccessPrivate: Signals + RegBlock {
-        fn set_interrupt_handler(&self, handler: InterruptHandler);
-
         fn enable_listen(&self, interrupts: EnumSet<I2sInterrupt>, enable: bool) {
             self.regs().int_ena().modify(|_, w| {
                 for interrupt in interrupts {
@@ -1512,18 +1508,7 @@ mod private {
         }
     }
 
-    impl RegisterAccessPrivate for I2S0<'_> {
-        fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::system::Cpu::other() {
-                crate::interrupt::disable(core, Interrupt::I2S0);
-            }
-            unsafe { crate::peripherals::I2S0::steal() }.bind_i2s0_interrupt(handler.handler());
-            unwrap!(crate::interrupt::enable(
-                Interrupt::I2S0,
-                handler.priority()
-            ));
-        }
-    }
+    impl RegisterAccessPrivate for I2S0<'_> {}
 
     impl Signals for crate::peripherals::I2S0<'_> {
         fn mclk_signal(&self) -> OutputSignal {
@@ -1621,18 +1606,7 @@ mod private {
     }
 
     #[cfg(soc_has_i2s1)]
-    impl RegisterAccessPrivate for I2S1<'_> {
-        fn set_interrupt_handler(&self, handler: InterruptHandler) {
-            for core in crate::system::Cpu::other() {
-                crate::interrupt::disable(core, Interrupt::I2S1);
-            }
-            unsafe { crate::peripherals::I2S1::steal() }.bind_i2s1_interrupt(handler.handler());
-            unwrap!(crate::interrupt::enable(
-                Interrupt::I2S1,
-                handler.priority()
-            ));
-        }
-    }
+    impl RegisterAccessPrivate for I2S1<'_> {}
 
     #[cfg(soc_has_i2s1)]
     impl Signals for crate::peripherals::I2S1<'_> {
@@ -1705,7 +1679,9 @@ mod private {
         }
     }
 
-    impl RegisterAccessPrivate for super::AnyI2s<'_> {
+    impl RegisterAccessPrivate for super::AnyI2s<'_> {}
+
+    impl super::AnyI2s<'_> {
         delegate::delegate! {
             to match &self.0 {
                 #[cfg(soc_has_i2s0)]
@@ -1713,8 +1689,16 @@ mod private {
                 #[cfg(soc_has_i2s1)]
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
-                fn set_interrupt_handler(&self, handler: InterruptHandler);
+                fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+                fn disable_peri_interrupt(&self);
+                fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
             }
+        }
+
+        pub(super) fn set_interrupt_handler(&self, handler: InterruptHandler) {
+            self.disable_peri_interrupt();
+            self.bind_peri_interrupt(handler.handler());
+            self.enable_peri_interrupt(handler.priority());
         }
     }
 
