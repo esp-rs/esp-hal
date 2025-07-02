@@ -1,7 +1,6 @@
 use crate::{
     binary::include::esp_bt_controller_config_t,
     hal::{
-        clock::ModemClockController,
         interrupt,
         peripherals::{BT, Interrupt},
     },
