@@ -11,13 +11,14 @@ use esp_hal::{
     DriverMode,
     gpio::{InputPin, Level, NoPin, OutputPin},
     rmt::{
-        AnyRxChannel,
-        AnyTxChannel,
+        Channel,
         Error,
         PulseCode,
         Rmt,
+        Rx,
         RxChannelConfig,
         RxChannelCreator,
+        Tx,
         TxChannelConfig,
         TxChannelCreator,
     },
@@ -41,12 +42,11 @@ fn setup<Dm: DriverMode>(
     tx: impl OutputPin,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>) {
+) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
@@ -57,8 +57,7 @@ fn setup<Dm: DriverMode>(
     };
     let rx_channel = rx_channel_creator
         .configure_rx(rx, rx_config.with_clk_divider(DIV))
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     (tx_channel, rx_channel)
 }
@@ -77,8 +76,8 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
 }
 
 fn do_rmt_loopback_inner<const TX_LEN: usize>(
-    tx_channel: AnyTxChannel<Blocking>,
-    rx_channel: AnyRxChannel<Blocking>,
+    tx_channel: Channel<Blocking, Tx>,
+    rx_channel: Channel<Blocking, Rx>,
 ) {
     use esp_hal::rmt::{RxChannel, TxChannel};
 
@@ -308,14 +307,12 @@ mod tests {
             let tx_channel = rmt
                 .$tx_channel
                 .configure_tx($tx_pin.reborrow(), tx_config)
-                .unwrap()
-                .degrade();
+                .unwrap();
 
             let rx_channel = rmt
                 .$rx_channel
                 .configure_rx($rx_pin.reborrow(), rx_config)
-                .unwrap()
-                .degrade();
+                .unwrap();
 
             do_rmt_loopback_inner::<20>(tx_channel, rx_channel);
         };
