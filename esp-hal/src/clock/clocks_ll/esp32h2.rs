@@ -290,10 +290,6 @@ pub(super) fn enable_ieee802154(en: bool) {
     ble_ieee802154_clock_enable(en);
 }
 
-pub(super) fn reset_wifi_mac() {
-    // empty
-}
-
 pub(super) fn init_clocks() {
     PMU::regs()
         .hp_sleep_icg_modem()

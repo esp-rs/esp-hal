@@ -99,11 +99,3 @@ pub(super) fn init_clocks() {
         .wifi_clk_en()
         .modify(|r, w| unsafe { w.bits(r.bits() & !WIFI_BT_SDIO_CLK | DPORT_WIFI_CLK_WIFI_EN) });
 }
-
-pub(super) fn ble_rtc_clk_init() {
-    // nothing for this target
-}
-
-pub(super) fn reset_rpa() {
-    // nothing for this target
-}
