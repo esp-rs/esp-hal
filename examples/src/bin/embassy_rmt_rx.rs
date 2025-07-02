@@ -14,7 +14,7 @@ use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
-    rmt::{PulseCode, Rmt, RxChannelAsync, RxChannelConfig, RxChannelCreator},
+    rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator},
     time::Rate,
     timer::timg::TimerGroup,
 };

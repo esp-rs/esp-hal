@@ -240,8 +240,6 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], rx_count: Option<usize>, rx
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannel, TxChannel};
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
@@ -286,8 +284,6 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
@@ -333,8 +329,6 @@ fn do_rmt_single_shot_iter(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
-    use esp_hal::rmt::TxChannel;
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
@@ -358,8 +352,6 @@ async fn do_rmt_single_shot_iter_async(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
-    use esp_hal::rmt::TxChannelAsync;
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
@@ -520,7 +512,7 @@ mod tests {
 
     #[test]
     async fn rmt_async_tx_invalid_args_slice() {
-        use esp_hal::rmt::{TxChannelAsync, TxChannelCreator};
+        use esp_hal::rmt::TxChannelCreator;
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -552,7 +544,7 @@ mod tests {
 
     #[test]
     async fn rmt_async_tx_invalid_args_iter() {
-        use esp_hal::rmt::{TxChannelAsync, TxChannelCreator};
+        use esp_hal::rmt::TxChannelCreator;
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
@@ -585,7 +577,6 @@ mod tests {
 
     #[test]
     async fn rmt_loopback_after_drop() {
-        use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
         const TX_LEN: usize = 20;
 
         let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -634,7 +625,7 @@ mod tests {
 
     #[test]
     async fn rmt_pin_reconfigure() {
-        use esp_hal::rmt::{TxChannelAsync, TxChannelCreator};
+        use esp_hal::rmt::TxChannelCreator;
 
         let mut peripherals = esp_hal::init(esp_hal::Config::default());
         let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);

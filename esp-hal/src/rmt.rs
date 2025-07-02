@@ -2558,12 +2558,12 @@ where
 }
 
 /// Channel in TX mode
-pub trait TxChannel: Sized {
+impl Channel<'_, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<'a, T>(
+    pub fn transmit<'a, T>(
         &mut self,
         data: &'a [T],
     ) -> Result<SingleShotTxTransaction<'_, SliceEncoder<'a, T>>, Error>
@@ -2574,7 +2574,7 @@ pub trait TxChannel: Sized {
     }
 
     /// FIXME: docs
-    fn transmit_iter<I>(
+    pub fn transmit_iter<I>(
         &mut self,
         data: I,
     ) -> Result<SingleShotTxTransaction<'_, IterEncoder<I::IntoIter>>, Error>
@@ -2585,55 +2585,7 @@ pub trait TxChannel: Sized {
     }
 
     /// FIXME: docs
-    fn transmit_enc<E>(
-        &mut self,
-        data: E,
-    ) -> Result<SingleShotTxTransaction<'_, E>, Error>
-    where
-        E: Encoder;
-
-
-    /// Start transmitting the given pulse code continuously.
-    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
-    /// ongoing transmission and get back the channel for further use.
-    /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<T>(
-        &mut self,
-        loopcount: Option<NonZeroU16>,
-        data: &'_ [T]
-    ) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        T: Into<PulseCode> + Copy,
-    {
-        self.transmit_continuously_enc(loopcount, SliceEncoder::new(data))
-    }
-
-    /// FIXME: docs
-    fn transmit_continuously_iter<I>(
-        &mut self,
-        loopcount: Option<NonZeroU16>,
-        data: I,
-    ) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        I: IntoIterator<Item = PulseCode>,
-    {
-        self.transmit_continuously_enc(loopcount, IterEncoder::new(data))
-    }
-
-    /// Like [`Self::transmit_continuously`] but also sets a loop count.
-    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
-    /// reached.
-    fn transmit_continuously_enc<E>(
-        &mut self,
-        loopcount: Option<NonZeroU16>,
-        data: E,
-    ) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        E: Encoder;
-}
-
-impl TxChannel for Channel<'_, Blocking, Tx> {
-    fn transmit_enc<E>(
+    pub fn transmit_enc<E>(
         &mut self,
         mut data: E,
     ) -> Result<SingleShotTxTransaction<'_, E>, Error>
@@ -2662,7 +2614,37 @@ impl TxChannel for Channel<'_, Blocking, Tx> {
         })
     }
 
-    fn transmit_continuously_enc<E>(
+    /// Start transmitting the given pulse code continuously.
+    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
+    /// ongoing transmission and get back the channel for further use.
+    /// The length of sequence cannot exceed the size of the allocated RMT RAM.
+    pub fn transmit_continuously<T>(
+        &mut self,
+        loopcount: Option<NonZeroU16>,
+        data: &'_ [T]
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
+        self.transmit_continuously_enc(loopcount, SliceEncoder::new(data))
+    }
+
+    /// FIXME: docs
+    pub fn transmit_continuously_iter<I>(
+        &mut self,
+        loopcount: Option<NonZeroU16>,
+        data: I,
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
+    where
+        I: IntoIterator<Item = PulseCode>,
+    {
+        self.transmit_continuously_enc(loopcount, IterEncoder::new(data))
+    }
+
+    /// Like [`Self::transmit_continuously`] but also sets a loop count.
+    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
+    /// reached.
+    pub fn transmit_continuously_enc<E>(
         &mut self,
         loopcount: Option<NonZeroU16>,
         mut data: E,
@@ -2801,11 +2783,11 @@ where
 }
 
 /// Channel is RX mode
-pub trait RxChannel: Sized {
+impl Channel<'_, Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    fn receive<'ch, 'a, T>(
+    pub fn receive<'ch, 'a, T>(
         &'ch mut self,
         data: &'a mut [T],
     ) -> Result<RxTransaction<'ch, SliceDecoder<'a, T>>, Error>
@@ -2816,7 +2798,7 @@ pub trait RxChannel: Sized {
     }
 
     /// FIXME: docs
-    fn receive_iter<'ch, 'a, D, T>(
+    pub fn receive_iter<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
     ) -> Result<RxTransaction<'ch, IterDecoder<'a, D::IntoIter, T>>, Error>
@@ -2828,13 +2810,7 @@ pub trait RxChannel: Sized {
     }
 
     /// FIXME: Docs
-    fn receive_dec<D>(&mut self, data: D) -> Result<RxTransaction<'_, D>, Error>
-    where
-        D: Decoder;
-}
-
-impl RxChannel for Channel<'_, Blocking, Rx> {
-    fn receive_dec<D>(
+    pub fn receive_dec<D>(
         &mut self,
         data: D,
     ) -> Result<RxTransaction<'_, D>, Error>
@@ -2938,11 +2914,11 @@ impl Drop for RmtTxFuture<'_> {
 }
 
 /// TX channel in async mode
-pub trait TxChannelAsync {
+impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
+    pub async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
     where
         Self: Sized,
         T: Into<PulseCode> + Copy,
@@ -2951,7 +2927,7 @@ pub trait TxChannelAsync {
     }
 
     /// FIXME: docs
-    async fn transmit_iter<I>(&mut self, data: I) -> Result<(), Error>
+    pub async fn transmit_iter<I>(&mut self, data: I) -> Result<(), Error>
     where
         Self: Sized,
         I: IntoIterator<Item=PulseCode>,
@@ -2961,7 +2937,7 @@ pub trait TxChannelAsync {
     }
 
     /// FIXME: docs
-    async fn transmit_enc<E>(&mut self, data: &mut E) -> Result<(), Error>
+    pub async fn transmit_enc<E>(&mut self, data: &mut E) -> Result<(), Error>
     where
         Self: Sized,
         E: Encoder + Unpin
@@ -2969,13 +2945,6 @@ pub trait TxChannelAsync {
         self.transmit_inner(data).await
     }
 
-    #[doc(hidden)]
-    async fn transmit_inner(&mut self, data: &mut (dyn Encoder + Unpin)) -> Result<(), Error>
-    where
-        Self: Sized;
-}
-
-impl TxChannelAsync for Channel<'_, Async, Tx> {
     fn transmit_inner(&mut self, data: &mut (dyn Encoder + Unpin)) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
@@ -3098,38 +3067,39 @@ where
 }
 
 /// RX channel in async mode
-pub trait RxChannelAsync {
+impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<'a, T>(&'a mut self, data: &'a mut [T]) -> Result<usize, Error>
+    pub async fn receive<'a, T>(&'a mut self, data: &'a mut [T]) -> Result<usize, Error>
     where
         Self: Sized,
         T: From<PulseCode> + 'a
     {
-        self.receive_dec(SliceDecoder::new(data)).await
+        self.receive_inner(SliceDecoder::new(data)).await
     }
 
     /// FIXME: docs
-    async fn receive_iter<'a, D, T>(&'a mut self, data: D) -> Result<usize, Error>
+    pub async fn receive_iter<'a, D, T>(&'a mut self, data: D) -> Result<usize, Error>
     where
         Self: Sized,
         D: IntoIterator<Item = &'a mut T>,
         D::IntoIter: Unpin,
         T: From<PulseCode> + 'a
     {
-        self.receive_dec(IterDecoder::new(data)).await
+        self.receive_inner(IterDecoder::new(data)).await
     }
 
     /// FIXME: docs
-    async fn receive_dec<'a, D>(&'a mut self, data: D) -> Result<usize, Error>
+    pub async fn receive_dec<'a, D>(&'a mut self, data: D) -> Result<usize, Error>
     where
         Self: Sized,
-        D: Decoder + Unpin;
-}
+        D: Decoder + Unpin,
+    {
+        self.receive_inner(data).await
+    }
 
-impl RxChannelAsync for Channel<'_, Async, Rx> {
-    fn receive_dec<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
+    fn receive_inner<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
     where
         Self: Sized,
         D: Decoder + Unpin,
