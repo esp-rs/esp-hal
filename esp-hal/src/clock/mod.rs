@@ -686,7 +686,7 @@ pub trait ModemClockController<'d>: Sealed + 'd {
     /// Decreases the PHY clock reference count for this modem ignoring currently alive [PhyClockGuard]s.
     ///
     /// # Panics
-    /// If the ref count is lower than the number of [PhyClockGuard]s, dropping a guard can now panic.
+    /// This function panics if the PHY clock is inactive. If the ref count is lower than the number of alive [PhyClockGuard]s, dropping a guard can now panic.
     fn decrease_phy_clock_ref_count(&self) {
         decrease_phy_clock_ref_count_internal();
     }
