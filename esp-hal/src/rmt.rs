@@ -4033,11 +4033,6 @@ mod chip_specific {
             }
         }
 
-        fn is_tx_threshold_set(&self) -> bool {
-            let rmt = crate::peripherals::RMT::regs();
-            rmt.int_raw().read().ch_tx_thr_event(self.ch_idx()).bit()
-        }
-
         fn reset_tx_threshold_set(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_clr()
