@@ -236,14 +236,11 @@ pub fn _setup_interrupts() {
         // disable all known interrupts
         // at least after the 2nd stage bootloader there are some interrupts enabled
         // (e.g. UART)
+        // IMPROVEMENT: iterate over interrupts and not the other way around
         for peripheral_interrupt in 0..255 {
-            crate::peripherals::Interrupt::try_from(peripheral_interrupt)
-                .map(|intr| {
-                    #[cfg(multi_core)]
-                    disable(Cpu::AppCpu, intr);
-                    disable(Cpu::ProCpu, intr);
-                })
-                .ok();
+            if crate::peripherals::Interrupt::try_from(peripheral_interrupt).is_ok() {
+                disable_impl(peripheral_interrupt as isize)
+            }
         }
 
         let vec_table = &_vector_table as *const _ as usize;
@@ -285,10 +282,13 @@ pub fn enable_direct(
 
 /// Disable the given peripheral interrupt.
 pub fn disable(_core: Cpu, interrupt: Interrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+    disable_impl(interrupt as isize);
+}
 
+fn disable_impl(interrupt_number: isize) {
+    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+
+    unsafe {
         // set to 0 to disable the peripheral interrupt on chips with an interrupt
         // controller other than PLIC use the disabled interrupt 31 otherwise
         intr_map_base
