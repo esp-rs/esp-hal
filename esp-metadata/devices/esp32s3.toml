@@ -78,7 +78,6 @@ peripherals = [
     { name = "BT", virtual = true },
     { name = "CPU_CTRL", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "RADIO_CLK", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "ULP_RISCV_CORE", virtual = true },
     { name = "WIFI", virtual = true },
