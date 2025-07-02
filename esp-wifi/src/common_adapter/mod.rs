@@ -307,9 +307,9 @@ pub(crate) unsafe fn phy_enable_clock() {
     if count == 0 {
         // stealing WIFI or BT is safe since it is passed into `init`
         #[cfg(not(esp32h2))]
-        let mut peripheral = unsafe { esp_hal::peripheral::WIFI::steal() };
+        let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
         #[cfg(esp32h2)]
-        let mut peripheral = unsafe { esp_hal::peripheral::BT::steal() };
+        let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
 
         let clock_guard = peripheral.enable_phy_clock();
         core::mem::forget(clock_guard);
@@ -324,9 +324,9 @@ pub(crate) unsafe fn phy_disable_clock() {
     if count == 1 {
         // stealing WIFI or BT is safe since it is passed into `init`
         #[cfg(not(esp32h2))]
-        let mut peripheral = unsafe { esp_hal::peripheral::WIFI::steal() };
+        let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
         #[cfg(esp32h2)]
-        let mut peripheral = unsafe { esp_hal::peripheral::BT::steal() };
+        let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
         peripheral.decrease_phy_clock_ref_count();
         trace!("phy_disable_clock done!");
     }
