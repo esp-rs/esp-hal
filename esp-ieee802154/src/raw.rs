@@ -2,7 +2,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 use esp_hal::{
-    clock::{ModemClockController, PhyClockGuard},
+    clock::{ModemClockController, PhyClockGuard, init_radio_clocks},
     handler,
     interrupt::Priority,
     peripherals::IEEE802154,
@@ -77,7 +77,7 @@ pub struct RawReceived {
 }
 
 pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<'_> {
-    radio.init_clocks();
+    init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
     radio.enable_modem_clock(true);
 

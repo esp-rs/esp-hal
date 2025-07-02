@@ -320,7 +320,7 @@ pub(crate) unsafe fn phy_disable_clock() {
     if count == 1 {
         // stealing WIFI is safe since it is passed (as mutable reference or by
         // value) into `init`
-        let clock_guard = unsafe { WIFI::steal().decrease_phy_clock_ref_count() };
+        unsafe { WIFI::steal().decrease_phy_clock_ref_count() };
         trace!("phy_disable_clock done!");
     }
 }

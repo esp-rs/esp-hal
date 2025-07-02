@@ -3,7 +3,7 @@ use crate::{
     hal::{
         clock::RadioClockController,
         interrupt,
-        peripherals::{Interrupt, RADIO_CLK},
+        peripherals::{BT, Interrupt},
     },
 };
 
@@ -71,10 +71,10 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // stealing BT is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).enable_bt(true);
+    let mut bt = unsafe { BT::steal() };
+    bt.enable_modem_clock(true);
 }
 
 pub(crate) fn disable_sleep_mode() {
@@ -117,18 +117,18 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    // stealing RADIO_CLK is safe since it is passed (as reference or by value) into
-    // `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).ble_rtc_clk_init();
+    // stealing BT is safe since it is passed (as mutable reference or by
+    // value) into `init`
+    let mut bt = unsafe { BT::steal() };
+    bt.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
+    // stealing BT is safe since it is passed (as mutable reference or by
     // value) into `init`
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).reset_rpa();
+    let mut bt = unsafe { BT::steal() };
+    bt.reset_rpa();
 }
 
 #[allow(improper_ctypes_definitions)]

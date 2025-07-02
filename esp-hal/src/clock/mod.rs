@@ -672,7 +672,6 @@ impl Drop for PhyClockGuard<'_> {
 #[instability::unstable]
 /// This trait provides common functionality for all
 pub trait ModemClockController<'d>: Sealed + 'd {
-
     /// Enable the modem clock for this controller.
     fn enable_modem_clock(&mut self, enable: bool);
 
@@ -690,9 +689,10 @@ pub trait ModemClockController<'d>: Sealed + 'd {
     /// Unsafely decrease the PHY clock reference count for this modem.
     ///
     /// # Safety
-    /// Calling this is only safe, if you previously [core::mem::forget] a [PhyClockGuard], 
-    /// since otherwise the reference counting would be left in an invalid state. In practice 
-    /// this would mean, that any PhyClockGuard getting dropped could now panic.
+    /// Calling this is only safe, if you previously [core::mem::forget] a
+    /// [PhyClockGuard], since otherwise the reference counting would be
+    /// left in an invalid state. In practice this would mean, that any
+    /// PhyClockGuard getting dropped could now panic.
     fn decrease_phy_clock_ref_count(&self) {
         decrease_phy_clock_ref_count_internal();
     }

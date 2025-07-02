@@ -424,4 +424,3 @@ pub fn wifi_set_log_verbose() {
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);
     }
 }
-
