@@ -600,8 +600,8 @@ impl Clocks {
 }
 
 #[cfg(any(bt, ieee802154, wifi))]
-/// Tracks which modems currently request an active PHY clock.
-static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<Cell<u8>> =
+/// Tracks the number of references to the PHY clock.
+static PHY_CLOCK_REF_COUNTER: critical_section::Mutex<Cell<u8>> =
     critical_section::Mutex::new(Cell::new(0));
 
 // These functions are moved out of the trait to prevent monomorphization for
@@ -611,7 +611,7 @@ static PHY_CLOCK_REF_COUNTERS: critical_section::Mutex<Cell<u8>> =
 #[cfg(any(bt, ieee802154, wifi))]
 fn increase_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
-        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTERS.borrow(cs);
+        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTER.borrow(cs);
         let phy_clock_ref_count = phy_clock_ref_counter.get();
 
         // If other modems have reference to the PHY clock, but this one doesn't, the
@@ -627,7 +627,7 @@ fn increase_phy_clock_ref_count_internal() {
 #[cfg(any(bt, ieee802154, wifi))]
 fn decrease_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
-        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTERS.borrow(cs);
+        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTER.borrow(cs);
 
         let new_phy_clock_ref_count = unwrap!(phy_clock_ref_counter
             .get()
