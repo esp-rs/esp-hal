@@ -60,6 +60,7 @@ impl Item {
         }
         .replace("<p>", "")
         .replace("</p>", "\n")
+        .replace("<br>", "\n")
         .to_string()
     }
 
