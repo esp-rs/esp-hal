@@ -827,7 +827,8 @@ impl RmtWriterOuter {
         debug_assert!(offset == 0 || offset == memsize / 2 - 1 || offset == memsize - 1);
         debug_assert!(start_offset == 0 || start_offset == memsize / 2);
 
-        let count0 = core::hint::select_unpredictable(self.written == 0, memsize, memsize / 2);
+        // let count0 = core::hint::select_unpredictable(self.written == 0, memsize, memsize / 2);
+        let count0 = if self.written == 0 { memsize } else { memsize / 2 };
 
         // FIXME: Restructure such that `internal` is passed by registers/included in the
         // monomorphized code while not leading to dead code in vtables!!
