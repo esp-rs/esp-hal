@@ -28,10 +28,10 @@ impl Item {
         match self {
             Item::TopLevel(crate_name) => crate_name.clone(),
             Item::CrateLevel(config_option) => {
-                let display_value = format_using_display_hint(
-                    &config_option.actual_value,
-                    &config_option.option.display_hint,
-                );
+                let display_value = config_option
+                    .option
+                    .display_hint
+                    .format_value(&config_option.actual_value);
                 let default_indicator =
                     if config_option.actual_value == config_option.option.default_value {
                         ui_elements.default_value
@@ -83,19 +83,6 @@ impl Item {
             Item::TopLevel(_) => unreachable!(),
             Item::CrateLevel(config_option) => config_option.option.display_hint.clone(),
         }
-    }
-}
-
-fn format_using_display_hint(value: &Value, hint: &DisplayHint) -> String {
-    match value {
-        Value::Bool(b) => b.to_string(),
-        Value::Integer(i) => match hint {
-            DisplayHint::None => format!("{}", i),
-            DisplayHint::Binary => format!("0b{:0b}", i),
-            DisplayHint::Hex => format!("0x{:x}", i),
-            DisplayHint::Octal => format!("0o{:o}", i),
-        },
-        Value::String(s) => s.clone(),
     }
 }
 
@@ -474,11 +461,10 @@ impl App<'_> {
                                         self.handle_error(set_res);
                                     }
                                     Value::Integer(_) => {
-                                        let display_value = format_using_display_hint(
-                                            &current,
-                                            &self.repository.current_level()[selected]
-                                                .display_hint(),
-                                        );
+                                        let display_value = self.repository.current_level()
+                                            [selected]
+                                            .display_hint()
+                                            .format_value(&current);
                                         self.textarea =
                                             make_text_area(&display_value, &self.colors);
                                         self.editing_constraints = constraint;

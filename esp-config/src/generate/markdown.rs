@@ -25,7 +25,7 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
         description = option.description,
         key = name,
         stability = option.stability,
-        default = option.default_value,
+        default = option.display_hint.format_value(&option.default_value),
         allowed = allowed_values
     )
     .unwrap();

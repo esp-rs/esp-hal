@@ -440,7 +440,7 @@ impl Display for Stability {
 }
 
 /// A display hint (for tooling only)
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayHint {
     /// No display hint
     None,
@@ -453,6 +453,22 @@ pub enum DisplayHint {
 
     /// Use a octal representation
     Octal,
+}
+
+impl DisplayHint {
+    /// Converts a [Value] to String applying the correct display hint.
+    pub fn format_value(self, value: &Value) -> String {
+        match value {
+            Value::Bool(b) => b.to_string(),
+            Value::Integer(i) => match self {
+                DisplayHint::None => format!("{}", i),
+                DisplayHint::Binary => format!("0b{:0b}", i),
+                DisplayHint::Hex => format!("0x{:X}", i),
+                DisplayHint::Octal => format!("0o{:o}", i),
+            },
+            Value::String(s) => s.clone(),
+        }
+    }
 }
 
 /// A configuration option.
