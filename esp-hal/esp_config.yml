@@ -55,6 +55,7 @@ options:
         validator: enumeration
         value:
         - '32'
+  active: 'chip == "esp32" || chip == "esp32c2"'
 
 - name: spi-address-workaround
   description: "Enables a workaround for the issue where SPI in

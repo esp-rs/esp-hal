@@ -145,7 +145,7 @@ fn parse_configs(
     chip_from_args: Option<esp_metadata::Chip>,
     config_file: Option<&str>,
 ) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
-    let config_toml_path = path.join(config_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
+    let config_toml_path = path.join(config_file.unwrap_or(DEFAULT_CONFIG_PATH));
     let config_toml_content = std::fs::read_to_string(config_toml_path)?;
     let config_toml = config_toml_content.as_str().parse::<DocumentMut>()?;
 
