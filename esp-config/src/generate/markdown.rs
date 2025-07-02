@@ -3,8 +3,8 @@ use std::fmt::Write;
 use crate::{ConfigOption, Value};
 
 pub(crate) const DOC_TABLE_HEADER: &str = r#"
-| Name | Description | Default&nbsp;value | Allowed&nbsp;value |
-|------|-------------|--------------------|--------------------|
+| Option | Stability | Default&nbsp;value | Allowed&nbsp;values |
+|--------|:---------:|:------------------:|:-------------------:|
 "#;
 
 pub(crate) const SELECTED_TABLE_HEADER: &str = r#"
@@ -21,7 +21,7 @@ pub(crate) fn write_doc_table_line(mut table: impl Write, name: &str, option: &C
 
     writeln!(
         table,
-        "| <p>{key}</p><p>{stability}</p> | <p>{description}</p> | <center>{default}</center> | <center>{allowed}</center>",
+        "| <p>**{key}**</p> <p>{description}</p> | {stability} | {default} | {allowed}",
         description = option.description,
         key = name,
         stability = option.stability,
