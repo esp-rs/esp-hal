@@ -651,7 +651,8 @@ impl core::fmt::Display for ConfigError {
 
 /// SPI peripheral driver
 ///
-/// ### SPI Initialization
+/// ## Example
+///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::spi::Mode;
@@ -682,9 +683,23 @@ impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 impl<'d> Spi<'d, Blocking> {
     /// Constructs an SPI instance in 8bit dataframe mode.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// See [`Spi::apply_config`].
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
@@ -727,7 +742,10 @@ impl<'d> Spi<'d, Blocking> {
         Ok(this)
     }
 
-    /// Converts the SPI instance into async mode.
+    /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// See the [`Async`] documentation for an example on how to use this
+    /// method.
     pub fn into_async(mut self) -> Spi<'d, Async> {
         self.set_interrupt_handler(self.spi.info().async_handler);
         Spi {
@@ -816,7 +834,10 @@ impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
 }
 
 impl<'d> Spi<'d, Async> {
-    /// Converts the SPI instance into blocking mode.
+    /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// See the [`Blocking`] documentation for an example on how to use this
+    /// method.
     pub fn into_blocking(self) -> Spi<'d, Blocking> {
         self.spi.disable_peri_interrupt();
         Spi {
@@ -828,6 +849,26 @@ impl<'d> Spi<'d, Async> {
     }
 
     /// Waits for the completion of previous operations.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer_in_place_async(&mut buffer).await?;
+    /// spi.flush_async().await?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         self.driver().flush_async().await
     }
@@ -838,6 +879,25 @@ impl<'d> Spi<'d, Async> {
     /// amount of data may have been transferred before the Future is
     /// dropped. Dropping the future may block for a short while to ensure
     /// the transfer is aborted.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer_in_place_async(&mut buffer).await?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
@@ -903,6 +963,19 @@ where
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
         self.pins.sclk_pin = self.connect_output_pin(sclk.into(), self.driver().info.sclk);
 
@@ -917,6 +990,19 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_mosi(peripherals.GPIO1);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
         self.pins.sio0_pin = self.connect_sio_output_pin(mosi.into(), 0);
 
@@ -930,6 +1016,19 @@ where
     ///
     /// You want to use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_miso(peripherals.GPIO2);
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
         let miso = miso.into();
 
@@ -1022,12 +1121,46 @@ where
     )]
     /// or is below 70kHz,
     /// [`ConfigError::UnsupportedFrequency`] error will be returned.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?;
+    ///
+    /// spi.apply_config(&Config::default()
+    /// .with_frequency(Rate::from_khz(100)));
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
 
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let buffer = [0; 10];
+    /// spi.write(&buffer)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().write(words)?;
@@ -1038,6 +1171,25 @@ where
 
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.read(&mut buffer)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
@@ -1045,6 +1197,25 @@ where
 
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::spi::Mode;
+    /// # use esp_hal::spi::master::{Config, Spi};
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    /// .with_sck(peripherals.GPIO0)
+    /// .with_mosi(peripherals.GPIO1)
+    /// .with_miso(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer(&mut buffer)?;
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().transfer(words)
