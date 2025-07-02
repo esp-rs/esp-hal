@@ -118,16 +118,14 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    // stealing BT is safe since it is passed (as mutable reference or by
-    // value) into `init`
+    // stealing BT is safe since it is passed into `init`
     let mut bt = unsafe { BT::steal() };
     bt.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    // stealing BT is safe since it is passed (as mutable reference or by
-    // value) into `init`
+    // stealing BT is safe since it is passed into `init`
     let mut bt = unsafe { BT::steal() };
     bt.reset_rpa();
 }

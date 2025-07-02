@@ -305,8 +305,7 @@ static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 pub(crate) unsafe fn phy_enable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
     if count == 0 {
-        // stealing WIFI is safe since it is passed (as mutable reference or by
-        // value) into `init`
+        // stealing WIFI is safe since it is passed into `init`
         let clock_guard = unsafe { WIFI::steal() }.enable_phy_clock();
         core::mem::forget(clock_guard);
 
@@ -318,8 +317,7 @@ pub(crate) unsafe fn phy_enable_clock() {
 pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
     if count == 1 {
-        // stealing WIFI is safe since it is passed (as mutable reference or by
-        // value) into `init`
+        // stealing WIFI is safe since it is passed into `init`
         unsafe { WIFI::steal().decrease_phy_clock_ref_count() };
         trace!("phy_disable_clock done!");
     }
