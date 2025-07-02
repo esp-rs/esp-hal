@@ -997,8 +997,7 @@ where
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::spi::Mode;
     /// # use esp_hal::spi::master::{Config, Spi};
-    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_mosi(peripherals.GPIO1);
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_mosi(peripherals.GPIO1);
     ///
     /// # Ok(())
     /// # }
@@ -1023,8 +1022,7 @@ where
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::spi::Mode;
     /// # use esp_hal::spi::master::{Config, Spi};
-    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_miso(peripherals.GPIO2);
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_miso(peripherals.GPIO2);
     ///
     /// # Ok(())
     /// # }
@@ -1130,8 +1128,7 @@ where
     /// # use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?;
     ///
-    /// spi.apply_config(&Config::default()
-    /// .with_frequency(Rate::from_khz(100)));
+    /// spi.apply_config(&Config::default().with_frequency(Rate::from_khz(100)));
     ///
     /// # Ok(())
     /// # }
