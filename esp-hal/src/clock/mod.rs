@@ -603,20 +603,12 @@ impl Clocks {
 /// Tracks the number of references to the PHY clock.
 static PHY_CLOCK_REF_COUNTER: critical_section::Mutex<Cell<u8>> =
     critical_section::Mutex::new(Cell::new(0));
-
-// These functions are moved out of the trait to prevent monomorphization for
-// every modem clock controller. If that doens't really make sense, this can be
-// moved back.
-
 #[cfg(any(bt, ieee802154, wifi))]
 fn increase_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
         let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTER.borrow(cs);
         let phy_clock_ref_count = phy_clock_ref_counter.get();
 
-        // If other modems have reference to the PHY clock, but this one doesn't, the
-        // PHY clock will just be set to enabled again, which shouldn't have any
-        // effect.
         if phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(true);
         }
@@ -641,8 +633,9 @@ fn decrease_phy_clock_ref_count_internal() {
         phy_clock_ref_counter.set(new_phy_clock_ref_count);
     });
 }
-/// Do any common initial initialization needed for the radio clocks
 #[inline]
+#[instability::unstable]
+/// Do any common initial initialization needed for the radio clocks
 pub fn init_radio_clocks() {
     clocks_ll::init_clocks();
 }
