@@ -56,7 +56,7 @@ use esp_hal::timer::{AnyTimer, timg::Timer as TimgTimer};
 pub use macros::embassy_main as main;
 
 #[cfg(feature = "executors")]
-pub use self::executor::{Executor, InterruptExecutor};
+pub use self::executor::{Callbacks, Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, Timer};
 
 #[cfg(feature = "executors")]
