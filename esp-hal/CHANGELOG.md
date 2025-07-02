@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 - SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
+- The functions of the `RadioClockController` have been split up to the modem peripheral structs. The clock management is now provided by the `ModemClockController`. (#3687)
 
 ### Changed
 
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `InterruptHandler` no longer implements `PartialEq`, `Eq` or `Hash`. (#3650)
 - `gpio::NUM_PINS` (#3658)
+- `RADIO_CLK` and `RadioClockController` have been removed (#3687)
 
 ## [v1.0.0-beta.1] - 2025-06-03
 
