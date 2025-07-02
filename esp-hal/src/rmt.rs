@@ -238,7 +238,7 @@ use crate::{
         InputConfig,
         Level,
         OutputConfig,
-        interconnect::{PeripheralInput, PeripheralOutput},
+        interconnect::{PeripheralInput, PeripheralOutput, InputSignal, OutputSignal},
     },
     handler,
     peripherals::{Interrupt, RMT},
@@ -1392,11 +1392,6 @@ impl<Dir: Capability> RawChannelAccess for DynChannelAccess<Dir> {
     }
 }
 
-/// Alias for a type-erased channels configured for tx.
-pub type AnyTxChannel<'ch, Dm> = Channel<'ch, Dm, DynChannelAccess<Tx>>;
-/// Alias for a type-erased channels configured for rx.
-pub type AnyRxChannel<'ch, Dm> = Channel<'ch, Dm, DynChannelAccess<Rx>>;
-
 /// Channel configuration for TX channels
 #[derive(Debug, Copy, Clone, procmacros::BuilderLite)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1843,14 +1838,11 @@ where
 /// FIXME: docs
 pub trait TxChannelCreator<Dm: crate::DriverMode>: Sized {
     /// FIXME: docs
-    type Raw: TxChannelInternal;
-
-    /// FIXME: docs
     fn configure_tx<'pin>(
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Tx>, (Error, Self)>
     where
         Self: 'pin;
 }
@@ -1858,14 +1850,11 @@ pub trait TxChannelCreator<Dm: crate::DriverMode>: Sized {
 /// FIXME: docs
 pub trait RxChannelCreator<Dm: crate::DriverMode>: Sized {
     /// FIXME: docs
-    type Raw: RxChannelInternal;
-
-    /// FIXME: docs
     fn configure_rx<'pin>(
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Rx>, (Error, Self)>
     where
         Self: 'pin;
 }
@@ -1884,19 +1873,17 @@ where
     Dm: crate::DriverMode,
     Raw: Configure<Tx>,
 {
-    type Raw = <Raw as Configure<Tx>>::Configured;
-
     /// Configure the TX channel
     fn configure_tx<'pin>(
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Tx>, (Error, Self)>
     where
         Self: 'pin,
     {
-        let raw = self.raw.configure();
-        if let Err(e) = configure_tx_channel(raw, pin, config) {
+        let raw = self.raw.configure().degrade();
+        if let Err(e) = configure_tx_channel(raw, pin.into(), config) {
             return Err((e, self));
         };
         Ok(Channel::new(raw))
@@ -1908,19 +1895,17 @@ where
     Dm: crate::DriverMode,
     Raw: Configure<Rx>,
 {
-    type Raw = <Raw as Configure<Rx>>::Configured;
-
     /// Configure the RX channel
     fn configure_rx<'pin>(
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<'pin, Dm, Self::Raw>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Rx>, (Error, Self)>
     where
         Self: 'pin,
     {
-        let raw = self.raw.configure();
-        if let Err(e) = configure_rx_channel(raw, pin, config) {
+        let raw = self.raw.configure().degrade();
+        if let Err(e) = configure_rx_channel(raw, pin.into(), config) {
             return Err((e, self));
         };
         Ok(Channel::new(raw))
@@ -2014,8 +1999,8 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
 }
 
 fn configure_rx_channel<'d>(
-    raw: impl RxChannelInternal,
-    pin: impl PeripheralInput<'d>,
+    raw: DynChannelAccess<Rx>,
+    pin: InputSignal<'d>,
     config: RxChannelConfig,
 ) -> Result<(), Error> {
     let threshold = if cfg!(any(esp32, esp32s2)) {
@@ -2030,8 +2015,6 @@ fn configure_rx_channel<'d>(
 
     let memsize = MemSize::from_blocks(config.memsize);
     reserve_channel(raw.channel(), RmtState::RxIdle, memsize)?;
-
-    let pin = pin.into();
 
     pin.apply_input_config(&InputConfig::default());
     pin.set_input_enable(true);
@@ -2053,14 +2036,12 @@ fn configure_rx_channel<'d>(
 }
 
 fn configure_tx_channel<'d>(
-    raw: impl TxChannelInternal,
-    pin: impl PeripheralOutput<'d>,
+    raw: DynChannelAccess<Tx>,
+    pin: OutputSignal<'d>,
     config: TxChannelConfig,
 ) -> Result<(), Error> {
     let memsize = MemSize::from_blocks(config.memsize);
     reserve_channel(raw.channel(), RmtState::TxIdle, memsize)?;
-
-    let pin = pin.into();
 
     pin.apply_output_config(&OutputConfig::default());
     pin.set_output_enable(true);
@@ -2185,22 +2166,22 @@ use state::RmtState;
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Channel<'ch, Dm, Raw>
+pub struct Channel<'ch, Dm, Dir>
 where
     Dm: crate::DriverMode,
-    Raw: ChannelInternal,
+    Dir: Direction,
 {
-    raw: Raw,
+    raw: DynChannelAccess<Dir>,
     _rmt: PhantomData<Rmt<'ch, Dm>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, Raw> Channel<'_, Dm, Raw>
+impl<Dm, Dir> Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
-    Raw: ChannelInternal,
+    Dir: Direction
 {
-    fn new(raw: Raw) -> Self {
+    fn new(raw: DynChannelAccess<Dir>) -> Self {
         Self {
             raw,
             _rmt: core::marker::PhantomData,
@@ -2221,35 +2202,10 @@ where
     }
 }
 
-// Note that this is intentionally implemented even if Raw is DynChannelAccess
-// already for convenience!
-impl<'ch, Dm, Dir, Raw> Channel<'ch, Dm, Raw>
+impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
-    Raw: RawChannelAccess<Dir = Dir>,
-{
-    /// Consume the channel and return a type-erased version
-    pub fn degrade(self) -> Channel<'ch, Dm, DynChannelAccess<Dir>> {
-        use core::mem::ManuallyDrop;
-        // Disable Drop handler on self
-        let old = ManuallyDrop::new(self);
-        Channel {
-            raw: DynChannelAccess {
-                ch_idx: unsafe { ChannelIndex::from_u8_unchecked(old.raw.ch_idx()) },
-                _direction: PhantomData,
-            },
-            _rmt: PhantomData,
-            // FIXME: Don't clone, but move old._guard
-            _guard: old._guard.clone(),
-        }
-    }
-}
-
-impl<Dm, Raw> Drop for Channel<'_, Dm, Raw>
-where
-    Dm: crate::DriverMode,
-    Raw: ChannelInternal,
 {
     fn drop(&mut self) {
         let memsize = self.raw.memsize();
@@ -2276,13 +2232,12 @@ where
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-pub struct SingleShotTxTransaction<'a, Raw, E>
+pub struct SingleShotTxTransaction<'a, E>
 where
-    Raw: TxChannelInternal,
     E: Encoder,
 {
-    raw: Raw,
-    _phantom: PhantomData<&'a mut Raw>,
+    raw: DynChannelAccess<Tx>,
+    _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
 
     writer: RmtWriterOuter,
 
@@ -2291,9 +2246,8 @@ where
     data: E,
 }
 
-impl<Raw, E> SingleShotTxTransaction<'_, Raw, E>
+impl<E> SingleShotTxTransaction<'_, E>
 where
-    Raw: TxChannelInternal,
     E: Encoder,
 {
     fn poll_internal(&mut self) -> Option<Event> {
@@ -2355,9 +2309,8 @@ where
     }
 }
 
-impl<Raw, E> Drop for SingleShotTxTransaction<'_, Raw, E>
+impl<E> Drop for SingleShotTxTransaction<'_, E>
 where
-    Raw: TxChannelInternal,
     E: Encoder,
 {
     fn drop(&mut self) {
@@ -2379,12 +2332,12 @@ where
 }
 
 /// An in-progress continuous TX transaction
-pub struct ContinuousTxTransaction<'a, Raw: TxChannelInternal> {
-    raw: Raw,
-    _phantom: PhantomData<&'a mut Raw>,
+pub struct ContinuousTxTransaction<'a> {
+    raw: DynChannelAccess<Tx>,
+    _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
 }
 
-impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
+impl ContinuousTxTransaction<'_> {
     /// Stop transaction when the current iteration ends.
     pub fn stop_next(self) -> Result<(), Error> {
         let raw = self.raw;
@@ -2437,7 +2390,7 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<'_, Raw> {
     }
 }
 
-impl<Raw: TxChannelInternal> Drop for ContinuousTxTransaction<'_, Raw> {
+impl Drop for ContinuousTxTransaction<'_> {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not manually
         // stopped with `stop()` or `stop_next()`.
@@ -2519,10 +2472,9 @@ impl defmt::Format for BenchmarkResult {
     }
 }
 
-impl<Dm, Raw> Channel<'_, Dm, Raw>
+impl<Dm> Channel<'_, Dm, Tx>
 where
     Dm: crate::DriverMode,
-    Raw: TxChannelInternal,
 {
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
@@ -2647,9 +2599,6 @@ where
 
 /// Channel in TX mode
 pub trait TxChannel: Sized {
-    /// Channel identifier of the implementing channel.
-    type Raw: TxChannelInternal;
-
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
@@ -2657,7 +2606,7 @@ pub trait TxChannel: Sized {
     fn transmit<'a, T>(
         &mut self,
         data: &'a [T],
-    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, SliceEncoder<'a, T>>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, SliceEncoder<'a, T>>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -2668,7 +2617,7 @@ pub trait TxChannel: Sized {
     fn transmit_iter<I>(
         &mut self,
         data: I,
-    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, IterEncoder<I::IntoIter>>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, IterEncoder<I::IntoIter>>, Error>
     where
         I: IntoIterator<Item = PulseCode>,
     {
@@ -2679,7 +2628,7 @@ pub trait TxChannel: Sized {
     fn transmit_enc<E>(
         &mut self,
         data: E,
-    ) -> Result<SingleShotTxTransaction<'_, Self::Raw, E>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, E>, Error>
     where
         E: Encoder;
 
@@ -2692,7 +2641,7 @@ pub trait TxChannel: Sized {
         &mut self,
         loopcount: Option<NonZeroU16>,
         data: &'_ [T]
-    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -2704,7 +2653,7 @@ pub trait TxChannel: Sized {
         &mut self,
         loopcount: Option<NonZeroU16>,
         data: I,
-    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
         I: IntoIterator<Item = PulseCode>,
     {
@@ -2718,21 +2667,16 @@ pub trait TxChannel: Sized {
         &mut self,
         loopcount: Option<NonZeroU16>,
         data: E,
-    ) -> Result<ContinuousTxTransaction<'_, Self::Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
         E: Encoder;
 }
 
-impl<Raw> TxChannel for Channel<'_, Blocking, Raw>
-where
-    Raw: TxChannelInternal,
-{
-    type Raw = Raw;
-
+impl TxChannel for Channel<'_, Blocking, Tx> {
     fn transmit_enc<E>(
         &mut self,
         mut data: E,
-    ) -> Result<SingleShotTxTransaction<'_, Raw, E>, Error>
+    ) -> Result<SingleShotTxTransaction<'_, E>, Error>
     where
         E: Encoder,
     {
@@ -2765,7 +2709,7 @@ where
         &mut self,
         loopcount: Option<NonZeroU16>,
         mut data: E,
-    ) -> Result<ContinuousTxTransaction<'_, Raw>, Error>
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
         E: Encoder,
     {
@@ -2790,22 +2734,20 @@ where
 
 /// RX transaction instance
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-pub struct RxTransaction<'ch, Raw, D>
+pub struct RxTransaction<'ch, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder,
 {
-    raw: Raw,
-    _phantom: PhantomData<&'ch mut Raw>,
+    raw: DynChannelAccess<Rx>,
+    _phantom: PhantomData<&'ch mut DynChannelAccess<Rx>>,
 
     reader: RmtReaderOuter,
 
     data: D,
 }
 
-impl<Raw, D> RxTransaction<'_, Raw, D>
+impl<D> RxTransaction<'_, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder,
 {
     fn poll_internal(&mut self) -> Option<Event> {
@@ -2827,7 +2769,7 @@ where
                     self.reader.state = ReaderState::Done;
                 }
             }
-            Some(Event::Threshold) if Raw::supports_rx_wrap() => {
+            Some(Event::Threshold) if raw.supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
 
                 self.reader.read(&mut self.data, raw, false);
@@ -2870,9 +2812,8 @@ where
     }
 }
 
-impl<Raw, D> Drop for RxTransaction<'_, Raw, D>
+impl<D> Drop for RxTransaction<'_, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder,
 {
     fn drop(&mut self) {
@@ -2900,16 +2841,13 @@ where
 
 /// Channel is RX mode
 pub trait RxChannel: Sized {
-    /// Channel identifier of the implementing channel.
-    type Raw: RxChannelInternal;
-
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     fn receive<'ch, 'a, T>(
         &'ch mut self,
         data: &'a mut [T],
-    ) -> Result<RxTransaction<'ch, Self::Raw, SliceDecoder<'a, T>>, Error>
+    ) -> Result<RxTransaction<'ch, SliceDecoder<'a, T>>, Error>
     where
         T: From<PulseCode> + 'a
     {
@@ -2920,7 +2858,7 @@ pub trait RxChannel: Sized {
     fn receive_iter<'ch, 'a, D, T>(
         &'ch mut self,
         data: D,
-    ) -> Result<RxTransaction<'ch, Self::Raw, IterDecoder<'a, D::IntoIter, T>>, Error>
+    ) -> Result<RxTransaction<'ch, IterDecoder<'a, D::IntoIter, T>>, Error>
     where
         D: IntoIterator<Item = &'a mut T>,
         T: From<PulseCode> + 'a
@@ -2929,21 +2867,16 @@ pub trait RxChannel: Sized {
     }
 
     /// FIXME: Docs
-    fn receive_dec<D>(&mut self, data: D) -> Result<RxTransaction<'_, Self::Raw, D>, Error>
+    fn receive_dec<D>(&mut self, data: D) -> Result<RxTransaction<'_, D>, Error>
     where
         D: Decoder;
 }
 
-impl<Raw> RxChannel for Channel<'_, Blocking, Raw>
-where
-    Raw: RxChannelInternal,
-{
-    type Raw = Raw;
-
+impl RxChannel for Channel<'_, Blocking, Rx> {
     fn receive_dec<D>(
         &mut self,
         data: D,
-    ) -> Result<RxTransaction<'_, Raw, D>, Error>
+    ) -> Result<RxTransaction<'_, D>, Error>
     where
         D: Decoder,
     {
@@ -2970,25 +2903,17 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 // FIXME: This is essentially the same as SingleShotTxTransaction. Is it
 // possible to share most of the code?
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, Raw, E>
-where
-    Raw: TxChannelInternal,
-    E: Encoder,
-{
-    raw: Raw,
-    _phantom: PhantomData<(&'a mut Raw, E)>,
+struct RmtTxFuture<'a> {
+    raw: DynChannelAccess<Tx>,
+    _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
 
     writer: RmtWriterOuter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: E,
+    data: &'a mut (dyn Encoder + Unpin),
 }
 
-impl<Raw, E> Future for RmtTxFuture<'_, Raw, E>
-where
-    Raw: TxChannelInternal,
-    E: Encoder + Unpin,
-{
+impl Future for RmtTxFuture<'_> {
     type Output = Result<(), Error>;
 
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -3063,11 +2988,7 @@ where
     }
 }
 
-impl<Raw, E> Drop for RmtTxFuture<'_, Raw, E>
-where
-    Raw: TxChannelInternal,
-    E: Encoder,
-{
+impl Drop for RmtTxFuture<'_> {
     fn drop(&mut self) {
         let raw = self.raw;
 
@@ -3118,10 +3039,7 @@ pub trait TxChannelAsync {
         E: Encoder + Unpin;
 }
 
-impl<Raw> TxChannelAsync for Channel<'_, Async, Raw>
-where
-    Raw: TxChannelInternal,
-{
+impl TxChannelAsync for Channel<'_, Async, Tx> {
     fn transmit_enc<E>(&mut self, data: E) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
@@ -3162,22 +3080,20 @@ where
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a, Raw, D>
+struct RmtRxFuture<'a, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder + Unpin,
 {
-    raw: Raw,
-    _phantom: PhantomData<&'a mut Raw>,
+    raw: DynChannelAccess<Rx>,
+    _phantom: PhantomData<&'a mut DynChannelAccess<Rx>>,
 
     reader: RmtReaderOuter,
 
     data: D,
 }
 
-impl<'a, Raw, D> Future for RmtRxFuture<'a, Raw, D>
+impl<'a, D> Future for RmtRxFuture<'a, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder + Unpin,
 {
     type Output = Result<usize, Error>;
@@ -3198,7 +3114,7 @@ where
 
                 Ok(this.reader.total)
             }
-            Some(Event::Threshold) if Raw::supports_rx_wrap() => {
+            Some(Event::Threshold) if raw.supports_rx_wrap() => {
                 raw.reset_rx_threshold_set();
 
                 if this.reader.state == ReaderState::Active {
@@ -3223,9 +3139,8 @@ where
     }
 }
 
-impl<'a, Raw, D> Drop for RmtRxFuture<'a, Raw, D>
+impl<'a, D> Drop for RmtRxFuture<'a, D>
 where
-    Raw: RxChannelInternal,
     D: Decoder + Unpin,
 {
     fn drop(&mut self) {
@@ -3278,10 +3193,7 @@ pub trait RxChannelAsync {
         D: Decoder + Unpin;
 }
 
-impl<Raw> RxChannelAsync for Channel<'_, Async, Raw>
-where
-    Raw: RxChannelInternal,
-{
+impl RxChannelAsync for Channel<'_, Async, Rx> {
     fn receive_dec<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<usize, Error>>
     where
         Self: Sized,
@@ -3309,7 +3221,7 @@ where
 // #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
-    fn on_tx(raw: &impl RawChannelAccess<Dir = Tx>, event: Event) {
+    fn on_tx(raw: DynChannelAccess<Tx>, event: Event) {
         let events_to_unlisten = match event {
             Event::End | Event::Error => Event::End | Event::Error | Event::Threshold,
             // The RmtTxFuture will wnable the threshold interrupt again if required
@@ -3320,7 +3232,7 @@ fn async_interrupt_handler() {
         WAKER[raw.channel() as usize].wake();
     }
 
-    fn on_rx(raw: &impl RawChannelAccess<Dir = Rx>, event: Event) {
+    fn on_rx(raw: DynChannelAccess<Rx>, event: Event) {
         let events_to_unlisten = match event {
             Event::End | Event::Error => Event::End | Event::Error | Event::Threshold,
             // The RmtRxFuture will wnable the threshold interrupt again if required
@@ -3430,7 +3342,7 @@ pub trait RxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Rx> {
 
     fn clear_rx_interrupts(&self);
 
-    fn supports_rx_wrap() -> bool;
+    fn supports_rx_wrap(&self) -> bool;
 
     fn set_rx_wrap_mode(&self, wrap: bool);
 
@@ -3579,8 +3491,8 @@ mod chip_specific {
 
     #[allow(unused)]
     pub(super) fn handle_channel_interrupts(
-        on_tx: fn(&DynChannelAccess<Tx>, Event),
-        on_rx: fn(&DynChannelAccess<Rx>, Event),
+        on_tx: fn(DynChannelAccess<Tx>, Event),
+        on_rx: fn(DynChannelAccess<Rx>, Event),
     ) {
         let st = RMT::regs().int_st().read();
 
@@ -3596,7 +3508,7 @@ mod chip_specific {
             };
 
             let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-            on_tx(&raw, event);
+            on_tx(raw, event);
         }
 
         for ch_idx in ChannelIndex::iter_all() {
@@ -3611,7 +3523,7 @@ mod chip_specific {
             };
 
             let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-            on_rx(&raw, event);
+            on_rx(raw, event);
         }
     }
 
@@ -3852,7 +3764,8 @@ mod chip_specific {
             });
         }
 
-        fn supports_rx_wrap() -> bool {
+        #[inline(always)]
+        fn supports_rx_wrap(&self) -> bool {
             true
         }
 
@@ -4039,8 +3952,8 @@ mod chip_specific {
 
     #[allow(unused)]
     pub(super) fn handle_channel_interrupts(
-        on_tx: fn(&DynChannelAccess<Tx>, Event),
-        on_rx: fn(&DynChannelAccess<Rx>, Event),
+        on_tx: fn(DynChannelAccess<Tx>, Event),
+        on_rx: fn(DynChannelAccess<Rx>, Event),
     ) {
         let st = RMT::regs().int_st().read();
 
@@ -4068,10 +3981,10 @@ mod chip_specific {
 
             if is_tx {
                 let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                on_tx(&raw, event);
+                on_tx(raw, event);
             } else {
                 let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                on_rx(&raw, event);
+                on_rx(raw, event);
             }
         }
     }
@@ -4291,7 +4204,8 @@ mod chip_specific {
             });
         }
 
-        fn supports_rx_wrap() -> bool {
+        #[inline(always)]
+        fn supports_rx_wrap(&self) -> bool {
             false
         }
 

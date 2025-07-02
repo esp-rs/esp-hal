@@ -10,13 +10,14 @@ use esp_hal::{
     DriverMode,
     gpio::{Input, InputPin, Level, NoPin, OutputPin},
     rmt::{
-        AnyRxChannel,
-        AnyTxChannel,
+        Channel,
         Error,
         PulseCode,
         Rmt,
+        Rx,
         RxChannelConfig,
         RxChannelCreator,
+        Tx,
         TxChannelConfig,
         TxChannelCreator,
     },
@@ -42,13 +43,12 @@ fn setup<'a, Dm: DriverMode + 'static>(
     tx: impl OutputPin + 'a,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (AnyTxChannel<'a, Dm>, AnyRxChannel<'a, Dm>) {
+) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
         .map_err(|(e, _c)| e)
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
