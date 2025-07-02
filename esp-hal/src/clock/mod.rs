@@ -629,7 +629,11 @@ fn decrease_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
         let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTERS.borrow(cs);
 
-        let new_phy_clock_ref_count = phy_clock_ref_counter.get().checked_sub(1).expect("PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used ModemClockController::decrease_phy_clock_ref_count incorrectly.");
+        let new_phy_clock_ref_count = unwrap!(phy_clock_ref_counter
+            .get()
+            .checked_sub(1), 
+            "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used ModemClockController::decrease_phy_clock_ref_count incorrectly."
+        );
 
         if new_phy_clock_ref_count == 0 {
             clocks_ll::enable_phy(false);
@@ -688,11 +692,8 @@ pub trait ModemClockController<'d>: Sealed + 'd {
 
     /// Unsafely decrease the PHY clock reference count for this modem.
     ///
-    /// # Safety
-    /// Calling this is only safe, if you previously [core::mem::forget] a
-    /// [PhyClockGuard], since otherwise the reference counting would be
-    /// left in an invalid state. In practice this would mean, that any
-    /// PhyClockGuard getting dropped could now panic.
+    /// # Panics
+    /// If the ref count is lower than the number of [PhyClockGuard]s, dropping a guard can now panic.
     fn decrease_phy_clock_ref_count(&self) {
         decrease_phy_clock_ref_count_internal();
     }
