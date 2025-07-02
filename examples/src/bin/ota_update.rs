@@ -47,6 +47,7 @@ static OTA_IMAGE: &[u8] = include_bytes!("../../target/ota_image");
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut storage = esp_storage::FlashStorage::new();

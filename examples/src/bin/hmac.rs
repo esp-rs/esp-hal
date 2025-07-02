@@ -75,6 +75,7 @@ type HmacSha256 = HmacSw<Sha256>;
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut rng = Rng::new(peripherals.RNG);

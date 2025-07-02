@@ -36,6 +36,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     esp_println::println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
 

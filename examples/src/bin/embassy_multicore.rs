@@ -52,6 +52,7 @@ async fn control_led(
 
 #[esp_hal_embassy::main]
 async fn main(_spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

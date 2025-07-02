@@ -57,7 +57,7 @@ const DMA_CHUNK_SIZE: usize = 4096 - DMA_ALIGNMENT as usize;
 
 #[main]
 fn main() -> ! {
-    esp_println::logger::init_logger(log::LevelFilter::Info);
+    esp_println::logger::init_logger_from_env();
     info!("Starting SPI loopback test");
     let peripherals = esp_hal::init(esp_hal::Config::default());
     esp_alloc::psram_allocator!(peripherals.PSRAM, esp_hal::psram);

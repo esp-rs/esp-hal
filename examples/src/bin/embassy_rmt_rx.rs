@@ -40,6 +40,7 @@ async fn signal_task(mut pin: Output<'static>) {
 
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
+    esp_println::logger::init_logger_from_env();
     println!("Init!");
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
