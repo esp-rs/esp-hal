@@ -176,7 +176,7 @@
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 #![no_std]
 
 // MUST be the first module

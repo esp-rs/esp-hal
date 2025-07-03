@@ -1,14 +1,15 @@
+#![cfg_attr(docsrs, procmacros::insert_doc_snippet(
+    "etm_availability" => {
+        cfg(soc_has_etm) => "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
+    }
+))]
 //! # General Purpose Input/Output (GPIO)
 //!
 //! ## Overview
 //!
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
-#![cfg_attr(
-    soc_has_etm,
-    doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
-)]
-#![doc = ""]
+//! #{etm_availability}
 //! ## Working with pins
 //!
 //! After initializing the HAL, you can access the individual pins using the

@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use proc_macro::TokenStream;
+use proc_macro2::TokenStream as TokenStream2;
 use syn::{
+    AttrStyle,
     Attribute,
     Expr,
     Item,
@@ -12,29 +14,48 @@ use syn::{
     Token,
     braced,
     parse::Parse,
-    parse_quote,
     punctuated::Punctuated,
     spanned::Spanned,
     token,
 };
 
 struct Replacements {
-    replacements: HashMap<String, Vec<Attribute>>,
+    replacements: HashMap<String, Vec<TokenStream2>>,
 }
 
 impl Replacements {
-    fn get(&self, line: &str) -> Option<Vec<Attribute>> {
-        let tokens = match line {
-            "#{before_snippet}" => vec![syn::parse_quote! {
+    fn get(&self, line: &str, outer: bool) -> Option<Vec<Attribute>> {
+        let attributes = match line {
+            "#{before_snippet}" if outer => vec![syn::parse_quote! {
                 #[doc = crate::before_snippet!()]
             }],
-            "#{after_snippet}" => vec![syn::parse_quote! {
+            "#{before_snippet}" => vec![syn::parse_quote! {
+                #![doc = crate::before_snippet!()]
+            }],
+            "#{after_snippet}" if outer => vec![syn::parse_quote! {
                 #[doc = crate::after_snippet!()]
             }],
-            _ => return self.replacements.get(line).cloned(),
+            "#{after_snippet}" => vec![syn::parse_quote! {
+                #![doc = crate::after_snippet!()]
+            }],
+            _ => {
+                let lines = self.replacements.get(line).cloned()?;
+
+                let mut attrs = vec![];
+
+                for line in lines {
+                    if outer {
+                        attrs.push(syn::parse_quote! { #[ #line ] });
+                    } else {
+                        attrs.push(syn::parse_quote! { #![ #line ] });
+                    }
+                }
+
+                attrs
+            }
         };
 
-        Some(tokens)
+        Some(attributes)
     }
 }
 
@@ -45,8 +66,8 @@ impl Parse for Replacements {
             let args = Punctuated::<Replacement, Token![,]>::parse_terminated(input)?;
             for arg in args {
                 let replacement = match arg.replacement {
-                    ReplacementKind::Literal(expr) => vec![parse_quote! {
-                        #[doc = #expr]
+                    ReplacementKind::Literal(expr) => vec![quote::quote! {
+                        doc = #expr
                     }],
                     ReplacementKind::Choice(items) => {
                         let mut branches = vec![];
@@ -59,13 +80,13 @@ impl Parse for Replacements {
                                     let condition = cfg.tokens;
 
                                     cfgs.push(condition.clone());
-                                    branches.push(syn::parse_quote! {
-                                        #[cfg_attr(#condition, doc = #body)]
+                                    branches.push(quote::quote! {
+                                        cfg_attr(#condition, doc = #body)
                                     });
                                 }
                                 None => {
-                                    branches.push(syn::parse_quote! {
-                                        #[cfg_attr(not(any( #(#cfgs),*) ), doc = #body)]
+                                    branches.push(quote::quote! {
+                                        cfg_attr(not(any( #(#cfgs),*) ), doc = #body)
                                     });
                                 }
                                 _ => {
@@ -179,7 +200,9 @@ pub(crate) fn insert(attr: TokenStream, input: TokenStream) -> TokenStream {
                     in_code_block = true;
                     replacement_attrs.push(attr.clone());
                 }
-            } else if let Some(replacement) = replacements.get(&doc_line) {
+            } else if let Some(replacement) =
+                replacements.get(&doc_line, attr.style == AttrStyle::Outer)
+            {
                 replacement_attrs.extend(replacement);
             } else {
                 replacement_attrs.push(attr.clone());
@@ -205,6 +228,7 @@ impl ItemLike for Item {
             Item::Struct(item_struct) => &mut item_struct.attrs,
             Item::Enum(item_enum) => &mut item_enum.attrs,
             Item::Trait(item_trait) => &mut item_trait.attrs,
+            Item::Mod(module) => &mut module.attrs,
             _ => panic!("Unsupported item type for switch macro"),
         }
     }
