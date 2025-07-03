@@ -45,3 +45,8 @@ options:
   constraints:
     - type:
         validator: positive_integer
+
+- name: low-power-wait-stats
+  description: Enables statistics for the low-power wait feature. Needs the `low-power-wait` config option to be enabled
+  default:
+    - value: true

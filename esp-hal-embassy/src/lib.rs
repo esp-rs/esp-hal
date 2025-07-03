@@ -55,6 +55,8 @@ mod fmt;
 use esp_hal::timer::{AnyTimer, timg::Timer as TimgTimer};
 pub use macros::embassy_main as main;
 
+#[cfg(all(low_power_wait, low_power_wait_stats, feature = "executors"))]
+pub use self::executor::thread_low_power_wait_stats::ThreadLowPowerWaitStats;
 #[cfg(feature = "executors")]
 pub use self::executor::{Executor, InterruptExecutor};
 use self::time_driver::{EmbassyTimer, Timer};
