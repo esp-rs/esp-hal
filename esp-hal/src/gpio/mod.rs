@@ -80,6 +80,8 @@ pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
 
+#[cfg(feature = "rt")]
+use crate::peripherals::Interrupt;
 pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
@@ -88,9 +90,6 @@ use crate::{
     private::{self, Sealed},
     sync::RawMutex,
 };
-#[cfg(feature = "rt")]
-use crate::peripherals::Interrupt;
-
 
 pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 

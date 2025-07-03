@@ -160,6 +160,19 @@
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
+//! ## Library usage
+//!
+//! If you intend to write a library that uses esp-hal, you should import it as follows:
+//!
+//! ```toml
+//! [dependencies]
+//! esp-hal = { version = "1", default-features = false } }
+//! ```
+//!
+//! This ensures that the `rt` feature is not enabled, nor any chip features. The application that
+//! uses your library will then be able to choose the chip feature it needs and enable `rt` such
+//! that only the final user application calls [`init`].
+//!
 //! [documentation]: https://docs.espressif.com/projects/rust/esp-hal/latest/
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/

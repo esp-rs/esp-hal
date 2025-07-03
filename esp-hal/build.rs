@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use esp_config::{generate_config_from_yaml_definition, Value};
+use esp_config::{Value, generate_config_from_yaml_definition};
 use esp_metadata::{Chip, Config};
 
 #[macro_export]
