@@ -768,6 +768,120 @@ struct RmtWriterOuter {
     last_code: PulseCode,
 }
 
+trait EncoderExt {
+    fn write(&mut self, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>);
+}
+
+impl<E: Encoder + ?Sized> EncoderExt for E {
+    // TODO: better check that hw ptr matches expectation when done! that also helps
+    // with underruns
+    // FIXME: This doesn't work for continuous tx that uses the full buffer!!!
+    #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn write(&mut self, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
+        let memsize = raw.memsize().codes();
+        let offset = usize::from(writer.offset);
+        let ram_start = raw.channel_ram_start();
+
+        // For memsize = 2n
+        // - offset = n - 1  -> n = 2n - ((n - 1) + 1)
+        // - offset = 2n - 1 -> 0 = 2n - ((2n - 1) + 1)
+        let start_offset = memsize - (offset + 1);
+        let start0 = unsafe { ram_start.add(start_offset) };
+
+        // Don't call next() on data again if done!
+        if writer.state == WriterState::DoneNeedEndMarker {
+            // Write last_code and an end marker
+            writer.state = WriterState::DoneNoEnd;
+            unsafe { ram_start.add(offset).write_volatile(writer.last_code) };
+            unsafe { start0.write_volatile(PulseCode::end_marker()) };
+            return;
+        } else if writer.state != WriterState::Active {
+            return;
+        }
+
+        unsafe { ram_start.add(offset).write_volatile(writer.last_code) };
+
+        // FIXME: debug_assert that the current hw read addr is in the part of RAM that
+        // we don't overwrite
+
+        debug_assert!(offset == 0 || offset == memsize / 2 - 1 || offset == memsize - 1);
+        debug_assert!(start_offset == 0 || start_offset == memsize / 2);
+
+        // let count0 = core::hint::select_unpredictable(writer.written == 0, memsize, memsize / 2);
+        let count0 = if writer.written == 0 { memsize } else { memsize / 2 };
+
+        // FIXME: Restructure such that `internal` is passed by registers/included in the
+        // monomorphized code while not leading to dead code in vtables!!
+        let mut internal = RmtWriterInner {
+            last_code: writer.last_code,
+            ptr: start0,
+            start: start0,
+            end: unsafe { start0.add(count0) },
+        };
+
+        let done = self.encode(&mut internal);
+
+        debug_assert!(internal.ptr.addr() >= internal.start.addr());
+        debug_assert!(internal.ptr.addr() <= internal.end.addr());
+
+        let written = unsafe { internal.ptr.offset_from(internal.start) } as usize;
+        writer.written += written;
+        writer.last_code = internal.last_code;
+
+        // Write an extra end marker to detect underruns.
+        // Do not increment the offset or written afterwards since we want to overwrite
+        // it in the next call
+
+        if done.is_break() {
+            let has_end = writer.last_code.is_end_marker();
+            // Encoder explicitly stated that it's done
+            if writer.written == 0 {
+                writer.state = WriterState::Empty;
+            } else if internal.ptr < internal.end {
+                writer.state = if has_end { WriterState::Done } else { WriterState::DoneNoEnd };
+                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+            } else if writer.last_code.is_end_marker() {
+                writer.state = WriterState::Done;
+            } else {
+                // Will write last_code and an end marker in the next call
+                internal.ptr = unsafe { internal.ptr.sub(1) };
+                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+                writer.state = WriterState::DoneNeedEndMarker;
+            }
+        } else if internal.ptr < internal.end {
+            // Encoder exhausted
+            writer.state = if writer.written > 0 { WriterState::Done } else { WriterState::Empty };
+            if !writer.last_code.is_end_marker() {
+                writer.state = WriterState::DoneNoEnd;
+            }
+            // There might already be an end marker, but since we have space
+            // left in the buffer, just write another one without bothering
+            // to ensure that tx will stop.
+            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+        } else {
+            // Not done
+            debug_assert!(internal.ptr > internal.start);
+            internal.ptr = unsafe { internal.ptr.sub(1) };
+            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
+        };
+
+        writer.offset = unsafe { internal.ptr.offset_from(ram_start) } as u16;
+
+        // When we're done, the pointer can point anywhere depending on the data length.
+        // Otherwise, it should point at the last entry of either half of the channel
+        // RAM.
+        if writer.state == WriterState::Active {
+            debug_assert!(writer.written % (memsize / 2) == 0);
+        }
+        debug_assert!(
+            writer.state != WriterState::Active
+                || usize::from(writer.offset) == memsize / 2 - 1
+                || usize::from(writer.offset) == memsize - 1
+        );
+    }
+}
+
 impl RmtWriterOuter {
     fn new(raw: impl ChannelInternal) -> Self {
         Self {
@@ -791,115 +905,6 @@ impl RmtWriterOuter {
             // Unexpectedly not done
             WriterState::Active | WriterState::DoneNeedEndMarker => Err(Error::TransmissionError),
         }
-    }
-
-    // TODO: better check that hw ptr matches expectation when done! that also helps
-    // with underruns
-    // FIXME: This doesn't work for continuous tx that uses the full buffer!!!
-    // Always inline the wrapper function...
-    #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn write(&mut self, data: &mut dyn Encoder, raw: DynChannelAccess<Tx>) {
-        let memsize = raw.memsize().codes();
-        let offset = usize::from(self.offset);
-        let ram_start = raw.channel_ram_start();
-
-        // For memsize = 2n
-        // - offset = n - 1  -> n = 2n - ((n - 1) + 1)
-        // - offset = 2n - 1 -> 0 = 2n - ((2n - 1) + 1)
-        let start_offset = memsize - (offset + 1);
-        let start0 = unsafe { ram_start.add(start_offset) };
-
-        // Don't call next() on data again if done!
-        if self.state == WriterState::DoneNeedEndMarker {
-            // Write last_code and an end marker
-            self.state = WriterState::DoneNoEnd;
-            unsafe { ram_start.add(offset).write_volatile(self.last_code) };
-            unsafe { start0.write_volatile(PulseCode::end_marker()) };
-            return;
-        } else if self.state != WriterState::Active {
-            return;
-        }
-
-        unsafe { ram_start.add(offset).write_volatile(self.last_code) };
-
-        // FIXME: debug_assert that the current hw read addr is in the part of RAM that
-        // we don't overwrite
-
-        debug_assert!(offset == 0 || offset == memsize / 2 - 1 || offset == memsize - 1);
-        debug_assert!(start_offset == 0 || start_offset == memsize / 2);
-
-        // let count0 = core::hint::select_unpredictable(self.written == 0, memsize, memsize / 2);
-        let count0 = if self.written == 0 { memsize } else { memsize / 2 };
-
-        // FIXME: Restructure such that `internal` is passed by registers/included in the
-        // monomorphized code while not leading to dead code in vtables!!
-        let mut internal = RmtWriterInner {
-            last_code: self.last_code,
-            ptr: start0,
-            start: start0,
-            end: unsafe { start0.add(count0) },
-        };
-
-        let done = data.encode(&mut internal);
-
-        debug_assert!(internal.ptr.addr() >= internal.start.addr());
-        debug_assert!(internal.ptr.addr() <= internal.end.addr());
-
-        let written = unsafe { internal.ptr.offset_from(internal.start) } as usize;
-        self.written += written;
-        self.last_code = internal.last_code;
-
-        // Write an extra end marker to detect underruns.
-        // Do not increment the offset or written afterwards since we want to overwrite
-        // it in the next call
-
-        if done.is_break() {
-            let has_end = self.last_code.is_end_marker();
-            // Encoder explicitly stated that it's done
-            if self.written == 0 {
-                self.state = WriterState::Empty;
-            } else if internal.ptr < internal.end {
-                self.state = if has_end { WriterState::Done } else { WriterState::DoneNoEnd };
-                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-            } else if self.last_code.is_end_marker() {
-                self.state = WriterState::Done;
-            } else {
-                // Will write last_code and an end marker in the next call
-                internal.ptr = unsafe { internal.ptr.sub(1) };
-                unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-                self.state = WriterState::DoneNeedEndMarker;
-            }
-        } else if internal.ptr < internal.end {
-            // Encoder exhausted
-            self.state = if self.written > 0 { WriterState::Done } else { WriterState::Empty };
-            if !self.last_code.is_end_marker() {
-                self.state = WriterState::DoneNoEnd;
-            }
-            // There might already be an end marker, but since we have space
-            // left in the buffer, just write another one without bothering
-            // to ensure that tx will stop.
-            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-        } else {
-            // Not done
-            debug_assert!(internal.ptr > internal.start);
-            internal.ptr = unsafe { internal.ptr.sub(1) };
-            unsafe { internal.ptr.write_volatile(PulseCode::end_marker()) }
-        };
-
-        self.offset = unsafe { internal.ptr.offset_from(ram_start) } as u16;
-
-        // When we're done, the pointer can point anywhere depending on the data length.
-        // Otherwise, it should point at the last entry of either half of the channel
-        // RAM.
-        if self.state == WriterState::Active {
-            debug_assert!(self.written % (memsize / 2) == 0);
-        }
-        debug_assert!(
-            self.state != WriterState::Active
-                || usize::from(self.offset) == memsize / 2 - 1
-                || usize::from(self.offset) == memsize - 1
-        );
     }
 }
 
@@ -2057,7 +2062,7 @@ where
             raw.reset_tx_threshold_set();
 
             // re-fill TX RAM
-            self.writer.write(&mut self.data, raw.degrade());
+            self.data.write(&mut self.writer, raw);
         }
 
         status
@@ -2340,10 +2345,8 @@ where
             }
         };
 
-        // FIXME: Add WriterState.is_done() for this check!
-        // while !writer.is_done() {
-        while writer.state == WriterState::Active {
-            writer.write(&mut encoder, raw.degrade());
+        while !writer.is_done() {
+            encoder.write(&mut writer, raw.degrade());
             sum_codes(&writer);
         }
 
@@ -2367,9 +2370,8 @@ where
             let mut encoder = data.clone();
             writer = RmtWriterOuter::new(raw);
 
-            // while !writer.is_done() {
-            while writer.state == WriterState::Active {
-                writer.write(&mut encoder, raw.degrade());
+            while !writer.is_done() {
+                encoder.write(&mut writer, raw.degrade());
             }
             assert!(writer.written == total);
             iterations += 1;
@@ -2431,7 +2433,7 @@ impl Channel<'_, Blocking, Tx> {
         let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new(raw);
-        writer.write(&mut data, raw.degrade());
+        data.write(&mut writer, raw.degrade());
 
         if writer.state == WriterState::Empty {
             return Err(Error::InvalidArgument);
@@ -2492,7 +2494,7 @@ impl Channel<'_, Blocking, Tx> {
         let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new(raw);
-        writer.write(&mut data, raw.degrade());
+        data.write(&mut writer, raw.degrade());
 
         match writer.state {
             WriterState::Empty => return Err(Error::InvalidArgument),
@@ -2687,7 +2689,7 @@ struct RmtTxFuture<'a> {
     writer: RmtWriterOuter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: &'a mut (dyn Encoder + Unpin),
+    data: &'a mut (dyn EncoderExt + Unpin),
 }
 
 impl Future for RmtTxFuture<'_> {
@@ -2714,7 +2716,7 @@ impl Future for RmtTxFuture<'_> {
                 raw.reset_tx_threshold_set();
 
                 // re-fill TX RAM
-                this.writer.write(this.data, raw.degrade());
+                this.data.write(&mut this.writer, raw);
 
                 if !this.writer.is_done() {
                     raw.listen_tx_interrupt(Event::Threshold);
@@ -2790,7 +2792,7 @@ impl Channel<'_, Async, Tx> {
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn transmit_inner(&mut self, data: &mut (dyn Encoder + Unpin)) -> impl Future<Output = Result<(), Error>>
+    fn transmit_inner(&mut self, data: &mut (dyn EncoderExt + Unpin)) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         // FIXME: Is being Unpin a significant restriction for the iterator?
@@ -2806,7 +2808,7 @@ impl Channel<'_, Async, Tx> {
             data,
         };
 
-        fut.writer.write(fut.data, raw.degrade());
+        fut.data.write(&mut fut.writer, raw.degrade());
 
         // Error cases; the future will return the error on the first call to poll()
         if fut.writer.state == WriterState::Empty {
