@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added simplified conditional documentation using the `#[enable_doc_switch]` macro (#3630)
 - `error!` and `warning!` (moved from `esp-build`) (#3645)
+- Added `insert_doc_snippet` macro (#?)
 
 ### Changed
 

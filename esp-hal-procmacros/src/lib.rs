@@ -49,6 +49,7 @@ mod blocking;
 mod builder;
 #[cfg(feature = "embassy")]
 mod embassy;
+mod insert_snippet;
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -140,6 +141,17 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
     switch::enable_doc_switch(args, input)
+}
+
+/// Inserts the `before_snippet!` macro at the start of comment blocks in doc
+/// comments.
+///
+/// The purpose of this macro is to enable us to extract boilerplate, while at
+/// the same time let rustfmt format code blocks. This macro rewrites _all_ code
+/// blocks in the current item's documentation.
+#[proc_macro_attribute]
+pub fn insert_doc_snippet(args: TokenStream, input: TokenStream) -> TokenStream {
+    insert_snippet::insert(args, input)
 }
 
 /// Mark a function as an interrupt handler.

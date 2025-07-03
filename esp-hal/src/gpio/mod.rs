@@ -922,6 +922,7 @@ pub struct Output<'d> {
 impl private::Sealed for Output<'_> {}
 
 impl<'d> Output<'d> {
+    #[procmacros::insert_doc_snippet]
     /// Creates a new GPIO output driver.
     ///
     /// The `initial_level` parameter sets the initial output level of the pin.
@@ -935,9 +936,10 @@ impl<'d> Output<'d> {
     /// the pin is low.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Output, OutputConfig};
-    /// use esp_hal::delay::Delay;
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     gpio::{Level, Output, OutputConfig},
+    /// };
     ///
     /// fn blink_once(led: &mut Output<'_>, delay: &mut Delay) {
     ///     led.set_low();
@@ -1087,6 +1089,7 @@ pub struct Input<'d> {
 impl private::Sealed for Input<'_> {}
 
 impl<'d> Input<'d> {
+    #[procmacros::insert_doc_snippet]
     /// Creates a new GPIO input.
     ///
     /// The `pull` parameter configures internal pull-up or pull-down
@@ -1099,9 +1102,10 @@ impl<'d> Input<'d> {
     /// when the button is pressed.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Input, InputConfig, Pull};
-    /// use esp_hal::delay::Delay;
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     gpio::{Input, InputConfig, Level, Pull},
+    /// };
     ///
     /// fn print_when_pressed(button: &mut Input<'_>, delay: &mut Delay) {
     ///     let mut was_pressed = false;
@@ -1135,6 +1139,7 @@ impl<'d> Input<'d> {
         Self { pin }
     }
 
+    #[procmacros::insert_doc_snippet]
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1144,7 +1149,6 @@ impl<'d> Input<'d> {
     /// [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
     /// # use esp_hal::gpio::{Input, InputConfig, Pull};
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
@@ -1181,6 +1185,7 @@ impl<'d> Input<'d> {
         self.pin.apply_input_config(config)
     }
 
+    #[procmacros::insert_doc_snippet]
     /// Listen for interrupts.
     ///
     /// The interrupts will be handled by the handler set using
@@ -1197,8 +1202,7 @@ impl<'d> Input<'d> {
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Event, Input, InputConfig, Pull, Io};
+    /// use esp_hal::gpio::{Event, Input, InputConfig, Io, Pull};
     ///
     /// let mut io = Io::new(peripherals.IO_MUX);
     /// io.set_interrupt_handler(handler);
@@ -1223,12 +1227,12 @@ impl<'d> Input<'d> {
     ///
     /// # use esp_hal::gpio::Input;
     /// use core::cell::RefCell;
+    ///
     /// use critical_section::Mutex;
     ///
     /// // You will need to store the `Input` object in a static variable so
     /// // that the interrupt handler can access it.
-    /// static BUTTON: Mutex<RefCell<Option<Input>>> =
-    ///     Mutex::new(RefCell::new(None));
+    /// static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
     ///
     /// #[handler]
     /// fn handler() {
