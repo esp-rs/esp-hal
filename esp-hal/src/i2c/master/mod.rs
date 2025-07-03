@@ -621,7 +621,8 @@ impl Default for Config {
 
 /// I2C driver
 ///
-/// ### I2C initialization and communication with the device
+/// ## Example
+///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
 /// # use esp_hal::i2c::master::{Config, I2c};
@@ -687,10 +688,25 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
 impl<'d> I2c<'d, Blocking> {
     /// Create a new I2C instance.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// let i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
 
@@ -713,7 +729,10 @@ impl<'d> I2c<'d, Blocking> {
         Ok(i2c)
     }
 
-    /// Configures the I2C peripheral to operate in asynchronous mode.
+    /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// See the [`Async`] documentation for an example on how to use this
+    /// method.
     pub fn into_async(mut self) -> I2c<'d, Async> {
         self.set_interrupt_handler(self.driver().info.async_handler);
 
@@ -915,7 +934,10 @@ impl Drop for I2cFuture<'_> {
 }
 
 impl<'d> I2c<'d, Async> {
-    /// Configure the I2C peripheral to operate in blocking mode.
+    /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// See the [`Blocking`] documentation for an example on how to use this
+    /// method.
     pub fn into_blocking(self) -> I2c<'d, Blocking> {
         self.i2c.disable_peri_interrupt();
 
@@ -928,6 +950,25 @@ impl<'d> I2c<'d, Async> {
     }
 
     /// Writes bytes to slave with given `address`
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// i2c.write_async(DEVICE_ADDR, &[0xaa]).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn write_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -939,10 +980,30 @@ impl<'d> I2c<'d, Async> {
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut data = [0u8; 22];
+    /// i2c.read_async(DEVICE_ADDR, &mut data).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn read_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -955,10 +1016,30 @@ impl<'d> I2c<'d, Async> {
     /// Writes bytes to slave with given `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// passed buffer has zero length.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut data = [0u8; 22];
+    /// i2c.write_read_async(DEVICE_ADDR, &[0xaa], &mut data).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn write_read_async<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -993,10 +1074,33 @@ impl<'d> I2c<'d, Async> {
         any(esp32, esp32s2),
         doc = "\n\nOn ESP32 and ESP32-S2 there might be issues combining large read/write operations with small (<3 bytes) read/write operations.\n\n"
     )]
-    /// # Errors
+    /// ## Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// buffer passed to an [`Operation`] has zero length.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c, Operation};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_sda(peripherals.GPIO1)
+    /// .with_scl(peripherals.GPIO2)
+    /// .into_async();
+    ///
+    /// let mut data = [0u8; 22];
+    /// i2c.transaction_async(DEVICE_ADDR, &mut [
+    ///     Operation::Write(&[0xaa]),
+    ///     Operation::Read(&mut data),
+    /// ]).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn transaction_async<'a, A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -1045,6 +1149,21 @@ where
     /// Connect a pin to the I2C SCL signal.
     ///
     /// This will replace previous pin assignments for this signal.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// const DEVICE_ADDR: u8 = 0x77;
+    /// let i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?
+    /// .with_scl(peripherals.GPIO2);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn with_scl(mut self, scl: impl PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
         let input = info.scl_input;
@@ -1055,6 +1174,9 @@ where
     }
 
     /// Writes bytes to slave with given `address`
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::i2c::master::{Config, I2c};
@@ -1072,6 +1194,9 @@ where
     }
 
     /// Reads enough bytes from slave with `address` to fill `buffer`
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::i2c::master::{Config, I2c};
@@ -1086,7 +1211,7 @@ where
     /// # }
     /// ```
     /// 
-    /// # Errors
+    /// ## Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the passed buffer has zero length.
     pub fn read<A: Into<I2cAddress>>(
@@ -1099,6 +1224,14 @@ where
 
     /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
+    ///
+    /// ## Errors
+    ///
+    /// The corresponding error variant from [`Error`] will be returned if the passed buffer has
+    /// zero length.
+    ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::i2c::master::{Config, I2c};
@@ -1112,10 +1245,6 @@ where
     /// # Ok(())
     /// # }
     /// ```
-    /// 
-    /// # Errors
-    ///
-    /// The corresponding error variant from [`Error`] will be returned if the passed buffer has zero length.
     pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -1145,6 +1274,8 @@ where
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
     ///
+    /// ## Example
+    ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
     /// # use esp_hal::i2c::master::{Config, I2c, Operation};
@@ -1166,7 +1297,7 @@ where
         any(esp32, esp32s2),
         doc = "\n\nOn ESP32 and ESP32-S2 it is advisable to not combine large read/write operations with small (<3 bytes) read/write operations.\n\n"
     )]
-    /// # Errors
+    /// ## Errors
     ///
     /// The corresponding error variant from [`Error`] will be returned if the
     /// buffer passed to an [`Operation`] has zero length.
@@ -1182,10 +1313,25 @@ where
 
     /// Applies a new configuration.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// A [`ConfigError`] variant will be returned if bus frequency or timeout
     /// passed in config is invalid.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// let mut i2c = I2c::new(
+    ///     peripherals.I2C0,
+    ///     Config::default(),
+    /// )?;
+    ///
+    /// i2c.apply_config(&Config::default().with_frequency(Rate::from_khz(400)))?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.config.config = *config;
         self.driver().setup(config)?;
