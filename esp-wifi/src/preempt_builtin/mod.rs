@@ -100,7 +100,7 @@ impl SchedulerState {
         save_task_context(unsafe { &mut *self.current_task }, trap_frame);
 
         if !self.to_delete.is_null() {
-            let task_to_delete = core::mem::replace(&mut self.to_delete, core::ptr::null_mut());
+            let task_to_delete = core::mem::take(&mut self.to_delete);
             self.delete_task(task_to_delete);
         }
 
@@ -209,7 +209,7 @@ fn delete_all_tasks() {
     let first_task = SCHEDULER_STATE.with(|state| {
         // Remove all tasks from the list. We will drop them outside of the critical
         // section.
-        core::mem::replace(&mut state.current_task, core::ptr::null_mut())
+        core::mem::take(&mut state.current_task)
     });
 
     if first_task.is_null() {

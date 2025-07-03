@@ -4,7 +4,7 @@
 #![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(asm_sub_register, named_asm_labels)]
-#![feature(asm_experimental_arch, naked_functions)]
+#![feature(asm_experimental_arch)]
 #![no_std]
 
 use core::{

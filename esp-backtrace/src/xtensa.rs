@@ -107,7 +107,7 @@ impl Display for ExceptionCause {
                 "Cp0Disabled (Access to the floating point coprocessor is not allowed. You may want to enable the `float-save-restore` feature of the `xtensa-lx-rt` crate.)"
             )
         } else {
-            write!(f, "{:?}", self)
+            write!(f, "{self:?}")
         }
     }
 }
