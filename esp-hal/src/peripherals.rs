@@ -14,91 +14,6 @@ pub use pac::Interrupt;
 
 pub(crate) use crate::soc::pac;
 
-/// Creates a new `Peripherals` struct and its associated methods.
-///
-/// The macro has a few fields doing different things, in the form of
-/// `second <= third (fourth)`.
-/// - The second field is the name of the peripheral, as it appears in the `Peripherals` struct.
-/// - The third field is the name of the peripheral as it appears in the PAC. This may be `virtual`
-///   if the peripheral is not present in the PAC.
-/// - The fourth field is an optional list of interrupts that can be bound to the peripheral.
-macro_rules! peripherals {
-    (
-        peripherals: [
-            $(
-                $name:ident <= $from_pac:tt $interrupts:tt,
-            )*
-        ],
-        unstable_peripherals: [
-            $(
-                $unstable_name:ident <= $unstable_from_pac:tt $unstable_interrupts:tt,
-            )*
-        ],
-    ) => {
-        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
-        #[allow(non_snake_case)]
-        pub struct Peripherals {
-            $(
-                #[doc = concat!("The ", stringify!($name), " peripheral.")]
-                pub $name: $name<'static>,
-            )*
-            $(
-                #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
-                #[doc = "**This API is marked as unstable** and is only available when the `unstable`
-                        crate feature is enabled. This comes with no stability guarantees, and could be changed
-                        or removed at any time."]
-                #[cfg(feature = "unstable")]
-                #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-                pub $unstable_name: $unstable_name<'static>,
-
-                #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
-                #[doc = "**This API is marked as unstable** and is only available when the `unstable`
-                        crate feature is enabled. This comes with no stability guarantees, and could be changed
-                        or removed at any time."]
-                #[cfg(not(feature = "unstable"))]
-                #[allow(unused)]
-                pub(crate) $unstable_name: $unstable_name<'static>,
-            )*
-        }
-
-        impl Peripherals {
-            /// Returns all the peripherals *once*
-            #[inline]
-            pub(crate) fn take() -> Self {
-                #[unsafe(no_mangle)]
-                static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
-
-                critical_section::with(|_| unsafe {
-                    if _ESP_HAL_DEVICE_PERIPHERALS {
-                        panic!("init called more than once!")
-                    }
-                    _ESP_HAL_DEVICE_PERIPHERALS = true;
-                    Self::steal()
-                })
-            }
-
-            /// Unsafely create an instance of this peripheral out of thin air.
-            ///
-            /// # Safety
-            ///
-            /// You must ensure that you're only using one instance of this type at a time.
-            #[inline]
-            pub unsafe fn steal() -> Self {
-                unsafe {
-                    Self {
-                        $(
-                            $name: $name::steal(),
-                        )*
-                        $(
-                            $unstable_name: $unstable_name::steal(),
-                        )*
-                    }
-                }
-            }
-        }
-    };
-}
-
 /// Macro to create a peripheral structure.
 macro_rules! create_peripheral {
     ($(#[$attr:meta])? $name:ident <= virtual ($($interrupt:ident: { $bind:ident, $enable:ident, $disable:ident }),*)) => {
@@ -207,14 +122,105 @@ macro_rules! create_peripheral {
 include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
 include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
 
-define_peripherals!();
-
 for_each_peripheral! {
-    (stable $name:ident <= $from_pac:tt $interrupts:tt) => {
+    // Define stable peripheral singletons
+    ($name:ident <= $from_pac:tt $interrupts:tt) => {
         create_peripheral!($name <= $from_pac $interrupts);
     };
 
-    (unstable $name:ident <= $from_pac:tt $interrupts:tt) => {
+    // Define unstable peripheral singletons
+    ($name:ident <= $from_pac:tt $interrupts:tt (unstable)) => {
         create_peripheral!(#[instability::unstable] $name <= $from_pac $interrupts);
+    };
+
+    // Define the Peripherals struct
+    (all $( ($name:ident <= $from_pac:tt $interrupts:tt $(($unstable:ident))?) ),*) => {
+        // We need a way to ignore the "unstable" marker, but macros can't generate attributes or struct fields.
+        // The solution is printing an empty doc comment.
+        macro_rules! ignore { ($any:tt) => {""} }
+
+        /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
+        #[allow(non_snake_case)]
+        pub struct Peripherals {
+            $(
+                // This is a bit hairy, but non-macro attributes are not allowed on struct fields. We work
+                // around this by excluding code with the `$()?` optional macro syntax and an "unstable" marker
+                // in the source data. The marker itself is passed through the `ignore` macro so that it doesn't
+                // appear in the generated code.
+                //
+                // The code can end up looking two ways:
+                //
+                // - Without `unstable` we just generate the field:
+                // ```
+                // #[attributes]
+                // pub PERI: PERI<'static>,
+                // ```
+                //
+                // - With `unstable` we're basically emulating what `instability::unstable` would do:
+                // ```
+                // #[attributes]
+                // #[cfg(feature = "unstable")]
+                // pub PERI: PERI<'static>,
+                //
+                // #[attributes]
+                // #[cfg(not(feature = "unstable"))]
+                // pub(crate) PERI: PERI<'static>,
+                // ```
+                #[doc = concat!("The ", stringify!($name), " peripheral.")]
+                $(
+                    #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                            crate feature is enabled. This comes with no stability guarantees, and could be changed
+                            or removed at any time."]
+                    #[doc = ignore!($unstable)]
+                    #[cfg(feature = "unstable")]
+                    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+                )?
+                pub $name: $name<'static>,
+
+                $(
+                    #[doc = concat!("The ", stringify!($unstable_name), " peripheral.")]
+                    #[doc = "**This API is marked as unstable** and is only available when the `unstable`
+                            crate feature is enabled. This comes with no stability guarantees, and could be changed
+                            or removed at any time."]
+                    #[doc = ignore!($unstable)]
+                    #[cfg(not(feature = "unstable"))]
+                    #[allow(unused)]
+                    pub(crate) $name: $name<'static>,
+                )?
+            )*
+        }
+
+        impl Peripherals {
+            /// Returns all the peripherals *once*
+            #[inline]
+            pub(crate) fn take() -> Self {
+                #[unsafe(no_mangle)]
+                static mut _ESP_HAL_DEVICE_PERIPHERALS: bool = false;
+
+                critical_section::with(|_| unsafe {
+                    if _ESP_HAL_DEVICE_PERIPHERALS {
+                        panic!("init called more than once!")
+                    }
+                    _ESP_HAL_DEVICE_PERIPHERALS = true;
+                    Self::steal()
+                })
+            }
+
+            /// Unsafely create an instance of this peripheral out of thin air.
+            ///
+            /// # Safety
+            ///
+            /// You must ensure that you're only using one instance of this type at a time.
+            #[inline]
+            pub unsafe fn steal() -> Self {
+                unsafe {
+                    Self {
+                        $(
+                            $name: $name::steal(),
+                        )*
+                    }
+                }
+            }
+        }
     };
 }

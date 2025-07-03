@@ -537,7 +537,7 @@ impl Config {
                 let tokens = quote::quote! {
                     #pin <= virtual ()
                 };
-                all_peripherals.push(quote::quote! { stable #tokens });
+                all_peripherals.push(quote::quote! { #tokens });
                 stable.push(tokens);
             }
         }
@@ -566,35 +566,15 @@ impl Config {
                 .iter()
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
-                all_peripherals.push(quote::quote! { stable #tokens });
+                all_peripherals.push(quote::quote! { #tokens });
                 stable.push(tokens);
             } else {
-                all_peripherals.push(quote::quote! { unstable #tokens });
+                all_peripherals.push(quote::quote! { #tokens (unstable) });
                 unstable.push(tokens);
             }
         }
 
-        let for_each = generate_for_each_macro("peripheral", &all_peripherals);
-
-        quote::quote! {
-            #for_each
-
-            // Creates the Peripherals struct
-            macro_rules! define_peripherals {
-                () => {
-                    peripherals! {
-                        peripherals: [
-                            #(#stable,)*
-                        ],
-                        unstable_peripherals: [
-                            #(#unstable,)*
-                        ],
-                    }
-                };
-            }
-
-            pub(crate) use define_peripherals;
-        }
+        generate_for_each_macro("peripheral", &all_peripherals)
     }
 }
 
@@ -610,9 +590,30 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
             ) => {
                 macro_rules! _for_each_inner {
                     $(($pattern) => $code;)*
+                    ($other:tt) => {}
                 }
 
+                // Generate single macro calls with each branch
+                // Usage:
+                // ```
+                // for_each_x! {
+                //     ( $pattern ) => {
+                //         $code
+                //     }
+                // }
+                // ```
                 #(_for_each_inner!(( #branches ));)*
+
+                // Generate a single macro call with all branches.
+                // Usage:
+                // ```
+                // for_each_x! {
+                //     (all $( ($pattern) ),*) => {
+                //         $( $code )*
+                //     }
+                // }
+                // ```
+                _for_each_inner!((all #((#branches)),*));
             };
         }
 
