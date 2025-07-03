@@ -201,7 +201,7 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
                     replacement_attrs.push(attr.clone());
                 }
             } else if let Some(replacement) =
-                replacements.get(&doc_line, attr.style == AttrStyle::Outer)
+                replacements.get(doc_line, attr.style == AttrStyle::Outer)
             {
                 replacement_attrs.extend(replacement);
             } else {
