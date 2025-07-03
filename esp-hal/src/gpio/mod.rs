@@ -988,7 +988,6 @@ impl<'d> Output<'d> {
     /// blink_once(&mut led, &mut delay);
     /// # {after_snippet}
     /// ```
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn new(pin: impl OutputPin + 'd, initial_level: Level, config: OutputConfig) -> Self {
         // Set up the pin
@@ -1259,7 +1258,6 @@ impl<'d> Input<'d> {
     /// print_when_pressed(&mut button, &mut delay);
     /// # {after_snippet}
     /// ```
-    // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
     pub fn new(pin: impl InputPin + 'd, config: InputConfig) -> Self {
         let mut pin = Flex::new(pin);
