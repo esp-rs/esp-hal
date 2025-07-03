@@ -149,6 +149,37 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
 /// The purpose of this macro is to enable us to extract boilerplate, while at
 /// the same time let rustfmt format code blocks. This macro rewrites _all_ code
 /// blocks in the current item's documentation.
+///
+/// Replacements can be placed in the code block as `#{placeholder}`. Each
+/// replacement must be its own line, it's not possible to place a placeholder in the middle of a
+/// line. The `before_snippet` and `after_snippet` placeholders are expanded to the
+/// `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros.
+///
+/// You can also define custom replacements in the attribute. A replacement can be
+/// an unconditional literal (i.e. a string that is always substituted into the doc comment),
+/// or a conditional.
+///
+/// ## Examples
+///
+/// ```rust, no_run
+/// #[insert_doc_snippet(
+///   "literal_placeholder" => "literal value",
+///   "conditional_placeholder" => {
+///     cfg(condition1) => "value 1",
+///     cfg(condition2) => "value 2",
+///     _ => "neither value 1 nor value 2",
+///   }
+/// )]
+/// /// Here comes the documentation.
+/// ///
+/// /// ```rust, no run
+/// /// // here is some code
+/// /// #{literal_placeholder}
+/// /// // here is some more code
+/// /// #{conditional_placeholder}
+/// /// ```
+/// fn my_function() {}
+/// ```
 #[proc_macro_attribute]
 pub fn insert_doc_snippet(args: TokenStream, input: TokenStream) -> TokenStream {
     insert_snippet::insert(args, input)
