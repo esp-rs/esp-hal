@@ -570,7 +570,13 @@ impl Config {
             }
         }
 
+        let for_each = generate_for_each_macro("peripheral", &stable);
+        let for_each_unstable = generate_for_each_macro("unstable_peripheral", &unstable);
+
         quote::quote! {
+            #for_each
+            #for_each_unstable
+
             crate::peripherals! {
                 peripherals: [
                     #(#stable,)*

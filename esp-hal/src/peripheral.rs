@@ -23,13 +23,6 @@ macro_rules! peripherals {
             )*
         ],
     ) => {
-        $(
-            $crate::create_peripheral!($name <= $from_pac $interrupts);
-        )*
-        $(
-            $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac $unstable_interrupts);
-        )*
-
         /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
         #[allow(non_snake_case)]
         pub struct Peripherals {
