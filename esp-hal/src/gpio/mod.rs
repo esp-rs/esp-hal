@@ -825,7 +825,7 @@ macro_rules! gpio {
             /// ## Example
             ///
             /// ```rust, no_run
-            #[doc = crate::before_snippet!()]
+            #[doc = $crate::before_snippet!()]
             /// # use esp_hal::gpio::AnyPin;
             /// let pin = unsafe { AnyPin::steal(1) };
             /// # Ok(())
@@ -846,7 +846,7 @@ macro_rules! gpio {
             /// ## Example
             ///
             /// ```rust, no_run
-            #[doc = crate::before_snippet!()]
+            #[doc = $crate::before_snippet!()]
             /// # use esp_hal::gpio::AnyPin;
             /// let pin = unsafe { AnyPin::steal(1) };
             /// let pin_cloned = unsafe { pin.clone_unchecked() };
@@ -866,7 +866,7 @@ macro_rules! gpio {
             /// ## Example
             ///
             /// ```rust, no_run
-            #[doc = crate::before_snippet!()]
+            #[doc = $crate::before_snippet!()]
             /// # use esp_hal::gpio::AnyPin;
             /// let mut pin = unsafe { AnyPin::steal(1) };
             /// let pin_reborrowed = pin.reborrow();
