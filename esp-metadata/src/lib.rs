@@ -551,9 +551,11 @@ impl Config {
             let mut interrupts = peri.interrupts.iter().collect::<Vec<_>>();
             interrupts.sort_by_key(|(k, _)| k.as_str());
             let interrupts = interrupts.iter().map(|(k, v)| {
-                let k = format_ident!("{k}");
-                let v = format_ident!("{v}");
-                quote::quote! { #k => #v }
+                let pac_interrupt_name = format_ident!("{v}");
+                let bind = format_ident!("bind_{k}_interrupt");
+                let enable = format_ident!("enable_{k}_interrupt");
+                let disable = format_ident!("disable_{k}_interrupt");
+                quote::quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
             });
             let tokens = quote::quote! {
                 #hal <= #pac ( #(#interrupts),* )
