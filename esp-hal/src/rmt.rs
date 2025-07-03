@@ -1980,6 +1980,62 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
+/// FIXME: docs
+pub trait ChannelRef<Dir>
+where
+    Dir: Direction,
+{
+    /// FIXME: docs
+    type Output;
+
+    // FIXME: Try to implement this differently such that these functions really are private!
+    #[doc(hidden)]
+    fn get(self) -> Self::Output;
+
+    #[doc(hidden)]
+    fn raw(&self) -> DynChannelAccess<Dir>;
+}
+
+impl<'ch, Dm, Dir> ChannelRef<Dir> for Channel<'ch, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    type Output = Self;
+
+    fn get(self) -> Self::Output {
+        self
+    }
+
+    fn raw(&self) -> DynChannelAccess<Dir> {
+        self.raw
+    }
+}
+
+/// FIXME: docs
+pub struct BorrowedChannel<'a, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    raw: DynChannelAccess<Dir>,
+    _phantom: PhantomData<&'a mut Channel<'a, Dm, Dir>>,
+}
+
+impl<'a, Dm, Dir> ChannelRef<Dir> for BorrowedChannel<'a, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    type Output = ();
+
+    fn get(self) -> Self::Output { }
+
+    fn raw(&self) -> DynChannelAccess<Dir> {
+        self.raw
+    }
+}
+
 impl<Dm, Dir> Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
@@ -2035,12 +2091,12 @@ where
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
 #[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
-pub struct SingleShotTxTransaction<'a, E>
+pub struct SingleShotTxTransaction<E, C>
 where
     E: Encoder,
+    C: ChannelRef<Tx>,
 {
-    raw: DynChannelAccess<Tx>,
-    _phantom: PhantomData<&'a mut DynChannelAccess<Tx>>,
+    channel: C,
 
     writer: RmtWriterOuter,
 
@@ -2049,13 +2105,14 @@ where
     data: E,
 }
 
-impl<E> SingleShotTxTransaction<'_, E>
+impl<E, C> SingleShotTxTransaction<E, C>
 where
     E: Encoder,
+    C: ChannelRef<Tx>,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
-        let raw = self.raw;
+        let raw = self.channel.raw();
 
         let status = raw.get_tx_status();
         if status == Some(Event::Threshold) {
@@ -2094,7 +2151,7 @@ where
             }
         };
 
-        RmtState::store(RmtState::TxIdle, self.raw, Ordering::Relaxed);
+        RmtState::store(RmtState::TxIdle, self.channel.raw(), Ordering::Relaxed);
 
         // Disable the Drop handler since the transaction is properly stopped
         // already.
@@ -2103,16 +2160,17 @@ where
     }
 }
 
-impl<E> Drop for SingleShotTxTransaction<'_, E>
+impl<E, C> Drop for SingleShotTxTransaction<E, C>
 where
     E: Encoder,
+    C: ChannelRef<Tx>,
 {
     fn drop(&mut self) {
         // If this is dropped, that implies that the transaction was not properly
         // `wait()`ed for. Thus, attempt to stop it as quickly as possible and
         // block in the meantime, such that subsequent uses of the channel are
         // safe (i.e. start from a state where the hardware is stopped).
-        let raw = self.raw;
+        let raw = self.channel.raw();
 
         let immediate = raw.stop_tx();
         raw.update();
@@ -2402,11 +2460,23 @@ impl Channel<'_, Blocking, Tx> {
     pub fn transmit<'a, T>(
         &mut self,
         data: &'a [T],
-    ) -> Result<SingleShotTxTransaction<'_, SliceEncoder<'a, T>>, Error>
+    ) -> Result<SingleShotTxTransaction<SliceEncoder<'a, T>, BorrowedChannel<'_, Blocking, Tx>>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
-        self.transmit_enc(SliceEncoder::new(data))
+        let channel = BorrowedChannel { raw: self.raw, _phantom: PhantomData };
+        Self::transmit_inner(channel, SliceEncoder::new(data))
+    }
+
+    /// FIXME: docs
+    pub fn transmit_owned<'a, T>(
+        self,
+        data: &'a [T],
+    ) -> Result<SingleShotTxTransaction<SliceEncoder<'a, T>, Self>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
+        Self::transmit_inner(self, SliceEncoder::new(data))
     }
 
     /// FIXME: docs
@@ -2414,23 +2484,59 @@ impl Channel<'_, Blocking, Tx> {
     pub fn transmit_iter<I>(
         &mut self,
         data: I,
-    ) -> Result<SingleShotTxTransaction<'_, IterEncoder<I::IntoIter>>, Error>
+    ) -> Result<SingleShotTxTransaction<IterEncoder<I::IntoIter>, BorrowedChannel<'_, Blocking, Tx>>, Error>
     where
         I: IntoIterator<Item = PulseCode>,
     {
-        self.transmit_enc(IterEncoder::new(data))
+        let channel = BorrowedChannel { raw: self.raw, _phantom: PhantomData };
+        Self::transmit_inner(channel, IterEncoder::new(data))
+    }
+
+    /// FIXME: docs
+    pub fn transmit_iter_owned<I>(
+        self,
+        data: I,
+    ) -> Result<SingleShotTxTransaction<IterEncoder<I::IntoIter>, Self>, Error>
+    where
+        I: IntoIterator<Item = PulseCode>,
+    {
+        Self::transmit_inner(self, IterEncoder::new(data))
     }
 
     /// FIXME: docs
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn transmit_enc<E>(
         &mut self,
-        mut data: E,
-    ) -> Result<SingleShotTxTransaction<'_, E>, Error>
+        data: E,
+    ) -> Result<SingleShotTxTransaction<E, BorrowedChannel<'_, Blocking, Tx>>, Error>
     where
         E: Encoder,
     {
-        let raw = self.raw;
+        let channel = BorrowedChannel { raw: self.raw, _phantom: PhantomData };
+        Self::transmit_inner(channel, data)
+    }
+
+    /// FIXME: docs
+    pub fn transmit_enc_owned<E>(
+        self,
+        data: E,
+    ) -> Result<SingleShotTxTransaction<E, Self>, Error>
+    where
+        E: Encoder,
+    {
+        Self::transmit_inner(self, data)
+    }
+
+    /// FIXME: docs
+    fn transmit_inner<E, C>(
+        channel: C,
+        mut data: E,
+    ) -> Result<SingleShotTxTransaction<E, C>, Error>
+    where
+        E: Encoder,
+        C: ChannelRef<Tx>,
+    {
+        let raw = channel.raw();
 
         let mut writer = RmtWriterOuter::new(raw);
         data.write(&mut writer, raw.degrade());
@@ -2445,8 +2551,7 @@ impl Channel<'_, Blocking, Tx> {
         raw.start_send(false, None);
 
         Ok(SingleShotTxTransaction {
-            raw,
-            _phantom: PhantomData,
+            channel,
             writer,
             data,
         })
