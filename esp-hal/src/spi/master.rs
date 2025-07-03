@@ -756,8 +756,12 @@ impl<'d> Spi<'d, Blocking> {
         }
     }
 
-    #[enable_doc_switch]
-    #[procmacros::insert_doc_snippet]
+    #[procmacros::insert_doc_snippet(
+        "dma_channel" => {
+            cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+            _ => "let dma_channel = peripherals.DMA_CH0;",
+        }
+    )]
     /// Configures the SPI instance to use DMA with the specified channel.
     ///
     /// This method prepares the SPI instance for DMA transfers using SPI
@@ -769,10 +773,7 @@ impl<'d> Spi<'d, Blocking> {
     /// # use esp_hal::spi::master::{Config, Spi};
     /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
     /// # use esp_hal::dma_buffers;
-    #[doc_switch(
-        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-        _ => "let dma_channel = peripherals.DMA_CH0;",
-    )]
+    /// #{dma_channel}
     /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
     ///     dma_buffers!(32000);
     ///
