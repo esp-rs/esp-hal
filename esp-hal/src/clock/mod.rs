@@ -119,6 +119,17 @@ impl Default for CpuClock {
 
 impl CpuClock {
     /// Use the highest possible frequency for a particular chip.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    #[doc = crate::before_snippet!()]
+    /// # use esp_hal::clock::CpuClock;
+    /// let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+    /// let peripherals = esp_hal::init(config);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub const fn max() -> Self {
         cfg_if::cfg_if! {
             if #[cfg(esp32c2)] {
