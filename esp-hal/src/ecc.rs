@@ -12,8 +12,7 @@
 //!
 //! ## Configuration
 //! ECC Accelerator supports:
-//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS
-//!   186-3.
+//! - Two different elliptic curves, namely P-192 and P-256 defined in FIPS 186-3.
 //! - Seven working modes.
 //! - Interrupt upon completion of calculation.
 //!

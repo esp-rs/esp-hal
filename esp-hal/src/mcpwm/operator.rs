@@ -161,12 +161,11 @@ impl DeadTimeCfg {
 /// A MCPWM operator
 ///
 /// The PWM Operator submodule has the following functions:
-/// * Generates a PWM signal pair, based on timing references obtained from the
-///   corresponding PWM timer.
-/// * Each signal out of the PWM signal pair includes a specific pattern of dead
-///   time. (Not yet implemented)
-/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet
+/// * Generates a PWM signal pair, based on timing references obtained from the corresponding PWM
+///   timer.
+/// * Each signal out of the PWM signal pair includes a specific pattern of dead time. (Not yet
 ///   implemented)
+/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet implemented)
 /// * Handles response under fault conditions. (Not yet implemented)
 pub struct Operator<'d, const OP: u8, PWM> {
     phantom: PhantomData<&'d PWM>,

@@ -658,14 +658,12 @@ impl<'d> Io<'d> {
     /// setting for you. Based on your use case, you need to do one of this
     /// yourself:
     ///
-    /// - Disabling the interrupt enable setting for the GPIO pin allows you to
-    ///   handle an event once per call to [`listen()`]. Using this method, the
-    ///   [`is_interrupt_set()`] method will return `true` if the interrupt is
-    ///   set even after your handler has finished running.
-    /// - Clearing the interrupt status register allows you to handle an event
-    ///   repeatedly after [`listen()`] is called. Using this method,
-    ///   [`is_interrupt_set()`] will return `false` after your handler has
-    ///   finished running.
+    /// - Disabling the interrupt enable setting for the GPIO pin allows you to handle an event once
+    ///   per call to [`listen()`]. Using this method, the [`is_interrupt_set()`] method will return
+    ///   `true` if the interrupt is set even after your handler has finished running.
+    /// - Clearing the interrupt status register allows you to handle an event repeatedly after
+    ///   [`listen()`] is called. Using this method, [`is_interrupt_set()`] will return `false`
+    ///   after your handler has finished running.
     ///
     /// [`listen()`]: Input::listen
     /// [`is_interrupt_set()`]: Input::is_interrupt_set
@@ -2035,8 +2033,7 @@ impl RtcPinWithResistors for AnyPin<'_> {
 /// Set GPIO event listening.
 ///
 /// - `gpio_num`: the pin to configure
-/// - `int_ena`: maskable and non-maskable CPU interrupt bits. None to leave
-///   unchanged.
+/// - `int_ena`: maskable and non-maskable CPU interrupt bits. None to leave unchanged.
 /// - `int_type`: interrupt type, see [Event] (or 0 to disable)
 /// - `wake_up_from_light_sleep`: whether to wake up from light sleep
 fn set_int_enable(gpio_num: u8, int_ena: Option<u8>, int_type: u8, wake_up_from_light_sleep: bool) {

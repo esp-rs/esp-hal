@@ -1,8 +1,7 @@
 //! Using a static IP example
 //!
 //! - set SSID and PASSWORD env variable
-//! - set STATIC_IP and GATEWAY_IP env variable (e.g. "192.168.2.191" /
-//!   "192.168.2.1")
+//! - set STATIC_IP and GATEWAY_IP env variable (e.g. "192.168.2.191" / "192.168.2.1")
 //! - might be necessary to configure your WiFi access point accordingly
 //! - uses the given static IP
 //! - responds with some HTML content when connecting to port 8080

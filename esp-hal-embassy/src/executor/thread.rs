@@ -89,8 +89,8 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// - a [StaticCell](https://docs.rs/static_cell/latest/static_cell/) (safe)
     /// - a `static mut` (unsafe, not recommended)
-    /// - a local variable in a function you know never returns (like `fn main()
-    ///   -> !`), upgrading its lifetime with `transmute`. (unsafe)
+    /// - a local variable in a function you know never returns (like `fn main() -> !`), upgrading
+    ///   its lifetime with `transmute`. (unsafe)
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {

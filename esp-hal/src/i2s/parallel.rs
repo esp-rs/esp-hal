@@ -10,10 +10,8 @@
 //! ## Notes
 //!
 //! Data output is interleaved:
-//! - 8bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16bit
-//!   words)
-//! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are
-//!   swapped)
+//! - 8bit: [A, B, C, D] is output as [C, D, A, B]  (i.e., swapped as 16bit words)
+//! - 16bit: [A, B, C, D] is output as [B, A, D, C] (i.e., 16bit words are swapped)
 #![cfg_attr(esp32, doc = "")]
 #![cfg_attr(
     esp32,

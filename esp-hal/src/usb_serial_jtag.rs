@@ -15,17 +15,16 @@
 //!
 //! The USB Serial/JTAG controller boasts the following features:
 //!
-//! - Hardwired for CDC-ACM (Communication Device Class - Abstract Control
-//!   Model) and JTAG adapter functionality
-//! - Integrates CDC-ACM adherent serial port emulation (plug-and-play on most
-//!   modern OSes); supports host controllable chip reset and entry into
-//!   download mode
-//! - Allows fast communication with CPU debugging core using a compact
-//!   representation of JTAG instructions
-//! - Two OUT Endpoints and three IN Endpoints in addition to Control Endpoint
-//!   0; Up to 64-byte data payload size
-//! - Internal PHY means that very few or no external components needed to
-//!   connect to a host computer
+//! - Hardwired for CDC-ACM (Communication Device Class - Abstract Control Model) and JTAG adapter
+//!   functionality
+//! - Integrates CDC-ACM adherent serial port emulation (plug-and-play on most modern OSes);
+//!   supports host controllable chip reset and entry into download mode
+//! - Allows fast communication with CPU debugging core using a compact representation of JTAG
+//!   instructions
+//! - Two OUT Endpoints and three IN Endpoints in addition to Control Endpoint 0; Up to 64-byte data
+//!   payload size
+//! - Internal PHY means that very few or no external components needed to connect to a host
+//!   computer
 //!
 //! ## Usage
 //!

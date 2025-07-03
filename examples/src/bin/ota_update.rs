@@ -9,15 +9,13 @@
 //! chip used!
 //!
 //! - `cargo xtask build examples examples esp32 --example=gpio_interrupt`
-//! - `espflash save-image --chip=esp32
-//!   examples/target/xtensa-esp32-none-elf/release/gpio_interrupt
+//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/gpio_interrupt
 //!   examples/target/ota_image`
 //! - `cargo xtask build examples examples esp32 --example=ota_update`
-//! - `espflash save-image --chip=esp32
-//!   examples/target/xtensa-esp32-none-elf/release/ota_update
+//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/ota_update
 //!   examples/target/ota_image`
-//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata
-//!   is cleared and no code is flashed to any partition)
+//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata is cleared and no
+//!   code is flashed to any partition)
 //! - run via `cargo xtask run example examples esp32 --example=ota_update`
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from

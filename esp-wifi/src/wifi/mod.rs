@@ -1528,8 +1528,8 @@ pub enum ScanTypeConfig {
     ///
     /// # Procedure
     /// 1. Send probe request on each channel.
-    /// 2. Wait for probe response. Wait at least `min` time, but if no response
-    ///    is received, wait up to `max` time.
+    /// 2. Wait for probe response. Wait at least `min` time, but if no response is received, wait
+    ///    up to `max` time.
     /// 3. Switch channel.
     /// 4. Repeat from 1.
     Active {
@@ -2799,10 +2799,9 @@ impl WifiController<'_> {
     /// Connect WiFi station to the AP.
     ///
     /// - If station is connected , call [Self::disconnect] to disconnect.
-    /// - Scanning will not be effective until connection between device and the
-    ///   AP is established.
-    /// - If device is scanning and connecting at the same time, it will abort
-    ///   scanning and return a warning message and error
+    /// - Scanning will not be effective until connection between device and the AP is established.
+    /// - If device is scanning and connecting at the same time, it will abort scanning and return a
+    ///   warning message and error
     pub fn connect(&mut self) -> Result<(), WifiError> {
         self.connect_impl()
     }

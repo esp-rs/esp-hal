@@ -2,14 +2,12 @@
 //! tasks over others.
 //!
 //! The example creates three tasks:
-//!  - A low priority task that is not actually async, but simulates some
-//!    blocking work. This task will run for 5 seconds, then sleep for 5
-//!    seconds.
-//!  - A low priority task that is actually async, but will not be able to run
-//!    while the blocking task is running.
-//!  - A high priority task that prints something every second. The example
-//!    demonstrates that this task will continue to run even while the low
-//!    priority blocking task is running.
+//!  - A low priority task that is not actually async, but simulates some blocking work. This task
+//!    will run for 5 seconds, then sleep for 5 seconds.
+//!  - A low priority task that is actually async, but will not be able to run while the blocking
+//!    task is running.
+//!  - A high priority task that prints something every second. The example demonstrates that this
+//!    task will continue to run even while the low priority blocking task is running.
 
 // The thread-executor is created by the `#[esp_hal_embassy::main]` macro and is used to spawn
 // `low_prio_async` and `low_prio_blocking`. The interrupt-executor is created in `main` and is used

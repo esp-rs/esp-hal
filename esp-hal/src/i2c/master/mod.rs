@@ -976,19 +976,17 @@ impl<'d> I2c<'d, Async> {
     /// transaction.
     ///
     /// Transaction contract:
-    /// - Before executing the first operation an ST is sent automatically. This
-    ///   is followed by SAD+R/W as appropriate.
-    /// - Data from adjacent operations of the same type are sent after each
-    ///   other without an SP or SR.
-    /// - Between adjacent operations of a different type an SR and SAD+R/W is
-    ///   sent.
+    /// - Before executing the first operation an ST is sent automatically. This is followed by
+    ///   SAD+R/W as appropriate.
+    /// - Data from adjacent operations of the same type are sent after each other without an SP or
+    ///   SR.
+    /// - Between adjacent operations of a different type an SR and SAD+R/W is sent.
     /// - After executing the last operation an SP is sent automatically.
-    /// - If the last operation is a `Read` the master does not send an
-    ///   acknowledge for the last byte.
+    /// - If the last operation is a `Read` the master does not send an acknowledge for the last
+    ///   byte.
     ///
     /// - `ST` = start condition
-    /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or 0
-    ///   to indicate writing
+    /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or 0 to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
     #[cfg_attr(
@@ -1133,19 +1131,17 @@ where
     /// Execute the provided operations on the I2C bus.
     ///
     /// Transaction contract:
-    /// - Before executing the first operation an ST is sent automatically. This
-    ///   is followed by SAD+R/W as appropriate.
-    /// - Data from adjacent operations of the same type are sent after each
-    ///   other without an SP or SR.
-    /// - Between adjacent operations of a different type an SR and SAD+R/W is
-    ///   sent.
+    /// - Before executing the first operation an ST is sent automatically. This is followed by
+    ///   SAD+R/W as appropriate.
+    /// - Data from adjacent operations of the same type are sent after each other without an SP or
+    ///   SR.
+    /// - Between adjacent operations of a different type an SR and SAD+R/W is sent.
     /// - After executing the last operation an SP is sent automatically.
-    /// - If the last operation is a `Read` the master does not send an
-    ///   acknowledge for the last byte.
+    /// - If the last operation is a `Read` the master does not send an acknowledge for the last
+    ///   byte.
     ///
     /// - `ST` = start condition
-    /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or 0
-    ///   to indicate writing
+    /// - `SAD+R/W` = slave address followed by bit 1 to indicate reading or 0 to indicate writing
     /// - `SR` = repeated start condition
     /// - `SP` = stop condition
     ///
@@ -1825,8 +1821,8 @@ impl Driver<'_> {
     /// Configures the I2C peripheral for a write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_write<'a, I>(
         &self,
@@ -1940,10 +1936,10 @@ impl Driver<'_> {
     /// Configures the I2C peripheral for a read operation.
     /// - `addr` is the address of the slave device.
     /// - `buffer` is the buffer to store the read data.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `will_continue` indicates whether there is another read operation
-    ///   following this one and we should not nack the last byte.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `will_continue` indicates whether there is another read operation following this one and
+    ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn setup_read<'a, I>(
         &self,
@@ -2308,12 +2304,11 @@ impl Driver<'_> {
     /// Executes an I2C read operation.
     /// - `addr` is the address of the slave device.
     /// - `buffer` is the buffer to store the read data.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `stop` indicates whether the operation should end with a STOP
-    ///   condition.
-    /// - `will_continue` indicates whether there is another read operation
-    ///   following this one and we should not nack the last byte.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `will_continue` indicates whether there is another read operation following this one and
+    ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn start_read_operation(
         &self,
@@ -2347,10 +2342,9 @@ impl Driver<'_> {
     /// Executes an I2C write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `stop` indicates whether the operation should end with a STOP
-    ///   condition.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn write_operation_blocking(
         &self,
@@ -2378,12 +2372,11 @@ impl Driver<'_> {
     /// Executes an I2C read operation.
     /// - `addr` is the address of the slave device.
     /// - `buffer` is the buffer to store the read data.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `stop` indicates whether the operation should end with a STOP
-    ///   condition.
-    /// - `will_continue` indicates whether there is another read operation
-    ///   following this one and we should not nack the last byte.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `will_continue` indicates whether there is another read operation following this one and
+    ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
     fn read_operation_blocking(
         &self,
@@ -2414,10 +2407,9 @@ impl Driver<'_> {
     /// Executes an async I2C write operation.
     /// - `addr` is the address of the slave device.
     /// - `bytes` is the data two be sent.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `stop` indicates whether the operation should end with a STOP
-    ///   condition.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `stop` indicates whether the operation should end with a STOP condition.
     /// - `cmd_iterator` is an iterator over the command registers.
     async fn write_operation(
         &self,
@@ -2445,12 +2437,11 @@ impl Driver<'_> {
     /// Executes an async I2C read operation.
     /// - `addr` is the address of the slave device.
     /// - `buffer` is the buffer to store the read data.
-    /// - `start` indicates whether the operation should start by a START
-    ///   condition and sending the address.
-    /// - `stop` indicates whether the operation should end with a STOP
-    ///   condition.
-    /// - `will_continue` indicates whether there is another read operation
-    ///   following this one and we should not nack the last byte.
+    /// - `start` indicates whether the operation should start by a START condition and sending the
+    ///   address.
+    /// - `stop` indicates whether the operation should end with a STOP condition.
+    /// - `will_continue` indicates whether there is another read operation following this one and
+    ///   we should not nack the last byte.
     /// - `cmd_iterator` is an iterator over the command registers.
     async fn read_operation(
         &self,
@@ -2893,8 +2884,8 @@ mod bus_clear {
             // Starting from (9, false), becase:
             // - we start with SCL low
             // - a complete SCL cycle consists of a high period and a low period
-            // - we decrement the remaining counter at the beginning of a cycle, which gives
-            //   us 9 complete SCL cycles.
+            // - we decrement the remaining counter at the beginning of a cycle, which gives us 9
+            //   complete SCL cycles.
             let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
 
             Self {

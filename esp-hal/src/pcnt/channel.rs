@@ -56,10 +56,8 @@ impl<const UNIT: usize, const NUM: usize> Channel<'_, UNIT, NUM> {
     /// Configures how the channel affects the counter based on the transition
     /// made by the input signal.
     ///
-    /// * `neg_edge` - The effect on the counter when the input signal goes 1 ->
-    ///   0.
-    /// * `pos_edge` - The effect on the counter when the input signal goes 0 ->
-    ///   1.
+    /// * `neg_edge` - The effect on the counter when the input signal goes 1 -> 0.
+    /// * `pos_edge` - The effect on the counter when the input signal goes 0 -> 1.
     pub fn set_input_mode(&self, neg_edge: EdgeMode, pos_edge: EdgeMode) {
         let pcnt = PCNT::regs();
         let conf0 = pcnt.unit(UNIT).conf0();
