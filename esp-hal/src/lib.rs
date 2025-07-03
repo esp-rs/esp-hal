@@ -234,7 +234,6 @@ pub mod clock;
 pub mod gpio;
 #[cfg(any(soc_has_i2c0, soc_has_i2c1))]
 pub mod i2c;
-pub mod peripheral;
 #[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
 #[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
@@ -245,6 +244,7 @@ pub mod time;
 pub mod uart;
 
 mod macros;
+mod peripheral;
 
 pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
