@@ -8,10 +8,11 @@
 //! from the PAC, allowing users to handle interrupts associated with these
 //! peripherals.
 
-pub(crate) use esp32s2 as pac;
 // We need to export this for users to use
 #[doc(hidden)]
 pub use pac::Interrupt;
+
+pub(crate) use crate::soc::pac;
 
 include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
 include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
