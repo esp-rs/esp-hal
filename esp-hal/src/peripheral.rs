@@ -22,9 +22,6 @@ macro_rules! peripherals {
                 $unstable_name:ident <= $unstable_from_pac:tt ($($unstable_interrupt_name:ident => $unstable_interrupt:ident),*),
             )*
         ],
-        pins: [
-            $( $gpio:ident, )*
-        ]
     ) => {
         macro_rules! generate_interrupt_fns {
             ($fn_name:ident, $int_name:ident) => {
@@ -58,9 +55,6 @@ macro_rules! peripherals {
         $(
             $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
         )*
-        $(
-            $crate::create_peripheral!($gpio <= virtual);
-        )*
 
         /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
         #[allow(non_snake_case)]
@@ -85,11 +79,6 @@ macro_rules! peripherals {
                 #[cfg(not(feature = "unstable"))]
                 #[allow(unused)]
                 pub(crate) $unstable_name: $unstable_name<'static>,
-            )*
-
-            $(
-                #[doc = stringify!($gpio)]
-                pub $gpio: $gpio<'static>,
             )*
         }
 
@@ -123,10 +112,6 @@ macro_rules! peripherals {
                         )*
                         $(
                             $unstable_name: $unstable_name::steal(),
-                        )*
-
-                        $(
-                            $gpio: $gpio::steal(),
                         )*
                     }
                 }

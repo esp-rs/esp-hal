@@ -530,15 +530,15 @@ impl Config {
             }
         }
 
-        let gpios = if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
-            gpio.pins_and_signals
-                .pins
-                .iter()
-                .map(|pin| format_ident!("GPIO{}", pin.pin))
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
+        if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
+            for pin in gpio.pins_and_signals.pins.iter() {
+                let pin = format_ident!("GPIO{}", pin.pin);
+                let tokens = quote::quote! {
+                    #pin <= virtual ()
+                };
+                stable.push(tokens);
+            }
+        }
 
         for peri in self.device.peripherals.iter() {
             let hal = format_ident!("{}", peri.name);
@@ -576,7 +576,6 @@ impl Config {
                 unstable_peripherals: [
                     #(#unstable,)*
                 ],
-                pins: [#(#gpios,)*]
             }
         }
     }
