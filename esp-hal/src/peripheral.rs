@@ -4,12 +4,10 @@
 ///
 /// The macro has a few fields doing different things, in the form of
 /// `second <= third (fourth)`.
-/// - The second field is the name of the peripheral, as it appears in the
-///   `Peripherals` struct.
-/// - The third field is the name of the peripheral as it appears in the PAC.
-///   This may be `virtual` if the peripheral is not present in the PAC.
-/// - The fourth field is an optional list of interrupts that can be bound to
-///   the peripheral.
+/// - The second field is the name of the peripheral, as it appears in the `Peripherals` struct.
+/// - The third field is the name of the peripheral as it appears in the PAC. This may be `virtual`
+///   if the peripheral is not present in the PAC.
+/// - The fourth field is an optional list of interrupts that can be bound to the peripheral.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! peripherals {

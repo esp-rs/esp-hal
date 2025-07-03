@@ -355,14 +355,13 @@ pub(crate) mod utils {
         ///
         /// [`wp_gpio_num`]: u8 Number of the WP pin to reconfigure for quad I/O
         /// [`spiconfig`]: u32 Pin configuration, as returned from ets_efuse_get_spiconfig().
-        /// - If this parameter is 0, default SPI pins are used and wp_gpio_num
-        ///   parameter is ignored.
-        /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num
-        ///   parameter is ignored.
-        /// - For other values, this parameter encodes the HD pin number and
-        ///   also the CLK pin number. CLK pin selection is used to determine if
-        ///   HSPI or SPI peripheral will be used (use HSPI if CLK pin is the
-        ///   HSPI clock pin, otherwise use SPI).
+        /// - If this parameter is 0, default SPI pins are used and wp_gpio_num parameter is
+        ///   ignored.
+        /// - If this parameter is 1, default HSPI pins are used and wp_gpio_num parameter is
+        ///   ignored.
+        /// - For other values, this parameter encodes the HD pin number and also the CLK pin
+        ///   number. CLK pin selection is used to determine if HSPI or SPI peripheral will be used
+        ///   (use HSPI if CLK pin is the HSPI clock pin, otherwise use SPI).
         //   Both HD & WP pins are configured via GPIO matrix to map to the selected peripheral.
         fn esp_rom_spiflash_select_qio_pins(wp_gpio_num: u8, spiconfig: u32);
     }

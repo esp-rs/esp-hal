@@ -1,7 +1,6 @@
 //! WiFi frame injection example
 //!
 //! Periodically transmits a beacon frame.
-//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6

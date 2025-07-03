@@ -42,7 +42,8 @@ fn interrupt_handler() {
         if touch1.is_interrupt_set() {
             println!("touch 1 pin interrupt");
             touch1.clear_interrupt();
-            // We disable the interrupt until the next loop iteration to avoid massive retriggering.
+            // We disable the interrupt until the next loop iteration to avoid massive
+            // retriggering.
             touch1.disable_interrupt();
         }
     });

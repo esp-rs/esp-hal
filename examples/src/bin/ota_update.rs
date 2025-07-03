@@ -1,25 +1,32 @@
 //! OTA Update Example
 //!
-//! This shows the basics of dealing with partitions and changing the active partition.
-//! For simplicity it will flash an application image embedded into the binary.
-//! In a real world application you can get the image via HTTP(S), UART or from an sd-card etc.
+//! This shows the basics of dealing with partitions and changing the active
+//! partition. For simplicity it will flash an application image embedded into
+//! the binary. In a real world application you can get the image via HTTP(S),
+//! UART or from an sd-card etc.
 //!
-//! Adjust the target and the chip in the following commands according to the chip used!
+//! Adjust the target and the chip in the following commands according to the
+//! chip used!
 //!
 //! - `cargo xtask build examples examples esp32 --example=gpio_interrupt`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image`
+//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/gpio_interrupt
+//!   examples/target/ota_image`
 //! - `cargo xtask build examples examples esp32 --example=ota_update`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image`
-//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata is cleared and no code is flashed to any partition)
+//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/ota_update
+//!   examples/target/ota_image`
+//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata is cleared and no
+//!   code is flashed to any partition)
 //! - run via `cargo xtask run example examples esp32 --example=ota_update`
 //!
-//! On first boot notice the firmware partition gets booted ("Loaded app from partition at offset 0x10000").
-//! Press the BOOT button, once finished press the RESET button.
+//! On first boot notice the firmware partition gets booted ("Loaded app from
+//! partition at offset 0x10000"). Press the BOOT button, once finished press
+//! the RESET button.
 //!
 //! Notice OTA0 gets booted ("Loaded app from partition at offset 0x110000").
 //!
 //! Once again press BOOT, when finished press RESET.
-//! You will see the `gpio_interrupt` example gets booted from OTA1 ("Loaded app from partition at offset 0x210000")
+//! You will see the `gpio_interrupt` example gets booted from OTA1 ("Loaded app
+//! from partition at offset 0x210000")
 //!
 //! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html
 
@@ -78,8 +85,9 @@ fn main() -> ! {
     );
     println!("current {:?} - next {:?}", current, current.next());
 
-    // Mark the current slot as VALID - this is only needed if the bootloader was built with auto-rollback support.
-    // The default pre-compiled bootloader in espflash is NOT.
+    // Mark the current slot as VALID - this is only needed if the bootloader was
+    // built with auto-rollback support. The default pre-compiled bootloader in
+    // espflash is NOT.
     if ota.current_slot().unwrap() != Slot::None
         && (ota.current_ota_state().unwrap() == esp_bootloader_esp_idf::ota::OtaImageState::New
             || ota.current_ota_state().unwrap()

@@ -365,8 +365,7 @@ impl<'d> Rtc<'d> {
 
         // In terms of peripherals:
 
-        // - LPWR is used on the following chips: esp32, esp32p4, esp32c2, esp32c3,
-        //   esp32s2, esp32s3
+        // - LPWR is used on the following chips: esp32, esp32p4, esp32c2, esp32c3, esp32s2, esp32s3
 
         // - LP_AON is used on the following chips: esp32c5, esp32c6, esp32c61, esp32h2
 

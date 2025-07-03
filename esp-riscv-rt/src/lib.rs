@@ -4,8 +4,7 @@
 //!
 //! This crate provides:
 //!
-//! - Before main initialization of the `.bss` and `.data` sections controlled
-//!   by features
+//! - Before main initialization of the `.bss` and `.data` sections controlled by features
 //! - `#[entry]` to declare the entry point of the program
 //!
 //! ## Feature Flags

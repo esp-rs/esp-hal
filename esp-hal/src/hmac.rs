@@ -9,11 +9,9 @@
 //! Main features:
 //!
 //! - Standard HMAC-SHA-256 algorithm.
-//! - Hash result only accessible by configurable hardware peripheral (in
-//!   downstream mode).
+//! - Hash result only accessible by configurable hardware peripheral (in downstream mode).
 //! - Compatible to challenge-response authentication algorithm.
-//! - Generates required keys for the Digital Signature (DS) peripheral (in
-//!   downstream mode).
+//! - Generates required keys for the Digital Signature (DS) peripheral (in downstream mode).
 //! - Re-enables soft-disabled JTAG (in downstream mode).
 //!
 //! ## Configuration

@@ -1,6 +1,8 @@
-//! While this can be used as an example it's meant to be used with `extras/ieee802154-sniffer`
+//! While this can be used as an example it's meant to be used with
+//! `extras/ieee802154-sniffer`
 //!
-//! Besides the runtime changeable channel and the output format it's almost identical to ieee802154_receive_all_frames
+//! Besides the runtime changeable channel and the output format it's almost
+//! identical to ieee802154_receive_all_frames
 
 //% CHIPS: esp32c6 esp32h2
 //% FEATURES: esp-ieee802154 esp-hal/unstable

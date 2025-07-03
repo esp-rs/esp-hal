@@ -60,12 +60,10 @@ macro_rules! trm_markdown_link {
 /// This macro generates the following:
 ///
 /// - An `AnyPeripheral` struct, name provided by the macro call.
-/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a
-///   relevant Instance.
+/// - An `any::Degrade` trait which is supposed to be used as a supertrait of a relevant Instance.
 /// - An `any::Inner` enum, with the same variants as the original peripheral.
 /// - A `From` implementation for each peripheral variant.
-/// - A `degrade` method for each peripheral variant using the `any::Degrade`
-///   trait.
+/// - A `degrade` method for each peripheral variant using the `any::Degrade` trait.
 #[macro_export]
 macro_rules! any_peripheral {
     ($(#[$meta:meta])* $vis:vis peripheral $name:ident<'d> {

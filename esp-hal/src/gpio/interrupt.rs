@@ -2,17 +2,14 @@
 //!
 //! ## Requirements
 //!
-//! - On devices other than the P4, there is a single interrupt handler. GPIO
-//!   interrupt handling must not interfere with the async API in this single
-//!   handler.
-//! - Async operations take pins by `&mut self`, so they can only be accessed
-//!   after the operation is complete, or cancelled. They may be defined to
-//!   overwrite the configuration of the manual interrupt API, but not affect
-//!   the interrupt handler.
-//! - Manual `listen` operations don't need to be prepared for async operations,
-//!   but async operations need to be prepared to handle cases where the pin was
-//!   configured to listen for an event - or even that the user unlistened the
-//!   pin but left the interrupt status set.
+//! - On devices other than the P4, there is a single interrupt handler. GPIO interrupt handling
+//!   must not interfere with the async API in this single handler.
+//! - Async operations take pins by `&mut self`, so they can only be accessed after the operation is
+//!   complete, or cancelled. They may be defined to overwrite the configuration of the manual
+//!   interrupt API, but not affect the interrupt handler.
+//! - Manual `listen` operations don't need to be prepared for async operations, but async
+//!   operations need to be prepared to handle cases where the pin was configured to listen for an
+//!   event - or even that the user unlistened the pin but left the interrupt status set.
 //!
 //! The user should be careful when using the async API and the manual interrupt
 //! API together. For performance reasons, we will not prevent the user handler
