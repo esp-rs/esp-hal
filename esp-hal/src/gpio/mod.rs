@@ -1501,6 +1501,7 @@ impl<'d> Input<'d> {
 /// disable the driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct Flex<'d> {
     pin: AnyPin<'d>,
 }
