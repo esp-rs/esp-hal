@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use regex::{Captures, Regex};
 use strum::IntoEnumIterator;
@@ -26,11 +26,10 @@ pub struct BumpMsrvArgs {
 /// Bump the MSRV
 ///
 /// This will process
-/// - `Cargo.toml` for the packages (adjust (or add if not present) the
-///   "rust-version")
+/// - `Cargo.toml` for the packages (adjust (or add if not present) the "rust-version")
 /// - `README.md` for the packages if it exists (adjusts the MSRV badge)
-/// - IF the esp-hal package was touched: .github/workflows/ci.yml (adapts the
-///   `MSRV: "<msrv>"` entry)
+/// - IF the esp-hal package was touched: .github/workflows/ci.yml (adapts the `MSRV: "<msrv>"`
+///   entry)
 ///
 /// Non-published packages are not touched.
 ///
@@ -161,12 +160,20 @@ fn add_dependent_crates(
 /// Check files in the package and show if we find the version string in any
 /// file. Most probably it will report false positives but maybe not.
 fn check_mentions(package_path: &std::path::PathBuf, previous_rust_version: &str) -> Result<()> {
+    use std::ffi::OsStr;
+    let disallowed_extensions = [OsStr::new("gz")];
     for entry in walkdir::WalkDir::new(package_path)
         .into_iter()
         .filter_map(|entry| {
             let path = entry.unwrap().into_path();
 
             if !path.is_file() {
+                return None;
+            }
+
+            if let Some(ext) = path.extension()
+                && disallowed_extensions.contains(&ext)
+            {
                 return None;
             }
 
@@ -177,7 +184,8 @@ fn check_mentions(package_path: &std::path::PathBuf, previous_rust_version: &str
             Some(path)
         })
     {
-        let contents = std::fs::read_to_string(&entry)?;
+        let contents = std::fs::read_to_string(&entry)
+            .with_context(|| format!("Failed to read {}", entry.as_path().display()))?;
         if contents.contains(previous_rust_version) {
             println!(
                 "⚠️ '{previous_rust_version}' found in file {} - might be a false positive, otherwise consider adjusting the xtask.",

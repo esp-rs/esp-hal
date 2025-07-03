@@ -217,7 +217,7 @@ fn inject_cpu_cfgs(isa_config: &HashMap<&str, Value>) {
         .and_then(|v| v.as_integer())
     {
         for i in 0..value.count_ones() {
-            println!("cargo:rustc-cfg=XCHAL_HAVE_SOFTWARE{}", i);
+            println!("cargo:rustc-cfg=XCHAL_HAVE_SOFTWARE{i}");
         }
     }
 }
