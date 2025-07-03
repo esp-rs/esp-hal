@@ -16,7 +16,7 @@ pub struct SlchostInfo {
 unsafe impl Sync for SlchostInfo {}
 
 /// A peripheral singleton compatible with the SDIO SLCHOST driver.
-pub trait SlchostInstance: IntoAnySlchost {
+pub trait SlchostInstance: any::Degrade {
     /// Gets a static reference the the [SlchostInfo].
     fn info(&self) -> &'static SlchostInfo {
         static INFO: SlchostInfo = SlchostInfo {
