@@ -40,6 +40,17 @@ macro_rules! before_snippet {
 
 #[doc(hidden)]
 #[macro_export]
+macro_rules! after_snippet {
+    () => {
+        r#"
+# Ok(())
+# }
+"#
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
 macro_rules! trm_markdown_link {
     () => {
         concat!("[Technical Reference Manual](", property!("trm"), ")")

@@ -757,13 +757,14 @@ impl<'d> Spi<'d, Blocking> {
     }
 
     #[enable_doc_switch]
+    #[procmacros::insert_doc_snippet]
     /// Configures the SPI instance to use DMA with the specified channel.
     ///
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// #{before_snippet}
     /// # use esp_hal::spi::Mode;
     /// # use esp_hal::spi::master::{Config, Spi};
     /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
@@ -793,8 +794,7 @@ impl<'d> Spi<'d, Blocking> {
     /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
-    /// # Ok(())
-    /// # }
+    /// #{after_snippet}
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {

@@ -14,19 +14,29 @@ pub(crate) fn insert(_: TokenStream, input: TokenStream) -> TokenStream {
             && ident == "doc"
             && let Expr::Lit(lit) = value
             && let Lit::Str(doc) = &lit.lit
-            && doc.value().trim().starts_with("```")
         {
-            if in_code_block {
-                // Closing code block
-                replacement_attrs.push(attr.clone());
-                in_code_block = false;
-            } else {
-                // Opening code block
-                in_code_block = true;
-                replacement_attrs.push(attr.clone());
+            let doc_line = doc.value();
+            let doc_line = doc_line.trim();
+            if doc_line.starts_with("```") {
+                if in_code_block {
+                    // Closing code block
+                    replacement_attrs.push(attr.clone());
+                    in_code_block = false;
+                } else {
+                    // Opening code block
+                    in_code_block = true;
+                    replacement_attrs.push(attr.clone());
+                }
+            } else if doc_line == "#{before_snippet}" {
                 replacement_attrs.push(syn::parse_quote! {
                     #[doc = crate::before_snippet!()]
                 });
+            } else if doc_line == "#{after_snippet}" {
+                replacement_attrs.push(syn::parse_quote! {
+                    #[doc = crate::after_snippet!()]
+                });
+            } else {
+                replacement_attrs.push(attr.clone());
             }
         } else {
             replacement_attrs.push(attr.clone());
