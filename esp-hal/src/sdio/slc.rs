@@ -16,7 +16,7 @@ pub struct SlcInfo {
 unsafe impl Sync for SlcInfo {}
 
 /// A peripheral singleton compatible with the SDIO SLC driver.
-pub trait SlcInstance: IntoAnySlc {
+pub trait SlcInstance: any::Degrade {
     /// Gets a static reference the the [SlcInfo].
     fn info(&self) -> &'static SlcInfo {
         static INFO: SlcInfo = SlcInfo {
