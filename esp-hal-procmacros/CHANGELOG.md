@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- MSRV is now 1.88.0 (#3742)
 - The `handler` macro no longer accepts priority as a string (#3643)
 
 ### Fixed

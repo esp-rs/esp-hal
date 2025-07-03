@@ -755,7 +755,7 @@ pub(crate) mod utils {
         }
     }
 
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Default, Debug, Copy, Clone, PartialEq)]
     struct PsramCmd {
         cmd: u16,             // Command value
         cmd_bit_len: u16,     // Command byte length
@@ -766,22 +766,6 @@ pub(crate) mod utils {
         rx_data: *mut u32,    // Point to recevie data buffer
         rx_data_bit_len: u16, // Recevie Data byte length.
         dummy_bit_len: u32,
-    }
-
-    impl Default for PsramCmd {
-        fn default() -> Self {
-            Self {
-                cmd: Default::default(),
-                cmd_bit_len: Default::default(),
-                addr: Default::default(),
-                addr_bit_len: Default::default(),
-                tx_data: core::ptr::null(),
-                tx_data_bit_len: Default::default(),
-                rx_data: core::ptr::null_mut(),
-                rx_data_bit_len: Default::default(),
-                dummy_bit_len: Default::default(),
-            }
-        }
     }
 
     const PSRAM_ENTER_QMODE: u32 = 0x35;

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `esp_ieee802154::Ieee802154::new` no longer requires the `RADIO_CLK` peripheral (#3687)
 
+- MSRV is now 1.88.0 (#3742)
 
 ### Fixed
 
