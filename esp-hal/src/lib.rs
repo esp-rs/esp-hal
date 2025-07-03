@@ -244,7 +244,6 @@ pub mod time;
 pub mod uart;
 
 mod macros;
-mod peripheral;
 
 pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]

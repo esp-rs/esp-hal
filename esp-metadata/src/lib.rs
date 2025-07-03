@@ -579,14 +579,21 @@ impl Config {
         quote::quote! {
             #for_each
 
-            crate::peripherals! {
-                peripherals: [
-                    #(#stable,)*
-                ],
-                unstable_peripherals: [
-                    #(#unstable,)*
-                ],
+            // Creates the Peripherals struct
+            macro_rules! define_peripherals {
+                () => {
+                    peripherals! {
+                        peripherals: [
+                            #(#stable,)*
+                        ],
+                        unstable_peripherals: [
+                            #(#unstable,)*
+                        ],
+                    }
+                };
             }
+
+            pub(crate) use define_peripherals;
         }
     }
 }
