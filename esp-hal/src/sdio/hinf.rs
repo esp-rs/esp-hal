@@ -16,7 +16,7 @@ pub struct HinfInfo {
 unsafe impl Sync for HinfInfo {}
 
 /// A peripheral singleton compatible with the SDIO HINF driver.
-pub trait HinfInstance: IntoAnyHinf {
+pub trait HinfInstance: any::Degrade {
     /// Gets a static reference the the [HinfInfo].
     fn info(&self) -> &'static HinfInfo {
         static INFO: HinfInfo = HinfInfo {
