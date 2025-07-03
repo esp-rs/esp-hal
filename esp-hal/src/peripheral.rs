@@ -14,46 +14,20 @@ macro_rules! peripherals {
     (
         peripherals: [
             $(
-                $name:ident <= $from_pac:tt ($($interrupt_name:ident => $interrupt:ident),*),
+                $name:ident <= $from_pac:tt $interrupts:tt,
             )*
         ],
         unstable_peripherals: [
             $(
-                $unstable_name:ident <= $unstable_from_pac:tt ($($unstable_interrupt_name:ident => $unstable_interrupt:ident),*),
+                $unstable_name:ident <= $unstable_from_pac:tt $unstable_interrupts:tt,
             )*
         ],
     ) => {
-        macro_rules! generate_interrupt_fns {
-            ($fn_name:ident, $int_name:ident) => {
-                paste::paste!{
-                    /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
-                    #[instability::unstable]
-                    pub fn [<bind_ $fn_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
-                        unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$int_name, handler); }
-                    }
-
-                    /// Disables the interrupt handler
-                    #[instability::unstable]
-                    pub fn [<disable_ $fn_name _interrupt >](&self) {
-                        for core in $crate::system::Cpu::other() {
-                            $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$int_name);
-                        }
-                    }
-
-                    /// Enables the interrupt handler on the given core
-                    #[instability::unstable]
-                    pub fn [<enable_ $fn_name _interrupt >](&self, priority: $crate::interrupt::Priority) {
-                        unwrap!($crate::interrupt::enable($crate::peripherals::Interrupt::$int_name, priority));
-                    }
-                }
-            };
-        }
-
         $(
-            $crate::create_peripheral!($name <= $from_pac);
+            $crate::create_peripheral!($name <= $from_pac $interrupts);
         )*
         $(
-            $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac);
+            $crate::create_peripheral!(#[instability::unstable] $unstable_name <= $unstable_from_pac $unstable_interrupts);
         )*
 
         /// The `Peripherals` struct provides access to all of the hardware peripherals on the chip.
@@ -117,22 +91,6 @@ macro_rules! peripherals {
                 }
             }
         }
-
-        $(
-            impl $name<'_> {
-                $(
-                    generate_interrupt_fns!($interrupt_name, $interrupt);
-                )*
-            }
-        )*
-
-        $(
-            impl $unstable_name<'_> {
-                $(
-                    generate_interrupt_fns!($unstable_interrupt_name, $unstable_interrupt);
-                )*
-            }
-        )*
     };
 }
 
@@ -140,7 +98,7 @@ macro_rules! peripherals {
 #[macro_export]
 /// Macro to create a peripheral structure.
 macro_rules! create_peripheral {
-    ($(#[$attr:meta])? $name:ident <= virtual) => {
+    ($(#[$attr:meta])? $name:ident <= virtual ($($interrupt_name:ident => $interrupt:ident),*)) => {
         $(#[$attr])?
         #[derive(Debug)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -184,13 +142,37 @@ macro_rules! create_peripheral {
             pub fn reborrow(&mut self) -> $name<'_> {
                 unsafe { self.clone_unchecked() }
             }
+
+            $(
+                paste::paste !{
+                    /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
+                    #[instability::unstable]
+                    pub fn [<bind_ $interrupt_name _interrupt >](&self, handler: unsafe extern "C" fn() -> ()) {
+                        unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
+                    }
+
+                    /// Disables the interrupt handler
+                    #[instability::unstable]
+                    pub fn [<disable_ $interrupt_name _interrupt >](&self) {
+                        for core in $crate::system::Cpu::other() {
+                            $crate::interrupt::disable(core, $crate::peripherals::Interrupt::$interrupt);
+                        }
+                    }
+
+                    /// Enables the interrupt handler on the given core
+                    #[instability::unstable]
+                    pub fn [<enable_ $interrupt_name _interrupt >](&self, priority: $crate::interrupt::Priority) {
+                        unwrap!($crate::interrupt::enable($crate::peripherals::Interrupt::$interrupt, priority));
+                    }
+                }
+            )*
         }
 
         impl $crate::private::Sealed for $name<'_> {}
     };
 
-    ($(#[$attr:meta])? $name:ident <= $base:ident) => {
-        $crate::create_peripheral!($(#[$attr])? $name <= virtual);
+    ($(#[$attr:meta])? $name:ident <= $base:ident $interrupts:tt) => {
+        $crate::create_peripheral!($(#[$attr])? $name <= virtual $interrupts);
 
         impl $name<'_> {
             #[doc = r"Pointer to the register block"]
