@@ -1,4 +1,4 @@
-#![cfg_attr(docsrs, procmacros::insert_doc_snippet(
+#![cfg_attr(docsrs, procmacros::doc_replace(
     "etm_availability" => {
         cfg(soc_has_etm) => "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
     }
@@ -923,7 +923,7 @@ pub struct Output<'d> {
 impl private::Sealed for Output<'_> {}
 
 impl<'d> Output<'d> {
-    #[procmacros::insert_doc_snippet]
+    #[procmacros::doc_replace]
     /// Creates a new GPIO output driver.
     ///
     /// The `initial_level` parameter sets the initial output level of the pin.
@@ -1090,7 +1090,7 @@ pub struct Input<'d> {
 impl private::Sealed for Input<'_> {}
 
 impl<'d> Input<'d> {
-    #[procmacros::insert_doc_snippet]
+    #[procmacros::doc_replace]
     /// Creates a new GPIO input.
     ///
     /// The `pull` parameter configures internal pull-up or pull-down
@@ -1140,7 +1140,7 @@ impl<'d> Input<'d> {
         Self { pin }
     }
 
-    #[procmacros::insert_doc_snippet]
+    #[procmacros::doc_replace]
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1188,7 +1188,7 @@ impl<'d> Input<'d> {
         self.pin.apply_input_config(config)
     }
 
-    #[procmacros::insert_doc_snippet]
+    #[procmacros::doc_replace]
     /// Listen for interrupts.
     ///
     /// The interrupts will be handled by the handler set using

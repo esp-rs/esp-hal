@@ -47,9 +47,9 @@ use proc_macro::TokenStream;
 mod alert;
 mod blocking;
 mod builder;
+mod doc_replace;
 #[cfg(feature = "embassy")]
 mod embassy;
-mod insert_snippet;
 mod interrupt;
 #[cfg(any(
     feature = "is-lp-core",
@@ -143,8 +143,7 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
     switch::enable_doc_switch(args, input)
 }
 
-/// Inserts the `before_snippet!` macro at the start of comment blocks in doc
-/// comments.
+/// Replaces placeholders in rustdoc code blocks.
 ///
 /// The purpose of this macro is to enable us to extract boilerplate, while at
 /// the same time let rustfmt format code blocks. This macro rewrites _all_ code
@@ -162,7 +161,7 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ## Examples
 ///
 /// ```rust, no_run
-/// #[insert_doc_snippet(
+/// #[doc_replace(
 ///   "literal_placeholder" => "literal value",
 ///   "conditional_placeholder" => {
 ///     cfg(condition1) => "value 1",
@@ -181,8 +180,8 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
 /// fn my_function() {}
 /// ```
 #[proc_macro_attribute]
-pub fn insert_doc_snippet(args: TokenStream, input: TokenStream) -> TokenStream {
-    insert_snippet::insert(args, input)
+pub fn doc_replace(args: TokenStream, input: TokenStream) -> TokenStream {
+    doc_replace::replace(args, input)
 }
 
 /// Mark a function as an interrupt handler.

@@ -756,7 +756,7 @@ impl<'d> Spi<'d, Blocking> {
         }
     }
 
-    #[procmacros::insert_doc_snippet(
+    #[procmacros::doc_replace(
         "dma_channel" => {
             cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
             _ => "let dma_channel = peripherals.DMA_CH0;",

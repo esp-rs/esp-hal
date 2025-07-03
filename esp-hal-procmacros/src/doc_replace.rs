@@ -169,7 +169,7 @@ impl Parse for Branch {
     }
 }
 
-pub(crate) fn insert(attr: TokenStream, input: TokenStream) -> TokenStream {
+pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
     let replacements: Replacements = match syn::parse(attr) {
         Ok(replacements) => replacements,
         Err(e) => return e.into_compile_error().into(),
