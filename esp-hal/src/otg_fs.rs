@@ -168,8 +168,7 @@ pub mod asynch {
         ///
         /// # Arguments
         ///
-        /// * `ep_out_buffer` - An internal buffer used to temporarily store
-        ///   received packets.
+        /// * `ep_out_buffer` - An internal buffer used to temporarily store received packets.
         ///
         /// Must be large enough to fit all OUT endpoint max packet sizes.
         /// Endpoint allocation will fail if it is too small.

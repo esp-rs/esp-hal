@@ -296,8 +296,7 @@ where
     /// Creates an instance of `RsaModularMultiplication`.
     ///
     /// - `r` can be calculated using `2 ^ ( bitlength * 2 ) mod modulus`.
-    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of
-    ///   modulus) mod 2^32`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of modulus) mod 2^32`.
     ///
     /// For more information refer to 20.3.1 of <https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf>.
     pub fn new(

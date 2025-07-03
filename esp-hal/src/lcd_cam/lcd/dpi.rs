@@ -501,8 +501,8 @@ where
 
     /// Sending out the [DmaTxBuffer] to the RGB/DPI interface.
     ///
-    /// - `next_frame_en`: Automatically send the next frame data when the
-    ///   current frame is sent out.
+    /// - `next_frame_en`: Automatically send the next frame data when the current frame is sent
+    ///   out.
     pub fn send<TX: DmaTxBuffer>(
         mut self,
         next_frame_en: bool,
@@ -716,8 +716,7 @@ pub struct Format {
 
     /// Configures the byte order for data transmission.
     ///
-    /// - In 8-bit mode, [ByteOrder::Inverted] means every two bytes are
-    ///   swapped.
+    /// - In 8-bit mode, [ByteOrder::Inverted] means every two bytes are swapped.
     /// - In 16-bit mode, this controls the byte order (endianness).
     pub byte_order: ByteOrder,
 

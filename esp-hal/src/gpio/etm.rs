@@ -14,12 +14,9 @@
 //!
 //! GPIO has several event channels, and the ETM events that each event
 //! channel can generate are:
-//! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO has
-//!   a rising edge
-//! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has
-//!   a falling edge
-//! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is
-//!   reversed
+//! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO has a rising edge
+//! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has a falling edge
+//! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is reversed
 //!
 //! ## Examples
 //! ### Toggle an LED When a Button is Pressed

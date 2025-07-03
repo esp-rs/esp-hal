@@ -11,12 +11,10 @@
 //! under any of the following conditions:
 //!
 //! - RF subsystem is enabled (i.e. Wi-Fi or Bluetooth are enabled).
-//! - An internal entropy source has been enabled by calling
-//!   `bootloader_random_enable()` and not yet disabled by calling
-//!   `bootloader_random_disable()`.
-//! - While the ESP-IDF Second stage bootloader is running. This is because the
-//!   default ESP-IDF bootloader implementation calls
-//!   `bootloader_random_enable()` when the bootloader starts, and
+//! - An internal entropy source has been enabled by calling `bootloader_random_enable()` and not
+//!   yet disabled by calling `bootloader_random_disable()`.
+//! - While the ESP-IDF Second stage bootloader is running. This is because the default ESP-IDF
+//!   bootloader implementation calls `bootloader_random_enable()` when the bootloader starts, and
 //!   `bootloader_random_disable()` before executing the app.
 //!
 //! When any of these conditions are true, samples of physical noise are

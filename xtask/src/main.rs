@@ -195,11 +195,14 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
             .build();
 
         if args.check {
-            cargo_args.push("--".into());
             cargo_args.push("--check".into());
         }
 
         cargo_args.push("--".into());
+        cargo_args.push(format!(
+            "--config-path={}/rustfmt.toml",
+            workspace.display()
+        ));
         cargo_args.extend_from_slice(&source_files);
 
         xtask::cargo::run(&cargo_args, &path)?;

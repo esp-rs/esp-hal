@@ -34,7 +34,8 @@ fn main() -> ! {
     println!();
 
     // The app descriptor (if present) is contained in the first 256 bytes
-    // of an app image, right after the image header (24 bytes) and the first section header (8 bytes)
+    // of an app image, right after the image header (24 bytes) and the first
+    // section header (8 bytes)
     let mut app_desc = [0u8; 256];
     pt.find_partition(partitions::PartitionType::App(
         partitions::AppPartitionSubType::Factory,

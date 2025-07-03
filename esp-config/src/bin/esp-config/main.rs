@@ -162,8 +162,7 @@ fn parse_configs(
 
     // Get the metadata of the project to
     // - discover configurable crates
-    // - get the active features on crates (e.g. to guess the chip the project is
-    //   targeting)
+    // - get the active features on crates (e.g. to guess the chip the project is targeting)
     // this might fetch the dependencies from registries and/or git repositories
     // so this
     // - might take a few seconds (while it's usually very quick)

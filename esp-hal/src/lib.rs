@@ -530,9 +530,8 @@ pub use private::Internal;
 /// # Safety
 ///
 /// - The type must be inhabited
-/// - The type must be valid for any bit pattern of its backing memory in case a
-///   reset occurs during a write or a reset interrupts the zero initialization
-///   on first boot.
+/// - The type must be valid for any bit pattern of its backing memory in case a reset occurs during
+///   a write or a reset interrupts the zero initialization on first boot.
 /// - Structs must contain only `Persistable` fields and padding
 #[instability::unstable]
 pub unsafe trait Persistable: Sized {}

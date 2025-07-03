@@ -276,8 +276,7 @@ impl<'d> Touch<'d, Continuous, Async> {
     ///
     /// ## Parameters:
     ///
-    /// - `rtc`: The RTC peripheral is needed to configure the required
-    ///   interrupts.
+    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts.
     /// - `config`: Optional configuration options.
     ///
     /// ## Example
@@ -414,9 +413,8 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///
     /// ## Parameters:
-    /// - `threshold`: The threshold above/below which the pin is considered
-    ///   touched. Above/below depends on the configuration of `touch` in
-    ///   [`new`](Self::new) (defaults to below).
+    /// - `threshold`: The threshold above/below which the pin is considered touched. Above/below
+    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
     ///
     /// ## Example
     pub fn enable_interrupt(&mut self, threshold: u16) {

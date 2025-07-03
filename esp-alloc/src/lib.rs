@@ -268,10 +268,8 @@ impl HeapRegion {
     ///
     /// # Safety
     ///
-    /// - The supplied memory region must be available for the entire program
-    ///   (`'static`).
-    /// - The supplied memory region must be exclusively available to the heap
-    ///   only, no aliasing.
+    /// - The supplied memory region must be available for the entire program (`'static`).
+    /// - The supplied memory region must be exclusively available to the heap only, no aliasing.
     /// - `size > 0`.
     pub unsafe fn new(
         heap_bottom: *mut u8,
@@ -412,18 +410,17 @@ impl EspHeap {
     ///
     /// - Memory is allocated from the first suitable memory region first
     ///
-    /// - The heap grows "upwards", towards larger addresses. Thus `end_addr`
-    ///   must be larger than `start_addr`
+    /// - The heap grows "upwards", towards larger addresses. Thus `end_addr` must be larger than
+    ///   `start_addr`
     ///
-    /// - The size of the heap is `(end_addr as usize) - (start_addr as usize)`.
-    ///   The allocator won't use the byte at `end_addr`.
+    /// - The size of the heap is `(end_addr as usize) - (start_addr as usize)`. The allocator won't
+    ///   use the byte at `end_addr`.
     ///
     /// # Safety
     ///
-    /// - The supplied memory region must be available for the entire program (a
-    ///   `'static` lifetime).
-    /// - The supplied memory region must be exclusively available to the heap
-    ///   only, no aliasing.
+    /// - The supplied memory region must be available for the entire program (a `'static`
+    ///   lifetime).
+    /// - The supplied memory region must be exclusively available to the heap only, no aliasing.
     /// - `size > 0`.
     pub unsafe fn add_region(&self, region: HeapRegion) {
         critical_section::with(|cs| {

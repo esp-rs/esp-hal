@@ -12,10 +12,8 @@
 //! Typically, the RMT peripheral can be used in the following scenarios:
 //! - Transmit or receive infrared signals, with any IR protocols, e.g., NEC
 //! - General-purpose sequence generator
-//! - Transmit signals in a hardware-controlled loop, with a finite or infinite
-//!   number of times
-//! - Modulate the carrier to the output signal or demodulate the carrier from
-//!   the input signal
+//! - Transmit signals in a hardware-controlled loop, with a finite or infinite number of times
+//! - Modulate the carrier to the output signal or demodulate the carrier from the input signal
 //!
 //! ### Channels
 //!

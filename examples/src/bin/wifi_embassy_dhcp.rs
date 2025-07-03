@@ -3,7 +3,8 @@
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 //!
-//! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
+//! This gets an ip address via DHCP then performs an HTTP get request to some
+//! "random" server
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 

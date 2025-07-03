@@ -96,8 +96,8 @@ async fn edge_counter_task(
         // This join will:
         // - first set up the pin to listen
         // - then poll the pin future once (which will return Pending)
-        // - then signal that the pin is listening, which enables the other core to
-        //   toggle the matching OutputPin
+        // - then signal that the pin is listening, which enables the other core to toggle the
+        //   matching OutputPin
         // - then will wait for the pin future to resolve.
         embassy_futures::join::join(in_pin.wait_for_any_edge(), async {
             signal.signal(edge_count);

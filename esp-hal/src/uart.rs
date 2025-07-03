@@ -525,9 +525,8 @@ pub enum ConfigError {
     ///
     /// This error is returned if:
     ///  * the baud rate exceeds 5MBaud or is equal to zero.
-    ///  * the user has specified an exact baud rate or with some percentage of
-    ///    deviation to the desired value, and the driver cannot reach this
-    ///    speed.
+    ///  * the user has specified an exact baud rate or with some percentage of deviation to the
+    ///    desired value, and the driver cannot reach this speed.
     UnsupportedBaudrate,
 
     /// The requested  timeout exceeds the maximum value (
@@ -2900,8 +2899,8 @@ impl Info {
     /// [ConfigError::UnsupportedTimeout] if the provided value exceeds
     /// the maximum value for SOC:
     /// - `esp32`: Symbol size is fixed to 8, do not pass a value > **0x7F**.
-    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The
-    ///   value you pass times the symbol size must be <= **0x3FF**
+    /// - `esp32c2`, `esp32c3`, `esp32c6`, `esp32h2`, esp32s2`, esp32s3`: The value you pass times
+    ///   the symbol size must be <= **0x3FF**
     fn set_rx_timeout(&self, timeout: Option<u8>, _symbol_len: u8) -> Result<(), ConfigError> {
         cfg_if::cfg_if! {
             if #[cfg(esp32)] {
