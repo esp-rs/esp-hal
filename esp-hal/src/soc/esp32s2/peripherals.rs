@@ -17,13 +17,11 @@ include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
 include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
 
 for_each_peripheral! {
-    ($name:ident <= $from_pac:tt $interrupts:tt) => {
+    (stable $name:ident <= $from_pac:tt $interrupts:tt) => {
         crate::create_peripheral!($name <= $from_pac $interrupts);
     };
-}
 
-for_each_unstable_peripheral! {
-    ($name:ident <= $from_pac:tt $interrupts:tt) => {
+    (unstable $name:ident <= $from_pac:tt $interrupts:tt) => {
         crate::create_peripheral!(#[instability::unstable] $name <= $from_pac $interrupts);
     };
 }

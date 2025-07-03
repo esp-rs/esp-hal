@@ -515,6 +515,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut stable = vec![];
         let mut unstable = vec![];
+        let mut all_peripherals = vec![];
 
         let mut stable_peris = vec![];
 
@@ -536,6 +537,7 @@ impl Config {
                 let tokens = quote::quote! {
                     #pin <= virtual ()
                 };
+                all_peripherals.push(quote::quote! { stable #tokens });
                 stable.push(tokens);
             }
         }
@@ -564,18 +566,18 @@ impl Config {
                 .iter()
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
+                all_peripherals.push(quote::quote! { stable #tokens });
                 stable.push(tokens);
             } else {
+                all_peripherals.push(quote::quote! { unstable #tokens });
                 unstable.push(tokens);
             }
         }
 
-        let for_each = generate_for_each_macro("peripheral", &stable);
-        let for_each_unstable = generate_for_each_macro("unstable_peripheral", &unstable);
+        let for_each = generate_for_each_macro("peripheral", &all_peripherals);
 
         quote::quote! {
             #for_each
-            #for_each_unstable
 
             crate::peripherals! {
                 peripherals: [
@@ -597,10 +599,10 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
         // macro that substitutes the properties into the template provided by the call in esp-hal.
         macro_rules! #macro_name {
             (
-                $pattern:tt => $code:tt;
+                $($pattern:tt => $code:tt;)*
             ) => {
                 macro_rules! _for_each_inner {
-                    ($pattern) => $code;
+                    $(($pattern) => $code;)*
                 }
 
                 #(_for_each_inner!(( #branches ));)*
