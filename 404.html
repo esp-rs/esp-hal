@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Page Moved</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Page Moved</h1>
+  <p>If you are not redirected automatically, <a id="manual-link" href="/index.html">click here</a>.</p>
+
+  <noscript>
+    <p style="color: red;">
+      JavaScript is required for automatic redirection. The page you're looking for has probably moved to:<br>
+      <a href="https://docs.espressif.com/projects/rust/">https://docs.espressif.com/projects/rust/</a>
+    </p>
+  </noscript>
+
+  <script>
+    (function () {
+      const path = window.location.pathname;
+
+      if (path.startsWith("/esp-hal/esp-hal")) {
+        window.location.href = "https://docs.espressif.com/projects/rust/esp-hal/latest/";
+      } else if (path.startsWith("/esp-hal/esp-wifi")) {
+        window.location.href = "https://docs.espressif.com/projects/rust/esp-wifi/latest/";
+      } else if (path.startsWith("/book")) {
+        const suffix = path.substring("/book/".length);
+        window.location.href = "http://docs.espressif.com/projects/rust/book/" + suffix;
+      } else if (path.startsWith("/no_std-training")) {
+        const suffix = path.substring("/no_std-training/".length);
+        window.location.href = "http://docs.espressif.com/projects/rust/no_std-training/" + suffix;
+      } else {
+        // Default fallback
+        window.location.href = "/index.html";
+      }
+    })();
+  </script>
+</body>
+</html>
