@@ -97,12 +97,7 @@ mod tests {
     #[test]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let _init = esp_wifi::init(
-            timg0.timer1,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap();
+        let _init = esp_wifi::init(timg0.timer1, Rng::new(peripherals.RNG)).unwrap();
 
         let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -145,12 +140,7 @@ mod tests {
                     }
 
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
-                    let _init = esp_wifi::init(
-                        timg0.timer1,
-                        Rng::new(peripherals.RNG),
-                        peripherals.RADIO_CLK,
-                    )
-                    .unwrap();
+                    let _init = esp_wifi::init(timg0.timer1, Rng::new(peripherals.RNG)).unwrap();
 
                     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -190,7 +180,6 @@ mod tests {
 fn esp_wifi_can_be_initialized_with_any_timer(
     timer: esp_hal::timer::AnyTimer<'static>,
     rng: esp_hal::rng::Rng,
-    radio_clocks: esp_hal::peripherals::RADIO_CLK<'static>,
 ) {
-    esp_wifi::init(timer, rng, radio_clocks);
+    esp_wifi::init(timer, rng);
 }

@@ -29,22 +29,12 @@ fn _esp_wifi_can_be_reinited() {
 
     {
         let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0.reborrow());
-        let _init = esp_wifi::init(
-            timg0.timer0,
-            Rng::new(p.RNG.reborrow()),
-            p.RADIO_CLK.reborrow(),
-        )
-        .unwrap();
+        let _init = esp_wifi::init(timg0.timer0, Rng::new(p.RNG.reborrow())).unwrap();
     }
 
     {
         let timg0 = TimerGroup::new(p.TIMG0.reborrow());
-        let _init = esp_wifi::init(
-            timg0.timer0,
-            Rng::new(p.RNG.reborrow()),
-            p.RADIO_CLK.reborrow(),
-        )
-        .unwrap();
+        let _init = esp_wifi::init(timg0.timer0, Rng::new(p.RNG.reborrow())).unwrap();
     }
 }
 
@@ -69,12 +59,7 @@ mod tests {
     #[test]
     fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = esp_wifi::init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap();
+        let init = esp_wifi::init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 

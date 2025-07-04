@@ -286,7 +286,7 @@ pub(super) fn enable_bt(en: bool) {
         .modify(|_, w| w.clk_coex_en().bit(en));
 }
 
-pub(super) fn reset_mac() {
+pub(super) fn reset_wifi_mac() {
     // empty
 }
 

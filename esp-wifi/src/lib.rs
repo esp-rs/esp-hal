@@ -109,10 +109,10 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-use esp_hal::{self as hal, clock::RadioClockController, peripherals::RADIO_CLK};
+use esp_hal as hal;
 use hal::{
     Blocking,
-    clock::Clocks,
+    clock::{Clocks, init_radio_clocks},
     rng::{Rng, Trng},
     time::Rate,
     timer::{AnyTimer, PeriodicTimer, timg::Timer as TimgTimer},
@@ -326,7 +326,6 @@ impl private::Sealed for Trng<'_> {}
 pub fn init<'d>(
     timer: impl EspWifiTimerSource + 'd,
     _rng: impl EspWifiRngSource + 'd,
-    _radio_clocks: RADIO_CLK<'d>,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
@@ -359,7 +358,7 @@ pub fn init<'d>(
     yield_task();
 
     wifi_set_log_verbose();
-    init_clocks();
+    init_radio_clocks();
 
     #[cfg(coex)]
     match crate::wifi::coex_initialize() {
@@ -424,9 +423,4 @@ pub fn wifi_set_log_verbose() {
 
         esp_wifi_internal_set_log_level(wifi_log_level_t_WIFI_LOG_VERBOSE);
     }
-}
-
-fn init_clocks() {
-    let radio_clocks = unsafe { RADIO_CLK::steal() };
-    RadioClockController::new(radio_clocks).init_clocks();
 }

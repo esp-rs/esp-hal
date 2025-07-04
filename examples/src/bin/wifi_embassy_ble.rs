@@ -64,12 +64,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
-        init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        init(timg0.timer0, Rng::new(peripherals.RNG),).unwrap()
     );
 
     let config = InputConfig::default().with_pull(Pull::Down);

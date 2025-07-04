@@ -79,7 +79,6 @@ peripherals = [
 
     { name = "ADC1", virtual = true },
     { name = "BT", virtual = true },
-    { name = "RADIO_CLK", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "MEM2MEM1", virtual = true },
     { name = "MEM2MEM4", virtual = true },

@@ -1,7 +1,12 @@
 use core::cell::RefCell;
 
 use critical_section::Mutex;
-use esp_hal::{clock::RadioClockController, handler, interrupt::Priority, peripherals::RADIO_CLK};
+use esp_hal::{
+    clock::{ModemClockController, PhyClockGuard, init_radio_clocks},
+    handler,
+    interrupt::Priority,
+    peripherals::IEEE802154,
+};
 use esp_wifi_sys::include::{
     esp_phy_calibration_data_t,
     esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
@@ -71,11 +76,10 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(radio_clock_control: RADIO_CLK<'_>) {
-    let mut radio_clock_control = RadioClockController::new(radio_clock_control);
-    radio_clock_control.init_clocks();
-    radio_clock_control.enable_phy(true);
-    radio_clock_control.enable_ieee802154(true);
+pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<'_> {
+    init_radio_clocks();
+    let phy_clock_guard = radio.enable_phy_clock();
+    radio.enable_modem_clock(true);
 
     esp_phy_enable();
     esp_btbb_enable();
@@ -83,6 +87,7 @@ pub(crate) fn esp_ieee802154_enable(radio_clock_control: RADIO_CLK<'_>) {
 
     unsafe { phy_version_print() }; // libphy.a
     info!("date={:x}", mac_date());
+    phy_clock_guard
 }
 
 fn esp_phy_enable() {
