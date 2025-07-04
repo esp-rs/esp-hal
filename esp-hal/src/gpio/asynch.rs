@@ -106,7 +106,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),
@@ -129,7 +129,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),
@@ -152,7 +152,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),
@@ -175,7 +175,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),
@@ -198,7 +198,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),
@@ -222,7 +222,7 @@ impl Input<'_> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Event, Input, InputConfig};
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
     /// let mut input_pin = Input::new(
     ///     peripherals.GPIO4,
     ///     InputConfig::default(),

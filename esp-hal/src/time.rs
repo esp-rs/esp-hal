@@ -53,7 +53,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_hz(1000);
     /// # Ok(())
     /// # }
@@ -69,7 +69,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_khz(1000);
     /// # Ok(())
     /// # }
@@ -85,7 +85,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_mhz(1000);
     /// # Ok(())
     /// # }
@@ -101,7 +101,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_hz(1000);
     /// let hz = rate.as_hz();
     /// # Ok(())
@@ -118,7 +118,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_khz(1000);
     /// let khz = rate.as_khz();
     /// # Ok(())
@@ -135,7 +135,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_mhz(1000);
     /// let mhz = rate.as_mhz();
     /// # Ok(())
@@ -152,7 +152,7 @@ impl Rate {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Rate;
+    /// use esp_hal::time::Rate;
     /// let rate = Rate::from_hz(1000);
     /// let duration = rate.as_duration();
     /// # Ok(())
@@ -250,7 +250,7 @@ impl Instant {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Instant;
+    /// use esp_hal::time::Instant;
     /// let now = Instant::now();
     /// # Ok(())
     /// # }
@@ -274,7 +274,7 @@ impl Instant {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Instant;
+    /// use esp_hal::time::Instant;
     /// let now = Instant::now();
     /// let duration = now.duration_since_epoch();
     /// # Ok(())
@@ -291,7 +291,7 @@ impl Instant {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Instant;
+    /// use esp_hal::time::Instant;
     /// let now = Instant::now();
     /// let duration = now.elapsed();
     /// # Ok(())
@@ -390,7 +390,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_micros(1000);
     /// # Ok(())
     /// # }
@@ -406,7 +406,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_millis(100);
     /// # Ok(())
     /// # }
@@ -422,7 +422,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_secs(1);
     /// # Ok(())
     /// # }
@@ -438,7 +438,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_minutes(1);
     /// # Ok(())
     /// # }
@@ -454,7 +454,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_hours(1);
     /// # Ok(())
     /// # }
@@ -473,7 +473,7 @@ impl Duration {
             ///
             /// ```rust, no_run
             #[doc = crate::before_snippet!()]
-            /// # use esp_hal::time::Duration;
+            /// use esp_hal::time::Duration;
             /// let duration = Duration::from_micros(1000);
             /// let micros = duration.as_micros();
             /// # Ok(())
@@ -488,7 +488,7 @@ impl Duration {
             ///
             /// ```rust, no_run
             #[doc = crate::before_snippet!()]
-            /// # use esp_hal::time::Duration;
+            /// use esp_hal::time::Duration;
             /// let duration = Duration::from_millis(100);
             /// let millis = duration.as_millis();
             /// # Ok(())
@@ -503,7 +503,7 @@ impl Duration {
             ///
             /// ```rust, no_run
             #[doc = crate::before_snippet!()]
-            /// # use esp_hal::time::Duration;
+            /// use esp_hal::time::Duration;
             /// let duration = Duration::from_secs(1);
             /// let secs = duration.as_secs();
             /// # Ok(())
@@ -518,7 +518,7 @@ impl Duration {
             ///
             /// ```rust, no_run
             #[doc = crate::before_snippet!()]
-            /// # use esp_hal::time::Duration;
+            /// use esp_hal::time::Duration;
             /// let duration = Duration::from_minutes(1);
             /// let minutes = duration.as_minutes();
             /// # Ok(())
@@ -533,7 +533,7 @@ impl Duration {
             ///
             /// ```rust, no_run
             #[doc = crate::before_snippet!()]
-            /// # use esp_hal::time::Duration;
+            /// use esp_hal::time::Duration;
             /// let duration = Duration::from_hours(1);
             /// let hours = duration.as_hours();
             /// # Ok(())
@@ -550,7 +550,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_secs(1);
     /// let duration2 = Duration::from_secs(2);
     ///
@@ -577,7 +577,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_secs(3);
     /// let duration2 = Duration::from_secs(1);
     ///
@@ -604,7 +604,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_secs(1);
     /// let duration2 = Duration::from_secs(2);
     ///
@@ -628,7 +628,7 @@ impl Duration {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::time::Duration;
+    /// use esp_hal::time::Duration;
     /// let duration = Duration::from_secs(3);
     /// let duration2 = Duration::from_secs(1);
     ///
