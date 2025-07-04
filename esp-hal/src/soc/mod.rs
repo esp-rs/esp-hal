@@ -162,6 +162,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 
 #[cfg(xtensa)]
 #[cfg(feature = "rt")]
+#[unsafe(no_mangle)]
 #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
 unsafe extern "C" fn ESP32Reset() -> ! {
     unsafe {

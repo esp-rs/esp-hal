@@ -717,7 +717,7 @@ mod plic {
     mod rt {
         use super::*;
         /// Get interrupt priority - called by assembly code
-        #[inline]
+        #[unsafe(no_mangle)]
         pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
             super::priority(cpu_interrupt)
         }
@@ -787,7 +787,7 @@ mod rt {
     }
 
     #[doc(hidden)]
-    #[cfg_attr(feature = "rt", unsafe(no_mangle))]
+    #[unsafe(no_mangle)]
     unsafe fn _setup_interrupts() {
         unsafe extern "C" {
             static _vector_table: *const u32;
@@ -819,6 +819,7 @@ mod rt {
         }
     }
 
+    #[unsafe(no_mangle)]
     #[ram]
     unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
         let core = Cpu::current();
