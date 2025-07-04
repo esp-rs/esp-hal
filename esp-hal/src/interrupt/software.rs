@@ -76,6 +76,10 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
     ///
     /// Use this method if you would like to keep working with the peripheral
     /// after you dropped the driver that consumes this.
+    ///
+    /// See [Peripheral singleton] section for more information.
+    ///
+    /// [Peripheral singleton]: crate#peripheral-singletons
     pub fn reborrow(&mut self) -> SoftwareInterrupt<'_, NUM> {
         unsafe { SoftwareInterrupt::steal() }
     }
