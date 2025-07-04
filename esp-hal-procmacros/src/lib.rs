@@ -59,7 +59,6 @@ mod interrupt;
 ))]
 mod lp_core;
 mod ram;
-mod switch;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -116,31 +115,6 @@ mod switch;
 #[proc_macro_attribute]
 pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     ram::ram(args, input)
-}
-
-/// Enables an alternative syntax to cfg-gate `#[doc]` comments.
-///
-/// The branches can be `cfg` conditions or a catch-all condition using `_`.
-/// Multiple branches may be active at the same time, and all active branches
-/// will be added to the documentation. The catch-all condition `_` is only
-/// used if no other branches are active.
-///
-/// # Example
-///
-/// ```rust, no_run
-/// #[enable_doc_switch]
-/// /// Untouched documentation.
-/// #[doc_switch(
-///     cfg(feature = "foo") => "Documentation for foo feature",
-///     cfg(feature = "bar") => "Documentation for bar feature",
-///     _ => "Documentation for cases where neither feature is enabled"
-/// )]
-/// /// More documentation.
-/// fn my_function() {}
-/// ```
-#[proc_macro_attribute]
-pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
-    switch::enable_doc_switch(args, input)
 }
 
 /// Replaces placeholders in rustdoc doc comments.
