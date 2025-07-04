@@ -119,7 +119,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             crate::execute_app(
                 &package_path,
                 args.chip,
-                target,
+                &target,
                 test,
                 action.clone(),
                 args.repeat,
@@ -136,7 +136,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             if crate::execute_app(
                 &package_path,
                 args.chip,
-                target,
+                &target,
                 &test,
                 action.clone(),
                 args.repeat,

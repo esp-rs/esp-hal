@@ -179,7 +179,7 @@ pub fn run_examples(
                 && crate::execute_app(
                     package_path,
                     args.chip,
-                    target,
+                    &target,
                     &example,
                     CargoAction::Run,
                     1,
