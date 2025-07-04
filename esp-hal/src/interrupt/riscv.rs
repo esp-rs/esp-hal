@@ -408,10 +408,9 @@ mod vectored {
                     assigned_cpu_interrupt(core::mem::transmute::<u16, Interrupt>(
                         interrupt_nr as u16,
                     ))
+                    && priority_by_core(core, cpu_interrupt) == priority
                 {
-                    if priority_by_core(core, cpu_interrupt) == priority {
-                        res.set(interrupt_nr);
-                    }
+                    res.set(interrupt_nr);
                 }
             }
             res
