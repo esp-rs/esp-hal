@@ -397,6 +397,10 @@ impl Timer<'_> {
     ///
     /// Use this method if you would like to keep working with the peripheral
     /// after you dropped the driver that consumes this.
+    ///
+    /// See [Peripheral singleton] section for more information.
+    ///
+    /// [Peripheral singleton]: crate#peripheral-singletons
     pub fn reborrow(&mut self) -> Timer<'_> {
         unsafe { self.clone_unchecked() }
     }
