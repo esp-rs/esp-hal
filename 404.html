@@ -37,6 +37,8 @@
       } else if (path.startsWith("/no_std-training")) {
         const suffix = path.substring("/no_std-training/".length);
         window.location.href = "http://docs.espressif.com/projects/rust/no_std-training/" + suffix;
+      } else if (path.startsWith("/esp-hal")) {
+        window.location.href = "https://docs.espressif.com/projects/rust/esp-hal/latest/";
       } else {
         // Default fallback
         window.location.href = "/index.html";
