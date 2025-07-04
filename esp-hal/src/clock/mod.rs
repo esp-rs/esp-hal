@@ -330,7 +330,7 @@ impl Clocks {
     #[cfg(systimer)]
     #[inline]
     pub(crate) fn xtal_freq() -> Rate {
-        if let true = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto"
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto"
             && let Some(clocks) = Self::try_get()
         {
             return clocks.xtal_clock;
