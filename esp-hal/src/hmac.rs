@@ -327,10 +327,7 @@ impl<'d> Hmac<'d> {
 
         self.byte_written = self.byte_written.wrapping_add(pad_len);
 
-        assert_eq!(
-            self.byte_written.is_multiple_of(64) as usize,
-            64 - core::mem::size_of::<u64>()
-        );
+        assert_eq!(self.byte_written % 64, 64 - core::mem::size_of::<u64>());
 
         // Add padded key
         let len_mem = (msg_len * 8).to_be_bytes();
