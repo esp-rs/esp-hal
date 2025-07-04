@@ -122,6 +122,22 @@ macro_rules! create_peripheral {
 include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
 include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
 
+for_each_gpio! {
+    ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($($attr:ident)*)) => {
+        $(
+            crate::io_type!($attr, $pin_peri);
+        )*
+    };
+
+    (all $( ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt $attrs:tt) ),*) => {
+        crate::gpio! {
+            $( ($n, $pin_peri $af_ins $af_outs) )*
+        }
+    };
+}
+
+define_io_mux_reg!();
+
 for_each_peripheral! {
     // Define stable peripheral singletons
     ($name:ident <= $from_pac:tt $interrupts:tt) => {

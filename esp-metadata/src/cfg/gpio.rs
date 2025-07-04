@@ -6,7 +6,7 @@ use std::str::FromStr;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 
-use crate::number;
+use crate::{generate_for_each_macro, number};
 
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
 /// These don't get turned into symbols, but are used to generate code.
@@ -244,13 +244,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
     };
 
-    let mut io_type_macro_calls = vec![];
-    for (pin, attrs) in pin_peris.iter().zip(pin_attrs.iter()) {
-        io_type_macro_calls.push(quote::quote! {
-            #( crate::io_type!(#attrs, #pin); )*
-        })
-    }
-
     // Generates a macro that can select between a `then` and an `else` branch based
     // on whether a pin implement a certain attribute.
     //
@@ -314,17 +307,31 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
     };
 
-    quote::quote! {
-        crate::gpio! {
-            #( (#pin_numbers, #pin_peris #pin_afs) )*
-        }
+    let mut branches = vec![];
+    for (((n, p), af), attrs) in pin_numbers
+        .iter()
+        .zip(pin_peris.iter())
+        .zip(pin_afs.iter())
+        .zip(pin_attrs.iter())
+    {
+        branches.push(quote::quote! {
+            #n, #p #af (#(#attrs)*)
+        })
+    }
 
-        #( #io_type_macro_calls )*
+    let for_each = generate_for_each_macro("gpio", &branches);
+
+    quote::quote! {
+        #for_each
 
         #if_pin_is_type
         #impl_for_pin_type
 
-        #io_mux_accessor
+        macro_rules! define_io_mux_reg {
+            () => {
+                #io_mux_accessor
+            };
+        }
     }
 }
 
