@@ -377,6 +377,8 @@ mod gdma;
 mod m2m;
 #[cfg(pdma)]
 mod pdma;
+#[cfg(all(sd_slave, esp32c6))]
+pub mod sdio;
 
 /// Kinds of interrupt to listen to.
 #[derive(Debug, EnumSetType)]
@@ -721,6 +723,8 @@ macro_rules! dma_descriptor_count {
         }
     }};
 }
+#[doc(hidden)]
+pub use dma_descriptor_count;
 
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaTxBuf`.
@@ -934,6 +938,24 @@ impl From<u32> for Owner {
         match value {
             0 => Owner::Cpu,
             _ => Owner::Dma,
+        }
+    }
+}
+
+impl From<bool> for Owner {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Owner::Cpu,
+            true => Owner::Dma,
+        }
+    }
+}
+
+impl From<Owner> for bool {
+    fn from(value: Owner) -> Self {
+        match value {
+            Owner::Cpu => false,
+            Owner::Dma => true,
         }
     }
 }

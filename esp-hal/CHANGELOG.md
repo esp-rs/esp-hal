@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 - SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
+- ESP32-C6: Added SDIO dedicated DMA types (#3749)
 
 ### Changed
 
