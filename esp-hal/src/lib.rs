@@ -205,6 +205,7 @@ metadata!("build_info", CHIP_NAME, chip!());
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
+pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
@@ -218,8 +219,6 @@ pub use self::soc::efuse;
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
-pub use self::soc::peripherals;
-pub(crate) use self::soc::peripherals::pac;
 #[instability::unstable]
 #[cfg(feature = "psram")]
 pub use self::soc::psram;
@@ -234,6 +233,7 @@ pub mod clock;
 pub mod gpio;
 #[cfg(any(soc_has_i2c0, soc_has_i2c1))]
 pub mod i2c;
+pub mod peripherals;
 #[cfg(all(feature = "unstable", any(soc_has_hmac, soc_has_sha)))]
 mod reg_access;
 #[cfg(any(soc_has_spi0, soc_has_spi1, soc_has_spi2, soc_has_spi3))]
@@ -244,7 +244,6 @@ pub mod time;
 pub mod uart;
 
 mod macros;
-mod peripheral;
 
 pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
