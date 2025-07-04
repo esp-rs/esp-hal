@@ -706,158 +706,155 @@ impl Default for RxChannelConfig {
     }
 }
 
-// Declare input/output signals in a const array.
-macro_rules! declare_signals {
-    ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
-        const $name: [crate::gpio::$type; $count] = [
-            $(crate::gpio::$type::$entry,)*
-        ];
-    };
-}
+// Channel specification
 
+// Looping all channels: Build up the Rmt struct and compute NUM_CHANNELS
 macro_rules! declare_channels {
-    // Final step of the macro, when all input has been iterated over: Declares the Rmt struct and
-    // its constructor.
-    (@define_rmt {
-        () -> (
-            [$($field_decl:tt)*],
-            [$($field_init:tt)*]
-        )
-    }) => {
-        /// RMT Instance
-        pub struct Rmt<'d, Dm>
-        where
-            Dm: $crate::DriverMode,
-        {
-            pub(super) peripheral: $crate::peripherals::RMT<'d>,
-            $($field_decl)+
-            _mode: ::core::marker::PhantomData<Dm>,
-        }
+    ($($num:literal),+ $(,)?) => {
+        paste::paste! {
+            /// RMT Instance
+            pub struct Rmt<'d, Dm>
+            where
+                Dm: crate::DriverMode,
+            {
+                pub(super) peripheral: RMT<'d>,
+                $(
+                    #[doc = concat!("RMT Channel ", $num)]
+                    pub [<channel $num>]: ChannelCreator<Dm, $num>,
+                )+
+                _mode: PhantomData<Dm>,
+            }
 
-        impl<'d, Dm> Rmt<'d, Dm>
-        where
-            Dm: crate::DriverMode,
-        {
-            fn create(peripheral: crate::peripherals::RMT<'d>) -> Self {
-                Self {
-                    peripheral,
-                    $($field_init)+
-                    _mode: ::core::marker::PhantomData,
+            impl<'d, Dm> Rmt<'d, Dm>
+            where
+                Dm: crate::DriverMode,
+            {
+                fn create(peripheral: RMT<'d>) -> Self {
+                    Self {
+                        peripheral,
+                        $(
+                            [<channel $num>]: ChannelCreator::conjure(),
+                        )+
+                        _mode: PhantomData,
+                    }
                 }
             }
+
+            #[allow(clippy::no_effect)]
+            const NUM_CHANNELS: usize = const { 0 $( + {$num; 1} )+ };
         }
-    };
-
-    // Iteration step of the macro when going through channels: Takes one entry from the channel
-    // declaration and builds up field definitions for the Rmt struct as well as corresponding
-    // initializers.
-    (@define_rmt {
-        ([$name:ident, $num:literal] $(, $($ch:tt),+)?)
-        -> (
-            [$($field_decl:tt)*],
-            [$($field_init:tt)*]
-        )
-    }) => {
-        declare_channels! (@define_rmt {
-            ($($($ch),+)?) -> ([
-                $($field_decl)*
-                #[doc = concat!("RMT Channel ", $num)]
-                pub $name: ChannelCreator<Dm, $num>,
-            ], [
-                $($field_init)*
-                $name: $crate::rmt::ChannelCreator {
-                    _mode: ::core::marker::PhantomData,
-                    _guard: $crate::system::GenericPeripheralGuard::new(),
-                },
-            ])
-        });
-    };
-
-    // The main entry-point of the macro: takes a comma-separated list of channels,
-    // allowing for a trailing comma.
-    ($($ch:tt),+ $(,)?) => {
-        declare_channels! (@define_rmt { ($($ch),+) -> ([], []) });
     };
 }
 
-const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
+// Looping channel indices: Declare input/output signals and ChannelIndex
+// The number of Rx and Tx channels is identical for all chips.
+macro_rules! declare_tx_channels {
+    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+        paste::paste! {
+            #[allow(clippy::no_effect)]
+            const CHANNEL_INDEX_COUNT: u8 = const { 0 $( + {$idx; 1} )+ };
+
+            const OUTPUT_SIGNALS: [crate::gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
+                $(
+                    crate::gpio::OutputSignal::[< RMT_SIG_ $idx >],
+                )+
+            ];
+
+            $(
+                impl<'d, Dm> TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                where
+                    Dm: crate::DriverMode,
+                {
+                    type Raw = ConstChannelAccess<Tx, $num>;
+                    const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
+                }
+            )+
+        }
+    };
+}
+
+macro_rules! declare_rx_channels {
+    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+        paste::paste! {
+            const INPUT_SIGNALS: [crate::gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
+                $(
+                    crate::gpio::InputSignal::[< RMT_SIG_ $idx >],
+                )+
+            ];
+
+            $(
+                impl<'d, Dm> RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                where
+                    Dm: crate::DriverMode,
+                {
+                    type Raw = ConstChannelAccess<$crate::rmt::Rx, $num>;
+                    const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
+                }
+            )+
+        }
+    };
+}
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [4, 4],
+            [5, 5],
+            [6, 6],
+            [7, 7],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+        declare_rx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [4, 4],
+            [5, 5],
+            [6, 6],
+            [7, 7],
         );
     } else if #[cfg(esp32s2)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+        declare_channels!(0, 1, 2, 3);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+        declare_rx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
     } else if #[cfg(esp32s3)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+        declare_rx_channels!(
+            [4, 0],
+            [5, 1],
+            [6, 2],
+            [7, 3],
         );
     } else {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+        declare_channels!(0, 1, 2, 3);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+        declare_rx_channels!(
+            [2, 0],
+            [3, 1],
         );
     }
 }
@@ -1384,32 +1381,6 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
     }
 }
 
-macro_rules! impl_tx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Tx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
-macro_rules! impl_rx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Rx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
 /// RMT Channel Creator
 pub struct ChannelCreator<Dm, const CHANNEL: u8>
 where
@@ -1420,6 +1391,13 @@ where
 }
 
 impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+    fn conjure() -> ChannelCreator<Dm, CHANNEL> {
+        ChannelCreator {
+            _mode: PhantomData,
+            _guard: GenericPeripheralGuard::new(),
+        }
+    }
+
     /// Unsafely steal a channel creator instance.
     ///
     /// # Safety
@@ -1433,62 +1411,6 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
             _guard: GenericPeripheralGuard::new(),
         }
     }
-}
-
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-    impl_tx_channel_creator!(4);
-    impl_tx_channel_creator!(5);
-    impl_tx_channel_creator!(6);
-    impl_tx_channel_creator!(7);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
-}
-
-#[cfg(esp32s2)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32s3)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
 }
 
 /// Channel in TX mode
