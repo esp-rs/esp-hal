@@ -5,14 +5,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{ensure, Context as _, Result};
+use anyhow::{Context as _, Result, ensure};
 use clap::ValueEnum;
 use esp_metadata::Config;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use crate::{cargo::CargoArgsBuilder, Chip, Package};
+use crate::{Chip, Package, cargo::CargoArgsBuilder};
 
 // ----------------------------------------------------------------------------
 // Build Documentation
@@ -210,7 +210,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         .arg("--lib")
         .arg("--no-deps");
 
-    if let Some(target) = target {
+    if let Some(ref target) = target {
         builder = builder.target(target);
     }
 
@@ -239,7 +239,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         workspace.join(package.to_string()).join("target")
     };
 
-    if let Some(target) = target {
+    if let Some(ref target) = target {
         docs_path = docs_path.join(target);
     }
     docs_path = docs_path.join("doc");

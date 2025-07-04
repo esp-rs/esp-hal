@@ -54,6 +54,7 @@ pub enum Package {
     EspIeee802154,
     EspLpHal,
     EspMetadata,
+    EspMetadataGenerated,
     EspPrintln,
     EspRiscvRt,
     EspStorage,
@@ -77,6 +78,7 @@ impl Package {
                 | EspBootloaderEspIdf
                 | EspHal
                 | EspHalEmbassy
+                | EspMetadataGenerated
                 | EspRomSys
                 | EspIeee802154
                 | EspLpHal
@@ -140,7 +142,13 @@ impl Package {
 
         matches!(
             self,
-            EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspRomSys | EspBootloaderEspIdf
+            EspHal
+                | EspLpHal
+                | EspWifi
+                | EspHalEmbassy
+                | EspRomSys
+                | EspBootloaderEspIdf
+                | EspMetadataGenerated
         )
     }
 
@@ -155,10 +163,12 @@ impl Package {
     }
 
     /// Build on host
-    pub fn build_on_host(&self) -> bool {
-        use Package::*;
-
-        matches!(self, EspConfig | EspMetadata)
+    pub fn build_on_host(&self, features: &[String]) -> bool {
+        match self {
+            Self::EspConfig | Self::EspMetadata => true,
+            Self::EspMetadataGenerated if features.iter().any(|f| f == "build-script") => true,
+            _ => false,
+        }
     }
 
     /// Given a device config, return the features which should be enabled for
@@ -229,6 +239,9 @@ impl Package {
             Package::EspAlloc => {
                 features.push("defmt".to_owned());
             }
+            Package::EspMetadataGenerated => {
+                features.push("build-script".to_owned());
+            }
             _ => {}
         }
 
@@ -239,21 +252,27 @@ impl Package {
     pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
 
-        if self == &Package::EspWifi {
-            // Minimal set of features that when enabled _should_ still compile:
-            cases.push(vec![
-                "esp-hal/unstable".to_owned(),
-                "builtin-scheduler".to_owned(),
-            ]);
+        match self {
+            Package::EspWifi => {
+                // Minimal set of features that when enabled _should_ still compile:
+                cases.push(vec![
+                    "esp-hal/unstable".to_owned(),
+                    "builtin-scheduler".to_owned(),
+                ]);
+            }
+            Package::EspMetadataGenerated => {
+                cases.push(vec!["build-script".to_owned()]);
+            }
+            _ => {}
         }
 
         cases
     }
 
     /// Return the target triple for a given package/chip pair.
-    pub fn target_triple(&self, chip: &Chip) -> Result<&'static str> {
+    pub fn target_triple(&self, chip: &Chip) -> Result<String> {
         if *self == Package::EspLpHal {
-            chip.lp_target()
+            chip.lp_target().map(ToString::to_string)
         } else {
             Ok(chip.target())
         }

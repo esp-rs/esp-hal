@@ -3237,7 +3237,7 @@ fn estimate_ack_failed_reason(_register_block: &RegisterBlock) -> AcknowledgeChe
     }
 }
 
-crate::peripherals::for_each_i2c_master!(
+for_each_i2c_master!(
     ($inst:ident, $peri:ident, $scl:ident, $sda:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&Info, &State) {

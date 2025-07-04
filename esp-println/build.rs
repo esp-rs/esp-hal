@@ -1,6 +1,5 @@
 use std::{env, path::Path};
 
-use esp_metadata::Chip;
 use log_04::LevelFilter;
 
 #[macro_export]
@@ -14,27 +13,14 @@ macro_rules! assert_unique_used_features {
     };
 }
 
-fn main() {
-    // Ensure that only a single chip is specified
-    let chip = if cfg!(feature = "esp32p4") {
-        None
-    } else {
-        Some(Chip::from_cargo_feature().unwrap())
-    };
-
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that only a single communication method is specified
     assert_unique_used_features!("jtag-serial", "uart", "auto");
 
+    let chip = esp_metadata_generated::build::Chip::from_cargo_feature()?;
     // Ensure that, if the `jtag-serial` communication method feature is enabled,
     // a compatible chip feature is also enabled.
-
-    // TODO: replace with Config once the P4 is supported by esp-hal (we're using
-    // Config::for_chip to reject P4 currently)
-    let has_jtag_serial = cfg!(feature = "esp32p4")
-        || matches!(
-            chip,
-            Some(Chip::Esp32c3 | Chip::Esp32c6 | Chip::Esp32h2 | Chip::Esp32s3)
-        );
+    let has_jtag_serial = chip.contains("soc_has_usb_device");
 
     if cfg!(feature = "jtag-serial") && !has_jtag_serial {
         panic!(
@@ -62,6 +48,8 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=ESP_LOG");
     println!("cargo:rustc-check-cfg=cfg(host_is_windows)");
+
+    Ok(())
 }
 
 fn generate_filter_snippet() {

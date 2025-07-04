@@ -299,7 +299,7 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    if !package.build_on_host() {
+    if !package.build_on_host(features) {
         if chip.is_xtensa() {
             // In case the user doesn't specify a toolchain, make sure we use +esp
             toolchain.get_or_insert("esp");
@@ -308,7 +308,7 @@ fn lint_package(
     }
 
     if let Some(toolchain) = toolchain {
-        if !package.build_on_host() && toolchain.starts_with("esp") {
+        if !package.build_on_host(features) && toolchain.starts_with("esp") {
             builder = builder.arg("-Zbuild-std=core,alloc");
         }
         builder = builder.toolchain(toolchain);

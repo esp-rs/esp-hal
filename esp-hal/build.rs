@@ -8,7 +8,6 @@ use std::{
 };
 
 use esp_config::{Value, generate_config_from_yaml_definition};
-use esp_metadata::{Chip, Config};
 
 #[macro_export]
 macro_rules! assert_unique_features {
@@ -35,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_features!("log-04", "defmt");
 
     // Ensure that exactly one chip has been specified:
-    let chip = Chip::from_cargo_feature()?;
+    let chip = esp_metadata_generated::build::Chip::from_cargo_feature()?;
 
     if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
         panic!("
@@ -46,12 +45,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         ");
     }
 
-    // Load the configuration file for the configured device:
-    let config = Config::for_chip(&chip);
-
     // Define all necessary configuration symbols for the configured device:
-    config.define_symbols();
-    config.generate_metadata();
+    chip.define_cfgs();
 
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
@@ -62,17 +57,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-hal");
-    let cfg =
-        generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
+    let cfg = generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
-    let mut config_symbols = config.all().to_vec();
+    let mut config_symbols = chip.all_symbols().to_vec();
 
     for (key, value) in &cfg {
         if let Value::Bool(true) = value {
-            config_symbols.push(key.to_string());
+            config_symbols.push(key.as_str());
         }
     }
 
@@ -119,7 +113,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // With the architecture-specific linker scripts taken care of, we can copy all
     // remaining linker scripts which are common to all devices:
     copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{chip}"), &out)?;
+    copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.name()), &out)?;
 
     Ok(())
 }
@@ -128,7 +122,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 
 fn copy_dir_all(
-    config_symbols: &[String],
+    config_symbols: &[&str],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -158,7 +152,7 @@ fn copy_dir_all(
 
 /// A naive pre-processor for linker scripts
 fn preprocess_file(
-    config: &[String],
+    config: &[&str],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -177,7 +171,7 @@ fn preprocess_file(
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.iter().any(|c| c.as_str() == condition);
+            let should_take = should_take && config.contains(&condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {

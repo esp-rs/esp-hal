@@ -263,11 +263,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
 
         quote::quote! {
+            #[macro_export]
             macro_rules! if_pin_is_type {
                 #(#branches)*
             }
-
-            pub(crate) use if_pin_is_type;
         }
     };
 
@@ -280,9 +279,9 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         let mut impl_branches = vec![];
         for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
             impl_branches.push(quote::quote! {
-                #gpionum => $crate::peripherals::if_pin_is_type!(#peri, $on_type, {{
+                #gpionum => if_pin_is_type!(#peri, $on_type, {{
                     #[allow(unused_unsafe, unused_mut)]
-                    let mut $inner_ident = unsafe { $crate::peripherals::#peri::steal() };
+                    let mut $inner_ident = unsafe { crate::peripherals::#peri::steal() };
                     #[allow(unused_braces)]
                     $code
                 }} else {
@@ -292,6 +291,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
 
         quote::quote! {
+            #[macro_export]
+            #[expect(clippy::crate_in_macro_def)]
             macro_rules! impl_for_pin_type {
                 ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
                     match $any_pin.number() {
@@ -303,7 +304,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                     impl_for_pin_type!($any_pin, $inner_ident, $on_type, $code else { panic!("Unsupported") })
                 };
             }
-            pub(crate) use impl_for_pin_type;
         }
     };
 
@@ -320,6 +320,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     }
 
     let for_each = generate_for_each_macro("gpio", &branches);
+    let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
+    let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
     quote::quote! {
         #for_each
@@ -327,21 +329,21 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         #if_pin_is_type
         #impl_for_pin_type
 
+        #[macro_export]
+        macro_rules! define_io_mux_signals {
+            () => {
+                #input_signals
+                #output_signals
+            };
+        }
+
+        #[macro_export]
+        #[expect(clippy::crate_in_macro_def)]
         macro_rules! define_io_mux_reg {
             () => {
                 #io_mux_accessor
             };
         }
-    }
-}
-
-pub(crate) fn generate_iomux_signals(gpio: &super::GpioProperties) -> TokenStream {
-    let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
-    let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
-
-    quote::quote! {
-        #input_signals
-        #output_signals
     }
 }
 

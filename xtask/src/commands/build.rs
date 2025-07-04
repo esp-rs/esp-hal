@@ -135,7 +135,7 @@ pub fn build_examples(
             crate::execute_app(
                 package_path,
                 args.chip,
-                target,
+                &target,
                 example,
                 CargoAction::Build(out_path.to_path_buf()),
                 1,
@@ -154,7 +154,7 @@ pub fn build_examples(
             crate::execute_app(
                 package_path,
                 args.chip,
-                target,
+                &target,
                 example,
                 CargoAction::Build(out_path.to_path_buf()),
                 1,

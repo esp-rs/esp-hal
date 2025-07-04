@@ -211,14 +211,14 @@ fn parse_configs(
     }
 
     let mut configs = Vec::new();
-    let chip = esp_metadata::Config::for_chip(chip.as_ref().unwrap());
+    let chip = esp_metadata_generated::build::Chip::from_str(chip.unwrap().as_ref()).unwrap();
     let features = vec![];
     for krate in meta.packages {
         let maybe_cfg = krate.manifest_path.parent().unwrap().join("esp_config.yml");
         if maybe_cfg.exists() {
             let yaml = std::fs::read_to_string(&maybe_cfg)?;
             let (cfg, options) =
-                esp_config::evaluate_yaml_config(&yaml, Some(chip.clone()), features.clone(), true)
+                esp_config::evaluate_yaml_config(&yaml, Some(chip), features.clone(), true)
                     .map_err(|e| {
                         format!(
                             "Error evaluating YAML config for crate {}: {}",

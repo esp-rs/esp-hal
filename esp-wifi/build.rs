@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use esp_config::generate_config_from_yaml_definition;
-use esp_metadata::{Chip, Config};
+use esp_metadata_generated::build::Chip;
 
 #[macro_export]
 macro_rules! assert_unique_features {
@@ -17,10 +17,9 @@ macro_rules! assert_unique_features {
 fn main() -> Result<(), Box<dyn Error>> {
     // Load the configuration file for the configured device:
     let chip = Chip::from_cargo_feature()?;
-    let config = Config::for_chip(&chip);
 
     // Define all necessary configuration symbols for the configured device:
-    config.define_symbols();
+    chip.define_cfgs();
 
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
@@ -28,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_features!("log-04", "defmt");
 
     assert!(
-        !cfg!(feature = "ble") || config.contains("bt"),
+        !cfg!(feature = "ble") || chip.contains("bt"),
         r#"
 
         BLE is not supported on this target.
@@ -36,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "#
     );
     assert!(
-        !cfg!(feature = "wifi") || config.contains("wifi"),
+        !cfg!(feature = "wifi") || chip.contains("wifi"),
         r#"
 
         WiFi is not supported on this target.
@@ -58,7 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     #[cfg(feature = "coex")]
     {
         assert!(
-            config.contains("wifi") && config.contains("bt"),
+            chip.contains("wifi") && chip.contains("bt"),
             r#"
 
             WiFi/Bluetooth coexistence is not supported on this target.
@@ -83,7 +82,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-wifi");
-    generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(config.clone())).unwrap();
+    generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
     Ok(())
 }
