@@ -1,14 +1,15 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "etm_availability" => {
+        cfg(soc_has_etm) => "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
+    }
+))]
 //! # General Purpose Input/Output (GPIO)
 //!
 //! ## Overview
 //!
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
-#![cfg_attr(
-    soc_has_etm,
-    doc = "The GPIO pins also provide tasks and events via the ETM interconnect system. For more information, see the [etm] module."
-)]
-#![doc = ""]
+//! # {etm_availability}
 //! ## Working with pins
 //!
 //! After initializing the HAL, you can access the individual pins using the
@@ -922,6 +923,7 @@ pub struct Output<'d> {
 impl private::Sealed for Output<'_> {}
 
 impl<'d> Output<'d> {
+    #[procmacros::doc_replace]
     /// Creates a new GPIO output driver.
     ///
     /// The `initial_level` parameter sets the initial output level of the pin.
@@ -935,9 +937,11 @@ impl<'d> Output<'d> {
     /// the pin is low.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Output, OutputConfig};
-    /// use esp_hal::delay::Delay;
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     gpio::{Level, Output, OutputConfig},
+    /// };
     ///
     /// fn blink_once(led: &mut Output<'_>, delay: &mut Delay) {
     ///     led.set_low();
@@ -950,8 +954,7 @@ impl<'d> Output<'d> {
     /// let mut delay = Delay::new();
     ///
     /// blink_once(&mut led, &mut delay);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
@@ -1087,6 +1090,7 @@ pub struct Input<'d> {
 impl private::Sealed for Input<'_> {}
 
 impl<'d> Input<'d> {
+    #[procmacros::doc_replace]
     /// Creates a new GPIO input.
     ///
     /// The `pull` parameter configures internal pull-up or pull-down
@@ -1099,9 +1103,11 @@ impl<'d> Input<'d> {
     /// when the button is pressed.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Input, InputConfig, Pull};
-    /// use esp_hal::delay::Delay;
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     gpio::{Input, InputConfig, Level, Pull},
+    /// };
     ///
     /// fn print_when_pressed(button: &mut Input<'_>, delay: &mut Delay) {
     ///     let mut was_pressed = false;
@@ -1120,8 +1126,7 @@ impl<'d> Input<'d> {
     /// let mut delay = Delay::new();
     ///
     /// print_when_pressed(&mut button, &mut delay);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
@@ -1135,6 +1140,7 @@ impl<'d> Input<'d> {
         Self { pin }
     }
 
+    #[procmacros::doc_replace]
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1144,13 +1150,14 @@ impl<'d> Input<'d> {
     /// [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
+    /// #
     /// # use esp_hal::gpio::{Input, InputConfig, Pull};
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
     /// let pin1 = pin1_gpio.peripheral_input();
-    /// # Ok(())
-    /// # }
+    /// #
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1181,6 +1188,7 @@ impl<'d> Input<'d> {
         self.pin.apply_input_config(config)
     }
 
+    #[procmacros::doc_replace]
     /// Listen for interrupts.
     ///
     /// The interrupts will be handled by the handler set using
@@ -1197,8 +1205,8 @@ impl<'d> Input<'d> {
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Event, Input, InputConfig, Pull, Io};
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig, Io, Pull};
     ///
     /// let mut io = Io::new(peripherals.IO_MUX);
     /// io.set_interrupt_handler(handler);
@@ -1216,19 +1224,18 @@ impl<'d> Input<'d> {
     ///     button.listen(Event::LowLevel);
     ///     BUTTON.borrow_ref_mut(cs).replace(button);
     /// });
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     ///
     /// // Outside of your `main` function:
     ///
     /// # use esp_hal::gpio::Input;
     /// use core::cell::RefCell;
+    ///
     /// use critical_section::Mutex;
     ///
     /// // You will need to store the `Input` object in a static variable so
     /// // that the interrupt handler can access it.
-    /// static BUTTON: Mutex<RefCell<Option<Input>>> =
-    ///     Mutex::new(RefCell::new(None));
+    /// static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
     ///
     /// #[handler]
     /// fn handler() {

@@ -47,6 +47,7 @@ use proc_macro::TokenStream;
 mod alert;
 mod blocking;
 mod builder;
+mod doc_replace;
 #[cfg(feature = "embassy")]
 mod embassy;
 mod interrupt;
@@ -58,7 +59,6 @@ mod interrupt;
 ))]
 mod lp_core;
 mod ram;
-mod switch;
 
 /// Sets which segment of RAM to use for a function or static and how it should
 /// be initialized.
@@ -117,29 +117,49 @@ pub fn ram(args: TokenStream, input: TokenStream) -> TokenStream {
     ram::ram(args, input)
 }
 
-/// Enables an alternative syntax to cfg-gate `#[doc]` comments.
+/// Replaces placeholders in rustdoc doc comments.
 ///
-/// The branches can be `cfg` conditions or a catch-all condition using `_`.
-/// Multiple branches may be active at the same time, and all active branches
-/// will be added to the documentation. The catch-all condition `_` is only
-/// used if no other branches are active.
+/// The purpose of this macro is to enable us to extract boilerplate, while at
+/// the same time let rustfmt format code blocks. This macro rewrites the whole
+/// documentation of the annotated item.
 ///
-/// # Example
+/// Replacements can be placed in the documentation as `# {placeholder}`. Each
+/// replacement must be its own line, it's not possible to place a placeholder in the middle of a
+/// line. The `before_snippet` and `after_snippet` placeholders are expanded to the
+/// `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros, and are expected to be
+/// used in example code blocks.
+///
+/// You can also define custom replacements in the attribute. A replacement can be
+/// an unconditional literal (i.e. a string that is always substituted into the doc comment),
+/// or a conditional.
+///
+/// ## Examples
 ///
 /// ```rust, no_run
-/// #[enable_doc_switch]
-/// /// Untouched documentation.
-/// #[doc_switch(
-///     cfg(feature = "foo") => "Documentation for foo feature",
-///     cfg(feature = "bar") => "Documentation for bar feature",
-///     _ => "Documentation for cases where neither feature is enabled"
+/// #[doc_replace(
+///   "literal_placeholder" => "literal value",
+///   "conditional_placeholder" => {
+///     cfg(condition1) => "value 1",
+///     cfg(condition2) => "value 2",
+///     _ => "neither value 1 nor value 2",
+///   }
 /// )]
-/// /// More documentation.
+/// /// Here comes the documentation.
+/// ///
+/// /// The replacements are interpreted outside of code blocks, too:
+/// /// # {literal_placeholder}
+/// ///
+/// /// ```rust, no run
+/// /// // here is some code
+/// /// # {literal_placeholder}
+/// /// // here is some more code
+/// /// # {conditional_placeholder}
+/// /// ```
 /// fn my_function() {}
 /// ```
 #[proc_macro_attribute]
-pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
-    switch::enable_doc_switch(args, input)
+pub fn doc_replace(args: TokenStream, input: TokenStream) -> TokenStream {
+    doc_replace::replace(args, input)
 }
 
 /// Mark a function as an interrupt handler.
