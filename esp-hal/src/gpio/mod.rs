@@ -9,7 +9,7 @@
 //!
 //! Each pin can be used as a general-purpose I/O, or be connected to one or
 //! more internal peripheral signals.
-//! #{etm_availability}
+//! # {etm_availability}
 //! ## Working with pins
 //!
 //! After initializing the HAL, you can access the individual pins using the
@@ -937,7 +937,7 @@ impl<'d> Output<'d> {
     /// the pin is low.
     ///
     /// ```rust, no_run
-    /// #{before_snippet}
+    /// # {before_snippet}
     /// use esp_hal::{
     ///     delay::Delay,
     ///     gpio::{Level, Output, OutputConfig},
@@ -954,7 +954,7 @@ impl<'d> Output<'d> {
     /// let mut delay = Delay::new();
     ///
     /// blink_once(&mut led, &mut delay);
-    /// #{after_snippet}
+    /// # {after_snippet}
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
@@ -1103,7 +1103,7 @@ impl<'d> Input<'d> {
     /// when the button is pressed.
     ///
     /// ```rust, no_run
-    /// #{before_snippet}
+    /// # {before_snippet}
     /// use esp_hal::{
     ///     delay::Delay,
     ///     gpio::{Input, InputConfig, Level, Pull},
@@ -1126,7 +1126,7 @@ impl<'d> Input<'d> {
     /// let mut delay = Delay::new();
     ///
     /// print_when_pressed(&mut button, &mut delay);
-    /// #{after_snippet}
+    /// # {after_snippet}
     /// ```
     // FIXME: when https://github.com/esp-rs/esp-hal/issues/2839 is resolved, add an appropriate `# Error` entry.
     #[inline]
@@ -1150,14 +1150,14 @@ impl<'d> Input<'d> {
     /// [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
-    /// #{before_snippet}
+    /// # {before_snippet}
     /// #
     /// # use esp_hal::gpio::{Input, InputConfig, Pull};
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
     /// let pin1 = pin1_gpio.peripheral_input();
     /// #
-    /// #{after_snippet}
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1205,7 +1205,7 @@ impl<'d> Input<'d> {
     ///
     /// ### Print something when a button is pressed.
     /// ```rust, no_run
-    /// #{before_snippet}
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Event, Input, InputConfig, Io, Pull};
     ///
     /// let mut io = Io::new(peripherals.IO_MUX);
@@ -1224,7 +1224,7 @@ impl<'d> Input<'d> {
     ///     button.listen(Event::LowLevel);
     ///     BUTTON.borrow_ref_mut(cs).replace(button);
     /// });
-    /// #{after_snippet}
+    /// # {after_snippet}
     ///
     /// // Outside of your `main` function:
     ///

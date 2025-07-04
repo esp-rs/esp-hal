@@ -768,7 +768,7 @@ impl<'d> Spi<'d, Blocking> {
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
     /// ```rust, no_run
-    /// #{before_snippet}
+    /// # {before_snippet}
     /// # use esp_hal::spi::Mode;
     /// # use esp_hal::spi::master::{Config, Spi};
     /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
@@ -795,7 +795,7 @@ impl<'d> Spi<'d, Blocking> {
     /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
-    /// #{after_snippet}
+    /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {

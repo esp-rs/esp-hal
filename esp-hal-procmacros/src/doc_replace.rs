@@ -26,16 +26,16 @@ struct Replacements {
 impl Replacements {
     fn get(&self, line: &str, outer: bool) -> Option<Vec<Attribute>> {
         let attributes = match line {
-            "#{before_snippet}" if outer => vec![syn::parse_quote! {
+            "# {before_snippet}" if outer => vec![syn::parse_quote! {
                 #[doc = crate::before_snippet!()]
             }],
-            "#{before_snippet}" => vec![syn::parse_quote! {
+            "# {before_snippet}" => vec![syn::parse_quote! {
                 #![doc = crate::before_snippet!()]
             }],
-            "#{after_snippet}" if outer => vec![syn::parse_quote! {
+            "# {after_snippet}" if outer => vec![syn::parse_quote! {
                 #[doc = crate::after_snippet!()]
             }],
-            "#{after_snippet}" => vec![syn::parse_quote! {
+            "# {after_snippet}" => vec![syn::parse_quote! {
                 #![doc = crate::after_snippet!()]
             }],
             _ => {
@@ -122,7 +122,7 @@ impl Parse for Replacement {
         let replacement: ReplacementKind = input.parse()?;
 
         Ok(Self {
-            placeholder: format!("#{{{}}}", placeholder.value()),
+            placeholder: format!("# {{{}}}", placeholder.value()),
             replacement,
         })
     }
@@ -180,33 +180,16 @@ pub(crate) fn replace(attr: TokenStream, input: TokenStream) -> TokenStream {
     let mut replacement_attrs = Vec::new();
 
     let attrs = item.attrs_mut();
-    let mut in_code_block = false;
     for attr in attrs {
         if let Meta::NameValue(MetaNameValue { path, value, .. }) = &attr.meta
             && let Some(ident) = path.get_ident()
             && ident == "doc"
             && let Expr::Lit(lit) = value
             && let Lit::Str(doc) = &lit.lit
+            && let Some(replacement) =
+                replacements.get(doc.value().trim(), attr.style == AttrStyle::Outer)
         {
-            let doc_line = doc.value();
-            let doc_line = doc_line.trim();
-            if doc_line.starts_with("```") {
-                if in_code_block {
-                    // Closing code block
-                    replacement_attrs.push(attr.clone());
-                    in_code_block = false;
-                } else {
-                    // Opening code block
-                    in_code_block = true;
-                    replacement_attrs.push(attr.clone());
-                }
-            } else if let Some(replacement) =
-                replacements.get(doc_line, attr.style == AttrStyle::Outer)
-            {
-                replacement_attrs.extend(replacement);
-            } else {
-                replacement_attrs.push(attr.clone());
-            }
+            replacement_attrs.extend(replacement);
         } else {
             replacement_attrs.push(attr.clone());
         }

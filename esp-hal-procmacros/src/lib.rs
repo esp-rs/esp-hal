@@ -143,16 +143,17 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
     switch::enable_doc_switch(args, input)
 }
 
-/// Replaces placeholders in rustdoc code blocks.
+/// Replaces placeholders in rustdoc doc comments.
 ///
 /// The purpose of this macro is to enable us to extract boilerplate, while at
-/// the same time let rustfmt format code blocks. This macro rewrites _all_ code
-/// blocks in the current item's documentation.
+/// the same time let rustfmt format code blocks. This macro rewrites the whole
+/// documentation of the annotated item.
 ///
-/// Replacements can be placed in the code block as `#{placeholder}`. Each
+/// Replacements can be placed in the documentation as `# {placeholder}`. Each
 /// replacement must be its own line, it's not possible to place a placeholder in the middle of a
 /// line. The `before_snippet` and `after_snippet` placeholders are expanded to the
-/// `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros.
+/// `esp_hal::before_snippet!()` and `esp_hal::after_snippet!()` macros, and are expected to be
+/// used in example code blocks.
 ///
 /// You can also define custom replacements in the attribute. A replacement can be
 /// an unconditional literal (i.e. a string that is always substituted into the doc comment),
@@ -171,11 +172,14 @@ pub fn enable_doc_switch(args: TokenStream, input: TokenStream) -> TokenStream {
 /// )]
 /// /// Here comes the documentation.
 /// ///
+/// /// The replacements are interpreted outside of code blocks, too:
+/// /// # {literal_placeholder}
+/// ///
 /// /// ```rust, no run
 /// /// // here is some code
-/// /// #{literal_placeholder}
+/// /// # {literal_placeholder}
 /// /// // here is some more code
-/// /// #{conditional_placeholder}
+/// /// # {conditional_placeholder}
 /// /// ```
 /// fn my_function() {}
 /// ```
