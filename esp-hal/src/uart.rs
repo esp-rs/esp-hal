@@ -477,7 +477,7 @@ where
 ///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
-/// # use esp_hal::uart::{Config, Uart};
+/// use esp_hal::uart::{Config, Uart};
 /// let mut uart = Uart::new(
 ///     peripherals.UART0,
 ///     Config::default())?
@@ -616,7 +616,7 @@ impl<'d> UartTx<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, UartTx};
+    /// use esp_hal::uart::{Config, UartTx};
     /// let tx = UartTx::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -910,7 +910,7 @@ impl<'d> UartRx<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, UartRx};
+    /// use esp_hal::uart::{Config, UartRx};
     /// let rx = UartRx::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1237,7 +1237,7 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1290,8 +1290,8 @@ impl<'d> Uart<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::delay::Delay;
-    /// # use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
+    /// use esp_hal::delay::Delay;
+    /// use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
     /// # let delay = Delay::new();
     /// # let config = Config::default().with_rx(
     /// #    RxConfig::default().with_fifo_full_threshold(30)
@@ -1314,14 +1314,14 @@ impl<'d> Uart<'d, Blocking> {
     /// }
     /// # }
     ///
-    /// # use core::cell::RefCell;
-    /// # use critical_section::Mutex;
-    /// # use esp_hal::uart::Uart;
+    /// use core::cell::RefCell;
+    /// use critical_section::Mutex;
+    /// use esp_hal::uart::Uart;
     /// static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
     ///     Mutex::new(RefCell::new(None));
     ///
-    /// # use esp_hal::uart::UartInterrupt;
-    /// # use core::fmt::Write;
+    /// use esp_hal::uart::UartInterrupt;
+    /// use core::fmt::Write;
     /// #[handler]
     /// fn interrupt_handler() {
     ///     critical_section::with(|cs| {
@@ -1402,7 +1402,7 @@ impl<'d> Uart<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1433,7 +1433,7 @@ impl<'d> Uart<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1474,7 +1474,7 @@ impl<'d> Uart<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1554,7 +1554,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1577,7 +1577,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1597,7 +1597,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1618,7 +1618,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?
@@ -1664,7 +1664,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?;
@@ -1684,7 +1684,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?;
@@ -1729,7 +1729,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?;
@@ -1759,7 +1759,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?;
@@ -1786,7 +1786,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::uart::{Config, Uart};
+    /// use esp_hal::uart::{Config, Uart};
     /// let mut uart = Uart::new(
     ///     peripherals.UART0,
     ///     Config::default())?

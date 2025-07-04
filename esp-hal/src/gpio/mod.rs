@@ -826,7 +826,7 @@ macro_rules! gpio {
             ///
             /// ```rust, no_run
             #[doc = $crate::before_snippet!()]
-            /// # use esp_hal::gpio::AnyPin;
+            /// use esp_hal::gpio::AnyPin;
             /// let pin = unsafe { AnyPin::steal(1) };
             /// # Ok(())
             /// # }
@@ -847,7 +847,7 @@ macro_rules! gpio {
             ///
             /// ```rust, no_run
             #[doc = $crate::before_snippet!()]
-            /// # use esp_hal::gpio::AnyPin;
+            /// use esp_hal::gpio::AnyPin;
             /// let pin = unsafe { AnyPin::steal(1) };
             /// let pin_cloned = unsafe { pin.clone_unchecked() };
             /// # Ok(())
@@ -867,7 +867,7 @@ macro_rules! gpio {
             ///
             /// ```rust, no_run
             #[doc = $crate::before_snippet!()]
-            /// # use esp_hal::gpio::AnyPin;
+            /// use esp_hal::gpio::AnyPin;
             /// let mut pin = unsafe { AnyPin::steal(1) };
             /// let pin_reborrowed = pin.reborrow();
             /// # Ok(())
@@ -1014,7 +1014,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Output, OutputConfig, Level};
+    /// use esp_hal::gpio::{Output, OutputConfig, Level};
     /// # let config = OutputConfig::default();
     /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
     /// let output = pin1_gpio.into_peripheral_output();
@@ -1033,7 +1033,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig, DriveMode};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig, DriveMode};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     ///
     /// pin.apply_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
@@ -1052,7 +1052,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
     /// pin.set_high();
     ///
@@ -1070,7 +1070,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.set_low();
     ///
@@ -1088,7 +1088,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.set_level(Level::Low);
     ///
@@ -1109,7 +1109,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let is_high = pin.is_set_high();
     ///
@@ -1130,7 +1130,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let is_low = pin.is_set_low();
     ///
@@ -1151,7 +1151,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let level = pin.output_level();
     ///
@@ -1172,7 +1172,7 @@ impl<'d> Output<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Level, Output, OutputConfig};
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.toggle();
     ///
@@ -1283,7 +1283,7 @@ impl<'d> Input<'d> {
     /// ```rust, no_run
     /// # {before_snippet}
     /// #
-    /// # use esp_hal::gpio::{Input, InputConfig, Pull};
+    /// use esp_hal::gpio::{Input, InputConfig, Pull};
     /// let config = InputConfig::default().with_pull(Pull::Up);
     /// let pin1_gpio = Input::new(peripherals.GPIO1, config);
     /// let pin1 = pin1_gpio.peripheral_input();
@@ -1302,7 +1302,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig};
+    /// use esp_hal::gpio::{Input, InputConfig};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let is_high = pin.is_high();
     ///
@@ -1320,7 +1320,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig};
+    /// use esp_hal::gpio::{Input, InputConfig};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let is_low = pin.is_low();
     ///
@@ -1338,7 +1338,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Level};
+    /// use esp_hal::gpio::{Input, InputConfig, Level};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let level = pin.level();
     ///
@@ -1356,7 +1356,7 @@ impl<'d> Input<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{Input, InputConfig, Level, Pull};
+    /// use esp_hal::gpio::{Input, InputConfig, Level, Pull};
     /// let mut pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// pin.apply_config(&InputConfig::default().with_pull(Pull::Up));
     ///
@@ -1407,10 +1407,10 @@ impl<'d> Input<'d> {
     ///
     /// // Outside of your `main` function:
     ///
-    /// # use esp_hal::gpio::Input;
     /// use core::cell::RefCell;
     ///
     /// use critical_section::Mutex;
+    /// use esp_hal::gpio::Input;
     ///
     /// // You will need to store the `Input` object in a static variable so
     /// // that the interrupt handler can access it.
@@ -1714,7 +1714,7 @@ impl<'d> Flex<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Flex;
+    /// use esp_hal::gpio::Flex;
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
@@ -1743,7 +1743,7 @@ impl<'d> Flex<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Flex;
+    /// use esp_hal::gpio::Flex;
     /// let pin1 = Flex::new(peripherals.GPIO1);
     /// let (input, output) = pin1.split();
     /// # Ok(())
@@ -1808,7 +1808,7 @@ impl<'d> Flex<'d> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::Flex;
+    /// use esp_hal::gpio::Flex;
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an output.
     /// let pin1 = pin1_gpio.into_peripheral_output();
@@ -1900,7 +1900,7 @@ impl<'lt> AnyPin<'lt> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::gpio::{AnyPin, Pin};
+    /// use esp_hal::gpio::{AnyPin, Pin};
     /// let pin1 = peripherals.GPIO1.degrade();
     /// let (input, output) = unsafe { pin1.split() };
     /// # Ok(())

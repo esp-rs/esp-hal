@@ -625,7 +625,7 @@ impl Default for Config {
 ///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
-/// # use esp_hal::i2c::master::{Config, I2c};
+/// use esp_hal::i2c::master::{Config, I2c};
 /// # const DEVICE_ADDR: u8 = 0x77;
 /// let mut i2c = I2c::new(
 ///     peripherals.I2C0,
@@ -697,7 +697,7 @@ impl<'d> I2c<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// let i2c = I2c::new(
     ///     peripherals.I2C0,
     ///     Config::default(),
@@ -955,7 +955,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.I2C0,
@@ -989,7 +989,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.I2C0,
@@ -1025,7 +1025,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.I2C0,
@@ -1083,7 +1083,7 @@ impl<'d> I2c<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c, Operation};
+    /// use esp_hal::i2c::master::{Config, I2c, Operation};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let mut i2c = I2c::new(
     ///     peripherals.I2C0,
@@ -1154,7 +1154,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
     /// let i2c = I2c::new(
     ///     peripherals.I2C0,
@@ -1179,7 +1179,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
@@ -1199,7 +1199,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
@@ -1234,7 +1234,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
@@ -1278,7 +1278,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c, Operation};
+    /// use esp_hal::i2c::master::{Config, I2c, Operation};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
     /// #   Config::default(),
@@ -1322,7 +1322,7 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::i2c::master::{Config, I2c};
+    /// use esp_hal::i2c::master::{Config, I2c};
     /// let mut i2c = I2c::new(
     ///     peripherals.I2C0,
     ///     Config::default(),
