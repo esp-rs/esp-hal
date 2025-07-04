@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "rt"), expect(unused))]
+
 use core::ops::Range;
 
 use portable_atomic::{AtomicU8, Ordering};
@@ -142,6 +144,7 @@ pub(crate) fn addr_in_range(addr: usize, range: Range<usize>) -> bool {
     range.contains(&addr)
 }
 
+#[cfg(feature = "rt")]
 #[cfg(riscv)]
 #[unsafe(export_name = "hal_main")]
 fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
@@ -158,6 +161,7 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
 }
 
 #[cfg(xtensa)]
+#[cfg(feature = "rt")]
 #[unsafe(no_mangle)]
 #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
 unsafe extern "C" fn ESP32Reset() -> ! {
@@ -234,11 +238,13 @@ unsafe extern "C" fn ESP32Reset() -> ! {
     unsafe { xtensa_lx_rt::Reset() }
 }
 
+#[cfg(feature = "rt")]
 #[unsafe(export_name = "__stack_chk_fail")]
 unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
+#[cfg(feature = "rt")]
 fn setup_stack_guard() {
     unsafe extern "C" {
         static mut __stack_chk_guard: u32;

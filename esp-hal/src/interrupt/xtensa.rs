@@ -1,8 +1,10 @@
 //! Interrupt handling
 
+use procmacros::ram;
 use xtensa_lx::interrupt;
 #[cfg(esp32)]
 pub(crate) use xtensa_lx::interrupt::free;
+#[cfg(feature = "rt")]
 use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
@@ -368,8 +370,6 @@ pub(crate) unsafe fn change_current_runlevel(level: Priority) -> Priority {
 }
 
 mod vectored {
-    use procmacros::ram;
-
     use super::*;
 
     /// Interrupt priority levels.
@@ -468,7 +468,11 @@ mod vectored {
 
     /// Get the interrupts configured for the core
     #[inline(always)]
-    fn configured_interrupts(core: Cpu, status: InterruptStatus, level: u32) -> InterruptStatus {
+    pub(crate) fn configured_interrupts(
+        core: Cpu,
+        status: InterruptStatus,
+        level: u32,
+    ) -> InterruptStatus {
         unsafe {
             let intr_map_base = match core {
                 Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
@@ -567,7 +571,7 @@ mod vectored {
 
     // TODO use CpuInterrupt::LevelX.mask() // TODO make it const
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    static CPU_INTERRUPT_LEVELS: [u32; 8] = [
+    pub(crate) static CPU_INTERRUPT_LEVELS: [u32; 8] = [
         0b_0000_0000_0000_0000_0000_0000_0000_0000, // Dummy level 0
         0b_0000_0000_0000_0110_0011_0111_1111_1111, // Level_1
         0b_0000_0000_0011_1000_0000_0000_0000_0000, // Level 2
@@ -578,27 +582,78 @@ mod vectored {
         0b_0000_0000_0000_0000_0100_0000_0000_0000, // Level 7
     ];
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
+    pub(crate) static CPU_INTERRUPT_INTERNAL: u32 = 0b_0010_0000_0000_0001_1000_1000_1100_0000;
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
+    pub(crate) static CPU_INTERRUPT_EDGE: u32 = 0b_0111_0000_0100_0000_0000_1100_1000_0000;
 
-    #[inline]
-    fn cpu_interrupt_nr_to_cpu_interrupt_handler(
-        number: u32,
-    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
-        use xtensa_lx_rt::*;
-        // we're fortunate that all esp variants use the same CPU interrupt layout
-        Some(match number {
-            6 => Timer0,
-            7 => Software0,
-            11 => Profiling,
-            14 => NMI,
-            15 => Timer1,
-            16 => Timer2,
-            29 => Software1,
-            _ => return None,
-        })
+    #[cfg(esp32)]
+    pub(crate) mod chip_specific {
+        use super::*;
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+            0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1111_1100_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0000_0000_0011,
+        );
+        #[inline]
+        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+            [
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
+            ]
+            .contains(&interrupt)
+        }
     }
+
+    #[cfg(esp32s2)]
+    pub(crate) mod chip_specific {
+        use super::*;
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
+            0b0000_0000_0000_0000_0000_0000_0000_0000,
+            0b1100_0000_0000_0000_0000_0000_0000_0000,
+            0b0000_0000_0000_0000_0000_0011_1011_1111,
+        );
+        #[inline]
+        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
+            [
+                Interrupt::TG0_T0_EDGE,
+                Interrupt::TG0_T1_EDGE,
+                Interrupt::TG0_WDT_EDGE,
+                Interrupt::TG0_LACT_EDGE,
+                Interrupt::TG1_T0_EDGE,
+                Interrupt::TG1_T1_EDGE,
+                Interrupt::TG1_WDT_EDGE,
+                Interrupt::TG1_LACT_EDGE,
+                Interrupt::SYSTIMER_TARGET0,
+                Interrupt::SYSTIMER_TARGET1,
+                Interrupt::SYSTIMER_TARGET2,
+            ]
+            .contains(&interrupt)
+        }
+    }
+
+    #[cfg(esp32s3)]
+    pub(crate) mod chip_specific {
+        use super::*;
+        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
+        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
+        #[inline]
+        pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
+            false
+        }
+    }
+}
+
+#[cfg(feature = "rt")]
+mod rt {
+    use super::{vectored::*, *};
 
     #[unsafe(no_mangle)]
     #[ram]
@@ -696,74 +751,25 @@ mod vectored {
         }
     }
 
-    #[cfg(esp32)]
-    mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1111_1100_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0000_0000_0011,
-        );
-        #[inline]
-        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            [
-                Interrupt::TG0_T0_EDGE,
-                Interrupt::TG0_T1_EDGE,
-                Interrupt::TG0_WDT_EDGE,
-                Interrupt::TG0_LACT_EDGE,
-                Interrupt::TG1_T0_EDGE,
-                Interrupt::TG1_T1_EDGE,
-                Interrupt::TG1_WDT_EDGE,
-                Interrupt::TG1_LACT_EDGE,
-            ]
-            .contains(&interrupt)
-        }
+    #[inline]
+    pub(crate) fn cpu_interrupt_nr_to_cpu_interrupt_handler(
+        number: u32,
+    ) -> Option<unsafe extern "C" fn(save_frame: &mut Context)> {
+        use xtensa_lx_rt::*;
+        // we're fortunate that all esp variants use the same CPU interrupt layout
+        Some(match number {
+            6 => Timer0,
+            7 => Software0,
+            11 => Profiling,
+            14 => NMI,
+            15 => Timer1,
+            16 => Timer2,
+            29 => Software1,
+            _ => return None,
+        })
     }
 
-    #[cfg(esp32s2)]
-    mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::from(
-            0b0000_0000_0000_0000_0000_0000_0000_0000,
-            0b1100_0000_0000_0000_0000_0000_0000_0000,
-            0b0000_0000_0000_0000_0000_0011_1011_1111,
-        );
-        #[inline]
-        pub fn interrupt_is_edge(interrupt: Interrupt) -> bool {
-            [
-                Interrupt::TG0_T0_EDGE,
-                Interrupt::TG0_T1_EDGE,
-                Interrupt::TG0_WDT_EDGE,
-                Interrupt::TG0_LACT_EDGE,
-                Interrupt::TG1_T0_EDGE,
-                Interrupt::TG1_T1_EDGE,
-                Interrupt::TG1_WDT_EDGE,
-                Interrupt::TG1_LACT_EDGE,
-                Interrupt::SYSTIMER_TARGET0,
-                Interrupt::SYSTIMER_TARGET1,
-                Interrupt::SYSTIMER_TARGET2,
-            ]
-            .contains(&interrupt)
-        }
-    }
-
-    #[cfg(esp32s3)]
-    mod chip_specific {
-        use super::*;
-        #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-        pub static INTERRUPT_EDGE: InterruptStatus = InterruptStatus::empty();
-        #[inline]
-        pub fn interrupt_is_edge(_interrupt: Interrupt) -> bool {
-            false
-        }
-    }
-}
-
-mod raw {
-    use super::*;
-
+    // Raw handlers for CPU interrupts, assembly only.
     unsafe extern "C" {
         fn level4_interrupt(save_frame: &mut Context);
         fn level5_interrupt(save_frame: &mut Context);

@@ -160,6 +160,19 @@
 //!
 //! You might want to consider using [`#[deny(clippy::mem_forget)`](https://rust-lang.github.io/rust-clippy/v0.0.212/index.html#mem_forget) in your project.
 //!
+//! ## Library usage
+//!
+//! If you intend to write a library that uses esp-hal, you should import it as follows:
+//!
+//! ```toml
+//! [dependencies]
+//! esp-hal = { version = "1", default-features = false } }
+//! ```
+//!
+//! This ensures that the `rt` feature is not enabled, nor any chip features. The application that
+//! uses your library will then be able to choose the chip feature it needs and enable `rt` such
+//! that only the final user application calls [`init`].
+//!
 //! [documentation]: https://docs.espressif.com/projects/rust/esp-hal/latest/
 //! [examples]: https://github.com/esp-rs/esp-hal/tree/main/examples
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
@@ -201,12 +214,13 @@ use esp_rom_sys as _;
 
 metadata!("build_info", CHIP_NAME, chip!());
 
-#[cfg(riscv)]
+#[cfg(all(riscv, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
 pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
+#[cfg(all(xtensa, feature = "rt"))]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
@@ -245,6 +259,7 @@ pub mod uart;
 
 mod macros;
 
+#[cfg(feature = "rt")]
 pub use procmacros::blocking_main as main;
 #[cfg(any(lp_core, ulp_riscv_core))]
 #[cfg(feature = "unstable")]
@@ -365,6 +380,7 @@ unstable_driver! {
 
 /// State of the CPU saved when entering exception or interrupt
 #[instability::unstable]
+#[cfg(feature = "rt")]
 #[allow(unused_imports)]
 pub mod trapframe {
     #[cfg(riscv)]
@@ -561,18 +577,19 @@ pub mod __macro_implementation {
     #[instability::unstable]
     pub const fn assert_is_persistable<T: super::Persistable>() {}
 
+    #[cfg(feature = "rt")]
     #[cfg(riscv)]
     pub use esp_riscv_rt::entry as __entry;
+    #[cfg(feature = "rt")]
     #[cfg(xtensa)]
     pub use xtensa_lx_rt::entry as __entry;
 }
 
+use crate::clock::CpuClock;
 #[cfg(feature = "unstable")]
 use crate::config::{WatchdogConfig, WatchdogStatus};
-use crate::{
-    clock::{Clocks, CpuClock},
-    peripherals::Peripherals,
-};
+#[cfg(feature = "rt")]
+use crate::{clock::Clocks, peripherals::Peripherals};
 
 /// System configuration.
 ///
@@ -606,6 +623,7 @@ pub struct Config {
 ///
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
+#[cfg(feature = "rt")]
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 

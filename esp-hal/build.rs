@@ -56,7 +56,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
     // files:
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    println!("cargo:rustc-link-search={}", out.display());
 
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
@@ -76,18 +75,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if chip.is_xtensa() {
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
+    // Only emit linker directives if the `rt` feature is enabled
+    #[cfg(feature = "rt")]
+    {
+        println!("cargo:rustc-link-search={}", out.display());
 
-        let (irtc, drtc) = if cfg!(feature = "esp32s3") {
-            ("rtc_fast_seg", "rtc_fast_seg")
-        } else {
-            ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
-        };
+        if chip.is_xtensa() {
+            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
 
-        let alias = format!(
-            r#"
+            let (irtc, drtc) = if cfg!(feature = "esp32s3") {
+                ("rtc_fast_seg", "rtc_fast_seg")
+            } else {
+                ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
+            };
+
+            let alias = format!(
+                r#"
             REGION_ALIAS("ROTEXT", irom_seg);
             REGION_ALIAS("RWTEXT", iram_seg);
             REGION_ALIAS("RODATA", drom_seg);
@@ -95,31 +99,32 @@ fn main() -> Result<(), Box<dyn Error>> {
             REGION_ALIAS("RTC_FAST_RWTEXT", {irtc});
             REGION_ALIAS("RTC_FAST_RWDATA", {drtc});
         "#
-        );
+            );
 
-        fs::write(out.join("alias.x"), alias)?;
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
-    } else {
-        // RISC-V devices:
+            fs::write(out.join("alias.x"), alias)?;
+            fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        } else {
+            // RISC-V devices:
 
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/asserts.x",
-            out.join("asserts.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/hal-defaults.x",
-            out.join("hal-defaults.x"),
-        )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/asserts.x",
+                out.join("asserts.x"),
+            )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/hal-defaults.x",
+                out.join("hal-defaults.x"),
+            )?;
+        }
+
+        // With the architecture-specific linker scripts taken care of, we can copy all
+        // remaining linker scripts which are common to all devices:
+        copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
+        copy_dir_all(&config_symbols, &cfg, format!("ld/{chip}"), &out)?;
     }
-
-    // With the architecture-specific linker scripts taken care of, we can copy all
-    // remaining linker scripts which are common to all devices:
-    copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{chip}"), &out)?;
 
     Ok(())
 }
