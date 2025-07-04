@@ -896,11 +896,11 @@ impl<'a> I2cFuture<'a> {
             self.finished = true;
             Poll::Ready(error)
         } else {
-            if let Some(deadline) = self.deadline {
-                if now > deadline {
-                    // If the deadline is reached, we return an error.
-                    return Poll::Ready(Err(Error::Timeout));
-                }
+            if let Some(deadline) = self.deadline
+                && now > deadline
+            {
+                // If the deadline is reached, we return an error.
+                return Poll::Ready(Err(Error::Timeout));
             }
 
             Poll::Pending
@@ -2266,11 +2266,12 @@ impl Driver<'_> {
             // if there is a valid command which is not END, check if it's marked as done
             if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
                 // Let's retry
-                if let Some(deadline) = deadline {
-                    if now > deadline {
-                        return Err(Error::ExecutionIncomplete);
-                    }
+                if let Some(deadline) = deadline
+                    && now > deadline
+                {
+                    return Err(Error::ExecutionIncomplete);
                 }
+
                 return Ok(false);
             }
 

@@ -601,7 +601,7 @@ where
     {
         let (ptr, len) = unsafe { words.write_buffer() };
 
-        if len % 4 != 0 {
+        if !len.is_multiple_of(4) {
             return Err(Error::IllegalArgument);
         }
 
@@ -1913,7 +1913,7 @@ pub mod asynch {
         pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
 
-            if len % 4 != 0 {
+            if !len.is_multiple_of(4) {
                 return Err(Error::IllegalArgument);
             }
 
@@ -1949,7 +1949,7 @@ pub mod asynch {
         {
             let (ptr, len) = unsafe { words.write_buffer() };
 
-            if len % 4 != 0 {
+            if !len.is_multiple_of(4) {
                 return Err(Error::IllegalArgument);
             }
 
