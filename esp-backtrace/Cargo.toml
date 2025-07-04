@@ -28,7 +28,6 @@ semihosting = { version = "0.1.20", optional = true }
 
 [build-dependencies]
 esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
 [features]
 default = ["colors"]
@@ -38,7 +37,6 @@ esp32c2 = ["esp-println?/esp32c2"]
 esp32c3 = ["esp-println?/esp32c3"]
 esp32c6 = ["esp-println?/esp32c6"]
 esp32h2 = ["esp-println?/esp32h2"]
-esp32p4 = ["esp-println?/esp32p4"]
 esp32s2 = ["esp-println?/esp32s2", "semihosting?/openocd-semihosting"]
 esp32s3 = ["esp-println?/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
 

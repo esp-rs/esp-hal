@@ -119,9 +119,6 @@ macro_rules! create_peripheral {
     };
 }
 
-include!(concat!(env!("OUT_DIR"), "/_generated_peris.rs"));
-include!(concat!(env!("OUT_DIR"), "/_generated_gpio.rs"));
-
 for_each_gpio! {
     ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($($attr:ident)*)) => {
         $(

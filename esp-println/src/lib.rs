@@ -135,7 +135,6 @@ type PrinterImpl = auto_printer::Printer;
         feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32h2",
-        feature = "esp32p4",    // as mentioned in 'build.rs'
         feature = "esp32s3"
     )
 ))]
@@ -161,8 +160,6 @@ mod auto_printer {
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
             #[cfg(feature = "esp32h2")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x6000f008 as *const u32;
-            #[cfg(feature = "esp32p4")]
-            const USB_DEVICE_INT_RAW: *const u32 = unimplemented!();
             #[cfg(feature = "esp32s3")]
             const USB_DEVICE_INT_RAW: *const u32 = 0x60038000 as *const u32;
 
@@ -195,7 +192,6 @@ mod auto_printer {
         feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32h2",
-        feature = "esp32p4",
         feature = "esp32s3"
     ))
 ))]
@@ -210,7 +206,6 @@ mod auto_printer {
         feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32h2",
-        feature = "esp32p4",
         feature = "esp32s3"
     )
 ))]
@@ -229,11 +224,6 @@ mod serial_jtag_printer {
     const SERIAL_JTAG_FIFO_REG: usize = 0x6000_F000;
     #[cfg(any(feature = "esp32c6", feature = "esp32h2"))]
     const SERIAL_JTAG_CONF_REG: usize = 0x6000_F004;
-
-    #[cfg(feature = "esp32p4")]
-    const SERIAL_JTAG_FIFO_REG: usize = 0x500D_2000;
-    #[cfg(feature = "esp32p4")]
-    const SERIAL_JTAG_CONF_REG: usize = 0x500D_2004;
 
     #[cfg(feature = "esp32s3")]
     const SERIAL_JTAG_FIFO_REG: usize = 0x6003_8000;
@@ -454,23 +444,6 @@ mod uart_printer {
             unsafe {
                 const TX_FLUSH: usize = 0x4000_0074;
                 const GET_CHANNEL: usize = 0x4000_003C;
-
-                let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
-                let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);
-
-                tx_flush(get_channel());
-            }
-        }
-    }
-
-    #[cfg(feature = "esp32p4")]
-    impl Functions for Device {
-        const TX_ONE_CHAR: usize = 0x4FC0_0054;
-
-        fn flush() {
-            unsafe {
-                const TX_FLUSH: usize = 0x4FC0_0074;
-                const GET_CHANNEL: usize = 0x4FC0_0038;
 
                 let tx_flush: unsafe extern "C" fn(u8) = core::mem::transmute(TX_FLUSH);
                 let get_channel: unsafe extern "C" fn() -> u8 = core::mem::transmute(GET_CHANNEL);

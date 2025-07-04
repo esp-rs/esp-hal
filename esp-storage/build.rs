@@ -1,9 +1,4 @@
 fn main() -> Result<(), String> {
-    // Ensure that only a single chip is specified
-    if !cfg!(feature = "emulation") {
-        let _ = esp_metadata::Chip::from_cargo_feature().map_err(|e| format!("{e:?}"))?;
-    }
-
     if cfg!(feature = "esp32") {
         match std::env::var("OPT_LEVEL") {
             Ok(level) if std::env::var("CI").is_err() => {

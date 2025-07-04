@@ -141,16 +141,8 @@ impl Chip {
         Ok(Self::from_str(chip.as_str()).unwrap())
     }
 
-    pub fn target(&self) -> &'static str {
-        use Chip::*;
-
-        match self {
-            Esp32 => "xtensa-esp32-none-elf",
-            Esp32c2 | Esp32c3 => "riscv32imc-unknown-none-elf",
-            Esp32c6 | Esp32h2 => "riscv32imac-unknown-none-elf",
-            Esp32s2 => "xtensa-esp32s2-none-elf",
-            Esp32s3 => "xtensa-esp32s3-none-elf",
-        }
+    pub fn target(&self) -> String {
+        Config::for_chip(self).device.target.clone()
     }
 
     pub fn has_lp_core(&self) -> bool {
@@ -160,12 +152,22 @@ impl Chip {
     }
 
     pub fn lp_target(&self) -> Result<&'static str> {
-        use Chip::*;
-
         match self {
-            Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
-            Esp32s2 | Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
-            _ => bail!("Chip does not contain an LP core: '{}'", self),
+            Chip::Esp32c6 => Ok("riscv32imac-unknown-none-elf"),
+            Chip::Esp32s2 | Chip::Esp32s3 => Ok("riscv32imc-unknown-none-elf"),
+            _ => bail!("Chip does not contain an LP core: '{self}'"),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            Chip::Esp32 => "Esp32",
+            Chip::Esp32c2 => "Esp32c2",
+            Chip::Esp32c3 => "Esp32c3",
+            Chip::Esp32c6 => "Esp32c6",
+            Chip::Esp32h2 => "Esp32h2",
+            Chip::Esp32s2 => "Esp32s2",
+            Chip::Esp32s3 => "Esp32s3",
         }
     }
 
@@ -187,6 +189,48 @@ impl Chip {
 
     pub fn is_riscv(&self) -> bool {
         !self.is_xtensa()
+    }
+
+    pub fn list_of_check_cfgs() -> Vec<String> {
+        let mut cfgs = vec![];
+
+        // Used by our documentation builds to prevent the huge red warning banner.
+        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
+
+        let mut cfg_values: HashMap<String, Vec<String>> = HashMap::new();
+
+        for chip in Chip::iter() {
+            let config = Config::for_chip(&chip);
+            for symbol in config.all() {
+                if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
+                    // cfg's with values need special syntax, so let's collect all
+                    // of them separately.
+                    let symbol_name = symbol_name.replace('.', "_");
+                    let entry = cfg_values.entry(symbol_name).or_default();
+                    // Avoid duplicates in the same cfg.
+                    if !entry.contains(&symbol_value.to_string()) {
+                        entry.push(symbol_value.to_string());
+                    }
+                } else {
+                    // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
+                    let cfg = format!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
+
+                    if !cfgs.contains(&cfg) {
+                        cfgs.push(cfg);
+                    }
+                }
+            }
+        }
+
+        // Now output all cfgs with values.
+        for (symbol_name, symbol_values) in cfg_values {
+            cfgs.push(format!(
+                "cargo:rustc-check-cfg=cfg({symbol_name}, values({}))",
+                symbol_values.join(",")
+            ));
+        }
+
+        cfgs
     }
 }
 
@@ -222,6 +266,7 @@ impl PeripheralDef {
 struct Device {
     name: String,
     arch: Arch,
+    target: String,
     cores: usize,
     trm: String,
 
@@ -266,10 +311,11 @@ impl Config {
     pub fn empty() -> Self {
         Self {
             device: Device {
-                name: "".to_owned(),
+                name: String::new(),
                 arch: Arch::RiscV,
+                target: String::new(),
                 cores: 1,
-                trm: "".to_owned(),
+                trm: String::new(),
                 peripherals: Vec::new(),
                 symbols: Vec::new(),
                 memory: Vec::new(),
@@ -369,31 +415,13 @@ impl Config {
         self.all().iter().any(|i| i == item)
     }
 
-    /// Define all symbols for a given configuration.
-    pub fn define_symbols(&self) {
-        define_all_possible_symbols();
-        // Define all necessary configuration symbols for the configured device:
-        for symbol in self.all() {
-            println!("cargo:rustc-cfg={}", symbol.replace('.', "_"));
-        }
-
-        // Define env-vars for all memory regions
-        for memory in self.memory() {
-            println!("cargo:rustc-cfg=has_{}_region", memory.name.to_lowercase());
-        }
-    }
-
     pub fn generate_metadata(&self) {
-        let out_dir = std::env::var_os("OUT_DIR").unwrap();
-        let out_dir = Path::new(&out_dir);
-
-        self.generate_properties(out_dir, "_generated.rs");
-        self.generate_gpios(out_dir, "_generated_gpio.rs");
-        self.generate_iomux_signals(out_dir, "_generated_iomux_signals.rs");
-        self.generate_peripherals(out_dir, "_generated_peris.rs");
+        self.generate_properties("_generated.rs");
+        self.generate_peripherals("_generated_peris.rs");
+        self.generate_gpios("_generated_gpio.rs");
     }
 
-    fn generate_properties(&self, out_dir: &Path, file_name: &str) {
+    fn generate_properties(&self, file_name: &str) {
         let mut g = TokenStream::new();
 
         let chip_name = self.name();
@@ -465,10 +493,10 @@ impl Config {
             }
         });
 
-        save(out_dir.join(file_name), g);
+        save(file_name, g);
     }
 
-    fn generate_gpios(&self, out_dir: &Path, file_name: &str) {
+    fn generate_gpios(&self, file_name: &str) {
         let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
             // No GPIOs defined, nothing to do.
             return;
@@ -476,21 +504,10 @@ impl Config {
 
         let tokens = cfg::generate_gpios(gpio);
 
-        save(out_dir.join(file_name), tokens);
+        save(file_name, tokens);
     }
 
-    fn generate_iomux_signals(&self, out_dir: &Path, file_name: &str) {
-        let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
-            // No GPIOs defined, nothing to do.
-            return;
-        };
-
-        let tokens = cfg::generate_iomux_signals(gpio);
-
-        save(out_dir.join(file_name), tokens);
-    }
-
-    fn generate_peripherals(&self, out_dir: &Path, file_name: &str) {
+    fn generate_peripherals(&self, file_name: &str) {
         let mut tokens = TokenStream::new();
 
         // TODO: repeat for all drivers that have Instance traits
@@ -509,7 +526,7 @@ impl Config {
 
         tokens.extend(self.generate_peripherals_macro());
 
-        save(out_dir.join(file_name), tokens);
+        save(file_name, tokens);
     }
 
     fn generate_peripherals_macro(&self) -> TokenStream {
@@ -576,6 +593,29 @@ impl Config {
 
         generate_for_each_macro("peripheral", &all_peripherals)
     }
+
+    pub fn active_cfgs(&self) -> Vec<String> {
+        let mut cfgs = vec![];
+
+        // Define all necessary configuration symbols for the configured device:
+        for symbol in self.all() {
+            cfgs.push(symbol.replace('.', "_"));
+        }
+
+        // Define env-vars for all memory regions
+        for memory in self.memory() {
+            cfgs.push(format!("has_{}_region", memory.name.to_lowercase()));
+        }
+
+        cfgs
+    }
+
+    pub fn list_of_cfgs(&self) -> Vec<String> {
+        self.active_cfgs()
+            .iter()
+            .map(|cfg| format!("cargo:rustc-cfg={cfg}"))
+            .collect()
+    }
 }
 
 fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream {
@@ -584,6 +624,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
         // This macro is called in esp-hal to implement a driver's
         // Instance trait for available peripherals. It works by defining, then calling an inner
         // macro that substitutes the properties into the template provided by the call in esp-hal.
+        #[macro_export]
         macro_rules! #macro_name {
             (
                 $($pattern:tt => $code:tt;)*
@@ -616,12 +657,150 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
                 _for_each_inner!((all #((#branches)),*));
             };
         }
-
-        pub(crate) use #macro_name;
     }
 }
 
-fn save(path: impl AsRef<Path>, tokens: TokenStream) {
+pub fn generate_build_script_utils(file_name: &str) {
+    let check_cfgs = Chip::list_of_check_cfgs();
+
+    let chip = Chip::iter()
+        .map(|c| format_ident!("{}", c.name()))
+        .collect::<Vec<_>>();
+    let feature_env = Chip::iter().map(|c| format!("CARGO_FEATURE_{}", c.as_ref().to_uppercase()));
+    let name = Chip::iter()
+        .map(|c| c.as_ref().to_string())
+        .collect::<Vec<_>>();
+    let all_chip_features = name.join(", ");
+    let config = Chip::iter().map(|chip| {
+        let config = Config::for_chip(&chip);
+        let symbols = config.active_cfgs();
+        let arch = config.device.arch.to_string();
+        let target = config.device.target.as_str();
+        let cfgs = config.list_of_cfgs();
+        quote::quote! {
+            Config {
+                architecture: #arch,
+                target: #target,
+                symbols: &[
+                    #(#symbols,)*
+                ],
+                cfgs: &[
+                    #(#cfgs,)*
+                ],
+            }
+        }
+    });
+
+    let bail_message = format!(
+        "Expected exactly one of the following features to be enabled: {all_chip_features}"
+    );
+
+    let tokens = quote::quote! {
+        #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        pub enum Chip {
+            #(#chip),*
+        }
+
+        impl core::str::FromStr for Chip {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    #( #name => Ok(Self::#chip),)*
+                    _ => Err(()),
+                }
+            }
+        }
+
+        impl Chip {
+            pub fn from_cargo_feature() -> Result<Self, Box<dyn std::error::Error>> {
+                let all_chips = [
+                    #(( #feature_env, Self::#chip )),*
+                ];
+
+                let mut chip = None;
+                for (env, c) in all_chips {
+                    if std::env::var(env).is_ok() {
+                        if chip.is_some() {
+                            return Err(String::from(#bail_message).into());
+                        }
+                        chip = Some(c);
+                    }
+                }
+
+                match chip {
+                    Some(chip) => Ok(chip),
+                    None => Err(String::from(#bail_message).into())
+                }
+            }
+
+            pub fn is_xtensa(self) -> bool {
+                self.config().architecture == "xtensa"
+            }
+
+            pub fn target(self) -> &'static str {
+                self.config().target
+            }
+
+            pub fn name(self) -> &'static str {
+                match self {
+                    #( Self::#chip => #name ),*
+                }
+            }
+
+            pub fn contains(self, symbol: &str) -> bool {
+                self.config().contains(symbol)
+            }
+
+            pub fn define_cfgs(self) {
+                self.config().define_cfgs()
+            }
+
+            pub fn all_symbols(&self) -> &'static [&'static str] {
+                self.config().symbols
+            }
+
+            pub fn iter() -> impl Iterator<Item = Chip> {
+                [
+                    #( Self::#chip ),*
+                ].into_iter()
+            }
+
+            pub fn config(self) -> Config {
+                match self {
+                    #(Self::#chip => #config),*
+                }
+            }
+        }
+
+        pub struct Config {
+            architecture: &'static str,
+            target: &'static str,
+            symbols: &'static [&'static str],
+            cfgs: &'static [&'static str],
+        }
+
+        impl Config {
+            fn contains(&self, symbol: &str) -> bool {
+                self.symbols.contains(&symbol)
+            }
+
+            fn define_cfgs(&self) {
+                #(println!(#check_cfgs);)*
+
+                for cfg in self.cfgs {
+                    println!("{cfg}");
+                }
+            }
+        }
+    };
+    save(file_name, tokens);
+}
+
+fn save(file: &str, tokens: TokenStream) {
+    let out_dir = std::env::var_os("OUT_DIR").unwrap();
+    let out_path = Path::new(&out_dir).join(file);
+
     let source = tokens.to_string();
 
     #[cfg(feature = "pretty")]
@@ -629,45 +808,7 @@ fn save(path: impl AsRef<Path>, tokens: TokenStream) {
     #[cfg(feature = "pretty")]
     let source = prettyplease::unparse(&syntax_tree);
 
-    std::fs::write(path, source).unwrap();
-}
-
-/// Defines all possible symbols that _could_ be output from this crate
-/// regardless of the chosen configuration.
-///
-/// This is required to avoid triggering the unexpected-cfgs lint.
-fn define_all_possible_symbols() {
-    // Used by our documentation builds to prevent the huge red warning banner.
-    println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
-
-    let mut cfg_values: HashMap<String, Vec<String>> = HashMap::new();
-
-    for chip in Chip::iter() {
-        let config = Config::for_chip(&chip);
-        for symbol in config.all() {
-            if let Some((symbol_name, symbol_value)) = symbol.split_once('=') {
-                // cfg's with values need special syntax, so let's collect all
-                // of them separately.
-                let symbol_name = symbol_name.replace('.', "_");
-                let entry = cfg_values.entry(symbol_name).or_default();
-                // Avoid duplicates in the same cfg.
-                if !entry.contains(&symbol_value.to_string()) {
-                    entry.push(symbol_value.to_string());
-                }
-            } else {
-                // https://doc.rust-lang.org/cargo/reference/build-scripts.html#rustc-check-cfg
-                println!("cargo:rustc-check-cfg=cfg({})", symbol.replace('.', "_"));
-            }
-        }
-    }
-
-    // Now output all cfgs with values.
-    for (symbol_name, symbol_values) in cfg_values {
-        println!(
-            "cargo:rustc-check-cfg=cfg({symbol_name}, values({}))",
-            symbol_values.join(",")
-        );
-    }
+    std::fs::write(out_path, source).unwrap();
 }
 
 pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
