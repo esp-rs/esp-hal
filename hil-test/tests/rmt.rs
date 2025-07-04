@@ -79,7 +79,7 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN
 
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
-fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_first: bool) {
+fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     use esp_hal::rmt::{RxChannel, TxChannel};
 
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -96,16 +96,19 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8, wait_tx_
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
 
-    let rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
-    let tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
 
-    if wait_tx_first {
-        tx_transaction.wait().unwrap();
-        rx_transaction.wait().unwrap();
-    } else {
-        rx_transaction.wait().unwrap();
-        tx_transaction.wait().unwrap();
+    loop {
+        let tx_done = tx_transaction.poll();
+        let rx_done = rx_transaction.poll();
+        if tx_done && rx_done {
+            break;
+        }
     }
+
+    tx_transaction.wait().unwrap();
+    rx_transaction.wait().unwrap();
 
     // the last two pulse-codes are the ones which wait for the timeout so
     // they can't be equal
@@ -180,7 +183,7 @@ mod tests {
     #[test]
     fn rmt_loopback_simple() {
         // 20 codes fit a single RAM block
-        do_rmt_loopback::<20>(1, 1, false);
+        do_rmt_loopback::<20>(1, 1);
     }
 
     #[test]
@@ -191,7 +194,7 @@ mod tests {
     #[test]
     fn rmt_loopback_extended_ram() {
         // 80 codes require two RAM blocks
-        do_rmt_loopback::<80>(2, 2, false);
+        do_rmt_loopback::<80>(2, 2);
     }
 
     // FIXME: This test currently fails on esp32 with an rmt::Error::ReceiverError,
@@ -204,9 +207,8 @@ mod tests {
     #[test]
     fn rmt_loopback_tx_wrap() {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
-        // wrapping. We need to .wait() on the tx transaction first to handle
-        // this.
-        do_rmt_loopback::<80>(1, 2, true);
+        // wrapping.
+        do_rmt_loopback::<80>(1, 2);
     }
 
     // FIXME: This test can't work right now, because wrapping rx is not
@@ -216,7 +218,7 @@ mod tests {
     // fn rmt_loopback_rx_wrap() {
     //     // 80 codes require two RAM blocks; thus an rx channel with only 1 block
     //     // requires wrapping
-    //     do_rmt_loopback<80>(2, 1, false);
+    //     do_rmt_loopback<80>(2, 1);
     // }
 
     #[test]
