@@ -179,7 +179,7 @@ impl<'d> Hmac<'d> {
         nb::block!(self.write_data(&[0x80])).unwrap();
         nb::block!(self.flush_data()).unwrap();
         self.next_command();
-        debug_assert!(self.byte_written % 4 == 0);
+        debug_assert!(self.byte_written.is_multiple_of(4));
 
         self.padding(msg_len);
 
@@ -231,7 +231,7 @@ impl<'d> Hmac<'d> {
     }
 
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        let mod_length = self.byte_written % 64;
+        let mod_length = self.byte_written.is_multiple_of(64) as usize;
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
@@ -272,11 +272,11 @@ impl<'d> Hmac<'d> {
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
-            (self.byte_written % 64) / self.alignment_helper.align_size(),
+            (self.byte_written.is_multiple_of(64)) as usize / self.alignment_helper.align_size(),
         );
 
         self.byte_written = self.byte_written.wrapping_add(flushed);
-        if flushed > 0 && self.byte_written % 64 == 0 {
+        if flushed > 0 && self.byte_written.is_multiple_of(64) {
             self.regs()
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
@@ -288,7 +288,7 @@ impl<'d> Hmac<'d> {
     }
 
     fn padding(&mut self, msg_len: u64) {
-        let mod_cursor = self.byte_written % 64;
+        let mod_cursor = self.byte_written.is_multiple_of(64) as usize;
 
         // The padding will be spanned over 2 blocks
         if mod_cursor > 56 {
@@ -306,13 +306,13 @@ impl<'d> Hmac<'d> {
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
             self.byte_written = self.byte_written.wrapping_add(pad_len);
-            debug_assert!(self.byte_written % 64 == 0);
+            debug_assert!(self.byte_written.is_multiple_of(64));
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
             self.next_command();
         }
 
-        let mod_cursor = self.byte_written % 64;
+        let mod_cursor = self.byte_written.is_multiple_of(64) as usize;
         let pad_len = 64 - mod_cursor - core::mem::size_of::<u64>();
 
         self.alignment_helper.volatile_write(
@@ -327,7 +327,10 @@ impl<'d> Hmac<'d> {
 
         self.byte_written = self.byte_written.wrapping_add(pad_len);
 
-        assert_eq!(self.byte_written % 64, 64 - core::mem::size_of::<u64>());
+        assert_eq!(
+            self.byte_written.is_multiple_of(64) as usize,
+            64 - core::mem::size_of::<u64>()
+        );
 
         // Add padded key
         let len_mem = (msg_len * 8).to_be_bytes();

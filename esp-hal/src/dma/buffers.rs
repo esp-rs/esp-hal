@@ -300,14 +300,14 @@ impl BurstConfig {
         direction: TransferDirection,
     ) -> Result<(), DmaAlignmentError> {
         let alignment = self.min_alignment(buffer, direction);
-        if buffer.as_ptr() as usize % alignment != 0 {
+        if !(buffer.as_ptr() as usize).is_multiple_of(alignment) {
             return Err(DmaAlignmentError::Address);
         }
 
         // NB: the TRMs suggest that buffer length don't need to be aligned, but
         // for IN transfers, we configure the DMA descriptors' size field, which needs
         // to be aligned.
-        if direction == TransferDirection::In && buffer.len() % alignment != 0 {
+        if direction == TransferDirection::In && !buffer.len().is_multiple_of(alignment) {
             return Err(DmaAlignmentError::Size);
         }
 
