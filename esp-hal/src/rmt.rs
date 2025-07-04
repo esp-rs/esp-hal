@@ -862,21 +862,12 @@ cfg_if::cfg_if! {
     }
 }
 
-impl<'d, Dm> Rmt<'d, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
-        let me = Rmt::create(peripheral);
-        self::chip_specific::configure_clock(frequency)?;
-        Ok(me)
-    }
-}
-
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
     pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
-        Self::new_internal(peripheral, frequency)
+        let this = Rmt::create(peripheral);
+        self::chip_specific::configure_clock(frequency)?;
+        Ok(this)
     }
 
     /// Reconfigures the driver for asynchronous operation.
