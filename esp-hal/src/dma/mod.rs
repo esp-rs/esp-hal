@@ -941,6 +941,24 @@ impl From<u32> for Owner {
     }
 }
 
+impl From<bool> for Owner {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Self::Cpu,
+            true => Self::Dma,
+        }
+    }
+}
+
+impl From<Owner> for bool {
+    fn from(value: Owner) -> Self {
+        match value {
+            Owner::Cpu => false,
+            Owner::Dma => true,
+        }
+    }
+}
+
 #[doc(hidden)]
 #[instability::unstable]
 pub trait DmaEligible {
