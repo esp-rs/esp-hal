@@ -21,6 +21,7 @@ use embedded_hal_sdmmc::{
 use crate::pac;
 
 mod config;
+mod dma;
 mod hinf;
 mod interrupt;
 mod pins;
@@ -30,6 +31,7 @@ mod state;
 mod timing;
 
 pub use config::Config;
+pub use dma::{DmaDescriptor, DmaDescriptorFlags};
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::{DeviceInterrupt, HostInterrupt};
 pub use pins::Pins;
