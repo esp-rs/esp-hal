@@ -8,9 +8,10 @@ pub(crate) mod btdm;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 pub(crate) mod npl;
 
-use alloc::{boxed::Box, collections::vec_deque::VecDeque, vec::Vec};
+use alloc::{collections::vec_deque::VecDeque, vec::Vec};
 use core::{cell::RefCell, mem::MaybeUninit};
 
+use allocator_api2::boxed::Box;
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use critical_section::Mutex;
 
