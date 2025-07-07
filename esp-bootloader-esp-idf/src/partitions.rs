@@ -213,7 +213,7 @@ impl<'a> PartitionTable<'a> {
             )
         };
 
-        let mut raw = Self {
+        let mut raw_table = Self {
             binary,
             entries: binary.len(),
         };
@@ -223,28 +223,27 @@ impl<'a> PartitionTable<'a> {
             let (hash, index) = {
                 let mut i = 0;
                 loop {
-                    if let Ok(entry) = raw.get_partition(i) {
+                    if let Ok(entry) = raw_table.get_partition(i) {
                         if entry.magic() == MD5_MAGIC {
                             break (&entry.binary[16..][..16], i);
                         }
 
                         i += 1;
-                        if i >= raw.entries {
+                        if i >= raw_table.entries {
                             return Err(Error::Invalid);
                         }
                     }
                 }
             };
 
-            use md5::Digest;
-            let mut hasher = md5::Md5::new();
+            let mut hasher = crate::crypto::Md5::new();
 
             for i in 0..index {
-                hasher.update(raw.binary[i]);
+                hasher.update(&raw_table.binary[i]);
             }
             let calculated_hash = hasher.finalize();
 
-            if *calculated_hash != *hash {
+            if calculated_hash != hash {
                 return Err(Error::Invalid);
             }
         }
@@ -252,14 +251,14 @@ impl<'a> PartitionTable<'a> {
         let entries = {
             let mut i = 0;
             loop {
-                if let Ok(entry) = raw.get_partition(i) {
+                if let Ok(entry) = raw_table.get_partition(i) {
                     if entry.magic() != ENTRY_MAGIC {
                         break;
                     }
 
                     i += 1;
 
-                    if i == raw.entries {
+                    if i == raw_table.entries {
                         break;
                     }
                 } else {
@@ -269,9 +268,9 @@ impl<'a> PartitionTable<'a> {
             i
         };
 
-        raw.entries = entries;
+        raw_table.entries = entries;
 
-        Ok(raw)
+        Ok(raw_table)
     }
 
     /// Number of partitions contained in the partition table.
