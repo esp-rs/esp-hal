@@ -655,8 +655,8 @@ impl core::fmt::Display for ConfigError {
 ///
 /// ```rust, no_run
 #[doc = crate::before_snippet!()]
-/// # use esp_hal::spi::Mode;
-/// # use esp_hal::spi::master::{Config, Spi};
+/// use esp_hal::spi::Mode;
+/// use esp_hal::spi::master::{Config, Spi};
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default()
@@ -691,8 +691,8 @@ impl<'d> Spi<'d, Blocking> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -769,10 +769,14 @@ impl<'d> Spi<'d, Blocking> {
     /// operations.
     /// ```rust, no_run
     /// # {before_snippet}
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
-    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
-    /// # use esp_hal::dma_buffers;
+    /// use esp_hal::{
+    ///     dma::{DmaRxBuf, DmaTxBuf},
+    ///     dma_buffers,
+    ///     spi::{
+    ///         Mode,
+    ///         master::{Config, Spi},
+    ///     },
+    /// };
     /// # {dma_channel}
     /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
@@ -850,8 +854,8 @@ impl<'d> Spi<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -880,8 +884,8 @@ impl<'d> Spi<'d, Async> {
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -964,8 +968,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0);
     ///
@@ -991,8 +995,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_mosi(peripherals.GPIO1);
     ///
     /// # Ok(())
@@ -1016,8 +1020,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_miso(peripherals.GPIO2);
     ///
     /// # Ok(())
@@ -1121,8 +1125,10 @@ where
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?;
     ///
     /// spi.apply_config(&Config::default().with_frequency(Rate::from_khz(100)));
@@ -1140,8 +1146,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -1169,8 +1175,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -1195,8 +1201,8 @@ where
     ///
     /// ```rust, no_run
     #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
+    /// use esp_hal::spi::Mode;
+    /// use esp_hal::spi::master::{Config, Spi};
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
     /// .with_sck(peripherals.GPIO0)
     /// .with_mosi(peripherals.GPIO1)
@@ -1374,10 +1380,14 @@ mod dma {
     /// embedded-hal traits.
     /// ```rust, no_run
     /// # {before_snippet}
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
-    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
-    /// # use esp_hal::dma_buffers;
+    /// use esp_hal::{
+    ///     dma::{DmaRxBuf, DmaTxBuf},
+    ///     dma_buffers,
+    ///     spi::{
+    ///         Mode,
+    ///         master::{Config, Spi},
+    ///     },
+    /// };
     /// # {dma_channel}
     /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
