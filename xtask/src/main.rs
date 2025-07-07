@@ -34,6 +34,8 @@ enum Cli {
     /// Format all packages in the workspace with rustfmt
     #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
+    /// Run cargo clean
+    Clean(CleanArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Semver Checks
@@ -61,6 +63,13 @@ struct FmtPackagesArgs {
     #[arg(long)]
     check: bool,
 
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct CleanArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
@@ -151,6 +160,7 @@ fn main() -> Result<()> {
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
+        Cli::Clean(args) => clean(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
@@ -204,6 +214,22 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
             workspace.display()
         ));
         cargo_args.extend_from_slice(&source_files);
+
+        xtask::cargo::run(&cargo_args, &path)?;
+    }
+
+    Ok(())
+}
+
+fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
+    let mut packages = args.packages;
+    packages.sort();
+
+    for package in packages {
+        log::info!("Cleaning package: {}", package);
+        let path = workspace.join(package.to_string());
+
+        let cargo_args = CargoArgsBuilder::default().subcommand("clean").build();
 
         xtask::cargo::run(&cargo_args, &path)?;
     }
@@ -351,6 +377,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -387,6 +414,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 example: None,
                 debug: false,
                 toolchain: args.toolchain.clone(),
+                timings: false,
             },
             CargoAction::Build(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -462,6 +490,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
@@ -479,6 +508,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )

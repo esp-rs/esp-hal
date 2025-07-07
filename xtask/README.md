@@ -8,15 +8,17 @@ Automation using [cargo-xtask](https://github.com/matklad/cargo-xtask).
 Usage: xtask <COMMAND>
 
 Commands:
-  build            Build-related subcommands
-  run              Run-related subcommands
-  release          Release-related subcommands
-  ci               Perform (parts of) the checks done in CI
-  fmt-packages     Format all packages in the workspace with rustfmt
-  lint-packages    Lint all packages in the workspace with clippy
-  semver-check     Semver Checks
-  check-changelog  Check the changelog for packages
-  help             Print this message or the help of the given subcommand(s)
+  build                      Build-related subcommands
+  run                        Run-related subcommands
+  release                    Release-related subcommands
+  ci                         Perform (parts of) the checks done in CI
+  fmt-packages               Format all packages in the workspace with rustfmt
+  clean                      Run cargo clean
+  lint-packages              Lint all packages in the workspace with clippy
+  semver-check               Semver Checks
+  check-changelog            Check the changelog for packages
+  update-chip-support-table  Re-generate the chip support table in the esp-hal README
+  help                       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help

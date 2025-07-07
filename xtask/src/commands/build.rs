@@ -141,6 +141,7 @@ pub fn build_examples(
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
+                args.timings,
             )?;
         }
         Ok(())
@@ -159,6 +160,7 @@ pub fn build_examples(
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
+                args.timings,
             )
         })
     }
