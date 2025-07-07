@@ -378,8 +378,12 @@ pub fn execute_app(
         builder = builder.toolchain("nightly");
     }
 
-    if !debug {
-        builder.add_arg("--release");
+    if debug {
+        if std::env::var("CI").is_ok() {
+            builder.add_arg("--profile=ci");
+        } else {
+            builder.add_arg("--release");
+        }
     }
     if timings {
         builder.add_arg("--timings");

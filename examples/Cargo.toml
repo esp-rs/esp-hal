@@ -58,6 +58,10 @@ esp-wifi = ["dep:esp-wifi"]
 
 embassy                = ["dep:esp-hal-embassy"]
 
+[profile.ci]
+inherits = "dev"
+debug = false
+
 [profile.release]
 codegen-units    = 1
 debug            = 2

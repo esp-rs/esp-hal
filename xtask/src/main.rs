@@ -373,7 +373,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 package: Package::EspLpHal,
                 chip: args.chip,
                 example: None,
-                debug: false,
+                debug: true,
                 toolchain: args.toolchain.clone(),
                 timings: false,
             },
