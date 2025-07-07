@@ -10,6 +10,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   RUSTDOCFLAGS: -Dwarnings
   DEFMT_LOG: trace
+  CARGO_INCREMENTAL: 0
 
 jobs:
   esp-hal-nightly:
