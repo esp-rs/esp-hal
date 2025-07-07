@@ -630,6 +630,21 @@ impl RmtWriterInner {
 /// FIXME: Docs
 pub trait Encoder {
     /// FIXME: docs
+    ///
+    /// This function must write as many codes via the `writer` until the latter indicates that the
+    /// buffer is full. Otherwise, the `writer` will consider the `Encoder` to be exhausted and not
+    /// call it again to check for more data. Upon exhaustion of the `Encoder`, if the last pulse
+    /// code written does not contain and end marker, the driver will insert an all-zero end
+    /// marker, i.e. [`PulseCode::end_marker()`].
+    ///
+    /// While this will presently not be called again after being exhausted, implementations must
+    /// not rely on this for safety or correctness. Rather, they should return without writing any
+    /// pulse codes in that case.
+    ///
+    /// For best performance, this should be inlined. It is likely that the compiler does so
+    /// automatically (since the driver has only a single, non-generic function that calls this
+    /// method). To be extra sure, consider marking your implementation of this method as
+    /// `#[inline(always)]`.
     fn encode(&mut self, writer: &mut RmtWriterInner) -> ControlFlow<()>;
 }
 
@@ -669,7 +684,6 @@ where
     }
 }
 
-// FIXME: Use write_many
 impl<'a, T> Encoder for SliceEncoder<'a, T>
 where
     T: Into<PulseCode> + Copy,
@@ -682,6 +696,8 @@ where
         let written = writer.write_many(len, || {
             // SAFETY: write_many() guarantees that this will be called at most
             // `len` times, such the pointer will remain in-bounds.
+            // FIXME: Check whether we can use safe indexing here and the compiler is smart enough
+            // to optimize the bounds check.
             let code = unsafe { ptr.read() }.into();
             ptr = unsafe { ptr.add(1) };
             code
@@ -766,6 +782,73 @@ where
     }
 }
 
+/// FIXME: docs
+#[derive(Clone, Copy, Debug)]
+pub struct BytesEncoder<'a> {
+    // remaining data
+    data: &'a [u8],
+
+    // number of bits left in 
+    bits: u8,
+    pulse_zero: PulseCode,
+    pulse_one: PulseCode,
+    pulse_end: PulseCode,
+}
+
+impl<'a> BytesEncoder<'a> {
+    /// FIXME: docs
+    pub fn new(
+        data: &'a [u8],
+        pulse_one: PulseCode,
+        pulse_zero: PulseCode,
+        pulse_end: PulseCode
+    ) -> BytesEncoder<'a> {
+        Self { data, bits: 8, pulse_zero, pulse_one, pulse_end }
+    }
+}
+
+impl Encoder for BytesEncoder<'_> {
+    #[inline(always)]
+    fn encode(&mut self, writer: &mut RmtWriterInner) -> ControlFlow<()> {
+        let mut data = self.data;
+        let mut bits = self.bits as usize;
+
+        let result = 'outer: {
+            while let Some(&byte) = data.first() {
+                let mut byte = byte << (8 - bits);
+
+                let written = writer.write_many(bits, || {
+                    let bit = (byte << 1) & 1 == 1;
+                    byte <<= 1;
+                    core::hint::select_unpredictable(bit, self.pulse_one, self.pulse_zero)
+                });
+
+                bits -= written;
+                
+                if bits > 0 {
+                    // buffer is full
+                    break 'outer ControlFlow::Continue(());
+                }
+
+                let _ = data.split_off_first().unwrap();
+                bits = 8;
+            }
+
+            if let Some(slot) = writer.next() {
+                slot.write(self.pulse_end);
+            } else {
+                break 'outer ControlFlow::Continue(());
+            }
+
+            ControlFlow::Break(())
+        };
+
+        self.data = data;
+        self.bits = bits as u8;
+        result
+    }
+}
+
 #[derive(Copy, Clone, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum WriterState {
@@ -803,47 +886,76 @@ struct RmtWriterOuter {
 }
 
 trait EncoderExt {
-    fn write(&mut self, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>);
+    unsafe fn write(this: *mut (), writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>);
 }
 
-#[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
-#[cfg_attr(place_rmt_driver_in_ram, ram)]
-unsafe fn encoder_write<E: Encoder>(this: &mut E, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
-    this.write(writer, raw)
-}
+// SAFETY: `this` must be valid for exclusive access to an instance of `E`.
+// #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+// #[cfg_attr(place_rmt_driver_in_ram, ram)]
+// unsafe fn encoder_write<E: Encoder>(this: *mut (), writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
+//     // SAFETY: The caller guarantees that we have exclusive access to `this`, which points to an
+//     // instance of `E`.
+//     let enc = unsafe { &mut *(this as *mut E) };
+//     enc.write(writer, raw)
+// }
 
+// This is a bespoke `&'a dyn mut EncoderExt`, which optimizes for the case of not owning the
+// `Encoder` and using only a single method. Thus, we only need the data pointer and a single
+// function pointer, rather than the indirection via a vtable.
 struct EncoderExtRef<'a> {
+    // Pointer to the Encoder instance, and a PhantomData to hold onto its lifetime.
     data: *mut (),
-    func: unsafe fn(*mut(), &mut RmtWriterOuter, raw: DynChannelAccess<Tx>),
     _phantom: PhantomData<&'a mut ()>,
+
+    // Function pointer to encoder_write specialized for the type stored in data.
+    func: unsafe fn(*mut(), &mut RmtWriterOuter, raw: DynChannelAccess<Tx>),
 }
 
 impl<'a> EncoderExtRef<'a> {
     fn new<E: Encoder>(enc: &'a mut E) -> Self {
+        // let func: unsafe fn(&mut E, &mut RmtWriterOuter, DynChannelAccess<Tx>) = <E as EncoderExt>::write;
+        // let func: unsafe fn(&mut E, &mut RmtWriterOuter, DynChannelAccess<Tx>) = func;
+        // let func: unsafe fn(*mut (), &mut RmtWriterOuter, DynChannelAccess<Tx>) = func as _;
         Self {
             data: enc as *mut _ as *mut (),
+            _phantom: PhantomData,
+
             // SAFETY: Coercion of the function pointer is ok since they are ABI compatible, by
             // virtue of being Rust-to-Rust calls, and all arguments being either identical or
             // compatible since `*mut E` and `&mut E` are always API compatible.
-            func: encoder_write::<E>,
+            // The function pointer also has the 'static lifetime.
+            // func: encoder_write::<E>,
+            func: <E as EncoderExt>::write,
+            // func,
+        }
+    }
+
+    fn reborrow(&mut self) -> EncoderExtRef<'_> {
+        Self {
+            data: self.data,
             _phantom: PhantomData,
+            func: self.func,
         }
     }
 
     fn write(&mut self, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
         // SAFETY: The caller holds a mutable reference of self, which in turn keeps the borrow
-        // taken in `new()` alive. Thus, the encoder is exclusively borrowed.
+        // taken in `new()` alive. Thus, we have exclusive access to the encoder.
         unsafe { (self.func)(self.data, writer, raw) }
     }
 }
 
 // FIMXE: Completely remove this in favor of EncoderExtRef and encoder_write
-impl<E: Encoder + ?Sized> EncoderExt for E {
+impl<E: Encoder> EncoderExt for E {
     // TODO: better check that hw ptr matches expectation when done! that also helps
     // with underruns
     // FIXME: This doesn't work for continuous tx that uses the full buffer!!!
-    #[inline(always)]
-    fn write(&mut self, writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
+    // FIXME: Add a way for users to decide whether to place this into RAM!
+    #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    unsafe fn write(this: *mut (), writer: &mut RmtWriterOuter, raw: DynChannelAccess<Tx>) {
+        let this = unsafe { &mut *(this as *mut E) };
+
         let memsize = raw.memsize().codes();
         let offset = usize::from(writer.offset);
         let ram_start = raw.channel_ram_start();
@@ -885,7 +997,7 @@ impl<E: Encoder + ?Sized> EncoderExt for E {
             end: unsafe { start0.add(count0) },
         };
 
-        let done = self.encode(&mut internal);
+        let done = this.encode(&mut internal);
 
         debug_assert!(internal.ptr.addr() >= internal.start.addr());
         debug_assert!(internal.ptr.addr() <= internal.end.addr());
@@ -1117,6 +1229,8 @@ where
 {
     #[inline(always)]
     fn decode(&mut self, reader: &mut RmtReaderInner) -> ControlFlow<()> {
+        // FIXME: This is incorrect and skips slots at the end of the buffer!
+        // -> add HIL test and fix
         while let Some(slot) = self.data.next() {
             if let Some(code) = reader.next() {
                 *slot = code.into();
@@ -2179,7 +2293,10 @@ where
     C: ChannelRef<Tx>,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn poll_internal(&mut self, data: &mut dyn Encoder) -> Option<Event> {
+    fn poll_internal(
+        &mut self,
+        mut data: EncoderExtRef<'_>,
+    ) -> Option<Event> {
         let raw = self.channel.raw();
 
         let status = raw.get_tx_status();
@@ -2199,32 +2316,50 @@ where
     /// Returns whether transmission has ended (whether successfully or with an
     /// error). In that case, a subsequent call to `wait()` returns immediately.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn poll(&mut self, data: &mut dyn Encoder) -> bool {
-        match self.poll_internal(data) {
-            Some(Event::Error | Event::End) => true,
-            Some(Event::Threshold) | None => false,
+    pub fn poll(&mut self, data: &mut impl Encoder) -> bool {
+        #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+        fn inner(
+            this: &mut SingleShotTxTransaction<impl ChannelRef<Tx>>,
+            mut data: EncoderExtRef<'_>
+        ) -> bool {
+            match this.poll_internal(data.reborrow()) {
+                Some(Event::Error | Event::End) => true,
+                Some(Event::Threshold) | None => false,
+            }
         }
+
+        let data = EncoderExtRef::new(data);
+        inner(self, data)
     }
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self, data: &mut dyn Encoder) -> Result<(), Error> {
-        // Not sure that all the error cases below can happen. However, it's best to
-        // handle them to be sure that we don't lock up here in case they can happen.
-        let result = loop {
-            match self.poll_internal(data) {
-                Some(Event::Error) => break Err(Error::TransmissionError),
-                Some(Event::End) => break self.writer.state_to_result(),
-                _ => continue,
-            }
-        };
+    pub fn wait(self, data: &mut impl Encoder) -> Result<(), Error> {
+        #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+        fn inner(
+            mut this: SingleShotTxTransaction<impl ChannelRef<Tx>>,
+            mut data: EncoderExtRef<'_>
+        ) -> Result<(), Error> {
+            // Not sure that all the error cases below can happen. However, it's best to
+            // handle them to be sure that we don't lock up here in case they can happen.
+            let result = loop {
+                match this.poll_internal(data.reborrow()) {
+                    Some(Event::Error) => break Err(Error::TransmissionError),
+                    Some(Event::End) => break this.writer.state_to_result(),
+                    _ => continue,
+                }
+            };
 
-        RmtState::store(RmtState::TxIdle, self.channel.raw(), Ordering::Relaxed);
+            RmtState::store(RmtState::TxIdle, this.channel.raw(), Ordering::Relaxed);
 
-        // Disable the Drop handler since the transaction is properly stopped
-        // already.
-        let _ = ManuallyDrop::new(self);
-        result
+            // Disable the Drop handler since the transaction is properly stopped
+            // already.
+            let _ = ManuallyDrop::new(this);
+            result
+        }
+
+        let data = EncoderExtRef::new(data);
+        inner(self, data)
     }
 }
 
@@ -2415,11 +2550,14 @@ where
             total_length += code.length() as u64;
         }
 
-        self.bench_inner(move || EncoderExtRef::new(&mut SliceEncoder::new(data)), total_length, total)
+        self.bench_inner(move || SliceEncoder::new(data), total_length, total)
     }
 
     /// FIXME: docs
-    pub fn bench_iter<I, F>(&mut self, mut get_data: F) -> BenchmarkResult
+    pub fn bench_iter<I, F>(
+        &mut self,
+        mut get_data: F
+    ) -> BenchmarkResult
     where
         I: IntoIterator<Item=PulseCode>,
         I::IntoIter: Clone,
@@ -2440,7 +2578,10 @@ where
     }
 
     /// FIXME: docs
-    pub fn bench_enc<E, F>(&mut self, mut get_data: F) -> BenchmarkResult
+    pub fn bench_enc<E, F>(
+        &mut self,
+        mut get_data: F
+    ) -> BenchmarkResult
     where
         E: Encoder + Clone,
         F: FnMut() -> E,
@@ -2476,17 +2617,18 @@ where
             sum_codes(&writer);
         }
 
-        self.bench_inner(move || EncoderExtRef::new(&mut get_data()), code_length, writer.written)
+        self.bench_inner(get_data, code_length, writer.written)
     }
 
-    fn bench_inner<'a, F>(
+    fn bench_inner<'a, E, F>(
         &mut self,
         mut get_data: F,
         total_length: u64,
         total: usize
     ) -> BenchmarkResult
     where
-        F: 'a + FnMut() -> EncoderExtRef<'a>,
+        E: Encoder,
+        F: 'a + FnMut() -> E,
     {
         let raw = self.raw;
 
@@ -2499,7 +2641,7 @@ where
         let mut writer;
         loop {
             let mut encoder = get_data();
-            // let mut encoder = EncoderExtRef::new(&mut encoder);
+            let mut encoder = EncoderExtRef::new(&mut encoder);
             writer = RmtWriterOuter::new(raw);
 
             while !writer.is_done() {
@@ -2536,6 +2678,7 @@ impl Channel<'_, Blocking, Tx> {
         data: &mut impl Encoder,
     ) -> Result<SingleShotTxTransaction<BorrowedChannel<'_, Blocking, Tx>>, Error> {
         let channel = BorrowedChannel { raw: self.raw, _phantom: PhantomData };
+        let data = EncoderExtRef::new(data);
         Self::transmit_inner(channel, data)
     }
 
@@ -2545,6 +2688,7 @@ impl Channel<'_, Blocking, Tx> {
         self,
         data: &mut impl Encoder,
     ) -> Result<SingleShotTxTransaction<Self>, Error> {
+        let data = EncoderExtRef::new(data);
         Self::transmit_inner(self, data)
     }
 
@@ -2553,7 +2697,7 @@ impl Channel<'_, Blocking, Tx> {
     #[cfg_attr(not(place_rmt_driver_in_ram), inline(never))]
     fn transmit_inner<C>(
         channel: C,
-        data: &mut dyn Encoder,
+        mut data: EncoderExtRef<'_>,
     ) -> Result<SingleShotTxTransaction<C>, Error>
     where
         C: ChannelRef<Tx>,
@@ -2582,41 +2726,26 @@ impl Channel<'_, Blocking, Tx> {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    #[inline(always)]
     pub fn transmit_continuously<T>(
         &mut self,
         loopcount: Option<NonZeroU16>,
-        data: &'_ [T]
+        data: &mut impl Encoder,
     ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
-        self.transmit_continuously_enc(loopcount, SliceEncoder::new(data))
-    }
-
-    /// FIXME: docs
-    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn transmit_continuously_iter<I>(
-        &mut self,
-        loopcount: Option<NonZeroU16>,
-        data: I,
-    ) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        I: IntoIterator<Item = PulseCode>,
-    {
-        self.transmit_continuously_enc(loopcount, IterEncoder::new(data))
+        let data = EncoderExtRef::new(data);
+        self.transmit_continuously_inner(loopcount, data)
     }
 
     /// FIXME: docs
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_continuously_enc<E>(
+    fn transmit_continuously_inner(
         &mut self,
         loopcount: Option<NonZeroU16>,
-        mut data: E,
-    ) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        E: Encoder,
-    {
+        mut data: EncoderExtRef<'_>,
+    ) -> Result<ContinuousTxTransaction<'_>, Error> {
         let raw = self.raw;
 
         let mut writer = RmtWriterOuter::new(raw);

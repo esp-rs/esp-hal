@@ -10,7 +10,9 @@ use esp_hal::{
     DriverMode,
     gpio::{Input, InputPin, Level, NoPin, OutputPin},
     rmt::{
+        BytesEncoder,
         Channel,
+        Encoder,
         Error,
         IterEncoder,
         PulseCode,
@@ -66,7 +68,7 @@ fn setup<'a, Dm: DriverMode + 'static>(
 
 fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
-        PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
+        PulseCode::new(Level::High, (100 + (i % 20) * 10) as u16, Level::Low, 50)
     });
 
     if write_end_marker {
@@ -78,9 +80,15 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
 }
 
 struct TxDataIter {
-    remaining: usize,
+    remaining: u16,
     i: u16,
     write_end_marker: bool,
+}
+
+impl TxDataIter {
+    fn new(len: u16, write_end_marker: bool) -> Self {
+        Self { remaining: len, i: 0, write_end_marker }
+    }
 }
 
 impl Iterator for TxDataIter {
@@ -91,15 +99,10 @@ impl Iterator for TxDataIter {
             0 => return None,
             1 if self.write_end_marker => PulseCode::end_marker(),
             2 if self.write_end_marker => PulseCode::new(Level::High, 3000, Level::Low, 500),
-            _ => PulseCode::new(
-                Level::High,
-                (100 + (self.i * 10) % 200) as u16,
-                Level::Low,
-                50,
-            ),
+            _ => PulseCode::new(Level::High, 100 + self.i * 10, Level::Low, 50),
         };
 
-        self.i += 1;
+        self.i = (self.i + 1) % 20;
         self.remaining -= 1;
 
         Some(code)
@@ -258,10 +261,9 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
 // Run a test that just sends some data, without trying to receive it. This uses
 // an Iterator of PulseCode instead of a slice.
 #[must_use = "Tests should fail on errors"]
-fn do_rmt_single_shot_iter(
-    tx_len: usize,
+fn do_rmt_single_shot(
+    mut tx_data: impl Encoder,
     tx_memsize: u8,
-    write_end_marker: bool,
 ) -> Result<(), Error> {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
@@ -272,20 +274,13 @@ fn do_rmt_single_shot_iter(
         .with_memsize(tx_memsize);
     let (mut tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
-    let mut tx_data = TxDataIter {
-        remaining: tx_len,
-        i: 0,
-        write_end_marker,
-    };
-    let mut enc = IterEncoder::new(&mut tx_data);
-    tx_channel.transmit(&mut enc)?.wait(&mut enc)
+    tx_channel.transmit(&mut tx_data)?.wait(&mut tx_data)
 }
 
 #[must_use = "Tests should fail on errors"]
-async fn do_rmt_single_shot_iter_async(
-    tx_len: usize,
+async fn do_rmt_single_shot_async(
+    tx_data: impl Encoder + Unpin,
     tx_memsize: u8,
-    write_end_marker: bool,
 ) -> Result<(), Error> {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
@@ -296,13 +291,7 @@ async fn do_rmt_single_shot_iter_async(
         .with_memsize(tx_memsize);
     let (mut tx_channel, _) = setup(rmt, rx, tx, tx_config, Default::default());
 
-    let mut tx_data = TxDataIter {
-        remaining: tx_len,
-        i: 0,
-        write_end_marker,
-    };
-    let enc = IterEncoder::new(&mut tx_data);
-    tx_channel.transmit(enc).await
+    tx_channel.transmit(tx_data).await
 }
 
 #[cfg(test)]
@@ -385,38 +374,66 @@ mod tests {
     #[test]
     async fn rmt_single_shot_simple_async() {
         // 20 codes fit a single RAM block
-        do_rmt_single_shot_iter_async(20, 1, true).await.unwrap();
+        let mut tx_data = TxDataIter::new(20, true);
+        let enc = IterEncoder::new(&mut tx_data);
+        do_rmt_single_shot_async(enc, 1).await.unwrap();
     }
 
     #[test]
     fn rmt_single_shot_wrap() {
         // Single RAM block (48 or 64 codes), requires wrapping
-        do_rmt_single_shot_iter(80, 1, true).unwrap();
+        let mut tx_data = TxDataIter::new(80, true);
+        let enc = IterEncoder::new(&mut tx_data);
+        do_rmt_single_shot(enc, 1).unwrap();
     }
 
     #[test]
     async fn rmt_single_shot_wrap_async() {
         // Single RAM block (48 or 64 codes), requires wrapping
-        do_rmt_single_shot_iter_async(80, 1, true).await.unwrap();
+        let mut tx_data = TxDataIter::new(80, true);
+        let enc = IterEncoder::new(&mut tx_data);
+        do_rmt_single_shot_async(enc, 1).await.unwrap();
     }
 
     #[test]
     fn rmt_single_shot_extended() {
         // Two RAM blocks (96 or 128 codes), no wrapping
-        do_rmt_single_shot_iter(80, 2, true).unwrap();
+        let mut tx_data = TxDataIter::new(80, true);
+        let enc = IterEncoder::new(&mut tx_data);
+        do_rmt_single_shot(enc, 2).unwrap();
     }
 
     #[test]
     fn rmt_single_shot_extended_wrap() {
         // Two RAM blocks (96 or 128 codes), requires wrapping
-        do_rmt_single_shot_iter(150, 2, true).unwrap();
+        let mut tx_data = TxDataIter::new(150, true);
+        let enc = IterEncoder::new(&mut tx_data);
+        do_rmt_single_shot(enc, 2).unwrap();
     }
 
     #[test]
     fn rmt_single_shot_fails_without_end_marker() {
-        let result = do_rmt_single_shot_iter(20, 1, false);
+        let mut tx_data = TxDataIter::new(20, false);
+        let enc = IterEncoder::new(&mut tx_data);
+        let result = do_rmt_single_shot(enc, 1);
 
         assert_eq!(result, Err(Error::EndMarkerMissing));
+    }
+
+    #[test]
+    fn rmt_single_shot_bytes_encoder() {
+        let tx_data = [
+            0x12, 0x34, 0x56, 0x78, 0x90,
+            0x09, 0x87, 0x65, 0x43, 0x21,
+            0x33, 0x55, 0x33, 0x55, 0x33,
+        ];
+        let enc = BytesEncoder::new(
+            &tx_data,
+            PulseCode::new(Level::High, 200, Level::Low, 50),
+            PulseCode::new(Level::High, 100, Level::Low, 150),
+            PulseCode::new(Level::High, 3000, Level::Low, 0),
+        );
+        do_rmt_single_shot(enc, 1).unwrap();
     }
 
     #[test]
