@@ -351,6 +351,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -387,6 +388,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 example: None,
                 debug: false,
                 toolchain: args.toolchain.clone(),
+                timings: false,
             },
             CargoAction::Build(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -462,6 +464,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
@@ -479,6 +482,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )

@@ -138,7 +138,10 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspRomSys | EspBootloaderEspIdf)
+        matches!(
+            self,
+            EspHal | EspLpHal | EspWifi | EspHalEmbassy | EspRomSys | EspBootloaderEspIdf
+        )
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -309,6 +312,7 @@ pub fn execute_app(
     repeat: usize,
     debug: bool,
     toolchain: Option<&str>,
+    timings: bool,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -360,6 +364,9 @@ pub fn execute_app(
 
     if !debug {
         builder.add_arg("--release");
+    }
+    if timings {
+        builder.add_arg("--timings");
     }
 
     let toolchain = match toolchain {

@@ -185,6 +185,7 @@ pub fn run_examples(
                     1,
                     args.debug,
                     args.toolchain.as_deref(),
+                    args.timings,
                 )
                 .is_err()
             {

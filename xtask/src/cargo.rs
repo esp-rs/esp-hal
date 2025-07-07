@@ -6,12 +6,12 @@ use std::{
     process::{Command, Stdio},
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
 use toml_edit::{DocumentMut, Formatted, Item, Value};
 
-use crate::{windows_safe_path, Package};
+use crate::{Package, windows_safe_path};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
@@ -294,8 +294,7 @@ impl<'a> CargoToml<'a> {
     ///
     /// Callback arguments:
     /// - `path`: The path to the table (e.g. `dependencies.package`)
-    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`,
-    ///   `dev-dependencies`)
+    /// - `dependency_kind`: The kind of dependency (e.g. `dependencies`, `dev-dependencies`)
     /// - `table`: The table itself
     pub fn visit_dependencies(
         &mut self,
