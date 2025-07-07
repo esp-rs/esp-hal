@@ -28,9 +28,6 @@ esp-rom-sys      = { version = "0.1.0", path = "../esp-rom-sys", optional = true
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2.11"
 
-[build-dependencies]
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
-
 [features]
 default = ["critical-section"]
 

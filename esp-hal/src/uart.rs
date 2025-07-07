@@ -3381,7 +3381,7 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-crate::peripherals::for_each_uart! {
+for_each_uart! {
     ($inst:ident, $peri:ident, $rxd:ident, $txd:ident, $cts:ident, $rts:ident) => {
         impl Instance for crate::peripherals::$inst<'_> {
             fn parts(&self) -> (&'static Info, &'static State) {
