@@ -176,41 +176,7 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        log::info!("Formatting package: {}", package);
-        let path = workspace.join(package.to_string());
-
-        // we need to list all source files since modules in `unstable_module!` macros
-        // won't get picked up otherwise
-        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
-            .into_iter()
-            .filter_map(|entry| {
-                let path = entry.unwrap().into_path();
-                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
-                    Some(String::from(path.to_str().unwrap()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mut cargo_args = CargoArgsBuilder::default()
-            .toolchain("nightly")
-            .subcommand("fmt")
-            .arg("--all")
-            .build();
-
-        if args.check {
-            cargo_args.push("--check".into());
-        }
-
-        cargo_args.push("--".into());
-        cargo_args.push(format!(
-            "--config-path={}/rustfmt.toml",
-            workspace.display()
-        ));
-        cargo_args.extend_from_slice(&source_files);
-
-        xtask::cargo::run(&cargo_args, &path)?;
+        xtask::format_package(workspace, package, args.check)?;
     }
 
     Ok(())

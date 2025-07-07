@@ -5,10 +5,8 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use cargo::CargoAction;
-use clap::ValueEnum;
 use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumIter};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoToml},
@@ -34,9 +32,10 @@ pub mod semver_check;
     PartialOrd,
     Ord,
     Hash,
-    Display,
-    EnumIter,
-    ValueEnum,
+    clap::ValueEnum,
+    strum::Display,
+    strum::EnumIter,
+    strum::AsRefStr,
     serde::Deserialize,
     serde::Serialize,
 )]
@@ -313,7 +312,7 @@ impl Package {
     }
 }
 
-#[derive(Debug, Clone, Copy, Display, ValueEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum Version {
     Major,
@@ -485,9 +484,50 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
+pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
+    log::info!("Formatting package: {}", package);
+    let path = workspace.join(package.as_ref());
+
+    // we need to list all source files since modules in `unstable_module!` macros
+    // won't get picked up otherwise
+    let source_files = walkdir::WalkDir::new(path.join("src"))
+        .into_iter()
+        .filter_map(|entry| {
+            let path = entry.unwrap().into_path();
+            if let Some("rs") = path.extension().unwrap_or_default().to_str() {
+                Some(String::from(path.to_str().unwrap()))
+            } else {
+                None
+            }
+        });
+
+    let mut cargo_args = CargoArgsBuilder::default()
+        .toolchain("nightly")
+        .subcommand("fmt")
+        .arg("--all")
+        .build();
+
+    if check {
+        cargo_args.push("--check".into());
+    }
+
+    cargo_args.push("--".into());
+    cargo_args.push(format!(
+        "--config-path={}/rustfmt.toml",
+        workspace.display()
+    ));
+    cargo_args.extend(source_files);
+
+    cargo::run(&cargo_args, &path)?;
+
+    Ok(())
+}
+
 pub fn update_metadata(workspace: &Path) -> Result<()> {
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
+
+    format_package(workspace, Package::EspMetadataGenerated, false)?;
 
     Ok(())
 }

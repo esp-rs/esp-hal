@@ -1013,141 +1013,510 @@ macro_rules! impl_for_pin_type {
 #[macro_export]
 macro_rules! define_io_mux_signals {
     () => {
-        #[allow(non_camel_case_types, clippy::upper_case_acronyms)] #[derive(Debug,
-        PartialEq, Copy, Clone)] #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-        #[doc(hidden)] pub enum InputSignal { SPICLK = 0, SPIQ = 1, SPID = 2, SPIHD = 3,
-        SPIWP = 4, SPICS0 = 5, SPICS1 = 6, SPICS2 = 7, HSPICLK = 8, HSPIQ = 9, HSPID =
-        10, HSPICS0 = 11, HSPIHD = 12, HSPIWP = 13, U0RXD = 14, U0CTS = 15, U0DSR = 16,
-        U1RXD = 17, U1CTS = 18, I2S0O_BCK = 23, I2S1O_BCK = 24, I2S0O_WS = 25, I2S1O_WS =
-        26, I2S0I_BCK = 27, I2S0I_WS = 28, I2CEXT0_SCL = 29, I2CEXT0_SDA = 30, PWM0_SYNC0
-        = 31, PWM0_SYNC1 = 32, PWM0_SYNC2 = 33, PWM0_F0 = 34, PWM0_F1 = 35, PWM0_F2 = 36,
-        PCNT0_SIG_CH0 = 39, PCNT0_SIG_CH1 = 40, PCNT0_CTRL_CH0 = 41, PCNT0_CTRL_CH1 = 42,
-        PCNT1_SIG_CH0 = 43, PCNT1_SIG_CH1 = 44, PCNT1_CTRL_CH0 = 45, PCNT1_CTRL_CH1 = 46,
-        PCNT2_SIG_CH0 = 47, PCNT2_SIG_CH1 = 48, PCNT2_CTRL_CH0 = 49, PCNT2_CTRL_CH1 = 50,
-        PCNT3_SIG_CH0 = 51, PCNT3_SIG_CH1 = 52, PCNT3_CTRL_CH0 = 53, PCNT3_CTRL_CH1 = 54,
-        PCNT4_SIG_CH0 = 55, PCNT4_SIG_CH1 = 56, PCNT4_CTRL_CH0 = 57, PCNT4_CTRL_CH1 = 58,
-        HSPICS1 = 61, HSPICS2 = 62, VSPICLK = 63, VSPIQ = 64, VSPID = 65, VSPIHD = 66,
-        VSPIWP = 67, VSPICS0 = 68, VSPICS1 = 69, VSPICS2 = 70, PCNT5_SIG_CH0 = 71,
-        PCNT5_SIG_CH1 = 72, PCNT5_CTRL_CH0 = 73, PCNT5_CTRL_CH1 = 74, PCNT6_SIG_CH0 = 75,
-        PCNT6_SIG_CH1 = 76, PCNT6_CTRL_CH0 = 77, PCNT6_CTRL_CH1 = 78, PCNT7_SIG_CH0 = 79,
-        PCNT7_SIG_CH1 = 80, PCNT7_CTRL_CH0 = 81, PCNT7_CTRL_CH1 = 82, RMT_SIG_0 = 83,
-        RMT_SIG_1 = 84, RMT_SIG_2 = 85, RMT_SIG_3 = 86, RMT_SIG_4 = 87, RMT_SIG_5 = 88,
-        RMT_SIG_6 = 89, RMT_SIG_7 = 90, TWAI_RX = 94, I2CEXT1_SCL = 95, I2CEXT1_SDA = 96,
-        HOST_CARD_DETECT_N_1 = 97, HOST_CARD_DETECT_N_2 = 98, HOST_CARD_WRITE_PRT_1 = 99,
-        HOST_CARD_WRITE_PRT_2 = 100, HOST_CARD_INT_N_1 = 101, HOST_CARD_INT_N_2 = 102,
-        PWM1_SYNC0 = 103, PWM1_SYNC1 = 104, PWM1_SYNC2 = 105, PWM1_F0 = 106, PWM1_F1 =
-        107, PWM1_F2 = 108, PWM0_CAP0 = 109, PWM0_CAP1 = 110, PWM0_CAP2 = 111, PWM1_CAP0
-        = 112, PWM1_CAP1 = 113, PWM1_CAP2 = 114, I2S0I_DATA_0 = 140, I2S0I_DATA_1 = 141,
-        I2S0I_DATA_2 = 142, I2S0I_DATA_3 = 143, I2S0I_DATA_4 = 144, I2S0I_DATA_5 = 145,
-        I2S0I_DATA_6 = 146, I2S0I_DATA_7 = 147, I2S0I_DATA_8 = 148, I2S0I_DATA_9 = 149,
-        I2S0I_DATA_10 = 150, I2S0I_DATA_11 = 151, I2S0I_DATA_12 = 152, I2S0I_DATA_13 =
-        153, I2S0I_DATA_14 = 154, I2S0I_DATA_15 = 155, I2S1I_BCK = 164, I2S1I_WS = 165,
-        I2S1I_DATA_0 = 166, I2S1I_DATA_1 = 167, I2S1I_DATA_2 = 168, I2S1I_DATA_3 = 169,
-        I2S1I_DATA_4 = 170, I2S1I_DATA_5 = 171, I2S1I_DATA_6 = 172, I2S1I_DATA_7 = 173,
-        I2S1I_DATA_8 = 174, I2S1I_DATA_9 = 175, I2S1I_DATA_10 = 176, I2S1I_DATA_11 = 177,
-        I2S1I_DATA_12 = 178, I2S1I_DATA_13 = 179, I2S1I_DATA_14 = 180, I2S1I_DATA_15 =
-        181, I2S0I_H_SYNC = 190, I2S0I_V_SYNC = 191, I2S0I_H_ENABLE = 192, I2S1I_H_SYNC =
-        193, I2S1I_V_SYNC = 194, I2S1I_H_ENABLE = 195, U2RXD = 198, U2CTS = 199, EMAC_MDC
-        = 200, EMAC_MDI = 201, EMAC_CRS = 202, EMAC_COL = 203, PCMFSYNC = 204, PCMCLK =
-        205, PCMDIN = 206, SD_CMD, SD_DATA0, SD_DATA1, SD_DATA2, SD_DATA3, HS1_DATA0,
-        HS1_DATA1, HS1_DATA2, HS1_DATA3, HS1_DATA4, HS1_DATA5, HS1_DATA6, HS1_DATA7,
-        HS2_DATA0, HS2_DATA1, HS2_DATA2, HS2_DATA3, EMAC_TX_CLK, EMAC_RXD2, EMAC_TX_ER,
-        EMAC_RX_CLK, EMAC_RX_ER, EMAC_RXD3, EMAC_RXD0, EMAC_RXD1, EMAC_RX_DV, MTDI, MTCK,
-        MTMS, } #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
-        #[derive(Debug, PartialEq, Copy, Clone)] #[cfg_attr(feature = "defmt",
-        derive(defmt::Format))] #[doc(hidden)] pub enum OutputSignal { SPICLK = 0, SPIQ =
-        1, SPID = 2, SPIHD = 3, SPIWP = 4, SPICS0 = 5, SPICS1 = 6, SPICS2 = 7, HSPICLK =
-        8, HSPIQ = 9, HSPID = 10, HSPICS0 = 11, HSPIHD = 12, HSPIWP = 13, U0TXD = 14,
-        U0RTS = 15, U0DTR = 16, U1TXD = 17, U1RTS = 18, I2S0O_BCK = 23, I2S1O_BCK = 24,
-        I2S0O_WS = 25, I2S1O_WS = 26, I2S0I_BCK = 27, I2S0I_WS = 28, I2CEXT0_SCL = 29,
-        I2CEXT0_SDA = 30, SDIO_TOHOSTT = 31, PWM0_0A = 32, PWM0_0B = 33, PWM0_1A = 34,
-        PWM0_1B = 35, PWM0_2A = 36, PWM0_2B = 37, HSPICS1 = 61, HSPICS2 = 62, VSPICLK =
-        63, VSPIQ = 64, VSPID = 65, VSPIHD = 66, VSPIWP = 67, VSPICS0 = 68, VSPICS1 = 69,
-        VSPICS2 = 70, LEDC_HS_SIG0 = 71, LEDC_HS_SIG1 = 72, LEDC_HS_SIG2 = 73,
-        LEDC_HS_SIG3 = 74, LEDC_HS_SIG4 = 75, LEDC_HS_SIG5 = 76, LEDC_HS_SIG6 = 77,
-        LEDC_HS_SIG7 = 78, LEDC_LS_SIG0 = 79, LEDC_LS_SIG1 = 80, LEDC_LS_SIG2 = 81,
-        LEDC_LS_SIG3 = 82, LEDC_LS_SIG4 = 83, LEDC_LS_SIG5 = 84, LEDC_LS_SIG6 = 85,
-        LEDC_LS_SIG7 = 86, RMT_SIG_0 = 87, RMT_SIG_1 = 88, RMT_SIG_2 = 89, RMT_SIG_3 =
-        90, RMT_SIG_4 = 91, RMT_SIG_5 = 92, RMT_SIG_6 = 93, RMT_SIG_7 = 94, I2CEXT1_SCL =
-        95, I2CEXT1_SDA = 96, HOST_CCMD_OD_PULLUP_EN_N = 97, HOST_RST_N_1 = 98,
-        HOST_RST_N_2 = 99, GPIO_SD0 = 100, GPIO_SD1 = 101, GPIO_SD2 = 102, GPIO_SD3 =
-        103, GPIO_SD4 = 104, GPIO_SD5 = 105, GPIO_SD6 = 106, GPIO_SD7 = 107, PWM1_0A =
-        108, PWM1_0B = 109, PWM1_1A = 110, PWM1_1B = 111, PWM1_2A = 112, PWM1_2B = 113,
-        TWAI_TX = 123, TWAI_BUS_OFF_ON = 124, TWAI_CLKOUT = 125, I2S0O_DATA_0 = 140,
-        I2S0O_DATA_1 = 141, I2S0O_DATA_2 = 142, I2S0O_DATA_3 = 143, I2S0O_DATA_4 = 144,
-        I2S0O_DATA_5 = 145, I2S0O_DATA_6 = 146, I2S0O_DATA_7 = 147, I2S0O_DATA_8 = 148,
-        I2S0O_DATA_9 = 149, I2S0O_DATA_10 = 150, I2S0O_DATA_11 = 151, I2S0O_DATA_12 =
-        152, I2S0O_DATA_13 = 153, I2S0O_DATA_14 = 154, I2S0O_DATA_15 = 155, I2S0O_DATA_16
-        = 156, I2S0O_DATA_17 = 157, I2S0O_DATA_18 = 158, I2S0O_DATA_19 = 159,
-        I2S0O_DATA_20 = 160, I2S0O_DATA_21 = 161, I2S0O_DATA_22 = 162, I2S0O_DATA_23 =
-        163, I2S1I_BCK = 164, I2S1I_WS = 165, I2S1O_DATA_0 = 166, I2S1O_DATA_1 = 167,
-        I2S1O_DATA_2 = 168, I2S1O_DATA_3 = 169, I2S1O_DATA_4 = 170, I2S1O_DATA_5 = 171,
-        I2S1O_DATA_6 = 172, I2S1O_DATA_7 = 173, I2S1O_DATA_8 = 174, I2S1O_DATA_9 = 175,
-        I2S1O_DATA_10 = 176, I2S1O_DATA_11 = 177, I2S1O_DATA_12 = 178, I2S1O_DATA_13 =
-        179, I2S1O_DATA_14 = 180, I2S1O_DATA_15 = 181, I2S1O_DATA_16 = 182, I2S1O_DATA_17
-        = 183, I2S1O_DATA_18 = 184, I2S1O_DATA_19 = 185, I2S1O_DATA_20 = 186,
-        I2S1O_DATA_21 = 187, I2S1O_DATA_22 = 188, I2S1O_DATA_23 = 189, U2TXD = 198, U2RTS
-        = 199, EMAC_MDC = 200, EMAC_MDO = 201, EMAC_CRS = 202, EMAC_COL = 203,
-        BT_AUDIO0RQ = 204, BT_AUDIO1RQ = 205, BT_AUDIO2RQ = 206, BLE_AUDIO0RQ = 207,
-        BLE_AUDIO1RQ = 208, BLE_AUDIO2RQ = 209, PCMFSYNC = 210, PCMCLK = 211, PCMDOUT =
-        212, BLE_AUDIO_SYNC0_P = 213, BLE_AUDIO_SYNC1_P = 214, BLE_AUDIO_SYNC2_P = 215,
-        ANT_SEL0 = 216, ANT_SEL1 = 217, ANT_SEL2 = 218, ANT_SEL3 = 219, ANT_SEL4 = 220,
-        ANT_SEL5 = 221, ANT_SEL6 = 222, ANT_SEL7 = 223, SIGNAL_224 = 224, SIGNAL_225 =
-        225, SIGNAL_226 = 226, SIGNAL_227 = 227, SIGNAL_228 = 228, GPIO = 256, CLK_OUT1,
-        CLK_OUT2, CLK_OUT3, SD_CLK, SD_CMD, SD_DATA0, SD_DATA1, SD_DATA2, SD_DATA3,
-        HS1_CLK, HS1_CMD, HS1_DATA0, HS1_DATA1, HS1_DATA2, HS1_DATA3, HS1_DATA4,
-        HS1_DATA5, HS1_DATA6, HS1_DATA7, HS1_STROBE, HS2_CLK, HS2_CMD, HS2_DATA0,
-        HS2_DATA1, HS2_DATA2, HS2_DATA3, EMAC_TX_CLK, EMAC_TX_ER, EMAC_TXD3, EMAC_RX_ER,
-        EMAC_TXD2, EMAC_CLK_OUT, EMAC_CLK_180, EMAC_TXD0, EMAC_TX_EN, EMAC_TXD1, MTDO, }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum InputSignal {
+            SPICLK                = 0,
+            SPIQ                  = 1,
+            SPID                  = 2,
+            SPIHD                 = 3,
+            SPIWP                 = 4,
+            SPICS0                = 5,
+            SPICS1                = 6,
+            SPICS2                = 7,
+            HSPICLK               = 8,
+            HSPIQ                 = 9,
+            HSPID                 = 10,
+            HSPICS0               = 11,
+            HSPIHD                = 12,
+            HSPIWP                = 13,
+            U0RXD                 = 14,
+            U0CTS                 = 15,
+            U0DSR                 = 16,
+            U1RXD                 = 17,
+            U1CTS                 = 18,
+            I2S0O_BCK             = 23,
+            I2S1O_BCK             = 24,
+            I2S0O_WS              = 25,
+            I2S1O_WS              = 26,
+            I2S0I_BCK             = 27,
+            I2S0I_WS              = 28,
+            I2CEXT0_SCL           = 29,
+            I2CEXT0_SDA           = 30,
+            PWM0_SYNC0            = 31,
+            PWM0_SYNC1            = 32,
+            PWM0_SYNC2            = 33,
+            PWM0_F0               = 34,
+            PWM0_F1               = 35,
+            PWM0_F2               = 36,
+            PCNT0_SIG_CH0         = 39,
+            PCNT0_SIG_CH1         = 40,
+            PCNT0_CTRL_CH0        = 41,
+            PCNT0_CTRL_CH1        = 42,
+            PCNT1_SIG_CH0         = 43,
+            PCNT1_SIG_CH1         = 44,
+            PCNT1_CTRL_CH0        = 45,
+            PCNT1_CTRL_CH1        = 46,
+            PCNT2_SIG_CH0         = 47,
+            PCNT2_SIG_CH1         = 48,
+            PCNT2_CTRL_CH0        = 49,
+            PCNT2_CTRL_CH1        = 50,
+            PCNT3_SIG_CH0         = 51,
+            PCNT3_SIG_CH1         = 52,
+            PCNT3_CTRL_CH0        = 53,
+            PCNT3_CTRL_CH1        = 54,
+            PCNT4_SIG_CH0         = 55,
+            PCNT4_SIG_CH1         = 56,
+            PCNT4_CTRL_CH0        = 57,
+            PCNT4_CTRL_CH1        = 58,
+            HSPICS1               = 61,
+            HSPICS2               = 62,
+            VSPICLK               = 63,
+            VSPIQ                 = 64,
+            VSPID                 = 65,
+            VSPIHD                = 66,
+            VSPIWP                = 67,
+            VSPICS0               = 68,
+            VSPICS1               = 69,
+            VSPICS2               = 70,
+            PCNT5_SIG_CH0         = 71,
+            PCNT5_SIG_CH1         = 72,
+            PCNT5_CTRL_CH0        = 73,
+            PCNT5_CTRL_CH1        = 74,
+            PCNT6_SIG_CH0         = 75,
+            PCNT6_SIG_CH1         = 76,
+            PCNT6_CTRL_CH0        = 77,
+            PCNT6_CTRL_CH1        = 78,
+            PCNT7_SIG_CH0         = 79,
+            PCNT7_SIG_CH1         = 80,
+            PCNT7_CTRL_CH0        = 81,
+            PCNT7_CTRL_CH1        = 82,
+            RMT_SIG_0             = 83,
+            RMT_SIG_1             = 84,
+            RMT_SIG_2             = 85,
+            RMT_SIG_3             = 86,
+            RMT_SIG_4             = 87,
+            RMT_SIG_5             = 88,
+            RMT_SIG_6             = 89,
+            RMT_SIG_7             = 90,
+            TWAI_RX               = 94,
+            I2CEXT1_SCL           = 95,
+            I2CEXT1_SDA           = 96,
+            HOST_CARD_DETECT_N_1  = 97,
+            HOST_CARD_DETECT_N_2  = 98,
+            HOST_CARD_WRITE_PRT_1 = 99,
+            HOST_CARD_WRITE_PRT_2 = 100,
+            HOST_CARD_INT_N_1     = 101,
+            HOST_CARD_INT_N_2     = 102,
+            PWM1_SYNC0            = 103,
+            PWM1_SYNC1            = 104,
+            PWM1_SYNC2            = 105,
+            PWM1_F0               = 106,
+            PWM1_F1               = 107,
+            PWM1_F2               = 108,
+            PWM0_CAP0             = 109,
+            PWM0_CAP1             = 110,
+            PWM0_CAP2             = 111,
+            PWM1_CAP0             = 112,
+            PWM1_CAP1             = 113,
+            PWM1_CAP2             = 114,
+            I2S0I_DATA_0          = 140,
+            I2S0I_DATA_1          = 141,
+            I2S0I_DATA_2          = 142,
+            I2S0I_DATA_3          = 143,
+            I2S0I_DATA_4          = 144,
+            I2S0I_DATA_5          = 145,
+            I2S0I_DATA_6          = 146,
+            I2S0I_DATA_7          = 147,
+            I2S0I_DATA_8          = 148,
+            I2S0I_DATA_9          = 149,
+            I2S0I_DATA_10         = 150,
+            I2S0I_DATA_11         = 151,
+            I2S0I_DATA_12         = 152,
+            I2S0I_DATA_13         = 153,
+            I2S0I_DATA_14         = 154,
+            I2S0I_DATA_15         = 155,
+            I2S1I_BCK             = 164,
+            I2S1I_WS              = 165,
+            I2S1I_DATA_0          = 166,
+            I2S1I_DATA_1          = 167,
+            I2S1I_DATA_2          = 168,
+            I2S1I_DATA_3          = 169,
+            I2S1I_DATA_4          = 170,
+            I2S1I_DATA_5          = 171,
+            I2S1I_DATA_6          = 172,
+            I2S1I_DATA_7          = 173,
+            I2S1I_DATA_8          = 174,
+            I2S1I_DATA_9          = 175,
+            I2S1I_DATA_10         = 176,
+            I2S1I_DATA_11         = 177,
+            I2S1I_DATA_12         = 178,
+            I2S1I_DATA_13         = 179,
+            I2S1I_DATA_14         = 180,
+            I2S1I_DATA_15         = 181,
+            I2S0I_H_SYNC          = 190,
+            I2S0I_V_SYNC          = 191,
+            I2S0I_H_ENABLE        = 192,
+            I2S1I_H_SYNC          = 193,
+            I2S1I_V_SYNC          = 194,
+            I2S1I_H_ENABLE        = 195,
+            U2RXD                 = 198,
+            U2CTS                 = 199,
+            EMAC_MDC              = 200,
+            EMAC_MDI              = 201,
+            EMAC_CRS              = 202,
+            EMAC_COL              = 203,
+            PCMFSYNC              = 204,
+            PCMCLK                = 205,
+            PCMDIN                = 206,
+            SD_CMD,
+            SD_DATA0,
+            SD_DATA1,
+            SD_DATA2,
+            SD_DATA3,
+            HS1_DATA0,
+            HS1_DATA1,
+            HS1_DATA2,
+            HS1_DATA3,
+            HS1_DATA4,
+            HS1_DATA5,
+            HS1_DATA6,
+            HS1_DATA7,
+            HS2_DATA0,
+            HS2_DATA1,
+            HS2_DATA2,
+            HS2_DATA3,
+            EMAC_TX_CLK,
+            EMAC_RXD2,
+            EMAC_TX_ER,
+            EMAC_RX_CLK,
+            EMAC_RX_ER,
+            EMAC_RXD3,
+            EMAC_RXD0,
+            EMAC_RXD1,
+            EMAC_RX_DV,
+            MTDI,
+            MTCK,
+            MTMS,
+        }
+        #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+        #[doc(hidden)]
+        pub enum OutputSignal {
+            SPICLK                   = 0,
+            SPIQ                     = 1,
+            SPID                     = 2,
+            SPIHD                    = 3,
+            SPIWP                    = 4,
+            SPICS0                   = 5,
+            SPICS1                   = 6,
+            SPICS2                   = 7,
+            HSPICLK                  = 8,
+            HSPIQ                    = 9,
+            HSPID                    = 10,
+            HSPICS0                  = 11,
+            HSPIHD                   = 12,
+            HSPIWP                   = 13,
+            U0TXD                    = 14,
+            U0RTS                    = 15,
+            U0DTR                    = 16,
+            U1TXD                    = 17,
+            U1RTS                    = 18,
+            I2S0O_BCK                = 23,
+            I2S1O_BCK                = 24,
+            I2S0O_WS                 = 25,
+            I2S1O_WS                 = 26,
+            I2S0I_BCK                = 27,
+            I2S0I_WS                 = 28,
+            I2CEXT0_SCL              = 29,
+            I2CEXT0_SDA              = 30,
+            SDIO_TOHOSTT             = 31,
+            PWM0_0A                  = 32,
+            PWM0_0B                  = 33,
+            PWM0_1A                  = 34,
+            PWM0_1B                  = 35,
+            PWM0_2A                  = 36,
+            PWM0_2B                  = 37,
+            HSPICS1                  = 61,
+            HSPICS2                  = 62,
+            VSPICLK                  = 63,
+            VSPIQ                    = 64,
+            VSPID                    = 65,
+            VSPIHD                   = 66,
+            VSPIWP                   = 67,
+            VSPICS0                  = 68,
+            VSPICS1                  = 69,
+            VSPICS2                  = 70,
+            LEDC_HS_SIG0             = 71,
+            LEDC_HS_SIG1             = 72,
+            LEDC_HS_SIG2             = 73,
+            LEDC_HS_SIG3             = 74,
+            LEDC_HS_SIG4             = 75,
+            LEDC_HS_SIG5             = 76,
+            LEDC_HS_SIG6             = 77,
+            LEDC_HS_SIG7             = 78,
+            LEDC_LS_SIG0             = 79,
+            LEDC_LS_SIG1             = 80,
+            LEDC_LS_SIG2             = 81,
+            LEDC_LS_SIG3             = 82,
+            LEDC_LS_SIG4             = 83,
+            LEDC_LS_SIG5             = 84,
+            LEDC_LS_SIG6             = 85,
+            LEDC_LS_SIG7             = 86,
+            RMT_SIG_0                = 87,
+            RMT_SIG_1                = 88,
+            RMT_SIG_2                = 89,
+            RMT_SIG_3                = 90,
+            RMT_SIG_4                = 91,
+            RMT_SIG_5                = 92,
+            RMT_SIG_6                = 93,
+            RMT_SIG_7                = 94,
+            I2CEXT1_SCL              = 95,
+            I2CEXT1_SDA              = 96,
+            HOST_CCMD_OD_PULLUP_EN_N = 97,
+            HOST_RST_N_1             = 98,
+            HOST_RST_N_2             = 99,
+            GPIO_SD0                 = 100,
+            GPIO_SD1                 = 101,
+            GPIO_SD2                 = 102,
+            GPIO_SD3                 = 103,
+            GPIO_SD4                 = 104,
+            GPIO_SD5                 = 105,
+            GPIO_SD6                 = 106,
+            GPIO_SD7                 = 107,
+            PWM1_0A                  = 108,
+            PWM1_0B                  = 109,
+            PWM1_1A                  = 110,
+            PWM1_1B                  = 111,
+            PWM1_2A                  = 112,
+            PWM1_2B                  = 113,
+            TWAI_TX                  = 123,
+            TWAI_BUS_OFF_ON          = 124,
+            TWAI_CLKOUT              = 125,
+            I2S0O_DATA_0             = 140,
+            I2S0O_DATA_1             = 141,
+            I2S0O_DATA_2             = 142,
+            I2S0O_DATA_3             = 143,
+            I2S0O_DATA_4             = 144,
+            I2S0O_DATA_5             = 145,
+            I2S0O_DATA_6             = 146,
+            I2S0O_DATA_7             = 147,
+            I2S0O_DATA_8             = 148,
+            I2S0O_DATA_9             = 149,
+            I2S0O_DATA_10            = 150,
+            I2S0O_DATA_11            = 151,
+            I2S0O_DATA_12            = 152,
+            I2S0O_DATA_13            = 153,
+            I2S0O_DATA_14            = 154,
+            I2S0O_DATA_15            = 155,
+            I2S0O_DATA_16            = 156,
+            I2S0O_DATA_17            = 157,
+            I2S0O_DATA_18            = 158,
+            I2S0O_DATA_19            = 159,
+            I2S0O_DATA_20            = 160,
+            I2S0O_DATA_21            = 161,
+            I2S0O_DATA_22            = 162,
+            I2S0O_DATA_23            = 163,
+            I2S1I_BCK                = 164,
+            I2S1I_WS                 = 165,
+            I2S1O_DATA_0             = 166,
+            I2S1O_DATA_1             = 167,
+            I2S1O_DATA_2             = 168,
+            I2S1O_DATA_3             = 169,
+            I2S1O_DATA_4             = 170,
+            I2S1O_DATA_5             = 171,
+            I2S1O_DATA_6             = 172,
+            I2S1O_DATA_7             = 173,
+            I2S1O_DATA_8             = 174,
+            I2S1O_DATA_9             = 175,
+            I2S1O_DATA_10            = 176,
+            I2S1O_DATA_11            = 177,
+            I2S1O_DATA_12            = 178,
+            I2S1O_DATA_13            = 179,
+            I2S1O_DATA_14            = 180,
+            I2S1O_DATA_15            = 181,
+            I2S1O_DATA_16            = 182,
+            I2S1O_DATA_17            = 183,
+            I2S1O_DATA_18            = 184,
+            I2S1O_DATA_19            = 185,
+            I2S1O_DATA_20            = 186,
+            I2S1O_DATA_21            = 187,
+            I2S1O_DATA_22            = 188,
+            I2S1O_DATA_23            = 189,
+            U2TXD                    = 198,
+            U2RTS                    = 199,
+            EMAC_MDC                 = 200,
+            EMAC_MDO                 = 201,
+            EMAC_CRS                 = 202,
+            EMAC_COL                 = 203,
+            BT_AUDIO0RQ              = 204,
+            BT_AUDIO1RQ              = 205,
+            BT_AUDIO2RQ              = 206,
+            BLE_AUDIO0RQ             = 207,
+            BLE_AUDIO1RQ             = 208,
+            BLE_AUDIO2RQ             = 209,
+            PCMFSYNC                 = 210,
+            PCMCLK                   = 211,
+            PCMDOUT                  = 212,
+            BLE_AUDIO_SYNC0_P        = 213,
+            BLE_AUDIO_SYNC1_P        = 214,
+            BLE_AUDIO_SYNC2_P        = 215,
+            ANT_SEL0                 = 216,
+            ANT_SEL1                 = 217,
+            ANT_SEL2                 = 218,
+            ANT_SEL3                 = 219,
+            ANT_SEL4                 = 220,
+            ANT_SEL5                 = 221,
+            ANT_SEL6                 = 222,
+            ANT_SEL7                 = 223,
+            SIGNAL_224               = 224,
+            SIGNAL_225               = 225,
+            SIGNAL_226               = 226,
+            SIGNAL_227               = 227,
+            SIGNAL_228               = 228,
+            GPIO                     = 256,
+            CLK_OUT1,
+            CLK_OUT2,
+            CLK_OUT3,
+            SD_CLK,
+            SD_CMD,
+            SD_DATA0,
+            SD_DATA1,
+            SD_DATA2,
+            SD_DATA3,
+            HS1_CLK,
+            HS1_CMD,
+            HS1_DATA0,
+            HS1_DATA1,
+            HS1_DATA2,
+            HS1_DATA3,
+            HS1_DATA4,
+            HS1_DATA5,
+            HS1_DATA6,
+            HS1_DATA7,
+            HS1_STROBE,
+            HS2_CLK,
+            HS2_CMD,
+            HS2_DATA0,
+            HS2_DATA1,
+            HS2_DATA2,
+            HS2_DATA3,
+            EMAC_TX_CLK,
+            EMAC_TX_ER,
+            EMAC_TXD3,
+            EMAC_RX_ER,
+            EMAC_TXD2,
+            EMAC_CLK_OUT,
+            EMAC_CLK_180,
+            EMAC_TXD0,
+            EMAC_TX_EN,
+            EMAC_TXD1,
+            MTDO,
+        }
     };
 }
 #[macro_export]
 #[expect(clippy::crate_in_macro_def)]
 macro_rules! define_io_mux_reg {
     () => {
-        pub (crate) fn io_mux_reg(gpio_num : u8) -> & 'static crate ::pac::io_mux::GPIO0
-        { use core::mem::transmute; use crate :: { pac::io_mux, peripherals::IO_MUX };
-        let iomux = IO_MUX::regs(); unsafe { match gpio_num { 0 => transmute:: < &
-        'static io_mux::GPIO0, & 'static io_mux::GPIO0 > (iomux.gpio0()), 1 =>
-        transmute:: < & 'static io_mux::GPIO1, & 'static io_mux::GPIO0 > (iomux.gpio1()),
-        2 => transmute:: < & 'static io_mux::GPIO2, & 'static io_mux::GPIO0 > (iomux
-        .gpio2()), 3 => transmute:: < & 'static io_mux::GPIO3, & 'static io_mux::GPIO0 >
-        (iomux.gpio3()), 4 => transmute:: < & 'static io_mux::GPIO4, & 'static
-        io_mux::GPIO0 > (iomux.gpio4()), 5 => transmute:: < & 'static io_mux::GPIO5, &
-        'static io_mux::GPIO0 > (iomux.gpio5()), 6 => transmute:: < & 'static
-        io_mux::GPIO6, & 'static io_mux::GPIO0 > (iomux.gpio6()), 7 => transmute:: < &
-        'static io_mux::GPIO7, & 'static io_mux::GPIO0 > (iomux.gpio7()), 8 =>
-        transmute:: < & 'static io_mux::GPIO8, & 'static io_mux::GPIO0 > (iomux.gpio8()),
-        9 => transmute:: < & 'static io_mux::GPIO9, & 'static io_mux::GPIO0 > (iomux
-        .gpio9()), 10 => transmute:: < & 'static io_mux::GPIO10, & 'static io_mux::GPIO0
-        > (iomux.gpio10()), 11 => transmute:: < & 'static io_mux::GPIO11, & 'static
-        io_mux::GPIO0 > (iomux.gpio11()), 12 => transmute:: < & 'static io_mux::GPIO12, &
-        'static io_mux::GPIO0 > (iomux.gpio12()), 13 => transmute:: < & 'static
-        io_mux::GPIO13, & 'static io_mux::GPIO0 > (iomux.gpio13()), 14 => transmute:: < &
-        'static io_mux::GPIO14, & 'static io_mux::GPIO0 > (iomux.gpio14()), 15 =>
-        transmute:: < & 'static io_mux::GPIO15, & 'static io_mux::GPIO0 > (iomux
-        .gpio15()), 16 => transmute:: < & 'static io_mux::GPIO16, & 'static io_mux::GPIO0
-        > (iomux.gpio16()), 17 => transmute:: < & 'static io_mux::GPIO17, & 'static
-        io_mux::GPIO0 > (iomux.gpio17()), 18 => transmute:: < & 'static io_mux::GPIO18, &
-        'static io_mux::GPIO0 > (iomux.gpio18()), 19 => transmute:: < & 'static
-        io_mux::GPIO19, & 'static io_mux::GPIO0 > (iomux.gpio19()), 20 => transmute:: < &
-        'static io_mux::GPIO20, & 'static io_mux::GPIO0 > (iomux.gpio20()), 21 =>
-        transmute:: < & 'static io_mux::GPIO21, & 'static io_mux::GPIO0 > (iomux
-        .gpio21()), 22 => transmute:: < & 'static io_mux::GPIO22, & 'static io_mux::GPIO0
-        > (iomux.gpio22()), 23 => transmute:: < & 'static io_mux::GPIO23, & 'static
-        io_mux::GPIO0 > (iomux.gpio23()), 25 => transmute:: < & 'static io_mux::GPIO25, &
-        'static io_mux::GPIO0 > (iomux.gpio25()), 26 => transmute:: < & 'static
-        io_mux::GPIO26, & 'static io_mux::GPIO0 > (iomux.gpio26()), 27 => transmute:: < &
-        'static io_mux::GPIO27, & 'static io_mux::GPIO0 > (iomux.gpio27()), 32 =>
-        transmute:: < & 'static io_mux::GPIO32, & 'static io_mux::GPIO0 > (iomux
-        .gpio32()), 33 => transmute:: < & 'static io_mux::GPIO33, & 'static io_mux::GPIO0
-        > (iomux.gpio33()), 34 => transmute:: < & 'static io_mux::GPIO34, & 'static
-        io_mux::GPIO0 > (iomux.gpio34()), 35 => transmute:: < & 'static io_mux::GPIO35, &
-        'static io_mux::GPIO0 > (iomux.gpio35()), 36 => transmute:: < & 'static
-        io_mux::GPIO36, & 'static io_mux::GPIO0 > (iomux.gpio36()), 37 => transmute:: < &
-        'static io_mux::GPIO37, & 'static io_mux::GPIO0 > (iomux.gpio37()), 38 =>
-        transmute:: < & 'static io_mux::GPIO38, & 'static io_mux::GPIO0 > (iomux
-        .gpio38()), 39 => transmute:: < & 'static io_mux::GPIO39, & 'static io_mux::GPIO0
-        > (iomux.gpio39()), other => panic!("GPIO {} does not exist", other), } } }
+        pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+            use core::mem::transmute;
+
+            use crate::{pac::io_mux, peripherals::IO_MUX};
+            let iomux = IO_MUX::regs();
+            unsafe {
+                match gpio_num {
+                    0 => transmute::<&'static io_mux::GPIO0, &'static io_mux::GPIO0>(iomux.gpio0()),
+                    1 => transmute::<&'static io_mux::GPIO1, &'static io_mux::GPIO0>(iomux.gpio1()),
+                    2 => transmute::<&'static io_mux::GPIO2, &'static io_mux::GPIO0>(iomux.gpio2()),
+                    3 => transmute::<&'static io_mux::GPIO3, &'static io_mux::GPIO0>(iomux.gpio3()),
+                    4 => transmute::<&'static io_mux::GPIO4, &'static io_mux::GPIO0>(iomux.gpio4()),
+                    5 => transmute::<&'static io_mux::GPIO5, &'static io_mux::GPIO0>(iomux.gpio5()),
+                    6 => transmute::<&'static io_mux::GPIO6, &'static io_mux::GPIO0>(iomux.gpio6()),
+                    7 => transmute::<&'static io_mux::GPIO7, &'static io_mux::GPIO0>(iomux.gpio7()),
+                    8 => transmute::<&'static io_mux::GPIO8, &'static io_mux::GPIO0>(iomux.gpio8()),
+                    9 => transmute::<&'static io_mux::GPIO9, &'static io_mux::GPIO0>(iomux.gpio9()),
+                    10 => {
+                        transmute::<&'static io_mux::GPIO10, &'static io_mux::GPIO0>(iomux.gpio10())
+                    }
+                    11 => {
+                        transmute::<&'static io_mux::GPIO11, &'static io_mux::GPIO0>(iomux.gpio11())
+                    }
+                    12 => {
+                        transmute::<&'static io_mux::GPIO12, &'static io_mux::GPIO0>(iomux.gpio12())
+                    }
+                    13 => {
+                        transmute::<&'static io_mux::GPIO13, &'static io_mux::GPIO0>(iomux.gpio13())
+                    }
+                    14 => {
+                        transmute::<&'static io_mux::GPIO14, &'static io_mux::GPIO0>(iomux.gpio14())
+                    }
+                    15 => {
+                        transmute::<&'static io_mux::GPIO15, &'static io_mux::GPIO0>(iomux.gpio15())
+                    }
+                    16 => {
+                        transmute::<&'static io_mux::GPIO16, &'static io_mux::GPIO0>(iomux.gpio16())
+                    }
+                    17 => {
+                        transmute::<&'static io_mux::GPIO17, &'static io_mux::GPIO0>(iomux.gpio17())
+                    }
+                    18 => {
+                        transmute::<&'static io_mux::GPIO18, &'static io_mux::GPIO0>(iomux.gpio18())
+                    }
+                    19 => {
+                        transmute::<&'static io_mux::GPIO19, &'static io_mux::GPIO0>(iomux.gpio19())
+                    }
+                    20 => {
+                        transmute::<&'static io_mux::GPIO20, &'static io_mux::GPIO0>(iomux.gpio20())
+                    }
+                    21 => {
+                        transmute::<&'static io_mux::GPIO21, &'static io_mux::GPIO0>(iomux.gpio21())
+                    }
+                    22 => {
+                        transmute::<&'static io_mux::GPIO22, &'static io_mux::GPIO0>(iomux.gpio22())
+                    }
+                    23 => {
+                        transmute::<&'static io_mux::GPIO23, &'static io_mux::GPIO0>(iomux.gpio23())
+                    }
+                    25 => {
+                        transmute::<&'static io_mux::GPIO25, &'static io_mux::GPIO0>(iomux.gpio25())
+                    }
+                    26 => {
+                        transmute::<&'static io_mux::GPIO26, &'static io_mux::GPIO0>(iomux.gpio26())
+                    }
+                    27 => {
+                        transmute::<&'static io_mux::GPIO27, &'static io_mux::GPIO0>(iomux.gpio27())
+                    }
+                    32 => {
+                        transmute::<&'static io_mux::GPIO32, &'static io_mux::GPIO0>(iomux.gpio32())
+                    }
+                    33 => {
+                        transmute::<&'static io_mux::GPIO33, &'static io_mux::GPIO0>(iomux.gpio33())
+                    }
+                    34 => {
+                        transmute::<&'static io_mux::GPIO34, &'static io_mux::GPIO0>(iomux.gpio34())
+                    }
+                    35 => {
+                        transmute::<&'static io_mux::GPIO35, &'static io_mux::GPIO0>(iomux.gpio35())
+                    }
+                    36 => {
+                        transmute::<&'static io_mux::GPIO36, &'static io_mux::GPIO0>(iomux.gpio36())
+                    }
+                    37 => {
+                        transmute::<&'static io_mux::GPIO37, &'static io_mux::GPIO0>(iomux.gpio37())
+                    }
+                    38 => {
+                        transmute::<&'static io_mux::GPIO38, &'static io_mux::GPIO0>(iomux.gpio38())
+                    }
+                    39 => {
+                        transmute::<&'static io_mux::GPIO39, &'static io_mux::GPIO0>(iomux.gpio39())
+                    }
+                    other => panic!("GPIO {} does not exist", other),
+                }
+            }
+        }
     };
 }
