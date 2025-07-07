@@ -5,7 +5,7 @@ macro_rules! chip {
         "esp32h2"
     };
 }
-/// A link to the Technical Reference Manual (TRM) for the chip.
+/// The properties of this chip and its drivers.
 #[macro_export]
 macro_rules! property {
     ("chip") => {

@@ -465,7 +465,7 @@ impl Config {
 
         // Not public API, can use a private macro:
         tokens.extend(quote! {
-            /// A link to the Technical Reference Manual (TRM) for the chip.
+            /// The properties of this chip and its drivers.
             #[macro_export]
             macro_rules! property {
                 ("chip") => { #chip_name };
