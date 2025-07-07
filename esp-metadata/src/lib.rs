@@ -466,7 +466,6 @@ impl Config {
         // Not public API, can use a private macro:
         tokens.extend(quote! {
             /// A link to the Technical Reference Manual (TRM) for the chip.
-            #[doc(hidden)]
             #[macro_export]
             macro_rules! property {
                 ("chip") => { #chip_name };
@@ -493,7 +492,6 @@ impl Config {
         tokens.extend(quote! {
             /// Macro to get the address range of the given memory region.
             #[macro_export]
-            #[doc(hidden)]
             macro_rules! memory_range {
                 #(#region_branches)*
             }

@@ -6,7 +6,6 @@ macro_rules! chip {
     };
 }
 /// A link to the Technical Reference Manual (TRM) for the chip.
-#[doc(hidden)]
 #[macro_export]
 macro_rules! property {
     ("chip") => {
@@ -150,7 +149,6 @@ macro_rules! property {
 }
 /// Macro to get the address range of the given memory region.
 #[macro_export]
-#[doc(hidden)]
 macro_rules! memory_range {
     ("DRAM") => {
         1070104576..1070596096
