@@ -311,9 +311,9 @@ pub(crate) const unsafe fn modem_clock_controller() -> impl ModemClockController
     // Stealing the peripherals is safe here, as they must have been passed into the relevant
     // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
     #[cfg(not(esp32h2))]
-    let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
+    unsafe { esp_hal::peripherals::WIFI::steal() }
     #[cfg(esp32h2)]
-    let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
+    unsafe { esp_hal::peripherals::BT::steal() }
 }
 
 pub(crate) unsafe fn phy_enable_clock() {
