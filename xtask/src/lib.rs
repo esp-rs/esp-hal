@@ -6,7 +6,7 @@ use std::{
 use anyhow::{Result, anyhow};
 use cargo::CargoAction;
 use clap::ValueEnum;
-use esp_metadata::{Chip, Config};
+use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
@@ -486,20 +486,45 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
 }
 
 pub fn update_metadata(workspace: &Path) -> Result<()> {
-    use strum::IntoEnumIterator;
     update_chip_support_table(workspace)?;
+    generate_metadata(workspace, save)?;
+
+    Ok(())
+}
+
+fn generate_metadata(
+    workspace: &Path,
+    call_for_file: fn(&Path, TokenStream) -> Result<()>,
+) -> Result<()> {
+    use strum::IntoEnumIterator;
 
     let out_path = workspace.join("esp-metadata-generated").join("src");
 
     for chip in Chip::iter() {
-        // Load the configuration file for the configured device:
         let config = esp_metadata::Config::for_chip(&chip);
-        let path = out_path.join(format!("_generated_{chip}.rs"));
-        config.generate_metadata(&path);
+        call_for_file(
+            &out_path.join(format!("_generated_{chip}.rs")),
+            config.generate_metadata(),
+        )?;
     }
 
-    esp_metadata::generate_build_script_utils(&out_path.join("_build_script_utils.rs"));
-    esp_metadata::generate_lib_rs(&out_path.join("lib.rs"));
+    call_for_file(
+        &out_path.join("_build_script_utils.rs"),
+        esp_metadata::generate_build_script_utils(),
+    )?;
+
+    call_for_file(&out_path.join("lib.rs"), esp_metadata::generate_lib_rs())?;
+
+    Ok(())
+}
+
+fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
+    let source = tokens.to_string();
+
+    let syntax_tree = syn::parse_file(&source)?;
+    let source = prettyplease::unparse(&syntax_tree);
+
+    std::fs::write(out_path, source)?;
 
     Ok(())
 }

@@ -2,11 +2,11 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{collections::HashMap, fmt::Write, path::Path, sync::OnceLock};
+use std::{collections::HashMap, fmt::Write, sync::OnceLock};
 
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
-use proc_macro2::TokenStream;
+pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
@@ -415,19 +415,16 @@ impl Config {
         self.all().iter().any(|i| i == item)
     }
 
-    pub fn generate_metadata(&self, path: &Path) {
+    pub fn generate_metadata(&self) -> TokenStream {
         let properties = self.generate_properties();
         let peris = self.generate_peripherals();
         let gpios = self.generate_gpios();
 
-        save(
-            path,
-            quote! {
-                #properties
-                #peris
-                #gpios
-            },
-        )
+        quote! {
+            #properties
+            #peris
+            #gpios
+        }
     }
 
     fn generate_properties(&self) -> TokenStream {
@@ -667,7 +664,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
     }
 }
 
-pub fn generate_build_script_utils(path: &Path) {
+pub fn generate_build_script_utils() -> TokenStream {
     let check_cfgs = Chip::list_of_check_cfgs();
 
     let chip = Chip::iter()
@@ -702,7 +699,7 @@ pub fn generate_build_script_utils(path: &Path) {
         "Expected exactly one of the following features to be enabled: {all_chip_features}"
     );
 
-    let tokens = quote! {
+    quote! {
         #[derive(Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Chip {
             #(#chip),*
@@ -800,22 +797,10 @@ pub fn generate_build_script_utils(path: &Path) {
                 }
             }
         }
-    };
-    save(path, tokens);
+    }
 }
 
-fn save(out_path: &Path, tokens: TokenStream) {
-    let source = tokens.to_string();
-
-    #[cfg(feature = "pretty")]
-    let syntax_tree = syn::parse_file(&source).unwrap();
-    #[cfg(feature = "pretty")]
-    let source = prettyplease::unparse(&syntax_tree);
-
-    std::fs::write(out_path, source).unwrap();
-}
-
-pub fn generate_lib_rs(path: &Path) {
+pub fn generate_lib_rs() -> TokenStream {
     let chips = Chip::iter().map(|c| {
         let feature = format!("{c}");
         let file = format!("_generated_{c}.rs");
@@ -825,17 +810,14 @@ pub fn generate_lib_rs(path: &Path) {
         }
     });
 
-    save(
-        path,
-        quote! {
-            #![cfg_attr(not(feature = "build-script"), no_std)]
+    quote! {
+        #![cfg_attr(not(feature = "build-script"), no_std)]
 
-            #(#chips)*
+        #(#chips)*
 
-            #[cfg(feature = "build-script")]
-            include!( "_build_script_utils.rs");
-        },
-    )
+        #[cfg(feature = "build-script")]
+        include!( "_build_script_utils.rs");
+    }
 }
 
 pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {
