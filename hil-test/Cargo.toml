@@ -351,22 +351,3 @@ embassy = [
     "dep:esp-hal-embassy",
 ]
 psram = ["esp-hal/psram", "esp-alloc"]
-
-# https://doc.rust-lang.org/cargo/reference/profiles.html#test
-# Test and bench profiles inherit from dev and release respectively.
-[profile.dev]
-codegen-units    = 1
-debug            = 2
-debug-assertions = true
-incremental      = false
-opt-level        = "z"
-overflow-checks  = true
-
-[profile.release]
-codegen-units    = 1
-debug            = 2
-debug-assertions = true
-incremental      = false
-opt-level        = 3
-lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
-overflow-checks  = true

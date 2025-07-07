@@ -17,11 +17,11 @@ proc-macro = true
 [dependencies]
 document-features = "0.2.11"
 litrs             = "0.4.1"
-object            = { version = "0.36.7", default-features = false, features = ["read_core", "elf"], optional = true }
+object            = { version = "0.37.1", default-features = false, features = ["read_core", "elf"], optional = true }
 proc-macro-crate  = "3.3.0"
-proc-macro2       = "1.0.95"
+proc-macro2       = { workspace = true }
 quote             = "1.0.40"
-syn               = { version = "2.0.100", features = ["extra-traits", "full"] }
+syn               = { workspace = true }
 termcolor         = "1.4.1"
 
 [features]

@@ -36,3 +36,12 @@ HOST_IP = "1.1.1.1"
 
 [unstable]
 build-std = ["alloc", "core"]
+
+[profile.release]
+codegen-units    = 1
+debug            = 2
+debug-assertions = true
+incremental      = false
+opt-level        = 3
+lto = 'fat'
+overflow-checks  = false

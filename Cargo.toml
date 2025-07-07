@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members  = ["xtask"]
-exclude  = [
+members  = [
+    "xtask",
     "esp-alloc",
     "esp-backtrace",
     "esp-bootloader-esp-idf",
@@ -28,3 +28,9 @@ exclude  = [
     "xtensa-lx-rt",
     "xtensa-lx-rt-proc-macros",
 ]
+[workspace.dependencies]
+proc-macro2 = "1.0.95"
+quote = "1.0"
+syn = { version = "2.0", default-features = false, features = ["full", "parsing", "printing", "proc-macro", "clone-impls", "extra-traits", "derive"] }
+embassy-sync = { version = "0.7.0" }
+defmt = "1.0.1"

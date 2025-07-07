@@ -32,3 +32,9 @@ ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
 
 [unstable]
 build-std = ["alloc", "core"]
+
+[profile.release]
+debug         = 2
+debug-assertions = true
+lto           = "fat"
+codegen-units = 1

@@ -27,7 +27,7 @@ static_cell               = "2.1.0"
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features         = "0.2.11"
-embassy-sync              = { version = "0.6.2" }
+embassy-sync              = { workspace = true }
 embassy-time              = { version = "0.4.0" }
 embassy-time-driver       = { version = "0.2.0", features = [ "tick-hz-1_000_000" ] }
 embassy-time-queue-utils  = { version = "0.1.0", features = ["_generic-queue"] }
@@ -38,7 +38,7 @@ macros                    = { version = "0.18.0", features = ["embassy"], packag
 embassy-executor          = { version = "0.7.0", features = ["timer-item-payload-size-4"], optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt                     = { version = "1.0.1", optional = true }
+defmt                     = { workspace = true, optional = true }
 log-04                    = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
