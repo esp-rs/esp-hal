@@ -9,6 +9,69 @@
 //! - read the partition table
 //! - conveniently use a partition to read and write flash contents
 //!
+//! ## Examples
+//!
+//! ### Populating the Application Descriptor
+//!
+//! To use the default values:
+//!
+//! ```rust, ignore
+//! #![no_std]
+//! #![no_main]
+//!
+//! #[panic_handler]
+//! fn panic(_: &core::panic::PanicInfo) -> ! {
+//!     loop {}
+//! }
+//!
+//! esp_bootloader_esp_idf::esp_app_desc!();
+//!
+//! #[esp_hal::main]
+//! fn main() -> ! {
+//!     let _peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//!     loop {}
+//! }
+//! ```
+//!
+//! If you want to customize the application descriptor:
+//!
+//! ```rust, ignore
+//! #![no_std]
+//! #![no_main]
+//!
+//! #[panic_handler]
+//! fn panic(_: &core::panic::PanicInfo) -> ! {
+//!     loop {}
+//! }
+//!
+//! esp_bootloader_esp_idf::esp_app_desc!(
+//!     // Version
+//!     "1.0.0",
+//!     // Project name
+//!     "my_project",
+//!     // Build time
+//!     "12:00:00",
+//!     // Build date
+//!     "2021-01-01",
+//!     // ESP-IDF version
+//!     "4.4",
+//!     // MMU page size
+//!     8 * 1024,
+//!     // Minimal eFuse block revision supported by image. Format: major * 100 + minor
+//!     0,
+//!     // Maximum eFuse block revision supported by image. Format: major * 100 + minor
+//!     u16::MAX
+//! );
+//!
+//! #[esp_hal::main]
+//! fn main() -> ! {
+//!     let _peripherals = esp_hal::init(esp_hal::Config::default());
+//!
+//!     loop {}
+//! }
+//! ```
+//!
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo

@@ -515,6 +515,7 @@ impl Config {
     fn generate_peripherals_macro(&self) -> TokenStream {
         let mut stable = vec![];
         let mut unstable = vec![];
+        let mut all_peripherals = vec![];
 
         let mut stable_peris = vec![];
 
@@ -530,15 +531,16 @@ impl Config {
             }
         }
 
-        let gpios = if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
-            gpio.pins_and_signals
-                .pins
-                .iter()
-                .map(|pin| format_ident!("GPIO{}", pin.pin))
-                .collect::<Vec<_>>()
-        } else {
-            vec![]
-        };
+        if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
+            for pin in gpio.pins_and_signals.pins.iter() {
+                let pin = format_ident!("GPIO{}", pin.pin);
+                let tokens = quote::quote! {
+                    #pin <= virtual ()
+                };
+                all_peripherals.push(quote::quote! { #tokens });
+                stable.push(tokens);
+            }
+        }
 
         for peri in self.device.peripherals.iter() {
             let hal = format_ident!("{}", peri.name);
@@ -551,9 +553,11 @@ impl Config {
             let mut interrupts = peri.interrupts.iter().collect::<Vec<_>>();
             interrupts.sort_by_key(|(k, _)| k.as_str());
             let interrupts = interrupts.iter().map(|(k, v)| {
-                let k = format_ident!("{k}");
-                let v = format_ident!("{v}");
-                quote::quote! { #k => #v }
+                let pac_interrupt_name = format_ident!("{v}");
+                let bind = format_ident!("bind_{k}_interrupt");
+                let enable = format_ident!("enable_{k}_interrupt");
+                let disable = format_ident!("disable_{k}_interrupt");
+                quote::quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
             });
             let tokens = quote::quote! {
                 #hal <= #pac ( #(#interrupts),* )
@@ -562,23 +566,15 @@ impl Config {
                 .iter()
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
+                all_peripherals.push(quote::quote! { #tokens });
                 stable.push(tokens);
             } else {
+                all_peripherals.push(quote::quote! { #tokens (unstable) });
                 unstable.push(tokens);
             }
         }
 
-        quote::quote! {
-            crate::peripherals! {
-                peripherals: [
-                    #(#stable,)*
-                ],
-                unstable_peripherals: [
-                    #(#unstable,)*
-                ],
-                pins: [#(#gpios,)*]
-            }
-        }
+        generate_for_each_macro("peripheral", &all_peripherals)
     }
 }
 
@@ -590,13 +586,34 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
         // macro that substitutes the properties into the template provided by the call in esp-hal.
         macro_rules! #macro_name {
             (
-                $pattern:tt => $code:tt;
+                $($pattern:tt => $code:tt;)*
             ) => {
                 macro_rules! _for_each_inner {
-                    ($pattern) => $code;
+                    $(($pattern) => $code;)*
+                    ($other:tt) => {}
                 }
 
+                // Generate single macro calls with each branch
+                // Usage:
+                // ```
+                // for_each_x! {
+                //     ( $pattern ) => {
+                //         $code
+                //     }
+                // }
+                // ```
                 #(_for_each_inner!(( #branches ));)*
+
+                // Generate a single macro call with all branches.
+                // Usage:
+                // ```
+                // for_each_x! {
+                //     (all $( ($pattern) ),*) => {
+                //         $( $code )*
+                //     }
+                // }
+                // ```
+                _for_each_inner!((all #((#branches)),*));
             };
         }
 

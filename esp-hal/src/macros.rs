@@ -3,6 +3,7 @@
 //! Most of the macros in this module are hidden and intended for internal use
 //! only. For the list of public macros, see the [procmacros](https://docs.rs/esp-hal-procmacros/latest/esp_hal_procmacros/)
 //! documentation.
+
 #[doc(hidden)]
 /// Helper macro for checking doctest code snippets
 #[macro_export]
@@ -33,6 +34,17 @@ macro_rules! before_snippet {
 # }
 # async fn example() -> Result<(), ExampleError> {
 #   let mut peripherals = esp_hal::init(esp_hal::Config::default());
+"#
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! after_snippet {
+    () => {
+        r#"
+# Ok(())
+# }
 "#
     };
 }
@@ -154,6 +166,11 @@ macro_rules! any_peripheral {
             ///
             /// Use this method if you would like to keep working with the peripheral after
             /// you dropped the driver that consumes this.
+            ///
+            /// See [Peripheral singleton] section for more information.
+            ///
+            /// [Peripheral singleton]: crate#peripheral-singletons
+
             #[inline]
             pub fn reborrow(&mut self) -> $name<'_> {
                 unsafe { self.clone_unchecked() }

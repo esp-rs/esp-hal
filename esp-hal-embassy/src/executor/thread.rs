@@ -104,6 +104,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        #[cfg_attr(not(low_power_wait), expect(dead_code, reason = "cpu index is unused"))]
         struct NoHooks(usize);
 
         impl Callbacks for NoHooks {
