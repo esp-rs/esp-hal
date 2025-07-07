@@ -238,9 +238,7 @@ impl Package {
             Package::EspAlloc => {
                 features.push("defmt".to_owned());
             }
-            Package::EspMetadataGenerated => {
-                features.push("build-script".to_owned());
-            }
+            Package::EspMetadataGenerated => {}
             _ => {}
         }
 
