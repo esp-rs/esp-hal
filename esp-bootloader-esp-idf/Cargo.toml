@@ -39,7 +39,7 @@ esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 default = ["validation"]
 
 ## Enable MD5 validation of the partition table.
-validation = ["dep:md-5"]
+validation = []
 
 ## Enable support for version 0.4 of the `log` crate
 log-04 = ["dep:log-04"]
@@ -48,7 +48,7 @@ log-04 = ["dep:log-04"]
 defmt = ["dep:defmt"]
 
 # Replace ROM functions with pure Rust implementations, needed for tests.
-std = ["dep:crc"]
+std = ["dep:crc", "dep:md-5"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
