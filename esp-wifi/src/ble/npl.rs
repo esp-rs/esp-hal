@@ -1,8 +1,10 @@
 use alloc::boxed::Box;
 use core::{
-    mem::size_of_val,
+    mem::{size_of_val, transmute},
     ptr::{addr_of, addr_of_mut},
 };
+
+use esp_hal::time::{Duration, Instant};
 
 use super::*;
 use crate::{
@@ -397,10 +399,7 @@ unsafe extern "C" fn task_create(
     } // we will run it in task 0
 
     unsafe {
-        let task_func = core::mem::transmute::<
-            *mut crate::binary::c_types::c_void,
-            extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
-        >(task_func);
+        let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
         let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
         *(task_handle as *mut usize) = task as usize;
@@ -507,9 +506,9 @@ pub struct npl_funcs_t {
         Option<unsafe extern "C" fn(callout: *const ble_npl_callout, arg: *const c_void)>,
     p_ble_npl_time_get: Option<unsafe extern "C" fn() -> u32>,
     p_ble_npl_time_ms_to_ticks:
-        Option<unsafe extern "C" fn(ms: u32, p_time: *const ble_npl_time_t) -> ble_npl_error_t>,
+        Option<unsafe extern "C" fn(ms: u32, p_time: *mut ble_npl_time_t) -> ble_npl_error_t>,
     p_ble_npl_time_ticks_to_ms:
-        Option<unsafe extern "C" fn(time: ble_npl_time_t, *const u32) -> ble_npl_error_t>,
+        Option<unsafe extern "C" fn(time: ble_npl_time_t, *mut u32) -> ble_npl_error_t>,
     p_ble_npl_time_ms_to_ticks32: Option<unsafe extern "C" fn(ms: u32) -> ble_npl_time_t>,
     p_ble_npl_time_ticks_to_ms32: Option<unsafe extern "C" fn(time: ble_npl_time_t) -> u32>,
     p_ble_npl_time_delay: Option<unsafe extern "C" fn(time: ble_npl_time_t)>,
@@ -620,29 +619,30 @@ unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
     unsafe {
-        critical_section::release(core::mem::transmute::<u32, critical_section::RestoreState>(
-            mask,
-        ));
+        critical_section::release(transmute::<u32, critical_section::RestoreState>(mask));
     }
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
     trace!("ble_npl_hw_enter_critical");
-    unsafe {
-        core::mem::transmute::<critical_section::RestoreState, u32>(critical_section::acquire())
-    }
+    unsafe { transmute::<critical_section::RestoreState, u32>(critical_section::acquire()) }
 }
 
 unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {
     todo!()
 }
 
-unsafe extern "C" fn ble_npl_time_delay(_time: ble_npl_time_t) {
-    todo!()
+unsafe extern "C" fn ble_npl_time_delay(time: ble_npl_time_t) {
+    let start = Instant::now();
+    let timeout = Duration::from_millis(time as u64);
+    while start.elapsed() <= timeout {
+        yield_task();
+    }
 }
 
-unsafe extern "C" fn ble_npl_time_ticks_to_ms32(_time: ble_npl_time_t) -> u32 {
-    todo!()
+unsafe extern "C" fn ble_npl_time_ticks_to_ms32(time: ble_npl_time_t) -> u32 {
+    trace!("ble_npl_time_ticks_to_ms32 {}", time);
+    time
 }
 
 unsafe extern "C" fn ble_npl_time_ms_to_ticks32(ms: u32) -> ble_npl_time_t {
@@ -651,24 +651,30 @@ unsafe extern "C" fn ble_npl_time_ms_to_ticks32(ms: u32) -> ble_npl_time_t {
 }
 
 unsafe extern "C" fn ble_npl_time_ticks_to_ms(
-    _time: ble_npl_time_t,
-    _p_ms: *const u32,
+    time: ble_npl_time_t,
+    p_ms: *mut u32,
 ) -> ble_npl_error_t {
-    todo!()
+    trace!("ble_npl_time_ticks_to_ms {}", time);
+    unsafe {
+        *p_ms = time;
+    }
+    0
 }
 
 unsafe extern "C" fn ble_npl_time_ms_to_ticks(
-    _ms: u32,
-    _p_time: *const ble_npl_time_t,
+    ms: u32,
+    p_time: *mut ble_npl_time_t,
 ) -> ble_npl_error_t {
-    todo!()
+    trace!("ble_npl_time_ms_to_ticks {}", ms);
+    unsafe {
+        *p_time = ms;
+    }
+    0
 }
 
 unsafe extern "C" fn ble_npl_time_get() -> u32 {
     trace!("ble_npl_time_get");
-    esp_hal::time::Instant::now()
-        .duration_since_epoch()
-        .as_millis() as u32
+    Instant::now().duration_since_epoch().as_millis() as u32
 }
 
 unsafe extern "C" fn ble_npl_callout_set_arg(
@@ -872,7 +878,7 @@ unsafe extern "C" fn ble_npl_event_run(event: *const ble_npl_event) {
         event as u32
     );
     unsafe {
-        let func: unsafe extern "C" fn(u32) = core::mem::transmute((*evt).event_fn_ptr);
+        let func: unsafe extern "C" fn(u32) = transmute((*evt).event_fn_ptr);
         func(event as u32);
     }
 
@@ -926,25 +932,34 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
     let queue = unsafe { (*queue).dummy } as *mut ConcurrentQueue;
 
-    let mut event: usize = 0;
-    if time == TIME_FOREVER {
-        loop {
-            if unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
-                let event = event as *mut ble_npl_event;
-                let evt = unsafe { (*event).dummy } as *mut Event;
-                if unsafe { (*evt).queued } {
-                    trace!("got {:x}", evt as usize);
-                    unsafe {
-                        (*evt).queued = false;
-                    }
-                    return event as *const ble_npl_event;
-                }
-            }
-
-            yield_task();
-        }
+    let timeout = if time == TIME_FOREVER {
+        None
     } else {
-        panic!("timed eventq_get not yet supported - go implement it!");
+        Some(Duration::from_millis(time as u64))
+    };
+    let start = Instant::now();
+
+    let mut event: usize = 0;
+    loop {
+        while unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
+            let event = event as *mut ble_npl_event;
+            let evt = unsafe { (*event).dummy } as *mut Event;
+            if unsafe { (*evt).queued } {
+                trace!("got {:x}", evt as usize);
+                unsafe {
+                    (*evt).queued = false;
+                }
+                return event as *const ble_npl_event;
+            }
+        }
+
+        if let Some(timeout) = timeout
+            && start.elapsed() >= timeout
+        {
+            return core::ptr::null();
+        }
+
+        yield_task();
     }
 }
 
