@@ -12,6 +12,7 @@ use esp_hal::{
     rmt::{
         Channel,
         Error,
+        IterEncoder,
         PulseCode,
         Rmt,
         Rx,
@@ -191,18 +192,20 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
+    let mut tx_ptr = tx_data.as_slice();
+
     let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    let mut tx_transaction = tx_channel.transmit(&mut tx_ptr).unwrap();
 
     loop {
-        let tx_done = tx_transaction.poll();
+        let tx_done = tx_transaction.poll(&mut tx_ptr);
         let rx_done = rx_transaction.poll();
         if tx_done && rx_done {
             break;
         }
     }
 
-    tx_transaction.wait().unwrap();
+    tx_transaction.wait(&mut tx_ptr).unwrap();
     let rx_count = match rx_transaction.wait() {
         Ok(count) => Some(count),
         #[cfg(any(esp32, esp32s2))]
@@ -234,7 +237,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
 
     let (rx_res, tx_res) = embassy_futures::join::join(
         rx_channel.receive(&mut rcv_data),
-        tx_channel.transmit(&tx_data),
+        tx_channel.transmit(tx_data.as_slice()),
     )
     .await;
 
@@ -274,7 +277,8 @@ fn do_rmt_single_shot_iter(
         i: 0,
         write_end_marker,
     };
-    tx_channel.transmit_iter(&mut tx_data)?.wait()
+    let mut enc = IterEncoder::new(&mut tx_data);
+    tx_channel.transmit(&mut enc)?.wait(&mut enc)
 }
 
 #[must_use = "Tests should fail on errors"]
@@ -297,7 +301,8 @@ async fn do_rmt_single_shot_iter_async(
         i: 0,
         write_end_marker,
     };
-    tx_channel.transmit_iter(&mut tx_data).await
+    let enc = IterEncoder::new(&mut tx_data);
+    tx_channel.transmit(enc).await
 }
 
 #[cfg(test)]
@@ -482,20 +487,23 @@ mod tests {
 
         let code = PulseCode::new(Level::High, 42, Level::Low, 42);
 
+        let enc = IterEncoder::new(core::iter::repeat(code).take(0));
         assert_eq!(
-            ch0.transmit_iter(core::iter::repeat(code).take(0)).await,
+            ch0.transmit(enc).await,
             Err(Error::InvalidArgument)
         );
 
         // No wrapping, error should already be detected before starting tx
+        let enc = IterEncoder::new(core::iter::repeat(code).take(3));
         assert_eq!(
-            ch0.transmit_iter(core::iter::repeat(code).take(3)).await,
+            ch0.transmit(enc).await,
             Err(Error::EndMarkerMissing)
         );
 
         // Requires wrapping, error can only be detected after starting tx
+        let enc = IterEncoder::new(core::iter::repeat(code).take(80));
         assert_eq!(
-            ch0.transmit_iter(core::iter::repeat(code).take(80)).await,
+            ch0.transmit(enc).await,
             Err(Error::EndMarkerMissing)
         );
     }
@@ -521,7 +529,7 @@ mod tests {
 
         // Start the transactions...
         let rx_fut = rx_channel.receive(&mut rcv_data);
-        let tx_fut = tx_channel.transmit(&tx_data);
+        let tx_fut = tx_channel.transmit(tx_data.as_slice());
 
         // ...poll them for a while, but then drop them...
         // (`poll_once` takes the future by value and this drops it before returning)
@@ -533,7 +541,7 @@ mod tests {
         // dropping the futures).
         let (rx_res, tx_res) = embassy_futures::join::join(
             rx_channel.receive(&mut rcv_data),
-            tx_channel.transmit(&tx_data),
+            tx_channel.transmit(tx_data.as_slice()),
         )
         .await;
 
@@ -567,7 +575,7 @@ mod tests {
 
                 let tx_data: [_; 10] = generate_tx_data(true);
 
-                ch0.transmit(&tx_data).await.unwrap();
+                ch0.transmit(tx_data.as_slice()).await.unwrap();
 
                 ch0
             };
@@ -585,7 +593,7 @@ mod tests {
 
                 let tx_data: [_; 10] = generate_tx_data(true);
 
-                ch0.transmit(&tx_data).await.unwrap();
+                ch0.transmit(tx_data.as_slice()).await.unwrap();
 
                 ch0
             }
