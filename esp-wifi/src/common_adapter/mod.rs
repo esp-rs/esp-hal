@@ -302,16 +302,24 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
 
 static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
+/// Steal a peripheral implementing [ModemClockController].
+///
+/// This returns the [WIFI] peripheral on all chips, except the ESP32-H2, where it returns [BT].
+pub(crate) const unsafe fn modem_clock_controller() -> impl ModemClockController {
+    // We're stealing either WIFI or BT here, since esp-wifi also supports the ESP32-H2 as the only
+    // chip, with BT but without WIFI. 
+    // Stealing the peripherals is safe here, as they must have been passed into the relevant
+    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    #[cfg(not(esp32h2))]
+    let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
+    #[cfg(esp32h2)]
+    let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
+}
+
 pub(crate) unsafe fn phy_enable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
     if count == 0 {
-        // stealing WIFI or BT is safe since it is passed into `init`
-        #[cfg(not(esp32h2))]
-        let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
-        #[cfg(esp32h2)]
-        let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
-
-        let clock_guard = peripheral.enable_phy_clock();
+        let clock_guard = unsafe { modem_clock_controller() }.enable_phy_clock();
         core::mem::forget(clock_guard);
 
         trace!("phy_enable_clock done!");
@@ -322,12 +330,7 @@ pub(crate) unsafe fn phy_enable_clock() {
 pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
     if count == 1 {
-        // stealing WIFI or BT is safe since it is passed into `init`
-        #[cfg(not(esp32h2))]
-        let peripheral = unsafe { esp_hal::peripherals::WIFI::steal() };
-        #[cfg(esp32h2)]
-        let peripheral = unsafe { esp_hal::peripherals::BT::steal() };
-        peripheral.decrease_phy_clock_ref_count();
+        unsafe { modem_clock_controller() }.decrease_phy_clock_ref_count();
         trace!("phy_disable_clock done!");
     }
 }
