@@ -305,7 +305,7 @@ static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 /// Steal a peripheral implementing [ModemClockController].
 ///
 /// This returns the [WIFI] peripheral on all chips, except the ESP32-H2, where it returns [BT].
-pub(crate) const unsafe fn modem_clock_controller() -> impl ModemClockController<'static> {
+pub(crate) unsafe fn modem_clock_controller() -> impl ModemClockController<'static> {
     // We're stealing either WIFI or BT here, since esp-wifi also supports the ESP32-H2 as the only
     // chip, with BT but without WIFI. 
     // Stealing the peripherals is safe here, as they must have been passed into the relevant
