@@ -66,8 +66,7 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
         .arg("-Zdoctest-xcompile")
         .arg("-Zbuild-std=core,panic_abort")
         .target(target)
-        .features(&features)
-        .arg("--release");
+        .features(&features);
 
     let args = builder.build();
     log::debug!("{args:#?}");

@@ -378,19 +378,19 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 timings: false,
             },
             CargoAction::Build(PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
+                "./esp-lp-hal/target/{}/debug/examples",
                 args.chip.target()
             ))),
         )
         .inspect_err(|_| failed.push("Build LP-HAL Examples"))
         .and_then(|_| {
             let from_dir = PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples/{}",
+                "./esp-lp-hal/target/{}/debug/examples/{}",
                 args.chip.target(),
                 args.chip
             ));
             let to_dir = PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
+                "./esp-lp-hal/target/{}/debug/examples",
                 args.chip.target()
             ));
             from_dir.read_dir()?.for_each(|entry| {

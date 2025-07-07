@@ -379,11 +379,7 @@ pub fn execute_app(
     }
 
     if debug {
-        if std::env::var("CI").is_ok() {
-            builder.add_arg("--profile=ci");
-        } else {
-            builder.add_arg("--release");
-        }
+        builder.add_arg("--release");
     }
     if timings {
         builder.add_arg("--timings");
