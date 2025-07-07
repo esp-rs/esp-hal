@@ -37,8 +37,6 @@ jobs:
           toolchain: nightly
           components: rust-src, clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2
-
       - name: Build and Check
         shell: bash
         run: cargo xtask ci ${{ matrix.device }} --toolchain nightly

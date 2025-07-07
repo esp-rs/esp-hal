@@ -86,11 +86,6 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "ci-${{ matrix.device.soc }}"
-          cache-all-crates: true
-
       - name: Build and Check
         shell: bash
         run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
@@ -108,7 +103,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
       # Build the extra crates
       - name: Build the bench-server
@@ -134,7 +128,6 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
-      - uses: Swatinem/rust-cache@v2
 
       - name: Stable toolchain checks
         run: rustc +${{ env.MSRV }} --version --verbose
@@ -163,7 +156,6 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt,miri
-      - uses: Swatinem/rust-cache@v2
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
