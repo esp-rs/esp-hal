@@ -134,7 +134,7 @@ pub fn generate_config_from_yaml_definition(
     yaml: &str,
     enable_unstable: bool,
     emit_md_tables: bool,
-    chip: Option<esp_metadata_generated::build::Chip>,
+    chip: Option<esp_metadata_generated::Chip>,
 ) -> Result<HashMap<String, Value>, Error> {
     let features: Vec<String> = env::vars()
         .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
@@ -186,7 +186,7 @@ pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> 
 /// Evaluate the given YAML representation of a config definition.
 pub fn evaluate_yaml_config(
     yaml: &str,
-    chip: Option<esp_metadata_generated::build::Chip>,
+    chip: Option<esp_metadata_generated::Chip>,
     features: Vec<String>,
     ignore_feature_gates: bool,
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
@@ -1047,7 +1047,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata_generated::build::Chip::Esp32c6),
+            Some(esp_metadata_generated::Chip::Esp32c6),
             vec![],
             false,
         )
@@ -1117,7 +1117,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata_generated::build::Chip::Esp32c3),
+            Some(esp_metadata_generated::Chip::Esp32c3),
             vec![],
             false,
         )
@@ -1169,7 +1169,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata_generated::build::Chip::Esp32),
+            Some(esp_metadata_generated::Chip::Esp32),
             vec![],
             false,
         )

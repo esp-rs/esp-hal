@@ -415,13 +415,13 @@ impl Config {
         self.all().iter().any(|i| i == item)
     }
 
-    pub fn generate_metadata(&self) {
+    pub fn generate_metadata(&self, path: &Path) {
         let properties = self.generate_properties();
         let peris = self.generate_peripherals();
         let gpios = self.generate_gpios();
 
         save(
-            "_generated.rs",
+            path,
             quote! {
                 #properties
                 #peris
@@ -667,7 +667,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
     }
 }
 
-pub fn generate_build_script_utils(file_name: &str) {
+pub fn generate_build_script_utils(path: &Path) {
     let check_cfgs = Chip::list_of_check_cfgs();
 
     let chip = Chip::iter()
@@ -729,7 +729,7 @@ pub fn generate_build_script_utils(file_name: &str) {
                 for (env, c) in all_chips {
                     if std::env::var(env).is_ok() {
                         if chip.is_some() {
-                            return Err(String::from(#bail_message).into());
+                            return Err(#bail_message.into());
                         }
                         chip = Some(c);
                     }
@@ -737,7 +737,7 @@ pub fn generate_build_script_utils(file_name: &str) {
 
                 match chip {
                     Some(chip) => Ok(chip),
-                    None => Err(String::from(#bail_message).into())
+                    None => Err(#bail_message.into())
                 }
             }
 
@@ -801,13 +801,10 @@ pub fn generate_build_script_utils(file_name: &str) {
             }
         }
     };
-    save(file_name, tokens);
+    save(path, tokens);
 }
 
-fn save(file: &str, tokens: TokenStream) {
-    let out_dir = std::env::var_os("OUT_DIR").unwrap();
-    let out_path = Path::new(&out_dir).join(file);
-
+fn save(out_path: &Path, tokens: TokenStream) {
     let source = tokens.to_string();
 
     #[cfg(feature = "pretty")]
@@ -816,6 +813,29 @@ fn save(file: &str, tokens: TokenStream) {
     let source = prettyplease::unparse(&syntax_tree);
 
     std::fs::write(out_path, source).unwrap();
+}
+
+pub fn generate_lib_rs(path: &Path) {
+    let chips = Chip::iter().map(|c| {
+        let feature = format!("{c}");
+        let file = format!("_generated_{c}.rs");
+        quote! {
+            #[cfg(all(not(feature = "build-script"), feature = #feature))]
+            include!(#file);
+        }
+    });
+
+    save(
+        path,
+        quote! {
+            #![cfg_attr(not(feature = "build-script"), no_std)]
+
+            #(#chips)*
+
+            #[cfg(feature = "build-script")]
+            include!( "_build_script_utils.rs");
+        },
+    )
 }
 
 pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result {

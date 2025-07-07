@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use esp_config::generate_config_from_yaml_definition;
-use esp_metadata_generated::build::Chip;
+use esp_metadata_generated::Chip;
 
 #[macro_export]
 macro_rules! assert_unique_features {

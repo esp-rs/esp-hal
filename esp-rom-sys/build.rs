@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("The 'esp-rom-sys' crate is not allowed to get bumped to anything above 0.1.x");
     }
 
-    let chip = esp_metadata_generated::build::Chip::from_cargo_feature()?;
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile

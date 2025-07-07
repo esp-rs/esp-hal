@@ -485,7 +485,26 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
-pub fn update_chip_support_table(workspace: &Path) -> Result<()> {
+pub fn update_metadata(workspace: &Path) -> Result<()> {
+    use strum::IntoEnumIterator;
+    update_chip_support_table(workspace)?;
+
+    let out_path = workspace.join("esp-metadata-generated").join("src");
+
+    for chip in Chip::iter() {
+        // Load the configuration file for the configured device:
+        let config = esp_metadata::Config::for_chip(&chip);
+        let path = out_path.join(format!("_generated_{chip}.rs"));
+        config.generate_metadata(&path);
+    }
+
+    esp_metadata::generate_build_script_utils(&out_path.join("_build_script_utils.rs"));
+    esp_metadata::generate_lib_rs(&out_path.join("lib.rs"));
+
+    Ok(())
+}
+
+fn update_chip_support_table(workspace: &Path) -> Result<()> {
     let mut output = String::new();
     let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
 

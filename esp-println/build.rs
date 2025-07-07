@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure that only a single communication method is specified
     assert_unique_used_features!("jtag-serial", "uart", "auto");
 
-    let chip = esp_metadata_generated::build::Chip::from_cargo_feature()?;
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
     // Ensure that, if the `jtag-serial` communication method feature is enabled,
     // a compatible chip feature is also enabled.
     let has_jtag_serial = chip.contains("soc_has_usb_device");

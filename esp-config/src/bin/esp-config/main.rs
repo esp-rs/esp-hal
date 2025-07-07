@@ -211,7 +211,7 @@ fn parse_configs(
     }
 
     let mut configs = Vec::new();
-    let chip = esp_metadata_generated::build::Chip::from_str(chip.unwrap().as_ref()).unwrap();
+    let chip = esp_metadata_generated::Chip::from_str(chip.unwrap().as_ref()).unwrap();
     let features = vec![];
     for krate in meta.packages {
         let maybe_cfg = krate.manifest_path.parent().unwrap().join("esp_config.yml");

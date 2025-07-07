@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert_unique_features!("log-04", "defmt");
 
     // Ensure that exactly one chip has been specified:
-    let chip = esp_metadata_generated::build::Chip::from_cargo_feature()?;
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
     if chip.target() != std::env::var("TARGET").unwrap_or_default().as_str() {
         panic!("
