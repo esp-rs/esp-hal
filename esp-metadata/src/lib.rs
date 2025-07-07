@@ -7,7 +7,7 @@ use std::{collections::HashMap, fmt::Write, path::Path, sync::OnceLock};
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
 use proc_macro2::TokenStream;
-use quote::format_ident;
+use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
 
 use crate::cfg::{SupportItem, SupportStatus, Value};
@@ -416,17 +416,26 @@ impl Config {
     }
 
     pub fn generate_metadata(&self) {
-        self.generate_properties("_generated.rs");
-        self.generate_peripherals("_generated_peris.rs");
-        self.generate_gpios("_generated_gpio.rs");
+        let properties = self.generate_properties();
+        let peris = self.generate_peripherals();
+        let gpios = self.generate_gpios();
+
+        save(
+            "_generated.rs",
+            quote! {
+                #properties
+                #peris
+                #gpios
+            },
+        )
     }
 
-    fn generate_properties(&self, file_name: &str) {
-        let mut g = TokenStream::new();
+    fn generate_properties(&self) -> TokenStream {
+        let mut tokens = TokenStream::new();
 
         let chip_name = self.name();
         // Public API, can't use a private macro:
-        g.extend(quote::quote! {
+        tokens.extend(quote! {
             /// The name of the chip as `&str`
             #[macro_export]
             macro_rules! chip {
@@ -444,21 +453,21 @@ impl Config {
                 .peri_config
                 .properties()
                 .flat_map(|(name, value)| match value {
-                    Value::Unset => quote::quote! {},
+                    Value::Unset => quote! {},
                     Value::Number(value) => {
                         let value = number(value); // ensure no numeric suffix is added
-                        quote::quote! {
+                        quote! {
                             (#name) => { #value };
                             (#name, str) => { stringify!(#value) };
                         }
                     }
-                    Value::Boolean(value) => quote::quote! {
+                    Value::Boolean(value) => quote! {
                         (#name) => { #value };
                     },
                 });
 
         // Not public API, can use a private macro:
-        g.extend(quote::quote! {
+        tokens.extend(quote! {
             /// A link to the Technical Reference Manual (TRM) for the chip.
             #[doc(hidden)]
             #[macro_export]
@@ -477,14 +486,14 @@ impl Config {
             let start = number(region.start as usize);
             let end = number(region.end as usize);
 
-            quote::quote! {
+            quote! {
                 ( #name ) => {
                     #start .. #end
                 };
             }
         });
 
-        g.extend(quote::quote! {
+        tokens.extend(quote! {
             /// Macro to get the address range of the given memory region.
             #[macro_export]
             #[doc(hidden)]
@@ -493,21 +502,19 @@ impl Config {
             }
         });
 
-        save(file_name, g);
+        tokens
     }
 
-    fn generate_gpios(&self, file_name: &str) {
+    fn generate_gpios(&self) -> TokenStream {
         let Some(gpio) = self.device.peri_config.gpio.as_ref() else {
             // No GPIOs defined, nothing to do.
-            return;
+            return quote! {};
         };
 
-        let tokens = cfg::generate_gpios(gpio);
-
-        save(file_name, tokens);
+        cfg::generate_gpios(gpio)
     }
 
-    fn generate_peripherals(&self, file_name: &str) {
+    fn generate_peripherals(&self) -> TokenStream {
         let mut tokens = TokenStream::new();
 
         // TODO: repeat for all drivers that have Instance traits
@@ -526,7 +533,7 @@ impl Config {
 
         tokens.extend(self.generate_peripherals_macro());
 
-        save(file_name, tokens);
+        tokens
     }
 
     fn generate_peripherals_macro(&self) -> TokenStream {
@@ -551,10 +558,10 @@ impl Config {
         if let Some(gpio) = self.device.peri_config.gpio.as_ref() {
             for pin in gpio.pins_and_signals.pins.iter() {
                 let pin = format_ident!("GPIO{}", pin.pin);
-                let tokens = quote::quote! {
+                let tokens = quote! {
                     #pin <= virtual ()
                 };
-                all_peripherals.push(quote::quote! { #tokens });
+                all_peripherals.push(quote! { #tokens });
                 stable.push(tokens);
             }
         }
@@ -574,19 +581,19 @@ impl Config {
                 let bind = format_ident!("bind_{k}_interrupt");
                 let enable = format_ident!("enable_{k}_interrupt");
                 let disable = format_ident!("disable_{k}_interrupt");
-                quote::quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
+                quote! { #pac_interrupt_name: { #bind, #enable, #disable } }
             });
-            let tokens = quote::quote! {
+            let tokens = quote! {
                 #hal <= #pac ( #(#interrupts),* )
             };
             if stable_peris
                 .iter()
                 .any(|p| peri.name.eq_ignore_ascii_case(p))
             {
-                all_peripherals.push(quote::quote! { #tokens });
+                all_peripherals.push(quote! { #tokens });
                 stable.push(tokens);
             } else {
-                all_peripherals.push(quote::quote! { #tokens (unstable) });
+                all_peripherals.push(quote! { #tokens (unstable) });
                 unstable.push(tokens);
             }
         }
@@ -620,7 +627,7 @@ impl Config {
 
 fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream {
     let macro_name = format_ident!("for_each_{name}");
-    quote::quote! {
+    quote! {
         // This macro is called in esp-hal to implement a driver's
         // Instance trait for available peripherals. It works by defining, then calling an inner
         // macro that substitutes the properties into the template provided by the call in esp-hal.
@@ -677,7 +684,7 @@ pub fn generate_build_script_utils(file_name: &str) {
         let arch = config.device.arch.to_string();
         let target = config.device.target.as_str();
         let cfgs = config.list_of_cfgs();
-        quote::quote! {
+        quote! {
             Config {
                 architecture: #arch,
                 target: #target,
@@ -695,7 +702,7 @@ pub fn generate_build_script_utils(file_name: &str) {
         "Expected exactly one of the following features to be enabled: {all_chip_features}"
     );
 
-    let tokens = quote::quote! {
+    let tokens = quote! {
         #[derive(Clone, Copy, PartialEq, Eq, Hash)]
         pub enum Chip {
             #(#chip),*
