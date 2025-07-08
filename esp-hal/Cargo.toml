@@ -209,6 +209,7 @@ psram = []
 #! Unstable APIs are not covered by semver guarantees.
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
+## Never enable this feature in a library crate using esp-hal.
 unstable = [
     "dep:digest",
     "dep:embassy-embedded-hal",
@@ -220,6 +221,12 @@ unstable = [
     "dep:nb",
     "dep:ufmt-write",
 ]
+
+## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
+requires-unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"
