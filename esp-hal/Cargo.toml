@@ -209,6 +209,7 @@ psram = []
 #! Unstable APIs are not covered by semver guarantees.
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
+## Never enable this feature in a library crate using esp-hal.
 unstable = [
     "dep:digest",
     "dep:embassy-embedded-hal",
