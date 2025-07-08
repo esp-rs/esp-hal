@@ -134,7 +134,7 @@ pub fn generate_config_from_yaml_definition(
     yaml: &str,
     enable_unstable: bool,
     emit_md_tables: bool,
-    chip: Option<esp_metadata::Config>,
+    chip: Option<esp_metadata_generated::Chip>,
 ) -> Result<HashMap<String, Value>, Error> {
     let features: Vec<String> = env::vars()
         .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
@@ -186,16 +186,19 @@ pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> 
 /// Evaluate the given YAML representation of a config definition.
 pub fn evaluate_yaml_config(
     yaml: &str,
-    chip: Option<esp_metadata::Config>,
+    chip: Option<esp_metadata_generated::Chip>,
     features: Vec<String>,
     ignore_feature_gates: bool,
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
     let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
     let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
-    if let Some(config) = chip {
+    if let Some(chip) = chip {
         eval_ctx
-            .set_value("chip".into(), evalexpr::Value::String(config.name()))
+            .set_value(
+                "chip".into(),
+                evalexpr::Value::String(chip.name().to_string()),
+            )
             .map_err(|err| Error::Parse(err.to_string()))?;
 
         eval_ctx
@@ -203,7 +206,7 @@ pub fn evaluate_yaml_config(
                 "feature".into(),
                 evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
                     if let evalexpr::Value::String(which) = arg {
-                        let res = config.contains(which);
+                        let res = chip.contains(which);
                         Ok(evalexpr::Value::Boolean(res))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
@@ -1044,7 +1047,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c6).clone()),
+            Some(esp_metadata_generated::Chip::Esp32c6),
             vec![],
             false,
         )
@@ -1114,7 +1117,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c3).clone()),
+            Some(esp_metadata_generated::Chip::Esp32c3),
             vec![],
             false,
         )
@@ -1166,7 +1169,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32).clone()),
+            Some(esp_metadata_generated::Chip::Esp32),
             vec![],
             false,
         )

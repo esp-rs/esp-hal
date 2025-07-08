@@ -33,7 +33,6 @@ md-5 = { version = "0.10.6", default-features = false, optional = true }
 [build-dependencies]
 jiff       = { version = "0.2.13", default-features = false, features = ["std"] }
 esp-config = { version = "0.4.0", path = "../esp-config", features = ["build"] }
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
 
 [features]
 default = ["validation"]

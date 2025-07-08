@@ -12,9 +12,6 @@ macro_rules! assert_unique_used_features {
 }
 
 fn main() {
-    // Ensure that only a single chip is specified:
-    let _ = esp_metadata::Chip::from_cargo_feature().unwrap();
-
     // Ensure that exactly a backend is selected:
     assert_unique_used_features!("defmt", "println");
 

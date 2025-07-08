@@ -1,7 +1,5 @@
 use std::{error::Error, path::Path};
 
-use esp_metadata::{Chip, Config};
-
 #[macro_export]
 macro_rules! assert_unique_features {
     ($($feature:literal),+ $(,)?) => {
@@ -20,28 +18,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         panic!("The 'esp-rom-sys' crate is not allowed to get bumped to anything above 0.1.x");
     }
 
-    // Ensure that exactly one chip has been specified:
-    let chip = Chip::from_cargo_feature()?;
+    let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
     // implementation detail.
     assert_unique_features!("log-04", "defmt");
 
-    // Load the configuration file for the configured device:
-    let config = Config::for_chip(&chip);
-
     // Define all necessary configuration symbols for the configured device:
-    config.define_symbols();
-    config.generate_metadata();
+    chip.define_cfgs();
 
     let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
     println!("cargo:rustc-link-search={}", out.display());
 
-    copy_dir_all(format!("./ld/{chip}/"), &out)?;
-    copy_dir_all(format!("./libs/{chip}/"), &out)?;
+    copy_dir_all(format!("./ld/{}/", chip.name()), &out)?;
+    copy_dir_all(format!("./libs/{}/", chip.name()), &out)?;
 
-    include_libs(format!("./libs/{chip}/"))?;
+    include_libs(format!("./libs/{}/", chip.name()))?;
 
     // exploit the fact that linkers treat an unknown library format as a linker
     // script

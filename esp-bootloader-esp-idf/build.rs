@@ -39,11 +39,5 @@ fn main() -> Result<(), Box<dyn Error>> {
         .expect("Failed to read esp_config.yml for esp-bootloader-esp-idf");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, None).unwrap();
 
-    #[cfg(not(feature = "std"))]
-    {
-        // Ensure that exactly one chip has been specified:
-        let _chip = esp_metadata::Chip::from_cargo_feature()?;
-    }
-
     Ok(())
 }

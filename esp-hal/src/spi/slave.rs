@@ -787,7 +787,7 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-crate::peripherals::for_each_spi_slave! {
+for_each_spi_slave! {
     ($peri:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
         impl Instance for crate::peripherals::$peri<'_> {
             #[inline(always)]

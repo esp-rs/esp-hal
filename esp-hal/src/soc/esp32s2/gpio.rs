@@ -35,8 +35,6 @@
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
 
-include!(concat!(env!("OUT_DIR"), "/_generated_iomux_signals.rs"));
-
 macro_rules! rtcio_analog {
     ($pin_num:expr, $pin_reg:expr, $hold:ident) => {
         paste::paste!{

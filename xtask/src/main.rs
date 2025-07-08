@@ -42,8 +42,8 @@ enum Cli {
     SemverCheck(SemverCheckArgs),
     /// Check the changelog for packages.
     CheckChangelog(CheckChangelogArgs),
-    /// Re-generate the chip support table in the esp-hal README.
-    UpdateChipSupportTable,
+    /// Re-generate metadata and the chip support table in the esp-hal README.
+    UpdateMetadata,
 }
 
 #[derive(Debug, Args)]
@@ -164,12 +164,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
-        Cli::UpdateChipSupportTable => {
-            // Re-generate the chip support table in the esp-hal README.
-            // This is a no-op if the table is already up-to-date.
-            xtask::update_chip_support_table(&workspace)?;
-            Ok(())
-        }
+        Cli::UpdateMetadata => xtask::update_metadata(&workspace),
     }
 }
 
@@ -181,41 +176,7 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        log::info!("Formatting package: {}", package);
-        let path = workspace.join(package.to_string());
-
-        // we need to list all source files since modules in `unstable_module!` macros
-        // won't get picked up otherwise
-        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
-            .into_iter()
-            .filter_map(|entry| {
-                let path = entry.unwrap().into_path();
-                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
-                    Some(String::from(path.to_str().unwrap()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mut cargo_args = CargoArgsBuilder::default()
-            .toolchain("nightly")
-            .subcommand("fmt")
-            .arg("--all")
-            .build();
-
-        if args.check {
-            cargo_args.push("--check".into());
-        }
-
-        cargo_args.push("--".into());
-        cargo_args.push(format!(
-            "--config-path={}/rustfmt.toml",
-            workspace.display()
-        ));
-        cargo_args.extend_from_slice(&source_files);
-
-        xtask::cargo::run(&cargo_args, &path)?;
+        xtask::format_package(workspace, package, args.check)?;
     }
 
     Ok(())
@@ -299,7 +260,7 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    if !package.build_on_host() {
+    if !package.build_on_host(features) {
         if chip.is_xtensa() {
             // In case the user doesn't specify a toolchain, make sure we use +esp
             toolchain.get_or_insert("esp");
@@ -308,7 +269,7 @@ fn lint_package(
     }
 
     if let Some(toolchain) = toolchain {
-        if !package.build_on_host() && toolchain.starts_with("esp") {
+        if !package.build_on_host(features) && toolchain.starts_with("esp") {
             builder = builder.arg("-Zbuild-std=core,alloc");
         }
         builder = builder.toolchain(toolchain);

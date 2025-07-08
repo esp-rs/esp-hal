@@ -25,7 +25,7 @@
 //! ```toml
 //! [dependencies.esp-wifi]
 //! # A supported chip needs to be specified, as well as specific use-case features
-#![doc = concat!(r#"features = [""#, esp_hal::chip!(), r#"", "wifi", "esp-now"]"#)]
+#![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now"]"#)]
 //! ```
 //! 
 //! ### Optimization Level
@@ -99,6 +99,9 @@
         ble or wifi."
     )
 )]
+
+#[macro_use]
+extern crate esp_metadata_generated;
 
 extern crate alloc;
 

@@ -6,10 +6,11 @@
 # update the table in the esp-hal README.
 
 [device]
-name  = "esp32h2"
-arch  = "riscv"
-cores = 1
-trm   = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
+name   = "esp32h2"
+arch   = "riscv"
+target = "riscv32imac-unknown-none-elf"
+cores  = 1
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
 
 peripherals = [
     { name = "AES" },

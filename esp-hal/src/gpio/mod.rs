@@ -77,13 +77,14 @@ pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
 
-pub use crate::soc::gpio::*;
 use crate::{
     asynch::AtomicWaker,
     interrupt::{InterruptHandler, Priority},
-    peripherals::{GPIO, IO_MUX, Interrupt, impl_for_pin_type, io_mux_reg},
+    peripherals::{GPIO, IO_MUX, Interrupt, io_mux_reg},
     private::{self, Sealed},
 };
+
+define_io_mux_signals!();
 
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.
@@ -880,7 +881,7 @@ macro_rules! gpio {
             pub(crate) fn is_output(&self) -> bool {
                 match self.pin {
                     $(
-                        $gpionum => $crate::peripherals::if_pin_is_type!($peri, Output, { true } else { false }),
+                        $gpionum => if_pin_is_type!($peri, Output, { true } else { false }),
                     )+
                     _ => false,
                 }
