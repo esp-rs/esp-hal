@@ -9,13 +9,14 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [dependencies]
-anyhow     = { version = "1.0.98" }
-clap       = { version = "4.5.37", features = ["derive"], optional = true }
-basic-toml = { version = "0.1.10" }
-serde      = { version = "1.0.219", default-features = false, features = ["derive"] }
-strum      = { version = "0.27.1", features = ["derive"] }
-proc-macro2 = { version = "1.0.36" }
-quote      = { version = "1.0.15" }
+anyhow     = "1.0"
+clap       = { version = "4.5", features = ["derive"], optional = true }
+basic-toml = "0.1"
+serde      = { version = "1.0", default-features = false, features = ["derive"] }
+strum      = { version = "0.27", features = ["derive"] }
+proc-macro2 = "1"
+quote      = "1"
+indexmap = { version = "2", features = ["serde"] }
 
 [features]
 default = []
