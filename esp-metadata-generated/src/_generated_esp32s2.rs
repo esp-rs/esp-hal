@@ -5,6 +5,7 @@
 /// ```rust, no_run
 /// use esp_hal::chip;
 /// let chip_name = chip!();
+#[doc = concat!("assert_eq!(chip_name, ", chip!(), ")")]
 /// ```
 #[macro_export]
 macro_rules! chip {
