@@ -71,3 +71,34 @@ pub fn ets_set_appcpu_boot_addr(boot_addr: u32) {
 
     unsafe { ets_set_appcpu_boot_addr(boot_addr) };
 }
+
+// libphy.a can pull this in on some chips, we provide it here
+// so that either ieee or esp-wifi gets it for free without duplicating in both
+#[unsafe(no_mangle)]
+extern "C" fn rtc_clk_xtal_freq_get() -> i32 {
+    cfg_if::cfg_if! {
+        if #[cfg(any(esp32c6, esp32h2))] {
+            unsafe extern "C" {
+                fn ets_clk_get_xtal_freq() -> i32;
+            }
+            (unsafe { ets_clk_get_xtal_freq() }) / 1_000_000
+        } else if #[cfg(any(esp32s2, esp32s3, esp32c3))] {
+            unsafe extern "C" {
+                fn ets_get_xtal_freq() -> i32;
+            }
+            (unsafe { ets_get_xtal_freq() }) / 1_000_000
+        } else if #[cfg(esp32)] {
+            // the ROM function returns something close to 80_000_000
+            // just rely on RTC_CNTL_STORE4
+            let rtc_cntl_store4: *const u32 = 0x3FF480B0 as *const u32;
+            ((unsafe { rtc_cntl_store4.read_volatile() })  & 0xff) as i32
+        } else if #[cfg(esp32c2)] {
+            // the ROM function returns 40 also for a 26 MHz xtal
+            // just rely on RTC_CNTL_STORE4
+            let rtc_cntl_store4: *const u32 = 0x600080AC  as *const u32;
+            ((unsafe { rtc_cntl_store4.read_volatile() })  & 0xff) as i32
+        } else {
+            compile_error!("rtc_clk_xtal_freq_get not implemented for this chip");
+        }
+    }
+}
