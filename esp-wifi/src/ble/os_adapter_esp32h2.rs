@@ -71,7 +71,8 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
 };
 
 pub(crate) fn bt_periph_module_enable() {
-    // stealing BT is safe since it is passed into `init`
+    // stealing BT is safe, since it is passed into the initialization function of the BLE
+    // controller.
     let mut bt = unsafe { BT::steal() };
     bt.enable_modem_clock(true);
 }
@@ -116,14 +117,16 @@ pub(super) unsafe extern "C" fn esp_intr_alloc(
 }
 
 pub(super) fn ble_rtc_clk_init() {
-    // stealing BT is safe since it is passed into `init`
+    // stealing BT is safe, since it is passed into the initialization function of the BLE
+    // controller.
     let mut bt = unsafe { BT::steal() };
     bt.ble_rtc_clk_init();
 }
 
 pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     trace!("esp_reset_rpa_moudle");
-    // stealing BT is safe since it is passed into `init`
+    // stealing BT is safe, since it is passed into the initialization function of the BLE
+    // controller.
     let mut bt = unsafe { BT::steal() };
     bt.reset_rpa();
 }
