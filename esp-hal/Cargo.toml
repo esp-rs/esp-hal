@@ -221,6 +221,10 @@ unstable = [
     "dep:ufmt-write",
 ]
 
+## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+requires-unstable = []
+
 [lints.clippy]
 mixed_attributes_style = "allow"
 
