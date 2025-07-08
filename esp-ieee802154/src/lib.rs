@@ -8,6 +8,9 @@
 //!
 //! Note that this crate currently requires you to enable the `unstable` feature
 //! on `esp-hal`.
+//! 
+//! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
+//! things will break.
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
@@ -118,6 +121,9 @@ pub struct Ieee802154<'a> {
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
+    ///
+    /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
+    /// things will break.
     pub fn new(radio: IEEE802154<'a>) -> Self {
         Self {
             _align: 0,

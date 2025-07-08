@@ -2608,7 +2608,8 @@ pub struct Interfaces<'d> {
 ///
 /// Dropping the controller will deinitialize / stop WiFi.
 ///
-/// Make sure to **not** call this function while interrupts are disabled.
+/// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
+/// currently in use.
 pub fn new<'d>(
     _inited: &'d EspWifiController<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
