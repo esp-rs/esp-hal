@@ -25,40 +25,24 @@ pub struct Artifact {
 }
 
 /// Execute cargo with the given arguments and from the specified directory.
-pub fn run(args: &[String], cwd: &Path) -> Result<()> {
-    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], false)?;
+pub fn run(args: &[String]) -> Result<()> {
+    run_with_env::<[(&str, &str); 0], _, _>(args, [], false)?;
     Ok(())
 }
 
 /// Execute cargo with the given arguments and from the specified directory.
-pub fn run_with_env<I, K, V>(args: &[String], cwd: &Path, envs: I, capture: bool) -> Result<String>
+pub fn run_with_env<I, K, V>(args: &[String], envs: I, capture: bool) -> Result<String>
 where
     I: IntoIterator<Item = (K, V)> + core::fmt::Debug,
     K: AsRef<OsStr>,
     V: AsRef<OsStr>,
 {
-    if !cwd.is_dir() {
-        bail!("The `cwd` argument MUST be a directory");
-    }
-
-    // Make sure to not use a UNC as CWD!
-    // That would make `OUT_DIR` a UNC which will trigger things like the one fixed in https://github.com/dtolnay/rustversion/pull/51
-    // While it's fixed in `rustversion` it's not fixed for other crates we are
-    // using now or in future!
-    let cwd = windows_safe_path(cwd);
-
-    log::debug!(
-        "Running `cargo {}` in {:?} - Environment {:?}",
-        args.join(" "),
-        cwd,
-        envs
-    );
+    log::debug!("Running `cargo {}`- Environment {:?}", args.join(" "), envs);
 
     let mut command = Command::new(get_cargo());
 
     command
         .args(args)
-        .current_dir(cwd)
         .envs(envs)
         .stdout(if capture {
             Stdio::piped()
@@ -107,16 +91,27 @@ fn get_cargo() -> String {
     cargo
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CargoArgsBuilder {
     toolchain: Option<String>,
     subcommand: String,
     target: Option<String>,
     features: Vec<String>,
     args: Vec<String>,
+    package: String,
 }
 
 impl CargoArgsBuilder {
+    pub fn new(package: impl Into<String>) -> Self {
+        Self {
+            toolchain: None,
+            subcommand: String::new(),
+            package: package.into(),
+            target: None,
+            features: Vec::new(),
+            args: Vec::new(),
+        }
+    }
     #[must_use]
     pub fn toolchain<S>(mut self, toolchain: S) -> Self
     where
@@ -187,6 +182,8 @@ impl CargoArgsBuilder {
         }
 
         args.push(self.subcommand.clone());
+        args.push("--package".to_string());
+        args.push(self.package.clone());
 
         if let Some(ref target) = self.target {
             args.push(format!("--target={target}"));

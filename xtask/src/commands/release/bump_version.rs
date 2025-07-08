@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
-use crate::{cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER, Package, Version};
+use crate::{Package, Version, cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER};
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {

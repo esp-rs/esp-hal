@@ -98,7 +98,11 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
+    let branch = make_git_changes(
+        !args.no_dry_run,
+        "release-branch",
+        "Finalize crate releases",
+    )?;
 
     open_pull_request(&branch, !args.no_dry_run, &plan_source, &plan)
         .with_context(|| "Failed to open pull request")?;
@@ -147,7 +151,11 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
-        Command::new("git").arg("add").arg(".").status().context("Failed to stage changes")?;
+        Command::new("git")
+            .arg("add")
+            .arg(".")
+            .status()
+            .context("Failed to stage changes")?;
         Command::new("git")
             .arg("commit")
             .arg("-m")

@@ -2,9 +2,8 @@ use std::fs;
 
 use anyhow::{Context, Result};
 use semver::Version;
-use super::execute_plan::make_git_changes;
-use super::PLACEHOLDER;
-use super::Plan;
+
+use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
 use crate::commands::comparison_url;
 
 pub fn post_release(workspace: &std::path::Path) -> Result<()> {

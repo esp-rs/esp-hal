@@ -10,6 +10,7 @@ use esp_metadata::Chip;
 
 use super::{ExamplesArgs, TestsArgs};
 use crate::{
+    Package,
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
 };
@@ -48,7 +49,7 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     let chip = args.chip;
 
     let package_name = args.package.to_string();
-    let package_path = crate::windows_safe_path(&workspace.join(&package_name));
+    // let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
@@ -59,7 +60,7 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
 
     // Build up an array of command-line arguments to pass to `cargo`:
-    let builder = CargoArgsBuilder::default()
+    let builder = CargoArgsBuilder::new(&package_name)
         .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
@@ -67,13 +68,15 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
         .arg("-Zbuild-std=core,panic_abort")
         .target(target)
         .features(&features)
-        .arg("--release");
+        .arg("--release")
+        .arg("--package")
+        .arg(package_name);
 
     let args = builder.build();
     log::debug!("{args:#?}");
 
     // Execute `cargo doc` from the package root:
-    crate::cargo::run(&args, &package_path)?;
+    crate::cargo::run(&args)?;
 
     Ok(())
 }
@@ -117,11 +120,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     Ok(())
 }
 
-pub fn run_examples(
-    args: ExamplesArgs,
-    examples: Vec<Metadata>,
-    package_path: &Path,
-) -> Result<()> {
+pub fn run_examples(args: ExamplesArgs, examples: Vec<Metadata>) -> Result<()> {
     let mut examples = examples;
 
     // Determine the appropriate build target for the given package and chip:
@@ -177,7 +176,7 @@ pub fn run_examples(
         if !skip {
             while !skip
                 && crate::execute_app(
-                    package_path,
+                    args.package,
                     args.chip,
                     &target,
                     &example,
