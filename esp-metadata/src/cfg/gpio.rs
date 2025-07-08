@@ -3,6 +3,7 @@
 
 use std::str::FromStr;
 
+use indexmap::IndexMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
@@ -183,30 +184,14 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
-    let mut af_in_traits = vec![];
-    let mut af_out_traits = vec![];
-
-    fn signal_trait(kind: &str, signal: &str) -> TokenStream {
-        let doc = format!(
-            "Marker trait for pins that have the {} {} function",
-            signal,
-            kind.to_lowercase(), // "input" / "output"
-        );
-        let trait_name = format_ident!("{kind}Function_{signal}");
-
-        quote! {
-            #[instability::unstable]
-            #[doc = #doc]
-            pub trait #trait_name {}
-        }
-    }
-
-    fn signal_trait_impl(pin_peri: &Ident, kind: &str, signal: &str) -> TokenStream {
-        let trait_name = format_ident!("{kind}Function_{signal}");
+    fn signal_trait_impl(pin_peri: &Ident, signal: &str) -> TokenStream {
+        let trait_name = format_ident!("AlternateFunction_{signal}");
         quote! {
             impl #trait_name for crate::peripherals::#pin_peri<'_> {}
         }
     }
+
+    let mut af_signals = IndexMap::<&str, (bool, bool)>::new();
 
     for signal in gpio
         .pins_and_signals
@@ -214,7 +199,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .iter()
         .filter_map(|s| s.id.is_none().then_some(&s.name))
     {
-        af_in_traits.push(signal_trait("Input", &signal));
+        let entry = af_signals.entry(signal).or_default();
+        entry.0 = true;
     }
 
     for signal in gpio
@@ -223,11 +209,30 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .iter()
         .filter_map(|s| s.id.is_none().then_some(&s.name))
     {
-        af_out_traits.push(signal_trait("Output", &signal));
+        let entry = af_signals.entry(signal).or_default();
+        entry.1 = true;
     }
 
-    let mut af_in_trait_impls = vec![];
-    let mut af_out_trait_impls = vec![];
+    let mut af_traits = vec![];
+    for (signal, (is_input, is_output)) in af_signals {
+        let doc = format!("Marker trait for pins that have the {signal} function");
+        let trait_name = format_ident!("AlternateFunction_{signal}");
+
+        let pin_trait = match (is_input, is_output) {
+            (true, true) => quote! { crate::gpio::InputPin + crate::gpio::OutputPin },
+            (true, false) => quote! { crate::gpio::InputPin },
+            (false, true) => quote! { crate::gpio::OutputPin },
+            _ => unreachable!(),
+        };
+
+        af_traits.push(quote! {
+            #[instability::unstable]
+            #[doc = #doc]
+            pub trait #trait_name: #pin_trait {}
+        });
+    }
+
+    let mut af_trait_impls = vec![];
 
     let pin_afs = gpio.pins_and_signals.pins.iter().map(|pin| {
         let mut input_afs = vec![];
@@ -252,11 +257,12 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             {
                 let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
                 input_afs.push(quote! { #af_variant => #signal_tokens });
-                found = true;
 
                 if signal.id.is_none() {
-                    af_in_trait_impls.push(signal_trait_impl(&pin_peri, "Input", &signal.name));
+                    af_trait_impls.push(signal_trait_impl(&pin_peri, &signal.name));
                 }
+
+                found = true;
             }
 
             // Is the signal present among the output signals?
@@ -268,11 +274,12 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             {
                 let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
                 output_afs.push(quote! { #af_variant => #signal_tokens });
-                found = true;
 
-                if signal.id.is_none() {
-                    af_out_trait_impls.push(signal_trait_impl(&pin_peri, "Output", &signal.name));
+                if signal.id.is_none() && !found {
+                    af_trait_impls.push(signal_trait_impl(&pin_peri, &signal.name));
                 }
+
+                found = true;
             }
 
             assert!(
@@ -399,9 +406,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
-    let af_in_traits = af_in_traits.iter();
-    let af_out_traits = af_out_traits.iter();
-
     quote! {
         #for_each
 
@@ -428,11 +432,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         #[doc(hidden)] // This macro is only needed because of https://github.com/rust-lang/rust/issues/127429, it's not intended to be called outside of esp-hal
         macro_rules! implement_alternate_function_markers {
             () => {
-                #(#af_in_traits)*
-                #(#af_in_trait_impls)*
-
-                #(#af_out_traits)*
-                #(#af_out_trait_impls)*
+                #(#af_traits)*
+                #(#af_trait_impls)*
             };
         }
     }

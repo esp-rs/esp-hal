@@ -1594,81 +1594,65 @@ macro_rules! define_io_mux_reg {
 macro_rules! implement_alternate_function_markers {
     () => {
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO4 input function"]
-        pub trait InputFunction_SPIIO4 {}
+        #[doc = "Marker trait for pins that have the SPIIO4 function"]
+        pub trait AlternateFunction_SPIIO4: crate::gpio::InputPin + crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO5 input function"]
-        pub trait InputFunction_SPIIO5 {}
+        #[doc = "Marker trait for pins that have the SPIIO5 function"]
+        pub trait AlternateFunction_SPIIO5: crate::gpio::InputPin + crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO6 input function"]
-        pub trait InputFunction_SPIIO6 {}
+        #[doc = "Marker trait for pins that have the SPIIO6 function"]
+        pub trait AlternateFunction_SPIIO6: crate::gpio::InputPin + crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO7 input function"]
-        pub trait InputFunction_SPIIO7 {}
+        #[doc = "Marker trait for pins that have the SPIIO7 function"]
+        pub trait AlternateFunction_SPIIO7: crate::gpio::InputPin + crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDI input function"]
-        pub trait InputFunction_MTDI {}
+        #[doc = "Marker trait for pins that have the MTDI function"]
+        pub trait AlternateFunction_MTDI: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTCK input function"]
-        pub trait InputFunction_MTCK {}
+        #[doc = "Marker trait for pins that have the MTCK function"]
+        pub trait AlternateFunction_MTCK: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTMS input function"]
-        pub trait InputFunction_MTMS {}
-        impl InputFunction_SPIIO4 for crate::peripherals::GPIO33<'_> {}
-        impl InputFunction_SPIIO5 for crate::peripherals::GPIO34<'_> {}
-        impl InputFunction_SPIIO6 for crate::peripherals::GPIO35<'_> {}
-        impl InputFunction_SPIIO7 for crate::peripherals::GPIO36<'_> {}
+        #[doc = "Marker trait for pins that have the MTMS function"]
+        pub trait AlternateFunction_MTMS: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO4 output function"]
-        pub trait OutputFunction_SPIIO4 {}
+        #[doc = "Marker trait for pins that have the CLK_OUT1 function"]
+        pub trait AlternateFunction_CLK_OUT1: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO5 output function"]
-        pub trait OutputFunction_SPIIO5 {}
+        #[doc = "Marker trait for pins that have the CLK_OUT2 function"]
+        pub trait AlternateFunction_CLK_OUT2: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO6 output function"]
-        pub trait OutputFunction_SPIIO6 {}
+        #[doc = "Marker trait for pins that have the CLK_OUT3 function"]
+        pub trait AlternateFunction_CLK_OUT3: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPIIO7 output function"]
-        pub trait OutputFunction_SPIIO7 {}
+        #[doc = "Marker trait for pins that have the SPICLK_P_DIFF function"]
+        pub trait AlternateFunction_SPICLK_P_DIFF: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the CLK_OUT1 output function"]
-        pub trait OutputFunction_CLK_OUT1 {}
+        #[doc = "Marker trait for pins that have the SPICLK_N_DIFF function"]
+        pub trait AlternateFunction_SPICLK_N_DIFF: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the CLK_OUT2 output function"]
-        pub trait OutputFunction_CLK_OUT2 {}
+        #[doc = "Marker trait for pins that have the SUBSPICLK_P_DIFF function"]
+        pub trait AlternateFunction_SUBSPICLK_P_DIFF: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the CLK_OUT3 output function"]
-        pub trait OutputFunction_CLK_OUT3 {}
+        #[doc = "Marker trait for pins that have the SUBSPICLK_N_DIFF function"]
+        pub trait AlternateFunction_SUBSPICLK_N_DIFF: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPICLK_P_DIFF output function"]
-        pub trait OutputFunction_SPICLK_P_DIFF {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SPICLK_N_DIFF output function"]
-        pub trait OutputFunction_SPICLK_N_DIFF {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SUBSPICLK_P_DIFF output function"]
-        pub trait OutputFunction_SUBSPICLK_P_DIFF {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SUBSPICLK_N_DIFF output function"]
-        pub trait OutputFunction_SUBSPICLK_N_DIFF {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDO output function"]
-        pub trait OutputFunction_MTDO {}
-        impl OutputFunction_CLK_OUT3 for crate::peripherals::GPIO18<'_> {}
-        impl OutputFunction_CLK_OUT2 for crate::peripherals::GPIO19<'_> {}
-        impl OutputFunction_CLK_OUT1 for crate::peripherals::GPIO20<'_> {}
-        impl OutputFunction_SPIIO4 for crate::peripherals::GPIO33<'_> {}
-        impl OutputFunction_SPIIO5 for crate::peripherals::GPIO34<'_> {}
-        impl OutputFunction_SPIIO6 for crate::peripherals::GPIO35<'_> {}
-        impl OutputFunction_SPIIO7 for crate::peripherals::GPIO36<'_> {}
-        impl OutputFunction_CLK_OUT3 for crate::peripherals::GPIO39<'_> {}
-        impl OutputFunction_CLK_OUT2 for crate::peripherals::GPIO40<'_> {}
-        impl OutputFunction_CLK_OUT1 for crate::peripherals::GPIO41<'_> {}
-        impl OutputFunction_CLK_OUT1 for crate::peripherals::GPIO43<'_> {}
-        impl OutputFunction_CLK_OUT2 for crate::peripherals::GPIO44<'_> {}
-        impl OutputFunction_SPICLK_P_DIFF for crate::peripherals::GPIO47<'_> {}
-        impl OutputFunction_SUBSPICLK_P_DIFF for crate::peripherals::GPIO47<'_> {}
-        impl OutputFunction_SPICLK_N_DIFF for crate::peripherals::GPIO48<'_> {}
-        impl OutputFunction_SUBSPICLK_N_DIFF for crate::peripherals::GPIO48<'_> {}
+        #[doc = "Marker trait for pins that have the MTDO function"]
+        pub trait AlternateFunction_MTDO: crate::gpio::OutputPin {}
+        impl AlternateFunction_CLK_OUT3 for crate::peripherals::GPIO18<'_> {}
+        impl AlternateFunction_CLK_OUT2 for crate::peripherals::GPIO19<'_> {}
+        impl AlternateFunction_CLK_OUT1 for crate::peripherals::GPIO20<'_> {}
+        impl AlternateFunction_SPIIO4 for crate::peripherals::GPIO33<'_> {}
+        impl AlternateFunction_SPIIO5 for crate::peripherals::GPIO34<'_> {}
+        impl AlternateFunction_SPIIO6 for crate::peripherals::GPIO35<'_> {}
+        impl AlternateFunction_SPIIO7 for crate::peripherals::GPIO36<'_> {}
+        impl AlternateFunction_CLK_OUT3 for crate::peripherals::GPIO39<'_> {}
+        impl AlternateFunction_CLK_OUT2 for crate::peripherals::GPIO40<'_> {}
+        impl AlternateFunction_CLK_OUT1 for crate::peripherals::GPIO41<'_> {}
+        impl AlternateFunction_CLK_OUT1 for crate::peripherals::GPIO43<'_> {}
+        impl AlternateFunction_CLK_OUT2 for crate::peripherals::GPIO44<'_> {}
+        impl AlternateFunction_SPICLK_P_DIFF for crate::peripherals::GPIO47<'_> {}
+        impl AlternateFunction_SUBSPICLK_P_DIFF for crate::peripherals::GPIO47<'_> {}
+        impl AlternateFunction_SPICLK_N_DIFF for crate::peripherals::GPIO48<'_> {}
+        impl AlternateFunction_SUBSPICLK_N_DIFF for crate::peripherals::GPIO48<'_> {}
     };
 }

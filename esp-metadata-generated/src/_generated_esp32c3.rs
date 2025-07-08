@@ -819,20 +819,20 @@ macro_rules! define_io_mux_reg {
 macro_rules! implement_alternate_function_markers {
     () => {
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTCK input function"]
-        pub trait InputFunction_MTCK {}
+        #[doc = "Marker trait for pins that have the MTCK function"]
+        pub trait AlternateFunction_MTCK: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTMS input function"]
-        pub trait InputFunction_MTMS {}
+        #[doc = "Marker trait for pins that have the MTMS function"]
+        pub trait AlternateFunction_MTMS: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDI input function"]
-        pub trait InputFunction_MTDI {}
-        impl InputFunction_MTMS for crate::peripherals::GPIO4<'_> {}
-        impl InputFunction_MTDI for crate::peripherals::GPIO5<'_> {}
-        impl InputFunction_MTCK for crate::peripherals::GPIO6<'_> {}
+        #[doc = "Marker trait for pins that have the MTDI function"]
+        pub trait AlternateFunction_MTDI: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDO output function"]
-        pub trait OutputFunction_MTDO {}
-        impl OutputFunction_MTDO for crate::peripherals::GPIO7<'_> {}
+        #[doc = "Marker trait for pins that have the MTDO function"]
+        pub trait AlternateFunction_MTDO: crate::gpio::OutputPin {}
+        impl AlternateFunction_MTMS for crate::peripherals::GPIO4<'_> {}
+        impl AlternateFunction_MTDI for crate::peripherals::GPIO5<'_> {}
+        impl AlternateFunction_MTCK for crate::peripherals::GPIO6<'_> {}
+        impl AlternateFunction_MTDO for crate::peripherals::GPIO7<'_> {}
     };
 }

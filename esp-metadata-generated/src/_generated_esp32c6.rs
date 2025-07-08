@@ -1112,64 +1112,59 @@ macro_rules! define_io_mux_reg {
 macro_rules! implement_alternate_function_markers {
     () => {
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_CMD input function"]
-        pub trait InputFunction_SDIO_CMD {}
+        #[doc = "Marker trait for pins that have the SDIO_CMD function"]
+        pub trait AlternateFunction_SDIO_CMD:
+            crate::gpio::InputPin + crate::gpio::OutputPin
+        {
+        }
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA0 input function"]
-        pub trait InputFunction_SDIO_DATA0 {}
+        #[doc = "Marker trait for pins that have the SDIO_DATA0 function"]
+        pub trait AlternateFunction_SDIO_DATA0:
+            crate::gpio::InputPin + crate::gpio::OutputPin
+        {
+        }
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA1 input function"]
-        pub trait InputFunction_SDIO_DATA1 {}
+        #[doc = "Marker trait for pins that have the SDIO_DATA1 function"]
+        pub trait AlternateFunction_SDIO_DATA1:
+            crate::gpio::InputPin + crate::gpio::OutputPin
+        {
+        }
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA2 input function"]
-        pub trait InputFunction_SDIO_DATA2 {}
+        #[doc = "Marker trait for pins that have the SDIO_DATA2 function"]
+        pub trait AlternateFunction_SDIO_DATA2:
+            crate::gpio::InputPin + crate::gpio::OutputPin
+        {
+        }
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA3 input function"]
-        pub trait InputFunction_SDIO_DATA3 {}
+        #[doc = "Marker trait for pins that have the SDIO_DATA3 function"]
+        pub trait AlternateFunction_SDIO_DATA3:
+            crate::gpio::InputPin + crate::gpio::OutputPin
+        {
+        }
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDI input function"]
-        pub trait InputFunction_MTDI {}
+        #[doc = "Marker trait for pins that have the MTDI function"]
+        pub trait AlternateFunction_MTDI: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTCK input function"]
-        pub trait InputFunction_MTCK {}
+        #[doc = "Marker trait for pins that have the MTCK function"]
+        pub trait AlternateFunction_MTCK: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTMS input function"]
-        pub trait InputFunction_MTMS {}
-        impl InputFunction_MTMS for crate::peripherals::GPIO4<'_> {}
-        impl InputFunction_MTDI for crate::peripherals::GPIO5<'_> {}
-        impl InputFunction_MTCK for crate::peripherals::GPIO6<'_> {}
-        impl InputFunction_SDIO_CMD for crate::peripherals::GPIO18<'_> {}
-        impl InputFunction_SDIO_DATA0 for crate::peripherals::GPIO20<'_> {}
-        impl InputFunction_SDIO_DATA1 for crate::peripherals::GPIO21<'_> {}
-        impl InputFunction_SDIO_DATA2 for crate::peripherals::GPIO22<'_> {}
-        impl InputFunction_SDIO_DATA3 for crate::peripherals::GPIO23<'_> {}
+        #[doc = "Marker trait for pins that have the MTMS function"]
+        pub trait AlternateFunction_MTMS: crate::gpio::InputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_CLK output function"]
-        pub trait OutputFunction_SDIO_CLK {}
+        #[doc = "Marker trait for pins that have the SDIO_CLK function"]
+        pub trait AlternateFunction_SDIO_CLK: crate::gpio::OutputPin {}
         #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_CMD output function"]
-        pub trait OutputFunction_SDIO_CMD {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA0 output function"]
-        pub trait OutputFunction_SDIO_DATA0 {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA1 output function"]
-        pub trait OutputFunction_SDIO_DATA1 {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA2 output function"]
-        pub trait OutputFunction_SDIO_DATA2 {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the SDIO_DATA3 output function"]
-        pub trait OutputFunction_SDIO_DATA3 {}
-        #[instability::unstable]
-        #[doc = "Marker trait for pins that have the MTDO output function"]
-        pub trait OutputFunction_MTDO {}
-        impl OutputFunction_MTDO for crate::peripherals::GPIO7<'_> {}
-        impl OutputFunction_SDIO_CMD for crate::peripherals::GPIO18<'_> {}
-        impl OutputFunction_SDIO_CLK for crate::peripherals::GPIO19<'_> {}
-        impl OutputFunction_SDIO_DATA0 for crate::peripherals::GPIO20<'_> {}
-        impl OutputFunction_SDIO_DATA1 for crate::peripherals::GPIO21<'_> {}
-        impl OutputFunction_SDIO_DATA2 for crate::peripherals::GPIO22<'_> {}
-        impl OutputFunction_SDIO_DATA3 for crate::peripherals::GPIO23<'_> {}
+        #[doc = "Marker trait for pins that have the MTDO function"]
+        pub trait AlternateFunction_MTDO: crate::gpio::OutputPin {}
+        impl AlternateFunction_MTMS for crate::peripherals::GPIO4<'_> {}
+        impl AlternateFunction_MTDI for crate::peripherals::GPIO5<'_> {}
+        impl AlternateFunction_MTCK for crate::peripherals::GPIO6<'_> {}
+        impl AlternateFunction_MTDO for crate::peripherals::GPIO7<'_> {}
+        impl AlternateFunction_SDIO_CMD for crate::peripherals::GPIO18<'_> {}
+        impl AlternateFunction_SDIO_CLK for crate::peripherals::GPIO19<'_> {}
+        impl AlternateFunction_SDIO_DATA0 for crate::peripherals::GPIO20<'_> {}
+        impl AlternateFunction_SDIO_DATA1 for crate::peripherals::GPIO21<'_> {}
+        impl AlternateFunction_SDIO_DATA2 for crate::peripherals::GPIO22<'_> {}
+        impl AlternateFunction_SDIO_DATA3 for crate::peripherals::GPIO23<'_> {}
     };
 }
