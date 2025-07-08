@@ -13,8 +13,6 @@ use toml_edit::{DocumentMut, Formatted, Item, Table};
 
 mod tui;
 
-const DEFAULT_CONFIG_PATH: &str = ".cargo/config.toml";
-
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
@@ -26,7 +24,7 @@ struct Args {
     #[arg(short = 'C', long)]
     chip: Option<esp_metadata::Chip>,
 
-    /// Config file - using `.cargo/config.toml` by default
+    /// Config file - using `config.toml` by default
     #[arg(short = 'c', long)]
     config_file: Option<String>,
 }
@@ -53,8 +51,55 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let work_dir = args.path.clone().unwrap_or(".".into());
 
-    let config_file_path =
-        work_dir.join(args.config_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
+    let config_file = if args.config_file.is_none() {
+        // if there are multiple config files and none is selected via the command line option
+        // let the user choose (but don't offer the base config.toml)
+
+        let mut config_file = None;
+        let cargo_dir = work_dir.join(".cargo");
+
+        if cargo_dir.exists() {
+            let files: Vec<String> = cargo_dir
+                .read_dir()?
+                .filter(|entry| {
+                    if let Ok(entry) = entry {
+                        entry.path().is_file()
+                            && entry.path().extension().unwrap_or_default() == "toml"
+                            && entry.file_name().to_string_lossy() != "config.toml"
+                    } else {
+                        false
+                    }
+                })
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().to_string())
+                .collect();
+
+            if files.len() > 0 {
+                let terminal = tui::init_terminal()?;
+                let mut chooser = tui::ConfigChooser::new(files);
+                config_file = chooser.run(terminal)?;
+                tui::restore_terminal()?;
+            } else {
+                config_file = Some("config.toml".to_string());
+            }
+        }
+
+        config_file
+    } else {
+        Some(
+            args.config_file
+                .as_deref()
+                .unwrap_or("config.toml")
+                .to_string(),
+        )
+    };
+
+    if config_file.is_none() {
+        return Ok(());
+    }
+
+    let config_file = config_file.unwrap();
+
+    let config_file_path = work_dir.join(".cargo").join(config_file);
     if !config_file_path.exists() {
         return Err(format!(
             "Config file {} does not exist or is not readable.",
@@ -63,7 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     }
 
-    let configs = parse_configs(&work_dir, args.chip, args.config_file.as_deref())?;
+    let (hint_about_config_toml, configs) = parse_configs(&work_dir, args.chip, &config_file_path)?;
     let initial_configs = configs.clone();
     let previous_config = initial_configs.clone();
 
@@ -73,31 +118,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     let terminal = tui::init_terminal()?;
 
     // create app and run it
-    let updated_cfg = tui::App::new(None, repository).run(terminal)?;
+    let updated_cfg = tui::App::new(if hint_about_config_toml {
+        Some("[env] section in base config.toml detected - avoid this and only add [env] sections to individual configs".to_string()) } else { None }, repository)
+        .run(terminal)?;
 
     tui::restore_terminal()?;
 
     // done with the TUI
     if let Some(updated_cfg) = updated_cfg {
-        apply_config(
-            &work_dir,
-            updated_cfg,
-            previous_config,
-            args.config_file.clone(),
-        )?;
+        apply_config(updated_cfg, previous_config, &config_file_path)?;
     }
 
     Ok(())
 }
 
 fn apply_config(
-    path: &Path,
     updated_cfg: Vec<CrateConfig>,
     previous_cfg: Vec<CrateConfig>,
-    cfg_file: Option<String>,
+    config_toml_path: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let config_toml_path = path.join(cfg_file.as_deref().unwrap_or(DEFAULT_CONFIG_PATH));
-
     let mut config = std::fs::read_to_string(&config_toml_path)?
         .as_str()
         .parse::<DocumentMut>()?;
@@ -143,9 +182,36 @@ fn apply_config(
 fn parse_configs(
     path: &Path,
     chip_from_args: Option<esp_metadata::Chip>,
-    config_file: Option<&str>,
-) -> Result<Vec<CrateConfig>, Box<dyn Error>> {
-    let config_toml_path = path.join(config_file.unwrap_or(DEFAULT_CONFIG_PATH));
+    config_toml_path: &PathBuf,
+) -> Result<(bool, Vec<CrateConfig>), Box<dyn Error>> {
+    let mut hint_about_configs = false;
+
+    // check if we find multiple potential config files - if yes and if the base `config.toml`
+    // contains an [env] section let the user know this is not ideal
+    if let Some(config_toml_dir) = config_toml_path.parent() {
+        if config_toml_dir
+            .read_dir()?
+            .filter(|entry| {
+                if let Ok(entry) = entry {
+                    entry.path().is_file() && entry.path().extension().unwrap_or_default() == "toml"
+                } else {
+                    false
+                }
+            })
+            .count()
+            > 1
+        {
+            let base_toml = config_toml_dir.join("config.toml");
+            if base_toml.exists() {
+                let base_toml_content = std::fs::read_to_string(base_toml)?;
+                let base_toml = base_toml_content.as_str().parse::<DocumentMut>()?;
+                if base_toml.contains_key("env") {
+                    hint_about_configs = true;
+                }
+            }
+        }
+    }
+
     let config_toml_content = std::fs::read_to_string(config_toml_path)?;
     let config_toml = config_toml_content.as_str().parse::<DocumentMut>()?;
 
@@ -263,5 +329,5 @@ fn parse_configs(
         return Err("No config files found.".into());
     }
 
-    Ok(configs)
+    Ok((hint_about_configs, configs))
 }
