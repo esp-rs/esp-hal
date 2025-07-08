@@ -9,6 +9,9 @@
 //! Note that this crate currently requires you to enable the `unstable` feature
 //! on `esp-hal`.
 //!
+//! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
+//! things will break.
+//!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 //!
@@ -17,12 +20,12 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
-use core::{cell::RefCell, marker::PhantomData};
+use core::cell::RefCell;
 
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_config::*;
-use esp_hal::peripherals::{IEEE802154, RADIO_CLK};
+use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
 use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
@@ -113,18 +116,19 @@ impl Default for Config {
 pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
-    _phantom1: PhantomData<&'a ()>,
+    _phy_clock_guard: PhyClockGuard<'a>,
 }
 
 impl<'a> Ieee802154<'a> {
     /// Construct a new driver, enabling the IEEE 802.15.4 radio in the process
-    pub fn new(_radio: IEEE802154<'a>, radio_clocks: RADIO_CLK<'a>) -> Self {
-        esp_ieee802154_enable(radio_clocks);
-
+    ///
+    /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
+    /// things will break.
+    pub fn new(radio: IEEE802154<'a>) -> Self {
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
-            _phantom1: PhantomData,
+            _phy_clock_guard: esp_ieee802154_enable(radio),
         }
     }
 

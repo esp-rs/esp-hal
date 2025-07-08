@@ -74,7 +74,6 @@ peripherals = [
     { name = "DAC1", virtual = true },
     { name = "DAC2", virtual = true },
     { name = "PSRAM", virtual = true },
-    { name = "RADIO_CLK", virtual = true },
     { name = "SW_INTERRUPT", virtual = true },
     { name = "TOUCH", virtual = true },
 ]

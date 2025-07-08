@@ -61,8 +61,7 @@ fn main() -> ! {
         .parse()
         .unwrap();
 
-    let radio = peripherals.IEEE802154;
-    let mut ieee802154 = Ieee802154::new(radio, peripherals.RADIO_CLK);
+    let mut ieee802154 = Ieee802154::new(peripherals.IEEE802154);
 
     ieee802154.set_config(Config {
         channel,

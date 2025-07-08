@@ -13,7 +13,7 @@ use portable_atomic::{AtomicU32, Ordering};
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::{common::*, timer_compat::*},
-    hal::{self, clock::RadioClockController, peripherals::RADIO_CLK, ram},
+    hal::{self, clock::ModemClockController, ram},
 };
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
@@ -302,13 +302,21 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
 
 static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
+// We're use either WIFI or BT here, since esp-wifi also supports the ESP32-H2 as the only
+// chip, with BT but without WIFI.
+#[cfg(not(esp32h2))]
+type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
+#[cfg(esp32h2)]
+type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
+
 pub(crate) unsafe fn phy_enable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
     if count == 0 {
-        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-        // value) into `init`
-        let radio_clocks = unsafe { RADIO_CLK::steal() };
-        RadioClockController::new(radio_clocks).enable_phy(true);
+        // Stealing the peripheral is safe here, as they must have been passed into the relevant
+        // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+        let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
+        core::mem::forget(clock_guard);
+
         trace!("phy_enable_clock done!");
     }
 }
@@ -317,10 +325,7 @@ pub(crate) unsafe fn phy_enable_clock() {
 pub(crate) unsafe fn phy_disable_clock() {
     let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
     if count == 1 {
-        // stealing RADIO_CLK is safe since it is passed (as mutable reference or by
-        // value) into `init`
-        let radio_clocks = unsafe { RADIO_CLK::steal() };
-        RadioClockController::new(radio_clocks).enable_phy(false);
+        unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
         trace!("phy_disable_clock done!");
     }
 }

@@ -15,7 +15,7 @@ use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
 use esp_hal::{
     clock::CpuClock,
     interrupt::{Priority, software::SoftwareInterruptControl},
-    peripherals::{Peripherals, RADIO_CLK, RNG, TIMG0},
+    peripherals::{Peripherals, RNG, TIMG0},
     rng::Rng,
     timer::timg::TimerGroup,
 };
@@ -31,11 +31,10 @@ async fn try_init(
     signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
     timer: TIMG0<'static>,
     rng: RNG<'static>,
-    radio_clk: RADIO_CLK<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
 
-    let init = esp_wifi::init(timg0.timer0, Rng::new(rng), radio_clk);
+    let init = esp_wifi::init(timg0.timer0, Rng::new(rng));
 
     match init {
         Ok(_) => {
@@ -63,13 +62,8 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = critical_section::with(|_| {
-            esp_wifi::init(
-                timg0.timer0,
-                Rng::new(peripherals.RNG),
-                peripherals.RADIO_CLK,
-            )
-        });
+        let init =
+            critical_section::with(|_| esp_wifi::init(timg0.timer0, Rng::new(peripherals.RNG)));
 
         assert!(matches!(
             init,
@@ -80,13 +74,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = interrupt_free(|| {
-            esp_wifi::init(
-                timg0.timer0,
-                Rng::new(peripherals.RNG),
-                peripherals.RADIO_CLK,
-            )
-        });
+        let init = interrupt_free(|| esp_wifi::init(timg0.timer0, Rng::new(peripherals.RNG)));
 
         assert!(matches!(
             init,
@@ -108,12 +96,7 @@ mod tests {
             mk_static!(Signal<CriticalSectionRawMutex, Option<InitializationError>>, Signal::new());
 
         spawner
-            .spawn(try_init(
-                signal,
-                peripherals.TIMG0,
-                peripherals.RNG,
-                peripherals.RADIO_CLK,
-            ))
+            .spawn(try_init(signal, peripherals.TIMG0, peripherals.RNG))
             .ok();
 
         let res = signal.wait().await;

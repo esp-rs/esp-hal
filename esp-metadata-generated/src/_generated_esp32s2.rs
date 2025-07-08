@@ -269,56 +269,54 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
         _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((DAC1 <=
         virtual() (unstable))); _for_each_inner!((DAC2 <= virtual() (unstable)));
-        _for_each_inner!((PSRAM <= virtual() (unstable))); _for_each_inner!((RADIO_CLK <=
-        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((ULP_RISCV_CORE <= virtual() (unstable)));
-        _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
-        virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
-        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
-        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
-        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()), (GPIO16 <=
-        virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <= virtual()),
-        (GPIO20 <= virtual()), (GPIO21 <= virtual()), (GPIO26 <= virtual()), (GPIO27 <=
-        virtual()), (GPIO28 <= virtual()), (GPIO29 <= virtual()), (GPIO30 <= virtual()),
-        (GPIO31 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <= virtual()), (GPIO34 <=
-        virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <= virtual()),
-        (GPIO38 <= virtual()), (GPIO39 <= virtual()), (GPIO40 <= virtual()), (GPIO41 <=
-        virtual()), (GPIO42 <= virtual()), (GPIO43 <= virtual()), (GPIO44 <= virtual()),
-        (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES() (unstable)),
-        (APB_SARADC <= APB_SARADC() (unstable)), (DEDICATED_GPIO <= DEDICATED_GPIO()
-        (unstable)), (DS <= DS() (unstable)), (EFUSE <= EFUSE() (unstable)), (EXTMEM <=
-        EXTMEM() (unstable)), (FE <= FE() (unstable)), (FE2 <= FE2() (unstable)), (GPIO
-        <= GPIO() (unstable)), (GPIO_SD <= GPIO_SD() (unstable)), (HMAC <= HMAC()
-        (unstable)), (I2C_ANA_MST <= I2C_ANA_MST() (unstable)), (I2C0 <= I2C0(I2C_EXT0 :
-        { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (I2C1
-        <= I2C1(I2C_EXT1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (I2S0 <= I2S0(I2S0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (INTERRUPT_CORE0 <=
-        INTERRUPT_CORE0() (unstable)), (IO_MUX <= IO_MUX() (unstable)), (LEDC <= LEDC()
-        (unstable)), (NRX <= NRX() (unstable)), (PCNT <= PCNT() (unstable)), (PMS <=
-        PMS() (unstable)), (RMT <= RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <=
-        RSA() (unstable)), (LPWR <= RTC_CNTL() (unstable)), (RTC_I2C <= RTC_I2C()
-        (unstable)), (RTC_IO <= RTC_IO() (unstable)), (SENS <= SENS() (unstable)), (SHA
-        <= SHA() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <= SPI1() (unstable)),
-        (SPI2 <= SPI2(SPI2_DMA : { bind_dma_interrupt, enable_dma_interrupt,
-        disable_dma_interrupt }, SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (SPI3 <= SPI3(SPI3_DMA : { bind_dma_interrupt,
-        enable_dma_interrupt, disable_dma_interrupt }, SPI3 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (SYSCON <= SYSCON()
-        (unstable)), (SYSTEM <= SYSTEM() (unstable)), (SYSTIMER <= SYSTIMER()
-        (unstable)), (TIMG0 <= TIMG0() (unstable)), (TIMG1 <= TIMG1() (unstable)), (TWAI0
-        <= TWAI0() (unstable)), (UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (UART1 <= UART1(UART1 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (UHCI0 <=
-        UHCI0() (unstable)), (USB0 <= USB0() (unstable)), (USB_WRAP <= USB_WRAP()
-        (unstable)), (XTS_AES <= XTS_AES() (unstable)), (WIFI <= WIFI() (unstable)),
-        (DMA_SPI2 <= SPI2() (unstable)), (DMA_SPI3 <= SPI3() (unstable)), (DMA_I2S0 <=
-        I2S0() (unstable)), (DMA_CRYPTO <= CRYPTO_DMA() (unstable)), (DMA_COPY <=
-        COPY_DMA() (unstable)), (ADC1 <= virtual() (unstable)), (ADC2 <= virtual()
-        (unstable)), (DAC1 <= virtual() (unstable)), (DAC2 <= virtual() (unstable)),
-        (PSRAM <= virtual() (unstable)), (RADIO_CLK <= virtual() (unstable)),
-        (SW_INTERRUPT <= virtual() (unstable)), (ULP_RISCV_CORE <= virtual()
-        (unstable))));
+        _for_each_inner!((PSRAM <= virtual() (unstable))); _for_each_inner!((SW_INTERRUPT
+        <= virtual() (unstable))); _for_each_inner!((ULP_RISCV_CORE <= virtual()
+        (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()),
+        (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <=
+        virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()),
+        (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <=
+        virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()),
+        (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <=
+        virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (GPIO26 <= virtual()),
+        (GPIO27 <= virtual()), (GPIO28 <= virtual()), (GPIO29 <= virtual()), (GPIO30 <=
+        virtual()), (GPIO31 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <= virtual()),
+        (GPIO34 <= virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <=
+        virtual()), (GPIO38 <= virtual()), (GPIO39 <= virtual()), (GPIO40 <= virtual()),
+        (GPIO41 <= virtual()), (GPIO42 <= virtual()), (GPIO43 <= virtual()), (GPIO44 <=
+        virtual()), (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES()
+        (unstable)), (APB_SARADC <= APB_SARADC() (unstable)), (DEDICATED_GPIO <=
+        DEDICATED_GPIO() (unstable)), (DS <= DS() (unstable)), (EFUSE <= EFUSE()
+        (unstable)), (EXTMEM <= EXTMEM() (unstable)), (FE <= FE() (unstable)), (FE2 <=
+        FE2() (unstable)), (GPIO <= GPIO() (unstable)), (GPIO_SD <= GPIO_SD()
+        (unstable)), (HMAC <= HMAC() (unstable)), (I2C_ANA_MST <= I2C_ANA_MST()
+        (unstable)), (I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (I2C1 <= I2C1(I2C_EXT1 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (I2S0 <=
+        I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }) (unstable)), (INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (IO_MUX <=
+        IO_MUX() (unstable)), (LEDC <= LEDC() (unstable)), (NRX <= NRX() (unstable)),
+        (PCNT <= PCNT() (unstable)), (PMS <= PMS() (unstable)), (RMT <= RMT()
+        (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA() (unstable)), (LPWR <=
+        RTC_CNTL() (unstable)), (RTC_I2C <= RTC_I2C() (unstable)), (RTC_IO <= RTC_IO()
+        (unstable)), (SENS <= SENS() (unstable)), (SHA <= SHA() (unstable)), (SPI0 <=
+        SPI0() (unstable)), (SPI1 <= SPI1() (unstable)), (SPI2 <= SPI2(SPI2_DMA : {
+        bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt }, SPI2 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (SPI3 <=
+        SPI3(SPI3_DMA : { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt
+        }, SPI3 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        })), (SYSCON <= SYSCON() (unstable)), (SYSTEM <= SYSTEM() (unstable)), (SYSTIMER
+        <= SYSTIMER() (unstable)), (TIMG0 <= TIMG0() (unstable)), (TIMG1 <= TIMG1()
+        (unstable)), (TWAI0 <= TWAI0() (unstable)), (UART0 <= UART0(UART0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (UART1 <=
+        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (UHCI0 <= UHCI0() (unstable)), (USB0 <= USB0()
+        (unstable)), (USB_WRAP <= USB_WRAP() (unstable)), (XTS_AES <= XTS_AES()
+        (unstable)), (WIFI <= WIFI() (unstable)), (DMA_SPI2 <= SPI2() (unstable)),
+        (DMA_SPI3 <= SPI3() (unstable)), (DMA_I2S0 <= I2S0() (unstable)), (DMA_CRYPTO <=
+        CRYPTO_DMA() (unstable)), (DMA_COPY <= COPY_DMA() (unstable)), (ADC1 <= virtual()
+        (unstable)), (ADC2 <= virtual() (unstable)), (DAC1 <= virtual() (unstable)),
+        (DAC2 <= virtual() (unstable)), (PSRAM <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (ULP_RISCV_CORE <= virtual() (unstable))));
     };
 }
 #[macro_export]

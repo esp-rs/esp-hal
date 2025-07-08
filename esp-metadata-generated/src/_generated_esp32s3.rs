@@ -280,8 +280,7 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((ADC1 <= virtual() (unstable))); _for_each_inner!((ADC2 <=
         virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
         _for_each_inner!((CPU_CTRL <= virtual() (unstable))); _for_each_inner!((PSRAM <=
-        virtual() (unstable))); _for_each_inner!((RADIO_CLK <= virtual() (unstable)));
-        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
+        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
         _for_each_inner!((ULP_RISCV_CORE <= virtual() (unstable)));
         _for_each_inner!((WIFI <= virtual() (unstable))); _for_each_inner!((all(GPIO0 <=
         virtual()), (GPIO1 <= virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()),
@@ -333,9 +332,9 @@ macro_rules! for_each_peripheral {
         virtual() (unstable)), (DMA_CH2 <= virtual() (unstable)), (DMA_CH3 <= virtual()
         (unstable)), (DMA_CH4 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
         (ADC2 <= virtual() (unstable)), (BT <= virtual() (unstable)), (CPU_CTRL <=
-        virtual() (unstable)), (PSRAM <= virtual() (unstable)), (RADIO_CLK <= virtual()
-        (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (ULP_RISCV_CORE <= virtual()
-        (unstable)), (WIFI <= virtual() (unstable))));
+        virtual() (unstable)), (PSRAM <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (ULP_RISCV_CORE <= virtual() (unstable)), (WIFI <=
+        virtual() (unstable))));
     };
 }
 #[macro_export]
