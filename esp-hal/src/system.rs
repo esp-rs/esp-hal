@@ -1169,16 +1169,16 @@ pub enum SleepSource {
     BT,
 }
 
+#[procmacros::doc_replace]
 /// Performs a software reset on the chip.
 ///
 /// # Example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::system::software_reset;
 /// software_reset();
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[inline]
 pub fn software_reset() -> ! {

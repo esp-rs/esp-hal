@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Configuration
 //!
 //! ## Overview
@@ -14,25 +15,25 @@
 //! ### Default initialization
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! let peripherals = esp_hal::init(esp_hal::Config::default());
-//! Ok(())
-//! # }
+//! #
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### Custom initialization
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::clock::CpuClock;
-//! use esp_hal::time::Duration;
+//! # {before_snippet}
+//! use esp_hal::{clock::CpuClock, time::Duration};
 //!
-//! let config =
-//! esp_hal::Config::default().with_cpu_clock(CpuClock::max()).
-//!     with_watchdog(esp_hal::config::WatchdogConfig::default().
-//!     with_rwdt(esp_hal::config::WatchdogStatus::Enabled(Duration::from_millis(1000u64))));
+//! let config = esp_hal::Config::default()
+//!     .with_cpu_clock(CpuClock::max())
+//!     .with_watchdog(esp_hal::config::WatchdogConfig::default().with_rwdt(
+//!         esp_hal::config::WatchdogStatus::Enabled(Duration::from_millis(1000u64)),
+//!     ));
 //! let peripherals = esp_hal::init(config);
-//! # Ok(())
-//! # }
+//! #
+//! # {after_snippet}
 //! ```
 
 use crate::time::Duration;

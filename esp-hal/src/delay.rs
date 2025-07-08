@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Delay
 //!
 //! ## Overview
@@ -18,16 +19,14 @@
 //! ## Examples
 //! ### Delay for 1 second
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use embedded_hal::delay::DelayNs;
 //! let mut delay = Delay::new();
 //!
 //! delay.delay_ms(1000 as u32);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
 //! [DelayNs]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/trait.DelayNs.html
 //! [embedded-hal]: https://docs.rs/embedded-hal/1.0.0/embedded_hal/delay/index.html
 
