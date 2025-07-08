@@ -38,18 +38,6 @@ macro_rules! property {
     ("gpio.gpio_function", str) => {
         stringify!(1)
     };
-    ("gpio.input_signal_max") => {
-        189
-    };
-    ("gpio.input_signal_max", str) => {
-        stringify!(189)
-    };
-    ("gpio.output_signal_max") => {
-        256
-    };
-    ("gpio.output_signal_max", str) => {
-        stringify!(256)
-    };
     ("gpio.constant_0_input") => {
         60
     };
@@ -70,6 +58,18 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.input_signal_max") => {
+        255
+    };
+    ("gpio.input_signal_max", str) => {
+        stringify!(255)
+    };
+    ("gpio.output_signal_max") => {
+        256
+    };
+    ("gpio.output_signal_max", str) => {
+        stringify!(256)
     };
     ("i2c_master.has_fsm_timeouts") => {
         true
@@ -1368,6 +1368,19 @@ macro_rules! define_io_mux_signals {
             SDHOST_CDATA_IN_25      = 218,
             SDHOST_CDATA_IN_26      = 219,
             SDHOST_CDATA_IN_27      = 220,
+            PRO_ALONEGPIO_IN0       = 221,
+            PRO_ALONEGPIO_IN1       = 222,
+            PRO_ALONEGPIO_IN2       = 223,
+            PRO_ALONEGPIO_IN3       = 224,
+            PRO_ALONEGPIO_IN4       = 225,
+            PRO_ALONEGPIO_IN5       = 226,
+            PRO_ALONEGPIO_IN6       = 227,
+            PRO_ALONEGPIO_IN7       = 228,
+            USB_JTAG_TDO_BRIDGE     = 251,
+            CORE1_GPIO_IN3          = 252,
+            CORE1_GPIO_IN4          = 253,
+            CORE1_GPIO_IN5          = 254,
+            CORE1_GPIO_IN6          = 255,
             SPIIO4,
             SPIIO5,
             SPIIO6,
@@ -1538,6 +1551,19 @@ macro_rules! define_io_mux_signals {
             SDHOST_CDATA_OUT_25        = 218,
             SDHOST_CDATA_OUT_26        = 219,
             SDHOST_CDATA_OUT_27        = 220,
+            PRO_ALONEGPIO_OUT0         = 221,
+            PRO_ALONEGPIO_OUT1         = 222,
+            PRO_ALONEGPIO_OUT2         = 223,
+            PRO_ALONEGPIO_OUT3         = 224,
+            PRO_ALONEGPIO_OUT4         = 225,
+            PRO_ALONEGPIO_OUT5         = 226,
+            PRO_ALONEGPIO_OUT6         = 227,
+            PRO_ALONEGPIO_OUT7         = 228,
+            USB_JTAG_TRST              = 251,
+            CORE1_GPIO_OUT3            = 252,
+            CORE1_GPIO_OUT4            = 253,
+            CORE1_GPIO_OUT5            = 254,
+            CORE1_GPIO_OUT6            = 255,
             GPIO                       = 256,
             SPIIO4,
             SPIIO5,

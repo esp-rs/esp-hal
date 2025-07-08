@@ -82,7 +82,7 @@ pub(crate) struct SupportItem {
 /// Define driver configuration structs, and a PeriConfig struct
 /// that contains all of them.
 macro_rules! driver_configs {
-    (@reify $t:tt) => { $t };
+    (@ignore $t:tt) => {};
     (@property (u32)           $self:ident, $config:ident) => { Value::Number($self.$config) };
     (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
@@ -129,6 +129,7 @@ macro_rules! driver_configs {
             driver: $driver:ident,
             // Driver name, used in the generated documentation.
             name: $name:literal,
+            $(has_computed_properties: $computed:literal,)?
             properties: $tokens:tt
         },
     )+) => {
@@ -193,6 +194,10 @@ macro_rules! driver_configs {
                 $(
                     if let Some(driver) = &self.$driver {
                         properties.extend(driver.properties());
+                        $(
+                            driver_configs!(@ignore $computed);
+                            properties.extend(driver.computed_properties());
+                        )?
                     }
                 )*
                 properties.into_iter()
@@ -272,12 +277,11 @@ driver_configs![
     GpioProperties {
         driver: gpio,
         name: "GPIO",
+        has_computed_properties: true,
         properties: {
             #[serde(default)]
             has_bank_1: bool,
             gpio_function: u32,
-            input_signal_max: u32,
-            output_signal_max: u32,
             constant_0_input: u32,
             constant_1_input: u32,
             #[serde(default)]

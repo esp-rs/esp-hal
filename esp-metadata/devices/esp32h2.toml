@@ -121,8 +121,6 @@ has_region_monitor = true
 [device.gpio]
 support_status = "supported"
 gpio_function = 1
-input_signal_max = 124
-output_signal_max = 128
 constant_0_input = 0x3c
 constant_1_input = 0x38
 pins = [
