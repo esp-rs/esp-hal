@@ -133,7 +133,7 @@ pub fn build_examples(
         // Attempt to build only the specified example:
         for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
             crate::execute_app(
-                Package::Examples,
+                package_path,
                 args.chip,
                 &target,
                 example,
@@ -152,7 +152,7 @@ pub fn build_examples(
         // Attempt to build each supported example, with all required features enabled:
         examples.iter().try_for_each(|example| {
             crate::execute_app(
-                Package::Examples,
+                package_path,
                 args.chip,
                 &target,
                 example,
@@ -180,7 +180,7 @@ pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
         log::info!("  Target:   {}", target);
     }
 
-    let mut builder = CargoArgsBuilder::new(args.package.to_string())
+    let mut builder = CargoArgsBuilder::default()
         .subcommand("build")
         .arg("--release");
 
@@ -208,7 +208,7 @@ pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    cargo::run(&args)?;
+    cargo::run(&args, &package_path)?;
 
     Ok(())
 }

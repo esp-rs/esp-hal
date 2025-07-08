@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use clap::ValueEnum;
 use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;

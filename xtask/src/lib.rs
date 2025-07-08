@@ -320,7 +320,7 @@ pub enum Version {
 
 /// Run or build the specified test or example for the specified chip.
 pub fn execute_app(
-    package: Package,
+    package_path: &Path,
     chip: Chip,
     target: &str,
     app: &Metadata,
@@ -330,8 +330,8 @@ pub fn execute_app(
     toolchain: Option<&str>,
     timings: bool,
 ) -> Result<()> {
-    let package_name = package.to_string();
-    log::info!("Building example '{package_name}' for '{chip}'");
+    let package = app.example_path().strip_prefix(package_path)?;
+    log::info!("Building example '{}' for '{}'", package.display(), chip);
 
     if !app.configuration().is_empty() {
         log::info!("  Configuration: {}", app.configuration());
@@ -345,25 +345,25 @@ pub fn execute_app(
 
     let env_vars = app.env_vars();
     for (key, value) in env_vars {
-        log::info!("  esp-config:    {key} = {value}");
+        log::info!("  esp-config:    {} = {}", key, value);
     }
 
-    let mut builder = CargoArgsBuilder::new(package_name.clone())
+    let mut builder = CargoArgsBuilder::default()
         .target(target)
         .features(&features);
 
-    let bin_arg = if matches!(package, Package::QaTest | Package::Examples) {
+    let bin_arg = if package.starts_with("src/bin") {
         format!("--bin={}", app.binary_name())
-    } else if package == Package::HilTest {
+    } else if package.starts_with("tests") {
         format!("--test={}", app.binary_name())
     } else {
-        todo!()
+        format!("--example={}", app.binary_name())
     };
     builder.add_arg(bin_arg);
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
-    } else if package_name.starts_with("tests") {
+    } else if package.starts_with("tests") {
         "test"
     } else {
         "run"
@@ -404,14 +404,14 @@ pub fn execute_app(
     log::debug!("{args:#?}");
 
     if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, env_vars, false)?;
+        cargo::run_with_env(&args, package_path, env_vars, false)?;
 
         // Now that the build has succeeded and we printed the output, we can
         // rerun the build again quickly enough to capture JSON. We'll use this to
         // copy the binary to the output directory.
         builder.add_arg("--message-format=json");
         let args = builder.build();
-        let output = cargo::run_with_env(&args, env_vars, true)?;
+        let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
                 let out_dir = out_dir.join(chip.to_string());
@@ -427,7 +427,7 @@ pub fn execute_app(
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            cargo::run_with_env(&args, env_vars.clone(), false)?;
+            cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
         }
     }
 
@@ -499,7 +499,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
             }
         });
 
-    let mut cargo_args = CargoArgsBuilder::new(package.to_string())
+    let mut cargo_args = CargoArgsBuilder::default()
         .toolchain("nightly")
         .subcommand("fmt")
         .arg("--all")
@@ -516,7 +516,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     ));
     cargo_args.extend(source_files);
 
-    cargo::run(&cargo_args)?;
+    cargo::run(&cargo_args, &path)?;
 
     Ok(())
 }

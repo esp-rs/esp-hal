@@ -101,7 +101,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // Execute the specified action:
     match action {
         CargoAction::Build(out_path) => build_examples(args, examples, &package_path, &out_path),
-        CargoAction::Run => run_examples(args, examples),
+        CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }
 
@@ -125,7 +125,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     if tests.iter().any(|test| test.matches(&args.test)) {
         for test in tests.iter().filter(|test| test.matches(&args.test)) {
             crate::execute_app(
-                Package::HilTest,
+                &package_path,
                 args.chip,
                 &target,
                 test,
@@ -143,7 +143,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         let mut failed = Vec::new();
         for test in tests {
             if crate::execute_app(
-                Package::HilTest,
+                &package_path,
                 args.chip,
                 &target,
                 &test,

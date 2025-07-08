@@ -202,9 +202,9 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
-    let mut builder = CargoArgsBuilder::new(package_name)
-        .subcommand("doc")
+    let mut builder = CargoArgsBuilder::default()
         .toolchain(toolchain)
+        .subcommand("doc")
         .features(&features)
         .arg("-Zrustdoc-map")
         .arg("--lib")
@@ -230,7 +230,7 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     }
 
     // Execute `cargo doc` from the package root:
-    crate::cargo::run_with_env(&args, envs, false)?;
+    crate::cargo::run_with_env(&args, &package_path, envs, false)?;
 
     // Build up the path at which the built documentation can be found:
     let mut docs_path = if let Ok(target_path) = std::env::var("CARGO_TARGET_DIR") {

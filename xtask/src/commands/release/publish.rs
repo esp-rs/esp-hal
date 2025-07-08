@@ -36,7 +36,7 @@ pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
         publish_args.push("--dry-run");
     }
 
-    let builder = CargoArgsBuilder::new(package_name)
+    let builder = CargoArgsBuilder::default()
         .subcommand("publish")
         .args(&publish_args);
 
@@ -44,7 +44,7 @@ pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     log::debug!("{args:#?}");
 
     // Execute `cargo publish` command from the package root:
-    crate::cargo::run(&args)?;
+    crate::cargo::run(&args, &package_path)?;
 
     Ok(())
 }

@@ -190,11 +190,9 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
         log::info!("Cleaning package: {}", package);
         let path = workspace.join(package.to_string());
 
-        let cargo_args = CargoArgsBuilder::new(package.to_string())
-            .subcommand("clean")
-            .build();
+        let cargo_args = CargoArgsBuilder::default().subcommand("clean").build();
 
-        xtask::cargo::run(&cargo_args)?;
+        xtask::cargo::run(&cargo_args, &path)?;
     }
 
     Ok(())
@@ -258,9 +256,9 @@ fn lint_package(
         features
     );
 
-    // let path = workspace.join(package.to_string());
+    let path = workspace.join(package.to_string());
 
-    let mut builder = CargoArgsBuilder::new(package.to_string()).subcommand("clippy");
+    let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
     if !package.build_on_host(features) {
         if chip.is_xtensa() {
@@ -281,10 +279,7 @@ fn lint_package(
         builder = builder.arg(arg.to_string());
     }
 
-    builder = builder
-        .arg(format!("--features={}", features.join(",")))
-        .arg("--package")
-        .arg(package.to_string());
+    builder = builder.arg(format!("--features={}", features.join(",")));
 
     let builder = if fix {
         builder.arg("--fix").arg("--lib").arg("--allow-dirty")
@@ -294,7 +289,12 @@ fn lint_package(
 
     let cargo_args = builder.build();
 
-    xtask::cargo::run_with_env(&cargo_args, [("CI", "1"), ("DEFMT_LOG", "trace")], false)?;
+    xtask::cargo::run_with_env(
+        &cargo_args,
+        &path,
+        [("CI", "1"), ("DEFMT_LOG", "trace")],
+        false,
+    )?;
 
     Ok(())
 }

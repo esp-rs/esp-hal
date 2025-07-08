@@ -34,7 +34,7 @@ esp-wifi-sys      = "0.7.1"
 ieee802154        = "0.6.1"
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt                     = { workspace = true, optional = true }
+defmt                     = { version = "1.0.1", optional = true }
 log-04                    = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]

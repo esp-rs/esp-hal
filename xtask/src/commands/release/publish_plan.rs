@@ -1,6 +1,6 @@
 use std::{path::Path, process::Command};
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{bail, ensure, Context, Result};
 use clap::Args;
 
 use crate::{
