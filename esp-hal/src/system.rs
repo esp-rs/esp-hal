@@ -1057,7 +1057,17 @@ impl Cpu {
     /// The number of available cores.
     pub const COUNT: usize = 1 + cfg!(multi_core) as usize;
 
+    #[procmacros::doc_replace]
     /// Returns the core the application is currently executing on
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::system::Cpu;
+    /// let current_cpu = Cpu::current();
+    /// #
+    /// # {after_snippet}
+    /// ```
     #[inline(always)]
     pub fn current() -> Self {
         // This works for both RISCV and Xtensa because both
@@ -1160,6 +1170,16 @@ pub enum SleepSource {
 }
 
 /// Performs a software reset on the chip.
+///
+/// # Example
+///
+/// ```rust, no_run
+#[doc = crate::before_snippet!()]
+/// use esp_hal::system::software_reset;
+/// software_reset();
+/// # Ok(())
+/// # }
+/// ```
 #[inline]
 pub fn software_reset() -> ! {
     crate::rom::software_reset()

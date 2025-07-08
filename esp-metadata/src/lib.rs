@@ -435,6 +435,13 @@ impl Config {
         // Public API, can't use a private macro:
         tokens.extend(quote! {
             /// The name of the chip as `&str`
+            ///
+            /// # Example
+            ///
+            /// ```rust, no_run
+            /// use esp_hal::chip;
+            /// let chip_name = chip!();
+            /// ```
             #[macro_export]
             macro_rules! chip {
                 () => { #chip_name };

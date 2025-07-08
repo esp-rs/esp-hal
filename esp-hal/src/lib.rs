@@ -593,10 +593,22 @@ pub struct Config {
     psram: psram::PsramConfig,
 }
 
+#[procmacros::doc_replace]
 /// Initialize the system.
 ///
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
+///
+/// # Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// #
+/// use esp_hal::{Config, init};
+/// let peripherals = init(Config::default());
+/// #
+/// # {after_snippet}
+/// ```
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 
