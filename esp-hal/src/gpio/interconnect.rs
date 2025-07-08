@@ -941,3 +941,5 @@ impl NoOp {
 /// # }
 /// ```
 fn _compile_tests() {}
+
+implement_alternate_function_markers!();

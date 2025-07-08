@@ -1518,3 +1518,284 @@ macro_rules! define_io_mux_reg {
         }
     };
 }
+#[macro_export]
+#[doc(hidden)]
+macro_rules! implement_alternate_function_markers {
+    () => {
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_CMD input function"]
+        pub trait InputFunction_SD_CMD {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA0 input function"]
+        pub trait InputFunction_SD_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA1 input function"]
+        pub trait InputFunction_SD_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA2 input function"]
+        pub trait InputFunction_SD_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA3 input function"]
+        pub trait InputFunction_SD_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA0 input function"]
+        pub trait InputFunction_HS1_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA1 input function"]
+        pub trait InputFunction_HS1_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA2 input function"]
+        pub trait InputFunction_HS1_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA3 input function"]
+        pub trait InputFunction_HS1_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA4 input function"]
+        pub trait InputFunction_HS1_DATA4 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA5 input function"]
+        pub trait InputFunction_HS1_DATA5 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA6 input function"]
+        pub trait InputFunction_HS1_DATA6 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA7 input function"]
+        pub trait InputFunction_HS1_DATA7 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA0 input function"]
+        pub trait InputFunction_HS2_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA1 input function"]
+        pub trait InputFunction_HS2_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA2 input function"]
+        pub trait InputFunction_HS2_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA3 input function"]
+        pub trait InputFunction_HS2_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TX_CLK input function"]
+        pub trait InputFunction_EMAC_TX_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RXD2 input function"]
+        pub trait InputFunction_EMAC_RXD2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TX_ER input function"]
+        pub trait InputFunction_EMAC_TX_ER {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RX_CLK input function"]
+        pub trait InputFunction_EMAC_RX_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RX_ER input function"]
+        pub trait InputFunction_EMAC_RX_ER {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RXD3 input function"]
+        pub trait InputFunction_EMAC_RXD3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RXD0 input function"]
+        pub trait InputFunction_EMAC_RXD0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RXD1 input function"]
+        pub trait InputFunction_EMAC_RXD1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RX_DV input function"]
+        pub trait InputFunction_EMAC_RX_DV {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTDI input function"]
+        pub trait InputFunction_MTDI {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTCK input function"]
+        pub trait InputFunction_MTCK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTMS input function"]
+        pub trait InputFunction_MTMS {}
+        impl InputFunction_EMAC_TX_CLK for crate::peripherals::GPIO0<'_> {}
+        impl InputFunction_EMAC_RXD2 for crate::peripherals::GPIO1<'_> {}
+        impl InputFunction_HS2_DATA0 for crate::peripherals::GPIO2<'_> {}
+        impl InputFunction_SD_DATA0 for crate::peripherals::GPIO2<'_> {}
+        impl InputFunction_HS2_DATA1 for crate::peripherals::GPIO4<'_> {}
+        impl InputFunction_SD_DATA1 for crate::peripherals::GPIO4<'_> {}
+        impl InputFunction_EMAC_TX_ER for crate::peripherals::GPIO4<'_> {}
+        impl InputFunction_HS1_DATA6 for crate::peripherals::GPIO5<'_> {}
+        impl InputFunction_EMAC_RX_CLK for crate::peripherals::GPIO5<'_> {}
+        impl InputFunction_SD_DATA0 for crate::peripherals::GPIO7<'_> {}
+        impl InputFunction_HS1_DATA0 for crate::peripherals::GPIO7<'_> {}
+        impl InputFunction_SD_DATA1 for crate::peripherals::GPIO8<'_> {}
+        impl InputFunction_HS1_DATA1 for crate::peripherals::GPIO8<'_> {}
+        impl InputFunction_SD_DATA2 for crate::peripherals::GPIO9<'_> {}
+        impl InputFunction_HS1_DATA2 for crate::peripherals::GPIO9<'_> {}
+        impl InputFunction_SD_DATA3 for crate::peripherals::GPIO10<'_> {}
+        impl InputFunction_HS1_DATA3 for crate::peripherals::GPIO10<'_> {}
+        impl InputFunction_SD_CMD for crate::peripherals::GPIO11<'_> {}
+        impl InputFunction_MTDI for crate::peripherals::GPIO12<'_> {}
+        impl InputFunction_HS2_DATA2 for crate::peripherals::GPIO12<'_> {}
+        impl InputFunction_SD_DATA2 for crate::peripherals::GPIO12<'_> {}
+        impl InputFunction_MTCK for crate::peripherals::GPIO13<'_> {}
+        impl InputFunction_HS2_DATA3 for crate::peripherals::GPIO13<'_> {}
+        impl InputFunction_SD_DATA3 for crate::peripherals::GPIO13<'_> {}
+        impl InputFunction_EMAC_RX_ER for crate::peripherals::GPIO13<'_> {}
+        impl InputFunction_MTMS for crate::peripherals::GPIO14<'_> {}
+        impl InputFunction_SD_CMD for crate::peripherals::GPIO15<'_> {}
+        impl InputFunction_EMAC_RXD3 for crate::peripherals::GPIO15<'_> {}
+        impl InputFunction_HS1_DATA4 for crate::peripherals::GPIO16<'_> {}
+        impl InputFunction_HS1_DATA5 for crate::peripherals::GPIO17<'_> {}
+        impl InputFunction_HS1_DATA7 for crate::peripherals::GPIO18<'_> {}
+        impl InputFunction_EMAC_RXD0 for crate::peripherals::GPIO25<'_> {}
+        impl InputFunction_EMAC_RXD1 for crate::peripherals::GPIO26<'_> {}
+        impl InputFunction_EMAC_RX_DV for crate::peripherals::GPIO27<'_> {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the CLK_OUT1 output function"]
+        pub trait OutputFunction_CLK_OUT1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the CLK_OUT2 output function"]
+        pub trait OutputFunction_CLK_OUT2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the CLK_OUT3 output function"]
+        pub trait OutputFunction_CLK_OUT3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_CLK output function"]
+        pub trait OutputFunction_SD_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_CMD output function"]
+        pub trait OutputFunction_SD_CMD {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA0 output function"]
+        pub trait OutputFunction_SD_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA1 output function"]
+        pub trait OutputFunction_SD_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA2 output function"]
+        pub trait OutputFunction_SD_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the SD_DATA3 output function"]
+        pub trait OutputFunction_SD_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_CLK output function"]
+        pub trait OutputFunction_HS1_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_CMD output function"]
+        pub trait OutputFunction_HS1_CMD {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA0 output function"]
+        pub trait OutputFunction_HS1_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA1 output function"]
+        pub trait OutputFunction_HS1_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA2 output function"]
+        pub trait OutputFunction_HS1_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA3 output function"]
+        pub trait OutputFunction_HS1_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA4 output function"]
+        pub trait OutputFunction_HS1_DATA4 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA5 output function"]
+        pub trait OutputFunction_HS1_DATA5 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA6 output function"]
+        pub trait OutputFunction_HS1_DATA6 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_DATA7 output function"]
+        pub trait OutputFunction_HS1_DATA7 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS1_STROBE output function"]
+        pub trait OutputFunction_HS1_STROBE {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_CLK output function"]
+        pub trait OutputFunction_HS2_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_CMD output function"]
+        pub trait OutputFunction_HS2_CMD {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA0 output function"]
+        pub trait OutputFunction_HS2_DATA0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA1 output function"]
+        pub trait OutputFunction_HS2_DATA1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA2 output function"]
+        pub trait OutputFunction_HS2_DATA2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the HS2_DATA3 output function"]
+        pub trait OutputFunction_HS2_DATA3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TX_CLK output function"]
+        pub trait OutputFunction_EMAC_TX_CLK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TX_ER output function"]
+        pub trait OutputFunction_EMAC_TX_ER {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TXD3 output function"]
+        pub trait OutputFunction_EMAC_TXD3 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_RX_ER output function"]
+        pub trait OutputFunction_EMAC_RX_ER {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TXD2 output function"]
+        pub trait OutputFunction_EMAC_TXD2 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_CLK_OUT output function"]
+        pub trait OutputFunction_EMAC_CLK_OUT {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_CLK_180 output function"]
+        pub trait OutputFunction_EMAC_CLK_180 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TXD0 output function"]
+        pub trait OutputFunction_EMAC_TXD0 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TX_EN output function"]
+        pub trait OutputFunction_EMAC_TX_EN {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the EMAC_TXD1 output function"]
+        pub trait OutputFunction_EMAC_TXD1 {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTDO output function"]
+        pub trait OutputFunction_MTDO {}
+        impl OutputFunction_CLK_OUT1 for crate::peripherals::GPIO0<'_> {}
+        impl OutputFunction_EMAC_TX_CLK for crate::peripherals::GPIO0<'_> {}
+        impl OutputFunction_CLK_OUT3 for crate::peripherals::GPIO1<'_> {}
+        impl OutputFunction_HS2_DATA0 for crate::peripherals::GPIO2<'_> {}
+        impl OutputFunction_SD_DATA0 for crate::peripherals::GPIO2<'_> {}
+        impl OutputFunction_CLK_OUT2 for crate::peripherals::GPIO3<'_> {}
+        impl OutputFunction_HS2_DATA1 for crate::peripherals::GPIO4<'_> {}
+        impl OutputFunction_SD_DATA1 for crate::peripherals::GPIO4<'_> {}
+        impl OutputFunction_EMAC_TX_ER for crate::peripherals::GPIO4<'_> {}
+        impl OutputFunction_HS1_DATA6 for crate::peripherals::GPIO5<'_> {}
+        impl OutputFunction_SD_CLK for crate::peripherals::GPIO6<'_> {}
+        impl OutputFunction_HS1_CLK for crate::peripherals::GPIO6<'_> {}
+        impl OutputFunction_SD_DATA0 for crate::peripherals::GPIO7<'_> {}
+        impl OutputFunction_HS1_DATA0 for crate::peripherals::GPIO7<'_> {}
+        impl OutputFunction_SD_DATA1 for crate::peripherals::GPIO8<'_> {}
+        impl OutputFunction_HS1_DATA1 for crate::peripherals::GPIO8<'_> {}
+        impl OutputFunction_SD_DATA2 for crate::peripherals::GPIO9<'_> {}
+        impl OutputFunction_HS1_DATA2 for crate::peripherals::GPIO9<'_> {}
+        impl OutputFunction_SD_DATA3 for crate::peripherals::GPIO10<'_> {}
+        impl OutputFunction_HS1_DATA3 for crate::peripherals::GPIO10<'_> {}
+        impl OutputFunction_SD_CMD for crate::peripherals::GPIO11<'_> {}
+        impl OutputFunction_HS1_CMD for crate::peripherals::GPIO11<'_> {}
+        impl OutputFunction_HS2_DATA2 for crate::peripherals::GPIO12<'_> {}
+        impl OutputFunction_SD_DATA2 for crate::peripherals::GPIO12<'_> {}
+        impl OutputFunction_EMAC_TXD3 for crate::peripherals::GPIO12<'_> {}
+        impl OutputFunction_HS2_DATA3 for crate::peripherals::GPIO13<'_> {}
+        impl OutputFunction_SD_DATA3 for crate::peripherals::GPIO13<'_> {}
+        impl OutputFunction_EMAC_RX_ER for crate::peripherals::GPIO13<'_> {}
+        impl OutputFunction_HS2_CLK for crate::peripherals::GPIO14<'_> {}
+        impl OutputFunction_SD_CLK for crate::peripherals::GPIO14<'_> {}
+        impl OutputFunction_EMAC_TXD2 for crate::peripherals::GPIO14<'_> {}
+        impl OutputFunction_MTDO for crate::peripherals::GPIO15<'_> {}
+        impl OutputFunction_HS2_CMD for crate::peripherals::GPIO15<'_> {}
+        impl OutputFunction_SD_CMD for crate::peripherals::GPIO15<'_> {}
+        impl OutputFunction_HS1_DATA4 for crate::peripherals::GPIO16<'_> {}
+        impl OutputFunction_EMAC_CLK_OUT for crate::peripherals::GPIO16<'_> {}
+        impl OutputFunction_HS1_DATA5 for crate::peripherals::GPIO17<'_> {}
+        impl OutputFunction_EMAC_CLK_180 for crate::peripherals::GPIO17<'_> {}
+        impl OutputFunction_HS1_DATA7 for crate::peripherals::GPIO18<'_> {}
+        impl OutputFunction_EMAC_TXD0 for crate::peripherals::GPIO19<'_> {}
+        impl OutputFunction_EMAC_TX_EN for crate::peripherals::GPIO21<'_> {}
+        impl OutputFunction_EMAC_TXD1 for crate::peripherals::GPIO22<'_> {}
+        impl OutputFunction_HS1_STROBE for crate::peripherals::GPIO23<'_> {}
+    };
+}

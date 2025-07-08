@@ -742,3 +742,25 @@ macro_rules! define_io_mux_reg {
         }
     };
 }
+#[macro_export]
+#[doc(hidden)]
+macro_rules! implement_alternate_function_markers {
+    () => {
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTCK input function"]
+        pub trait InputFunction_MTCK {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTMS input function"]
+        pub trait InputFunction_MTMS {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTDI input function"]
+        pub trait InputFunction_MTDI {}
+        impl InputFunction_MTMS for crate::peripherals::GPIO4<'_> {}
+        impl InputFunction_MTDI for crate::peripherals::GPIO5<'_> {}
+        impl InputFunction_MTCK for crate::peripherals::GPIO6<'_> {}
+        #[instability::unstable]
+        #[doc = "Marker trait for pins that have the MTDO output function"]
+        pub trait OutputFunction_MTDO {}
+        impl OutputFunction_MTDO for crate::peripherals::GPIO7<'_> {}
+    };
+}

@@ -3,8 +3,8 @@
 
 use std::str::FromStr;
 
-use proc_macro2::TokenStream;
-use quote::format_ident;
+use proc_macro2::{Ident, TokenStream};
+use quote::{format_ident, quote};
 
 use crate::{cfg::Value, generate_for_each_macro, number};
 
@@ -164,77 +164,128 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .map(|pin| {
             let mut attrs = vec![];
             pin.kind.iter().for_each(|kind| match kind {
-                PinCapability::Input => attrs.push(quote::quote! { Input }),
-                PinCapability::Output => attrs.push(quote::quote! { Output }),
-                PinCapability::Analog => attrs.push(quote::quote! { Analog }),
+                PinCapability::Input => attrs.push(quote! { Input }),
+                PinCapability::Output => attrs.push(quote! { Output }),
+                PinCapability::Analog => attrs.push(quote! { Analog }),
                 PinCapability::Rtc => {
-                    attrs.push(quote::quote! { RtcIo });
+                    attrs.push(quote! { RtcIo });
                     if pin.kind.contains(&PinCapability::Output) {
-                        attrs.push(quote::quote! { RtcIoOutput });
+                        attrs.push(quote! { RtcIoOutput });
                     }
                 }
-                PinCapability::Touch => attrs.push(quote::quote! { Touch }),
-                PinCapability::UsbDm => attrs.push(quote::quote! { UsbDm }),
-                PinCapability::UsbDp => attrs.push(quote::quote! { UsbDp }),
-                PinCapability::UsbDevice => attrs.push(quote::quote! { UsbDevice }),
+                PinCapability::Touch => attrs.push(quote! { Touch }),
+                PinCapability::UsbDm => attrs.push(quote! { UsbDm }),
+                PinCapability::UsbDp => attrs.push(quote! { UsbDp }),
+                PinCapability::UsbDevice => attrs.push(quote! { UsbDevice }),
             });
 
             attrs
         })
         .collect::<Vec<_>>();
 
-    let pin_afs = gpio
+    let mut af_in_traits = vec![];
+    let mut af_out_traits = vec![];
+
+    fn signal_trait(kind: &str, signal: &str) -> TokenStream {
+        let doc = format!(
+            "Marker trait for pins that have the {} {} function",
+            signal,
+            kind.to_lowercase(), // "input" / "output"
+        );
+        let trait_name = format_ident!("{kind}Function_{signal}");
+
+        quote! {
+            #[instability::unstable]
+            #[doc = #doc]
+            pub trait #trait_name {}
+        }
+    }
+
+    fn signal_trait_impl(pin_peri: &Ident, kind: &str, signal: &str) -> TokenStream {
+        let trait_name = format_ident!("{kind}Function_{signal}");
+        quote! {
+            impl #trait_name for crate::peripherals::#pin_peri<'_> {}
+        }
+    }
+
+    for signal in gpio
         .pins_and_signals
-        .pins
+        .input_signals
         .iter()
-        .map(|pin| {
-            let mut input_afs = vec![];
-            let mut output_afs = vec![];
+        .filter_map(|s| s.id.is_none().then_some(&s.name))
+    {
+        af_in_traits.push(signal_trait("Input", &signal));
+    }
 
-            for af in 0..6 {
-                let Some(signal) = pin.alternate_functions.get(af) else {
-                    continue;
-                };
+    for signal in gpio
+        .pins_and_signals
+        .output_signals
+        .iter()
+        .filter_map(|s| s.id.is_none().then_some(&s.name))
+    {
+        af_out_traits.push(signal_trait("Output", &signal));
+    }
 
-                let af_variant = quote::format_ident!("_{af}");
-                let mut found = false;
+    let mut af_in_trait_impls = vec![];
+    let mut af_out_trait_impls = vec![];
 
-                // Is the signal present among the input signals?
-                if let Some(signal) = gpio
-                    .pins_and_signals
-                    .input_signals
-                    .iter()
-                    .find(|s| s.name == signal)
-                {
-                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    input_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                    found = true;
+    let pin_afs = gpio.pins_and_signals.pins.iter().map(|pin| {
+        let mut input_afs = vec![];
+        let mut output_afs = vec![];
+
+        let pin_peri = format_ident!("GPIO{}", pin.pin);
+
+        for af in 0..6 {
+            let Some(signal) = pin.alternate_functions.get(af) else {
+                continue;
+            };
+
+            let af_variant = format_ident!("_{af}");
+            let mut found = false;
+
+            // Is the signal present among the input signals?
+            if let Some(signal) = gpio
+                .pins_and_signals
+                .input_signals
+                .iter()
+                .find(|s| s.name == signal)
+            {
+                let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                input_afs.push(quote! { #af_variant => #signal_tokens });
+                found = true;
+
+                if signal.id.is_none() {
+                    af_in_trait_impls.push(signal_trait_impl(&pin_peri, "Input", &signal.name));
                 }
-
-                // Is the signal present among the output signals?
-                if let Some(signal) = gpio
-                    .pins_and_signals
-                    .output_signals
-                    .iter()
-                    .find(|s| s.name == signal)
-                {
-                    let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    output_afs.push(quote::quote! { #af_variant => #signal_tokens });
-                    found = true;
-                }
-
-                assert!(
-                    found,
-                    "Signal '{signal}' not found in input signals for GPIO pin {}",
-                    pin.pin
-                );
             }
 
-            quote::quote! {
-                ( #(#input_afs)* ) ( #(#output_afs)* )
+            // Is the signal present among the output signals?
+            if let Some(signal) = gpio
+                .pins_and_signals
+                .output_signals
+                .iter()
+                .find(|s| s.name == signal)
+            {
+                let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
+                output_afs.push(quote! { #af_variant => #signal_tokens });
+                found = true;
+
+                if signal.id.is_none() {
+                    af_out_trait_impls.push(signal_trait_impl(&pin_peri, "Output", &signal.name));
+                }
             }
-        })
-        .collect::<Vec<_>>();
+
+            assert!(
+                found,
+                "Signal '{signal}' not found in input signals for GPIO pin {}",
+                pin.pin
+            );
+        }
+
+        quote! {
+            ( #(#input_afs)* ) ( #(#output_afs)* )
+        }
+    });
 
     let io_mux_accessor = if gpio.remap_iomux_pin_registers {
         let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
@@ -242,10 +293,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             let reg = format_ident!("GPIO{pin}");
             let accessor = format_ident!("gpio{pin}");
 
-            quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
+            quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
         });
 
-        quote::quote! {
+        quote! {
             pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
                 use core::mem::transmute;
 
@@ -262,7 +313,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         }
     } else {
-        quote::quote! {
+        quote! {
             pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
                 crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
             }
@@ -278,16 +329,16 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         let mut branches = vec![];
 
         for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
-            branches.push(quote::quote! {
+            branches.push(quote! {
                 #( (#pin, #attr, $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
             });
 
-            branches.push(quote::quote! {
+            branches.push(quote! {
                 (#pin, $t:tt, $then_tt:tt else $else_tt:tt ) => { $else_tt };
             });
         }
 
-        quote::quote! {
+        quote! {
             #[macro_export]
             macro_rules! if_pin_is_type {
                 #(#branches)*
@@ -303,7 +354,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let impl_for_pin_type = {
         let mut impl_branches = vec![];
         for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
-            impl_branches.push(quote::quote! {
+            impl_branches.push(quote! {
                 #gpionum => if_pin_is_type!(#peri, $on_type, {{
                     #[allow(unused_unsafe, unused_mut)]
                     let mut $inner_ident = unsafe { crate::peripherals::#peri::steal() };
@@ -315,7 +366,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             });
         }
 
-        quote::quote! {
+        quote! {
             #[macro_export]
             #[expect(clippy::crate_in_macro_def)]
             macro_rules! impl_for_pin_type {
@@ -336,10 +387,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     for (((n, p), af), attrs) in pin_numbers
         .iter()
         .zip(pin_peris.iter())
-        .zip(pin_afs.iter())
+        .zip(pin_afs)
         .zip(pin_attrs.iter())
     {
-        branches.push(quote::quote! {
+        branches.push(quote! {
             #n, #p #af (#(#attrs)*)
         })
     }
@@ -348,7 +399,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
-    quote::quote! {
+    let af_in_traits = af_in_traits.iter();
+    let af_out_traits = af_out_traits.iter();
+
+    quote! {
         #for_each
 
         #if_pin_is_type
@@ -369,13 +423,25 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 #io_mux_accessor
             };
         }
+
+        #[macro_export]
+        #[doc(hidden)] // This macro is only needed because of https://github.com/rust-lang/rust/issues/127429, it's not intended to be called outside of esp-hal
+        macro_rules! implement_alternate_function_markers {
+            () => {
+                #(#af_in_traits)*
+                #(#af_in_trait_impls)*
+
+                #(#af_out_traits)*
+                #(#af_out_trait_impls)*
+            };
+        }
     }
 }
 
 fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
     if signals.is_empty() {
         // If there are no signals, we don't need to generate an enum.
-        return quote::quote! {};
+        return quote! {};
     }
     let mut variants = vec![];
 
@@ -387,7 +453,7 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
 
         let name = format_ident!("{}", signal.name);
         let value = number(id);
-        variants.push(quote::quote! {
+        variants.push(quote! {
             #name = #value,
         });
     }
@@ -399,14 +465,14 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
         };
 
         let name = format_ident!("{}", signal.name);
-        variants.push(quote::quote! {
+        variants.push(quote! {
             #name,
         });
     }
 
     let enum_name = format_ident!("{enum_name}");
 
-    quote::quote! {
+    quote! {
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[derive(Debug, PartialEq, Copy, Clone)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]
