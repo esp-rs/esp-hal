@@ -763,13 +763,11 @@ impl ConfigChooser {
     }
 
     pub fn run(&mut self, mut terminal: Terminal<impl Backend>) -> AppResult<Option<String>> {
-        let _ = event::read()?;
-
         loop {
             self.draw(&mut terminal)?;
 
             if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Release {
+                if key.kind == KeyEventKind::Press {
                     match key.code {
                         KeyCode::Char('q') => return Ok(None),
                         KeyCode::Esc => return Ok(None),
