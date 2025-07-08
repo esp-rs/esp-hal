@@ -6,7 +6,7 @@ use std::str::FromStr;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 
-use crate::{generate_for_each_macro, number};
+use crate::{cfg::Value, generate_for_each_macro, number};
 
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
 /// These don't get turned into symbols, but are used to generate code.
@@ -115,6 +115,31 @@ pub(crate) struct IoMuxSignal {
     /// GPIO matrix.
     #[serde(default)]
     pub id: Option<usize>,
+}
+
+impl super::GpioProperties {
+    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, Value)> {
+        let input_max = self
+            .pins_and_signals
+            .input_signals
+            .iter()
+            .filter_map(|s| s.id)
+            .max()
+            .unwrap_or(0) as u32;
+        let output_max = self
+            .pins_and_signals
+            .output_signals
+            .iter()
+            .filter_map(|s| s.id)
+            .max()
+            .unwrap_or(0) as u32;
+
+        [
+            ("gpio.input_signal_max", Value::Number(input_max)),
+            ("gpio.output_signal_max", Value::Number(output_max)),
+        ]
+        .into_iter()
+    }
 }
 
 pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {

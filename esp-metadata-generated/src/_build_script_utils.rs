@@ -224,12 +224,12 @@ impl Chip {
                     "uart_uart2",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
-                    "gpio_input_signal_max=\"206\"",
-                    "gpio_output_signal_max=\"256\"",
                     "gpio_constant_0_input=\"48\"",
                     "gpio_constant_1_input=\"56\"",
                     "gpio_remap_iomux_pin_registers",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"206\"",
+                    "gpio_output_signal_max=\"256\"",
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
                     "i2c_master_max_bus_timeout=\"1048575\"",
@@ -366,12 +366,12 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart2",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"206\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"48\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
                     "cargo:rustc-cfg=gpio_remap_iomux_pin_registers",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"206\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"1048575\"",
@@ -471,11 +471,11 @@ impl Chip {
                     "uart_uart1",
                     "assist_debug_has_sp_monitor",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"100\"",
-                    "gpio_output_signal_max=\"128\"",
                     "gpio_constant_0_input=\"31\"",
                     "gpio_constant_1_input=\"30\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"100\"",
+                    "gpio_output_signal_max=\"128\"",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_hw_bus_clear",
                     "i2c_master_has_bus_timeout_enable",
@@ -573,11 +573,11 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"100\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"30\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"100\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
@@ -697,11 +697,11 @@ impl Chip {
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"100\"",
-                    "gpio_output_signal_max=\"128\"",
                     "gpio_constant_0_input=\"31\"",
                     "gpio_constant_1_input=\"30\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"100\"",
+                    "gpio_output_signal_max=\"128\"",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_hw_bus_clear",
                     "i2c_master_has_bus_timeout_enable",
@@ -819,11 +819,11 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"100\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"30\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"100\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
@@ -993,11 +993,11 @@ impl Chip {
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"124\"",
-                    "gpio_output_signal_max=\"128\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"124\"",
+                    "gpio_output_signal_max=\"128\"",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_hw_bus_clear",
                     "i2c_master_has_bus_timeout_enable",
@@ -1166,11 +1166,11 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"124\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"124\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
@@ -1322,11 +1322,11 @@ impl Chip {
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"124\"",
-                    "gpio_output_signal_max=\"128\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"124\"",
+                    "gpio_output_signal_max=\"128\"",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_hw_bus_clear",
                     "i2c_master_has_bus_timeout_enable",
@@ -1473,11 +1473,11 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"124\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"124\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"128\"",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
@@ -1623,11 +1623,11 @@ impl Chip {
                     "uart_uart1",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"204\"",
-                    "gpio_output_signal_max=\"256\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"242\"",
+                    "gpio_output_signal_max=\"256\"",
                     "i2c_master_has_bus_timeout_enable",
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_has_arbitration_en",
@@ -1766,11 +1766,11 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"204\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"242\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
@@ -1929,11 +1929,11 @@ impl Chip {
                     "assist_debug_has_region_monitor",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
-                    "gpio_input_signal_max=\"189\"",
-                    "gpio_output_signal_max=\"256\"",
                     "gpio_constant_0_input=\"60\"",
                     "gpio_constant_1_input=\"56\"",
                     "gpio_func_in_sel_offset=\"0\"",
+                    "gpio_input_signal_max=\"255\"",
+                    "gpio_output_signal_max=\"256\"",
                     "i2c_master_has_fsm_timeouts",
                     "i2c_master_has_hw_bus_clear",
                     "i2c_master_has_bus_timeout_enable",
@@ -2092,11 +2092,11 @@ impl Chip {
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
-                    "cargo:rustc-cfg=gpio_input_signal_max=\"189\"",
-                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
                     "cargo:rustc-cfg=gpio_constant_1_input=\"56\"",
                     "cargo:rustc-cfg=gpio_func_in_sel_offset=\"0\"",
+                    "cargo:rustc-cfg=gpio_input_signal_max=\"255\"",
+                    "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=i2c_master_has_fsm_timeouts",
                     "cargo:rustc-cfg=i2c_master_has_hw_bus_clear",
                     "cargo:rustc-cfg=i2c_master_has_bus_timeout_enable",
@@ -2383,31 +2383,31 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
         println!("cargo:rustc-check-cfg=cfg(octal_psram)");
         println!("cargo:rustc-check-cfg=cfg(camera)");
-        println!("cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"60\"))");
-        println!(
-            "cargo:rustc-check-cfg=cfg(i2c_master_max_bus_timeout, values(\"1048575\",\"31\",\"16777215\"))"
-        );
-        println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\"))");
-        println!(
-            "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
-        );
-        println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
-        println!("cargo:rustc-check-cfg=cfg(gpio_func_in_sel_offset, values(\"0\"))");
-        println!("cargo:rustc-check-cfg=cfg(i2c_master_fifo_size, values(\"32\",\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(gpio_gpio_function, values(\"2\",\"1\"))");
+        println!("cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"60\"))");
+        println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\"))");
+        println!("cargo:rustc-check-cfg=cfg(gpio_func_in_sel_offset, values(\"0\"))");
         println!(
-            "cargo:rustc-check-cfg=cfg(interrupts_status_registers, values(\"3\",\"2\",\"4\"))"
+            "cargo:rustc-check-cfg=cfg(gpio_input_signal_max, values(\"206\",\"100\",\"124\",\"242\",\"255\"))"
         );
         println!("cargo:rustc-check-cfg=cfg(gpio_output_signal_max, values(\"256\",\"128\"))");
         println!(
             "cargo:rustc-check-cfg=cfg(i2c_master_i2c0_data_register_ahb_address, values(\"1610690588\"))"
         );
         println!(
-            "cargo:rustc-check-cfg=cfg(i2c_master_ll_intr_mask, values(\"262143\",\"131071\"))"
+            "cargo:rustc-check-cfg=cfg(i2c_master_max_bus_timeout, values(\"1048575\",\"31\",\"16777215\"))"
         );
         println!(
-            "cargo:rustc-check-cfg=cfg(gpio_input_signal_max, values(\"206\",\"100\",\"124\",\"204\",\"189\"))"
+            "cargo:rustc-check-cfg=cfg(i2c_master_ll_intr_mask, values(\"262143\",\"131071\"))"
         );
+        println!("cargo:rustc-check-cfg=cfg(i2c_master_fifo_size, values(\"32\",\"16\"))");
+        println!(
+            "cargo:rustc-check-cfg=cfg(interrupts_status_registers, values(\"3\",\"2\",\"4\"))"
+        );
+        println!(
+            "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
+        );
+        println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
         for cfg in self.cfgs {
             println!("{cfg}");
         }

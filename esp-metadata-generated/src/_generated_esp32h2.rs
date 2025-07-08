@@ -38,18 +38,6 @@ macro_rules! property {
     ("gpio.gpio_function", str) => {
         stringify!(1)
     };
-    ("gpio.input_signal_max") => {
-        124
-    };
-    ("gpio.input_signal_max", str) => {
-        stringify!(124)
-    };
-    ("gpio.output_signal_max") => {
-        128
-    };
-    ("gpio.output_signal_max", str) => {
-        stringify!(128)
-    };
     ("gpio.constant_0_input") => {
         60
     };
@@ -70,6 +58,18 @@ macro_rules! property {
     };
     ("gpio.func_in_sel_offset", str) => {
         stringify!(0)
+    };
+    ("gpio.input_signal_max") => {
+        124
+    };
+    ("gpio.input_signal_max", str) => {
+        stringify!(124)
+    };
+    ("gpio.output_signal_max") => {
+        128
+    };
+    ("gpio.output_signal_max", str) => {
+        stringify!(128)
     };
     ("i2c_master.has_fsm_timeouts") => {
         true

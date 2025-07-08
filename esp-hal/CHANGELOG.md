@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
 - The functions of the `RadioClockController` have been split up to the modem peripheral structs. The clock management is now provided by the `ModemClockController`. (#3687)
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
+- Added the feature `requires-unstable` (#3772)
 
 ### Changed
 

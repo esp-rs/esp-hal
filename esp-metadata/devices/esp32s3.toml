@@ -126,8 +126,6 @@ has_region_monitor = true
 support_status = "supported"
 has_bank_1 = true
 gpio_function = 1
-input_signal_max = 189
-output_signal_max = 256
 constant_0_input = 0x3c
 constant_1_input = 0x38
 pins = [
@@ -334,6 +332,21 @@ input_signals = [
     { name = "SDHOST_CDATA_IN_25",      id = 218 },
     { name = "SDHOST_CDATA_IN_26",      id = 219 },
     { name = "SDHOST_CDATA_IN_27",      id = 220 },
+    
+    { name = "PRO_ALONEGPIO_IN0",      id = 221 },
+    { name = "PRO_ALONEGPIO_IN1",      id = 222 },
+    { name = "PRO_ALONEGPIO_IN2",      id = 223 },
+    { name = "PRO_ALONEGPIO_IN3",      id = 224 },
+    { name = "PRO_ALONEGPIO_IN4",      id = 225 },
+    { name = "PRO_ALONEGPIO_IN5",      id = 226 },
+    { name = "PRO_ALONEGPIO_IN6",      id = 227 },
+    { name = "PRO_ALONEGPIO_IN7",      id = 228 },
+    
+    { name = "USB_JTAG_TDO_BRIDGE",   id = 251 },
+    { name = "CORE1_GPIO_IN3",        id = 252 },
+    { name = "CORE1_GPIO_IN4",        id = 253 },
+    { name = "CORE1_GPIO_IN5",        id = 254 },
+    { name = "CORE1_GPIO_IN6",        id = 255 },
 
     { name = "SPIIO4" },
     { name = "SPIIO5" },
@@ -502,6 +515,22 @@ output_signals = [
     { name = "SDHOST_CDATA_OUT_25",        id = 218 },
     { name = "SDHOST_CDATA_OUT_26",        id = 219 },
     { name = "SDHOST_CDATA_OUT_27",        id = 220 },
+    
+    { name = "PRO_ALONEGPIO_OUT0",      id = 221 },
+    { name = "PRO_ALONEGPIO_OUT1",      id = 222 },
+    { name = "PRO_ALONEGPIO_OUT2",      id = 223 },
+    { name = "PRO_ALONEGPIO_OUT3",      id = 224 },
+    { name = "PRO_ALONEGPIO_OUT4",      id = 225 },
+    { name = "PRO_ALONEGPIO_OUT5",      id = 226 },
+    { name = "PRO_ALONEGPIO_OUT6",      id = 227 },
+    { name = "PRO_ALONEGPIO_OUT7",      id = 228 },
+    
+    { name = "USB_JTAG_TRST",           id = 251 },
+    { name = "CORE1_GPIO_OUT3",         id = 252 },
+    { name = "CORE1_GPIO_OUT4",         id = 253 },
+    { name = "CORE1_GPIO_OUT5",         id = 254 },
+    { name = "CORE1_GPIO_OUT6",         id = 255 },
+    
     { name = "GPIO",                       id = 256 },
 
     { name = "SPIIO4" },
