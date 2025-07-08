@@ -8,7 +8,7 @@
 //!
 //! Note that this crate currently requires you to enable the `unstable` feature
 //! on `esp-hal`.
-//! 
+//!
 //! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
 //! things will break.
 //!
