@@ -224,6 +224,8 @@ unstable = [
 
 ## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
 ## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
 requires-unstable = []
 
 [lints.clippy]
