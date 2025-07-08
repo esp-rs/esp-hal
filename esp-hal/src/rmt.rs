@@ -1061,11 +1061,12 @@ where
         status
     }
 
-    /// Check transmission status and write new data to the hardware if
-    /// necessary.
-    ///
-    /// Returns whether transmission has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately.
+    // Check transmission status and write new data to the hardware if
+    // necessary.
+    //
+    // Returns whether transmission has ended (whether successfully or with an
+    // error). In that case, a subsequent call to `wait()` returns immediately.
+    #[doc(hidden)]
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn poll(&mut self) -> bool {
         match self.poll_internal() {
@@ -1353,10 +1354,11 @@ impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
         status
     }
 
-    /// Check receive status
-    ///
-    /// Returns whether reception has ended (whether successfully or with an
-    /// error). In that case, a subsequent call to `wait()` returns immediately.
+    // Check receive status
+    //
+    // Returns whether reception has ended (whether successfully or with an
+    // error). In that case, a subsequent call to `wait()` returns immediately.
+    #[doc(hidden)]
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn poll(&mut self) -> bool {
         match self.poll_internal() {
