@@ -2,10 +2,11 @@
 mod cfg;
 
 use core::str::FromStr;
-use std::{collections::HashMap, fmt::Write, sync::OnceLock};
+use std::{fmt::Write, sync::OnceLock};
 
 use anyhow::{Result, bail, ensure};
 use cfg::PeriConfig;
+use indexmap::IndexMap;
 pub use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use strum::IntoEnumIterator;
@@ -197,7 +198,7 @@ impl Chip {
         // Used by our documentation builds to prevent the huge red warning banner.
         cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
 
-        let mut cfg_values: HashMap<String, Vec<String>> = HashMap::new();
+        let mut cfg_values: IndexMap<String, Vec<String>> = IndexMap::new();
 
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
@@ -253,7 +254,7 @@ pub struct PeripheralDef {
     is_virtual: bool,
     /// List of related interrupt signals
     #[serde(default)]
-    interrupts: HashMap<String, String>,
+    interrupts: IndexMap<String, String>,
 }
 
 impl PeripheralDef {
