@@ -24,7 +24,6 @@ The possible configuration values are output as a markdown table in the crates `
 
 | Name                                | Description                                         | Default value |
 | ----------------------------------- | --------------------------------------------------- | ------------- |
-| **ESP_HAL_PLACE_RMT_DRIVER_IN_RAM** | Places the RMT driver in RAM for better performance | false         |
 | **ESP_HAL_PLACE_SPI_DRIVER_IN_RAM** | Places the SPI driver in RAM for better performance | false         |
 
 ### Setting configuration options
