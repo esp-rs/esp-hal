@@ -599,7 +599,6 @@ impl Widget for &mut App<'_> {
                 .style(self.colors.edit_invalid_style)
                 .block(
                     Block::bordered()
-                        .title("Validation Error")
                         .style(self.colors.border_error_style)
                         .padding(Padding::uniform(1)),
                 );
@@ -738,4 +737,120 @@ pub(super) fn validate_config(config: &CrateConfig) -> Result<(), String> {
         return Err(error.to_string());
     }
     Ok(())
+}
+
+pub struct ConfigChooser {
+    config_files: Vec<String>,
+    state: ListState,
+    colors: Colors,
+}
+
+impl ConfigChooser {
+    pub fn new(config_files: Vec<String>) -> Self {
+        let colors = match std::env::var("TERM_PROGRAM").as_deref() {
+            Ok("vscode") => Colors::RGB,
+            Ok("Apple_Terminal") => Colors::ANSI,
+            _ => Colors::RGB,
+        };
+
+        let state = ListState::default().with_selected(Some(0));
+
+        Self {
+            config_files,
+            state,
+            colors,
+        }
+    }
+
+    pub fn run(&mut self, mut terminal: Terminal<impl Backend>) -> AppResult<Option<String>> {
+        loop {
+            self.draw(&mut terminal)?;
+
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') => return Ok(None),
+                        KeyCode::Esc => return Ok(None),
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            self.state.select_next();
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            self.state.select_previous();
+                        }
+                        KeyCode::Enter => {
+                            let selected = self.state.selected().unwrap_or_default();
+                            return Ok(Some(self.config_files[selected].clone()));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw(&mut self, terminal: &mut Terminal<impl Backend>) -> AppResult<()> {
+        terminal.draw(|f| {
+            f.render_widget(self, f.area());
+        })?;
+
+        Ok(())
+    }
+}
+
+impl Widget for &mut ConfigChooser {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let vertical = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Fill(1),
+            Constraint::Length(1),
+        ]);
+        let [header_area, rest_area, footer_area] = vertical.areas(area);
+
+        Paragraph::new("esp-config")
+            .bold()
+            .centered()
+            .render(header_area, buf);
+
+        Paragraph::new("Choose a config to edit")
+            .bold()
+            .centered()
+            .render(footer_area, buf);
+
+        // We create two blocks, one is for the header (outer) and the other is for the
+        // list (inner).
+        let outer_block = Block::default()
+            .borders(Borders::NONE)
+            .fg(self.colors.text_color)
+            .bg(self.colors.header_bg)
+            .title_alignment(Alignment::Center);
+        let inner_block = Block::default()
+            .borders(Borders::NONE)
+            .fg(self.colors.text_color)
+            .bg(self.colors.normal_row_color);
+
+        // We get the inner area from outer_block. We'll use this area later to render
+        // the table.
+        let outer_area = rest_area;
+        let inner_area = outer_block.inner(outer_area);
+
+        // We can render the header in outer_area.
+        outer_block.render(outer_area, buf);
+
+        // Iterate through all elements in the `items` and stylize them.
+        let items: Vec<ListItem> = self
+            .config_files
+            .iter()
+            .map(|value| ListItem::new(value.as_str()).style(Style::default()))
+            .collect();
+
+        // We can now render the item list
+        // (look carefully, we are using StatefulWidget's render.)
+        // ratatui::widgets::StatefulWidget::render as stateful_render
+        let state = &mut self.state;
+        let list_widget = List::new(items)
+            .block(inner_block)
+            .highlight_style(self.colors.selected_active_style)
+            .highlight_spacing(HighlightSpacing::Always);
+        StatefulWidget::render(list_widget, inner_area, buf, state);
+    }
 }
