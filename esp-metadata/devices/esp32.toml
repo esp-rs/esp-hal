@@ -148,7 +148,7 @@ pins = [
     { pin = 25, kind = ["input", "output"], functions = {                            5 = "EMAC_RXD0"  }, analog = { 0 = "DAC1",       1 = "ADC2_CH8"               }, rtc = { 0 = "RTC_GPIO6" } },
     { pin = 26, kind = ["input", "output"], functions = {                            5 = "EMAC_RXD1"  }, analog = { 0 = "DAC2",       1 = "ADC2_CH9"               }, rtc = { 0 = "RTC_GPIO7" } },
     { pin = 27, kind = ["input", "output"], functions = {                            5 = "EMAC_RX_DV" }, analog = {                   1 = "ADC2_CH7", 2 = "TOUCH7" }, rtc = { 0 = "RTC_GPIO17" } },
-    { pin = 32, kind = ["input", "output"],                                                              analog = { 0 = "XTAL_32K_P", 1 = "ADC1_CH4", 2 = "TOUCH9" }, rtc = { 0 = "RTC_GPIOö" } },
+    { pin = 32, kind = ["input", "output"],                                                              analog = { 0 = "XTAL_32K_P", 1 = "ADC1_CH4", 2 = "TOUCH9" }, rtc = { 0 = "RTC_GPIO9" } },
     { pin = 33, kind = ["input", "output"],                                                              analog = { 0 = "XTAL_32K_N", 1 = "ADC1_CH5", 2 = "TOUCH8" }, rtc = { 0 = "RTC_GPIO8" } },
     { pin = 34, kind = ["input"],                                                                        analog = {                   1 = "ADC1_CH6"               }, rtc = { 0 = "RTC_GPIO4" } },
     { pin = 35, kind = ["input"],                                                                        analog = {                   1 = "ADC1_CH7"               }, rtc = { 0 = "RTC_GPIO5" } },
