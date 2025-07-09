@@ -30,7 +30,7 @@ cfg_if::cfg_if! {
 pub enum Resolution {
     /// 13-bit resolution
     #[default]
-    Resolution13Bit,
+    Resolution12Bit,
 }
 
 impl<ADCI> AdcConfig<ADCI>
