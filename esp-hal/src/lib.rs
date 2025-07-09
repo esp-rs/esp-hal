@@ -599,10 +599,8 @@ pub struct Config {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// #
 /// use esp_hal::{Config, init};
 /// let peripherals = init(Config::default());
-/// #
 /// # {after_snippet}
 /// ```
 pub fn init(config: Config) -> Peripherals {

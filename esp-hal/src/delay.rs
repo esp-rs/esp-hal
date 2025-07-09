@@ -20,8 +20,8 @@
 //! ### Delay for 1 second
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::delay::Delay;
-//! # use embedded_hal::delay::DelayNs;
+//! use embedded_hal::delay::DelayNs;
+//! use esp_hal::delay::Delay;
 //! let mut delay = Delay::new();
 //!
 //! delay.delay_ms(1000 as u32);

@@ -17,7 +17,6 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! let peripherals = esp_hal::init(esp_hal::Config::default());
-//! #
 //! # {after_snippet}
 //! ```
 //!
@@ -25,14 +24,12 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! use esp_hal::{clock::CpuClock, time::Duration};
-//!
 //! let config = esp_hal::Config::default()
 //!     .with_cpu_clock(CpuClock::max())
 //!     .with_watchdog(esp_hal::config::WatchdogConfig::default().with_rwdt(
 //!         esp_hal::config::WatchdogStatus::Enabled(Duration::from_millis(1000u64)),
 //!     ));
 //! let peripherals = esp_hal::init(config);
-//! #
 //! # {after_snippet}
 //! ```
 

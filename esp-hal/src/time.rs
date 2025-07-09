@@ -246,7 +246,9 @@ impl Instant {
     /// The counter won’t measure time in sleep-mode.
     ///
     /// The timer has a 1 microsecond resolution and will wrap after
-    ///
+    #[cfg_attr(esp32, doc = "36_558 years")]
+    #[cfg_attr(esp32s2, doc = "7_311 years")]
+    #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
     /// ## Example
     ///
     /// ```rust, no_run
@@ -255,9 +257,6 @@ impl Instant {
     /// let now = Instant::now();
     /// # {after_snippet}
     /// ```
-    #[cfg_attr(esp32, doc = "36_558 years")]
-    #[cfg_attr(esp32s2, doc = "7_311 years")]
-    #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
     #[inline]
     pub fn now() -> Self {
         now()
