@@ -268,16 +268,14 @@ macro_rules! for_each_peripheral {
 macro_rules! for_each_gpio {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((0, GPIO0() () (Input Output Analog RtcIo RtcIoOutput)));
-        _for_each_inner!((1, GPIO1() () (Input Output Analog RtcIo RtcIoOutput)));
-        _for_each_inner!((2, GPIO2(_2 => FSPIQ) (_2 => FSPIQ) (Input Output Analog RtcIo
-        RtcIoOutput))); _for_each_inner!((3, GPIO3() () (Input Output Analog RtcIo
-        RtcIoOutput))); _for_each_inner!((4, GPIO4(_0 => MTMS _2 => FSPIHD) (_2 =>
-        FSPIHD) (Input Output Analog RtcIo RtcIoOutput))); _for_each_inner!((5, GPIO5(_0
-        => MTDI _2 => FSPIWP) (_2 => FSPIWP) (Input Output Analog RtcIo RtcIoOutput)));
-        _for_each_inner!((6, GPIO6(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK) (Input
-        Output))); _for_each_inner!((7, GPIO7(_2 => FSPID) (_0 => MTDO _2 => FSPID)
-        (Input Output))); _for_each_inner!((8, GPIO8() () (Input Output)));
+        _for_each_inner!((0, GPIO0() () (Input Output))); _for_each_inner!((1, GPIO1() ()
+        (Input Output))); _for_each_inner!((2, GPIO2(_2 => FSPIQ) (_2 => FSPIQ) (Input
+        Output))); _for_each_inner!((3, GPIO3() () (Input Output))); _for_each_inner!((4,
+        GPIO4(_0 => MTMS _2 => FSPIHD) (_2 => FSPIHD) (Input Output)));
+        _for_each_inner!((5, GPIO5(_0 => MTDI _2 => FSPIWP) (_2 => FSPIWP) (Input
+        Output))); _for_each_inner!((6, GPIO6(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK)
+        (Input Output))); _for_each_inner!((7, GPIO7(_2 => FSPID) (_0 => MTDO _2 =>
+        FSPID) (Input Output))); _for_each_inner!((8, GPIO8() () (Input Output)));
         _for_each_inner!((9, GPIO9() () (Input Output))); _for_each_inner!((10, GPIO10()
         () (Input Output))); _for_each_inner!((11, GPIO11(_0 => SPIHD) (_0 => SPIHD)
         (Input Output))); _for_each_inner!((12, GPIO12(_0 => SPIHD) (_0 => SPIHD) (Input
@@ -288,22 +286,20 @@ macro_rules! for_each_gpio {
         _for_each_inner!((17, GPIO17(_0 => SPIQ) (_0 => SPIQ) (Input Output)));
         _for_each_inner!((18, GPIO18() () (Input Output))); _for_each_inner!((19,
         GPIO19(_0 => U0RXD) () (Input Output))); _for_each_inner!((20, GPIO20() (_0 =>
-        U0TXD) (Input Output))); _for_each_inner!((all(0, GPIO0() () (Input Output Analog
-        RtcIo RtcIoOutput)), (1, GPIO1() () (Input Output Analog RtcIo RtcIoOutput)), (2,
-        GPIO2(_2 => FSPIQ) (_2 => FSPIQ) (Input Output Analog RtcIo RtcIoOutput)), (3,
-        GPIO3() () (Input Output Analog RtcIo RtcIoOutput)), (4, GPIO4(_0 => MTMS _2 =>
-        FSPIHD) (_2 => FSPIHD) (Input Output Analog RtcIo RtcIoOutput)), (5, GPIO5(_0 =>
-        MTDI _2 => FSPIWP) (_2 => FSPIWP) (Input Output Analog RtcIo RtcIoOutput)), (6,
-        GPIO6(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK) (Input Output)), (7, GPIO7(_2 =>
-        FSPID) (_0 => MTDO _2 => FSPID) (Input Output)), (8, GPIO8() () (Input Output)),
-        (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input Output)), (11, GPIO11(_0
-        => SPIHD) (_0 => SPIHD) (Input Output)), (12, GPIO12(_0 => SPIHD) (_0 => SPIHD)
-        (Input Output)), (13, GPIO13(_0 => SPIWP) (_0 => SPIWP) (Input Output)), (14,
-        GPIO14() (_0 => SPICS0) (Input Output)), (15, GPIO15() (_0 => SPICLK) (Input
-        Output)), (16, GPIO16(_0 => SPID) (_0 => SPID) (Input Output)), (17, GPIO17(_0 =>
-        SPIQ) (_0 => SPIQ) (Input Output)), (18, GPIO18() () (Input Output)), (19,
-        GPIO19(_0 => U0RXD) () (Input Output)), (20, GPIO20() (_0 => U0TXD) (Input
-        Output))));
+        U0TXD) (Input Output))); _for_each_inner!((all(0, GPIO0() () (Input Output)), (1,
+        GPIO1() () (Input Output)), (2, GPIO2(_2 => FSPIQ) (_2 => FSPIQ) (Input Output)),
+        (3, GPIO3() () (Input Output)), (4, GPIO4(_0 => MTMS _2 => FSPIHD) (_2 => FSPIHD)
+        (Input Output)), (5, GPIO5(_0 => MTDI _2 => FSPIWP) (_2 => FSPIWP) (Input
+        Output)), (6, GPIO6(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK) (Input Output)),
+        (7, GPIO7(_2 => FSPID) (_0 => MTDO _2 => FSPID) (Input Output)), (8, GPIO8() ()
+        (Input Output)), (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input
+        Output)), (11, GPIO11(_0 => SPIHD) (_0 => SPIHD) (Input Output)), (12, GPIO12(_0
+        => SPIHD) (_0 => SPIHD) (Input Output)), (13, GPIO13(_0 => SPIWP) (_0 => SPIWP)
+        (Input Output)), (14, GPIO14() (_0 => SPICS0) (Input Output)), (15, GPIO15() (_0
+        => SPICLK) (Input Output)), (16, GPIO16(_0 => SPID) (_0 => SPID) (Input Output)),
+        (17, GPIO17(_0 => SPIQ) (_0 => SPIQ) (Input Output)), (18, GPIO18() () (Input
+        Output)), (19, GPIO19(_0 => U0RXD) () (Input Output)), (20, GPIO20() (_0 =>
+        U0TXD) (Input Output))));
     };
 }
 #[macro_export]
@@ -312,15 +308,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO0, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO0, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO0, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO0, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO0, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -332,15 +319,6 @@ macro_rules! if_pin_is_type {
     (GPIO1, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO1, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO1, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO1, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO1, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -348,15 +326,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO2, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO2, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO2, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO2, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO2, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -368,15 +337,6 @@ macro_rules! if_pin_is_type {
     (GPIO3, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO3, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO3, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO3, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO3, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -386,15 +346,6 @@ macro_rules! if_pin_is_type {
     (GPIO4, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO4, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO4, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO4, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO4, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -402,15 +353,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO5, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO5, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO5, RtcIo, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO5, RtcIoOutput, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO5, $t:tt, $then_tt:tt else $else_tt:tt) => {

@@ -329,38 +329,37 @@ macro_rules! for_each_peripheral {
 macro_rules! for_each_gpio {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output Analog)));
-        _for_each_inner!((1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output
-        Analog))); _for_each_inner!((2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP)
-        (Input Output Analog))); _for_each_inner!((3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2
-        => FSPIHD) (Input Output Analog))); _for_each_inner!((4, GPIO4(_0 => MTCK _2 =>
-        FSPICLK) (_2 => FSPICLK) (Input Output Analog))); _for_each_inner!((5, GPIO5(_2
-        => FSPID) (_0 => MTDO _2 => FSPID) (Input Output Analog))); _for_each_inner!((6,
-        GPIO6() () (Input Output))); _for_each_inner!((7, GPIO7() () (Input Output)));
-        _for_each_inner!((8, GPIO8() () (Input Output))); _for_each_inner!((9, GPIO9() ()
-        (Input Output))); _for_each_inner!((10, GPIO10() () (Input Output)));
-        _for_each_inner!((11, GPIO11() () (Input Output))); _for_each_inner!((12,
-        GPIO12() () (Input Output))); _for_each_inner!((13, GPIO13() () (Input Output)));
-        _for_each_inner!((14, GPIO14() () (Input Output))); _for_each_inner!((22,
-        GPIO22() () (Input Output))); _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2 =>
-        FSPICS1) (Input Output))); _for_each_inner!((24, GPIO24() (_0 => U0TXD _2 =>
-        FSPICS2) (Input Output))); _for_each_inner!((25, GPIO25() (_2 => FSPICS3) (Input
-        Output))); _for_each_inner!((26, GPIO26() (_2 => FSPICS4) (Input Output
-        UsbDevice))); _for_each_inner!((27, GPIO27() (_2 => FSPICS5) (Input Output
-        UsbDevice))); _for_each_inner!((all(0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input
-        Output Analog)), (1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output Analog)),
-        (2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP) (Input Output Analog)), (3,
-        GPIO3(_0 => MTDI _2 => FSPIHD) (_2 => FSPIHD) (Input Output Analog)), (4,
-        GPIO4(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK) (Input Output Analog)), (5,
-        GPIO5(_2 => FSPID) (_0 => MTDO _2 => FSPID) (Input Output Analog)), (6, GPIO6()
-        () (Input Output)), (7, GPIO7() () (Input Output)), (8, GPIO8() () (Input
-        Output)), (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input Output)), (11,
-        GPIO11() () (Input Output)), (12, GPIO12() () (Input Output)), (13, GPIO13() ()
-        (Input Output)), (14, GPIO14() () (Input Output)), (22, GPIO22() () (Input
-        Output)), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)), (24, GPIO24()
-        (_0 => U0TXD _2 => FSPICS2) (Input Output)), (25, GPIO25() (_2 => FSPICS3) (Input
-        Output)), (26, GPIO26() (_2 => FSPICS4) (Input Output UsbDevice)), (27, GPIO27()
-        (_2 => FSPICS5) (Input Output UsbDevice))));
+        _for_each_inner!((0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output)));
+        _for_each_inner!((1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output)));
+        _for_each_inner!((2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP) (Input
+        Output))); _for_each_inner!((3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2 => FSPIHD)
+        (Input Output))); _for_each_inner!((4, GPIO4(_0 => MTCK _2 => FSPICLK) (_2 =>
+        FSPICLK) (Input Output))); _for_each_inner!((5, GPIO5(_2 => FSPID) (_0 => MTDO _2
+        => FSPID) (Input Output))); _for_each_inner!((6, GPIO6() () (Input Output)));
+        _for_each_inner!((7, GPIO7() () (Input Output))); _for_each_inner!((8, GPIO8() ()
+        (Input Output))); _for_each_inner!((9, GPIO9() () (Input Output)));
+        _for_each_inner!((10, GPIO10() () (Input Output))); _for_each_inner!((11,
+        GPIO11() () (Input Output))); _for_each_inner!((12, GPIO12() () (Input Output)));
+        _for_each_inner!((13, GPIO13() () (Input Output))); _for_each_inner!((14,
+        GPIO14() () (Input Output))); _for_each_inner!((22, GPIO22() () (Input Output)));
+        _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)));
+        _for_each_inner!((24, GPIO24() (_0 => U0TXD _2 => FSPICS2) (Input Output)));
+        _for_each_inner!((25, GPIO25() (_2 => FSPICS3) (Input Output)));
+        _for_each_inner!((26, GPIO26() (_2 => FSPICS4) (Input Output)));
+        _for_each_inner!((27, GPIO27() (_2 => FSPICS5) (Input Output)));
+        _for_each_inner!((all(0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output)), (1,
+        GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output)), (2, GPIO2(_0 => MTMS _2 =>
+        FSPIWP) (_2 => FSPIWP) (Input Output)), (3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2 =>
+        FSPIHD) (Input Output)), (4, GPIO4(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK)
+        (Input Output)), (5, GPIO5(_2 => FSPID) (_0 => MTDO _2 => FSPID) (Input Output)),
+        (6, GPIO6() () (Input Output)), (7, GPIO7() () (Input Output)), (8, GPIO8() ()
+        (Input Output)), (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input
+        Output)), (11, GPIO11() () (Input Output)), (12, GPIO12() () (Input Output)),
+        (13, GPIO13() () (Input Output)), (14, GPIO14() () (Input Output)), (22, GPIO22()
+        () (Input Output)), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)),
+        (24, GPIO24() (_0 => U0TXD _2 => FSPICS2) (Input Output)), (25, GPIO25() (_2 =>
+        FSPICS3) (Input Output)), (26, GPIO26() (_2 => FSPICS4) (Input Output)), (27,
+        GPIO27() (_2 => FSPICS5) (Input Output))));
     };
 }
 #[macro_export]
@@ -369,9 +368,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO0, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO0, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO0, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -383,9 +379,6 @@ macro_rules! if_pin_is_type {
     (GPIO1, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO1, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO1, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -393,9 +386,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO2, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO2, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO2, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -407,9 +397,6 @@ macro_rules! if_pin_is_type {
     (GPIO3, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO3, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO3, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -419,9 +406,6 @@ macro_rules! if_pin_is_type {
     (GPIO4, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO4, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO4, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -429,9 +413,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO5, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO5, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO5, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -560,9 +541,6 @@ macro_rules! if_pin_is_type {
     (GPIO26, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO26, UsbDevice, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO26, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -570,9 +548,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO27, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO27, UsbDevice, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO27, $t:tt, $then_tt:tt else $else_tt:tt) => {

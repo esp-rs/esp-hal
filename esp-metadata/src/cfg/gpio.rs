@@ -34,6 +34,14 @@ pub(crate) struct PinConfig {
     /// Available IO MUX functions for this pin.
     #[serde(default)]
     pub functions: FunctionMap,
+
+    /// Available analog functions for this pin.
+    #[serde(default)]
+    pub analog: AnalogMap,
+
+    /// Available LP/RTC IO functions for this pin.
+    #[serde(default, alias = "rtc")]
+    pub lp: LowPowerMap,
 }
 
 /// Pin capabilities. Some of these will cause a trait to be implemented for the
@@ -81,11 +89,81 @@ pub(crate) struct FunctionMap {
 }
 
 impl FunctionMap {
+    const COUNT: usize = 6;
+
     /// Returns the signal associated with the nth alternate function.
     ///
     /// Note that not all alternate functions are defined. The number of the
     /// GPIO function is available separately. Not all alternate function have
     /// IO signals.
+    pub fn get(&self, af: usize) -> Option<&str> {
+        match af {
+            0 => self.af0.as_deref(),
+            1 => self.af1.as_deref(),
+            2 => self.af2.as_deref(),
+            3 => self.af3.as_deref(),
+            4 => self.af4.as_deref(),
+            5 => self.af5.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// Available analog functions for a given GPIO pin.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct AnalogMap {
+    #[serde(rename = "0")]
+    af0: Option<String>,
+    #[serde(rename = "1")]
+    af1: Option<String>,
+    #[serde(rename = "2")]
+    af2: Option<String>,
+    #[serde(rename = "3")]
+    af3: Option<String>,
+    #[serde(rename = "4")]
+    af4: Option<String>,
+    #[serde(rename = "5")]
+    af5: Option<String>,
+}
+
+impl AnalogMap {
+    const COUNT: usize = 6;
+
+    /// Returns the signal associated with the nth alternate function.
+    pub fn get(&self, af: usize) -> Option<&str> {
+        match af {
+            0 => self.af0.as_deref(),
+            1 => self.af1.as_deref(),
+            2 => self.af2.as_deref(),
+            3 => self.af3.as_deref(),
+            4 => self.af4.as_deref(),
+            5 => self.af5.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// Available RTC/LP functions for a given GPIO pin.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct LowPowerMap {
+    #[serde(rename = "0")]
+    af0: Option<String>,
+    #[serde(rename = "1")]
+    af1: Option<String>,
+    #[serde(rename = "2")]
+    af2: Option<String>,
+    #[serde(rename = "3")]
+    af3: Option<String>,
+    #[serde(rename = "4")]
+    af4: Option<String>,
+    #[serde(rename = "5")]
+    af5: Option<String>,
+}
+
+impl LowPowerMap {
+    const COUNT: usize = 6;
+
+    /// Returns the signal associated with the nth alternate function.
     pub fn get(&self, af: usize) -> Option<&str> {
         match af {
             0 => self.af0.as_deref(),
@@ -191,7 +269,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             let mut input_afs = vec![];
             let mut output_afs = vec![];
 
-            for af in 0..6 {
+            for af in 0..FunctionMap::COUNT {
                 let Some(signal) = pin.functions.get(af) else {
                     continue;
                 };
