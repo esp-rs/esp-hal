@@ -61,16 +61,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         if cargo_dir.exists() {
             let files: Vec<String> = cargo_dir
                 .read_dir()?
+                .filter_map(|e| e.ok())
                 .filter(|entry| {
-                    if let Ok(entry) = entry {
-                        entry.path().is_file()
-                            && entry.path().extension().unwrap_or_default() == "toml"
-                            && entry.file_name().to_string_lossy() != "config.toml"
-                    } else {
-                        false
-                    }
+                    entry.path().is_file()
+                        && entry.path().extension().unwrap_or_default() == "toml"
+                        && entry.file_name().to_string_lossy() != "config.toml"
                 })
-                .map(|entry| entry.unwrap().file_name().to_string_lossy().to_string())
+                .map(|entry| entry.file_name().to_string_lossy().to_string())
                 .collect();
 
             if files.len() > 0 {
