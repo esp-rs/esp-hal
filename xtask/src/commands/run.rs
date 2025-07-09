@@ -72,7 +72,10 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     let args = builder.build();
     log::debug!("{args:#?}");
 
-    let envs = vec![("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")];
+    let envs = vec![
+        ("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs"),
+        ("ESP_HAL_DOCTEST", "1"),
+    ];
 
     // Execute `cargo doc` from the package root:
     crate::cargo::run_with_env(&args, &package_path, envs, false)?;
