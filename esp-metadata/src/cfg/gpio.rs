@@ -31,9 +31,9 @@ pub(crate) struct PinConfig {
     /// Different capabilities implemented by this pin.
     pub kind: Vec<PinCapability>,
 
-    /// Available alternate functions for this pin.
+    /// Available IO MUX functions for this pin.
     #[serde(default)]
-    pub alternate_functions: AfMap,
+    pub functions: FunctionMap,
 }
 
 /// Pin capabilities. Some of these will cause a trait to be implemented for the
@@ -60,12 +60,12 @@ pub(crate) enum PinCapability {
 ///
 /// Values of this struct correspond to rows in the IO MUX Pad List table.
 ///
-/// Used in [device.gpio.pins[X].alternate_functions]. The GPIO function is not
+/// Used in [device.gpio.pins[X].functions]. The GPIO function is not
 /// written here as that is common to all pins. The values are signal names
 /// listed in [device.gpio.input_signals] or [device.gpio.output_signals].
 /// `None` means the pin does not provide the given alternate function.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct AfMap {
+pub(crate) struct FunctionMap {
     #[serde(rename = "0")]
     af0: Option<String>,
     #[serde(rename = "1")]
@@ -80,7 +80,7 @@ pub(crate) struct AfMap {
     af5: Option<String>,
 }
 
-impl AfMap {
+impl FunctionMap {
     /// Returns the signal associated with the nth alternate function.
     ///
     /// Note that not all alternate functions are defined. The number of the
@@ -192,7 +192,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             let mut output_afs = vec![];
 
             for af in 0..6 {
-                let Some(signal) = pin.alternate_functions.get(af) else {
+                let Some(signal) = pin.functions.get(af) else {
                     continue;
                 };
 
