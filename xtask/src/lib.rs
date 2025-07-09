@@ -179,6 +179,7 @@ impl Package {
             Package::EspConfig => features.push("build".to_owned()),
             Package::EspHal => {
                 features.push("unstable".to_owned());
+                features.push("rt".to_owned());
                 if config.contains("psram") {
                     // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
                     // defaults to `quad`) as it would require a separate build
@@ -193,6 +194,7 @@ impl Package {
             }
             Package::EspWifi => {
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
                 features.push("defmt".to_owned());
                 if config.contains("wifi") {
                     features.push("wifi".to_owned());
@@ -213,12 +215,14 @@ impl Package {
             }
             Package::EspHalEmbassy => {
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
                 features.push("defmt".to_owned());
                 features.push("executors".to_owned());
             }
             Package::EspIeee802154 => {
                 features.push("defmt".to_owned());
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
             }
             Package::EspLpHal => {
                 if config.contains("lp_core") {
@@ -253,12 +257,18 @@ impl Package {
             Package::EspWifi => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec![
+                    "esp-hal/rt".to_owned(),
                     "esp-hal/unstable".to_owned(),
                     "builtin-scheduler".to_owned(),
                 ]);
             }
             Package::EspMetadataGenerated => {
                 cases.push(vec!["build-script".to_owned()]);
+            },
+            Package::EspHal => {
+                // This checks if the `esp-hal` crate compiles with the no features (other than the chip selection)
+            // Primarily, this tests that disabling the `rt` feature works
+                cases.push(vec![]);
             }
             _ => {}
         }

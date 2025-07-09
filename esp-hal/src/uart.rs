@@ -515,6 +515,7 @@ pub struct UartRx<'d, Dm: DriverMode> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
+#[allow(clippy::enum_variant_names)] // not all variants start with Unsupported, but sometimes they do based on feature flags
 pub enum ConfigError {
     /// The requested baud rate is not achievable.
     #[cfg(feature = "unstable")]

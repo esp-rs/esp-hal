@@ -1,7 +1,7 @@
+pub use esp_hal::trapframe::TrapFrame;
 use esp_wifi_sys::c_types;
 
 use super::*;
-pub use crate::hal::interrupt::TrapFrame;
 
 pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_types::c_void),

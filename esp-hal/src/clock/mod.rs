@@ -43,6 +43,7 @@
 //! # Ok(())
 //! # }
 //! ```
+#![cfg_attr(not(feature = "rt"), expect(unused))]
 
 use core::{cell::Cell, marker::PhantomData};
 

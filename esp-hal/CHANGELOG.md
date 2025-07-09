@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The functions of the `RadioClockController` have been split up to the modem peripheral structs. The clock management is now provided by the `ModemClockController`. (#3687)
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
 - Added the feature `requires-unstable` (#3772)
+- The `rt` feature (#3706)
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increase ESP32 DRAM memory region by 16K (#3703)
 - The I2C async interrupt handler is now placed into IRAM (#3722)
 - Adjusted ESP32-S2 and ESP-S3 memory region lengths to reflect those defined in ESP-IDF. (#3709)
+- Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
 
 ### Fixed
 
