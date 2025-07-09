@@ -384,6 +384,7 @@ WARNING: use --release
 /// the correct mode.
 pub trait DriverMode: crate::private::Sealed {}
 
+#[procmacros::doc_replace]
 /// Marker type signalling that a driver is initialized in blocking mode.
 ///
 /// Drivers are constructed in blocking mode by default. To learn about the
@@ -394,24 +395,22 @@ pub trait DriverMode: crate::private::Sealed {}
 /// `into_blocking` method, for example:
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use esp_hal::uart::{Config, Uart};
-/// let uart = Uart::new(
-///     peripherals.UART0,
-///     Config::default())?
-/// .with_rx(peripherals.GPIO1)
-/// .with_tx(peripherals.GPIO2)
-/// .into_async();
+/// let uart = Uart::new(peripherals.UART0, Config::default())?
+///     .with_rx(peripherals.GPIO1)
+///     .with_tx(peripherals.GPIO2)
+///     .into_async();
 ///
 /// let blocking_uart = uart.into_blocking();
 ///
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct Blocking;
 
+#[procmacros::doc_replace]
 /// Marker type signalling that a driver is initialized in async mode.
 ///
 /// Drivers are constructed in blocking mode by default. To set up an async
@@ -419,19 +418,16 @@ pub struct Blocking;
 /// the `into_async` method, for example:
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use esp_hal::uart::{Config, Uart};
-/// let uart = Uart::new(
-///     peripherals.UART0,
-///     Config::default())?
-/// .with_rx(peripherals.GPIO1)
-/// .with_tx(peripherals.GPIO2)
-/// .into_async();
+/// let uart = Uart::new(peripherals.UART0, Config::default())?
+///     .with_rx(peripherals.GPIO1)
+///     .with_tx(peripherals.GPIO2)
+///     .into_async();
 ///
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
-/// 
+///
 /// Drivers can be converted back to blocking mode using the `into_blocking`
 /// method, see [`Blocking`] documentation for more details.
 ///
@@ -593,10 +589,20 @@ pub struct Config {
     psram: psram::PsramConfig,
 }
 
+#[procmacros::doc_replace]
 /// Initialize the system.
 ///
 /// This function sets up the CPU clock and watchdog, then, returns the
 /// peripherals and clocks.
+///
+/// # Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::{Config, init};
+/// let peripherals = init(Config::default());
+/// # {after_snippet}
+/// ```
 pub fn init(config: Config) -> Peripherals {
     crate::soc::pre_init();
 

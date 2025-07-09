@@ -116,8 +116,9 @@ fn handle_esp32() -> Result<()> {
             })
     }
 
-    // Do not check target when building documentation
-    let chip = if std::env::var("RUSTDOCFLAGS").is_err() {
+    // Do not check target when building documentation, but do check for doc-tests
+    let chip = if std::env::var("RUSTDOCFLAGS").is_err() || std::env::var("ESP_HAL_DOCTEST").is_ok()
+    {
         // Based on the build target, determine which chip to use.
         let target = std::env::var("TARGET");
         let target = target.as_deref().unwrap_or("unspecified target");

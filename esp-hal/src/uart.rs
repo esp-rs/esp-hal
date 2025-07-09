@@ -471,22 +471,20 @@ where
     }
 }
 
+#[procmacros::doc_replace]
 /// UART (Full-duplex)
 ///
 /// ## Example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::uart::{Config, Uart};
-/// let mut uart = Uart::new(
-///     peripherals.UART0,
-///     Config::default())?
-/// .with_rx(peripherals.GPIO1)
-/// .with_tx(peripherals.GPIO2);
+/// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+///     .with_rx(peripherals.GPIO1)
+///     .with_tx(peripherals.GPIO2);
 ///
 /// uart.write(b"Hello world!")?;
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 pub struct Uart<'d, Dm: DriverMode> {
     rx: UartRx<'d, Dm>,
@@ -605,6 +603,7 @@ where
 }
 
 impl<'d> UartTx<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Create a new UART TX instance in [`Blocking`] mode.
     ///
     /// ## Errors
@@ -615,14 +614,10 @@ impl<'d> UartTx<'d, Blocking> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, UartTx};
-    /// let tx = UartTx::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_tx(peripherals.GPIO1);
-    /// # Ok(())
-    /// # }
+    /// let tx = UartTx::new(peripherals.UART0, Config::default())?.with_tx(peripherals.GPIO1);
+    /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
@@ -901,6 +896,7 @@ fn sync_regs(_register_block: &RegisterBlock) {
 }
 
 impl<'d> UartRx<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Create a new UART RX instance in [`Blocking`] mode.
     ///
     /// ## Errors
@@ -909,14 +905,10 @@ impl<'d> UartRx<'d, Blocking> {
     /// supported by the hardware.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, UartRx};
-    /// let rx = UartRx::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO2);
-    /// # Ok(())
-    /// # }
+    /// let rx = UartRx::new(peripherals.UART0, Config::default())?.with_rx(peripherals.GPIO2);
+    /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
@@ -1226,6 +1218,7 @@ where
 }
 
 impl<'d> Uart<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Create a new UART instance in [`Blocking`] mode.
     ///
     /// ## Errors
@@ -1236,15 +1229,12 @@ impl<'d> Uart<'d, Blocking> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2);
-    /// # Ok(())
-    /// # }
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
+    /// # {after_snippet}
     /// ```
     pub fn new(uart: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         UartBuilder::new(uart).init(config)
@@ -1281,6 +1271,7 @@ impl<'d> Uart<'d, Blocking> {
         self.tx.uart.set_interrupt_handler(handler);
     }
 
+    #[procmacros::doc_replace]
     /// Listen for the given interrupts
     ///
     /// ## Example
@@ -1289,9 +1280,11 @@ impl<'d> Uart<'d, Blocking> {
     /// to connect to the board (espflash won't work)
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::delay::Delay;
-    /// use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt};
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     uart::{AtCmdConfig, Config, RxConfig, Uart, UartInterrupt},
+    /// };
     /// # let delay = Delay::new();
     /// # let config = Config::default().with_rx(
     /// #    RxConfig::default().with_fifo_full_threshold(30)
@@ -1315,13 +1308,14 @@ impl<'d> Uart<'d, Blocking> {
     /// # }
     ///
     /// use core::cell::RefCell;
+    ///
     /// use critical_section::Mutex;
     /// use esp_hal::uart::Uart;
-    /// static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> =
-    ///     Mutex::new(RefCell::new(None));
+    /// static SERIAL: Mutex<RefCell<Option<Uart<esp_hal::Blocking>>>> = Mutex::new(RefCell::new(None));
+    ///
+    /// use core::fmt::Write;
     ///
     /// use esp_hal::uart::UartInterrupt;
-    /// use core::fmt::Write;
     /// #[handler]
     /// fn interrupt_handler() {
     ///     critical_section::with(|cs| {
@@ -1339,9 +1333,7 @@ impl<'d> Uart<'d, Blocking> {
     ///                 pending_interrupts.contains(UartInterrupt::RxFifoFull),
     ///             );
     ///
-    ///             serial.clear_interrupts(
-    ///                 UartInterrupt::AtCmd | UartInterrupt::RxFifoFull
-    ///             );
+    ///             serial.clear_interrupts(UartInterrupt::AtCmd | UartInterrupt::RxFifoFull);
     ///         }
     ///     });
     /// }
@@ -1382,6 +1374,7 @@ impl<'d> Uart<'d, Async> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Write data into the TX buffer.
     ///
     /// This function writes the provided buffer `bytes` into the UART transmit
@@ -1401,24 +1394,22 @@ impl<'d> Uart<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn write_async(&mut self, words: &[u8]) -> Result<usize, TxError> {
         self.tx.write_async(words).await
     }
 
+    #[procmacros::doc_replace]
     /// Asynchronously flushes the UART transmit buffer.
     ///
     /// This function ensures that all pending data in the transmit FIFO has
@@ -1432,25 +1423,23 @@ impl<'d> Uart<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
     /// uart.flush_async().await?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), TxError> {
         self.tx.flush_async().await
     }
 
+    #[procmacros::doc_replace]
     /// Read data asynchronously.
     ///
     /// This function reads data from the UART receive buffer into the
@@ -1473,14 +1462,12 @@ impl<'d> Uart<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write_async(&MESSAGE).await?;
@@ -1488,8 +1475,7 @@ impl<'d> Uart<'d, Async> {
     ///
     /// let mut buf = [0u8; MESSAGE.len()];
     /// uart.read_async(&mut buf[..]).await.unwrap();
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn read_async(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read_async(buf).await
@@ -1541,6 +1527,7 @@ impl<'d, Dm> Uart<'d, Dm>
 where
     Dm: DriverMode,
 {
+    #[procmacros::doc_replace]
     /// Assign the RX pin for UART instance.
     ///
     /// Sets the specified pin to input and connects it to the UART RX signal.
@@ -1553,21 +1540,18 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1);
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?.with_rx(peripherals.GPIO1);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_rx(mut self, rx: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_rx(rx);
         self
     }
 
+    #[procmacros::doc_replace]
     /// Assign the TX pin for UART instance.
     ///
     /// Sets the specified pin to push-pull output and connects it to the UART
@@ -1576,57 +1560,49 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_tx(peripherals.GPIO2);
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?.with_tx(peripherals.GPIO2);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_tx(mut self, tx: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_tx(tx);
         self
     }
 
+    #[procmacros::doc_replace]
     /// Configure CTS pin
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_cts(peripherals.GPIO3);
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_cts(peripherals.GPIO3);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_cts(mut self, cts: impl PeripheralInput<'d>) -> Self {
         self.rx = self.rx.with_cts(cts);
         self
     }
 
+    #[procmacros::doc_replace]
     /// Configure RTS pin
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_tx(peripherals.GPIO2)
-    /// .with_rts(peripherals.GPIO3);
+    /// let uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_tx(peripherals.GPIO2)
+    ///     .with_rts(peripherals.GPIO3);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_rts(mut self, rts: impl PeripheralOutput<'d>) -> Self {
         self.tx = self.tx.with_rts(rts);
@@ -1646,6 +1622,7 @@ where
         self.tx.write_ready()
     }
 
+    #[procmacros::doc_replace]
     /// Writes bytes.
     ///
     /// This function writes data to the internal TX FIFO of the UART
@@ -1663,37 +1640,32 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?;
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn write(&mut self, data: &[u8]) -> Result<usize, TxError> {
         self.tx.write(data)
     }
 
+    #[procmacros::doc_replace]
     /// Flush the transmit buffer of the UART
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?;
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
     /// uart.flush()?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn flush(&mut self) -> Result<(), TxError> {
         self.tx.flush()
@@ -1707,6 +1679,7 @@ where
         self.rx.read_ready()
     }
 
+    #[procmacros::doc_replace]
     /// Read received bytes.
     ///
     /// The UART hardware continuously receives bytes and stores them in the RX
@@ -1728,11 +1701,9 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?;
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
     ///
     /// const MESSAGE: &[u8] = b"Hello, world!";
     /// uart.write(&MESSAGE)?;
@@ -1741,13 +1712,13 @@ where
     /// let mut buf = [0u8; MESSAGE.len()];
     /// uart.read(&mut buf[..])?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn read(&mut self, buf: &mut [u8]) -> Result<usize, RxError> {
         self.rx.read(buf)
     }
 
+    #[procmacros::doc_replace]
     /// Change the configuration.
     ///
     /// ## Errors
@@ -1758,15 +1729,12 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?;
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?;
     ///
     /// uart.apply_config(&Config::default().with_baudrate(19_200))?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         // Must apply the common settings first, as `rx.apply_config` reads back symbol
@@ -1777,6 +1745,7 @@ where
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Split the UART into a transmitter and receiver
     ///
     /// This is particularly useful when having two tasks correlating to
@@ -1785,13 +1754,11 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::uart::{Config, Uart};
-    /// let mut uart = Uart::new(
-    ///     peripherals.UART0,
-    ///     Config::default())?
-    /// .with_rx(peripherals.GPIO1)
-    /// .with_tx(peripherals.GPIO2);
+    /// let mut uart = Uart::new(peripherals.UART0, Config::default())?
+    ///     .with_rx(peripherals.GPIO1)
+    ///     .with_tx(peripherals.GPIO2);
     ///
     /// // The UART can be split into separate Transmit and Receive components:
     /// let (mut rx, mut tx) = uart.split();
@@ -1800,8 +1767,7 @@ where
     /// tx.write(&[42u8])?;
     /// let mut byte = [0u8; 1];
     /// rx.read(&mut byte);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn split(self) -> (UartRx<'d, Dm>, UartTx<'d, Dm>) {
