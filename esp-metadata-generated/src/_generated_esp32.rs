@@ -536,18 +536,16 @@ macro_rules! for_each_analog_function {
         _for_each_inner!((TOUCH7, GPIO27)); _for_each_inner!((TOUCH7, (GPIO27, 27)));
         _for_each_inner!(((TOUCH7, TOUCHn, 7), GPIO27)); _for_each_inner!(((TOUCH7,
         TOUCHn, 7), (GPIO27, 27))); _for_each_inner!((XTAL_32K_P, GPIO32));
-        _for_each_inner!((XTAL_32K_P, (GPIO32, 32))); _for_each_inner!(((XTAL_32K_P,
-        XTAL_32K_P), GPIO32)); _for_each_inner!(((XTAL_32K_P, XTAL_32K_P), (GPIO32,
-        32))); _for_each_inner!((ADC1_CH4, GPIO32)); _for_each_inner!((ADC1_CH4, (GPIO32,
-        32))); _for_each_inner!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32));
+        _for_each_inner!((XTAL_32K_P, (GPIO32, 32))); _for_each_inner!((ADC1_CH4,
+        GPIO32)); _for_each_inner!((ADC1_CH4, (GPIO32, 32)));
+        _for_each_inner!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32));
         _for_each_inner!(((ADC1_CH4, ADCn_CHm, 1, 4), (GPIO32, 32)));
         _for_each_inner!((TOUCH9, GPIO32)); _for_each_inner!((TOUCH9, (GPIO32, 32)));
         _for_each_inner!(((TOUCH9, TOUCHn, 9), GPIO32)); _for_each_inner!(((TOUCH9,
         TOUCHn, 9), (GPIO32, 32))); _for_each_inner!((XTAL_32K_N, GPIO33));
-        _for_each_inner!((XTAL_32K_N, (GPIO33, 33))); _for_each_inner!(((XTAL_32K_N,
-        XTAL_32K_N), GPIO33)); _for_each_inner!(((XTAL_32K_N, XTAL_32K_N), (GPIO33,
-        33))); _for_each_inner!((ADC1_CH5, GPIO33)); _for_each_inner!((ADC1_CH5, (GPIO33,
-        33))); _for_each_inner!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33));
+        _for_each_inner!((XTAL_32K_N, (GPIO33, 33))); _for_each_inner!((ADC1_CH5,
+        GPIO33)); _for_each_inner!((ADC1_CH5, (GPIO33, 33)));
+        _for_each_inner!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33));
         _for_each_inner!(((ADC1_CH5, ADCn_CHm, 1, 5), (GPIO33, 33)));
         _for_each_inner!((TOUCH8, GPIO33)); _for_each_inner!((TOUCH8, (GPIO33, 33)));
         _for_each_inner!(((TOUCH8, TOUCHn, 8), GPIO33)); _for_each_inner!(((TOUCH8,
@@ -558,24 +556,20 @@ macro_rules! for_each_analog_function {
         35))); _for_each_inner!(((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35));
         _for_each_inner!(((ADC1_CH7, ADCn_CHm, 1, 7), (GPIO35, 35)));
         _for_each_inner!((ADC_H, GPIO36)); _for_each_inner!((ADC_H, (GPIO36, 36)));
-        _for_each_inner!(((ADC_H, ADC_H), GPIO36)); _for_each_inner!(((ADC_H, ADC_H),
-        (GPIO36, 36))); _for_each_inner!((ADC1_CH0, GPIO36)); _for_each_inner!((ADC1_CH0,
-        (GPIO36, 36))); _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36));
+        _for_each_inner!((ADC1_CH0, GPIO36)); _for_each_inner!((ADC1_CH0, (GPIO36, 36)));
+        _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36));
         _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO36, 36)));
         _for_each_inner!((ADC_H, GPIO37)); _for_each_inner!((ADC_H, (GPIO37, 37)));
-        _for_each_inner!(((ADC_H, ADC_H), GPIO37)); _for_each_inner!(((ADC_H, ADC_H),
-        (GPIO37, 37))); _for_each_inner!((ADC1_CH1, GPIO37)); _for_each_inner!((ADC1_CH1,
-        (GPIO37, 37))); _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37));
+        _for_each_inner!((ADC1_CH1, GPIO37)); _for_each_inner!((ADC1_CH1, (GPIO37, 37)));
+        _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37));
         _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), (GPIO37, 37)));
         _for_each_inner!((ADC_H, GPIO38)); _for_each_inner!((ADC_H, (GPIO38, 38)));
-        _for_each_inner!(((ADC_H, ADC_H), GPIO38)); _for_each_inner!(((ADC_H, ADC_H),
-        (GPIO38, 38))); _for_each_inner!((ADC1_CH2, GPIO38)); _for_each_inner!((ADC1_CH2,
-        (GPIO38, 38))); _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38));
+        _for_each_inner!((ADC1_CH2, GPIO38)); _for_each_inner!((ADC1_CH2, (GPIO38, 38)));
+        _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38));
         _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), (GPIO38, 38)));
         _for_each_inner!((ADC_H, GPIO39)); _for_each_inner!((ADC_H, (GPIO39, 39)));
-        _for_each_inner!(((ADC_H, ADC_H), GPIO39)); _for_each_inner!(((ADC_H, ADC_H),
-        (GPIO39, 39))); _for_each_inner!((ADC1_CH3, GPIO39)); _for_each_inner!((ADC1_CH3,
-        (GPIO39, 39))); _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39));
+        _for_each_inner!((ADC1_CH3, GPIO39)); _for_each_inner!((ADC1_CH3, (GPIO39, 39)));
+        _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39));
         _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), (GPIO39, 39)));
         _for_each_inner!((all(ADC2_CH1, GPIO0), (ADC2_CH1, (GPIO0, 0)), ((ADC2_CH1,
         ADCn_CHm, 2, 1), GPIO0), ((ADC2_CH1, ADCn_CHm, 2, 1), (GPIO0, 0)), (TOUCH1,
@@ -607,12 +601,10 @@ macro_rules! for_each_analog_function {
         GPIO27), (ADC2_CH7, (GPIO27, 27)), ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27),
         ((ADC2_CH7, ADCn_CHm, 2, 7), (GPIO27, 27)), (TOUCH7, GPIO27), (TOUCH7, (GPIO27,
         27)), ((TOUCH7, TOUCHn, 7), GPIO27), ((TOUCH7, TOUCHn, 7), (GPIO27, 27)),
-        (XTAL_32K_P, GPIO32), (XTAL_32K_P, (GPIO32, 32)), ((XTAL_32K_P, XTAL_32K_P),
-        GPIO32), ((XTAL_32K_P, XTAL_32K_P), (GPIO32, 32)), (ADC1_CH4, GPIO32), (ADC1_CH4,
+        (XTAL_32K_P, GPIO32), (XTAL_32K_P, (GPIO32, 32)), (ADC1_CH4, GPIO32), (ADC1_CH4,
         (GPIO32, 32)), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32), ((ADC1_CH4, ADCn_CHm, 1, 4),
         (GPIO32, 32)), (TOUCH9, GPIO32), (TOUCH9, (GPIO32, 32)), ((TOUCH9, TOUCHn, 9),
         GPIO32), ((TOUCH9, TOUCHn, 9), (GPIO32, 32)), (XTAL_32K_N, GPIO33), (XTAL_32K_N,
-        (GPIO33, 33)), ((XTAL_32K_N, XTAL_32K_N), GPIO33), ((XTAL_32K_N, XTAL_32K_N),
         (GPIO33, 33)), (ADC1_CH5, GPIO33), (ADC1_CH5, (GPIO33, 33)), ((ADC1_CH5,
         ADCn_CHm, 1, 5), GPIO33), ((ADC1_CH5, ADCn_CHm, 1, 5), (GPIO33, 33)), (TOUCH8,
         GPIO33), (TOUCH8, (GPIO33, 33)), ((TOUCH8, TOUCHn, 8), GPIO33), ((TOUCH8, TOUCHn,
@@ -620,18 +612,15 @@ macro_rules! for_each_analog_function {
         ADCn_CHm, 1, 6), GPIO34), ((ADC1_CH6, ADCn_CHm, 1, 6), (GPIO34, 34)), (ADC1_CH7,
         GPIO35), (ADC1_CH7, (GPIO35, 35)), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35),
         ((ADC1_CH7, ADCn_CHm, 1, 7), (GPIO35, 35)), (ADC_H, GPIO36), (ADC_H, (GPIO36,
-        36)), ((ADC_H, ADC_H), GPIO36), ((ADC_H, ADC_H), (GPIO36, 36)), (ADC1_CH0,
-        GPIO36), (ADC1_CH0, (GPIO36, 36)), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36),
-        ((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO36, 36)), (ADC_H, GPIO37), (ADC_H, (GPIO37,
-        37)), ((ADC_H, ADC_H), GPIO37), ((ADC_H, ADC_H), (GPIO37, 37)), (ADC1_CH1,
-        GPIO37), (ADC1_CH1, (GPIO37, 37)), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37),
-        ((ADC1_CH1, ADCn_CHm, 1, 1), (GPIO37, 37)), (ADC_H, GPIO38), (ADC_H, (GPIO38,
-        38)), ((ADC_H, ADC_H), GPIO38), ((ADC_H, ADC_H), (GPIO38, 38)), (ADC1_CH2,
-        GPIO38), (ADC1_CH2, (GPIO38, 38)), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38),
-        ((ADC1_CH2, ADCn_CHm, 1, 2), (GPIO38, 38)), (ADC_H, GPIO39), (ADC_H, (GPIO39,
-        39)), ((ADC_H, ADC_H), GPIO39), ((ADC_H, ADC_H), (GPIO39, 39)), (ADC1_CH3,
-        GPIO39), (ADC1_CH3, (GPIO39, 39)), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39),
-        ((ADC1_CH3, ADCn_CHm, 1, 3), (GPIO39, 39))));
+        36)), (ADC1_CH0, GPIO36), (ADC1_CH0, (GPIO36, 36)), ((ADC1_CH0, ADCn_CHm, 1, 0),
+        GPIO36), ((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO36, 36)), (ADC_H, GPIO37), (ADC_H,
+        (GPIO37, 37)), (ADC1_CH1, GPIO37), (ADC1_CH1, (GPIO37, 37)), ((ADC1_CH1,
+        ADCn_CHm, 1, 1), GPIO37), ((ADC1_CH1, ADCn_CHm, 1, 1), (GPIO37, 37)), (ADC_H,
+        GPIO38), (ADC_H, (GPIO38, 38)), (ADC1_CH2, GPIO38), (ADC1_CH2, (GPIO38, 38)),
+        ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38), ((ADC1_CH2, ADCn_CHm, 1, 2), (GPIO38, 38)),
+        (ADC_H, GPIO39), (ADC_H, (GPIO39, 39)), (ADC1_CH3, GPIO39), (ADC1_CH3, (GPIO39,
+        39)), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39), ((ADC1_CH3, ADCn_CHm, 1, 3), (GPIO39,
+        39))));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -657,22 +646,16 @@ macro_rules! for_each_lp_function {
         0))); _for_each_inner!(((RTC_GPIO11, RTC_GPIOn, 11), GPIO0));
         _for_each_inner!(((RTC_GPIO11, RTC_GPIOn, 11), (GPIO0, 0)));
         _for_each_inner!((SAR_I2C_SDA, GPIO0)); _for_each_inner!((SAR_I2C_SDA, (GPIO0,
-        0))); _for_each_inner!(((SAR_I2C_SDA, SAR_I2C_SDA), GPIO0));
-        _for_each_inner!(((SAR_I2C_SDA, SAR_I2C_SDA), (GPIO0, 0)));
-        _for_each_inner!((RTC_GPIO12, GPIO2)); _for_each_inner!((RTC_GPIO12, (GPIO2,
-        2))); _for_each_inner!(((RTC_GPIO12, RTC_GPIOn, 12), GPIO2));
+        0))); _for_each_inner!((RTC_GPIO12, GPIO2)); _for_each_inner!((RTC_GPIO12,
+        (GPIO2, 2))); _for_each_inner!(((RTC_GPIO12, RTC_GPIOn, 12), GPIO2));
         _for_each_inner!(((RTC_GPIO12, RTC_GPIOn, 12), (GPIO2, 2)));
         _for_each_inner!((SAR_I2C_SCL, GPIO2)); _for_each_inner!((SAR_I2C_SCL, (GPIO2,
-        2))); _for_each_inner!(((SAR_I2C_SCL, SAR_I2C_SCL), GPIO2));
-        _for_each_inner!(((SAR_I2C_SCL, SAR_I2C_SCL), (GPIO2, 2)));
-        _for_each_inner!((RTC_GPIO10, GPIO4)); _for_each_inner!((RTC_GPIO10, (GPIO4,
-        4))); _for_each_inner!(((RTC_GPIO10, RTC_GPIOn, 10), GPIO4));
+        2))); _for_each_inner!((RTC_GPIO10, GPIO4)); _for_each_inner!((RTC_GPIO10,
+        (GPIO4, 4))); _for_each_inner!(((RTC_GPIO10, RTC_GPIOn, 10), GPIO4));
         _for_each_inner!(((RTC_GPIO10, RTC_GPIOn, 10), (GPIO4, 4)));
         _for_each_inner!((SAR_I2C_SCL, GPIO4)); _for_each_inner!((SAR_I2C_SCL, (GPIO4,
-        4))); _for_each_inner!(((SAR_I2C_SCL, SAR_I2C_SCL), GPIO4));
-        _for_each_inner!(((SAR_I2C_SCL, SAR_I2C_SCL), (GPIO4, 4)));
-        _for_each_inner!((RTC_GPIO15, GPIO12)); _for_each_inner!((RTC_GPIO15, (GPIO12,
-        12))); _for_each_inner!(((RTC_GPIO15, RTC_GPIOn, 15), GPIO12));
+        4))); _for_each_inner!((RTC_GPIO15, GPIO12)); _for_each_inner!((RTC_GPIO15,
+        (GPIO12, 12))); _for_each_inner!(((RTC_GPIO15, RTC_GPIOn, 15), GPIO12));
         _for_each_inner!(((RTC_GPIO15, RTC_GPIOn, 15), (GPIO12, 12)));
         _for_each_inner!((RTC_GPIO14, GPIO13)); _for_each_inner!((RTC_GPIO14, (GPIO13,
         13))); _for_each_inner!(((RTC_GPIO14, RTC_GPIOn, 14), GPIO13));
@@ -684,10 +667,8 @@ macro_rules! for_each_lp_function {
         15))); _for_each_inner!(((RTC_GPIO13, RTC_GPIOn, 13), GPIO15));
         _for_each_inner!(((RTC_GPIO13, RTC_GPIOn, 13), (GPIO15, 15)));
         _for_each_inner!((SAR_I2C_SDA, GPIO15)); _for_each_inner!((SAR_I2C_SDA, (GPIO15,
-        15))); _for_each_inner!(((SAR_I2C_SDA, SAR_I2C_SDA), GPIO15));
-        _for_each_inner!(((SAR_I2C_SDA, SAR_I2C_SDA), (GPIO15, 15)));
-        _for_each_inner!((RTC_GPIO6, GPIO25)); _for_each_inner!((RTC_GPIO6, (GPIO25,
-        25))); _for_each_inner!(((RTC_GPIO6, RTC_GPIOn, 6), GPIO25));
+        15))); _for_each_inner!((RTC_GPIO6, GPIO25)); _for_each_inner!((RTC_GPIO6,
+        (GPIO25, 25))); _for_each_inner!(((RTC_GPIO6, RTC_GPIOn, 6), GPIO25));
         _for_each_inner!(((RTC_GPIO6, RTC_GPIOn, 6), (GPIO25, 25)));
         _for_each_inner!((RTC_GPIO7, GPIO26)); _for_each_inner!((RTC_GPIO7, (GPIO26,
         26))); _for_each_inner!(((RTC_GPIO7, RTC_GPIOn, 7), GPIO26));
@@ -721,42 +702,37 @@ macro_rules! for_each_lp_function {
         _for_each_inner!(((RTC_GPIO3, RTC_GPIOn, 3), (GPIO39, 39)));
         _for_each_inner!((all(RTC_GPIO11, GPIO0), (RTC_GPIO11, (GPIO0, 0)), ((RTC_GPIO11,
         RTC_GPIOn, 11), GPIO0), ((RTC_GPIO11, RTC_GPIOn, 11), (GPIO0, 0)), (SAR_I2C_SDA,
-        GPIO0), (SAR_I2C_SDA, (GPIO0, 0)), ((SAR_I2C_SDA, SAR_I2C_SDA), GPIO0),
-        ((SAR_I2C_SDA, SAR_I2C_SDA), (GPIO0, 0)), (RTC_GPIO12, GPIO2), (RTC_GPIO12,
-        (GPIO2, 2)), ((RTC_GPIO12, RTC_GPIOn, 12), GPIO2), ((RTC_GPIO12, RTC_GPIOn, 12),
-        (GPIO2, 2)), (SAR_I2C_SCL, GPIO2), (SAR_I2C_SCL, (GPIO2, 2)), ((SAR_I2C_SCL,
-        SAR_I2C_SCL), GPIO2), ((SAR_I2C_SCL, SAR_I2C_SCL), (GPIO2, 2)), (RTC_GPIO10,
-        GPIO4), (RTC_GPIO10, (GPIO4, 4)), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO4),
-        ((RTC_GPIO10, RTC_GPIOn, 10), (GPIO4, 4)), (SAR_I2C_SCL, GPIO4), (SAR_I2C_SCL,
-        (GPIO4, 4)), ((SAR_I2C_SCL, SAR_I2C_SCL), GPIO4), ((SAR_I2C_SCL, SAR_I2C_SCL),
-        (GPIO4, 4)), (RTC_GPIO15, GPIO12), (RTC_GPIO15, (GPIO12, 12)), ((RTC_GPIO15,
-        RTC_GPIOn, 15), GPIO12), ((RTC_GPIO15, RTC_GPIOn, 15), (GPIO12, 12)),
-        (RTC_GPIO14, GPIO13), (RTC_GPIO14, (GPIO13, 13)), ((RTC_GPIO14, RTC_GPIOn, 14),
-        GPIO13), ((RTC_GPIO14, RTC_GPIOn, 14), (GPIO13, 13)), (RTC_GPIO16, GPIO14),
-        (RTC_GPIO16, (GPIO14, 14)), ((RTC_GPIO16, RTC_GPIOn, 16), GPIO14), ((RTC_GPIO16,
-        RTC_GPIOn, 16), (GPIO14, 14)), (RTC_GPIO13, GPIO15), (RTC_GPIO13, (GPIO15, 15)),
-        ((RTC_GPIO13, RTC_GPIOn, 13), GPIO15), ((RTC_GPIO13, RTC_GPIOn, 13), (GPIO15,
-        15)), (SAR_I2C_SDA, GPIO15), (SAR_I2C_SDA, (GPIO15, 15)), ((SAR_I2C_SDA,
-        SAR_I2C_SDA), GPIO15), ((SAR_I2C_SDA, SAR_I2C_SDA), (GPIO15, 15)), (RTC_GPIO6,
-        GPIO25), (RTC_GPIO6, (GPIO25, 25)), ((RTC_GPIO6, RTC_GPIOn, 6), GPIO25),
-        ((RTC_GPIO6, RTC_GPIOn, 6), (GPIO25, 25)), (RTC_GPIO7, GPIO26), (RTC_GPIO7,
-        (GPIO26, 26)), ((RTC_GPIO7, RTC_GPIOn, 7), GPIO26), ((RTC_GPIO7, RTC_GPIOn, 7),
-        (GPIO26, 26)), (RTC_GPIO17, GPIO27), (RTC_GPIO17, (GPIO27, 27)), ((RTC_GPIO17,
-        RTC_GPIOn, 17), GPIO27), ((RTC_GPIO17, RTC_GPIOn, 17), (GPIO27, 27)), (RTC_GPIO9,
-        GPIO32), (RTC_GPIO9, (GPIO32, 32)), ((RTC_GPIO9, RTC_GPIOn, 9), GPIO32),
-        ((RTC_GPIO9, RTC_GPIOn, 9), (GPIO32, 32)), (RTC_GPIO8, GPIO33), (RTC_GPIO8,
-        (GPIO33, 33)), ((RTC_GPIO8, RTC_GPIOn, 8), GPIO33), ((RTC_GPIO8, RTC_GPIOn, 8),
-        (GPIO33, 33)), (RTC_GPIO4, GPIO34), (RTC_GPIO4, (GPIO34, 34)), ((RTC_GPIO4,
-        RTC_GPIOn, 4), GPIO34), ((RTC_GPIO4, RTC_GPIOn, 4), (GPIO34, 34)), (RTC_GPIO5,
-        GPIO35), (RTC_GPIO5, (GPIO35, 35)), ((RTC_GPIO5, RTC_GPIOn, 5), GPIO35),
-        ((RTC_GPIO5, RTC_GPIOn, 5), (GPIO35, 35)), (RTC_GPIO0, GPIO36), (RTC_GPIO0,
-        (GPIO36, 36)), ((RTC_GPIO0, RTC_GPIOn, 0), GPIO36), ((RTC_GPIO0, RTC_GPIOn, 0),
-        (GPIO36, 36)), (RTC_GPIO1, GPIO37), (RTC_GPIO1, (GPIO37, 37)), ((RTC_GPIO1,
-        RTC_GPIOn, 1), GPIO37), ((RTC_GPIO1, RTC_GPIOn, 1), (GPIO37, 37)), (RTC_GPIO2,
-        GPIO38), (RTC_GPIO2, (GPIO38, 38)), ((RTC_GPIO2, RTC_GPIOn, 2), GPIO38),
-        ((RTC_GPIO2, RTC_GPIOn, 2), (GPIO38, 38)), (RTC_GPIO3, GPIO39), (RTC_GPIO3,
-        (GPIO39, 39)), ((RTC_GPIO3, RTC_GPIOn, 3), GPIO39), ((RTC_GPIO3, RTC_GPIOn, 3),
-        (GPIO39, 39))));
+        GPIO0), (SAR_I2C_SDA, (GPIO0, 0)), (RTC_GPIO12, GPIO2), (RTC_GPIO12, (GPIO2, 2)),
+        ((RTC_GPIO12, RTC_GPIOn, 12), GPIO2), ((RTC_GPIO12, RTC_GPIOn, 12), (GPIO2, 2)),
+        (SAR_I2C_SCL, GPIO2), (SAR_I2C_SCL, (GPIO2, 2)), (RTC_GPIO10, GPIO4),
+        (RTC_GPIO10, (GPIO4, 4)), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO4), ((RTC_GPIO10,
+        RTC_GPIOn, 10), (GPIO4, 4)), (SAR_I2C_SCL, GPIO4), (SAR_I2C_SCL, (GPIO4, 4)),
+        (RTC_GPIO15, GPIO12), (RTC_GPIO15, (GPIO12, 12)), ((RTC_GPIO15, RTC_GPIOn, 15),
+        GPIO12), ((RTC_GPIO15, RTC_GPIOn, 15), (GPIO12, 12)), (RTC_GPIO14, GPIO13),
+        (RTC_GPIO14, (GPIO13, 13)), ((RTC_GPIO14, RTC_GPIOn, 14), GPIO13), ((RTC_GPIO14,
+        RTC_GPIOn, 14), (GPIO13, 13)), (RTC_GPIO16, GPIO14), (RTC_GPIO16, (GPIO14, 14)),
+        ((RTC_GPIO16, RTC_GPIOn, 16), GPIO14), ((RTC_GPIO16, RTC_GPIOn, 16), (GPIO14,
+        14)), (RTC_GPIO13, GPIO15), (RTC_GPIO13, (GPIO15, 15)), ((RTC_GPIO13, RTC_GPIOn,
+        13), GPIO15), ((RTC_GPIO13, RTC_GPIOn, 13), (GPIO15, 15)), (SAR_I2C_SDA, GPIO15),
+        (SAR_I2C_SDA, (GPIO15, 15)), (RTC_GPIO6, GPIO25), (RTC_GPIO6, (GPIO25, 25)),
+        ((RTC_GPIO6, RTC_GPIOn, 6), GPIO25), ((RTC_GPIO6, RTC_GPIOn, 6), (GPIO25, 25)),
+        (RTC_GPIO7, GPIO26), (RTC_GPIO7, (GPIO26, 26)), ((RTC_GPIO7, RTC_GPIOn, 7),
+        GPIO26), ((RTC_GPIO7, RTC_GPIOn, 7), (GPIO26, 26)), (RTC_GPIO17, GPIO27),
+        (RTC_GPIO17, (GPIO27, 27)), ((RTC_GPIO17, RTC_GPIOn, 17), GPIO27), ((RTC_GPIO17,
+        RTC_GPIOn, 17), (GPIO27, 27)), (RTC_GPIO9, GPIO32), (RTC_GPIO9, (GPIO32, 32)),
+        ((RTC_GPIO9, RTC_GPIOn, 9), GPIO32), ((RTC_GPIO9, RTC_GPIOn, 9), (GPIO32, 32)),
+        (RTC_GPIO8, GPIO33), (RTC_GPIO8, (GPIO33, 33)), ((RTC_GPIO8, RTC_GPIOn, 8),
+        GPIO33), ((RTC_GPIO8, RTC_GPIOn, 8), (GPIO33, 33)), (RTC_GPIO4, GPIO34),
+        (RTC_GPIO4, (GPIO34, 34)), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO34), ((RTC_GPIO4,
+        RTC_GPIOn, 4), (GPIO34, 34)), (RTC_GPIO5, GPIO35), (RTC_GPIO5, (GPIO35, 35)),
+        ((RTC_GPIO5, RTC_GPIOn, 5), GPIO35), ((RTC_GPIO5, RTC_GPIOn, 5), (GPIO35, 35)),
+        (RTC_GPIO0, GPIO36), (RTC_GPIO0, (GPIO36, 36)), ((RTC_GPIO0, RTC_GPIOn, 0),
+        GPIO36), ((RTC_GPIO0, RTC_GPIOn, 0), (GPIO36, 36)), (RTC_GPIO1, GPIO37),
+        (RTC_GPIO1, (GPIO37, 37)), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO37), ((RTC_GPIO1,
+        RTC_GPIOn, 1), (GPIO37, 37)), (RTC_GPIO2, GPIO38), (RTC_GPIO2, (GPIO38, 38)),
+        ((RTC_GPIO2, RTC_GPIOn, 2), GPIO38), ((RTC_GPIO2, RTC_GPIOn, 2), (GPIO38, 38)),
+        (RTC_GPIO3, GPIO39), (RTC_GPIO3, (GPIO39, 39)), ((RTC_GPIO3, RTC_GPIOn, 3),
+        GPIO39), ((RTC_GPIO3, RTC_GPIOn, 3), (GPIO39, 39))));
     };
 }
 #[macro_export]

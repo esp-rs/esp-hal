@@ -414,10 +414,7 @@ macro_rules! for_each_analog_function {
         _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO5));
         _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2, 0), (GPIO5, 5)));
         _for_each_inner!((USB_DM, GPIO18)); _for_each_inner!((USB_DM, (GPIO18, 18)));
-        _for_each_inner!(((USB_DM, USB_DM), GPIO18)); _for_each_inner!(((USB_DM, USB_DM),
-        (GPIO18, 18))); _for_each_inner!((USB_DP, GPIO19)); _for_each_inner!((USB_DP,
-        (GPIO19, 19))); _for_each_inner!(((USB_DP, USB_DP), GPIO19));
-        _for_each_inner!(((USB_DP, USB_DP), (GPIO19, 19)));
+        _for_each_inner!((USB_DP, GPIO19)); _for_each_inner!((USB_DP, (GPIO19, 19)));
         _for_each_inner!((all(ADC1_CH0, GPIO0), (ADC1_CH0, (GPIO0, 0)), ((ADC1_CH0,
         ADCn_CHm, 1, 0), GPIO0), ((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO0, 0)), (ADC1_CH1,
         GPIO1), (ADC1_CH1, (GPIO1, 1)), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1), ((ADC1_CH1,
@@ -428,9 +425,7 @@ macro_rules! for_each_analog_function {
         4)), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), (GPIO4,
         4)), (ADC2_CH0, GPIO5), (ADC2_CH0, (GPIO5, 5)), ((ADC2_CH0, ADCn_CHm, 2, 0),
         GPIO5), ((ADC2_CH0, ADCn_CHm, 2, 0), (GPIO5, 5)), (USB_DM, GPIO18), (USB_DM,
-        (GPIO18, 18)), ((USB_DM, USB_DM), GPIO18), ((USB_DM, USB_DM), (GPIO18, 18)),
-        (USB_DP, GPIO19), (USB_DP, (GPIO19, 19)), ((USB_DP, USB_DP), GPIO19), ((USB_DP,
-        USB_DP), (GPIO19, 19))));
+        (GPIO18, 18)), (USB_DP, GPIO19), (USB_DP, (GPIO19, 19))));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.

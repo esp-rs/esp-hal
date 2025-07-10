@@ -333,10 +333,14 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                         separator = "_";
                     }
 
-                    let pattern = format_ident!("{pattern}");
+                    if pattern == signal {
+                        None
+                    } else {
+                        let pattern = format_ident!("{pattern}");
 
-                    quote! {
-                        ( #signal_name, #pattern #(, #numbers)* )
+                        Some(quote! {
+                            ( #signal_name, #pattern #(, #numbers)* )
+                        })
                     }
                 };
 
@@ -349,12 +353,14 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 branches.push(quote! {
                     #simple_signal, #full_gpio
                 });
-                branches.push(quote! {
-                    #full_signal, #simple_gpio
-                });
-                branches.push(quote! {
-                    #full_signal, #full_gpio
-                });
+                if let Some(full_signal) = full_signal {
+                    branches.push(quote! {
+                        #full_signal, #simple_gpio
+                    });
+                    branches.push(quote! {
+                        #full_signal, #full_gpio
+                    });
+                }
             }
 
             for af in 0..AnalogMap::COUNT {
@@ -550,8 +556,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
         /// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the GPIO's number
-        /// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
-        /// - `($signal:ident, $gpio:ident)` - fully expanded case
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), ($gpio:ident, $gpio_num:literal))` - fully expanded case
+        ///
+        /// The last two cases are only available when the signal has at least one numbered component.
         #for_each_analog
 
         /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -563,8 +571,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
         /// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the GPIO's number
-        /// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
-        /// - `($signal:ident, $gpio:ident)` - fully expanded case
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), ($gpio:ident, $gpio_num:literal))` - fully expanded case
+        ///
+        /// The last two cases are only available when the signal has at least one numbered component.
         #for_each_lp
 
         #if_pin_is_type
