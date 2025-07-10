@@ -735,6 +735,9 @@ macro_rules! gpio {
     ) => {
         $(
             impl<'d> $peri<'d> {
+                #[allow(unused)]
+                pub(crate) const NUMBER: u8 = $gpionum;
+
                 /// Split the pin into an input and output signal.
                 ///
                 /// Peripheral signals allow connecting peripherals together without using
@@ -1851,16 +1854,16 @@ impl<'lt> AnyPin<'lt> {
             }
 
             macro_rules! disable_usb_pads {
-                ($number:literal) => {
-                    if self.number() == $number {
-                        disable_usb_pads($number);
+                ($gpio:ident) => {
+                    if self.number() == crate::peripherals::$gpio::NUMBER {
+                        disable_usb_pads(crate::peripherals::$gpio::NUMBER);
                     }
                 };
             }
 
             for_each_analog_function! {
-                (USB_DM, ($gpio:ident, $num:literal)) => { disable_usb_pads!($num) };
-                (USB_DP, ($gpio:ident, $num:literal)) => { disable_usb_pads!($num) };
+                (USB_DM, $gpio:ident) => { disable_usb_pads!($gpio) };
+                (USB_DP, $gpio:ident) => { disable_usb_pads!($gpio) };
             }
         }
 

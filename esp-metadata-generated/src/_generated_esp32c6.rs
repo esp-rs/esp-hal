@@ -454,58 +454,36 @@ macro_rules! for_each_gpio {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [for_each_gpio].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has two options for its "Individual matcher" case:
 ///
 /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the
-///   GPIO's number
-/// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case,
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
 ///   where you need the number(s) of a signal, or the general group to which the signal belongs.
 ///   For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
-/// - `($signal:ident, $gpio:ident)` - fully expanded case
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
 #[macro_export]
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((XTAL_32K_P, GPIO0)); _for_each_inner!((XTAL_32K_P, (GPIO0,
-        0))); _for_each_inner!((ADC0_CH0, GPIO0)); _for_each_inner!((ADC0_CH0, (GPIO0,
-        0))); _for_each_inner!(((ADC0_CH0, ADCn_CHm, 0, 0), GPIO0));
-        _for_each_inner!(((ADC0_CH0, ADCn_CHm, 0, 0), (GPIO0, 0)));
-        _for_each_inner!((XTAL_32K_N, GPIO1)); _for_each_inner!((XTAL_32K_N, (GPIO1,
-        1))); _for_each_inner!((ADC0_CH1, GPIO1)); _for_each_inner!((ADC0_CH1, (GPIO1,
-        1))); _for_each_inner!(((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1));
-        _for_each_inner!(((ADC0_CH1, ADCn_CHm, 0, 1), (GPIO1, 1)));
-        _for_each_inner!((ADC0_CH2, GPIO2)); _for_each_inner!((ADC0_CH2, (GPIO2, 2)));
-        _for_each_inner!(((ADC0_CH2, ADCn_CHm, 0, 2), GPIO2));
-        _for_each_inner!(((ADC0_CH2, ADCn_CHm, 0, 2), (GPIO2, 2)));
-        _for_each_inner!((ADC0_CH3, GPIO3)); _for_each_inner!((ADC0_CH3, (GPIO3, 3)));
-        _for_each_inner!(((ADC0_CH3, ADCn_CHm, 0, 3), GPIO3));
-        _for_each_inner!(((ADC0_CH3, ADCn_CHm, 0, 3), (GPIO3, 3)));
-        _for_each_inner!((ADC0_CH4, GPIO4)); _for_each_inner!((ADC0_CH4, (GPIO4, 4)));
+        _for_each_inner!((XTAL_32K_P, GPIO0)); _for_each_inner!((ADC0_CH0, GPIO0));
+        _for_each_inner!(((ADC0_CH0, ADCn_CHm, 0, 0), GPIO0));
+        _for_each_inner!((XTAL_32K_N, GPIO1)); _for_each_inner!((ADC0_CH1, GPIO1));
+        _for_each_inner!(((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1));
+        _for_each_inner!((ADC0_CH2, GPIO2)); _for_each_inner!(((ADC0_CH2, ADCn_CHm, 0,
+        2), GPIO2)); _for_each_inner!((ADC0_CH3, GPIO3)); _for_each_inner!(((ADC0_CH3,
+        ADCn_CHm, 0, 3), GPIO3)); _for_each_inner!((ADC0_CH4, GPIO4));
         _for_each_inner!(((ADC0_CH4, ADCn_CHm, 0, 4), GPIO4));
-        _for_each_inner!(((ADC0_CH4, ADCn_CHm, 0, 4), (GPIO4, 4)));
-        _for_each_inner!((ADC0_CH5, GPIO5)); _for_each_inner!((ADC0_CH5, (GPIO5, 5)));
-        _for_each_inner!(((ADC0_CH5, ADCn_CHm, 0, 5), GPIO5));
-        _for_each_inner!(((ADC0_CH5, ADCn_CHm, 0, 5), (GPIO5, 5)));
-        _for_each_inner!((ADC0_CH6, GPIO6)); _for_each_inner!((ADC0_CH6, (GPIO6, 6)));
-        _for_each_inner!(((ADC0_CH6, ADCn_CHm, 0, 6), GPIO6));
-        _for_each_inner!(((ADC0_CH6, ADCn_CHm, 0, 6), (GPIO6, 6)));
-        _for_each_inner!((USB_DM, GPIO12)); _for_each_inner!((USB_DM, (GPIO12, 12)));
-        _for_each_inner!((USB_DP, GPIO13)); _for_each_inner!((USB_DP, (GPIO13, 13)));
-        _for_each_inner!((all(XTAL_32K_P, GPIO0), (XTAL_32K_P, (GPIO0, 0)), (ADC0_CH0,
-        GPIO0), (ADC0_CH0, (GPIO0, 0)), ((ADC0_CH0, ADCn_CHm, 0, 0), GPIO0), ((ADC0_CH0,
-        ADCn_CHm, 0, 0), (GPIO0, 0)), (XTAL_32K_N, GPIO1), (XTAL_32K_N, (GPIO1, 1)),
-        (ADC0_CH1, GPIO1), (ADC0_CH1, (GPIO1, 1)), ((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1),
-        ((ADC0_CH1, ADCn_CHm, 0, 1), (GPIO1, 1)), (ADC0_CH2, GPIO2), (ADC0_CH2, (GPIO2,
-        2)), ((ADC0_CH2, ADCn_CHm, 0, 2), GPIO2), ((ADC0_CH2, ADCn_CHm, 0, 2), (GPIO2,
-        2)), (ADC0_CH3, GPIO3), (ADC0_CH3, (GPIO3, 3)), ((ADC0_CH3, ADCn_CHm, 0, 3),
-        GPIO3), ((ADC0_CH3, ADCn_CHm, 0, 3), (GPIO3, 3)), (ADC0_CH4, GPIO4), (ADC0_CH4,
-        (GPIO4, 4)), ((ADC0_CH4, ADCn_CHm, 0, 4), GPIO4), ((ADC0_CH4, ADCn_CHm, 0, 4),
-        (GPIO4, 4)), (ADC0_CH5, GPIO5), (ADC0_CH5, (GPIO5, 5)), ((ADC0_CH5, ADCn_CHm, 0,
-        5), GPIO5), ((ADC0_CH5, ADCn_CHm, 0, 5), (GPIO5, 5)), (ADC0_CH6, GPIO6),
-        (ADC0_CH6, (GPIO6, 6)), ((ADC0_CH6, ADCn_CHm, 0, 6), GPIO6), ((ADC0_CH6,
-        ADCn_CHm, 0, 6), (GPIO6, 6)), (USB_DM, GPIO12), (USB_DM, (GPIO12, 12)), (USB_DP,
-        GPIO13), (USB_DP, (GPIO13, 13))));
+        _for_each_inner!((ADC0_CH5, GPIO5)); _for_each_inner!(((ADC0_CH5, ADCn_CHm, 0,
+        5), GPIO5)); _for_each_inner!((ADC0_CH6, GPIO6)); _for_each_inner!(((ADC0_CH6,
+        ADCn_CHm, 0, 6), GPIO6)); _for_each_inner!((USB_DM, GPIO12));
+        _for_each_inner!((USB_DP, GPIO13)); _for_each_inner!((all(XTAL_32K_P, GPIO0),
+        (ADC0_CH0, GPIO0), ((ADC0_CH0, ADCn_CHm, 0, 0), GPIO0), (XTAL_32K_N, GPIO1),
+        (ADC0_CH1, GPIO1), ((ADC0_CH1, ADCn_CHm, 0, 1), GPIO1), (ADC0_CH2, GPIO2),
+        ((ADC0_CH2, ADCn_CHm, 0, 2), GPIO2), (ADC0_CH3, GPIO3), ((ADC0_CH3, ADCn_CHm, 0,
+        3), GPIO3), (ADC0_CH4, GPIO4), ((ADC0_CH4, ADCn_CHm, 0, 4), GPIO4), (ADC0_CH5,
+        GPIO5), ((ADC0_CH5, ADCn_CHm, 0, 5), GPIO5), (ADC0_CH6, GPIO6), ((ADC0_CH6,
+        ADCn_CHm, 0, 6), GPIO6), (USB_DM, GPIO12), (USB_DP, GPIO13)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -513,69 +491,43 @@ macro_rules! for_each_analog_function {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [for_each_gpio].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has two options for its "Individual matcher" case:
 ///
 /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the
-///   GPIO's number
-/// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case,
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
 ///   where you need the number(s) of a signal, or the general group to which the signal belongs.
 ///   For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
 ///   SAR_I2C_SCL_n, 1)`.
-/// - `($signal:ident, $gpio:ident)` - fully expanded case
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
 #[macro_export]
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((LP_GPIO0, GPIO0)); _for_each_inner!((LP_GPIO0, (GPIO0, 0)));
-        _for_each_inner!(((LP_GPIO0, LP_GPIOn, 0), GPIO0)); _for_each_inner!(((LP_GPIO0,
-        LP_GPIOn, 0), (GPIO0, 0))); _for_each_inner!((LP_UART_DTRN, GPIO0));
-        _for_each_inner!((LP_UART_DTRN, (GPIO0, 0))); _for_each_inner!((LP_GPIO1,
-        GPIO1)); _for_each_inner!((LP_GPIO1, (GPIO1, 1))); _for_each_inner!(((LP_GPIO1,
-        LP_GPIOn, 1), GPIO1)); _for_each_inner!(((LP_GPIO1, LP_GPIOn, 1), (GPIO1, 1)));
-        _for_each_inner!((LP_UART_DSRN, GPIO1)); _for_each_inner!((LP_UART_DSRN, (GPIO1,
-        1))); _for_each_inner!((LP_GPIO2, GPIO2)); _for_each_inner!((LP_GPIO2, (GPIO2,
-        2))); _for_each_inner!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
-        _for_each_inner!(((LP_GPIO2, LP_GPIOn, 2), (GPIO2, 2)));
-        _for_each_inner!((LP_UART_RTSN, GPIO2)); _for_each_inner!((LP_UART_RTSN, (GPIO2,
-        2))); _for_each_inner!((LP_GPIO3, GPIO3)); _for_each_inner!((LP_GPIO3, (GPIO3,
-        3))); _for_each_inner!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
-        _for_each_inner!(((LP_GPIO3, LP_GPIOn, 3), (GPIO3, 3)));
-        _for_each_inner!((LP_UART_CTSN, GPIO3)); _for_each_inner!((LP_UART_CTSN, (GPIO3,
-        3))); _for_each_inner!((LP_GPIO4, GPIO4)); _for_each_inner!((LP_GPIO4, (GPIO4,
-        4))); _for_each_inner!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
-        _for_each_inner!(((LP_GPIO4, LP_GPIOn, 4), (GPIO4, 4)));
-        _for_each_inner!((LP_UART_RXD, GPIO4)); _for_each_inner!((LP_UART_RXD, (GPIO4,
-        4))); _for_each_inner!((LP_GPIO5, GPIO5)); _for_each_inner!((LP_GPIO5, (GPIO5,
-        5))); _for_each_inner!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
-        _for_each_inner!(((LP_GPIO5, LP_GPIOn, 5), (GPIO5, 5)));
-        _for_each_inner!((LP_UART_TXD, GPIO5)); _for_each_inner!((LP_UART_TXD, (GPIO5,
-        5))); _for_each_inner!((LP_GPIO6, GPIO6)); _for_each_inner!((LP_GPIO6, (GPIO6,
-        6))); _for_each_inner!(((LP_GPIO6, LP_GPIOn, 6), GPIO6));
-        _for_each_inner!(((LP_GPIO6, LP_GPIOn, 6), (GPIO6, 6)));
-        _for_each_inner!((LP_I2C_SDA, GPIO6)); _for_each_inner!((LP_I2C_SDA, (GPIO6,
-        6))); _for_each_inner!((LP_GPIO7, GPIO7)); _for_each_inner!((LP_GPIO7, (GPIO7,
-        7))); _for_each_inner!(((LP_GPIO7, LP_GPIOn, 7), GPIO7));
-        _for_each_inner!(((LP_GPIO7, LP_GPIOn, 7), (GPIO7, 7)));
-        _for_each_inner!((LP_I2C_SCL, GPIO7)); _for_each_inner!((LP_I2C_SCL, (GPIO7,
-        7))); _for_each_inner!((all(LP_GPIO0, GPIO0), (LP_GPIO0, (GPIO0, 0)), ((LP_GPIO0,
-        LP_GPIOn, 0), GPIO0), ((LP_GPIO0, LP_GPIOn, 0), (GPIO0, 0)), (LP_UART_DTRN,
-        GPIO0), (LP_UART_DTRN, (GPIO0, 0)), (LP_GPIO1, GPIO1), (LP_GPIO1, (GPIO1, 1)),
-        ((LP_GPIO1, LP_GPIOn, 1), GPIO1), ((LP_GPIO1, LP_GPIOn, 1), (GPIO1, 1)),
-        (LP_UART_DSRN, GPIO1), (LP_UART_DSRN, (GPIO1, 1)), (LP_GPIO2, GPIO2), (LP_GPIO2,
-        (GPIO2, 2)), ((LP_GPIO2, LP_GPIOn, 2), GPIO2), ((LP_GPIO2, LP_GPIOn, 2), (GPIO2,
-        2)), (LP_UART_RTSN, GPIO2), (LP_UART_RTSN, (GPIO2, 2)), (LP_GPIO3, GPIO3),
-        (LP_GPIO3, (GPIO3, 3)), ((LP_GPIO3, LP_GPIOn, 3), GPIO3), ((LP_GPIO3, LP_GPIOn,
-        3), (GPIO3, 3)), (LP_UART_CTSN, GPIO3), (LP_UART_CTSN, (GPIO3, 3)), (LP_GPIO4,
-        GPIO4), (LP_GPIO4, (GPIO4, 4)), ((LP_GPIO4, LP_GPIOn, 4), GPIO4), ((LP_GPIO4,
-        LP_GPIOn, 4), (GPIO4, 4)), (LP_UART_RXD, GPIO4), (LP_UART_RXD, (GPIO4, 4)),
-        (LP_GPIO5, GPIO5), (LP_GPIO5, (GPIO5, 5)), ((LP_GPIO5, LP_GPIOn, 5), GPIO5),
-        ((LP_GPIO5, LP_GPIOn, 5), (GPIO5, 5)), (LP_UART_TXD, GPIO5), (LP_UART_TXD,
-        (GPIO5, 5)), (LP_GPIO6, GPIO6), (LP_GPIO6, (GPIO6, 6)), ((LP_GPIO6, LP_GPIOn, 6),
-        GPIO6), ((LP_GPIO6, LP_GPIOn, 6), (GPIO6, 6)), (LP_I2C_SDA, GPIO6), (LP_I2C_SDA,
-        (GPIO6, 6)), (LP_GPIO7, GPIO7), (LP_GPIO7, (GPIO7, 7)), ((LP_GPIO7, LP_GPIOn, 7),
-        GPIO7), ((LP_GPIO7, LP_GPIOn, 7), (GPIO7, 7)), (LP_I2C_SCL, GPIO7), (LP_I2C_SCL,
-        (GPIO7, 7))));
+        _for_each_inner!((LP_GPIO0, GPIO0)); _for_each_inner!(((LP_GPIO0, LP_GPIOn, 0),
+        GPIO0)); _for_each_inner!((LP_UART_DTRN, GPIO0)); _for_each_inner!((LP_GPIO1,
+        GPIO1)); _for_each_inner!(((LP_GPIO1, LP_GPIOn, 1), GPIO1));
+        _for_each_inner!((LP_UART_DSRN, GPIO1)); _for_each_inner!((LP_GPIO2, GPIO2));
+        _for_each_inner!(((LP_GPIO2, LP_GPIOn, 2), GPIO2));
+        _for_each_inner!((LP_UART_RTSN, GPIO2)); _for_each_inner!((LP_GPIO3, GPIO3));
+        _for_each_inner!(((LP_GPIO3, LP_GPIOn, 3), GPIO3));
+        _for_each_inner!((LP_UART_CTSN, GPIO3)); _for_each_inner!((LP_GPIO4, GPIO4));
+        _for_each_inner!(((LP_GPIO4, LP_GPIOn, 4), GPIO4));
+        _for_each_inner!((LP_UART_RXD, GPIO4)); _for_each_inner!((LP_GPIO5, GPIO5));
+        _for_each_inner!(((LP_GPIO5, LP_GPIOn, 5), GPIO5));
+        _for_each_inner!((LP_UART_TXD, GPIO5)); _for_each_inner!((LP_GPIO6, GPIO6));
+        _for_each_inner!(((LP_GPIO6, LP_GPIOn, 6), GPIO6)); _for_each_inner!((LP_I2C_SDA,
+        GPIO6)); _for_each_inner!((LP_GPIO7, GPIO7)); _for_each_inner!(((LP_GPIO7,
+        LP_GPIOn, 7), GPIO7)); _for_each_inner!((LP_I2C_SCL, GPIO7));
+        _for_each_inner!((all(LP_GPIO0, GPIO0), ((LP_GPIO0, LP_GPIOn, 0), GPIO0),
+        (LP_UART_DTRN, GPIO0), (LP_GPIO1, GPIO1), ((LP_GPIO1, LP_GPIOn, 1), GPIO1),
+        (LP_UART_DSRN, GPIO1), (LP_GPIO2, GPIO2), ((LP_GPIO2, LP_GPIOn, 2), GPIO2),
+        (LP_UART_RTSN, GPIO2), (LP_GPIO3, GPIO3), ((LP_GPIO3, LP_GPIOn, 3), GPIO3),
+        (LP_UART_CTSN, GPIO3), (LP_GPIO4, GPIO4), ((LP_GPIO4, LP_GPIOn, 4), GPIO4),
+        (LP_UART_RXD, GPIO4), (LP_GPIO5, GPIO5), ((LP_GPIO5, LP_GPIOn, 5), GPIO5),
+        (LP_UART_TXD, GPIO5), (LP_GPIO6, GPIO6), ((LP_GPIO6, LP_GPIOn, 6), GPIO6),
+        (LP_I2C_SDA, GPIO6), (LP_GPIO7, GPIO7), ((LP_GPIO7, LP_GPIOn, 7), GPIO7),
+        (LP_I2C_SCL, GPIO7)));
     };
 }
 #[macro_export]

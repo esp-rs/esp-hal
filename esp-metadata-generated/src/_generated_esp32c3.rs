@@ -382,50 +382,32 @@ macro_rules! for_each_gpio {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [for_each_gpio].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has two options for its "Individual matcher" case:
 ///
 /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the
-///   GPIO's number
-/// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case,
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
 ///   where you need the number(s) of a signal, or the general group to which the signal belongs.
 ///   For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
-/// - `($signal:ident, $gpio:ident)` - fully expanded case
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
 #[macro_export]
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((ADC1_CH0, GPIO0)); _for_each_inner!((ADC1_CH0, (GPIO0, 0)));
-        _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO0));
-        _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO0, 0)));
-        _for_each_inner!((ADC1_CH1, GPIO1)); _for_each_inner!((ADC1_CH1, (GPIO1, 1)));
-        _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1));
-        _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), (GPIO1, 1)));
-        _for_each_inner!((ADC1_CH2, GPIO2)); _for_each_inner!((ADC1_CH2, (GPIO2, 2)));
+        _for_each_inner!((ADC1_CH0, GPIO0)); _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1,
+        0), GPIO0)); _for_each_inner!((ADC1_CH1, GPIO1)); _for_each_inner!(((ADC1_CH1,
+        ADCn_CHm, 1, 1), GPIO1)); _for_each_inner!((ADC1_CH2, GPIO2));
         _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2));
-        _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), (GPIO2, 2)));
-        _for_each_inner!((ADC1_CH3, GPIO3)); _for_each_inner!((ADC1_CH3, (GPIO3, 3)));
-        _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3));
-        _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), (GPIO3, 3)));
-        _for_each_inner!((ADC1_CH4, GPIO4)); _for_each_inner!((ADC1_CH4, (GPIO4, 4)));
-        _for_each_inner!(((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4));
-        _for_each_inner!(((ADC1_CH4, ADCn_CHm, 1, 4), (GPIO4, 4)));
-        _for_each_inner!((ADC2_CH0, GPIO5)); _for_each_inner!((ADC2_CH0, (GPIO5, 5)));
-        _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO5));
-        _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2, 0), (GPIO5, 5)));
-        _for_each_inner!((USB_DM, GPIO18)); _for_each_inner!((USB_DM, (GPIO18, 18)));
-        _for_each_inner!((USB_DP, GPIO19)); _for_each_inner!((USB_DP, (GPIO19, 19)));
-        _for_each_inner!((all(ADC1_CH0, GPIO0), (ADC1_CH0, (GPIO0, 0)), ((ADC1_CH0,
-        ADCn_CHm, 1, 0), GPIO0), ((ADC1_CH0, ADCn_CHm, 1, 0), (GPIO0, 0)), (ADC1_CH1,
-        GPIO1), (ADC1_CH1, (GPIO1, 1)), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO1), ((ADC1_CH1,
-        ADCn_CHm, 1, 1), (GPIO1, 1)), (ADC1_CH2, GPIO2), (ADC1_CH2, (GPIO2, 2)),
-        ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2), (GPIO2, 2)),
-        (ADC1_CH3, GPIO3), (ADC1_CH3, (GPIO3, 3)), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3),
-        ((ADC1_CH3, ADCn_CHm, 1, 3), (GPIO3, 3)), (ADC1_CH4, GPIO4), (ADC1_CH4, (GPIO4,
-        4)), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4), ((ADC1_CH4, ADCn_CHm, 1, 4), (GPIO4,
-        4)), (ADC2_CH0, GPIO5), (ADC2_CH0, (GPIO5, 5)), ((ADC2_CH0, ADCn_CHm, 2, 0),
-        GPIO5), ((ADC2_CH0, ADCn_CHm, 2, 0), (GPIO5, 5)), (USB_DM, GPIO18), (USB_DM,
-        (GPIO18, 18)), (USB_DP, GPIO19), (USB_DP, (GPIO19, 19))));
+        _for_each_inner!((ADC1_CH3, GPIO3)); _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1,
+        3), GPIO3)); _for_each_inner!((ADC1_CH4, GPIO4)); _for_each_inner!(((ADC1_CH4,
+        ADCn_CHm, 1, 4), GPIO4)); _for_each_inner!((ADC2_CH0, GPIO5));
+        _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2, 0), GPIO5)); _for_each_inner!((USB_DM,
+        GPIO18)); _for_each_inner!((USB_DP, GPIO19)); _for_each_inner!((all(ADC1_CH0,
+        GPIO0), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO0), (ADC1_CH1, GPIO1), ((ADC1_CH1,
+        ADCn_CHm, 1, 1), GPIO1), (ADC1_CH2, GPIO2), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO2),
+        (ADC1_CH3, GPIO3), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO3), (ADC1_CH4, GPIO4),
+        ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO4), (ADC2_CH0, GPIO5), ((ADC2_CH0, ADCn_CHm, 2,
+        0), GPIO5), (USB_DM, GPIO18), (USB_DP, GPIO19)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -433,16 +415,15 @@ macro_rules! for_each_analog_function {
 /// For an explanation on the general syntax, as well as usage of individual/repeated
 /// matchers, refer to [for_each_gpio].
 ///
-/// This macro has four options for its "Individual matcher" case:
+/// This macro has two options for its "Individual matcher" case:
 ///
 /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `($signal:ident, ($gpio:ident, $gpio_num:literal))` - expanded GPIO case, where you need the
-///   GPIO's number
-/// - `(($signal:ident, $group:ident $(, $number:literal)*), $gpio:ident)` - expanded signal case,
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
 ///   where you need the number(s) of a signal, or the general group to which the signal belongs.
 ///   For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
 ///   SAR_I2C_SCL_n, 1)`.
-/// - `($signal:ident, $gpio:ident)` - fully expanded case
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
 #[macro_export]
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
