@@ -132,7 +132,9 @@ unsafe extern "C" fn mktime(time: *const Tm) -> i64 {
     // complexities
     let mut days_in_month = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-    let is_leap_year = |year: u32| year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let is_leap_year = |year: u32| {
+        year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
+    };
 
     let mut days = 0;
     let year = time.tm_year + 1900;

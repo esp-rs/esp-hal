@@ -22,10 +22,10 @@ macro_rules! assert_unique_features {
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-check-cfg=cfg(is_debug_build)");
-    if let Ok(level) = std::env::var("OPT_LEVEL") {
-        if level == "0" || level == "1" {
-            println!("cargo:rustc-cfg=is_debug_build");
-        }
+    if let Ok(level) = std::env::var("OPT_LEVEL")
+        && (level == "0" || level == "1")
+    {
+        println!("cargo:rustc-cfg=is_debug_build");
     }
 
     // If some library required unstable make sure unstable is actually enabled.

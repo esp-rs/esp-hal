@@ -3486,16 +3486,16 @@ impl Driver {
             }
         }
         let rem = c_iter.remainder();
-        if !rem.is_empty() {
-            if let Some(w_reg) = w_iter.next() {
-                let word = match rem.len() {
-                    3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
-                    2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
-                    1 => rem[0] as u32,
-                    _ => unreachable!(),
-                };
-                w_reg.write(|w| w.buf().set(word));
-            }
+        if !rem.is_empty()
+            && let Some(w_reg) = w_iter.next()
+        {
+            let word = match rem.len() {
+                3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
+                2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
+                1 => rem[0] as u32,
+                _ => unreachable!(),
+            };
+            w_reg.write(|w| w.buf().set(word));
         }
     }
 
