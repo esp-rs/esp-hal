@@ -250,6 +250,10 @@ impl Package {
         let mut cases = Vec::new();
 
         match self {
+            Package::EspHal => {
+                // Make sure no additional features (e.g. no "unstable") still compiles:
+                cases.push(vec![]);
+            }
             Package::EspWifi => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec![
