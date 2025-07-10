@@ -2216,21 +2216,21 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
 
 #[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_pin {
+    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt) => {
+        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
+            #[allow(unused_mut)]
+            let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+            return $code;
+        }
+    };
+
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
             (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
-                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-                    #[allow(unused_mut)]
-                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                    return $code;
-                }
+                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
             (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
-                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-                    #[allow(unused_mut)]
-                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                    return $code;
-                }
+                for_each_rtcio_pin!(@impl $ident, $target, $gpio, $code)
             };
         }
         unreachable!();
@@ -2239,29 +2239,25 @@ macro_rules! for_each_rtcio_pin {
 
 #[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_output_pin {
+    (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
+        if $ident.number() == $crate::peripherals::$gpio::NUMBER {
+            if_pin_is_type!($gpio, Output, {
+                #[allow(unused_mut)]
+                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                return $code;
+            } else {
+                pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, $kind)
+            })
+        }
+    };
+
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
             (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
-                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-                    if_pin_is_type!($gpio, Output, {
-                        #[allow(unused_mut)]
-                        let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                        return $code;
-                    } else {
-                        pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, "RTCIO output")
-                    })
-                }
+                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "RTC_IO output")
             };
             (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
-                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-                    if_pin_is_type!($gpio, Output, {
-                        #[allow(unused_mut)]
-                        let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                        return $code;
-                    } else {
-                        pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, "LPIO output")
-                    })
-                }
+                for_each_rtcio_output_pin!(@impl $ident, $target, $gpio, $code, "LP_IO output")
             };
         }
         unreachable!();
