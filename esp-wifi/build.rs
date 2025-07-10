@@ -43,14 +43,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         "#
     );
 
-    if let Ok(level) = std::env::var("OPT_LEVEL") {
-        if level != "2" && level != "3" && level != "s" {
-            let message = format!(
-                "esp-wifi should be built with optimization level 2, 3 or s - yours is {level}.
+    if let Ok(level) = std::env::var("OPT_LEVEL")
+        && level != "2"
+        && level != "3"
+        && level != "s"
+    {
+        let message = format!(
+            "esp-wifi should be built with optimization level 2, 3 or s - yours is {level}.
                 See https://github.com/esp-rs/esp-wifi",
-            );
-            print_warning(message);
-        }
+        );
+        print_warning(message);
     }
 
     println!("cargo:rustc-check-cfg=cfg(coex)");

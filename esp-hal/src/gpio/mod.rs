@@ -383,6 +383,7 @@ pub trait Pin: Sealed {
     /// GPIO number
     fn number(&self) -> u8;
 
+    #[procmacros::doc_replace]
     /// Type-erase this pin into an [`AnyPin`].
     ///
     /// This function converts pin singletons (`GPIO0<'_>`, …), which are all
@@ -392,22 +393,16 @@ pub trait Pin: Sealed {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{AnyPin, Pin, Output, OutputConfig, Level};
-    /// use esp_hal::delay::Delay;
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     delay::Delay,
+    ///     gpio::{AnyPin, Level, Output, OutputConfig, Pin},
+    /// };
     ///
     /// fn toggle_pins(pins: [AnyPin; 2], delay: &mut Delay) {
     ///     let [red, blue] = pins;
-    ///     let mut red = Output::new(
-    ///         red,
-    ///         Level::High,
-    ///         OutputConfig::default(),
-    ///     );
-    ///     let mut blue = Output::new(
-    ///         blue,
-    ///         Level::Low,
-    ///         OutputConfig::default(),
-    ///     );
+    ///     let mut red = Output::new(red, Level::High, OutputConfig::default());
+    ///     let mut blue = Output::new(blue, Level::Low, OutputConfig::default());
     ///
     ///     loop {
     ///         red.toggle();
@@ -416,15 +411,11 @@ pub trait Pin: Sealed {
     ///     }
     /// }
     ///
-    /// let pins: [AnyPin; 2] = [
-    ///    peripherals.GPIO5.degrade(),
-    ///    peripherals.GPIO6.degrade(),
-    /// ];
+    /// let pins: [AnyPin; 2] = [peripherals.GPIO5.degrade(), peripherals.GPIO6.degrade()];
     ///
     /// let mut delay = Delay::new();
     /// toggle_pins(pins, &mut delay);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     fn degrade<'d>(self) -> AnyPin<'d>
     where
@@ -1002,6 +993,7 @@ impl<'d> Output<'d> {
         this
     }
 
+    #[procmacros::doc_replace]
     /// Turns the pin object into a peripheral
     /// [output][interconnect::OutputSignal].
     ///
@@ -1014,13 +1006,12 @@ impl<'d> Output<'d> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Output, OutputConfig, Level};
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// # let config = OutputConfig::default();
     /// let pin1_gpio = Output::new(peripherals.GPIO1, Level::High, config);
     /// let output = pin1_gpio.into_peripheral_output();
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1028,79 +1019,79 @@ impl<'d> Output<'d> {
         self.pin.into_peripheral_output()
     }
 
+    #[procmacros::doc_replace]
     /// Change the configuration.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::gpio::{Level, Output, OutputConfig, DriveMode};
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{DriveMode, Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     ///
     /// pin.apply_config(&OutputConfig::default().with_drive_mode(DriveMode::OpenDrain));
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn apply_config(&mut self, config: &OutputConfig) {
         self.pin.apply_output_config(config)
     }
-
+    #[procmacros::doc_replace]
     /// Set the output as high.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
     /// pin.set_high();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn set_high(&mut self) {
         self.set_level(Level::High)
     }
 
+    #[procmacros::doc_replace]
     /// Set the output as low.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.set_low();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn set_low(&mut self) {
         self.set_level(Level::Low)
     }
 
+    #[procmacros::doc_replace]
     /// Set the output level.ç
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.set_level(Level::Low);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn set_level(&mut self, level: Level) {
         self.pin.set_level(level)
     }
 
+    #[procmacros::doc_replace]
     /// Returns whether the pin is set to high level.
     ///
     /// This function reads back the value set using `set_level`, `set_high` or
@@ -1109,19 +1100,19 @@ impl<'d> Output<'d> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let is_high = pin.is_set_high();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn is_set_high(&self) -> bool {
         self.output_level() == Level::High
     }
 
+    #[procmacros::doc_replace]
     /// Returns whether the pin is set to low level.
     ///
     /// This function reads back the value set using `set_level`, `set_high` or
@@ -1130,19 +1121,19 @@ impl<'d> Output<'d> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let is_low = pin.is_set_low();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn is_set_low(&self) -> bool {
         self.output_level() == Level::Low
     }
 
+    #[procmacros::doc_replace]
     /// Returns which level the pin is set to.
     ///
     /// This function reads back the value set using `set_level`, `set_high` or
@@ -1151,19 +1142,19 @@ impl<'d> Output<'d> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// let level = pin.output_level();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn output_level(&self) -> Level {
         self.pin.output_level()
     }
 
+    #[procmacros::doc_replace]
     /// Toggles the pin output.
     ///
     /// If the pin was previously set to high, it will be set to low, and vice
@@ -1172,13 +1163,12 @@ impl<'d> Output<'d> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Level, Output, OutputConfig};
     /// let mut pin = Output::new(peripherals.GPIO5, Level::High, OutputConfig::default());
     /// pin.toggle();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn toggle(&mut self) {
@@ -1297,72 +1287,72 @@ impl<'d> Input<'d> {
         self.pin.peripheral_input()
     }
 
+    #[procmacros::doc_replace]
     /// Get whether the pin input level is high.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Input, InputConfig};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let is_high = pin.is_high();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn is_high(&self) -> bool {
         self.level() == Level::High
     }
 
+    #[procmacros::doc_replace]
     /// Get whether the pin input level is low.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Input, InputConfig};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let is_low = pin.is_low();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn is_low(&self) -> bool {
         self.level() == Level::Low
     }
 
+    #[procmacros::doc_replace]
     /// Get the current pin input level.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Input, InputConfig, Level};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let level = pin.level();
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     pub fn level(&self) -> Level {
         self.pin.level()
     }
 
+    #[procmacros::doc_replace]
     /// Change the configuration.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{Input, InputConfig, Level, Pull};
     /// let mut pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// pin.apply_config(&InputConfig::default().with_pull(Pull::Up));
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn apply_config(&mut self, config: &InputConfig) {
         self.pin.apply_input_config(config)
@@ -1705,6 +1695,7 @@ impl<'d> Flex<'d> {
 
     // Other/common functions
 
+    #[procmacros::doc_replace]
     /// Returns a peripheral [input][interconnect::InputSignal] connected to
     /// this pin.
     ///
@@ -1714,15 +1705,14 @@ impl<'d> Flex<'d> {
     /// [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::Flex;
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an input.
     /// let pin1 = pin1_gpio.peripheral_input();
     /// // You can keep using the Flex, as well as connect the pin to a
     /// // peripheral input.
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1734,6 +1724,7 @@ impl<'d> Flex<'d> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Split the pin into an input and output signal pair.
     ///
     /// Peripheral signals allow connecting peripherals together without using
@@ -1743,12 +1734,11 @@ impl<'d> Flex<'d> {
     /// [frozen](interconnect::InputSignal::freeze).
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::Flex;
     /// let pin1 = Flex::new(peripherals.GPIO1);
     /// let (input, output) = pin1.split();
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1798,6 +1788,7 @@ impl<'d> Flex<'d> {
         (input, output)
     }
 
+    #[procmacros::doc_replace]
     /// Turns the pin object into a peripheral
     /// [output][interconnect::OutputSignal].
     ///
@@ -1808,13 +1799,12 @@ impl<'d> Flex<'d> {
     /// [frozen](interconnect::OutputSignal::freeze).
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::Flex;
     /// let pin1_gpio = Flex::new(peripherals.GPIO1);
     /// // Can be passed as an output.
     /// let pin1 = pin1_gpio.into_peripheral_output();
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -1880,6 +1870,7 @@ impl<'lt> AnyPin<'lt> {
         });
     }
 
+    #[procmacros::doc_replace]
     /// Split the pin into an input and output signal.
     ///
     /// Peripheral signals allow connecting peripherals together without
@@ -1900,12 +1891,11 @@ impl<'lt> AnyPin<'lt> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::gpio::{AnyPin, Pin};
     /// let pin1 = peripherals.GPIO1.degrade();
     /// let (input, output) = unsafe { pin1.split() };
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[inline]
     #[instability::unstable]
@@ -2176,6 +2166,57 @@ impl InputPin for AnyPin<'_> {
     }
 }
 impl OutputPin for AnyPin<'_> {}
+
+for_each_gpio! {
+    ($n:literal, $gpio:ident $($_rest:tt)*) => {
+        impl<'lt> TryFrom<AnyPin<'lt>> for crate::peripherals::$gpio<'lt> {
+            type Error = AnyPin<'lt>;
+
+            fn try_from(any_pin: AnyPin<'lt>) -> Result<Self, Self::Error> {
+                if any_pin.number() == $n {
+                    Ok(unsafe { Self::steal() })
+                } else {
+                    Err(any_pin)
+                }
+            }
+        }
+    };
+}
+
+impl AnyPin<'_> {
+    #[procmacros::doc_replace]
+    /// Attempts to downcast the pin into the underlying GPIO instance.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::{
+    ///     gpio::AnyPin,
+    ///     peripherals::{GPIO2, GPIO4},
+    /// };
+    ///
+    /// let any_pin2 = AnyPin::from(peripherals.GPIO2);
+    /// let any_pin3 = AnyPin::from(peripherals.GPIO3);
+    ///
+    /// let gpio2 = any_pin2
+    ///     .downcast::<GPIO2>()
+    ///     .expect("This downcast succeeds because AnyPin was created from GPIO2");
+    /// let gpio4 = any_pin3
+    ///     .downcast::<GPIO4>()
+    ///     .expect_err("This AnyPin was created from GPIO3, it cannot be downcast to GPIO4");
+    /// #
+    /// # {after_snippet}
+    /// ```
+    #[inline]
+    pub fn downcast<P: Pin>(self) -> Result<P, Self>
+    where
+        Self: TryInto<P, Error = Self>,
+    {
+        self.try_into()
+    }
+}
 
 #[cfg(not(esp32h2))]
 impl RtcPin for AnyPin<'_> {

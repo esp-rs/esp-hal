@@ -648,15 +648,17 @@ impl core::fmt::Display for ConfigError {
         }
     }
 }
-
+#[procmacros::doc_replace]
 /// SPI peripheral driver
 ///
 /// ## Example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
-/// use esp_hal::spi::Mode;
-/// use esp_hal::spi::master::{Config, Spi};
+/// # {before_snippet}
+/// use esp_hal::spi::{
+///     Mode,
+///     master::{Config, Spi},
+/// };
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default()
@@ -666,8 +668,7 @@ impl core::fmt::Display for ConfigError {
 /// .with_sck(peripherals.GPIO0)
 /// .with_mosi(peripherals.GPIO1)
 /// .with_miso(peripherals.GPIO2);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -681,6 +682,7 @@ pub struct Spi<'d, Dm: DriverMode> {
 impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 
 impl<'d> Spi<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Constructs an SPI instance in 8bit dataframe mode.
     ///
     /// ## Errors
@@ -690,15 +692,16 @@ impl<'d> Spi<'d, Blocking> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2);
-    /// # Ok(())
-    /// # }
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2);
+    /// # {after_snippet}
     /// ```
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
@@ -848,31 +851,34 @@ impl<'d> Spi<'d, Async> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Waits for the completion of previous operations.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2)
-    /// .into_async();
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut buffer = [0; 10];
     /// spi.transfer_in_place_async(&mut buffer).await?;
     /// spi.flush_async().await?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         self.driver().flush_async().await
     }
 
+    #[procmacros::doc_replace]
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     ///
     /// This function aborts the transfer when its Future is dropped. Some
@@ -883,20 +889,21 @@ impl<'d> Spi<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2)
-    /// .into_async();
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut buffer = [0; 10];
     /// spi.transfer_in_place_async(&mut buffer).await?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
@@ -957,6 +964,7 @@ where
         pin.connect_with_guard(signal)
     }
 
+    #[procmacros::doc_replace]
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
@@ -967,14 +975,14 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
-    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0);
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_sck(peripherals.GPIO0);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
         self.pins.sclk_pin = self.connect_output_pin(sclk.into(), self.driver().info.sclk);
@@ -982,6 +990,7 @@ where
         self
     }
 
+    #[procmacros::doc_replace]
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it as the MOSI
@@ -994,13 +1003,14 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_mosi(peripherals.GPIO1);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
         self.pins.sio0_pin = self.connect_sio_output_pin(mosi.into(), 0);
@@ -1008,6 +1018,7 @@ where
         self
     }
 
+    #[procmacros::doc_replace]
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
@@ -1019,13 +1030,14 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_miso(peripherals.GPIO2);
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
         let miso = miso.into();
@@ -1139,26 +1151,28 @@ where
         self.driver().apply_config(config)
     }
 
+    #[procmacros::doc_replace]
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2)
-    /// .into_async();
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let buffer = [0; 10];
     /// spi.write(&buffer)?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
@@ -1168,52 +1182,56 @@ where
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2)
-    /// .into_async();
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut buffer = [0; 10];
     /// spi.read(&mut buffer)?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
 
+    #[procmacros::doc_replace]
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// use esp_hal::spi::Mode;
-    /// use esp_hal::spi::master::{Config, Spi};
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
     /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
-    /// .with_sck(peripherals.GPIO0)
-    /// .with_mosi(peripherals.GPIO1)
-    /// .with_miso(peripherals.GPIO2)
-    /// .into_async();
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut buffer = [0; 10];
     /// spi.transfer(&mut buffer)?;
     ///
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
@@ -3468,16 +3486,16 @@ impl Driver {
             }
         }
         let rem = c_iter.remainder();
-        if !rem.is_empty() {
-            if let Some(w_reg) = w_iter.next() {
-                let word = match rem.len() {
-                    3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
-                    2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
-                    1 => rem[0] as u32,
-                    _ => unreachable!(),
-                };
-                w_reg.write(|w| w.buf().set(word));
-            }
+        if !rem.is_empty()
+            && let Some(w_reg) = w_iter.next()
+        {
+            let word = match rem.len() {
+                3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
+                2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
+                1 => rem[0] as u32,
+                _ => unreachable!(),
+            };
+            w_reg.write(|w| w.buf().set(word));
         }
     }
 

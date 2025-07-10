@@ -54,7 +54,9 @@ pub struct Efuse;
 impl Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
-        (Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT).count_ones() % 2) != 0
+        !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)
+            .count_ones()
+            .is_multiple_of(2)
     }
 
     /// Get the multiplier for the timeout value of the RWDT STAGE 0 register.

@@ -235,12 +235,12 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             );
             self.cursor = self.cursor.wrapping_add(flushed);
 
-            if flushed > 0 && self.cursor % A::CHUNK_LENGTH == 0 {
+            if flushed > 0 && self.cursor.is_multiple_of(A::CHUNK_LENGTH) {
                 self.process_buffer();
                 while self.is_busy() {}
             }
         }
-        debug_assert!(self.cursor % 4 == 0);
+        debug_assert!(self.cursor.is_multiple_of(4));
 
         let mod_cursor = self.cursor % A::CHUNK_LENGTH;
         if (A::CHUNK_LENGTH - mod_cursor) < A::CHUNK_LENGTH / 8 {

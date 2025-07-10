@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Inter-Integrated Circuit (I2C) - Master mode
 //!
 //! ## Overview
@@ -14,20 +15,20 @@
 //! [`Config`] struct.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::{i2c::master::Config, time::Rate};
 //!
 //! let config = Config::default().with_frequency(Rate::from_khz(100));
-//! # Ok(()) }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! You will then need to pass the configuration to [`I2c::new`], and you can
 //! also change the configuration later by calling [`I2c::apply_config`].
 //!
 //! You will also need to specify the SDA and SCL pins when you create the
 //! driver instance.
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::i2c::master::I2c;
 //! # use esp_hal::{i2c::master::Config, time::Rate};
 //! #
@@ -41,16 +42,16 @@
 //! // You can change the configuration later:
 //! let new_config = config.with_frequency(Rate::from_khz(400));
 //! i2c.apply_config(&new_config)?;
-//! # Ok(()) }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ## Usage
 //!
 //! The master communicates with slave devices using I2C transactions. A
 //! transaction can be a write, a read, or a combination of both. The
 //! [`I2c`] driver provides methods for performing these transactions:
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::i2c::master::{I2c, Config, Operation};
 //! # let config = Config::default();
 //! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
@@ -71,12 +72,12 @@
 //!         Operation::Read(&mut read_buffer),
 //!     ],
 //! )?;
-//! # Ok(()) }
+//! # {after_snippet}
 //! ```
 //! If you configure the driver to `async` mode, the driver also provides
 //! asynchronous versions of these methods:
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::i2c::master::{I2c, Config, Operation};
 //! # let config = Config::default();
 //! # let mut i2c = I2c::new(peripherals.I2C0, config)?;
@@ -104,9 +105,9 @@
 //! // You should still be able to use the blocking methods, if you need to:
 //! i2c.write(DEVICE_ADDR, &write_buffer)?;
 //!
-//! # Ok(()) }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! The I2C driver also implements [embedded-hal] and [embedded-hal-async]
 //! traits, so you can use it with any crate that supports these traits.
 //!
@@ -619,25 +620,22 @@ impl Default for Config {
     }
 }
 
+#[procmacros::doc_replace]
 /// I2C driver
 ///
 /// ## Example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::i2c::master::{Config, I2c};
 /// # const DEVICE_ADDR: u8 = 0x77;
-/// let mut i2c = I2c::new(
-///     peripherals.I2C0,
-///     Config::default(),
-/// )?
-/// .with_sda(peripherals.GPIO1)
-/// .with_scl(peripherals.GPIO2);
+/// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?
+///     .with_sda(peripherals.GPIO1)
+///     .with_scl(peripherals.GPIO2);
 ///
 /// let mut data = [0u8; 22];
 /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data)?;
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -686,6 +684,7 @@ impl<Dm: DriverMode> embedded_hal::i2c::I2c for I2c<'_, Dm> {
 }
 
 impl<'d> I2c<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Create a new I2C instance.
     ///
     /// ## Errors
@@ -696,16 +695,12 @@ impl<'d> I2c<'d, Blocking> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
-    /// let i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2);
-    /// # Ok(())
-    /// # }
+    /// let i2c = I2c::new(peripherals.I2C0, Config::default())?
+    ///     .with_sda(peripherals.GPIO1)
+    ///     .with_scl(peripherals.GPIO2);
+    /// # {after_snippet}
     /// ```
     pub fn new(i2c: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(i2c.info().peripheral);
@@ -896,11 +891,11 @@ impl<'a> I2cFuture<'a> {
             self.finished = true;
             Poll::Ready(error)
         } else {
-            if let Some(deadline) = self.deadline {
-                if now > deadline {
-                    // If the deadline is reached, we return an error.
-                    return Poll::Ready(Err(Error::Timeout));
-                }
+            if let Some(deadline) = self.deadline
+                && now > deadline
+            {
+                // If the deadline is reached, we return an error.
+                return Poll::Ready(Err(Error::Timeout));
             }
 
             Poll::Pending
@@ -949,25 +944,22 @@ impl<'d> I2c<'d, Async> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address`
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?
+    ///     .with_sda(peripherals.GPIO1)
+    ///     .with_scl(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// i2c.write_async(DEVICE_ADDR, &[0xaa]).await?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn write_async<A: Into<I2cAddress>>(
         &mut self,
@@ -978,6 +970,7 @@ impl<'d> I2c<'d, Async> {
             .await
     }
 
+    #[procmacros::doc_replace]
     /// Reads enough bytes from slave with `address` to fill `buffer`
     ///
     /// ## Errors
@@ -988,21 +981,17 @@ impl<'d> I2c<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?
+    ///     .with_sda(peripherals.GPIO1)
+    ///     .with_scl(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut data = [0u8; 22];
     /// i2c.read_async(DEVICE_ADDR, &mut data).await?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub async fn read_async<A: Into<I2cAddress>>(
         &mut self,
@@ -1013,6 +1002,7 @@ impl<'d> I2c<'d, Async> {
             .await
     }
 
+    #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address` and then reads enough
     /// bytes to fill `buffer` *in a single transaction*
     ///
@@ -1024,21 +1014,18 @@ impl<'d> I2c<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?
+    ///     .with_sda(peripherals.GPIO1)
+    ///     .with_scl(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut data = [0u8; 22];
-    /// i2c.write_read_async(DEVICE_ADDR, &[0xaa], &mut data).await?;
-    /// # Ok(())
-    /// # }
+    /// i2c.write_read_async(DEVICE_ADDR, &[0xaa], &mut data)
+    ///     .await?;
+    /// # {after_snippet}
     /// ```
     pub async fn write_read_async<A: Into<I2cAddress>>(
         &mut self,
@@ -1053,6 +1040,7 @@ impl<'d> I2c<'d, Async> {
         .await
     }
 
+    #[procmacros::doc_replace]
     /// Execute the provided operations on the I2C bus as a single
     /// transaction.
     ///
@@ -1082,24 +1070,21 @@ impl<'d> I2c<'d, Async> {
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c, Operation};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_sda(peripherals.GPIO1)
-    /// .with_scl(peripherals.GPIO2)
-    /// .into_async();
+    /// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?
+    ///     .with_sda(peripherals.GPIO1)
+    ///     .with_scl(peripherals.GPIO2)
+    ///     .into_async();
     ///
     /// let mut data = [0u8; 22];
-    /// i2c.transaction_async(DEVICE_ADDR, &mut [
-    ///     Operation::Write(&[0xaa]),
-    ///     Operation::Read(&mut data),
-    /// ]).await?;
-    /// # Ok(())
-    /// # }
+    /// i2c.transaction_async(
+    ///     DEVICE_ADDR,
+    ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)],
+    /// )
+    /// .await?;
+    /// # {after_snippet}
     /// ```
     pub async fn transaction_async<'a, A: Into<I2cAddress>>(
         &mut self,
@@ -1146,6 +1131,7 @@ where
         self
     }
 
+    #[procmacros::doc_replace]
     /// Connect a pin to the I2C SCL signal.
     ///
     /// This will replace previous pin assignments for this signal.
@@ -1153,16 +1139,11 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// const DEVICE_ADDR: u8 = 0x77;
-    /// let i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?
-    /// .with_scl(peripherals.GPIO2);
-    /// # Ok(())
-    /// # }
+    /// let i2c = I2c::new(peripherals.I2C0, Config::default())?.with_scl(peripherals.GPIO2);
+    /// # {after_snippet}
     /// ```
     pub fn with_scl(mut self, scl: impl PeripheralOutput<'d>) -> Self {
         let info = self.driver().info;
@@ -1173,12 +1154,13 @@ where
         self
     }
 
+    #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address`
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
@@ -1186,19 +1168,19 @@ where
     /// # )?;
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// i2c.write(DEVICE_ADDR, &[0xaa])?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn write<A: Into<I2cAddress>>(&mut self, address: A, buffer: &[u8]) -> Result<(), Error> {
         self.transaction(address, &mut [Operation::Write(buffer)])
     }
 
+    #[procmacros::doc_replace]
     /// Reads enough bytes from slave with `address` to fill `buffer`
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
@@ -1207,13 +1189,13 @@ where
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
     /// i2c.read(DEVICE_ADDR, &mut data)?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
-    /// 
+    ///
     /// ## Errors
     ///
-    /// The corresponding error variant from [`Error`] will be returned if the passed buffer has zero length.
+    /// The corresponding error variant from [`Error`] will be returned if the passed buffer has
+    /// zero length.
     pub fn read<A: Into<I2cAddress>>(
         &mut self,
         address: A,
@@ -1222,6 +1204,7 @@ where
         self.transaction(address, &mut [Operation::Read(buffer)])
     }
 
+    #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address` and then reads enough bytes
     /// to fill `buffer` *in a single transaction*
     ///
@@ -1233,7 +1216,7 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
@@ -1242,8 +1225,7 @@ where
     /// # const DEVICE_ADDR: u8 = 0x77;
     /// let mut data = [0u8; 22];
     /// i2c.write_read(DEVICE_ADDR, &[0xaa], &mut data)?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn write_read<A: Into<I2cAddress>>(
         &mut self,
@@ -1257,6 +1239,7 @@ where
         )
     }
 
+    #[procmacros::doc_replace]
     /// Execute the provided operations on the I2C bus.
     ///
     /// Transaction contract:
@@ -1277,7 +1260,7 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c, Operation};
     /// # let mut i2c = I2c::new(
     /// #   peripherals.I2C0,
@@ -1287,12 +1270,10 @@ where
     /// let mut data = [0u8; 22];
     /// i2c.transaction(
     ///     DEVICE_ADDR,
-    ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)]
+    ///     &mut [Operation::Write(&[0xaa]), Operation::Read(&mut data)],
     /// )?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
-    ///
     #[cfg_attr(
         any(esp32, esp32s2),
         doc = "\n\nOn ESP32 and ESP32-S2 it is advisable to not combine large read/write operations with small (<3 bytes) read/write operations.\n\n"
@@ -1311,6 +1292,7 @@ where
             .inspect_err(|_| self.internal_recover())
     }
 
+    #[procmacros::doc_replace]
     /// Applies a new configuration.
     ///
     /// ## Errors
@@ -1321,16 +1303,12 @@ where
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::i2c::master::{Config, I2c};
-    /// let mut i2c = I2c::new(
-    ///     peripherals.I2C0,
-    ///     Config::default(),
-    /// )?;
+    /// let mut i2c = I2c::new(peripherals.I2C0, Config::default())?;
     ///
     /// i2c.apply_config(&Config::default().with_frequency(Rate::from_khz(400)))?;
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.config.config = *config;
@@ -2266,11 +2244,12 @@ impl Driver<'_> {
             // if there is a valid command which is not END, check if it's marked as done
             if cmd.bits() != 0x0 && !cmd.opcode().is_end() && !cmd.command_done().bit_is_set() {
                 // Let's retry
-                if let Some(deadline) = deadline {
-                    if now > deadline {
-                        return Err(Error::ExecutionIncomplete);
-                    }
+                if let Some(deadline) = deadline
+                    && now > deadline
+                {
+                    return Err(Error::ExecutionIncomplete);
                 }
+
                 return Ok(false);
             }
 

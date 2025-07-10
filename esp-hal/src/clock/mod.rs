@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # CPU Clock Control
 //!
 //! ## Overview
@@ -34,14 +35,13 @@
 //!
 //! ### Initialize With Different Clock Frequencies
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::clock::CpuClock;
 //!
 //! // Initialize with the highest possible frequency for this chip
 //! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
 //! let peripherals = esp_hal::init(config);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::{cell::Cell, marker::PhantomData};
@@ -126,17 +126,17 @@ impl Default for CpuClock {
 }
 
 impl CpuClock {
+    #[procmacros::doc_replace]
     /// Use the highest possible frequency for a particular chip.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// use esp_hal::clock::CpuClock;
     /// let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     /// let peripherals = esp_hal::init(config);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub const fn max() -> Self {
         cfg_if::cfg_if! {
@@ -338,10 +338,10 @@ impl Clocks {
     #[cfg(systimer)]
     #[inline]
     pub(crate) fn xtal_freq() -> Rate {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if let Some(clocks) = Self::try_get() {
-                return clocks.xtal_clock;
-            }
+        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto"
+            && let Some(clocks) = Self::try_get()
+        {
+            return clocks.xtal_clock;
         }
 
         Self::measure_xtal_frequency().frequency()
