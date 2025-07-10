@@ -248,7 +248,7 @@ impl BusTimeout {
                 if raw <= property!("i2c_master.max_bus_timeout") {
                     Ok(Some(raw))
                 } else {
-                    Err(ConfigError::TimeoutInvalid)
+                    Err(ConfigError::TimeoutTooLong)
                 }
             }
         }
@@ -320,7 +320,7 @@ impl FsmTimeout {
     #[instability::unstable]
     pub fn new(value: u8) -> Result<Self, ConfigError> {
         if value > Self::FSM_TIMEOUT_MAX {
-            return Err(ConfigError::TimeoutInvalid);
+            return Err(ConfigError::TimeoutTooLong);
         }
 
         Ok(Self { value })
@@ -434,10 +434,10 @@ impl core::fmt::Display for Error {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// Provided bus frequency is invalid for the current configuration.
-    FrequencyInvalid,
-    /// Provided timeout is invalid for the current configuration.
-    TimeoutInvalid,
+    /// Provided bus frequency is not valid for the current configuration.
+    FrequencyOutOfRange,
+    /// Provided timeout is not valid for the current configuration.
+    TimeoutTooLong,
 }
 
 impl core::error::Error for ConfigError {}
@@ -445,11 +445,11 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ConfigError::FrequencyInvalid => write!(
+            ConfigError::FrequencyOutOfRange => write!(
                 f,
                 "Provided bus frequency is invalid for the current configuration"
             ),
-            ConfigError::TimeoutInvalid => write!(
+            ConfigError::TimeoutTooLong => write!(
                 f,
                 "Provided timeout is invalid for the current configuration"
             ),
@@ -1408,7 +1408,7 @@ fn configure_clock(
         #[cfg(not(esp32))]
         let scl_wait_high_period = scl_wait_high_period
             .try_into()
-            .map_err(|_| ConfigError::FrequencyInvalid)?;
+            .map_err(|_| ConfigError::FrequencyOutOfRange)?;
 
         register_block.scl_high_period().write(|w| {
             #[cfg(not(esp32))] // ESP32 does not have a wait_high field

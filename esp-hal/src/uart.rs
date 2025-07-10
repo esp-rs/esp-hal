@@ -349,7 +349,7 @@ impl Config {
 
         // Max supported baud rate is 5Mbaud
         if self.baudrate == 0 || self.baudrate > 5_000_000 {
-            return Err(ConfigError::UnsupportedBaudrate);
+            return Err(ConfigError::BaudrateNotSupported);
         }
         Ok(())
     }
@@ -517,7 +517,7 @@ pub enum ConfigError {
     /// The requested baud rate is not achievable.
     #[cfg(feature = "unstable")]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    UnachievableBaudrate,
+    BaudrateNotAchievable,
 
     /// The requested baud rate is not supported.
     ///
@@ -525,19 +525,19 @@ pub enum ConfigError {
     ///  * the baud rate exceeds 5MBaud or is equal to zero.
     ///  * the user has specified an exact baud rate or with some percentage of deviation to the
     ///    desired value, and the driver cannot reach this speed.
-    UnsupportedBaudrate,
+    BaudrateNotSupported,
 
-    /// The requested  timeout exceeds the maximum value (
+    /// The requested timeout exceeds the maximum value (
     #[cfg_attr(esp32, doc = "127")]
     #[cfg_attr(not(esp32), doc = "1023")]
     /// ).
-    UnsupportedTimeout,
+    TimeoutTooLong,
 
     /// The requested RX FIFO threshold exceeds the maximum value (127 bytes).
-    UnsupportedRxFifoThreshold,
+    RxFifoThresholdNotSupported,
 
     /// The requested TX FIFO threshold exceeds the maximum value (127 bytes).
-    UnsupportedTxFifoThreshold,
+    TxFifoThresholdNotSupported,
 }
 
 impl core::error::Error for ConfigError {}
@@ -546,17 +546,17 @@ impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             #[cfg(feature = "unstable")]
-            ConfigError::UnachievableBaudrate => {
+            ConfigError::BaudrateNotAchievable => {
                 write!(f, "The requested baud rate is not achievable")
             }
-            ConfigError::UnsupportedBaudrate => {
+            ConfigError::BaudrateNotSupported => {
                 write!(f, "The requested baud rate is not supported")
             }
-            ConfigError::UnsupportedTimeout => write!(f, "The requested timeout is not supported"),
-            ConfigError::UnsupportedRxFifoThreshold => {
+            ConfigError::TimeoutTooLong => write!(f, "The requested timeout is not supported"),
+            ConfigError::RxFifoThresholdNotSupported => {
                 write!(f, "The requested RX FIFO threshold is not supported")
             }
-            ConfigError::UnsupportedTxFifoThreshold => {
+            ConfigError::TxFifoThresholdNotSupported => {
                 write!(f, "The requested TX FIFO threshold is not supported")
             }
         }
@@ -2819,7 +2819,7 @@ impl Info {
     /// [`Info::RX_FIFO_MAX_THRHD`].
     fn set_rx_fifo_full_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::RX_FIFO_MAX_THRHD {
-            return Err(ConfigError::UnsupportedRxFifoThreshold);
+            return Err(ConfigError::RxFifoThresholdNotSupported);
         }
 
         self.regs()
@@ -2843,7 +2843,7 @@ impl Info {
     /// [`Info::TX_FIFO_MAX_THRHD`].
     fn set_tx_fifo_empty_threshold(&self, threshold: u16) -> Result<(), ConfigError> {
         if threshold > Self::TX_FIFO_MAX_THRHD {
-            return Err(ConfigError::UnsupportedTxFifoThreshold);
+            return Err(ConfigError::TxFifoThresholdNotSupported);
         }
 
         self.regs()
@@ -2887,7 +2887,7 @@ impl Info {
             let timeout_reg = timeout as u16 * _symbol_len as u16;
 
             if timeout_reg > MAX_THRHD {
-                return Err(ConfigError::UnsupportedTimeout);
+                return Err(ConfigError::TimeoutTooLong);
             }
 
             cfg_if::cfg_if! {
@@ -3175,7 +3175,7 @@ impl Info {
                 // We tolerate deviation of 1% from the desired baud value, as it never will be
                 // exactly the same
                 if deviation > 1_u32 {
-                    return Err(ConfigError::UnachievableBaudrate);
+                    return Err(ConfigError::BaudrateNotAchievable);
                 }
             }
             BaudrateTolerance::ErrorPercent(percent) => {
@@ -3183,7 +3183,7 @@ impl Info {
                     * 100)
                     / actual_baud;
                 if deviation > percent as u32 {
-                    return Err(ConfigError::UnachievableBaudrate);
+                    return Err(ConfigError::BaudrateNotAchievable);
                 }
             }
             _ => {}
