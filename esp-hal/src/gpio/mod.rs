@@ -2212,25 +2212,60 @@ impl AnyPin<'_> {
     }
 }
 
+#[cold]
+fn pin_does_not_support_function(pin: u8, function: &str) {
+    panic!("Pin {} is not an {}", pin, function)
+}
+
 macro_rules! for_each_rtcio_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
-                #[allow(unused_mut)]
-                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                if $ident.number() == $target.number() {
+            (($_sig:ident, RTC_GPIOn, $n:literal), $gpio:ident) => {
+                if $ident.number() == $n {
+                    #[allow(unused_mut)]
+                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                     return $code;
                 }
             };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
-                #[allow(unused_mut)]
-                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                if $ident.number() == $target.number() {
+            (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+                if $ident.number() == $n {
+                    #[allow(unused_mut)]
+                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                     return $code;
                 }
             };
         }
-        panic!("Unsupported operation")
+        unreachable!();
+    };
+}
+
+macro_rules! for_each_rtcio_output_pin {
+    (($ident:ident, $target:ident) => $code:tt;) => {
+        for_each_lp_function! {
+            (($_sig:ident, RTC_GPIOn, $n:literal), $gpio:ident) => {
+                if $ident.number() == $n {
+                    if_pin_is_type!($gpio, Output, {
+                        #[allow(unused_mut)]
+                        let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                        return $code;
+                    } else {
+                        pin_does_not_support_function($n, "RTCIO output")
+                    })
+                }
+            };
+            (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
+                if $ident.number() == $n {
+                    if_pin_is_type!($gpio, Output, {
+                        #[allow(unused_mut)]
+                        let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                        return $code;
+                    } else {
+                        pin_does_not_support_function($n, "LPIO output")
+                    })
+                }
+            };
+        }
+        unreachable!();
     };
 }
 
@@ -2267,19 +2302,15 @@ impl RtcPin for AnyPin<'_> {
 #[cfg(not(esp32h2))]
 impl RtcPinWithResistors for AnyPin<'_> {
     fn rtcio_pullup(&self, enable: bool) {
-        impl_for_pin_type!(self, _t, Output, {
-            for_each_rtcio_pin! {
-                (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
-            }
-        })
+        for_each_rtcio_output_pin! {
+            (self, target) => { RtcPinWithResistors::rtcio_pullup(&target, enable) };
+        }
     }
 
     fn rtcio_pulldown(&self, enable: bool) {
-        impl_for_pin_type!(self, _t, Output, {
-            for_each_rtcio_pin! {
-                (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
-            }
-        })
+        for_each_rtcio_output_pin! {
+            (self, target) => { RtcPinWithResistors::rtcio_pulldown(&target, enable) };
+        }
     }
 }
 
