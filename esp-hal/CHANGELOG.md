@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RADIO_CLK` and `RadioClockController` have been removed (#3687)
 - Removed GPIO24 from ESP32. (#3726)
 - Removed GPIO15-GPIO21 from ESP32-H2. (#3726)
+- ESP32-S3: `AnalogPin` is no longer implemented for GPIO0 and GPIO21 (#3781)
 
 ## [v1.0.0-beta.1] - 2025-06-03
 

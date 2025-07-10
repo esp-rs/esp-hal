@@ -399,7 +399,19 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((all));
+        _for_each_inner!((RTC_GPIO0, GPIO0)); _for_each_inner!(((RTC_GPIO0, RTC_GPIOn,
+        0), GPIO0)); _for_each_inner!((RTC_GPIO1, GPIO1)); _for_each_inner!(((RTC_GPIO1,
+        RTC_GPIOn, 1), GPIO1)); _for_each_inner!((RTC_GPIO2, GPIO2));
+        _for_each_inner!(((RTC_GPIO2, RTC_GPIOn, 2), GPIO2));
+        _for_each_inner!((RTC_GPIO3, GPIO3)); _for_each_inner!(((RTC_GPIO3, RTC_GPIOn,
+        3), GPIO3)); _for_each_inner!((RTC_GPIO4, GPIO4)); _for_each_inner!(((RTC_GPIO4,
+        RTC_GPIOn, 4), GPIO4)); _for_each_inner!((RTC_GPIO5, GPIO5));
+        _for_each_inner!(((RTC_GPIO5, RTC_GPIOn, 5), GPIO5));
+        _for_each_inner!((all(RTC_GPIO0, GPIO0), ((RTC_GPIO0, RTC_GPIOn, 0), GPIO0),
+        (RTC_GPIO1, GPIO1), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO1), (RTC_GPIO2, GPIO2),
+        ((RTC_GPIO2, RTC_GPIOn, 2), GPIO2), (RTC_GPIO3, GPIO3), ((RTC_GPIO3, RTC_GPIOn,
+        3), GPIO3), (RTC_GPIO4, GPIO4), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO4), (RTC_GPIO5,
+        GPIO5), ((RTC_GPIO5, RTC_GPIOn, 5), GPIO5)));
     };
 }
 #[macro_export]

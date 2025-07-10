@@ -93,12 +93,12 @@ gpio_function = 1
 constant_0_input = 0x1f
 constant_1_input = 0x1e
 pins = [
-    { pin =  0,                                            analog = { 1 = "ADC1_CH0" } },
-    { pin =  1,                                            analog = { 1 = "ADC1_CH1" } },
-    { pin =  2, functions = {             2 = "FSPIQ"   }, analog = { 1 = "ADC1_CH2" } },
-    { pin =  3,                                            analog = { 1 = "ADC1_CH3" } },
-    { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH4" } },
-    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  } },
+    { pin =  0,                                            analog = { 1 = "ADC1_CH0" }, rtc = { 0 = "RTC_GPIO0" } },
+    { pin =  1,                                            analog = { 1 = "ADC1_CH1" }, rtc = { 0 = "RTC_GPIO1" } },
+    { pin =  2, functions = {             2 = "FSPIQ"   }, analog = { 1 = "ADC1_CH2" }, rtc = { 0 = "RTC_GPIO2" } },
+    { pin =  3,                                            analog = { 1 = "ADC1_CH3" }, rtc = { 0 = "RTC_GPIO3" } },
+    { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH4" }, rtc = { 0 = "RTC_GPIO4" } },
+    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  },                              rtc = { 0 = "RTC_GPIO5" } },
     { pin =  6, functions = { 0 = "MTCK", 2 = "FSPICLK" } },
     { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
     { pin =  8 },
