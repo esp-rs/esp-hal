@@ -2217,6 +2217,7 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
     panic!("Pin {} is not an {}", pin, function)
 }
 
+#[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
@@ -2239,6 +2240,7 @@ macro_rules! for_each_rtcio_pin {
     };
 }
 
+#[cfg(not(esp32h2))]
 macro_rules! for_each_rtcio_output_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
