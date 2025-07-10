@@ -2218,15 +2218,15 @@ fn pin_does_not_support_function(pin: u8, function: &str) {
 macro_rules! for_each_rtcio_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $n:literal), $gpio:ident) => {
-                if $ident.number() == $n {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
+                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
                     #[allow(unused_mut)]
                     let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                     return $code;
                 }
             };
-            (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
-                if $ident.number() == $n {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
+                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
                     #[allow(unused_mut)]
                     let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                     return $code;
@@ -2241,25 +2241,25 @@ macro_rules! for_each_rtcio_pin {
 macro_rules! for_each_rtcio_output_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $n:literal), $gpio:ident) => {
-                if $ident.number() == $n {
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
+                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
                     if_pin_is_type!($gpio, Output, {
                         #[allow(unused_mut)]
                         let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                         return $code;
                     } else {
-                        pin_does_not_support_function($n, "RTCIO output")
+                        pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, "RTCIO output")
                     })
                 }
             };
-            (($_sig:ident, LP_GPIOn, $n:literal), $gpio:ident) => {
-                if $ident.number() == $n {
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
+                if $ident.number() == $crate::peripherals::$gpio::NUMBER {
                     if_pin_is_type!($gpio, Output, {
                         #[allow(unused_mut)]
                         let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                         return $code;
                     } else {
-                        pin_does_not_support_function($n, "LPIO output")
+                        pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, "LPIO output")
                     })
                 }
             };
