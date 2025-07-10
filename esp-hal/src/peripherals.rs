@@ -119,10 +119,22 @@ macro_rules! create_peripheral {
     };
 }
 
+macro_rules! io_type {
+    (Input, $peri:ident) => {
+        impl $crate::gpio::InputPin for $peri<'_> {}
+    };
+    (Output, $peri:ident) => {
+        impl $crate::gpio::OutputPin for $peri<'_> {}
+    };
+    ($other:ident, $peri:ident) => {
+        // TODO
+    };
+}
+
 for_each_gpio! {
     ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($($attr:ident)*)) => {
         $(
-            crate::io_type!($attr, $pin_peri);
+            io_type!($attr, $pin_peri);
         )*
     };
 

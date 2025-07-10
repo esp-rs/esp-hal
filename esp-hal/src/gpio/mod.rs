@@ -434,7 +434,11 @@ pub trait Pin: Sealed {
 /// Trait implemented by pins which can be used as inputs.
 pub trait InputPin: Pin {
     #[doc(hidden)]
-    fn waker(&self) -> &'static AtomicWaker;
+    #[inline(always)]
+    fn waker(&self) -> &'static AtomicWaker {
+        static WAKER: AtomicWaker = AtomicWaker::new();
+        &WAKER
+    }
 }
 
 /// Trait implemented by pins which can be used as outputs.
@@ -667,26 +671,6 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler) {
         self.set_interrupt_handler(handler);
     }
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! io_type {
-    (Input, $peri:ident) => {
-        impl $crate::gpio::InputPin for $peri<'_> {
-            #[inline(always)]
-            fn waker(&self) -> &'static $crate::asynch::AtomicWaker {
-                static WAKER: $crate::asynch::AtomicWaker = $crate::asynch::AtomicWaker::new();
-                &WAKER
-            }
-        }
-    };
-    (Output, $peri:ident) => {
-        impl $crate::gpio::OutputPin for $peri<'_> {}
-    };
-    ($other:ident, $peri:ident) => {
-        // TODO
-    };
 }
 
 macro_rules! impl_analog_trait {
@@ -2228,21 +2212,23 @@ impl AnyPin<'_> {
     }
 }
 
-macro_rules! impl_function {
-    ($ident:ident, $target:ident, $gpio:ident, $code:tt) => {
-        #[allow(unused_mut)]
-        let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-        if $ident.number() == $target.number() {
-            return $code;
-        }
-    };
-}
-
 macro_rules! for_each_rtcio_pin {
     (($ident:ident, $target:ident) => $code:tt;) => {
         for_each_lp_function! {
-            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => { impl_function!($ident, $target, $gpio, $code) };
-            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => { impl_function!($ident, $target, $gpio, $code) };
+            (($_sig:ident, RTC_GPIOn, $_n:literal), $gpio:ident) => {
+                #[allow(unused_mut)]
+                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                if $ident.number() == $target.number() {
+                    return $code;
+                }
+            };
+            (($_sig:ident, LP_GPIOn, $_n:literal), $gpio:ident) => {
+                #[allow(unused_mut)]
+                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                if $ident.number() == $target.number() {
+                    return $code;
+                }
+            };
         }
         panic!("Unsupported operation")
     };
