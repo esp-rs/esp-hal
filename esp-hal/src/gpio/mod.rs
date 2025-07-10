@@ -2209,6 +2209,7 @@ impl AnyPin<'_> {
     /// #
     /// # {after_snippet}
     /// ```
+    #[inline]
     pub fn downcast<P: Pin>(self) -> Result<P, Self>
     where
         Self: TryInto<P, Error = Self>,
