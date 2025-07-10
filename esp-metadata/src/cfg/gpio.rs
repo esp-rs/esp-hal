@@ -28,8 +28,9 @@ pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
 
-    /// Different capabilities implemented by this pin.
-    pub kind: Vec<PinCapability>,
+    /// Whether the GPIO has an output stage.
+    #[serde(default)]
+    pub input_only: bool,
 
     /// Available IO MUX functions for this pin.
     #[serde(default)]
@@ -42,23 +43,6 @@ pub(crate) struct PinConfig {
     /// Available LP/RTC IO functions for this pin.
     #[serde(default, alias = "rtc")]
     pub lp: LowPowerMap,
-}
-
-/// Pin capabilities. Some of these will cause a trait to be implemented for the
-/// given pin singleton. `UsbDevice` currently only changes what happens on GPIO
-/// driver initialization.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PinCapability {
-    Input,
-    Output,
-    Analog,
-    Rtc,
-    Touch,
-    UsbDm,
-    UsbDp,
-    // Pin has USB pullup according to the IO MUX Function list
-    UsbDevice,
 }
 
 /// Available alternate functions for a given GPIO pin.
@@ -240,24 +224,11 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .pins
         .iter()
         .map(|pin| {
-            let mut attrs = vec![];
-            pin.kind.iter().for_each(|kind| match kind {
-                PinCapability::Input => attrs.push(quote! { Input }),
-                PinCapability::Output => attrs.push(quote! { Output }),
-                PinCapability::Analog => attrs.push(quote! { Analog }),
-                PinCapability::Rtc => {
-                    attrs.push(quote! { RtcIo });
-                    if pin.kind.contains(&PinCapability::Output) {
-                        attrs.push(quote! { RtcIoOutput });
-                    }
-                }
-                PinCapability::Touch => attrs.push(quote! { Touch }),
-                PinCapability::UsbDm => attrs.push(quote! { UsbDm }),
-                PinCapability::UsbDp => attrs.push(quote! { UsbDp }),
-                PinCapability::UsbDevice => attrs.push(quote! { UsbDevice }),
-            });
-
-            attrs
+            if pin.input_only {
+                vec![quote! { Input }]
+            } else {
+                vec![quote! { Input }, quote! { Output }]
+            }
         })
         .collect::<Vec<_>>();
 
