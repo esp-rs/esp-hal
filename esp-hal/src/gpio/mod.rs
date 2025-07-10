@@ -2167,6 +2167,56 @@ impl InputPin for AnyPin<'_> {
 }
 impl OutputPin for AnyPin<'_> {}
 
+for_each_gpio! {
+    ($n:literal, $gpio:ident $($_rest:tt)*) => {
+        impl<'lt> TryFrom<AnyPin<'lt>> for crate::peripherals::$gpio<'lt> {
+            type Error = AnyPin<'lt>;
+
+            fn try_from(any_pin: AnyPin<'lt>) -> Result<Self, Self::Error> {
+                if any_pin.number() == $n {
+                    Ok(unsafe { Self::steal() })
+                } else {
+                    Err(any_pin)
+                }
+            }
+        }
+    };
+}
+
+impl AnyPin<'_> {
+    #[procmacros::doc_replace]
+    /// Attempts to downcast the pin into the underlying GPIO instance.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::{
+    ///     gpio::AnyPin,
+    ///     peripherals::{GPIO2, GPIO4},
+    /// };
+    ///
+    /// let any_pin2 = AnyPin::from(peripherals.GPIO2);
+    /// let any_pin3 = AnyPin::from(peripherals.GPIO3);
+    ///
+    /// let gpio2 = any_pin2
+    ///     .downcast::<GPIO2>()
+    ///     .expect("This downcast succeeds because AnyPin was created from GPIO2");
+    /// let gpio4 = any_pin3
+    ///     .downcast::<GPIO4>()
+    ///     .expect_err("This AnyPin was created from GPIO3, it cannot be downcast to GPIO4");
+    /// #
+    /// # {after_snippet}
+    /// ```
+    pub fn downcast<P: Pin>(self) -> Result<P, Self>
+    where
+        Self: TryInto<P, Error = Self>,
+    {
+        self.try_into()
+    }
+}
+
 #[cfg(not(esp32h2))]
 impl RtcPin for AnyPin<'_> {
     #[cfg(xtensa)]
