@@ -378,12 +378,15 @@ impl DmaDescriptor {
 unsafe impl Send for DmaDescriptor {}
 
 mod buffers;
+mod flags;
 #[cfg(gdma)]
 mod gdma;
 #[cfg(any(gdma, esp32s2))]
 mod m2m;
 #[cfg(pdma)]
 mod pdma;
+
+pub use flags::DescriptorFlagFields;
 
 /// Kinds of interrupt to listen to.
 #[derive(Debug, EnumSetType)]
