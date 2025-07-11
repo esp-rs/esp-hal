@@ -1840,9 +1840,9 @@ pub mod asynch {
 
         /// Continuously write to I2S. Returns [I2sWriteDmaTransferAsync]
         pub fn write_dma_circular_async<TXBUF: ReadBuffer>(
-            mut self,
+            &mut self,
             words: TXBUF,
-        ) -> Result<I2sWriteDmaTransferAsync<'d, TXBUF>, Error> {
+        ) -> Result<I2sWriteDmaTransferAsync<'_, 'd, TXBUF>, Error> {
             let (ptr, len) = unsafe { words.read_buffer() };
 
             // Reset TX unit and TX FIFO
@@ -1873,13 +1873,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA write transfer.
-    pub struct I2sWriteDmaTransferAsync<'d, BUFFER> {
-        i2s_tx: I2sTx<'d, Async>,
+    pub struct I2sWriteDmaTransferAsync<'a, 'd, BUFFER> {
+        i2s_tx: &'a mut I2sTx<'d, Async>,
         state: TxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<BUFFER> I2sWriteDmaTransferAsync<'_, BUFFER> {
+    impl<BUFFER> I2sWriteDmaTransferAsync<'_, '_, BUFFER> {
         /// How many bytes can be pushed into the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
@@ -1949,9 +1949,9 @@ pub mod asynch {
 
         /// Continuously read from I2S. Returns [I2sReadDmaTransferAsync]
         pub fn read_dma_circular_async<RXBUF>(
-            mut self,
+            &mut self,
             mut words: RXBUF,
-        ) -> Result<I2sReadDmaTransferAsync<'d, RXBUF>, Error>
+        ) -> Result<I2sReadDmaTransferAsync<'_, 'd, RXBUF>, Error>
         where
             RXBUF: WriteBuffer,
         {
@@ -1987,13 +1987,13 @@ pub mod asynch {
     }
 
     /// An in-progress async circular DMA read transfer.
-    pub struct I2sReadDmaTransferAsync<'d, BUFFER> {
-        i2s_rx: I2sRx<'d, Async>,
+    pub struct I2sReadDmaTransferAsync<'a, 'd, BUFFER> {
+        i2s_rx: &'a mut I2sRx<'d, Async>,
         state: RxCircularState,
         _buffer: BUFFER,
     }
 
-    impl<BUFFER> I2sReadDmaTransferAsync<'_, BUFFER> {
+    impl<BUFFER> I2sReadDmaTransferAsync<'_, '_, BUFFER> {
         /// How many bytes can be popped from the DMA transaction.
         /// Will wait for more than 0 bytes available.
         pub async fn available(&mut self) -> Result<usize, Error> {
