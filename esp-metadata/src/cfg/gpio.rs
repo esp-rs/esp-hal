@@ -224,6 +224,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .pins
         .iter()
         .map(|pin| {
+            // Input must come first
             if pin.input_only {
                 vec![quote! { Input }]
             } else {
@@ -408,8 +409,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     // Generates a macro that can select between a `then` and an `else` branch based
     // on whether a pin implement a certain attribute.
     //
-    // In essence this expands to (in case of pin = GPIO5, attr = Analog):
-    // `if typeof(GPIO5) == Analog { then_tokens } else { else_tokens }`
+    // In essence this expands to (in case of pin = GPIO5, attr = Output):
+    // `if typeof(GPIO5) == Output { then_tokens } else { else_tokens }`
     let if_pin_is_type = {
         let mut branches = vec![];
 
@@ -424,6 +425,22 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
 
         quote! {
+            /// Conditionally pick between two code blocks based on pin attributes.
+            ///
+            /// The attribute can be `Input` or `Output`.
+            ///
+            /// This macro can be used as:
+            ///
+            /// ```rust,no_run
+            /// if_pin_is_type! (GPIO0, Output, {
+            ///     // some code that is generated for output pins
+            /// } else {
+            ///     // some code that is generated for non-output pins
+            /// });
+            /// ```
+            ///
+            /// This macro can be useful when nested into other macros, to generate
+            /// code for all pins of a certain attribute.
             #[macro_export]
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! if_pin_is_type {
@@ -453,6 +470,25 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
 
         quote! {
+            /// Dispatch `AnyPin` methods to the underlying GPIO types, if they have the given attribute.
+            ///
+            /// The attribute can be `Input` or `Output`.
+            ///
+            /// ```rust,ignore
+            /// impl AnyPin<'_> {
+            ///     fn output_signals(
+            ///         &self,
+            ///         private: private::Internal,
+            ///     ) -> &'static [(AlternateFunction, OutputSignal)] {
+            ///         impl_for_pin_type!(self, target, Output, {
+            ///             Pin::output_signals(&target, private)
+            ///         })
+            ///     }
+            /// }
+            /// ```
+            ///
+            /// The first two arguments are the identifier of the AnyPin, and the identifier that can be used in the
+            /// generated code block, respectively.
             #[macro_export]
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             #[expect(clippy::crate_in_macro_def)]
@@ -478,7 +514,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .zip(pin_attrs.iter())
     {
         branches.push(quote! {
-            #n, #p #af (#(#attrs)*)
+            #n, #p #af (#([#attrs])*)
         })
     }
 
@@ -496,7 +532,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// This macro has one option for its "Individual matcher" case:
         ///
-        /// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*))`
+        /// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($([$pin_attribute:ident])*))`
         ///
         /// Macro fragments:
         ///
@@ -506,9 +542,9 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         /// - `$digital_input_function`: the name of the digital function, as an identifier.
         /// - `$digital_output_function`: the number of the digital function, as an identifier (i.e. for function 0 this is `_0`).
         /// - `$digital_output_function`: the name of the digital function, as an identifier.
-        /// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO.
+        /// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO. Bracketed so that they can also be matched as optional fragments. Order is always Input first.
         ///
-        /// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
+        /// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output]))`
         #for_each_gpio
 
         /// This macro can be used to generate code for each analog function of each GPIO.
@@ -562,6 +598,9 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         #if_pin_is_type
         #impl_for_pin_type
 
+        /// Defines the `InputSignal` and `OutputSignal` enums.
+        ///
+        /// This macro is intended to be called in esp-hal only.
         #[macro_export]
         #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
         macro_rules! define_io_mux_signals {
@@ -571,6 +610,18 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             };
         }
 
+        /// Defines and implements the `io_mux_reg` function.
+        ///
+        /// The generated function has the following signature:
+        ///
+        /// ```rust,ignore
+        /// pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+        ///     // ...
+        /// # unimplemented!()
+        /// }
+        /// ```
+        ///
+        /// This macro is intended to be called in esp-hal only.
         #[macro_export]
         #[expect(clippy::crate_in_macro_def)]
         #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]

@@ -136,7 +136,7 @@ macro_rules! io_type {
 }
 
 for_each_gpio! {
-    ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($($attr:ident)*)) => {
+    ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($([$attr:ident])*)) => {
         $(
             io_type!($attr, $pin_peri);
         )*

@@ -434,7 +434,7 @@ macro_rules! for_each_peripheral {
 ///
 /// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident =>
 /// $digital_input_signal:ident)*) ($($digital_output_function:ident =>
-/// $digital_output_signal:ident)*) ($($pin_attribute:ident)*))`
+/// $digital_output_signal:ident)*) ($([$pin_attribute:ident])*))`
 ///
 /// Macro fragments:
 ///
@@ -447,96 +447,103 @@ macro_rules! for_each_peripheral {
 ///   function 0 this is `_0`).
 /// - `$digital_output_function`: the name of the digital function, as an identifier.
 /// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO.
+///   Bracketed so that they can also be matched as optional fragments. Order is always Input first.
 ///
-/// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
+/// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input]
+/// [Output]))`
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_gpio {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((0, GPIO0() () (Input Output))); _for_each_inner!((1, GPIO1() ()
-        (Input Output))); _for_each_inner!((2, GPIO2() () (Input Output)));
-        _for_each_inner!((3, GPIO3() () (Input Output))); _for_each_inner!((4, GPIO4() ()
-        (Input Output))); _for_each_inner!((5, GPIO5() () (Input Output)));
-        _for_each_inner!((6, GPIO6() () (Input Output))); _for_each_inner!((7, GPIO7() ()
-        (Input Output))); _for_each_inner!((8, GPIO8() (_3 => SUBSPICS1) (Input
-        Output))); _for_each_inner!((9, GPIO9(_3 => SUBSPIHD _4 => FSPIHD) (_3 =>
-        SUBSPIHD _4 => FSPIHD) (Input Output))); _for_each_inner!((10, GPIO10(_2 =>
-        FSPIIO4 _4 => FSPICS0) (_2 => FSPIIO4 _3 => SUBSPICS0 _4 => FSPICS0) (Input
-        Output))); _for_each_inner!((11, GPIO11(_2 => FSPIIO5 _3 => SUBSPID _4 => FSPID)
-        (_2 => FSPIIO5 _3 => SUBSPID _4 => FSPID) (Input Output))); _for_each_inner!((12,
+        _for_each_inner!((0, GPIO0() () ([Input] [Output]))); _for_each_inner!((1,
+        GPIO1() () ([Input] [Output]))); _for_each_inner!((2, GPIO2() () ([Input]
+        [Output]))); _for_each_inner!((3, GPIO3() () ([Input] [Output])));
+        _for_each_inner!((4, GPIO4() () ([Input] [Output]))); _for_each_inner!((5,
+        GPIO5() () ([Input] [Output]))); _for_each_inner!((6, GPIO6() () ([Input]
+        [Output]))); _for_each_inner!((7, GPIO7() () ([Input] [Output])));
+        _for_each_inner!((8, GPIO8() (_3 => SUBSPICS1) ([Input] [Output])));
+        _for_each_inner!((9, GPIO9(_3 => SUBSPIHD _4 => FSPIHD) (_3 => SUBSPIHD _4 =>
+        FSPIHD) ([Input] [Output]))); _for_each_inner!((10, GPIO10(_2 => FSPIIO4 _4 =>
+        FSPICS0) (_2 => FSPIIO4 _3 => SUBSPICS0 _4 => FSPICS0) ([Input] [Output])));
+        _for_each_inner!((11, GPIO11(_2 => FSPIIO5 _3 => SUBSPID _4 => FSPID) (_2 =>
+        FSPIIO5 _3 => SUBSPID _4 => FSPID) ([Input] [Output]))); _for_each_inner!((12,
         GPIO12(_2 => FSPIIO6 _4 => FSPICLK) (_2 => FSPIIO6 _3 => SUBSPICLK _4 => FSPICLK)
-        (Input Output))); _for_each_inner!((13, GPIO13(_2 => FSPIIO7 _3 => SUBSPIQ _4 =>
-        FSPIQ) (_2 => FSPIIO7 _3 => SUBSPIQ _4 => FSPIQ) (Input Output)));
+        ([Input] [Output]))); _for_each_inner!((13, GPIO13(_2 => FSPIIO7 _3 => SUBSPIQ _4
+        => FSPIQ) (_2 => FSPIIO7 _3 => SUBSPIQ _4 => FSPIQ) ([Input] [Output])));
         _for_each_inner!((14, GPIO14(_3 => SUBSPIWP _4 => FSPIWP) (_2 => FSPIDQS _3 =>
-        SUBSPIWP _4 => FSPIWP) (Input Output))); _for_each_inner!((15, GPIO15() (_2 =>
-        U0RTS) (Input Output))); _for_each_inner!((16, GPIO16(_2 => U0CTS) () (Input
-        Output))); _for_each_inner!((17, GPIO17() (_2 => U1TXD) (Input Output)));
-        _for_each_inner!((18, GPIO18(_2 => U1RXD) (_3 => CLK_OUT3) (Input Output)));
-        _for_each_inner!((19, GPIO19() (_2 => U1RTS _3 => CLK_OUT2) (Input Output)));
-        _for_each_inner!((20, GPIO20(_2 => U1CTS) (_3 => CLK_OUT1) (Input Output)));
-        _for_each_inner!((21, GPIO21() () (Input Output))); _for_each_inner!((26,
-        GPIO26() (_0 => SPICS1) (Input Output))); _for_each_inner!((27, GPIO27(_0 =>
-        SPIHD) (_0 => SPIHD) (Input Output))); _for_each_inner!((28, GPIO28(_0 => SPIWP)
-        (_0 => SPIWP) (Input Output))); _for_each_inner!((29, GPIO29() (_0 => SPICS0)
-        (Input Output))); _for_each_inner!((30, GPIO30() (_0 => SPICLK) (Input Output)));
-        _for_each_inner!((31, GPIO31(_0 => SPIQ) (_0 => SPIQ) (Input Output)));
-        _for_each_inner!((32, GPIO32(_0 => SPID) (_0 => SPID) (Input Output)));
+        SUBSPIWP _4 => FSPIWP) ([Input] [Output]))); _for_each_inner!((15, GPIO15() (_2
+        => U0RTS) ([Input] [Output]))); _for_each_inner!((16, GPIO16(_2 => U0CTS) ()
+        ([Input] [Output]))); _for_each_inner!((17, GPIO17() (_2 => U1TXD) ([Input]
+        [Output]))); _for_each_inner!((18, GPIO18(_2 => U1RXD) (_3 => CLK_OUT3) ([Input]
+        [Output]))); _for_each_inner!((19, GPIO19() (_2 => U1RTS _3 => CLK_OUT2) ([Input]
+        [Output]))); _for_each_inner!((20, GPIO20(_2 => U1CTS) (_3 => CLK_OUT1) ([Input]
+        [Output]))); _for_each_inner!((21, GPIO21() () ([Input] [Output])));
+        _for_each_inner!((26, GPIO26() (_0 => SPICS1) ([Input] [Output])));
+        _for_each_inner!((27, GPIO27(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])));
+        _for_each_inner!((28, GPIO28(_0 => SPIWP) (_0 => SPIWP) ([Input] [Output])));
+        _for_each_inner!((29, GPIO29() (_0 => SPICS0) ([Input] [Output])));
+        _for_each_inner!((30, GPIO30() (_0 => SPICLK) ([Input] [Output])));
+        _for_each_inner!((31, GPIO31(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])));
+        _for_each_inner!((32, GPIO32(_0 => SPID) (_0 => SPID) ([Input] [Output])));
         _for_each_inner!((33, GPIO33(_2 => FSPIHD _3 => SUBSPIHD _4 => SPIIO4) (_2 =>
-        FSPIHD _3 => SUBSPIHD _4 => SPIIO4) (Input Output))); _for_each_inner!((34,
+        FSPIHD _3 => SUBSPIHD _4 => SPIIO4) ([Input] [Output]))); _for_each_inner!((34,
         GPIO34(_2 => FSPICS0 _4 => SPIIO5) (_2 => FSPICS0 _3 => SUBSPICS0 _4 => SPIIO5)
-        (Input Output))); _for_each_inner!((35, GPIO35(_2 => FSPID _3 => SUBSPID _4 =>
-        SPIIO6) (_2 => FSPID _3 => SUBSPID _4 => SPIIO6) (Input Output)));
+        ([Input] [Output]))); _for_each_inner!((35, GPIO35(_2 => FSPID _3 => SUBSPID _4
+        => SPIIO6) (_2 => FSPID _3 => SUBSPID _4 => SPIIO6) ([Input] [Output])));
         _for_each_inner!((36, GPIO36(_2 => FSPICLK _4 => SPIIO7) (_2 => FSPICLK _3 =>
-        SUBSPICLK _4 => SPIIO7) (Input Output))); _for_each_inner!((37, GPIO37(_2 =>
-        FSPIQ _3 => SUBSPIQ _4 => SPIDQS) (_2 => FSPIQ _3 => SUBSPIQ _4 => SPIDQS) (Input
-        Output))); _for_each_inner!((38, GPIO38(_2 => FSPIWP _3 => SUBSPIWP) (_2 =>
-        FSPIWP _3 => SUBSPIWP) (Input Output))); _for_each_inner!((39, GPIO39() (_2 =>
-        CLK_OUT3 _3 => SUBSPICS1) (Input Output))); _for_each_inner!((40, GPIO40() (_2 =>
-        CLK_OUT2) (Input Output))); _for_each_inner!((41, GPIO41() (_2 => CLK_OUT1)
-        (Input Output))); _for_each_inner!((42, GPIO42() () (Input Output)));
-        _for_each_inner!((43, GPIO43() (_0 => U0TXD _2 => CLK_OUT1) (Input Output)));
-        _for_each_inner!((44, GPIO44(_0 => U0RXD) (_2 => CLK_OUT2) (Input Output)));
-        _for_each_inner!((45, GPIO45() () (Input Output))); _for_each_inner!((46,
-        GPIO46() () (Input Output))); _for_each_inner!((47, GPIO47() (_0 => SPICLK_P_DIFF
-        _2 => SUBSPICLK_P_DIFF) (Input Output))); _for_each_inner!((48, GPIO48() (_0 =>
-        SPICLK_N_DIFF _2 => SUBSPICLK_N_DIFF) (Input Output))); _for_each_inner!((all(0,
-        GPIO0() () (Input Output)), (1, GPIO1() () (Input Output)), (2, GPIO2() () (Input
-        Output)), (3, GPIO3() () (Input Output)), (4, GPIO4() () (Input Output)), (5,
-        GPIO5() () (Input Output)), (6, GPIO6() () (Input Output)), (7, GPIO7() () (Input
-        Output)), (8, GPIO8() (_3 => SUBSPICS1) (Input Output)), (9, GPIO9(_3 => SUBSPIHD
-        _4 => FSPIHD) (_3 => SUBSPIHD _4 => FSPIHD) (Input Output)), (10, GPIO10(_2 =>
-        FSPIIO4 _4 => FSPICS0) (_2 => FSPIIO4 _3 => SUBSPICS0 _4 => FSPICS0) (Input
-        Output)), (11, GPIO11(_2 => FSPIIO5 _3 => SUBSPID _4 => FSPID) (_2 => FSPIIO5 _3
-        => SUBSPID _4 => FSPID) (Input Output)), (12, GPIO12(_2 => FSPIIO6 _4 => FSPICLK)
-        (_2 => FSPIIO6 _3 => SUBSPICLK _4 => FSPICLK) (Input Output)), (13, GPIO13(_2 =>
-        FSPIIO7 _3 => SUBSPIQ _4 => FSPIQ) (_2 => FSPIIO7 _3 => SUBSPIQ _4 => FSPIQ)
-        (Input Output)), (14, GPIO14(_3 => SUBSPIWP _4 => FSPIWP) (_2 => FSPIDQS _3 =>
-        SUBSPIWP _4 => FSPIWP) (Input Output)), (15, GPIO15() (_2 => U0RTS) (Input
-        Output)), (16, GPIO16(_2 => U0CTS) () (Input Output)), (17, GPIO17() (_2 =>
-        U1TXD) (Input Output)), (18, GPIO18(_2 => U1RXD) (_3 => CLK_OUT3) (Input
-        Output)), (19, GPIO19() (_2 => U1RTS _3 => CLK_OUT2) (Input Output)), (20,
-        GPIO20(_2 => U1CTS) (_3 => CLK_OUT1) (Input Output)), (21, GPIO21() () (Input
-        Output)), (26, GPIO26() (_0 => SPICS1) (Input Output)), (27, GPIO27(_0 => SPIHD)
-        (_0 => SPIHD) (Input Output)), (28, GPIO28(_0 => SPIWP) (_0 => SPIWP) (Input
-        Output)), (29, GPIO29() (_0 => SPICS0) (Input Output)), (30, GPIO30() (_0 =>
-        SPICLK) (Input Output)), (31, GPIO31(_0 => SPIQ) (_0 => SPIQ) (Input Output)),
-        (32, GPIO32(_0 => SPID) (_0 => SPID) (Input Output)), (33, GPIO33(_2 => FSPIHD _3
-        => SUBSPIHD _4 => SPIIO4) (_2 => FSPIHD _3 => SUBSPIHD _4 => SPIIO4) (Input
-        Output)), (34, GPIO34(_2 => FSPICS0 _4 => SPIIO5) (_2 => FSPICS0 _3 => SUBSPICS0
-        _4 => SPIIO5) (Input Output)), (35, GPIO35(_2 => FSPID _3 => SUBSPID _4 =>
-        SPIIO6) (_2 => FSPID _3 => SUBSPID _4 => SPIIO6) (Input Output)), (36, GPIO36(_2
-        => FSPICLK _4 => SPIIO7) (_2 => FSPICLK _3 => SUBSPICLK _4 => SPIIO7) (Input
-        Output)), (37, GPIO37(_2 => FSPIQ _3 => SUBSPIQ _4 => SPIDQS) (_2 => FSPIQ _3 =>
-        SUBSPIQ _4 => SPIDQS) (Input Output)), (38, GPIO38(_2 => FSPIWP _3 => SUBSPIWP)
-        (_2 => FSPIWP _3 => SUBSPIWP) (Input Output)), (39, GPIO39() (_2 => CLK_OUT3 _3
-        => SUBSPICS1) (Input Output)), (40, GPIO40() (_2 => CLK_OUT2) (Input Output)),
-        (41, GPIO41() (_2 => CLK_OUT1) (Input Output)), (42, GPIO42() () (Input Output)),
-        (43, GPIO43() (_0 => U0TXD _2 => CLK_OUT1) (Input Output)), (44, GPIO44(_0 =>
-        U0RXD) (_2 => CLK_OUT2) (Input Output)), (45, GPIO45() () (Input Output)), (46,
-        GPIO46() () (Input Output)), (47, GPIO47() (_0 => SPICLK_P_DIFF _2 =>
-        SUBSPICLK_P_DIFF) (Input Output)), (48, GPIO48() (_0 => SPICLK_N_DIFF _2 =>
-        SUBSPICLK_N_DIFF) (Input Output))));
+        SUBSPICLK _4 => SPIIO7) ([Input] [Output]))); _for_each_inner!((37, GPIO37(_2 =>
+        FSPIQ _3 => SUBSPIQ _4 => SPIDQS) (_2 => FSPIQ _3 => SUBSPIQ _4 => SPIDQS)
+        ([Input] [Output]))); _for_each_inner!((38, GPIO38(_2 => FSPIWP _3 => SUBSPIWP)
+        (_2 => FSPIWP _3 => SUBSPIWP) ([Input] [Output]))); _for_each_inner!((39,
+        GPIO39() (_2 => CLK_OUT3 _3 => SUBSPICS1) ([Input] [Output])));
+        _for_each_inner!((40, GPIO40() (_2 => CLK_OUT2) ([Input] [Output])));
+        _for_each_inner!((41, GPIO41() (_2 => CLK_OUT1) ([Input] [Output])));
+        _for_each_inner!((42, GPIO42() () ([Input] [Output]))); _for_each_inner!((43,
+        GPIO43() (_0 => U0TXD _2 => CLK_OUT1) ([Input] [Output]))); _for_each_inner!((44,
+        GPIO44(_0 => U0RXD) (_2 => CLK_OUT2) ([Input] [Output]))); _for_each_inner!((45,
+        GPIO45() () ([Input] [Output]))); _for_each_inner!((46, GPIO46() () ([Input]
+        [Output]))); _for_each_inner!((47, GPIO47() (_0 => SPICLK_P_DIFF _2 =>
+        SUBSPICLK_P_DIFF) ([Input] [Output]))); _for_each_inner!((48, GPIO48() (_0 =>
+        SPICLK_N_DIFF _2 => SUBSPICLK_N_DIFF) ([Input] [Output])));
+        _for_each_inner!((all(0, GPIO0() () ([Input] [Output])), (1, GPIO1() () ([Input]
+        [Output])), (2, GPIO2() () ([Input] [Output])), (3, GPIO3() () ([Input]
+        [Output])), (4, GPIO4() () ([Input] [Output])), (5, GPIO5() () ([Input]
+        [Output])), (6, GPIO6() () ([Input] [Output])), (7, GPIO7() () ([Input]
+        [Output])), (8, GPIO8() (_3 => SUBSPICS1) ([Input] [Output])), (9, GPIO9(_3 =>
+        SUBSPIHD _4 => FSPIHD) (_3 => SUBSPIHD _4 => FSPIHD) ([Input] [Output])), (10,
+        GPIO10(_2 => FSPIIO4 _4 => FSPICS0) (_2 => FSPIIO4 _3 => SUBSPICS0 _4 => FSPICS0)
+        ([Input] [Output])), (11, GPIO11(_2 => FSPIIO5 _3 => SUBSPID _4 => FSPID) (_2 =>
+        FSPIIO5 _3 => SUBSPID _4 => FSPID) ([Input] [Output])), (12, GPIO12(_2 => FSPIIO6
+        _4 => FSPICLK) (_2 => FSPIIO6 _3 => SUBSPICLK _4 => FSPICLK) ([Input] [Output])),
+        (13, GPIO13(_2 => FSPIIO7 _3 => SUBSPIQ _4 => FSPIQ) (_2 => FSPIIO7 _3 => SUBSPIQ
+        _4 => FSPIQ) ([Input] [Output])), (14, GPIO14(_3 => SUBSPIWP _4 => FSPIWP) (_2 =>
+        FSPIDQS _3 => SUBSPIWP _4 => FSPIWP) ([Input] [Output])), (15, GPIO15() (_2 =>
+        U0RTS) ([Input] [Output])), (16, GPIO16(_2 => U0CTS) () ([Input] [Output])), (17,
+        GPIO17() (_2 => U1TXD) ([Input] [Output])), (18, GPIO18(_2 => U1RXD) (_3 =>
+        CLK_OUT3) ([Input] [Output])), (19, GPIO19() (_2 => U1RTS _3 => CLK_OUT2)
+        ([Input] [Output])), (20, GPIO20(_2 => U1CTS) (_3 => CLK_OUT1) ([Input]
+        [Output])), (21, GPIO21() () ([Input] [Output])), (26, GPIO26() (_0 => SPICS1)
+        ([Input] [Output])), (27, GPIO27(_0 => SPIHD) (_0 => SPIHD) ([Input] [Output])),
+        (28, GPIO28(_0 => SPIWP) (_0 => SPIWP) ([Input] [Output])), (29, GPIO29() (_0 =>
+        SPICS0) ([Input] [Output])), (30, GPIO30() (_0 => SPICLK) ([Input] [Output])),
+        (31, GPIO31(_0 => SPIQ) (_0 => SPIQ) ([Input] [Output])), (32, GPIO32(_0 => SPID)
+        (_0 => SPID) ([Input] [Output])), (33, GPIO33(_2 => FSPIHD _3 => SUBSPIHD _4 =>
+        SPIIO4) (_2 => FSPIHD _3 => SUBSPIHD _4 => SPIIO4) ([Input] [Output])), (34,
+        GPIO34(_2 => FSPICS0 _4 => SPIIO5) (_2 => FSPICS0 _3 => SUBSPICS0 _4 => SPIIO5)
+        ([Input] [Output])), (35, GPIO35(_2 => FSPID _3 => SUBSPID _4 => SPIIO6) (_2 =>
+        FSPID _3 => SUBSPID _4 => SPIIO6) ([Input] [Output])), (36, GPIO36(_2 => FSPICLK
+        _4 => SPIIO7) (_2 => FSPICLK _3 => SUBSPICLK _4 => SPIIO7) ([Input] [Output])),
+        (37, GPIO37(_2 => FSPIQ _3 => SUBSPIQ _4 => SPIDQS) (_2 => FSPIQ _3 => SUBSPIQ _4
+        => SPIDQS) ([Input] [Output])), (38, GPIO38(_2 => FSPIWP _3 => SUBSPIWP) (_2 =>
+        FSPIWP _3 => SUBSPIWP) ([Input] [Output])), (39, GPIO39() (_2 => CLK_OUT3 _3 =>
+        SUBSPICS1) ([Input] [Output])), (40, GPIO40() (_2 => CLK_OUT2) ([Input]
+        [Output])), (41, GPIO41() (_2 => CLK_OUT1) ([Input] [Output])), (42, GPIO42() ()
+        ([Input] [Output])), (43, GPIO43() (_0 => U0TXD _2 => CLK_OUT1) ([Input]
+        [Output])), (44, GPIO44(_0 => U0RXD) (_2 => CLK_OUT2) ([Input] [Output])), (45,
+        GPIO45() () ([Input] [Output])), (46, GPIO46() () ([Input] [Output])), (47,
+        GPIO47() (_0 => SPICLK_P_DIFF _2 => SUBSPICLK_P_DIFF) ([Input] [Output])), (48,
+        GPIO48() (_0 => SPICLK_N_DIFF _2 => SUBSPICLK_N_DIFF) ([Input] [Output]))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.
@@ -734,6 +741,22 @@ macro_rules! for_each_lp_function {
         GPIO21)));
     };
 }
+/// Conditionally pick between two code blocks based on pin attributes.
+///
+/// The attribute can be `Input` or `Output`.
+///
+/// This macro can be used as:
+///
+/// ```rust,no_run
+/// if_pin_is_type! (GPIO0, Output, {
+///     // some code that is generated for output pins
+/// } else {
+///     // some code that is generated for non-output pins
+/// });
+/// ```
+///
+/// This macro can be useful when nested into other macros, to generate
+/// code for all pins of a certain attribute.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! if_pin_is_type {
@@ -1143,6 +1166,22 @@ macro_rules! if_pin_is_type {
         $else_tt
     };
 }
+/// Dispatch `AnyPin` methods to the underlying GPIO types, if they have the given attribute.
+///
+/// The attribute can be `Input` or `Output`.
+///
+/// ```rust,ignore
+/// impl AnyPin<'_> {
+///     fn output_signals(
+///         &self,
+///         private: private::Internal,
+///     ) -> &'static [(AlternateFunction, OutputSignal)] {
+///         impl_for_pin_type!(self, target, Output, {
+///             Pin::output_signals(&target, private)
+///         })
+///     }
+/// }
+/// ```
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 #[expect(clippy::crate_in_macro_def)]
@@ -1289,6 +1328,9 @@ macro_rules! impl_for_pin_type {
         panic!("Unsupported") })
     };
 }
+/// Defines the `InputSignal` and `OutputSignal` enums.
+///
+/// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! define_io_mux_signals {
@@ -1665,6 +1707,18 @@ macro_rules! define_io_mux_signals {
         }
     };
 }
+/// Defines and implements the `io_mux_reg` function.
+///
+/// The generated function has the following signature:
+///
+/// ```rust,ignore
+/// pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
+///     // ...
+/// # unimplemented!()
+/// }
+/// ```
+///
+/// This macro is intended to be called in esp-hal only.
 #[macro_export]
 #[expect(clippy::crate_in_macro_def)]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
