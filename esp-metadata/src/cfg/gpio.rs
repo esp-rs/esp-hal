@@ -416,11 +416,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
             branches.push(quote! {
-                #( (#pin, #attr, $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
-            });
-
-            branches.push(quote! {
-                (#pin, $t:tt, $then_tt:tt else $else_tt:tt ) => { $else_tt };
+                #( ((#pin, #attr) => $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
             });
         }
 
@@ -432,7 +428,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             /// This macro can be used as:
             ///
             /// ```rust,no_run
-            /// if_pin_is_type! (GPIO0, Output, {
+            /// if_pin_is_type! ((GPIO0, Output) => {
             ///     // some code that is generated for output pins
             /// } else {
             ///     // some code that is generated for non-output pins
@@ -445,6 +441,8 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! if_pin_is_type {
                 #(#branches)*
+
+                (($other:ident, $t:tt) => $then_tt:tt else $else_tt:tt ) => { $else_tt };
             }
         }
     };
@@ -458,7 +456,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         let mut impl_branches = vec![];
         for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
             impl_branches.push(quote! {
-                #gpionum => if_pin_is_type!(#peri, $on_type, {{
+                #gpionum => if_pin_is_type!((#peri, $on_type) => {{
                     #[allow(unused_unsafe, unused_mut)]
                     let mut $inner_ident = unsafe { crate::peripherals::#peri::steal() };
                     #[allow(unused_braces)]
@@ -480,9 +478,11 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             ///         &self,
             ///         private: private::Internal,
             ///     ) -> &'static [(AlternateFunction, OutputSignal)] {
-            ///         impl_for_pin_type!(self, target, Output, {
+            ///         impl_for_pin_type!((self, target, Output) => {
             ///             Pin::output_signals(&target, private)
-            ///         })
+            ///         } else {
+            ///             panic!("Pin is not an output")
+            ///         });
             ///     }
             /// }
             /// ```
@@ -493,14 +493,11 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             #[expect(clippy::crate_in_macro_def)]
             macro_rules! impl_for_pin_type {
-                ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
+                (($any_pin:ident, $inner_ident:ident, $on_type:tt) => $code:tt else $otherwise:tt) => {
                     match $any_pin.number() {
                         #(#impl_branches)*
                         _ => $otherwise,
                     }
-                };
-                ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt) => {
-                    impl_for_pin_type!($any_pin, $inner_ident, $on_type, $code else { panic!("Unsupported") })
                 };
             }
         }

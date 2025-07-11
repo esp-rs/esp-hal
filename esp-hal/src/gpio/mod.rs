@@ -850,7 +850,7 @@ macro_rules! gpio {
             pub(crate) fn is_output(&self) -> bool {
                 match self.pin {
                     $(
-                        $gpionum => if_pin_is_type!($peri, Output, { true } else { false }),
+                        $gpionum => if_pin_is_type!(($peri, Output) => { true } else { false }),
                     )+
                     _ => false,
                 }
@@ -2132,8 +2132,10 @@ impl Pin for AnyPin<'_> {
         &self,
         private: private::Internal,
     ) -> &'static [(AlternateFunction, OutputSignal)] {
-        impl_for_pin_type!(self, target, Output, {
+        impl_for_pin_type!((self, target, Output) => {
             Pin::output_signals(&target, private)
+        } else {
+            panic!("Pin is not an OutputPin")
         })
     }
 
@@ -2141,15 +2143,21 @@ impl Pin for AnyPin<'_> {
         &self,
         private: private::Internal,
     ) -> &'static [(AlternateFunction, InputSignal)] {
-        impl_for_pin_type!(self, target, Input, {
+        impl_for_pin_type!((self, target, Input) => {
             Pin::input_signals(&target, private)
+        } else {
+            panic!("Pin is not an InputPin")
         })
     }
 }
 
 impl InputPin for AnyPin<'_> {
     fn waker(&self) -> &'static AtomicWaker {
-        impl_for_pin_type!(self, target, Input, { InputPin::waker(&target) })
+        impl_for_pin_type!((self, target, Input) => {
+            InputPin::waker(&target)
+        } else {
+            panic!("Pin is not an InputPin")
+        })
     }
 }
 impl OutputPin for AnyPin<'_> {}
@@ -2238,7 +2246,7 @@ macro_rules! for_each_rtcio_pin {
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            if_pin_is_type!($gpio, Output, {
+            if_pin_is_type!(($gpio, Output) => {
                 #[allow(unused_mut)]
                 let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
                 return $code;

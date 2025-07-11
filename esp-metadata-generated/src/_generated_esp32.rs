@@ -705,7 +705,7 @@ macro_rules! for_each_lp_function {
 /// This macro can be used as:
 ///
 /// ```rust,no_run
-/// if_pin_is_type! (GPIO0, Output, {
+/// if_pin_is_type! ((GPIO0, Output) => {
 ///     // some code that is generated for output pins
 /// } else {
 ///     // some code that is generated for non-output pins
@@ -717,301 +717,199 @@ macro_rules! for_each_lp_function {
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! if_pin_is_type {
-    (GPIO0, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO0, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO0, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO0, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO0, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO1, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO1, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO1, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO1, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO1, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO2, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO2, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO2, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO2, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO2, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO3, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO3, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO3, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO3, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO3, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO4, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO4, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO4, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO4, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO4, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO5, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO5, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO5, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO5, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO5, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO6, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO6, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO6, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO6, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO6, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO7, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO7, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO7, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO7, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO7, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO8, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO8, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO8, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO8, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO8, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO9, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO9, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO9, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO9, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO9, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO10, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO10, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO10, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO10, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO10, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO11, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO11, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO11, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO11, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO11, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO12, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO12, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO12, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO12, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO12, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO13, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO13, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO13, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO13, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO13, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO14, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO14, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO14, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO14, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO14, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO15, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO15, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO15, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO15, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO15, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO16, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO16, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO16, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO16, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO16, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO17, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO17, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO17, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO17, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO17, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO18, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO18, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO18, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO18, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO18, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO19, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO19, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO19, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO19, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO19, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO20, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO20, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO20, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO20, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO20, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO21, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO21, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO21, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO21, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO21, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO22, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO22, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO22, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO22, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO22, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO23, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO23, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO23, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO23, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO23, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO25, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO25, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO25, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO25, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO25, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO26, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO26, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO26, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO26, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO26, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO27, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO27, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO27, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO27, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO27, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO32, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO32, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO32, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO32, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO32, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO33, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO33, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO33, Output, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO33, Output) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO33, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO34, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO34, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO34, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO35, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO35, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO35, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO36, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO36, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO36, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO37, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO37, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO37, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
-    };
-    (GPIO38, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO38, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
-    };
-    (GPIO38, $t:tt, $then_tt:tt else $else_tt:tt) => {
-        $else_tt
     };
-    (GPIO39, Input, $then_tt:tt else $else_tt:tt) => {
+    ((GPIO39, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO39, $t:tt, $then_tt:tt else $else_tt:tt) => {
+    (($other:ident, $t:tt) => $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
 }
@@ -1025,126 +923,130 @@ macro_rules! if_pin_is_type {
 ///         &self,
 ///         private: private::Internal,
 ///     ) -> &'static [(AlternateFunction, OutputSignal)] {
-///         impl_for_pin_type!(self, target, Output, {
+///         impl_for_pin_type!((self, target, Output) => {
 ///             Pin::output_signals(&target, private)
-///         })
+///         } else {
+///             panic!("Pin is not an output")
+///         });
 ///     }
 /// }
 /// ```
+///
+/// The first two arguments are the identifier of the AnyPin, and the identifier that can be used in
+/// the generated code block, respectively.
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 #[expect(clippy::crate_in_macro_def)]
 macro_rules! impl_for_pin_type {
-    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
-        match $any_pin .number() { 0 => if_pin_is_type!(GPIO0, $on_type, { {
+    (
+        ($any_pin:ident, $inner_ident:ident, $on_type:tt) => $code:tt else $otherwise:tt
+    ) => {
+        match $any_pin .number() { 0 => if_pin_is_type!((GPIO0, $on_type) => { {
         #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
         ::peripherals::GPIO0::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 1 => if_pin_is_type!(GPIO1, $on_type, { { #[allow(unused_unsafe,
-        unused_mut)] let mut $inner_ident = unsafe { crate ::peripherals::GPIO1::steal()
-        }; #[allow(unused_braces)] $code } } else { $otherwise }), 2 =>
-        if_pin_is_type!(GPIO2, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO2::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 3 =>
-        if_pin_is_type!(GPIO3, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO3::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 4 =>
-        if_pin_is_type!(GPIO4, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO4::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 5 =>
-        if_pin_is_type!(GPIO5, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO5::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 6 =>
-        if_pin_is_type!(GPIO6, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO6::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 7 =>
-        if_pin_is_type!(GPIO7, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO7::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 8 =>
-        if_pin_is_type!(GPIO8, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO8::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 9 =>
-        if_pin_is_type!(GPIO9, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO9::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 10 =>
-        if_pin_is_type!(GPIO10, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO10::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 11 =>
-        if_pin_is_type!(GPIO11, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO11::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 12 =>
-        if_pin_is_type!(GPIO12, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO12::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 13 =>
-        if_pin_is_type!(GPIO13, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO13::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 14 =>
-        if_pin_is_type!(GPIO14, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO14::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 15 =>
-        if_pin_is_type!(GPIO15, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO15::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 16 =>
-        if_pin_is_type!(GPIO16, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO16::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 17 =>
-        if_pin_is_type!(GPIO17, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO17::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 18 =>
-        if_pin_is_type!(GPIO18, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO18::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 19 =>
-        if_pin_is_type!(GPIO19, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO19::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 20 =>
-        if_pin_is_type!(GPIO20, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO20::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 21 =>
-        if_pin_is_type!(GPIO21, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO21::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 22 =>
-        if_pin_is_type!(GPIO22, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO22::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 23 =>
-        if_pin_is_type!(GPIO23, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO23::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 25 =>
-        if_pin_is_type!(GPIO25, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO25::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 26 =>
-        if_pin_is_type!(GPIO26, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO26::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 27 =>
-        if_pin_is_type!(GPIO27, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO27::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 32 =>
-        if_pin_is_type!(GPIO32, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO32::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 33 =>
-        if_pin_is_type!(GPIO33, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO33::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 34 =>
-        if_pin_is_type!(GPIO34, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO34::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 35 =>
-        if_pin_is_type!(GPIO35, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO35::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 36 =>
-        if_pin_is_type!(GPIO36, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO36::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 37 =>
-        if_pin_is_type!(GPIO37, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO37::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 38 =>
-        if_pin_is_type!(GPIO38, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO38::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), 39 =>
-        if_pin_is_type!(GPIO39, $on_type, { { #[allow(unused_unsafe, unused_mut)] let mut
-        $inner_ident = unsafe { crate ::peripherals::GPIO39::steal() };
-        #[allow(unused_braces)] $code } } else { $otherwise }), _ => $otherwise, }
-    };
-    ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt) => {
-        impl_for_pin_type!($any_pin, $inner_ident, $on_type, $code else {
-        panic!("Unsupported") })
+        $otherwise }), 1 => if_pin_is_type!((GPIO1, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO1::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 2 => if_pin_is_type!((GPIO2, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO2::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 3 => if_pin_is_type!((GPIO3, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO3::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 4 => if_pin_is_type!((GPIO4, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO4::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 5 => if_pin_is_type!((GPIO5, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO5::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 6 => if_pin_is_type!((GPIO6, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO6::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 7 => if_pin_is_type!((GPIO7, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO7::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 8 => if_pin_is_type!((GPIO8, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO8::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 9 => if_pin_is_type!((GPIO9, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO9::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 10 => if_pin_is_type!((GPIO10, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO10::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 11 => if_pin_is_type!((GPIO11, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO11::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 12 => if_pin_is_type!((GPIO12, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO12::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 13 => if_pin_is_type!((GPIO13, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO13::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 14 => if_pin_is_type!((GPIO14, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO14::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 15 => if_pin_is_type!((GPIO15, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO15::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 16 => if_pin_is_type!((GPIO16, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO16::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 17 => if_pin_is_type!((GPIO17, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO17::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 18 => if_pin_is_type!((GPIO18, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO18::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 19 => if_pin_is_type!((GPIO19, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO19::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 20 => if_pin_is_type!((GPIO20, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO20::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 21 => if_pin_is_type!((GPIO21, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO21::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 22 => if_pin_is_type!((GPIO22, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO22::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 23 => if_pin_is_type!((GPIO23, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO23::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 25 => if_pin_is_type!((GPIO25, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO25::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 26 => if_pin_is_type!((GPIO26, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO26::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 27 => if_pin_is_type!((GPIO27, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO27::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 32 => if_pin_is_type!((GPIO32, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO32::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 33 => if_pin_is_type!((GPIO33, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO33::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 34 => if_pin_is_type!((GPIO34, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO34::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 35 => if_pin_is_type!((GPIO35, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO35::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 36 => if_pin_is_type!((GPIO36, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO36::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 37 => if_pin_is_type!((GPIO37, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO37::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 38 => if_pin_is_type!((GPIO38, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO38::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), 39 => if_pin_is_type!((GPIO39, $on_type) => { {
+        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
+        ::peripherals::GPIO39::steal() }; #[allow(unused_braces)] $code } } else {
+        $otherwise }), _ => $otherwise, }
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.
