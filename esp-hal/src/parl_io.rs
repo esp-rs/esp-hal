@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Parallel IO (PARL_IO)
 //!
 //! ## Overview
@@ -14,7 +15,7 @@
 //! ### Initialization for RX
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::DmaRxBuf;
@@ -37,23 +38,14 @@
 //!
 //! // Set up Parallel IO for 1MHz data input, with DMA and bit packing
 //! //  configuration
-//!  let parl_io = ParlIo::new(
-//!     peripherals.PARL_IO,
-//!     dma_channel,
-//! )?;
+//! let parl_io = ParlIo::new(peripherals.PARL_IO, dma_channel)?;
 //!
 //! let config = RxConfig::default()
 //!     .with_frequency(Rate::from_mhz(1))
 //!     .with_bit_order(BitPackOrder::Msb)
 //!     .with_timeout_ticks(0xfff);
 //!
-//! let mut parl_io_rx = parl_io
-//!     .rx
-//!     .with_config(
-//!         rx_pins,
-//!         rx_clk_pin,
-//!         config,
-//!     )?;
+//! let mut parl_io_rx = parl_io.rx.with_config(rx_pins, rx_clk_pin, config)?;
 //!
 //! // Initialize the buffer and delay
 //! dma_rx_buf.as_mut_slice().fill(0u8);
@@ -68,10 +60,10 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### Initialization for TX
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::parl_io::{BitPackOrder, ParlIo, TxFourBits, ClkOutPin, TxConfig, TxPinConfigWithValidPin};

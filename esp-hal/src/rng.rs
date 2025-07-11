@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "analog_pin" => {
+        cfg(esp32) => "let analog_pin = peripherals.GPIO32;",
+        cfg(not(esp32)) => "let analog_pin = peripherals.GPIO3;"
+    }
+))]
 //! # Random Number Generator (RNG)
 //!
 //! ## Overview
@@ -39,7 +45,7 @@
 //! ### Basic RNG operation
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::rng::Rng;
 //!
 //! let mut rng = Rng::new(peripherals.RNG);
@@ -54,10 +60,10 @@
 //! loop {}
 //! # }
 //! ```
-//! 
+//!
 //! ### TRNG operation
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::Blocking;
 //! # use esp_hal::rng::Trng;
 //! # use esp_hal::peripherals::Peripherals;
@@ -72,20 +78,15 @@
 //! let mut true_rand = trng.random();
 //! let mut rng = trng.downgrade();
 //! // ADC is available now
-#![cfg_attr(esp32, doc = "let analog_pin = peripherals.GPIO32;")]
-#![cfg_attr(not(esp32), doc = "let analog_pin = peripherals.GPIO3;")]
+//! # {analog_pin}
 //! let mut adc1_config = AdcConfig::new();
-//! let mut adc1_pin = adc1_config.enable_pin(
-//!     analog_pin,
-//!     Attenuation::_11dB
-//! );
+//! let mut adc1_pin = adc1_config.enable_pin(analog_pin, Attenuation::_11dB);
 //! let mut adc1 = Adc::<ADC1, Blocking>::new(peripherals.ADC1, adc1_config);
 //! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
 //! rng.read(&mut buf);
 //! true_rand = rng.random();
 //! let pin_value: u16 = nb::block!(adc1.read_oneshot(&mut adc1_pin))?;
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use crate::{

@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # General-purpose Timers
 //!
 //! ## Overview
@@ -15,20 +16,19 @@
 //! ### One-shot Timer
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::timer::{OneShotTimer, PeriodicTimer, timg::TimerGroup};
 //! #
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut one_shot = OneShotTimer::new(timg0.timer0);
 //!
 //! one_shot.delay_millis(500);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### Periodic Timer
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::timer::{PeriodicTimer, timg::TimerGroup};
 //! #
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
@@ -36,7 +36,7 @@
 //!
 //! periodic.start(Duration::from_secs(1));
 //! loop {
-//!    periodic.wait();
+//!     periodic.wait();
 //! }
 //! # }
 //! ```

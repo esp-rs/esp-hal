@@ -89,6 +89,8 @@ pub(crate) fn build_doc_json(
         features
     );
 
+    let envs = vec![("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs")];
+
     // always use `esp` toolchain so we don't have to deal with potentially
     // different versions of the doc-json
     let mut cargo_builder = CargoArgsBuilder::default()
@@ -102,7 +104,7 @@ pub(crate) fn build_doc_json(
     cargo_builder = cargo_builder.arg("-Zbuild-std=alloc,core");
     let cargo_args = cargo_builder.build();
     log::debug!("{cargo_args:#?}");
-    crate::cargo::run(&cargo_args, package_path)?;
+    crate::cargo::run_with_env(&cargo_args, package_path, envs, false)?;
     Ok(current_path)
 }
 

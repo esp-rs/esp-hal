@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Two-wire Automotive Interface (TWAI)
 //!
 //! ## Overview
@@ -24,7 +25,7 @@
 //! ### Transmitting and Receiving Messages
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::filter::SingleStandardFilter;
@@ -47,13 +48,14 @@
 //!     twai_rx_pin,
 //!     twai_tx_pin,
 //!     TWAI_BAUDRATE,
-//!     TwaiMode::Normal
+//!     TwaiMode::Normal,
 //! );
 //!
 //! // Partially filter the incoming messages to reduce overhead of receiving
 //! // undesired messages
-//! twai_config.set_filter(const { SingleStandardFilter::new(b"xxxxxxxxxx0",
-//! b"x", [b"xxxxxxxx", b"xxxxxxxx"]) });
+//! twai_config.set_filter(
+//!     const { SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]) },
+//! );
 //!
 //! // Start the peripheral. This locks the configuration settings of the
 //! // peripheral and puts it into operation mode, allowing packets to be sent
@@ -69,10 +71,10 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### Self-testing (self reception of transmitted messages)
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::twai;
 //! # use esp_hal::twai::filter;
 //! # use esp_hal::twai::filter::SingleStandardFilter;

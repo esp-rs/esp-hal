@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Pulse Counter (PCNT)
 //!
 //! ## Overview
@@ -16,7 +17,7 @@
 //! ### Decoding a quadrature encoder
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::{Input, InputConfig, Pull};
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::pcnt::{channel, unit, Pcnt};
@@ -24,8 +25,8 @@
 //! # use critical_section::Mutex;
 //! # use portable_atomic::AtomicI32;
 //!
-//! static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> =
-//! Mutex::new(RefCell::new(None)); static VALUE: AtomicI32 = AtomicI32::new(0);
+//! static UNIT0: Mutex<RefCell<Option<unit::Unit<'static, 1>>>> = Mutex::new(RefCell::new(None));
+//! static VALUE: AtomicI32 = AtomicI32::new(0);
 //!
 //! // Initialize Pulse Counter (PCNT) unit with limits and filter settings
 //! let mut pcnt = Pcnt::new(peripherals.PCNT);
@@ -46,15 +47,13 @@
 //! ch0.set_ctrl_signal(input_a.clone());
 //! ch0.set_edge_signal(input_b.clone());
 //! ch0.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
-//! ch0.set_input_mode(channel::EdgeMode::Increment,
-//! channel::EdgeMode::Decrement);
+//! ch0.set_input_mode(channel::EdgeMode::Increment, channel::EdgeMode::Decrement);
 //!
 //! let ch1 = &u0.channel1;
 //! ch1.set_ctrl_signal(input_b);
 //! ch1.set_edge_signal(input_a);
 //! ch1.set_ctrl_mode(channel::CtrlMode::Reverse, channel::CtrlMode::Keep);
-//! ch1.set_input_mode(channel::EdgeMode::Decrement,
-//! channel::EdgeMode::Increment);
+//! ch1.set_input_mode(channel::EdgeMode::Decrement, channel::EdgeMode::Increment);
 //!
 //! // Enable interrupts and resume pulse counter unit
 //! u0.listen();
@@ -91,7 +90,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! [channel]: channel/index.html
 //! [unit]: unit/index.html
 

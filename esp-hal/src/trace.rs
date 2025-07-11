@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # RISC-­V Trace Encoder (TRACE)
 //!
 //! ## Overview
@@ -20,7 +21,7 @@
 //!
 //! ## Examples
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::trace::Trace;
 //! let mut buffer = [0_u8; 1024];
 //! let mut trace = Trace::new(peripherals.TRACE0);
@@ -30,8 +31,7 @@
 //! // end traced code
 //! let res = trace.stop_trace()?;
 //! // transfer the trace result to the host and decode it there
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use crate::{pac::trace::RegisterBlock, peripherals::TRACE0, system::PeripheralGuard};

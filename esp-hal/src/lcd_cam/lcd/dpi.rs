@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # LCD - RGB/Digital Parallel Interface Mode
 //!
 //! ## Overview
@@ -14,7 +15,7 @@
 //! display.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::Level;
 //! # use esp_hal::lcd_cam::{
 //! #     LcdCam,
@@ -91,8 +92,7 @@
 //!
 //! let transfer = dpi.send(false, dma_buf).map_err(|e| e.0)?;
 //! transfer.wait();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::{

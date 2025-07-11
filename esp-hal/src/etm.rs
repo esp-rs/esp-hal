@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Event Task Matrix (ETM)
 //!
 //! ## Overview
@@ -24,7 +25,7 @@
 //!
 //! ### Control LED by the button via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
@@ -44,8 +45,8 @@
 //!     },
 //! );
 //! let button_event = gpio_ext
-//! .channel0_event
-//! .falling_edge(button, InputConfig { pull: Pull::Down });
+//!     .channel0_event
+//!     .falling_edge(button, InputConfig { pull: Pull::Down });
 //!
 //! let etm = Etm::new(peripherals.ETM);
 //! let channel0 = etm.channel0;
@@ -58,10 +59,10 @@
 //! loop {}
 //! # }
 //! ```
-//! 
+//!
 //! ### Control LED by the systimer via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;

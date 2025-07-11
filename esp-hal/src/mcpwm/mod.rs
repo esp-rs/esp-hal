@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "clock_cfg" => {
+        cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
+        cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    }
+))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
 //!
 //! ## Overview
@@ -48,19 +54,12 @@
 //! `pin`.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # let pin = peripherals.GPIO0;
 //!
 //! // initialize peripheral
-#![cfg_attr(
-    not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
-)]
-#![cfg_attr(
-    esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
-)]
+//! # {clock_cfg}
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
@@ -78,8 +77,7 @@
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use operator::Operator;

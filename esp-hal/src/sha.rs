@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Secure Hash Algorithm (SHA) Accelerator
 //!
 //! ## Overview
@@ -30,7 +31,7 @@
 //!
 //! ## Examples
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::sha::Sha;
 //! # use esp_hal::sha::Sha256;
 //! # use nb::block;
@@ -51,8 +52,7 @@
 //! // the output.
 //! block!(hasher.finish(output.as_mut_slice()))?;
 //!
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.

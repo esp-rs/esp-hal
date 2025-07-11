@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # PSRAM "virtual peripheral" driver (ESP32-S2)
 //!
 //! ## Overview
@@ -18,7 +19,7 @@
 //! Notice that PSRAM example **must** be built in release mode!
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # extern crate alloc;
 //! # use alloc::{string::String, vec::Vec};
 //! # use esp_alloc as _;
@@ -36,8 +37,7 @@
 //! }
 //!
 //! // Initialize PSRAM and add it to the heap
-//! let (start, size) = psram::init_psram(peripherals.PSRAM,
-//!     psram::PsramConfig::default());
+//! let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
 //!
 //! init_psram_heap(start, size);
 //!

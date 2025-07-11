@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Reading of eFuses (ESP32-C6)
 //!
 //! ## Overview
@@ -20,7 +21,7 @@
 //! ### Read data from the eFuse storage.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::efuse::Efuse;
 //!
 //! let mac_address = Efuse::read_base_mac_address();
@@ -37,8 +38,7 @@
 //!
 //! println!("MAC address {:02x?}", Efuse::mac_address());
 //! println!("Flash Encryption {:?}", Efuse::flash_encryption());
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 pub use self::fields::*;

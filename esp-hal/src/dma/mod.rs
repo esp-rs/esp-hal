@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+    }
+))]
 //! # Direct Memory Access (DMA)
 //!
 //! ## Overview
@@ -16,11 +22,10 @@
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, Mode};
-#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
+//! # {dma_channel}
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO4;
@@ -28,8 +33,10 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(Rate::from_khz(100)).
-//! with_mode(Mode::_0) )?
+//!     Config::default()
+//!         .with_frequency(Rate::from_khz(100))
+//!         .with_mode(Mode::_0),
+//! )?
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
@@ -38,7 +45,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
@@ -1645,6 +1652,12 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     }
 }
 
+#[procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+    }
+)]
 /// Trait implemented for DMA channels that are compatible with a particular
 /// peripheral.
 ///
@@ -1662,12 +1675,12 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// types compatible with a specific peripheral.
 ///
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
-/// use esp_hal::spi::master::{
-///     AnySpi, Spi, SpiDma, Config, Instance as SpiInstance
+/// # {before_snippet}
+/// use esp_hal::{
+///     Blocking,
+///     dma::DmaChannelFor,
+///     spi::master::{AnySpi, Config, Instance as SpiInstance, Spi, SpiDma},
 /// };
-/// use esp_hal::dma::DmaChannelFor;
-/// use esp_hal::Blocking;
 ///
 /// fn configures_spi_dma<'d>(
 ///     spi: Spi<'d, Blocking>,
@@ -1675,13 +1688,10 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// ) -> SpiDma<'d, Blocking> {
 ///     spi.with_dma(channel)
 /// }
-#[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#[cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
-#[doc = ""]
-/// let spi = Spi::new(
-///     peripherals.SPI2,
-///     Config::default(),
-/// )?;
+///
+/// # {dma_channel}
+///
+/// let spi = Spi::new(peripherals.SPI2, Config::default())?;
 ///
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
 /// # Ok(())

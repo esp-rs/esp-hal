@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # LED Controller (LEDC)
 //!
 //! ## Overview
@@ -25,7 +26,7 @@
 //! range 0..100.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::ledc::Ledc;
 //! # use esp_hal::ledc::LSGlobalClkSource;
 //! # use esp_hal::ledc::timer::{self, TimerIFace};
@@ -37,20 +38,18 @@
 //! ledc.set_global_slow_clock(LSGlobalClkSource::APBClk);
 //!
 //! let mut lstimer0 = ledc.timer::<LowSpeed>(timer::Number::Timer0);
-//! lstimer0
-//!     .configure(timer::config::Config {
-//!         duty: timer::config::Duty::Duty5Bit,
-//!         clock_source: timer::LSClockSource::APBClk,
-//!         frequency: Rate::from_khz(24),
-//!     })?;
+//! lstimer0.configure(timer::config::Config {
+//!     duty: timer::config::Duty::Duty5Bit,
+//!     clock_source: timer::LSClockSource::APBClk,
+//!     frequency: Rate::from_khz(24),
+//! })?;
 //!
 //! let mut channel0 = ledc.channel(channel::Number::Channel0, led);
-//! channel0
-//!     .configure(channel::config::Config {
-//!         timer: &lstimer0,
-//!         duty_pct: 10,
-//!         pin_config: channel::config::PinConfig::PushPull,
-//!     })?;
+//! channel0.configure(channel::config::Config {
+//!     timer: &lstimer0,
+//!     duty_pct: 10,
+//!     pin_config: channel::config::PinConfig::PushPull,
+//! })?;
 //!
 //! loop {
 //!     // Set up a breathing LED: fade from off to on over a second, then
@@ -62,7 +61,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //! - Source clock selection is not supported
 //! - Interrupts are not supported

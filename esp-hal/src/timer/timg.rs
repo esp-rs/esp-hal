@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Timer Group (TIMG)
 //!
 //! ## Overview
@@ -25,9 +26,8 @@
 //! ### General-purpose Timer
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::timg::TimerGroup;
-//! use esp_hal::timer::Timer;
+//! # {before_snippet}
+//! use esp_hal::timer::{Timer, timg::TimerGroup};
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let timer0 = timg0.timer0;
@@ -44,16 +44,16 @@
 //! }
 //!
 //! timer0.clear_interrupt();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### Watchdog Timer
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::timg::TimerGroup;
-//! use esp_hal::timer::timg::MwdtStage;
-//! use esp_hal::timer::Timer;
+//! # {before_snippet}
+//! use esp_hal::timer::{
+//!     Timer,
+//!     timg::{MwdtStage, TimerGroup},
+//! };
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
