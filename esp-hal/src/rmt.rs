@@ -1,7 +1,18 @@
 #![cfg_attr(docsrs, procmacros::doc_replace(
     "freq" => {
         cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
-        cfg(not(esp32h2)) => "let freq = Rate::from_mhz(80);"
+        _ => "let freq = Rate::from_mhz(80);"
+    },
+    "channel" => {
+        cfg(any(esp32, esp32s2)) => "let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, rx_config)?;",
+        cfg(esp32s3) => "let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, rx_config)?;",
+        _ => "let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config)?;"
+    },
+    "channels_desc" => {
+        cfg(esp32) => "8 channels, each of them can be either receiver or transmitter.",
+        cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter.",
+        cfg(esp32s3) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals.",
+        cfg(any(esp32c3, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals.",
     }
 ))]
 //! # Remote Control Peripheral (RMT)
@@ -24,23 +35,8 @@
 //! ### Channels
 //!
 //! There are
-#![cfg_attr(
-    esp32,
-    doc = "8 channels, each of them can be either receiver or transmitter."
-)]
-#![cfg_attr(
-    esp32s2,
-    doc = "4 channels, each of them can be either receiver or transmitter."
-)]
-#![cfg_attr(
-    esp32s3,
-    doc = "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals."
-)]
-#![cfg_attr(
-    any(esp32c3, esp32c6, esp32h2),
-    doc = "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals."
-)]
-#![doc = ""]
+//! # {channels_desc}
+//!
 //! For more information, please refer to the
 #![doc = concat!("[ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/", chip!(), "/api-reference/peripherals/rmt.html)")]
 //! ## Configuration
@@ -84,15 +80,12 @@
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
-#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! # {freq}
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let tx_config = TxChannelConfig::default().with_clk_divider(255);
 //!
-//! let mut channel = rmt
-//!     .channel0
-//!     .configure_tx(peripherals.GPIO4, tx_config)?;
+//! let mut channel = rmt.channel0.configure_tx(peripherals.GPIO4, tx_config)?;
 //!
 //! let delay = Delay::new();
 //!
@@ -107,7 +100,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### RX operation
 //! ```rust, no_run
 //! # {before_snippet}
@@ -117,32 +110,16 @@
 //!
 //! const WIDTH: usize = 80;
 //!
-//! let mut out = Output::new(
-//!     peripherals.GPIO5,
-//!     Level::Low,
-//!     OutputConfig::default(),
-//! );
+//! let mut out = Output::new(peripherals.GPIO5, Level::Low, OutputConfig::default());
 //!
 //! // Configure frequency based on chip type
-#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
-#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! # {freq}
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
 //!
 //! let rx_config = RxChannelConfig::default()
 //!     .with_clk_divider(1)
 //!     .with_idle_threshold(10000);
-#![cfg_attr(
-    any(esp32, esp32s2),
-    doc = "let mut channel = rmt.channel0.configure_rx(peripherals.GPIO4, rx_config)?;"
-)]
-#![cfg_attr(
-    esp32s3,
-    doc = "let mut channel = rmt.channel7.configure_rx(peripherals.GPIO4, rx_config)?;"
-)]
-#![cfg_attr(
-    not(any(esp32, esp32s2, esp32s3)),
-    doc = "let mut channel = rmt.channel2.configure_rx(peripherals.GPIO4, rx_config)?;"
-)]
+//! # {channel}
 //! let delay = Delay::new();
 //! let mut data: [u32; 48] = [PulseCode::empty(); 48];
 //!
@@ -216,7 +193,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{

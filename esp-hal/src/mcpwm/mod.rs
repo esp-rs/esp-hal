@@ -2,6 +2,12 @@
     "clock_cfg" => {
         cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
         cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    },
+    "clock_src" => {
+        cfg(esp32) => "Clock source is PWM_CLOCK",
+        cfg(esp32s3) => "Clock source is CRYPTO_PWM_CLOCK",
+        cfg(esp32c6) => "Clock source is CRYPTO_CLOCK",
+        cfg(esp32h2) => "Clock source is XTAL",
     }
 ))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
@@ -39,12 +45,9 @@
 //!       updating methods.
 //! * Fault Detection Module (Not yet implemented)
 //! * Capture Module (Not yet implemented)
-#![doc = ""]
-#![cfg_attr(esp32, doc = "Clock source is PWM_CLOCK")]
-#![cfg_attr(esp32s3, doc = "Clock source is CRYPTO_PWM_CLOCK")]
-#![cfg_attr(esp32c6, doc = "Clock source is CRYPTO_CLOCK")]
-#![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
-#![doc = ""]
+//!
+//! # {clock_src}
+//!
 //! ## Examples
 //!
 //! ### Output a 20 kHz signal

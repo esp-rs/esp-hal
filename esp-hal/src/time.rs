@@ -240,15 +240,20 @@ impl Instant {
     /// Represents the moment the system booted.
     pub const EPOCH: Instant = Instant(InnerInstant::from_ticks(0));
 
-    #[procmacros::doc_replace]
+    #[procmacros::doc_replace(
+        "wrap_after" => {
+            cfg(esp32) => "36_558 years",
+            cfg(esp32s2) => "7_311 years",
+            _ => "more than 7 years"
+        }
+    )]
     /// Returns the current instant.
     ///
     /// The counter won’t measure time in sleep-mode.
     ///
     /// The timer has a 1 microsecond resolution and will wrap after
-    #[cfg_attr(esp32, doc = "36_558 years")]
-    #[cfg_attr(esp32s2, doc = "7_311 years")]
-    #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
+    /// # {wrap_after}
+    ///
     /// ## Example
     ///
     /// ```rust, no_run

@@ -494,6 +494,7 @@ macro_rules! dma_circular_buffers {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors.
 ///
 /// ## Usage
@@ -1650,6 +1651,10 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     "dma_channel" => {
         cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
         cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+    },
+    "note" => {
+        cfg(pdma) => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
+        _ => ""
     }
 )]
 /// Trait implemented for DMA channels that are compatible with a particular
@@ -1657,12 +1662,7 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaChannel` implementation.
-#[cfg_attr(pdma, doc = "")]
-#[cfg_attr(
-    pdma,
-    doc = "Note that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime."
-)]
-#[cfg_attr(pdma, doc = "")]
+/// # {note}
 /// ## Example
 ///
 /// The following example demonstrates how this trait can be used to only accept

@@ -261,7 +261,20 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     }
 }
 
-#[procmacros::doc_replace]
+#[procmacros::doc_replace(
+    "pin0" => {
+        cfg(any(esp32c3, esp32c2)) => "let mut pin_0 = peripherals.GPIO2;",
+        cfg(any(esp32s2, esp32s3)) => "let mut pin_0 = peripherals.GPIO17;"
+    },
+    "pin1" => {
+        cfg(any(esp32c3, esp32c2)) => "let mut pin_1 = peripherals.GPIO3;",
+        cfg(any(esp32s2, esp32s3)) => "let mut pin_1 = peripherals.GPIO18;"
+    },
+    "wakeup_pins" => {
+        cfg(any(esp32c3, esp32c2)) => "let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = \n\t&mut [(&mut pin_0, WakeupLevel::Low),(&mut pin_1, WakeupLevel::High)];",
+        cfg(any(esp32s2, esp32s3)) => "let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = \n\t&mut [(&mut pin_0, WakeupLevel::Low),(&mut pin_1, WakeupLevel::High)];"
+    },
+)]
 /// RTC_IO wakeup source
 ///
 /// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
@@ -273,7 +286,10 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};
-/// # use esp_hal::rtc_cntl::{reset_reason, sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
+/// # use esp_hal::rtc_cntl::{reset_reason,
+/// #   sleep::{RtcioWakeupSource, TimerWakeupSource, WakeupLevel},
+/// #   wakeup_cause, Rtc, SocResetReason
+/// # };
 /// # use esp_hal::system::Cpu;
 ///
 /// let mut rtc = Rtc::new(peripherals.LPWR);
@@ -285,27 +301,15 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 ///
 /// let delay = Delay::new();
 /// let timer = TimerWakeupSource::new(Duration::from_secs(10));
-#[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_0 = peripherals.GPIO2;")]
-#[cfg_attr(any(esp32c3, esp32c2), doc = "let mut pin_1 = peripherals.GPIO3;")]
-#[cfg_attr(any(esp32s2, esp32s3), doc = "let mut pin_0 = peripherals.GPIO17;")]
-#[cfg_attr(any(esp32s2, esp32s3), doc = "let mut pin_1 = peripherals.GPIO18;")]
-#[cfg_attr(
-    any(esp32c3, esp32c2),
-    doc = "let wakeup_pins: &mut [(&mut dyn gpio::RtcPinWithResistors, WakeupLevel)] = &mut ["
-)]
-#[cfg_attr(
-    any(esp32s2, esp32s3),
-    doc = "let wakeup_pins: &mut [(&mut dyn gpio::RtcPin, WakeupLevel)] = &mut ["
-)]
-///     (&mut pin_0, WakeupLevel::Low),
-///     (&mut pin_1, WakeupLevel::High),
-/// ];
+/// # {pin0}
+/// # {pin1}
+/// # {wakeup_pins}
 ///
 /// let rtcio = RtcioWakeupSource::new(wakeup_pins);
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer, &rtcio]);
 ///
-/// # }
+/// # {after_snippet}
 /// ```
 #[cfg(any(esp32c3, esp32s2, esp32s3, esp32c2))]
 pub struct RtcioWakeupSource<'a, 'b> {
