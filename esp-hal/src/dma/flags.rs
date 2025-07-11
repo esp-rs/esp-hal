@@ -37,22 +37,22 @@ pub trait DescriptorFlagFields {
 
     /// Returns the `SUC_EOF` bit.
     ///
-    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
-    /// data containing the EOF flag.
+    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to
+    /// 1 after receiving data containing the EOF flag.
     /// For transmit descriptors, software needs to set this bit to 1 as needed.
-    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in the data sent to
-    /// the corresponding peripheral, indicating to the peripheral that this data segment marks the end of one
-    /// transfer phase.
+    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in
+    /// the data sent to the corresponding peripheral, indicating to the peripheral that this
+    /// data segment marks the end of one transfer phase.
     fn suc_eof(&self) -> bool;
 
     /// Sets the `SUC_EOF` bit.
     ///
-    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
-    /// data containing the EOF flag.
+    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to
+    /// 1 after receiving data containing the EOF flag.
     /// For transmit descriptors, software needs to set this bit to 1 as needed.
-    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in the data sent to
-    /// the corresponding peripheral, indicating to the peripheral that this data segment marks the end of one
-    /// transfer phase.
+    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in
+    /// the data sent to the corresponding peripheral, indicating to the peripheral that this
+    /// data segment marks the end of one transfer phase.
     fn set_suc_eof(&mut self, suc_eof: bool);
 
     /// Returns the owner.
