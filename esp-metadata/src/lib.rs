@@ -444,6 +444,7 @@ impl Config {
             #[doc = concat!("assert_eq!(chip_name, ", chip!(), ")")]
             /// ```
             #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! chip {
                 () => { #chip_name };
             }
@@ -476,6 +477,7 @@ impl Config {
         tokens.extend(quote! {
             /// The properties of this chip and its drivers.
             #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! property {
                 ("chip") => { #chip_name };
                 ("arch") => { #arch };
@@ -501,6 +503,7 @@ impl Config {
         tokens.extend(quote! {
             /// Macro to get the address range of the given memory region.
             #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! memory_range {
                 #(#region_branches)*
             }
@@ -636,6 +639,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
         // Instance trait for available peripherals. It works by defining, then calling an inner
         // macro that substitutes the properties into the template provided by the call in esp-hal.
         #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
         macro_rules! #macro_name {
             (
                 $($pattern:tt => $code:tt;)*
@@ -707,7 +711,14 @@ pub fn generate_build_script_utils() -> TokenStream {
     );
 
     quote! {
+        // make it possible to build documentation without `std`.
+        #[cfg(docsrs)]
+        macro_rules! println {
+            ($($any:tt)*) => {};
+        }
+
         #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+        #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
         pub enum Chip {
             #(#chip),*
         }
@@ -724,7 +735,7 @@ pub fn generate_build_script_utils() -> TokenStream {
         }
 
         impl Chip {
-            pub fn from_cargo_feature() -> Result<Self, Box<dyn std::error::Error>> {
+            pub fn from_cargo_feature() -> Result<Self, &'static str> {
                 let all_chips = [
                     #(( #feature_env, Self::#chip )),*
                 ];
@@ -733,7 +744,7 @@ pub fn generate_build_script_utils() -> TokenStream {
                 for (env, c) in all_chips {
                     if std::env::var(env).is_ok() {
                         if chip.is_some() {
-                            return Err(#bail_message.into());
+                            return Err(#bail_message);
                         }
                         chip = Some(c);
                     }
@@ -741,7 +752,7 @@ pub fn generate_build_script_utils() -> TokenStream {
 
                 match chip {
                     Some(chip) => Ok(chip),
-                    None => Err(#bail_message.into())
+                    None => Err(#bail_message)
                 }
             }
 
@@ -784,6 +795,7 @@ pub fn generate_build_script_utils() -> TokenStream {
             }
         }
 
+        #[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
         pub struct Config {
             architecture: &'static str,
             target: &'static str,
@@ -818,11 +830,104 @@ pub fn generate_lib_rs() -> TokenStream {
     });
 
     quote! {
+        //! # (Generated) metadata for Espressif MCUs.
+        //!
+        //! This crate provides properties that are specific to various Espressif microcontrollers,
+        //! and provides macros to work with peripherals, pins, and various other parts of the chips.
+        //!
+        //! This crate can be used both in firmware, as well as in build scripts, but the usage is different.
+        //!
+        //! ## Usage in build scripts
+        //!
+        //! To use the `Chip` enum and the `Config` struct, add the crate to your `Cargo.toml` build
+        //! dependencies, with the `build-script` feature:
+        //!
+        //! ```toml
+        //! [build-dependencies]
+        //! esp-metadata-generated = { version = "...", features = ["build-script"] }
+        //! ```
+        //!
+        //! ## Usage in firmware
+        //!
+        //! To use the various macros, add the crate to your `Cargo.toml` dependencies.
+        //! A device-specific feature needs to be enabled in order to use the crate, usually
+        //! picked by the user:
+        //!
+        //! ```toml
+        //! [dependencies]
+        //! esp-metadata-generated = { version = "..." }
+        //! # ...
+        //!
+        //! [features]
+        //! esp32 = ["esp-metadata-generated/esp32"]
+        //! esp32c2 = ["esp-metadata-generated/esp32c2"]
+        //! # ...
+        //! ```
+        //!
+        //! ## `for_each` macros
+        //!
+        //! The basic syntax of this macro looks like a macro definition with two distinct syntax options:
+        //!
+        //! ```rust, no_run
+        //! for_each_peripherals! {
+        //!     // Individual matcher, invoked separately for each peripheral instance
+        //!     ( <individual match syntax> ) => { /* some code */ };
+        //!
+        //!     // Repeated matcher, invoked once with all peripheral instances
+        //!     ( all $( (<individual match syntax>) ),* ) => { /* some code */ };
+        //! }
+        //! ```
+        //!
+        //! You can specify any number of matchers in the same invocation.
+        //!
+        //! ### Using the individual matcher
+        //!
+        //! In this use case, each item's data is individually passed through the macro. This can be used to
+        //! generate code for each item separately, allowing specializing the implementation where needed.
+        //!
+        //! ```rust,no_run
+        //! for_each_gpio! {
+        //!   // Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
+        //!   ($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*)) => { /* some code */ };
+        //!
+        //!   // You can create matchers with data filled in. This example will specifically match GPIO2
+        //!   ($n:literal, GPIO2 $input_af:tt $output_af:tt $attributes:tt) => { /* Additional case only for GPIO2 */ };
+        //! }
+        //! ```
+        //!
+        //! Different macros can have multiple different syntax options for their individual matchers, usually
+        //! to provide more detailed information, while preserving simpler syntax for more basic use cases.
+        //! Consult each macro's documentation for available options.
+        //!
+        //! ### Repeated matcher
+        //!
+        //! With this option, all data is passed through the macro all at once. This form can be used to,
+        //! for example, generate struct fields. If the macro has multiple individual matcher options,
+        //! the repeated matcher will contain each item's data multiple times, once for each available
+        //! syntax option. Currently, using the repeated matcher is not recommended for these macros.
+        //!
+        //! > This issue will be likely resolved by naming the different syntax options, and providing
+        //! different match arms for each in place of `all`.
+        //!
+        //! ```rust,no_run
+        //! // Example usage to create a struct containing all GPIOs:
+        //! for_each_gpio! {
+        //!     (all $( ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt $_attrs:tt) ),*) => {
+        //!         struct Gpios {
+        //!             $(
+        //!                 #[doc = concat!(" The ", stringify!($n), "th GPIO pin")]
+        //!                 pub $gpio: Gpio<$n>,
+        //!             )*
+        //!         }
+        //!     };
+        //! }
+        //! ```
+        #![cfg_attr(docsrs, feature(doc_cfg))]
         #![cfg_attr(not(feature = "build-script"), no_std)]
 
         #(#chips)*
 
-        #[cfg(feature = "build-script")]
+        #[cfg(any(feature = "build-script", docsrs))]
         include!( "_build_script_utils.rs");
     }
 }

@@ -425,6 +425,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         quote! {
             #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             macro_rules! if_pin_is_type {
                 #(#branches)*
             }
@@ -453,6 +454,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         quote! {
             #[macro_export]
+            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
             #[expect(clippy::crate_in_macro_def)]
             macro_rules! impl_for_pin_type {
                 ($any_pin:ident, $inner_ident:ident, $on_type:tt, $code:tt else $otherwise:tt) => {
@@ -487,87 +489,81 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
     quote! {
-        /// This macro can be used to generate code for each GPIOn instance.
+        /// This macro can be used to generate code for each `GPIOn` instance.
         ///
-        /// The basic syntax of this macro looks like a macro definition with two distinct syntax options:
+        /// For an explanation on the general syntax, as well as usage of individual/repeated
+        /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
         ///
-        /// ```rust, no_run
-        /// for_each_gpio! {
-        ///     // Individual matcher, invoked separately for each GPIO
-        ///     ( <match arm> ) => { /* some code */ };
+        /// This macro has one option for its "Individual matcher" case:
         ///
-        ///     // Repeated matcher, invoked once with all GPIOs
-        ///     ( all $( (<individual match syntax>) ),* ) => { /* some code */ };
-        /// }
-        /// ```
+        /// Syntax: `($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*))`
         ///
-        /// You can specify any number of matchers.
+        /// Macro fragments:
         ///
-        /// ## Using the individual matcher
+        /// - `$n`: the number of the GPIO. For `GPIO0`, `$n` is 0.
+        /// - `$gpio`: the name of the GPIO.
+        /// - `$digital_input_function`: the number of the digital function, as an identifier (i.e. for function 0 this is `_0`).
+        /// - `$digital_input_function`: the name of the digital function, as an identifier.
+        /// - `$digital_output_function`: the number of the digital function, as an identifier (i.e. for function 0 this is `_0`).
+        /// - `$digital_output_function`: the name of the digital function, as an identifier.
+        /// - `$pin_attribute`: `Input` and/or `Output`, marks the possible directions of the GPIO.
         ///
-        /// In this use case, each GPIO's data is individually passed through the macro. This can be used to
-        /// generate code for each GPIO separately, allowing specializing the implementation where needed.
-        ///
-        /// ```rust,no_run
-        /// for_each_gpio! {
-        ///   // Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
-        ///   ($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*)) => { /* some code */ };
-        ///
-        ///   // You can create matchers with data filled in. This example will specifically match GPIO2
-        ///   ($n:literal, GPIO2 $input_af:tt $output_af:tt $attributes:tt) => { /* Additional case only for GPIO2 */ };
-        /// }
-        /// ```
-        ///
-        /// ## Repeated matcher
-        ///
-        /// With this option, all GPIO data is passed through the macro all at once. This form can be used to,
-        /// for example, generate struct fields.
-        ///
-        /// ```rust,no_run
-        /// // Example usage to create a struct containing all GPIOs:
-        /// for_each_gpio! {
-        ///     (all $( ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt $_attrs:tt) ),*) => {
-        ///         struct Gpios {
-        ///             $(
-        ///                 #[doc = concat!(" The ", stringify!($n), "th GPIO pin")]
-        ///                 pub $gpio: Gpio<$n>,
-        ///             )*
-        ///         }
-        ///     };
-        /// }
-        /// ```
+        /// Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
         #for_each_gpio
 
         /// This macro can be used to generate code for each analog function of each GPIO.
         ///
         /// For an explanation on the general syntax, as well as usage of individual/repeated
-        /// matchers, refer to [for_each_gpio].
+        /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
         ///
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
         /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
         ///
-        /// The expanded signal are only available when the signal has at least one numbered component.
+        /// Macro fragments:
+        ///
+        /// - `$signal`: the name of the signal.
+        /// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
+        /// - `$number`: the numbers extracted from `$signal`.
+        /// - `$gpio`: the name of the GPIO.
+        ///
+        /// Example data:
+        /// - `(ADC2_CH5, GPIO12)`
+        /// - `((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12)`
+        ///
+        /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_analog
 
         /// This macro can be used to generate code for each LP/RTC function of each GPIO.
         ///
         /// For an explanation on the general syntax, as well as usage of individual/repeated
-        /// matchers, refer to [for_each_gpio].
+        /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
         ///
         /// This macro has two options for its "Individual matcher" case:
         ///
         /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
         /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
         ///
-        /// The expanded signal are only available when the signal has at least one numbered component.
+        /// Macro fragments:
+        ///
+        /// - `$signal`: the name of the signal.
+        /// - `$group`: the name of the signal, with numbers replaced by placeholders. For `ADC2_CH3` this is `ADCn_CHm`.
+        /// - `$number`: the numbers extracted from `$signal`.
+        /// - `$gpio`: the name of the GPIO.
+        ///
+        /// Example data:
+        /// - `(RTC_GPIO15, GPIO12)`
+        /// - `((RTC_GPIO15, RTC_GPIOn, 15), GPIO12)`
+        ///
+        /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
 
         #if_pin_is_type
         #impl_for_pin_type
 
         #[macro_export]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
         macro_rules! define_io_mux_signals {
             () => {
                 #input_signals
@@ -577,6 +573,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         #[macro_export]
         #[expect(clippy::crate_in_macro_def)]
+        #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
         macro_rules! define_io_mux_reg {
             () => {
                 #io_mux_accessor
