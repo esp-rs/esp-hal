@@ -41,7 +41,7 @@ impl Debug for DmaDescriptorFlags {
             .field("size", &self.size())
             .field("length", &self.len())
             .field("suc_eof", &self.suc_eof())
-            .field("owner", &(if self.owner().into() { "DMA" } else { "CPU" }))
+            .field("owner", &self.owner().to_str())
             .finish()
     }
 }
@@ -55,7 +55,7 @@ impl defmt::Format for DmaDescriptorFlags {
             self.size(),
             self.len(),
             self.suc_eof(),
-            if self.owner() { "DMA" } else { "CPU" }
+            self.owner().to_str()
         );
     }
 }
