@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! RTC IO
 //!
 //! # Overview
@@ -21,12 +22,11 @@
 //! ### Configure a ULP Pin as Output
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::rtc_io::LowPowerOutput;
 //! // configure GPIO 1 as ULP output pin
 //! let lp_pin = LowPowerOutput::<'static, 1>::new(peripherals.GPIO1);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::marker::PhantomData;

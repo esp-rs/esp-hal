@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+        _ => "let dma_channel = peripherals.DMA_CH0;"
+    },
+))]
 //! # Serial Peripheral Interface - Slave Mode
 //!
 //! ## Overview
@@ -14,40 +20,33 @@
 //! ### SPI Slave with DMA
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 //! # use esp_hal::spi::Mode;
 //! # use esp_hal::spi::slave::Spi;
-#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
+//! # {dma_channel}
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO1;
 //! let mosi = peripherals.GPIO2;
 //! let cs = peripherals.GPIO3;
 //!
-//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-//! dma_buffers!(32000);
+//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 //! let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 //! let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-//! let mut spi = Spi::new(
-//!     peripherals.SPI2,
-//!     Mode::_0,
-//! )
-//! .with_sck(sclk)
-//! .with_mosi(mosi)
-//! .with_miso(miso)
-//! .with_cs(cs)
-//! .with_dma(dma_channel);
+//! let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
+//!     .with_sck(sclk)
+//!     .with_mosi(mosi)
+//!     .with_miso(miso)
+//!     .with_cs(cs)
+//!     .with_dma(dma_channel);
 //!
-//! let transfer = spi
-//!     .transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
+//! let transfer = spi.transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
 //!
 //! transfer.wait();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //! This driver is currently **unstable**.

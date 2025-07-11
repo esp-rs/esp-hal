@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Software Interrupts
 //!
 //! The [`SoftwareInterruptControl`] struct gives access to the available
@@ -10,9 +11,8 @@
 //! ## Examples
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! let sw_ints =
-//!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//! # {before_snippet}
+//! let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //!
 //! // Take the interrupt you want to use.
 //! let mut int0 = sw_ints.software_interrupt0;
@@ -23,8 +23,7 @@
 //!     int0.set_interrupt_handler(swint0_handler);
 //!     SWINT0.borrow_ref_mut(cs).replace(int0);
 //! });
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //!
 //! # use core::cell::RefCell;
 //! # use critical_section::Mutex;
@@ -32,8 +31,7 @@
 //! // ... somewhere outside of your main function
 //!
 //! // Define a shared handle to the software interrupt.
-//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
-//!     Mutex::new(RefCell::new(None));
+//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 //!
 //! #[handler]
 //! fn swint0_handler() {

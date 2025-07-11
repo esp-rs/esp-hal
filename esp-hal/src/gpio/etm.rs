@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Event Task Matrix (ETM)
 //!
 //! ## Overview
@@ -21,7 +22,7 @@
 //! ## Examples
 //! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::Channels;
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::etm::InputConfig;
@@ -44,8 +45,7 @@
 //! let button_event = gpio_ext
 //!     .channel0_event
 //!     .falling_edge(button, InputConfig { pull: Pull::Down });
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::marker::PhantomData;

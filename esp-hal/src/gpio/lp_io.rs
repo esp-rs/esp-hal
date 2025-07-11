@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! Low Power IO (LP_IO)
 //!
 //! # Overview
@@ -19,13 +20,11 @@
 //! ## Configure a LP Pin as Output
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::gpio::lp_io::LowPowerOutput;
 //! // configure GPIO 1 as LP output pin
-//! let lp_pin: LowPowerOutput<'_, 1> =
-//!     LowPowerOutput::new(peripherals.GPIO1);
-//! # Ok(())
-//! # }
+//! let lp_pin: LowPowerOutput<'_, 1> = LowPowerOutput::new(peripherals.GPIO1);
+//! # {after_snippet}
 //! ```
 
 use core::marker::PhantomData;

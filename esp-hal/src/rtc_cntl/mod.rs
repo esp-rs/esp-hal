@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Real-Time Control and Low-power Management (RTC_CNTL)
 //!
 //! ## Overview
@@ -11,17 +12,17 @@
 //! sources and low-power management. The driver provides the following features
 //! and functionalities:
 //!
-//!    * Clock Configuration
-//!    * Calibration
-//!    * Low-Power Management
-//!    * Handling Watchdog Timers
+//! * Clock Configuration
+//! * Calibration
+//! * Low-Power Management
+//! * Handling Watchdog Timers
 //!
 //! ## Examples
 //!
 //! ### Get time in ms from the RTC Timer
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use core::time::Duration;
 //! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 //!
@@ -39,10 +40,10 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ### RWDT usage
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use core::cell::RefCell;
 //! # use critical_section::Mutex;
 //! # use esp_hal::delay::Delay;
@@ -55,12 +56,12 @@
 //! let mut rtc = Rtc::new(peripherals.LPWR);
 //!
 //! rtc.set_interrupt_handler(interrupt_handler);
-//! rtc.rwdt.set_timeout(RwdtStage::Stage0, Duration::from_millis(2000));
+//! rtc.rwdt
+//!     .set_timeout(RwdtStage::Stage0, Duration::from_millis(2000));
 //! rtc.rwdt.listen();
 //!
 //! critical_section::with(|cs| RWDT.borrow_ref_mut(cs).replace(rtc.rwdt));
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //!
 //! // Where the `LP_WDT` interrupt handler is defined as:
 //! # use core::cell::RefCell;
@@ -81,19 +82,16 @@
 //!
 //!             println!("Restarting in 5 seconds...");
 //!
-//!             rwdt.set_timeout(
-//!                 RwdtStage::Stage0,
-//!                 Duration::from_millis(5000),
-//!             );
+//!             rwdt.set_timeout(RwdtStage::Stage0, Duration::from_millis(5000));
 //!             rwdt.unlisten();
 //!         }
 //!     });
 //! }
 //! ```
-//! 
+//!
 //! ### Get time in ms from the RTC Timer
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use core::time::Duration;
 //! # use esp_hal::{delay::Delay, rtc_cntl::Rtc};
 //!
@@ -396,6 +394,7 @@ impl<'d> Rtc<'d> {
         h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
+    #[procmacros::doc_replace]
     /// Get the current time in microseconds.
     ///
     /// # Example
@@ -405,19 +404,19 @@ impl<'d> Rtc<'d> {
     /// environments without dynamic memory allocation.
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// # use esp_hal::rtc_cntl::Rtc;
-    /// use jiff::{Timestamp, tz::{self, TimeZone}};
+    /// use jiff::{
+    ///     Timestamp,
+    ///     tz::{self, TimeZone},
+    /// };
     ///
     /// static TZ: TimeZone = tz::get!("America/New_York");
     ///
     /// let rtc = Rtc::new(peripherals.LPWR);
-    /// let now = Timestamp::from_microsecond(
-    ///     rtc.current_time_us() as i64,
-    /// )?;
+    /// let now = Timestamp::from_microsecond(rtc.current_time_us() as i64)?;
     /// let weekday_in_new_york = now.to_zoned(TZ.clone()).weekday();
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn current_time_us(&self) -> u64 {
         // Current time is boot time + time since boot

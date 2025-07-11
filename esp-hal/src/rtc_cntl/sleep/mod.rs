@@ -44,11 +44,12 @@ pub enum WakeupLevel {
     High,
 }
 
+#[procmacros::doc_replace]
 /// Represents a timer wake-up source, triggering an event after a specified
 /// duration.
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::TimerWakeupSource, wakeup_cause, Rtc, SocResetReason};
@@ -66,7 +67,7 @@ pub enum WakeupLevel {
 /// delay.delay_millis(100);
 /// rtc.sleep_deep(&[&timer]);
 ///
-/// # }
+/// # {after_snippet}
 /// ```
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg(any(esp32, esp32c3, esp32s2, esp32s3, esp32c6, esp32c2))]
@@ -93,10 +94,11 @@ pub enum Error {
     TooManyWakeupSources,
 }
 
+#[procmacros::doc_replace]
 /// External wake-up source (Ext0).
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext0WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
@@ -145,10 +147,11 @@ impl<P: RtcIoWakeupPinType> Ext0WakeupSource<P> {
     }
 }
 
+#[procmacros::doc_replace]
 /// External wake-up source (Ext1).
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
@@ -202,9 +205,10 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     }
 }
 
+#[procmacros::doc_replace]
 /// External wake-up source (Ext1).
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::rtc_cntl::{reset_reason, sleep::{Ext1WakeupSource, TimerWakeupSource, WakeupLevel}, wakeup_cause, Rtc, SocResetReason};
@@ -257,6 +261,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
     }
 }
 
+#[procmacros::doc_replace]
 /// RTC_IO wakeup source
 ///
 /// RTC_IO wakeup allows configuring any combination of RTC_IO pins with
@@ -264,7 +269,7 @@ impl<'a, 'b> Ext1WakeupSource<'a, 'b> {
 /// can be used to wake up from both light and deep sleep.
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use core::time::Duration;
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::gpio::{self, Input, InputConfig, Pull};

@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Camera - Master or Slave Mode
 //!
 //! ## Overview
@@ -15,7 +16,7 @@
 //! Following code shows how to receive some bytes from an 8 bit DVP stream in
 //! master mode.
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::lcd_cam::{cam::{Camera, Config}, LcdCam};
 //! # use esp_hal::dma_rx_stream_buffer;
 //!
@@ -29,28 +30,23 @@
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
 //! let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
-//! let mut camera = Camera::new(
-//!     lcd_cam.cam,
-//!     peripherals.DMA_CH0,
-//!     config,
-//! )?
-//! .with_master_clock(mclk_pin) // Remove this for slave mode
-//! .with_pixel_clock(pclk_pin)
-//! .with_vsync(vsync_pin)
-//! .with_h_enable(href_pin)
-//! .with_data0(peripherals.GPIO11)
-//! .with_data1(peripherals.GPIO9)
-//! .with_data2(peripherals.GPIO8)
-//! .with_data3(peripherals.GPIO10)
-//! .with_data4(peripherals.GPIO12)
-//! .with_data5(peripherals.GPIO18)
-//! .with_data6(peripherals.GPIO17)
-//! .with_data7(peripherals.GPIO16);
+//! let mut camera = Camera::new(lcd_cam.cam, peripherals.DMA_CH0, config)?
+//!     .with_master_clock(mclk_pin) // Remove this for slave mode
+//!     .with_pixel_clock(pclk_pin)
+//!     .with_vsync(vsync_pin)
+//!     .with_h_enable(href_pin)
+//!     .with_data0(peripherals.GPIO11)
+//!     .with_data1(peripherals.GPIO9)
+//!     .with_data2(peripherals.GPIO8)
+//!     .with_data3(peripherals.GPIO10)
+//!     .with_data4(peripherals.GPIO12)
+//!     .with_data5(peripherals.GPIO18)
+//!     .with_data6(peripherals.GPIO17)
+//!     .with_data7(peripherals.GPIO16);
 //!
 //! let transfer = camera.receive(dma_buf).map_err(|e| e.0)?;
 //!
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::{

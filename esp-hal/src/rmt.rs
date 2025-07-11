@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "freq" => {
+        cfg(esp32h2) => "let freq = Rate::from_mhz(32);",
+        cfg(not(esp32h2)) => "let freq = Rate::from_mhz(80);"
+    }
+))]
 //! # Remote Control Peripheral (RMT)
 //!
 //! ## Overview
@@ -48,35 +54,31 @@
 //! ### Initialization
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::Level;
 //! # use esp_hal::peripherals::Peripherals;
 //! # use esp_hal::rmt::TxChannelConfig;
 //! # use esp_hal::rmt::Rmt;
 //! # use crate::esp_hal::rmt::TxChannelCreator;
-#![cfg_attr(esp32h2, doc = "let freq = Rate::from_mhz(32);")]
-#![cfg_attr(not(esp32h2), doc = "let freq = Rate::from_mhz(80);")]
+//! # {freq}
 //! let rmt = Rmt::new(peripherals.RMT, freq)?;
-//! let mut channel = rmt
-//!     .channel0
-//!     .configure_tx(
-//!         peripherals.GPIO1,
-//!         TxChannelConfig::default()
-//!             .with_clk_divider(1)
-//!             .with_idle_output_level(Level::Low)
-//!             .with_idle_output(false)
-//!             .with_carrier_modulation(false)
-//!             .with_carrier_high(1)
-//!             .with_carrier_low(1)
-//!             .with_carrier_level(Level::Low),
-//!     )?;
-//! # Ok(())
-//! # }
+//! let mut channel = rmt.channel0.configure_tx(
+//!     peripherals.GPIO1,
+//!     TxChannelConfig::default()
+//!         .with_clk_divider(1)
+//!         .with_idle_output_level(Level::Low)
+//!         .with_idle_output(false)
+//!         .with_carrier_modulation(false)
+//!         .with_carrier_high(1)
+//!         .with_carrier_low(1)
+//!         .with_carrier_level(Level::Low),
+//! )?;
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### TX operation
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Level;
 //! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
@@ -108,7 +110,7 @@
 //! 
 //! ### RX operation
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator};
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::{Level, Output, OutputConfig};
