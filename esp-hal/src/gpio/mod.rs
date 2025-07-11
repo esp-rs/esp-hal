@@ -701,159 +701,77 @@ for_each_analog_function! {
 #[macro_export]
 macro_rules! gpio {
     (
-        $(
-            (
-                $gpionum:literal, $peri:ident
-                ( $( $af_input_num:ident => $af_input_signal:ident )* )
-                ( $( $af_output_num:ident => $af_output_signal:ident )* )
-            )
-        )+
+        $gpionum:literal, $peri:ident
+        ( $( $af_input_num:ident => $af_input_signal:ident )* )
+        ( $( $af_output_num:ident => $af_output_signal:ident )* )
     ) => {
-        $(
-            impl<'d> $peri<'d> {
-                #[allow(unused)]
-                pub(crate) const NUMBER: u8 = $gpionum;
+        impl<'d> $peri<'d> {
+            #[allow(unused)]
+            pub(crate) const NUMBER: u8 = $gpionum;
 
-                /// Split the pin into an input and output signal.
-                ///
-                /// Peripheral signals allow connecting peripherals together without using
-                /// external hardware.
-                ///
-                /// # Safety
-                ///
-                /// The caller must ensure that peripheral drivers don't configure the same
-                /// GPIO at the same time in multiple places. This includes clones of the
-                /// `InputSignal` struct, as well as the `OutputSignal` struct.
-                ///
-                /// ```rust, no_run
-                #[doc = $crate::before_snippet!()]
-                /// let (rx, tx) = unsafe { peripherals.GPIO2.split() };
-                /// // rx and tx can then be passed to different peripherals to connect them.
-                /// # Ok(())
-                /// # }
-                /// ```
-                #[instability::unstable]
-                pub unsafe fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
-                    use $crate::gpio::Pin;
-
-                    // FIXME: we should implement this in the gpio macro for output pins, but we
-                    // should also have an input-only alternative for pins that can't be used as
-                    // outputs.
-
-                    // This goes through AnyPin which calls `init_gpio` as needed.
-                    unsafe { self.degrade().split() }
-                }
-            }
-
-            impl $crate::gpio::Pin for $peri<'_> {
-                #[inline(always)]
-                fn number(&self) -> u8 {
-                    $gpionum
-                }
-
-                fn output_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
-                    &[
-                        $(
-                            (
-                                $crate::gpio::AlternateFunction::$af_output_num,
-                                $crate::gpio::OutputSignal::$af_output_signal
-                            ),
-                        )*
-                    ]
-                }
-
-                fn input_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
-                    &[
-                        $(
-                            (
-                                $crate::gpio::AlternateFunction::$af_input_num,
-                                $crate::gpio::InputSignal::$af_input_signal
-                            ),
-                        )*
-                    ]
-                }
-            }
-
-            impl<'lt> From<$peri<'lt>> for $crate::gpio::AnyPin<'lt> {
-                fn from(pin: $peri<'lt>) -> Self {
-                    $crate::gpio::Pin::degrade(pin)
-                }
-            }
-        )+
-
-        impl $crate::gpio::AnyPin<'_> {
-            /// Conjure a new GPIO pin out of thin air.
+            /// Split the pin into an input and output signal.
+            ///
+            /// Peripheral signals allow connecting peripherals together without using
+            /// external hardware.
             ///
             /// # Safety
             ///
-            /// The caller must ensure that only one instance of a pin is in use at one time.
-            ///
-            /// # Panics
-            ///
-            /// Panics if the pin with the given number does not exist.
-            ///
-            /// ## Example
+            /// The caller must ensure that peripheral drivers don't configure the same
+            /// GPIO at the same time in multiple places. This includes clones of the
+            /// `InputSignal` struct, as well as the `OutputSignal` struct.
             ///
             /// ```rust, no_run
             #[doc = $crate::before_snippet!()]
-            /// use esp_hal::gpio::AnyPin;
-            /// let pin = unsafe { AnyPin::steal(1) };
+            /// let (rx, tx) = unsafe { peripherals.GPIO2.split() };
+            /// // rx and tx can then be passed to different peripherals to connect them.
             /// # Ok(())
             /// # }
             /// ```
-            pub unsafe fn steal(pin: u8) ->  Self {
-                const PINS: &[u8] = &[$($gpionum),*];
-                assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
-                Self { pin, _lifetime: core::marker::PhantomData }
+            #[instability::unstable]
+            pub unsafe fn split(self) -> ($crate::gpio::interconnect::InputSignal<'d>, $crate::gpio::interconnect::OutputSignal<'d>) {
+                use $crate::gpio::Pin;
+
+                // FIXME: we should implement this in the gpio macro for output pins, but we
+                // should also have an input-only alternative for pins that can't be used as
+                // outputs.
+
+                // This goes through AnyPin which calls `init_gpio` as needed.
+                unsafe { self.degrade().split() }
+            }
+        }
+
+        impl $crate::gpio::Pin for $peri<'_> {
+            #[inline(always)]
+            fn number(&self) -> u8 {
+                $gpionum
             }
 
-            /// Unsafely clone the pin.
-            ///
-            /// # Safety
-            ///
-            /// Ensure that only one instance of a pin is in use at one time.
-            ///
-            /// ## Example
-            ///
-            /// ```rust, no_run
-            #[doc = $crate::before_snippet!()]
-            /// use esp_hal::gpio::{AnyPin, Pin};
-            /// let pin = peripherals.GPIO1.degrade();
-            /// let pin_cloned = unsafe { pin.clone_unchecked() };
-            /// # Ok(())
-            /// # }
-            /// ```
-            pub unsafe fn clone_unchecked(&self) -> Self {
-                Self {
-                    pin: self.pin,
-                    _lifetime: core::marker::PhantomData,
-                }
-            }
-
-            /// Create a new AnyPin object that is limited to the lifetime of the
-            /// passed reference.
-            ///
-            /// ## Example
-            ///
-            /// ```rust, no_run
-            #[doc = $crate::before_snippet!()]
-            /// use esp_hal::gpio::{AnyPin, Pin};
-            /// let mut pin = peripherals.GPIO1.degrade();
-            /// let pin_reborrowed = pin.reborrow();
-            /// # Ok(())
-            /// # }
-            /// ```
-            pub fn reborrow(&mut self) -> $crate::gpio::AnyPin<'_> {
-                unsafe { self.clone_unchecked() }
-            }
-
-            pub(crate) fn is_output(&self) -> bool {
-                match self.pin {
+            fn output_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::OutputSignal)] {
+                &[
                     $(
-                        $gpionum => if_pin_is_type!(($peri, Output) => { true } else { false }),
-                    )+
-                    _ => false,
-                }
+                        (
+                            $crate::gpio::AlternateFunction::$af_output_num,
+                            $crate::gpio::OutputSignal::$af_output_signal
+                        ),
+                    )*
+                ]
+            }
+
+            fn input_signals(&self, _: $crate::private::Internal) -> &'static [($crate::gpio::AlternateFunction, $crate::gpio::InputSignal)] {
+                &[
+                    $(
+                        (
+                            $crate::gpio::AlternateFunction::$af_input_num,
+                            $crate::gpio::InputSignal::$af_input_signal
+                        ),
+                    )*
+                ]
+            }
+        }
+
+        impl<'lt> From<$peri<'lt>> for $crate::gpio::AnyPin<'lt> {
+            fn from(pin: $peri<'lt>) -> Self {
+                $crate::gpio::Pin::degrade(pin)
             }
         }
     };
@@ -2238,6 +2156,99 @@ impl AnyPin<'_> {
     {
         self.try_into()
     }
+
+    #[procmacros::doc_replace]
+    /// Conjure a new GPIO pin out of thin air.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that only one instance of a pin is in use at one time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the pin with the given number does not exist.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::gpio::AnyPin;
+    /// let pin = unsafe { AnyPin::steal(1) };
+    /// #
+    /// # {after_snippet}
+    /// ```
+    pub unsafe fn steal(pin: u8) -> Self {
+        for_each_gpio! {
+            (all $( ($n:literal $($any:tt)*) ),*) => { const PINS: &[u8] = &[ $($n),* ]; };
+        };
+        assert!(PINS.contains(&pin), "Pin {} does not exist", pin);
+        Self {
+            pin,
+            _lifetime: core::marker::PhantomData,
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Unsafely clone the pin.
+    ///
+    /// # Safety
+    ///
+    /// Ensure that only one instance of a pin is in use at one time.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::gpio::{AnyPin, Pin};
+    /// let pin = peripherals.GPIO1.degrade();
+    /// let pin_cloned = unsafe { pin.clone_unchecked() };
+    /// #
+    /// # {after_snippet}
+    /// ```
+    pub unsafe fn clone_unchecked(&self) -> Self {
+        Self {
+            pin: self.pin,
+            _lifetime: core::marker::PhantomData,
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Create a new AnyPin object that is limited to the lifetime of the
+    /// passed reference.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// #
+    /// use esp_hal::gpio::{AnyPin, Pin};
+    /// let mut pin = peripherals.GPIO1.degrade();
+    /// let pin_reborrowed = pin.reborrow();
+    /// #
+    /// # {after_snippet}
+    /// ```
+    pub fn reborrow(&mut self) -> AnyPin<'_> {
+        unsafe { self.clone_unchecked() }
+    }
+
+    pub(crate) fn is_output(&self) -> bool {
+        for_each_gpio! {
+            (all $( ($n:literal, $gpio:ident $in_afs:tt $out_afs:tt ($input:tt [$($is_output:ident)?]) ) ),* ) => {
+                return match self.number() {
+                    $($(
+                        // This code is generated if the Output attribute is present
+                        $n => {
+                            crate::ignore!($is_output);
+                            true
+                        }
+                    )?)*
+                    other => false,
+                };
+            };
+        }
+    }
 }
 
 #[cold]
@@ -2273,13 +2284,18 @@ macro_rules! for_each_rtcio_pin {
 macro_rules! for_each_rtcio_output_pin {
     (@impl $ident:ident, $target:ident, $gpio:ident, $code:tt, $kind:literal) => {
         if $ident.number() == $crate::peripherals::$gpio::NUMBER {
-            if_pin_is_type!(($gpio, Output) => {
-                #[allow(unused_mut)]
-                let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
-                return $code;
-            } else {
-                pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, $kind)
-            })
+            for_each_gpio! {
+                // If the pin is an output pin, generate $code
+                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [Output])) => {
+                    #[allow(unused_mut)]
+                    let mut $target = unsafe { $crate::peripherals::$gpio::steal() };
+                    return $code;
+                };
+                // If the pin is not an output pin, generate a panic
+                ($n:tt, $gpio $in_afs:tt $out_afs:tt ($input:tt [])) => {
+                    pin_does_not_support_function($crate::peripherals::$gpio::NUMBER, $kind)
+                };
+            }
         }
     };
 

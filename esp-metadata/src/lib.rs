@@ -911,6 +911,9 @@ pub fn generate_lib_rs() -> TokenStream {
         //!
         //! You can specify any number of matchers in the same invocation.
         //!
+        //! > The way code is generated, you will need to use the full `return` syntax to return any
+        //! > values from code generated with these macros.
+        //!
         //! ### Using the individual matcher
         //!
         //! In this use case, each item's data is individually passed through the macro. This can be used to

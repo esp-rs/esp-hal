@@ -406,47 +406,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
     };
 
-    // Generates a macro that can select between a `then` and an `else` branch based
-    // on whether a pin implement a certain attribute.
-    //
-    // In essence this expands to (in case of pin = GPIO5, attr = Output):
-    // `if typeof(GPIO5) == Output { then_tokens } else { else_tokens }`
-    let if_pin_is_type = {
-        let mut branches = vec![];
-
-        for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
-            branches.push(quote! {
-                #( ((#pin, #attr) => $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
-            });
-        }
-
-        quote! {
-            /// Conditionally pick between two code blocks based on pin attributes.
-            ///
-            /// The attribute can be `Input` or `Output`.
-            ///
-            /// This macro can be used as:
-            ///
-            /// ```rust,no_run
-            /// if_pin_is_type! ((GPIO0, Output) => {
-            ///     // some code that is generated for output pins
-            /// } else {
-            ///     // some code that is generated for non-output pins
-            /// });
-            /// ```
-            ///
-            /// This macro can be useful when nested into other macros, to generate
-            /// code for all pins of a certain attribute.
-            #[macro_export]
-            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-            macro_rules! if_pin_is_type {
-                #(#branches)*
-
-                (($other:ident, $t:tt) => $then_tt:tt else $else_tt:tt ) => { $else_tt };
-            }
-        }
-    };
-
     let mut branches = vec![];
     for (((n, p), af), attrs) in pin_numbers
         .iter()
@@ -535,8 +494,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         ///
         /// The expanded syntax is only available when the signal has at least one numbered component.
         #for_each_lp
-
-        #if_pin_is_type
 
         /// Defines the `InputSignal` and `OutputSignal` enums.
         ///
