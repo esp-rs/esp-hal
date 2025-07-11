@@ -274,7 +274,7 @@ impl Debug for DmaDescriptorFlags {
             .field("size", &self.size())
             .field("length", &self.len())
             .field("suc_eof", &self.suc_eof())
-            .field("owner", &(if self.owner().into() { "DMA" } else { "CPU" }))
+            .field("owner", &self.owner().to_str())
             .finish()
     }
 }
@@ -288,7 +288,7 @@ impl defmt::Format for DmaDescriptorFlags {
             self.size(),
             self.length(),
             self.suc_eof(),
-            if self.owner() { "DMA" } else { "CPU" }
+            self.owner().to_str(),
         );
     }
 }
@@ -934,19 +934,36 @@ pub enum DmaPeripheral {
 }
 
 /// The owner bit of a DMA descriptor.
-<<<<<<< Updated upstream
-#[derive(PartialEq, PartialOrd)]
-=======
 ///
 /// - 0: CPU can access the buffer;
 /// - 1: The DMA controller can access the buffer.
 #[derive(Clone, Copy, PartialEq, PartialOrd)]
->>>>>>> Stashed changes
 pub enum Owner {
     /// Owned by CPU
     Cpu = 0,
     /// Owned by DMA
     Dma = 1,
+}
+
+impl Owner {
+    /// Creates a new [Owner].
+    pub const fn new() -> Self {
+        Self::Cpu
+    }
+
+    /// Converts the [Owner] into a string.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::Cpu => "CPU",
+            Self::Dma => "DMA",
+        }
+    }
+}
+
+impl From<Owner> for &'static str {
+    fn from(val: Owner) -> Self {
+        val.to_str()
+    }
 }
 
 impl From<u32> for Owner {
@@ -973,6 +990,12 @@ impl From<Owner> for bool {
             Owner::Cpu => false,
             Owner::Dma => true,
         }
+    }
+}
+
+impl Default for Owner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
