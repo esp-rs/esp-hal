@@ -212,6 +212,7 @@ impl ItemLike for Item {
             Item::Enum(item_enum) => &mut item_enum.attrs,
             Item::Trait(item_trait) => &mut item_trait.attrs,
             Item::Mod(module) => &mut module.attrs,
+            Item::Macro(item_macro) => &mut item_macro.attrs,
             _ => panic!("Unsupported item type for switch macro"),
         }
     }
