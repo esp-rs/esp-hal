@@ -434,11 +434,7 @@ pub trait Pin: Sealed {
 /// Trait implemented by pins which can be used as inputs.
 pub trait InputPin: Pin {
     #[doc(hidden)]
-    #[inline(always)]
-    fn waker(&self) -> &'static AtomicWaker {
-        static WAKER: AtomicWaker = AtomicWaker::new();
-        &WAKER
-    }
+    fn waker(&self) -> &'static AtomicWaker;
 }
 
 /// Trait implemented by pins which can be used as outputs.
