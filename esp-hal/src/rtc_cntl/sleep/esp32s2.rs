@@ -159,9 +159,8 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         &self,
         _rtc: &Rtc<'_>,
         triggers: &mut WakeTriggers,
-        sleep_config: &mut RtcSleepConfig,
+        _sleep_config: &mut RtcSleepConfig,
     ) {
-        sleep_config.set_rtc_peri_pd_en(false);
         triggers.set_ext1(true);
 
         // TODO: disable clock when not in use
@@ -174,6 +173,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
             pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtcio_pad_hold(true);
             bits |= 1 << pin.rtc_number();
         }
 
