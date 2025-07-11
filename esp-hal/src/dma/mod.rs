@@ -286,20 +286,23 @@ impl defmt::Format for DmaDescriptorFlags {
             fmt,
             "DmaDescriptorFlags {{ size: {}, length: {}, suc_eof: {}, owner: {} }}",
             self.size(),
-            self.length(),
+            self.len(),
             self.suc_eof(),
             self.owner().to_str(),
         );
     }
 }
 
+/// Convenience alias for the DMA descriptor used with the general DMA controller.
+pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
+
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
-pub struct DmaDescriptor {
+pub struct DmaDescriptorGeneric<FLAGS: DescriptorFlagFields> {
     /// Descriptor flags.
-    pub flags: DmaDescriptorFlags,
+    pub flags: FLAGS,
 
     /// Address of the buffer.
     pub buffer: *mut u8,
@@ -307,16 +310,14 @@ pub struct DmaDescriptor {
     /// Address of the next descriptor.
     /// If the current descriptor is the last one, this value is 0.
     /// This field can only point to internal RAM.
-    pub next: *mut DmaDescriptor,
+    pub next: *mut Self,
 }
 
-impl DmaDescriptor {
-    /// An empty DMA descriptor used to initialize the descriptor list.
-    pub const EMPTY: Self = Self {
-        flags: DmaDescriptorFlags(0),
-        buffer: core::ptr::null_mut(),
-        next: core::ptr::null_mut(),
-    };
+impl<FLAGS: DescriptorFlagFields> DmaDescriptorGeneric<FLAGS> {
+    const _SIZE_CHECK: () = core::assert!(
+        core::mem::size_of::<FLAGS>() == core::mem::size_of::<u32>(),
+        "descriptor flags must be the same size as `u32`"
+    );
 
     /// Resets the descriptor for a new receive transfer.
     pub fn reset_for_rx(&mut self) {
@@ -345,7 +346,7 @@ impl DmaDescriptor {
     }
 }
 
-impl DescriptorFlagFields for DmaDescriptor {
+impl<FLAGS: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptorGeneric<FLAGS> {
     fn size(&self) -> usize {
         self.flags.size()
     }
@@ -377,6 +378,15 @@ impl DescriptorFlagFields for DmaDescriptor {
     fn set_owner(&mut self, owner: Owner) {
         self.flags.set_owner(owner);
     }
+}
+
+impl DmaDescriptor {
+    /// An empty DMA descriptor used to initialize the descriptor list.
+    pub const EMPTY: Self = Self {
+        flags: DmaDescriptorFlags(0),
+        buffer: core::ptr::null_mut(),
+        next: core::ptr::null_mut(),
+    };
 }
 
 // The pointers in the descriptor can be Sent.

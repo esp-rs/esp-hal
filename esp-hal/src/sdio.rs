@@ -31,7 +31,7 @@ mod state;
 mod timing;
 
 pub use config::Config;
-pub use dma::DmaDescriptorFlags;
+pub use dma::{DmaDescriptor, DmaDescriptorFlags};
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::{DeviceInterrupt, HostInterrupt};
 pub use pins::Pins;
