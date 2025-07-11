@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increase ESP32 DRAM memory region by 16K (#3703)
 - The I2C async interrupt handler is now placed into IRAM (#3722)
 - Adjusted ESP32-S2 and ESP-S3 memory region lengths to reflect those defined in ESP-IDF. (#3709)
+- Changed the various `ConfigError` variant names to use a consistent word order. (#3782)
 - Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
 
 ### Fixed

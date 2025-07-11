@@ -602,7 +602,7 @@ impl Config {
 
         if self.frequency < source_freq / max_divider || self.frequency > source_freq / min_divider
         {
-            return Err(ConfigError::UnsupportedFrequency);
+            return Err(ConfigError::FrequencyOutOfRange);
         }
 
         Ok(())
@@ -633,8 +633,8 @@ struct SpiPinGuard {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {
-    /// The requested frequency is not supported.
-    UnsupportedFrequency,
+    /// The requested frequency is not in the supported range.
+    FrequencyOutOfRange,
 }
 
 impl core::error::Error for ConfigError {}
@@ -642,8 +642,8 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ConfigError::UnsupportedFrequency => {
-                write!(f, "The requested frequency is not supported")
+            ConfigError::FrequencyOutOfRange => {
+                write!(f, "The requested frequency is not in the supported range")
             }
         }
     }
@@ -1131,7 +1131,7 @@ where
     ///
     /// If frequency passed in config exceeds
     /// # {max_frequency}
-    /// or is below 70kHz, [`ConfigError::UnsupportedFrequency`] error will be returned.
+    /// or is below 70kHz, [`ConfigError::FrequencyOutOfRange`] error will be returned.
     ///
     /// ## Example
     ///

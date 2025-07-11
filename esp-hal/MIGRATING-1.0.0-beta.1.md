@@ -67,3 +67,22 @@ Additionally, the `configure` methods have been renamed to `configure_tx` and
 -};
 + let rx_channel = rmt.channel2.configure_rx(pin, rx_config);
 ```
+
+## `ConfigError` variants have been changed
+
+### SPI master
+
+- `UnsupportedFrequency` -> `FrequencyOutOfRange`
+
+### UART
+
+- `UnachievableBaudrate` -> `BaudrateNotAchievable`
+- `UnsupportedBaudrate` -> `BaudrateNotSupported`
+- `UnsupportedTimeout` -> `TimeoutTooLong`
+- `UnsupportedRxFifoThreshold` -> `RxFifoThresholdNotSupported`
+- `UnsupportedTxFifoThreshold` -> `TxFifoThresholdNotSupported`
+
+### I2C master
+
+- `FrequencyInvalid` -> `FrequencyOutOfRange`
+- `TimeoutInvalid` -> `TimeoutTooLong`

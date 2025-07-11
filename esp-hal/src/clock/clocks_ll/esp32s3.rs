@@ -40,11 +40,13 @@ pub(super) fn enable_phy(enable: bool) {
     });
 }
 
+#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(super) fn enable_bt(_: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`. does nothing
     // `periph_ll_wifi_module_disable_clk_set_rst`. does nothing
 }
 
+#[cfg_attr(not(feature = "unstable"), expect(unused))]
 pub(super) fn enable_wifi(_: bool) {
     // `periph_ll_wifi_module_enable_clk_clear_rst`. does nothing
     // `periph_ll_wifi_module_disable_clk_set_rst`. does nothing
