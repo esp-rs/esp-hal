@@ -48,7 +48,7 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
-    let for_each = generate_for_each_macro("uart", &uart_instance_cfgs);
+    let for_each = generate_for_each_macro("uart", &[("all", &uart_instance_cfgs)]);
     quote! {
         /// This macro can be used to generate code for each peripheral instance of the UART driver.
         ///

@@ -40,7 +40,7 @@ pub(crate) fn generate_i2c_master_peripherals(i2c: &I2cMasterProperties) -> Toke
         })
         .collect::<Vec<_>>();
 
-    let for_each = generate_for_each_macro("i2c_master", &i2c_master_instance_cfgs);
+    let for_each = generate_for_each_macro("i2c_master", &[("all", &i2c_master_instance_cfgs)]);
 
     quote! {
         /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

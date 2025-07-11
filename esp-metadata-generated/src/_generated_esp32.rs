@@ -527,10 +527,11 @@ macro_rules! for_each_gpio {
 ///
 /// This macro has two options for its "Individual matcher" case:
 ///
-/// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
-///   where you need the number(s) of a signal, or the general group to which the signal belongs.
-///   For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+/// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like
+///   `(ADC2_CH3, ADCn_CHm, 2, 3)`.
 ///
 /// Macro fragments:
 ///
@@ -550,69 +551,70 @@ macro_rules! for_each_gpio {
 macro_rules! for_each_analog_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((ADC2_CH1, GPIO0)); _for_each_inner!(((ADC2_CH1, ADCn_CHm, 2,
-        1), GPIO0)); _for_each_inner!((TOUCH1, GPIO0)); _for_each_inner!(((TOUCH1,
-        TOUCHn, 1), GPIO0)); _for_each_inner!((ADC2_CH2, GPIO2));
-        _for_each_inner!(((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2)); _for_each_inner!((TOUCH2,
-        GPIO2)); _for_each_inner!(((TOUCH2, TOUCHn, 2), GPIO2));
-        _for_each_inner!((ADC2_CH0, GPIO4)); _for_each_inner!(((ADC2_CH0, ADCn_CHm, 2,
-        0), GPIO4)); _for_each_inner!((TOUCH0, GPIO4)); _for_each_inner!(((TOUCH0,
-        TOUCHn, 0), GPIO4)); _for_each_inner!((ADC2_CH5, GPIO12));
-        _for_each_inner!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12)); _for_each_inner!((TOUCH5,
-        GPIO12)); _for_each_inner!(((TOUCH5, TOUCHn, 5), GPIO12));
-        _for_each_inner!((ADC2_CH4, GPIO13)); _for_each_inner!(((ADC2_CH4, ADCn_CHm, 2,
-        4), GPIO13)); _for_each_inner!((TOUCH4, GPIO13)); _for_each_inner!(((TOUCH4,
-        TOUCHn, 4), GPIO13)); _for_each_inner!((ADC2_CH6, GPIO14));
-        _for_each_inner!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14)); _for_each_inner!((TOUCH6,
-        GPIO14)); _for_each_inner!(((TOUCH6, TOUCHn, 6), GPIO14));
-        _for_each_inner!((ADC2_CH3, GPIO15)); _for_each_inner!(((ADC2_CH3, ADCn_CHm, 2,
-        3), GPIO15)); _for_each_inner!((TOUCH3, GPIO15)); _for_each_inner!(((TOUCH3,
-        TOUCHn, 3), GPIO15)); _for_each_inner!((DAC1, GPIO25)); _for_each_inner!(((DAC1,
-        DACn, 1), GPIO25)); _for_each_inner!((ADC2_CH8, GPIO25));
-        _for_each_inner!(((ADC2_CH8, ADCn_CHm, 2, 8), GPIO25)); _for_each_inner!((DAC2,
-        GPIO26)); _for_each_inner!(((DAC2, DACn, 2), GPIO26));
-        _for_each_inner!((ADC2_CH9, GPIO26)); _for_each_inner!(((ADC2_CH9, ADCn_CHm, 2,
-        9), GPIO26)); _for_each_inner!((ADC2_CH7, GPIO27)); _for_each_inner!(((ADC2_CH7,
-        ADCn_CHm, 2, 7), GPIO27)); _for_each_inner!((TOUCH7, GPIO27));
-        _for_each_inner!(((TOUCH7, TOUCHn, 7), GPIO27)); _for_each_inner!((XTAL_32K_P,
-        GPIO32)); _for_each_inner!((ADC1_CH4, GPIO32)); _for_each_inner!(((ADC1_CH4,
-        ADCn_CHm, 1, 4), GPIO32)); _for_each_inner!((TOUCH9, GPIO32));
-        _for_each_inner!(((TOUCH9, TOUCHn, 9), GPIO32)); _for_each_inner!((XTAL_32K_N,
-        GPIO33)); _for_each_inner!((ADC1_CH5, GPIO33)); _for_each_inner!(((ADC1_CH5,
-        ADCn_CHm, 1, 5), GPIO33)); _for_each_inner!((TOUCH8, GPIO33));
-        _for_each_inner!(((TOUCH8, TOUCHn, 8), GPIO33)); _for_each_inner!((ADC1_CH6,
-        GPIO34)); _for_each_inner!(((ADC1_CH6, ADCn_CHm, 1, 6), GPIO34));
-        _for_each_inner!((ADC1_CH7, GPIO35)); _for_each_inner!(((ADC1_CH7, ADCn_CHm, 1,
-        7), GPIO35)); _for_each_inner!((ADC_H, GPIO36)); _for_each_inner!((ADC1_CH0,
-        GPIO36)); _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36));
+        _for_each_inner!((ADC2_CH1, GPIO0)); _for_each_inner!((TOUCH1, GPIO0));
+        _for_each_inner!((ADC2_CH2, GPIO2)); _for_each_inner!((TOUCH2, GPIO2));
+        _for_each_inner!((ADC2_CH0, GPIO4)); _for_each_inner!((TOUCH0, GPIO4));
+        _for_each_inner!((ADC2_CH5, GPIO12)); _for_each_inner!((TOUCH5, GPIO12));
+        _for_each_inner!((ADC2_CH4, GPIO13)); _for_each_inner!((TOUCH4, GPIO13));
+        _for_each_inner!((ADC2_CH6, GPIO14)); _for_each_inner!((TOUCH6, GPIO14));
+        _for_each_inner!((ADC2_CH3, GPIO15)); _for_each_inner!((TOUCH3, GPIO15));
+        _for_each_inner!((DAC1, GPIO25)); _for_each_inner!((ADC2_CH8, GPIO25));
+        _for_each_inner!((DAC2, GPIO26)); _for_each_inner!((ADC2_CH9, GPIO26));
+        _for_each_inner!((ADC2_CH7, GPIO27)); _for_each_inner!((TOUCH7, GPIO27));
+        _for_each_inner!((XTAL_32K_P, GPIO32)); _for_each_inner!((ADC1_CH4, GPIO32));
+        _for_each_inner!((TOUCH9, GPIO32)); _for_each_inner!((XTAL_32K_N, GPIO33));
+        _for_each_inner!((ADC1_CH5, GPIO33)); _for_each_inner!((TOUCH8, GPIO33));
+        _for_each_inner!((ADC1_CH6, GPIO34)); _for_each_inner!((ADC1_CH7, GPIO35));
+        _for_each_inner!((ADC_H, GPIO36)); _for_each_inner!((ADC1_CH0, GPIO36));
         _for_each_inner!((ADC_H, GPIO37)); _for_each_inner!((ADC1_CH1, GPIO37));
-        _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37)); _for_each_inner!((ADC_H,
-        GPIO38)); _for_each_inner!((ADC1_CH2, GPIO38)); _for_each_inner!(((ADC1_CH2,
-        ADCn_CHm, 1, 2), GPIO38)); _for_each_inner!((ADC_H, GPIO39));
-        _for_each_inner!((ADC1_CH3, GPIO39)); _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1,
-        3), GPIO39)); _for_each_inner!((all(ADC2_CH1, GPIO0), ((ADC2_CH1, ADCn_CHm, 2,
-        1), GPIO0), (TOUCH1, GPIO0), ((TOUCH1, TOUCHn, 1), GPIO0), (ADC2_CH2, GPIO2),
-        ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2), (TOUCH2, GPIO2), ((TOUCH2, TOUCHn, 2),
-        GPIO2), (ADC2_CH0, GPIO4), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO4), (TOUCH0, GPIO4),
-        ((TOUCH0, TOUCHn, 0), GPIO4), (ADC2_CH5, GPIO12), ((ADC2_CH5, ADCn_CHm, 2, 5),
-        GPIO12), (TOUCH5, GPIO12), ((TOUCH5, TOUCHn, 5), GPIO12), (ADC2_CH4, GPIO13),
-        ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO13), (TOUCH4, GPIO13), ((TOUCH4, TOUCHn, 4),
-        GPIO13), (ADC2_CH6, GPIO14), ((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14), (TOUCH6,
-        GPIO14), ((TOUCH6, TOUCHn, 6), GPIO14), (ADC2_CH3, GPIO15), ((ADC2_CH3, ADCn_CHm,
-        2, 3), GPIO15), (TOUCH3, GPIO15), ((TOUCH3, TOUCHn, 3), GPIO15), (DAC1, GPIO25),
-        ((DAC1, DACn, 1), GPIO25), (ADC2_CH8, GPIO25), ((ADC2_CH8, ADCn_CHm, 2, 8),
-        GPIO25), (DAC2, GPIO26), ((DAC2, DACn, 2), GPIO26), (ADC2_CH9, GPIO26),
-        ((ADC2_CH9, ADCn_CHm, 2, 9), GPIO26), (ADC2_CH7, GPIO27), ((ADC2_CH7, ADCn_CHm,
-        2, 7), GPIO27), (TOUCH7, GPIO27), ((TOUCH7, TOUCHn, 7), GPIO27), (XTAL_32K_P,
-        GPIO32), (ADC1_CH4, GPIO32), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32), (TOUCH9,
-        GPIO32), ((TOUCH9, TOUCHn, 9), GPIO32), (XTAL_32K_N, GPIO33), (ADC1_CH5, GPIO33),
-        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33), (TOUCH8, GPIO33), ((TOUCH8, TOUCHn, 8),
-        GPIO33), (ADC1_CH6, GPIO34), ((ADC1_CH6, ADCn_CHm, 1, 6), GPIO34), (ADC1_CH7,
-        GPIO35), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35), (ADC_H, GPIO36), (ADC1_CH0,
-        GPIO36), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36), (ADC_H, GPIO37), (ADC1_CH1,
-        GPIO37), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37), (ADC_H, GPIO38), (ADC1_CH2,
-        GPIO38), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38), (ADC_H, GPIO39), (ADC1_CH3,
-        GPIO39), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39)));
+        _for_each_inner!((ADC_H, GPIO38)); _for_each_inner!((ADC1_CH2, GPIO38));
+        _for_each_inner!((ADC_H, GPIO39)); _for_each_inner!((ADC1_CH3, GPIO39));
+        _for_each_inner!(((ADC2_CH1, ADCn_CHm, 2, 1), GPIO0)); _for_each_inner!(((TOUCH1,
+        TOUCHn, 1), GPIO0)); _for_each_inner!(((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2));
+        _for_each_inner!(((TOUCH2, TOUCHn, 2), GPIO2)); _for_each_inner!(((ADC2_CH0,
+        ADCn_CHm, 2, 0), GPIO4)); _for_each_inner!(((TOUCH0, TOUCHn, 0), GPIO4));
+        _for_each_inner!(((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12));
+        _for_each_inner!(((TOUCH5, TOUCHn, 5), GPIO12)); _for_each_inner!(((ADC2_CH4,
+        ADCn_CHm, 2, 4), GPIO13)); _for_each_inner!(((TOUCH4, TOUCHn, 4), GPIO13));
+        _for_each_inner!(((ADC2_CH6, ADCn_CHm, 2, 6), GPIO14));
+        _for_each_inner!(((TOUCH6, TOUCHn, 6), GPIO14)); _for_each_inner!(((ADC2_CH3,
+        ADCn_CHm, 2, 3), GPIO15)); _for_each_inner!(((TOUCH3, TOUCHn, 3), GPIO15));
+        _for_each_inner!(((DAC1, DACn, 1), GPIO25)); _for_each_inner!(((ADC2_CH8,
+        ADCn_CHm, 2, 8), GPIO25)); _for_each_inner!(((DAC2, DACn, 2), GPIO26));
+        _for_each_inner!(((ADC2_CH9, ADCn_CHm, 2, 9), GPIO26));
+        _for_each_inner!(((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27));
+        _for_each_inner!(((TOUCH7, TOUCHn, 7), GPIO27)); _for_each_inner!(((ADC1_CH4,
+        ADCn_CHm, 1, 4), GPIO32)); _for_each_inner!(((TOUCH9, TOUCHn, 9), GPIO32));
+        _for_each_inner!(((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33));
+        _for_each_inner!(((TOUCH8, TOUCHn, 8), GPIO33)); _for_each_inner!(((ADC1_CH6,
+        ADCn_CHm, 1, 6), GPIO34)); _for_each_inner!(((ADC1_CH7, ADCn_CHm, 1, 7),
+        GPIO35)); _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1, 0), GPIO36));
+        _for_each_inner!(((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37));
+        _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO38));
+        _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39));
+        _for_each_inner!((all(ADC2_CH1, GPIO0), (TOUCH1, GPIO0), (ADC2_CH2, GPIO2),
+        (TOUCH2, GPIO2), (ADC2_CH0, GPIO4), (TOUCH0, GPIO4), (ADC2_CH5, GPIO12), (TOUCH5,
+        GPIO12), (ADC2_CH4, GPIO13), (TOUCH4, GPIO13), (ADC2_CH6, GPIO14), (TOUCH6,
+        GPIO14), (ADC2_CH3, GPIO15), (TOUCH3, GPIO15), (DAC1, GPIO25), (ADC2_CH8,
+        GPIO25), (DAC2, GPIO26), (ADC2_CH9, GPIO26), (ADC2_CH7, GPIO27), (TOUCH7,
+        GPIO27), (XTAL_32K_P, GPIO32), (ADC1_CH4, GPIO32), (TOUCH9, GPIO32), (XTAL_32K_N,
+        GPIO33), (ADC1_CH5, GPIO33), (TOUCH8, GPIO33), (ADC1_CH6, GPIO34), (ADC1_CH7,
+        GPIO35), (ADC_H, GPIO36), (ADC1_CH0, GPIO36), (ADC_H, GPIO37), (ADC1_CH1,
+        GPIO37), (ADC_H, GPIO38), (ADC1_CH2, GPIO38), (ADC_H, GPIO39), (ADC1_CH3,
+        GPIO39))); _for_each_inner!((all_expanded((ADC2_CH1, ADCn_CHm, 2, 1), GPIO0),
+        ((TOUCH1, TOUCHn, 1), GPIO0), ((ADC2_CH2, ADCn_CHm, 2, 2), GPIO2), ((TOUCH2,
+        TOUCHn, 2), GPIO2), ((ADC2_CH0, ADCn_CHm, 2, 0), GPIO4), ((TOUCH0, TOUCHn, 0),
+        GPIO4), ((ADC2_CH5, ADCn_CHm, 2, 5), GPIO12), ((TOUCH5, TOUCHn, 5), GPIO12),
+        ((ADC2_CH4, ADCn_CHm, 2, 4), GPIO13), ((TOUCH4, TOUCHn, 4), GPIO13), ((ADC2_CH6,
+        ADCn_CHm, 2, 6), GPIO14), ((TOUCH6, TOUCHn, 6), GPIO14), ((ADC2_CH3, ADCn_CHm, 2,
+        3), GPIO15), ((TOUCH3, TOUCHn, 3), GPIO15), ((DAC1, DACn, 1), GPIO25),
+        ((ADC2_CH8, ADCn_CHm, 2, 8), GPIO25), ((DAC2, DACn, 2), GPIO26), ((ADC2_CH9,
+        ADCn_CHm, 2, 9), GPIO26), ((ADC2_CH7, ADCn_CHm, 2, 7), GPIO27), ((TOUCH7, TOUCHn,
+        7), GPIO27), ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO32), ((TOUCH9, TOUCHn, 9), GPIO32),
+        ((ADC1_CH5, ADCn_CHm, 1, 5), GPIO33), ((TOUCH8, TOUCHn, 8), GPIO33), ((ADC1_CH6,
+        ADCn_CHm, 1, 6), GPIO34), ((ADC1_CH7, ADCn_CHm, 1, 7), GPIO35), ((ADC1_CH0,
+        ADCn_CHm, 1, 0), GPIO36), ((ADC1_CH1, ADCn_CHm, 1, 1), GPIO37), ((ADC1_CH2,
+        ADCn_CHm, 1, 2), GPIO38), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO39)));
     };
 }
 /// This macro can be used to generate code for each LP/RTC function of each GPIO.
@@ -622,11 +624,11 @@ macro_rules! for_each_analog_function {
 ///
 /// This macro has two options for its "Individual matcher" case:
 ///
-/// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
-/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
-///   where you need the number(s) of a signal, or the general group to which the signal belongs.
-///   For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
-///   SAR_I2C_SCL_n, 1)`.
+/// - `all`: `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `all_expanded`: `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` -
+///   expanded signal case, where you need the number(s) of a signal, or the general group to which
+///   the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like
+///   `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
 ///
 /// Macro fragments:
 ///
@@ -646,51 +648,52 @@ macro_rules! for_each_analog_function {
 macro_rules! for_each_lp_function {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((RTC_GPIO11, GPIO0)); _for_each_inner!(((RTC_GPIO11, RTC_GPIOn,
-        11), GPIO0)); _for_each_inner!((SAR_I2C_SDA, GPIO0));
-        _for_each_inner!((RTC_GPIO12, GPIO2)); _for_each_inner!(((RTC_GPIO12, RTC_GPIOn,
-        12), GPIO2)); _for_each_inner!((SAR_I2C_SCL, GPIO2));
-        _for_each_inner!((RTC_GPIO10, GPIO4)); _for_each_inner!(((RTC_GPIO10, RTC_GPIOn,
-        10), GPIO4)); _for_each_inner!((SAR_I2C_SCL, GPIO4));
-        _for_each_inner!((RTC_GPIO15, GPIO12)); _for_each_inner!(((RTC_GPIO15, RTC_GPIOn,
-        15), GPIO12)); _for_each_inner!((RTC_GPIO14, GPIO13));
-        _for_each_inner!(((RTC_GPIO14, RTC_GPIOn, 14), GPIO13));
-        _for_each_inner!((RTC_GPIO16, GPIO14)); _for_each_inner!(((RTC_GPIO16, RTC_GPIOn,
-        16), GPIO14)); _for_each_inner!((RTC_GPIO13, GPIO15));
-        _for_each_inner!(((RTC_GPIO13, RTC_GPIOn, 13), GPIO15));
+        _for_each_inner!((RTC_GPIO11, GPIO0)); _for_each_inner!((SAR_I2C_SDA, GPIO0));
+        _for_each_inner!((RTC_GPIO12, GPIO2)); _for_each_inner!((SAR_I2C_SCL, GPIO2));
+        _for_each_inner!((RTC_GPIO10, GPIO4)); _for_each_inner!((SAR_I2C_SCL, GPIO4));
+        _for_each_inner!((RTC_GPIO15, GPIO12)); _for_each_inner!((RTC_GPIO14, GPIO13));
+        _for_each_inner!((RTC_GPIO16, GPIO14)); _for_each_inner!((RTC_GPIO13, GPIO15));
         _for_each_inner!((SAR_I2C_SDA, GPIO15)); _for_each_inner!((RTC_GPIO6, GPIO25));
+        _for_each_inner!((RTC_GPIO7, GPIO26)); _for_each_inner!((RTC_GPIO17, GPIO27));
+        _for_each_inner!((RTC_GPIO9, GPIO32)); _for_each_inner!((RTC_GPIO8, GPIO33));
+        _for_each_inner!((RTC_GPIO4, GPIO34)); _for_each_inner!((RTC_GPIO5, GPIO35));
+        _for_each_inner!((RTC_GPIO0, GPIO36)); _for_each_inner!((RTC_GPIO1, GPIO37));
+        _for_each_inner!((RTC_GPIO2, GPIO38)); _for_each_inner!((RTC_GPIO3, GPIO39));
+        _for_each_inner!(((RTC_GPIO11, RTC_GPIOn, 11), GPIO0));
+        _for_each_inner!(((RTC_GPIO12, RTC_GPIOn, 12), GPIO2));
+        _for_each_inner!(((RTC_GPIO10, RTC_GPIOn, 10), GPIO4));
+        _for_each_inner!(((RTC_GPIO15, RTC_GPIOn, 15), GPIO12));
+        _for_each_inner!(((RTC_GPIO14, RTC_GPIOn, 14), GPIO13));
+        _for_each_inner!(((RTC_GPIO16, RTC_GPIOn, 16), GPIO14));
+        _for_each_inner!(((RTC_GPIO13, RTC_GPIOn, 13), GPIO15));
         _for_each_inner!(((RTC_GPIO6, RTC_GPIOn, 6), GPIO25));
-        _for_each_inner!((RTC_GPIO7, GPIO26)); _for_each_inner!(((RTC_GPIO7, RTC_GPIOn,
-        7), GPIO26)); _for_each_inner!((RTC_GPIO17, GPIO27));
+        _for_each_inner!(((RTC_GPIO7, RTC_GPIOn, 7), GPIO26));
         _for_each_inner!(((RTC_GPIO17, RTC_GPIOn, 17), GPIO27));
-        _for_each_inner!((RTC_GPIO9, GPIO32)); _for_each_inner!(((RTC_GPIO9, RTC_GPIOn,
-        9), GPIO32)); _for_each_inner!((RTC_GPIO8, GPIO33));
+        _for_each_inner!(((RTC_GPIO9, RTC_GPIOn, 9), GPIO32));
         _for_each_inner!(((RTC_GPIO8, RTC_GPIOn, 8), GPIO33));
-        _for_each_inner!((RTC_GPIO4, GPIO34)); _for_each_inner!(((RTC_GPIO4, RTC_GPIOn,
-        4), GPIO34)); _for_each_inner!((RTC_GPIO5, GPIO35));
+        _for_each_inner!(((RTC_GPIO4, RTC_GPIOn, 4), GPIO34));
         _for_each_inner!(((RTC_GPIO5, RTC_GPIOn, 5), GPIO35));
-        _for_each_inner!((RTC_GPIO0, GPIO36)); _for_each_inner!(((RTC_GPIO0, RTC_GPIOn,
-        0), GPIO36)); _for_each_inner!((RTC_GPIO1, GPIO37));
+        _for_each_inner!(((RTC_GPIO0, RTC_GPIOn, 0), GPIO36));
         _for_each_inner!(((RTC_GPIO1, RTC_GPIOn, 1), GPIO37));
-        _for_each_inner!((RTC_GPIO2, GPIO38)); _for_each_inner!(((RTC_GPIO2, RTC_GPIOn,
-        2), GPIO38)); _for_each_inner!((RTC_GPIO3, GPIO39));
+        _for_each_inner!(((RTC_GPIO2, RTC_GPIOn, 2), GPIO38));
         _for_each_inner!(((RTC_GPIO3, RTC_GPIOn, 3), GPIO39));
-        _for_each_inner!((all(RTC_GPIO11, GPIO0), ((RTC_GPIO11, RTC_GPIOn, 11), GPIO0),
-        (SAR_I2C_SDA, GPIO0), (RTC_GPIO12, GPIO2), ((RTC_GPIO12, RTC_GPIOn, 12), GPIO2),
-        (SAR_I2C_SCL, GPIO2), (RTC_GPIO10, GPIO4), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO4),
-        (SAR_I2C_SCL, GPIO4), (RTC_GPIO15, GPIO12), ((RTC_GPIO15, RTC_GPIOn, 15),
-        GPIO12), (RTC_GPIO14, GPIO13), ((RTC_GPIO14, RTC_GPIOn, 14), GPIO13),
-        (RTC_GPIO16, GPIO14), ((RTC_GPIO16, RTC_GPIOn, 16), GPIO14), (RTC_GPIO13,
-        GPIO15), ((RTC_GPIO13, RTC_GPIOn, 13), GPIO15), (SAR_I2C_SDA, GPIO15),
-        (RTC_GPIO6, GPIO25), ((RTC_GPIO6, RTC_GPIOn, 6), GPIO25), (RTC_GPIO7, GPIO26),
-        ((RTC_GPIO7, RTC_GPIOn, 7), GPIO26), (RTC_GPIO17, GPIO27), ((RTC_GPIO17,
-        RTC_GPIOn, 17), GPIO27), (RTC_GPIO9, GPIO32), ((RTC_GPIO9, RTC_GPIOn, 9),
-        GPIO32), (RTC_GPIO8, GPIO33), ((RTC_GPIO8, RTC_GPIOn, 8), GPIO33), (RTC_GPIO4,
-        GPIO34), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO34), (RTC_GPIO5, GPIO35), ((RTC_GPIO5,
-        RTC_GPIOn, 5), GPIO35), (RTC_GPIO0, GPIO36), ((RTC_GPIO0, RTC_GPIOn, 0), GPIO36),
-        (RTC_GPIO1, GPIO37), ((RTC_GPIO1, RTC_GPIOn, 1), GPIO37), (RTC_GPIO2, GPIO38),
-        ((RTC_GPIO2, RTC_GPIOn, 2), GPIO38), (RTC_GPIO3, GPIO39), ((RTC_GPIO3, RTC_GPIOn,
-        3), GPIO39)));
+        _for_each_inner!((all(RTC_GPIO11, GPIO0), (SAR_I2C_SDA, GPIO0), (RTC_GPIO12,
+        GPIO2), (SAR_I2C_SCL, GPIO2), (RTC_GPIO10, GPIO4), (SAR_I2C_SCL, GPIO4),
+        (RTC_GPIO15, GPIO12), (RTC_GPIO14, GPIO13), (RTC_GPIO16, GPIO14), (RTC_GPIO13,
+        GPIO15), (SAR_I2C_SDA, GPIO15), (RTC_GPIO6, GPIO25), (RTC_GPIO7, GPIO26),
+        (RTC_GPIO17, GPIO27), (RTC_GPIO9, GPIO32), (RTC_GPIO8, GPIO33), (RTC_GPIO4,
+        GPIO34), (RTC_GPIO5, GPIO35), (RTC_GPIO0, GPIO36), (RTC_GPIO1, GPIO37),
+        (RTC_GPIO2, GPIO38), (RTC_GPIO3, GPIO39)));
+        _for_each_inner!((all_expanded((RTC_GPIO11, RTC_GPIOn, 11), GPIO0), ((RTC_GPIO12,
+        RTC_GPIOn, 12), GPIO2), ((RTC_GPIO10, RTC_GPIOn, 10), GPIO4), ((RTC_GPIO15,
+        RTC_GPIOn, 15), GPIO12), ((RTC_GPIO14, RTC_GPIOn, 14), GPIO13), ((RTC_GPIO16,
+        RTC_GPIOn, 16), GPIO14), ((RTC_GPIO13, RTC_GPIOn, 13), GPIO15), ((RTC_GPIO6,
+        RTC_GPIOn, 6), GPIO25), ((RTC_GPIO7, RTC_GPIOn, 7), GPIO26), ((RTC_GPIO17,
+        RTC_GPIOn, 17), GPIO27), ((RTC_GPIO9, RTC_GPIOn, 9), GPIO32), ((RTC_GPIO8,
+        RTC_GPIOn, 8), GPIO33), ((RTC_GPIO4, RTC_GPIOn, 4), GPIO34), ((RTC_GPIO5,
+        RTC_GPIOn, 5), GPIO35), ((RTC_GPIO0, RTC_GPIOn, 0), GPIO36), ((RTC_GPIO1,
+        RTC_GPIOn, 1), GPIO37), ((RTC_GPIO2, RTC_GPIOn, 2), GPIO38), ((RTC_GPIO3,
+        RTC_GPIOn, 3), GPIO39)));
     };
 }
 #[macro_export]

@@ -41,7 +41,7 @@ pub(crate) fn generate_spi_slave_peripherals(spi_slave: &SpiSlaveProperties) -> 
         })
         .collect::<Vec<_>>();
 
-    let for_each = generate_for_each_macro("spi_slave", &instance_cfgs);
+    let for_each = generate_for_each_macro("spi_slave", &[("all", &instance_cfgs)]);
     quote! {
         /// This macro can be used to generate code for each peripheral instance of the SPI slave driver.
         ///

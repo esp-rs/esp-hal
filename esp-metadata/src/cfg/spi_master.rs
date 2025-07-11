@@ -45,7 +45,7 @@ pub(crate) fn generate_spi_master_peripherals(spi_slave: &SpiMasterProperties) -
         })
         .collect::<Vec<_>>();
 
-    let for_each = generate_for_each_macro("spi_master", &instance_cfgs);
+    let for_each = generate_for_each_macro("spi_master", &[("all", &instance_cfgs)]);
     quote! {
         /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
         ///
