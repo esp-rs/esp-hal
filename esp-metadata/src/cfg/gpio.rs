@@ -3,8 +3,8 @@
 
 use std::str::FromStr;
 
-use proc_macro2::TokenStream;
-use quote::format_ident;
+use proc_macro2::{Ident, TokenStream};
+use quote::{format_ident, quote};
 
 use crate::{cfg::Value, generate_for_each_macro, number};
 
@@ -28,29 +28,21 @@ pub(crate) struct PinConfig {
     /// The GPIO pin number.
     pub pin: usize,
 
-    /// Different capabilities implemented by this pin.
-    pub kind: Vec<PinCapability>,
-
-    /// Available alternate functions for this pin.
+    /// Whether the GPIO has an output stage.
     #[serde(default)]
-    pub alternate_functions: AfMap,
-}
+    pub input_only: bool,
 
-/// Pin capabilities. Some of these will cause a trait to be implemented for the
-/// given pin singleton. `UsbDevice` currently only changes what happens on GPIO
-/// driver initialization.
-#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum PinCapability {
-    Input,
-    Output,
-    Analog,
-    Rtc,
-    Touch,
-    UsbDm,
-    UsbDp,
-    // Pin has USB pullup according to the IO MUX Function list
-    UsbDevice,
+    /// Available IO MUX functions for this pin.
+    #[serde(default)]
+    pub functions: FunctionMap,
+
+    /// Available analog functions for this pin.
+    #[serde(default)]
+    pub analog: AnalogMap,
+
+    /// Available LP/RTC IO functions for this pin.
+    #[serde(default, alias = "rtc")]
+    pub lp: LowPowerMap,
 }
 
 /// Available alternate functions for a given GPIO pin.
@@ -60,12 +52,12 @@ pub(crate) enum PinCapability {
 ///
 /// Values of this struct correspond to rows in the IO MUX Pad List table.
 ///
-/// Used in [device.gpio.pins[X].alternate_functions]. The GPIO function is not
+/// Used in [device.gpio.pins[X].functions]. The GPIO function is not
 /// written here as that is common to all pins. The values are signal names
 /// listed in [device.gpio.input_signals] or [device.gpio.output_signals].
 /// `None` means the pin does not provide the given alternate function.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
-pub(crate) struct AfMap {
+pub(crate) struct FunctionMap {
     #[serde(rename = "0")]
     af0: Option<String>,
     #[serde(rename = "1")]
@@ -80,12 +72,82 @@ pub(crate) struct AfMap {
     af5: Option<String>,
 }
 
-impl AfMap {
+impl FunctionMap {
+    const COUNT: usize = 6;
+
     /// Returns the signal associated with the nth alternate function.
     ///
     /// Note that not all alternate functions are defined. The number of the
     /// GPIO function is available separately. Not all alternate function have
     /// IO signals.
+    pub fn get(&self, af: usize) -> Option<&str> {
+        match af {
+            0 => self.af0.as_deref(),
+            1 => self.af1.as_deref(),
+            2 => self.af2.as_deref(),
+            3 => self.af3.as_deref(),
+            4 => self.af4.as_deref(),
+            5 => self.af5.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// Available analog functions for a given GPIO pin.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct AnalogMap {
+    #[serde(rename = "0")]
+    af0: Option<String>,
+    #[serde(rename = "1")]
+    af1: Option<String>,
+    #[serde(rename = "2")]
+    af2: Option<String>,
+    #[serde(rename = "3")]
+    af3: Option<String>,
+    #[serde(rename = "4")]
+    af4: Option<String>,
+    #[serde(rename = "5")]
+    af5: Option<String>,
+}
+
+impl AnalogMap {
+    const COUNT: usize = 6;
+
+    /// Returns the signal associated with the nth alternate function.
+    pub fn get(&self, af: usize) -> Option<&str> {
+        match af {
+            0 => self.af0.as_deref(),
+            1 => self.af1.as_deref(),
+            2 => self.af2.as_deref(),
+            3 => self.af3.as_deref(),
+            4 => self.af4.as_deref(),
+            5 => self.af5.as_deref(),
+            _ => None,
+        }
+    }
+}
+
+/// Available RTC/LP functions for a given GPIO pin.
+#[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]
+pub(crate) struct LowPowerMap {
+    #[serde(rename = "0")]
+    af0: Option<String>,
+    #[serde(rename = "1")]
+    af1: Option<String>,
+    #[serde(rename = "2")]
+    af2: Option<String>,
+    #[serde(rename = "3")]
+    af3: Option<String>,
+    #[serde(rename = "4")]
+    af4: Option<String>,
+    #[serde(rename = "5")]
+    af5: Option<String>,
+}
+
+impl LowPowerMap {
+    const COUNT: usize = 6;
+
+    /// Returns the signal associated with the nth alternate function.
     pub fn get(&self, af: usize) -> Option<&str> {
         match af {
             0 => self.af0.as_deref(),
@@ -162,26 +224,16 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .pins
         .iter()
         .map(|pin| {
-            let mut attrs = vec![];
-            pin.kind.iter().for_each(|kind| match kind {
-                PinCapability::Input => attrs.push(quote::quote! { Input }),
-                PinCapability::Output => attrs.push(quote::quote! { Output }),
-                PinCapability::Analog => attrs.push(quote::quote! { Analog }),
-                PinCapability::Rtc => {
-                    attrs.push(quote::quote! { RtcIo });
-                    if pin.kind.contains(&PinCapability::Output) {
-                        attrs.push(quote::quote! { RtcIoOutput });
-                    }
-                }
-                PinCapability::Touch => attrs.push(quote::quote! { Touch }),
-                PinCapability::UsbDm => attrs.push(quote::quote! { UsbDm }),
-                PinCapability::UsbDp => attrs.push(quote::quote! { UsbDp }),
-                PinCapability::UsbDevice => attrs.push(quote::quote! { UsbDevice }),
-            });
-
-            attrs
+            if pin.input_only {
+                vec![quote! { Input }]
+            } else {
+                vec![quote! { Input }, quote! { Output }]
+            }
         })
         .collect::<Vec<_>>();
+
+    let mut lp_functions = vec![];
+    let mut analog_functions = vec![];
 
     let pin_afs = gpio
         .pins_and_signals
@@ -191,12 +243,14 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             let mut input_afs = vec![];
             let mut output_afs = vec![];
 
-            for af in 0..6 {
-                let Some(signal) = pin.alternate_functions.get(af) else {
+            let pin_peri = format_ident!("GPIO{}", pin.pin);
+
+            for af in 0..FunctionMap::COUNT {
+                let Some(signal) = pin.functions.get(af) else {
                     continue;
                 };
 
-                let af_variant = quote::format_ident!("_{af}");
+                let af_variant = format_ident!("_{af}");
                 let mut found = false;
 
                 // Is the signal present among the input signals?
@@ -207,7 +261,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                     .find(|s| s.name == signal)
                 {
                     let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    input_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    input_afs.push(quote! { #af_variant => #signal_tokens });
                     found = true;
                 }
 
@@ -219,7 +273,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                     .find(|s| s.name == signal)
                 {
                     let signal_tokens = TokenStream::from_str(&signal.name).unwrap();
-                    output_afs.push(quote::quote! { #af_variant => #signal_tokens });
+                    output_afs.push(quote! { #af_variant => #signal_tokens });
                     found = true;
                 }
 
@@ -230,7 +284,89 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
                 );
             }
 
-            quote::quote! {
+            fn create_matchers_for_signal(
+                branches: &mut Vec<TokenStream>,
+                pin_peri: &Ident,
+                signal: &str,
+            ) {
+                // Split "NAMEnumber" format fragments into the NAME and the number. The function
+                // returns `None` if the input string is not in this format. The NAME part can be
+                // empty (i.e. this function can return `Some("", number)`).
+                fn split_signal_with_number(fragment: &str) -> Option<(&str, usize)> {
+                    // Find the first character that is not a letter.
+                    let Some(breakpoint) = fragment
+                        .char_indices()
+                        .filter_map(|(idx, c)| if c.is_alphabetic() { None } else { Some(idx) })
+                        .next()
+                    else {
+                        // fragment only contains letters
+                        return None;
+                    };
+
+                    let number: usize = fragment[breakpoint..].parse().ok()?;
+
+                    Some((&fragment[..breakpoint], number))
+                }
+
+                let signal_name = TokenStream::from_str(signal).unwrap();
+
+                let simple_signal = quote! { #signal_name };
+                let full_signal = {
+                    // The signal name, with numbers replaced with placeholders
+                    let mut pattern = String::new();
+                    let mut numbers = vec![];
+
+                    let placeholders = ['n', 'm'];
+
+                    let mut separator = "";
+                    for fragment in signal.split('_') {
+                        if let Some((prefix, n)) = split_signal_with_number(fragment) {
+                            let placeholder = placeholders[numbers.len()];
+                            numbers.push(number(n));
+                            pattern = format!("{pattern}{separator}{prefix}{placeholder}")
+                        } else {
+                            pattern = format!("{pattern}{separator}{fragment}");
+                        };
+
+                        separator = "_";
+                    }
+
+                    if pattern == signal {
+                        None
+                    } else {
+                        let pattern = format_ident!("{pattern}");
+
+                        Some(quote! {
+                            ( #signal_name, #pattern #(, #numbers)* )
+                        })
+                    }
+                };
+
+                let simple_gpio = quote! { #pin_peri };
+
+                branches.push(quote! {
+                    #simple_signal, #simple_gpio
+                });
+                if let Some(full_signal) = full_signal {
+                    branches.push(quote! {
+                        #full_signal, #simple_gpio
+                    });
+                }
+            }
+
+            for af in 0..AnalogMap::COUNT {
+                if let Some(signal) = pin.analog.get(af) {
+                    create_matchers_for_signal(&mut analog_functions, &pin_peri, signal);
+                }
+            }
+
+            for af in 0..LowPowerMap::COUNT {
+                if let Some(signal) = pin.lp.get(af) {
+                    create_matchers_for_signal(&mut lp_functions, &pin_peri, signal);
+                }
+            }
+
+            quote! {
                 ( #(#input_afs)* ) ( #(#output_afs)* )
             }
         })
@@ -242,10 +378,10 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             let reg = format_ident!("GPIO{pin}");
             let accessor = format_ident!("gpio{pin}");
 
-            quote::quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
+            quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
         });
 
-        quote::quote! {
+        quote! {
             pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
                 use core::mem::transmute;
 
@@ -262,7 +398,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 
         }
     } else {
-        quote::quote! {
+        quote! {
             pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO {
                 crate::peripherals::IO_MUX::regs().gpio(gpio_num as usize)
             }
@@ -278,16 +414,16 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         let mut branches = vec![];
 
         for (pin, attr) in pin_peris.iter().zip(pin_attrs.iter()) {
-            branches.push(quote::quote! {
+            branches.push(quote! {
                 #( (#pin, #attr, $then_tt:tt else $else_tt:tt ) => { $then_tt }; )*
             });
 
-            branches.push(quote::quote! {
+            branches.push(quote! {
                 (#pin, $t:tt, $then_tt:tt else $else_tt:tt ) => { $else_tt };
             });
         }
 
-        quote::quote! {
+        quote! {
             #[macro_export]
             macro_rules! if_pin_is_type {
                 #(#branches)*
@@ -303,7 +439,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let impl_for_pin_type = {
         let mut impl_branches = vec![];
         for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
-            impl_branches.push(quote::quote! {
+            impl_branches.push(quote! {
                 #gpionum => if_pin_is_type!(#peri, $on_type, {{
                     #[allow(unused_unsafe, unused_mut)]
                     let mut $inner_ident = unsafe { crate::peripherals::#peri::steal() };
@@ -315,7 +451,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
             });
         }
 
-        quote::quote! {
+        quote! {
             #[macro_export]
             #[expect(clippy::crate_in_macro_def)]
             macro_rules! impl_for_pin_type {
@@ -339,17 +475,94 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .zip(pin_afs.iter())
         .zip(pin_attrs.iter())
     {
-        branches.push(quote::quote! {
+        branches.push(quote! {
             #n, #p #af (#(#attrs)*)
         })
     }
 
-    let for_each = generate_for_each_macro("gpio", &branches);
+    let for_each_gpio = generate_for_each_macro("gpio", &branches);
+    let for_each_analog = generate_for_each_macro("analog_function", &analog_functions);
+    let for_each_lp = generate_for_each_macro("lp_function", &lp_functions);
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
-    quote::quote! {
-        #for_each
+    quote! {
+        /// This macro can be used to generate code for each GPIOn instance.
+        ///
+        /// The basic syntax of this macro looks like a macro definition with two distinct syntax options:
+        ///
+        /// ```rust, no_run
+        /// for_each_gpio! {
+        ///     // Individual matcher, invoked separately for each GPIO
+        ///     ( <match arm> ) => { /* some code */ };
+        ///
+        ///     // Repeated matcher, invoked once with all GPIOs
+        ///     ( all $( (<individual match syntax>) ),* ) => { /* some code */ };
+        /// }
+        /// ```
+        ///
+        /// You can specify any number of matchers.
+        ///
+        /// ## Using the individual matcher
+        ///
+        /// In this use case, each GPIO's data is individually passed through the macro. This can be used to
+        /// generate code for each GPIO separately, allowing specializing the implementation where needed.
+        ///
+        /// ```rust,no_run
+        /// for_each_gpio! {
+        ///   // Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
+        ///   ($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*)) => { /* some code */ };
+        ///
+        ///   // You can create matchers with data filled in. This example will specifically match GPIO2
+        ///   ($n:literal, GPIO2 $input_af:tt $output_af:tt $attributes:tt) => { /* Additional case only for GPIO2 */ };
+        /// }
+        /// ```
+        ///
+        /// ## Repeated matcher
+        ///
+        /// With this option, all GPIO data is passed through the macro all at once. This form can be used to,
+        /// for example, generate struct fields.
+        ///
+        /// ```rust,no_run
+        /// // Example usage to create a struct containing all GPIOs:
+        /// for_each_gpio! {
+        ///     (all $( ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt $_attrs:tt) ),*) => {
+        ///         struct Gpios {
+        ///             $(
+        ///                 #[doc = concat!(" The ", stringify!($n), "th GPIO pin")]
+        ///                 pub $gpio: Gpio<$n>,
+        ///             )*
+        ///         }
+        ///     };
+        /// }
+        /// ```
+        #for_each_gpio
+
+        /// This macro can be used to generate code for each analog function of each GPIO.
+        ///
+        /// For an explanation on the general syntax, as well as usage of individual/repeated
+        /// matchers, refer to [for_each_gpio].
+        ///
+        /// This macro has two options for its "Individual matcher" case:
+        ///
+        /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+        ///
+        /// The expanded signal are only available when the signal has at least one numbered component.
+        #for_each_analog
+
+        /// This macro can be used to generate code for each LP/RTC function of each GPIO.
+        ///
+        /// For an explanation on the general syntax, as well as usage of individual/repeated
+        /// matchers, refer to [for_each_gpio].
+        ///
+        /// This macro has two options for its "Individual matcher" case:
+        ///
+        /// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+        /// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case, where you need the number(s) of a signal, or the general group to which the signal belongs. For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1, SAR_I2C_SCL_n, 1)`.
+        ///
+        /// The expanded signal are only available when the signal has at least one numbered component.
+        #for_each_lp
 
         #if_pin_is_type
         #impl_for_pin_type
@@ -375,7 +588,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
 fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
     if signals.is_empty() {
         // If there are no signals, we don't need to generate an enum.
-        return quote::quote! {};
+        return quote! {};
     }
     let mut variants = vec![];
 
@@ -387,7 +600,7 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
 
         let name = format_ident!("{}", signal.name);
         let value = number(id);
-        variants.push(quote::quote! {
+        variants.push(quote! {
             #name = #value,
         });
     }
@@ -399,14 +612,14 @@ fn render_signals(enum_name: &str, signals: &[IoMuxSignal]) -> TokenStream {
         };
 
         let name = format_ident!("{}", signal.name);
-        variants.push(quote::quote! {
+        variants.push(quote! {
             #name,
         });
     }
 
     let enum_name = format_ident!("{enum_name}");
 
-    quote::quote! {
+    quote! {
         #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
         #[derive(Debug, PartialEq, Copy, Clone)]
         #[cfg_attr(feature = "defmt", derive(defmt::Format))]

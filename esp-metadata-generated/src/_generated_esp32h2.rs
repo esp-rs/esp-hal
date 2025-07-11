@@ -325,42 +325,147 @@ macro_rules! for_each_peripheral {
         virtual() (unstable))));
     };
 }
+/// This macro can be used to generate code for each GPIOn instance.
+///
+/// The basic syntax of this macro looks like a macro definition with two distinct syntax options:
+///
+/// ```rust, no_run
+/// for_each_gpio! {
+///     // Individual matcher, invoked separately for each GPIO
+///     ( <match arm> ) => { /* some code */ };
+///
+///     // Repeated matcher, invoked once with all GPIOs
+///     ( all $( (<individual match syntax>) ),* ) => { /* some code */ };
+/// }
+/// ```
+///
+/// You can specify any number of matchers.
+///
+/// ## Using the individual matcher
+///
+/// In this use case, each GPIO's data is individually passed through the macro. This can be used to
+/// generate code for each GPIO separately, allowing specializing the implementation where needed.
+///
+/// ```rust,no_run
+/// for_each_gpio! {
+///   // Example data: `(0, GPIO0 (_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) (Input Output))`
+///   ($n:literal, $gpio:ident ($($digital_input_function:ident => $digital_input_signal:ident)*) ($($digital_output_function:ident => $digital_output_signal:ident)*) ($($pin_attribute:ident)*)) => { /* some code */ };
+///
+///   // You can create matchers with data filled in. This example will specifically match GPIO2
+///   ($n:literal, GPIO2 $input_af:tt $output_af:tt $attributes:tt) => { /* Additional case only for GPIO2 */ };
+/// }
+/// ```
+///
+/// ## Repeated matcher
+///
+/// With this option, all GPIO data is passed through the macro all at once. This form can be used
+/// to, for example, generate struct fields.
+///
+/// ```rust,no_run
+/// // Example usage to create a struct containing all GPIOs:
+/// for_each_gpio! {
+///     (all $( ($n:literal, $gpio:ident $_af_ins:tt $_af_outs:tt $_attrs:tt) ),*) => {
+///         struct Gpios {
+///             $(
+///                 #[doc = concat!(" The ", stringify!($n), "th GPIO pin")]
+///                 pub $gpio: Gpio<$n>,
+///             )*
+///         }
+///     };
+/// }
+/// ```
 #[macro_export]
 macro_rules! for_each_gpio {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
-        _for_each_inner!((0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output Analog)));
-        _for_each_inner!((1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output
-        Analog))); _for_each_inner!((2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP)
-        (Input Output Analog))); _for_each_inner!((3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2
-        => FSPIHD) (Input Output Analog))); _for_each_inner!((4, GPIO4(_0 => MTCK _2 =>
-        FSPICLK) (_2 => FSPICLK) (Input Output Analog))); _for_each_inner!((5, GPIO5(_2
-        => FSPID) (_0 => MTDO _2 => FSPID) (Input Output Analog))); _for_each_inner!((6,
-        GPIO6() () (Input Output))); _for_each_inner!((7, GPIO7() () (Input Output)));
-        _for_each_inner!((8, GPIO8() () (Input Output))); _for_each_inner!((9, GPIO9() ()
-        (Input Output))); _for_each_inner!((10, GPIO10() () (Input Output)));
-        _for_each_inner!((11, GPIO11() () (Input Output))); _for_each_inner!((12,
-        GPIO12() () (Input Output))); _for_each_inner!((13, GPIO13() () (Input Output)));
-        _for_each_inner!((14, GPIO14() () (Input Output))); _for_each_inner!((22,
-        GPIO22() () (Input Output))); _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2 =>
-        FSPICS1) (Input Output))); _for_each_inner!((24, GPIO24() (_0 => U0TXD _2 =>
-        FSPICS2) (Input Output))); _for_each_inner!((25, GPIO25() (_2 => FSPICS3) (Input
-        Output))); _for_each_inner!((26, GPIO26() (_2 => FSPICS4) (Input Output
-        UsbDevice))); _for_each_inner!((27, GPIO27() (_2 => FSPICS5) (Input Output
-        UsbDevice))); _for_each_inner!((all(0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input
-        Output Analog)), (1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output Analog)),
-        (2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP) (Input Output Analog)), (3,
-        GPIO3(_0 => MTDI _2 => FSPIHD) (_2 => FSPIHD) (Input Output Analog)), (4,
-        GPIO4(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK) (Input Output Analog)), (5,
-        GPIO5(_2 => FSPID) (_0 => MTDO _2 => FSPID) (Input Output Analog)), (6, GPIO6()
-        () (Input Output)), (7, GPIO7() () (Input Output)), (8, GPIO8() () (Input
-        Output)), (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input Output)), (11,
-        GPIO11() () (Input Output)), (12, GPIO12() () (Input Output)), (13, GPIO13() ()
-        (Input Output)), (14, GPIO14() () (Input Output)), (22, GPIO22() () (Input
-        Output)), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)), (24, GPIO24()
-        (_0 => U0TXD _2 => FSPICS2) (Input Output)), (25, GPIO25() (_2 => FSPICS3) (Input
-        Output)), (26, GPIO26() (_2 => FSPICS4) (Input Output UsbDevice)), (27, GPIO27()
-        (_2 => FSPICS5) (Input Output UsbDevice))));
+        _for_each_inner!((0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output)));
+        _for_each_inner!((1, GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output)));
+        _for_each_inner!((2, GPIO2(_0 => MTMS _2 => FSPIWP) (_2 => FSPIWP) (Input
+        Output))); _for_each_inner!((3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2 => FSPIHD)
+        (Input Output))); _for_each_inner!((4, GPIO4(_0 => MTCK _2 => FSPICLK) (_2 =>
+        FSPICLK) (Input Output))); _for_each_inner!((5, GPIO5(_2 => FSPID) (_0 => MTDO _2
+        => FSPID) (Input Output))); _for_each_inner!((6, GPIO6() () (Input Output)));
+        _for_each_inner!((7, GPIO7() () (Input Output))); _for_each_inner!((8, GPIO8() ()
+        (Input Output))); _for_each_inner!((9, GPIO9() () (Input Output)));
+        _for_each_inner!((10, GPIO10() () (Input Output))); _for_each_inner!((11,
+        GPIO11() () (Input Output))); _for_each_inner!((12, GPIO12() () (Input Output)));
+        _for_each_inner!((13, GPIO13() () (Input Output))); _for_each_inner!((14,
+        GPIO14() () (Input Output))); _for_each_inner!((22, GPIO22() () (Input Output)));
+        _for_each_inner!((23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)));
+        _for_each_inner!((24, GPIO24() (_0 => U0TXD _2 => FSPICS2) (Input Output)));
+        _for_each_inner!((25, GPIO25() (_2 => FSPICS3) (Input Output)));
+        _for_each_inner!((26, GPIO26() (_2 => FSPICS4) (Input Output)));
+        _for_each_inner!((27, GPIO27() (_2 => FSPICS5) (Input Output)));
+        _for_each_inner!((all(0, GPIO0(_2 => FSPIQ) (_2 => FSPIQ) (Input Output)), (1,
+        GPIO1(_2 => FSPICS0) (_2 => FSPICS0) (Input Output)), (2, GPIO2(_0 => MTMS _2 =>
+        FSPIWP) (_2 => FSPIWP) (Input Output)), (3, GPIO3(_0 => MTDI _2 => FSPIHD) (_2 =>
+        FSPIHD) (Input Output)), (4, GPIO4(_0 => MTCK _2 => FSPICLK) (_2 => FSPICLK)
+        (Input Output)), (5, GPIO5(_2 => FSPID) (_0 => MTDO _2 => FSPID) (Input Output)),
+        (6, GPIO6() () (Input Output)), (7, GPIO7() () (Input Output)), (8, GPIO8() ()
+        (Input Output)), (9, GPIO9() () (Input Output)), (10, GPIO10() () (Input
+        Output)), (11, GPIO11() () (Input Output)), (12, GPIO12() () (Input Output)),
+        (13, GPIO13() () (Input Output)), (14, GPIO14() () (Input Output)), (22, GPIO22()
+        () (Input Output)), (23, GPIO23(_0 => U0RXD) (_2 => FSPICS1) (Input Output)),
+        (24, GPIO24() (_0 => U0TXD _2 => FSPICS2) (Input Output)), (25, GPIO25() (_2 =>
+        FSPICS3) (Input Output)), (26, GPIO26() (_2 => FSPICS4) (Input Output)), (27,
+        GPIO27() (_2 => FSPICS5) (Input Output))));
+    };
+}
+/// This macro can be used to generate code for each analog function of each GPIO.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [for_each_gpio].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
+///   where you need the number(s) of a signal, or the general group to which the signal belongs.
+///   For example, in case of `ADC2_CH3` the expanded form looks like `(ADC2_CH3, ADCn_CHm, 2, 3)`.
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
+#[macro_export]
+macro_rules! for_each_analog_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((ADC1_CH0, GPIO1)); _for_each_inner!(((ADC1_CH0, ADCn_CHm, 1,
+        0), GPIO1)); _for_each_inner!((ADC1_CH1, GPIO2)); _for_each_inner!(((ADC1_CH1,
+        ADCn_CHm, 1, 1), GPIO2)); _for_each_inner!((ADC1_CH2, GPIO3));
+        _for_each_inner!(((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3));
+        _for_each_inner!((ADC1_CH3, GPIO4)); _for_each_inner!(((ADC1_CH3, ADCn_CHm, 1,
+        3), GPIO4)); _for_each_inner!((ADC1_CH4, GPIO5)); _for_each_inner!(((ADC1_CH4,
+        ADCn_CHm, 1, 4), GPIO5)); _for_each_inner!((ZCD0, GPIO10));
+        _for_each_inner!(((ZCD0, ZCDn, 0), GPIO10)); _for_each_inner!((ZCD1, GPIO11));
+        _for_each_inner!(((ZCD1, ZCDn, 1), GPIO11)); _for_each_inner!((XTAL_32K_P,
+        GPIO13)); _for_each_inner!((XTAL_32K_N, GPIO14)); _for_each_inner!((USB_DM,
+        GPIO26)); _for_each_inner!((USB_DP, GPIO27)); _for_each_inner!((all(ADC1_CH0,
+        GPIO1), ((ADC1_CH0, ADCn_CHm, 1, 0), GPIO1), (ADC1_CH1, GPIO2), ((ADC1_CH1,
+        ADCn_CHm, 1, 1), GPIO2), (ADC1_CH2, GPIO3), ((ADC1_CH2, ADCn_CHm, 1, 2), GPIO3),
+        (ADC1_CH3, GPIO4), ((ADC1_CH3, ADCn_CHm, 1, 3), GPIO4), (ADC1_CH4, GPIO5),
+        ((ADC1_CH4, ADCn_CHm, 1, 4), GPIO5), (ZCD0, GPIO10), ((ZCD0, ZCDn, 0), GPIO10),
+        (ZCD1, GPIO11), ((ZCD1, ZCDn, 1), GPIO11), (XTAL_32K_P, GPIO13), (XTAL_32K_N,
+        GPIO14), (USB_DM, GPIO26), (USB_DP, GPIO27)));
+    };
+}
+/// This macro can be used to generate code for each LP/RTC function of each GPIO.
+///
+/// For an explanation on the general syntax, as well as usage of individual/repeated
+/// matchers, refer to [for_each_gpio].
+///
+/// This macro has two options for its "Individual matcher" case:
+///
+/// - `($signal:ident, $gpio:ident)` - simple case where you only need identifiers
+/// - `(($signal:ident, $group:ident $(, $number:literal)+), $gpio:ident)` - expanded signal case,
+///   where you need the number(s) of a signal, or the general group to which the signal belongs.
+///   For example, in case of `SAR_I2C_SCL_1` the expanded form looks like `(SAR_I2C_SCL_1,
+///   SAR_I2C_SCL_n, 1)`.
+///
+/// The expanded signal are only available when the signal has at least one numbered component.
+#[macro_export]
+macro_rules! for_each_lp_function {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((all));
     };
 }
 #[macro_export]
@@ -369,9 +474,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO0, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO0, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO0, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -383,9 +485,6 @@ macro_rules! if_pin_is_type {
     (GPIO1, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO1, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO1, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -393,9 +492,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO2, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO2, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO2, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -407,9 +503,6 @@ macro_rules! if_pin_is_type {
     (GPIO3, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO3, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO3, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -419,9 +512,6 @@ macro_rules! if_pin_is_type {
     (GPIO4, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO4, Analog, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO4, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -429,9 +519,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO5, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO5, Analog, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO5, $t:tt, $then_tt:tt else $else_tt:tt) => {
@@ -560,9 +647,6 @@ macro_rules! if_pin_is_type {
     (GPIO26, Output, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
-    (GPIO26, UsbDevice, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
     (GPIO26, $t:tt, $then_tt:tt else $else_tt:tt) => {
         $else_tt
     };
@@ -570,9 +654,6 @@ macro_rules! if_pin_is_type {
         $then_tt
     };
     (GPIO27, Output, $then_tt:tt else $else_tt:tt) => {
-        $then_tt
-    };
-    (GPIO27, UsbDevice, $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (GPIO27, $t:tt, $then_tt:tt else $else_tt:tt) => {

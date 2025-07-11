@@ -119,10 +119,26 @@ macro_rules! create_peripheral {
     };
 }
 
+macro_rules! io_type {
+    (Input, $peri:ident) => {
+        impl $crate::gpio::InputPin for $peri<'_> {
+            #[doc(hidden)]
+            #[inline]
+            fn waker(&self) -> &'static $crate::asynch::AtomicWaker {
+                static WAKER: $crate::asynch::AtomicWaker = $crate::asynch::AtomicWaker::new();
+                &WAKER
+            }
+        }
+    };
+    (Output, $peri:ident) => {
+        impl $crate::gpio::OutputPin for $peri<'_> {}
+    };
+}
+
 for_each_gpio! {
     ($n:literal, $pin_peri:ident $af_ins:tt $af_outs:tt ($($attr:ident)*)) => {
         $(
-            crate::io_type!($attr, $pin_peri);
+            io_type!($attr, $pin_peri);
         )*
     };
 

@@ -53,6 +53,15 @@ pub trait UsbDp: crate::private::Sealed {}
 /// Trait representing the USB D- (data minus) pin.
 pub trait UsbDm: crate::private::Sealed {}
 
+for_each_analog_function! {
+    (USB_DM, $gpio:ident) => {
+        impl UsbDm for crate::peripherals::$gpio<'_> {}
+    };
+    (USB_DP, $gpio:ident) => {
+        impl UsbDp for crate::peripherals::$gpio<'_> {}
+    };
+}
+
 /// USB peripheral.
 pub struct Usb<'d> {
     _usb0: peripherals::USB0<'d>,
