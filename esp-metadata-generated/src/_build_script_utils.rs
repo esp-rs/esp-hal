@@ -32,6 +32,9 @@ impl core::str::FromStr for Chip {
     }
 }
 impl Chip {
+    /// Tries to extract the active chip from the active cargo features.
+    ///
+    /// Exactly one device feature must be enabled for this function to succeed.
     pub fn from_cargo_feature() -> Result<Self, &'static str> {
         let all_chips = [
             ("CARGO_FEATURE_ESP32", Self::Esp32),
@@ -60,12 +63,21 @@ impl Chip {
             ),
         }
     }
+    /// Returns whether the current chip uses the Tensilica Xtensa ISA.
     pub fn is_xtensa(self) -> bool {
         self.config().architecture == "xtensa"
     }
+    /// The target triple of the current chip.
     pub fn target(self) -> &'static str {
         self.config().target
     }
+    /// The simple name of the current chip.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// assert_eq!(Chip::Esp32s3.name(), "esp32s3");
+    /// ```
     pub fn name(self) -> &'static str {
         match self {
             Self::Esp32 => "esp32",
@@ -77,15 +89,39 @@ impl Chip {
             Self::Esp32s3 => "esp32s3",
         }
     }
+    /// Returns whether the chip configuration contains the given symbol.
+    ///
+    /// This function is a short-hand for `self.all_symbols().contains(&symbol)`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// assert!(Chip::Esp32s3.contains("soc_has_pcnt"));
+    /// ```
     pub fn contains(self, symbol: &str) -> bool {
-        self.config().contains(symbol)
+        self.all_symbols().contains(&symbol)
     }
+    /// Calling this function will define all cfg symbols for the firmware crate to use.
     pub fn define_cfgs(self) {
         self.config().define_cfgs()
     }
+    /// Returns all symbols as a big slice.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// assert!(Chip::Esp32s3.all_symbols().contains("soc_has_pcnt"));
+    /// ```
     pub fn all_symbols(&self) -> &'static [&'static str] {
         self.config().symbols
     }
+    /// Returns an iterator over all chips.
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// assert!(Chip::iter().any(|c| c == Chip::Esp32));
+    /// ```
     pub fn iter() -> impl Iterator<Item = Chip> {
         [
             Self::Esp32,
@@ -98,7 +134,7 @@ impl Chip {
         ]
         .into_iter()
     }
-    pub fn config(self) -> Config {
+    fn config(self) -> Config {
         match self {
             Self::Esp32 => Config {
                 architecture: "xtensa",
@@ -2109,17 +2145,13 @@ impl Chip {
         }
     }
 }
-#[cfg_attr(docsrs, doc(cfg(feature = "build-script")))]
-pub struct Config {
+struct Config {
     architecture: &'static str,
     target: &'static str,
     symbols: &'static [&'static str],
     cfgs: &'static [&'static str],
 }
 impl Config {
-    fn contains(&self, symbol: &str) -> bool {
-        self.symbols.contains(&symbol)
-    }
     fn define_cfgs(&self) {
         println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
         println!("cargo:rustc-check-cfg=cfg(esp32)");

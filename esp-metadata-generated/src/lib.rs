@@ -11,7 +11,7 @@
 //!
 //! ## Usage in build scripts
 //!
-//! To use the `Chip` enum and the `Config` struct, add the crate to your `Cargo.toml` build
+//! To use the `Chip` enum, add the crate to your `Cargo.toml` build
 //! dependencies, with the `build-script` feature:
 //!
 //! ```toml
@@ -79,7 +79,7 @@
 //! syntax option. Currently, using the repeated matcher is not recommended for these macros.
 //!
 //! > This issue will be likely resolved by naming the different syntax options, and providing
-//! different match arms for each in place of `all`.
+//! > different match arms for each in place of `all`.
 //!
 //! ```rust,no_run
 //! // Example usage to create a struct containing all GPIOs:
