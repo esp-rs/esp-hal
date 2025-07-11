@@ -2,7 +2,10 @@
 
 use core::fmt::Debug;
 
-use crate::dma::{DescriptorFlagFields, Owner};
+use crate::dma::{DescriptorFlagFields, DmaDescriptorGeneric, Owner};
+
+/// Convenience alias for the DMA descriptor used with the SDIO dedicated DMA controller.
+pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
 
 bitfield::bitfield! {
     /// DMA descriptor flags for the dedicated SDIO DMA engine.
