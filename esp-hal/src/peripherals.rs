@@ -123,7 +123,7 @@ macro_rules! io_type {
     (Input, $peri:ident) => {
         impl $crate::gpio::InputPin for $peri<'_> {
             #[doc(hidden)]
-            #[inline(always)]
+            #[inline]
             fn waker(&self) -> &'static $crate::asynch::AtomicWaker {
                 static WAKER: $crate::asynch::AtomicWaker = $crate::asynch::AtomicWaker::new();
                 &WAKER
@@ -132,9 +132,6 @@ macro_rules! io_type {
     };
     (Output, $peri:ident) => {
         impl $crate::gpio::OutputPin for $peri<'_> {}
-    };
-    ($other:ident, $peri:ident) => {
-        // TODO
     };
 }
 
