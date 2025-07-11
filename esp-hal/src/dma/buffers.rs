@@ -1352,7 +1352,7 @@ impl DmaRxStreamBufView {
             // Reset the descriptor for reuse.
             desc.set_owner(Owner::Dma);
             desc.set_suc_eof(false);
-            desc.set_length(0);
+            desc.set_len(0);
 
             // Before connecting this descriptor to the end of the list, the next descriptor
             // must be disconnected from this one to prevent the DMA from
@@ -1527,7 +1527,7 @@ impl DmaLoopBuf {
 
         descriptor.set_owner(Owner::Dma); // Doesn't matter
         descriptor.set_suc_eof(false);
-        descriptor.set_length(buffer.len());
+        descriptor.set_len(buffer.len());
         descriptor.set_size(buffer.len());
         descriptor.buffer = buffer.as_mut_ptr();
         descriptor.next = descriptor;
