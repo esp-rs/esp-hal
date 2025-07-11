@@ -938,6 +938,6 @@ impl NoOp {
 ///     Default::default()),
 /// );
 ///
-/// {after_snippet}
+/// # {after_snippet}
 /// ```
 fn _compile_tests() {}
