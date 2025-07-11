@@ -48,7 +48,7 @@ use core::{cell::Cell, marker::PhantomData};
 
 #[cfg(bt)]
 use crate::peripherals::BT;
-#[cfg(ieee802154)]
+#[cfg(all(feature = "unstable", ieee802154))]
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
