@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
 - Added the feature `requires-unstable` (#3772)
 - `AnyPin::downcast`/`AnyPeripheral::downcast` to allow retrieving the original GPIO/peripheral type (#3783, #3784)
+- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778).
 
 ### Changed
 

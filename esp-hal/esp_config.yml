@@ -22,6 +22,11 @@ options:
     - value: false
   stability: !Stable '1.0.0-beta.0'
 
+- name: place-rmt-driver-in-ram
+  description: Places the RMT driver in RAM for better performance
+  default:
+    - value: false
+
 # Ideally, we should be able to set any clock frequency for any chip. However,
 # currently only the 32 and C2 implements any sort of configurability, and
 # the rest have a fixed clock frequency.
