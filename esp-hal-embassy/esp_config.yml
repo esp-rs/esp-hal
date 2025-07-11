@@ -8,6 +8,17 @@ options:
   default:
     - value: true
 
+- name: low-power-wait-wifi-perf-opt
+  description: "If using wifi, this improves async ping times and may improve async throughput.
+               Enables running the wifi stack just before going into low power sleep.
+               This should cause any outbound packets to be sent earlier as we run the wifi stack before going to sleep.
+               This should also cause inbound packets to be processed earlier since if waiting for an interrupt,
+               and a radio interrupt occurs, then before going back to sleep we run the wifi stack which processes the incoming packet.
+               Enabling this option allows setting esp-wifi tick_rate_hz to 1 which helps further reduce power consumption,
+               as the wifi stack will run at a variable tick rate as needed rather than at a fixed rate."
+  default:
+    - value: true
+
 - name: timer-queue
   description: "The flavour of the timer queue provided by this crate. Integrated
                queues require the `executors` feature to be enabled.</p><p>If you use
