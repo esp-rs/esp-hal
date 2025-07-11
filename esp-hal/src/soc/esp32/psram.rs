@@ -18,28 +18,13 @@
 //! You need an ESP32 with at least 2 MB of PSRAM memory.
 //! Notice that PSRAM example **must** be built in release mode!
 //!
-//! ```rust, no_run
+//! ```rust, ignore
 //! # {before_snippet}
 //! # extern crate alloc;
 //! # use alloc::{string::String, vec::Vec};
-//! # use esp_alloc as _;
-//! # use esp_hal::psram;
-//!
-//! // Initialize PSRAM and add it as a heap memory region
-//! fn init_psram_heap(start: *mut u8, size: usize) {
-//!     unsafe {
-//!         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-//!             start,
-//!             size,
-//!             esp_alloc::MemoryCapability::External.into(),
-//!         ));
-//!     }
-//! }
-//!
-//! // Initialize PSRAM and add it to the heap
-//! let (start, size) = psram::init_psram(peripherals.PSRAM, psram::PsramConfig::default());
-//!
-//! init_psram_heap(start, size);
+//! #
+//! // Add PSRAM to the heap.
+//! esp_alloc::psram_allocator!(&peripherals.PSRAM, esp_hal::psram);
 //!
 //! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
 //!
@@ -48,7 +33,7 @@
 //! }
 //!
 //! let string = String::from("A string allocated in PSRAM");
-//! # }
+//! # {after_snippet}
 //! ```
 
 pub use crate::soc::psram_common::*;
