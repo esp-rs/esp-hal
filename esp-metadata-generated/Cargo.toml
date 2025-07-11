@@ -4,7 +4,7 @@ version       = "0.0.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Generated metadata for Espressif devices"
-documentation = "https://docs.espressif.com/projects/rust/esp-metadata/latest/"
+documentation = "https://docs.espressif.com/projects/rust/esp-metadata-generated/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
@@ -15,10 +15,11 @@ esp-metadata = { version = "0.7.0", path = "../esp-metadata" } # TODO: remove
 
 [features]
 build-script = []
-esp32   = []
-esp32c2 = []
-esp32c3 = []
-esp32c6 = []
-esp32h2 = []
-esp32s2 = []
-esp32s3 = []
+_device-selected = []
+esp32   = ["_device-selected"]
+esp32c2 = ["_device-selected"]
+esp32c3 = ["_device-selected"]
+esp32c6 = ["_device-selected"]
+esp32h2 = ["_device-selected"]
+esp32s2 = ["_device-selected"]
+esp32s3 = ["_device-selected"]
