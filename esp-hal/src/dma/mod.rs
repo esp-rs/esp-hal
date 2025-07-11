@@ -214,44 +214,60 @@ where
 
 bitfield::bitfield! {
     /// DMA descriptor flags.
+    ///
+    /// See [DescriptorFlagFields] for field details.
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub struct DmaDescriptorFlags(u32);
 
     u16;
 
-    /// Specifies the size of the buffer that this descriptor points to.
-    pub size, set_size: 11, 0;
+    _size, _set_size: 11, 0;
+    _length, _set_length: 23, 12;
+    _suc_eof, _set_suc_eof: 30;
+    _owner, _set_owner: 31;
+}
 
-    /// Specifies the number of valid bytes in the buffer that this descriptor points to.
-    ///
-    /// This field in a transmit descriptor is written by software and indicates how many bytes can
-    /// be read from the buffer.
-    ///
-    /// This field in a receive descriptor is written by hardware automatically and indicates how
-    /// many valid bytes have been stored into the buffer.
-    pub length, set_length: 23, 12;
+impl DescriptorFlagFields for DmaDescriptorFlags {
+    fn size(&self) -> usize {
+        self._size() as usize
+    }
 
-    /// For receive descriptors, software needs to clear this bit to 0, and hardware will set it to 1 after receiving
-    /// data containing the EOF flag.
-    /// For transmit descriptors, software needs to set this bit to 1 as needed.
-    /// If software configures this bit to 1 in a descriptor, the DMA will include the EOF flag in the data sent to
-    /// the corresponding peripheral, indicating to the peripheral that this data segment marks the end of one
-    /// transfer phase.
-    pub suc_eof, set_suc_eof: 30;
+    fn set_size(&mut self, size: usize) {
+        self._set_size(size as u16);
+    }
 
-    /// Specifies who is allowed to access the buffer that this descriptor points to.
-    /// - 0: CPU can access the buffer;
-    /// - 1: The GDMA controller can access the buffer.
-    pub owner, set_owner: 31;
+    fn len(&self) -> usize {
+        self._length() as usize
+    }
+
+    fn set_len(&mut self, length: usize) {
+        self._set_length(length as u16);
+    }
+
+    fn suc_eof(&self) -> bool {
+        self._suc_eof()
+    }
+
+    fn set_suc_eof(&mut self, suc_eof: bool) {
+        self._set_suc_eof(suc_eof);
+    }
+
+    fn owner(&self) -> Owner {
+        self._owner().into()
+    }
+
+    fn set_owner(&mut self, owner: Owner) {
+        self._set_owner(owner.into());
+    }
 }
 
 impl Debug for DmaDescriptorFlags {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("DmaDescriptorFlags")
             .field("size", &self.size())
-            .field("length", &self.length())
+            .field("length", &self.len())
             .field("suc_eof", &self.suc_eof())
-            .field("owner", &(if self.owner() { "DMA" } else { "CPU" }))
+            .field("owner", &self.owner().to_str())
             .finish()
     }
 }
@@ -263,20 +279,23 @@ impl defmt::Format for DmaDescriptorFlags {
             fmt,
             "DmaDescriptorFlags {{ size: {}, length: {}, suc_eof: {}, owner: {} }}",
             self.size(),
-            self.length(),
+            self.len(),
             self.suc_eof(),
-            if self.owner() { "DMA" } else { "CPU" }
+            self.owner().to_str(),
         );
     }
 }
+
+/// Convenience alias for the DMA descriptor used with the general DMA controller.
+pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
 
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
-pub struct DmaDescriptor {
+pub struct DmaDescriptorGeneric<FLAGS: DescriptorFlagFields> {
     /// Descriptor flags.
-    pub flags: DmaDescriptorFlags,
+    pub flags: FLAGS,
 
     /// Address of the buffer.
     pub buffer: *mut u8,
@@ -287,13 +306,11 @@ pub struct DmaDescriptor {
     pub next: *mut DmaDescriptor,
 }
 
-impl DmaDescriptor {
-    /// An empty DMA descriptor used to initialize the descriptor list.
-    pub const EMPTY: Self = Self {
-        flags: DmaDescriptorFlags(0),
-        buffer: core::ptr::null_mut(),
-        next: core::ptr::null_mut(),
-    };
+impl<FLAGS: DescriptorFlagFields> DmaDescriptorGeneric<FLAGS> {
+    const _SIZE_CHECK: () = core::assert!(
+        core::mem::size_of::<FLAGS>() == core::mem::size_of::<u32>(),
+        "descriptor flags must be the same size as `u32`"
+    );
 
     /// Resets the descriptor for a new receive transfer.
     pub fn reset_for_rx(&mut self) {
@@ -306,7 +323,7 @@ impl DmaDescriptor {
 
         // Clear this to allow hardware to set it when it's
         // done receiving data for this descriptor.
-        self.set_length(0);
+        self.set_len(0);
     }
 
     /// Resets the descriptor for a new transmit transfer. See
@@ -320,49 +337,49 @@ impl DmaDescriptor {
         // hardware should trigger an interrupt request.
         self.set_suc_eof(set_eof);
     }
+}
 
-    /// Set the size of the buffer. See [DmaDescriptorFlags::size].
-    pub fn set_size(&mut self, len: usize) {
-        self.flags.set_size(len as u16)
+impl<FLAGS: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptorGeneric<FLAGS> {
+    fn size(&self) -> usize {
+        self.flags.size()
     }
 
-    /// Set the length of the descriptor. See [DmaDescriptorFlags::length].
-    pub fn set_length(&mut self, len: usize) {
-        self.flags.set_length(len as u16)
+    fn set_size(&mut self, size: usize) {
+        self.flags.set_size(size);
     }
 
-    /// Returns the size of the buffer. See [DmaDescriptorFlags::size].
-    pub fn size(&self) -> usize {
-        self.flags.size() as usize
+    fn len(&self) -> usize {
+        self.flags.len()
     }
 
-    /// Returns the length of the descriptor. See [DmaDescriptorFlags::length].
-    #[allow(clippy::len_without_is_empty)]
-    pub fn len(&self) -> usize {
-        self.flags.length() as usize
+    fn set_len(&mut self, length: usize) {
+        self.flags.set_len(length);
     }
 
-    /// Set the suc_eof bit. See [DmaDescriptorFlags::suc_eof].
-    pub fn set_suc_eof(&mut self, suc_eof: bool) {
-        self.flags.set_suc_eof(suc_eof)
+    fn suc_eof(&self) -> bool {
+        self.flags.suc_eof()
     }
 
-    /// Set the owner. See [DmaDescriptorFlags::owner].
-    pub fn set_owner(&mut self, owner: Owner) {
-        let owner = match owner {
-            Owner::Cpu => false,
-            Owner::Dma => true,
-        };
-        self.flags.set_owner(owner)
+    fn set_suc_eof(&mut self, suc_eof: bool) {
+        self.flags.set_suc_eof(suc_eof);
     }
 
-    /// Returns the owner. See [DmaDescriptorFlags::owner].
-    pub fn owner(&self) -> Owner {
-        match self.flags.owner() {
-            false => Owner::Cpu,
-            true => Owner::Dma,
-        }
+    fn owner(&self) -> Owner {
+        self.flags.owner()
     }
+
+    fn set_owner(&mut self, owner: Owner) {
+        self.flags.set_owner(owner);
+    }
+}
+
+impl DmaDescriptor {
+    /// An empty DMA descriptor used to initialize the descriptor list.
+    pub const EMPTY: Self = Self {
+        flags: DmaDescriptorFlags(0),
+        buffer: core::ptr::null_mut(),
+        next: core::ptr::null_mut(),
+    };
 }
 
 // The pointers in the descriptor can be Sent.
@@ -371,12 +388,15 @@ impl DmaDescriptor {
 unsafe impl Send for DmaDescriptor {}
 
 mod buffers;
+mod flags;
 #[cfg(gdma)]
 mod gdma;
 #[cfg(any(gdma, esp32s2))]
 mod m2m;
 #[cfg(pdma)]
 mod pdma;
+
+pub use flags::DescriptorFlagFields;
 
 /// Kinds of interrupt to listen to.
 #[derive(Debug, EnumSetType)]
@@ -921,12 +941,36 @@ pub enum DmaPeripheral {
 }
 
 /// The owner bit of a DMA descriptor.
-#[derive(PartialEq, PartialOrd)]
+///
+/// - 0: CPU can access the buffer;
+/// - 1: The DMA controller can access the buffer.
+#[derive(Clone, Copy, PartialEq, PartialOrd)]
 pub enum Owner {
     /// Owned by CPU
     Cpu = 0,
     /// Owned by DMA
     Dma = 1,
+}
+
+impl Owner {
+    /// Creates a new [Owner].
+    pub const fn new() -> Self {
+        Self::Cpu
+    }
+
+    /// Converts the [Owner] into a string.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::Cpu => "CPU",
+            Self::Dma => "DMA",
+        }
+    }
+}
+
+impl From<Owner> for &'static str {
+    fn from(val: Owner) -> Self {
+        val.to_str()
+    }
 }
 
 impl From<u32> for Owner {
@@ -935,6 +979,30 @@ impl From<u32> for Owner {
             0 => Owner::Cpu,
             _ => Owner::Dma,
         }
+    }
+}
+
+impl From<bool> for Owner {
+    fn from(value: bool) -> Self {
+        match value {
+            false => Self::Cpu,
+            true => Self::Dma,
+        }
+    }
+}
+
+impl From<Owner> for bool {
+    fn from(value: Owner) -> Self {
+        match value {
+            Owner::Cpu => false,
+            Owner::Dma => true,
+        }
+    }
+}
+
+impl Default for Owner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -1011,7 +1079,7 @@ impl DescriptorChain {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
             // the end of the transfer.
             desc.reset_for_tx(desc.next.is_null() || is_circular);
-            desc.set_length(chunk_size); // align to 32 bits?
+            desc.set_len(chunk_size); // align to 32 bits?
         })
     }
 
@@ -1178,7 +1246,7 @@ impl<'a> DescriptorSet<'a> {
     /// See [`Self::set_up_descriptors`] for more details.
     fn set_tx_length(&mut self, len: usize, chunk_size: usize) -> Result<(), DmaBufError> {
         self.set_length(len, chunk_size, |desc, chunk_size| {
-            desc.set_length(chunk_size);
+            desc.set_len(chunk_size);
         })
     }
 
@@ -1537,7 +1605,7 @@ impl RxCircularState {
 
                 descr.set_owner(Owner::Dma);
                 descr.set_suc_eof(false);
-                descr.set_length(0);
+                descr.set_len(0);
                 descr_ptr.write_volatile(descr);
 
                 remaining_buffer = &mut remaining_buffer[count..];
