@@ -605,7 +605,7 @@ impl Config {
             }
         }
 
-        generate_for_each_macro("peripheral", &all_peripherals)
+        generate_for_each_macro("peripheral", &[("all", &all_peripherals)])
     }
 
     pub fn active_cfgs(&self) -> Vec<String> {
@@ -632,8 +632,15 @@ impl Config {
     }
 }
 
-fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream {
+type Branch<'a> = (&'a str, &'a [TokenStream]);
+
+fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
     let macro_name = format_ident!("for_each_{name}");
+
+    let flat_branches = branches.iter().flat_map(|b| b.1.iter());
+    let repeat_names = branches.iter().map(|b| TokenStream::from_str(b.0).unwrap());
+    let repeat_branches = branches.iter().map(|b| b.1);
+
     quote! {
         // This macro is called in esp-hal to implement a driver's
         // Instance trait for available peripherals. It works by defining, then calling an inner
@@ -658,7 +665,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
                 //     }
                 // }
                 // ```
-                #(_for_each_inner!(( #branches ));)*
+                #(_for_each_inner!(( #flat_branches ));)*
 
                 // Generate a single macro call with all branches.
                 // Usage:
@@ -669,7 +676,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
                 //     }
                 // }
                 // ```
-                _for_each_inner!((all #((#branches)),*));
+                #( _for_each_inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }

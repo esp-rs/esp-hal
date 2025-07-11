@@ -482,9 +482,9 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         })
     }
 
-    let for_each_gpio = generate_for_each_macro("gpio", &branches);
-    let for_each_analog = generate_for_each_macro("analog_function", &analog_functions);
-    let for_each_lp = generate_for_each_macro("lp_function", &lp_functions);
+    let for_each_gpio = generate_for_each_macro("gpio", &[("all", &branches)]);
+    let for_each_analog = generate_for_each_macro("analog_function", &[("all", &analog_functions)]);
+    let for_each_lp = generate_for_each_macro("lp_function", &[("all", &lp_functions)]);
     let input_signals = render_signals("InputSignal", &gpio.pins_and_signals.input_signals);
     let output_signals = render_signals("OutputSignal", &gpio.pins_and_signals.output_signals);
 
