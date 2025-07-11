@@ -53,9 +53,9 @@
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports:
-//! - Single transfers (not segmented transfers)
-//! - Full duplex, single bit (not dual or quad SPI)
-//! - DMA mode (not CPU mode).
+//!     - Single transfers (not segmented transfers)
+//!     - Full duplex, single bit (not dual or quad SPI)
+//!     - DMA mode (not CPU mode).
 #![cfg_attr(esp32, doc = "- ESP32 only supports SPI mode 1 and 3.\n\n")]
 //! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
