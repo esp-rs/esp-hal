@@ -2132,32 +2132,59 @@ impl Pin for AnyPin<'_> {
         &self,
         private: private::Internal,
     ) -> &'static [(AlternateFunction, OutputSignal)] {
-        impl_for_pin_type!((self, target, Output) => {
-            Pin::output_signals(&target, private)
-        } else {
-            panic!("Pin is not an OutputPin")
-        })
+        for_each_gpio! {
+            (all $( ($n:literal, $gpio:ident $in_afs:tt $out_afs:tt ($input:tt [$($is_output:ident)?]) ) ),* ) => {
+                match self.number() {
+                    $($(
+                        $n => {
+                            crate::ignore!($is_output);
+                            let inner = unsafe { crate::peripherals::$gpio::steal() };
+                            return Pin::output_signals(&inner, private);
+                        }
+                    )?)*
+                    other => panic!("Pin {} is not an OutputPin", other)
+                }
+            };
+        }
     }
 
     fn input_signals(
         &self,
         private: private::Internal,
     ) -> &'static [(AlternateFunction, InputSignal)] {
-        impl_for_pin_type!((self, target, Input) => {
-            Pin::input_signals(&target, private)
-        } else {
-            panic!("Pin is not an InputPin")
-        })
+        for_each_gpio! {
+            (all $( ($n:literal, $gpio:ident $in_afs:tt $out_afs:tt ([$($is_input:ident)?] $output:tt) ) ),* ) => {
+                match self.number() {
+                    $($(
+                        $n => {
+                            crate::ignore!($is_input);
+                            let inner = unsafe { crate::peripherals::$gpio::steal() };
+                            return Pin::input_signals(&inner, private);
+                        }
+                    )?)*
+                    other => panic!("Pin {} is not an InputPin", other)
+                }
+            };
+        }
     }
 }
 
 impl InputPin for AnyPin<'_> {
     fn waker(&self) -> &'static AtomicWaker {
-        impl_for_pin_type!((self, target, Input) => {
-            InputPin::waker(&target)
-        } else {
-            panic!("Pin is not an InputPin")
-        })
+        for_each_gpio! {
+            (all $( ($n:literal, $gpio:ident $in_afs:tt $out_afs:tt ([$($is_input:ident)?] $output:tt) ) ),* ) => {
+                match self.number() {
+                    $($(
+                        $n => {
+                            crate::ignore!($is_input);
+                            let inner = unsafe { crate::peripherals::$gpio::steal() };
+                            return InputPin::waker(&inner);
+                        }
+                    )?)*
+                    other => panic!("Pin {} is not an InputPin", other)
+                }
+            };
+        }
     }
 }
 impl OutputPin for AnyPin<'_> {}

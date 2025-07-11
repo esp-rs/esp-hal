@@ -481,48 +481,48 @@ macro_rules! for_each_gpio {
         () ([Input] [Output]))); _for_each_inner!((27, GPIO27(_5 => EMAC_RX_DV) ()
         ([Input] [Output]))); _for_each_inner!((32, GPIO32() () ([Input] [Output])));
         _for_each_inner!((33, GPIO33() () ([Input] [Output]))); _for_each_inner!((34,
-        GPIO34() () ([Input]))); _for_each_inner!((35, GPIO35() () ([Input])));
-        _for_each_inner!((36, GPIO36() () ([Input]))); _for_each_inner!((37, GPIO37() ()
-        ([Input]))); _for_each_inner!((38, GPIO38() () ([Input]))); _for_each_inner!((39,
-        GPIO39() () ([Input]))); _for_each_inner!((all(0, GPIO0(_5 => EMAC_TX_CLK) (_1 =>
-        CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output])), (1, GPIO1(_5 => EMAC_RXD2) (_0
-        => U0TXD _1 => CLK_OUT3) ([Input] [Output])), (2, GPIO2(_1 => HSPIWP _3 =>
-        HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) ([Input]
-        [Output])), (3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2) ([Input] [Output])), (4,
-        GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD
-        _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER) ([Input] [Output])), (5,
-        GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 => EMAC_RX_CLK) (_1 => VSPICS0 _3 =>
-        HS1_DATA6) ([Input] [Output])), (6, GPIO6(_1 => SPICLK _4 => U1CTS) (_0 => SD_CLK
-        _1 => SPICLK _3 => HS1_CLK) ([Input] [Output])), (7, GPIO7(_0 => SD_DATA0 _1 =>
-        SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0 _4 => U2RTS)
-        ([Input] [Output])), (8, GPIO8(_0 => SD_DATA1 _1 => SPID _3 => HS1_DATA1 _4 =>
-        U2CTS) (_0 => SD_DATA1 _1 => SPID _3 => HS1_DATA1) ([Input] [Output])), (9,
-        GPIO9(_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0 => SD_DATA2 _1
-        => SPIHD _3 => HS1_DATA2) ([Input] [Output])), (10, GPIO10(_0 => SD_DATA3 _1 =>
-        SPIWP _3 => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3 _4 => U1TXD)
-        ([Input] [Output])), (11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 => SD_CMD _1 =>
-        SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])), (12, GPIO12(_0 => MTDI _1
-        => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 =>
-        SD_DATA2 _5 => EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 => MTCK _1 => HSPID
-        _3 => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4
-        => SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0 => MTMS _1 =>
-        HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2) ([Input]
-        [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 => EMAC_RXD3) (_0 => MTDO
-        _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input] [Output])), (16, GPIO16(_3 =>
-        HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input] [Output])),
-        (17, GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 => EMAC_CLK_180)
-        ([Input] [Output])), (18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1 => VSPICLK _3
-        => HS1_DATA7) ([Input] [Output])), (19, GPIO19(_1 => VSPIQ _3 => U0CTS) (_1 =>
-        VSPIQ _5 => EMAC_TXD0) ([Input] [Output])), (20, GPIO20() () ([Input] [Output])),
-        (21, GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN) ([Input] [Output])),
-        (22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 => EMAC_TXD1) ([Input]
-        [Output])), (23, GPIO23(_1 => VSPID) (_1 => VSPID _3 => HS1_STROBE) ([Input]
-        [Output])), (25, GPIO25(_5 => EMAC_RXD0) () ([Input] [Output])), (26, GPIO26(_5
-        => EMAC_RXD1) () ([Input] [Output])), (27, GPIO27(_5 => EMAC_RX_DV) () ([Input]
-        [Output])), (32, GPIO32() () ([Input] [Output])), (33, GPIO33() () ([Input]
-        [Output])), (34, GPIO34() () ([Input])), (35, GPIO35() () ([Input])), (36,
-        GPIO36() () ([Input])), (37, GPIO37() () ([Input])), (38, GPIO38() () ([Input])),
-        (39, GPIO39() () ([Input]))));
+        GPIO34() () ([Input] []))); _for_each_inner!((35, GPIO35() () ([Input] [])));
+        _for_each_inner!((36, GPIO36() () ([Input] []))); _for_each_inner!((37, GPIO37()
+        () ([Input] []))); _for_each_inner!((38, GPIO38() () ([Input] [])));
+        _for_each_inner!((39, GPIO39() () ([Input] []))); _for_each_inner!((all(0,
+        GPIO0(_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output])),
+        (1, GPIO1(_5 => EMAC_RXD2) (_0 => U0TXD _1 => CLK_OUT3) ([Input] [Output])), (2,
+        GPIO2(_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0
+        _4 => SD_DATA0) ([Input] [Output])), (3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2)
+        ([Input] [Output])), (4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 =>
+        EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER)
+        ([Input] [Output])), (5, GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 => EMAC_RX_CLK)
+        (_1 => VSPICS0 _3 => HS1_DATA6) ([Input] [Output])), (6, GPIO6(_1 => SPICLK _4 =>
+        U1CTS) (_0 => SD_CLK _1 => SPICLK _3 => HS1_CLK) ([Input] [Output])), (7,
+        GPIO7(_0 => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 =>
+        HS1_DATA0 _4 => U2RTS) ([Input] [Output])), (8, GPIO8(_0 => SD_DATA1 _1 => SPID
+        _3 => HS1_DATA1 _4 => U2CTS) (_0 => SD_DATA1 _1 => SPID _3 => HS1_DATA1) ([Input]
+        [Output])), (9, GPIO9(_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0
+        => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2) ([Input] [Output])), (10, GPIO10(_0 =>
+        SD_DATA3 _1 => SPIWP _3 => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3
+        _4 => U1TXD) ([Input] [Output])), (11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 =>
+        SD_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])), (12,
+        GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2) (_1 => HSPIQ _3 =>
+        HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 =>
+        MTCK _1 => HSPID _3 => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3
+        => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0
+        => MTMS _1 => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2)
+        ([Input] [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 => EMAC_RXD3) (_0
+        => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input] [Output])), (16,
+        GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input]
+        [Output])), (17, GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 =>
+        EMAC_CLK_180) ([Input] [Output])), (18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1
+        => VSPICLK _3 => HS1_DATA7) ([Input] [Output])), (19, GPIO19(_1 => VSPIQ _3 =>
+        U0CTS) (_1 => VSPIQ _5 => EMAC_TXD0) ([Input] [Output])), (20, GPIO20() ()
+        ([Input] [Output])), (21, GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN)
+        ([Input] [Output])), (22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 =>
+        EMAC_TXD1) ([Input] [Output])), (23, GPIO23(_1 => VSPID) (_1 => VSPID _3 =>
+        HS1_STROBE) ([Input] [Output])), (25, GPIO25(_5 => EMAC_RXD0) () ([Input]
+        [Output])), (26, GPIO26(_5 => EMAC_RXD1) () ([Input] [Output])), (27, GPIO27(_5
+        => EMAC_RX_DV) () ([Input] [Output])), (32, GPIO32() () ([Input] [Output])), (33,
+        GPIO33() () ([Input] [Output])), (34, GPIO34() () ([Input] [])), (35, GPIO35() ()
+        ([Input] [])), (36, GPIO36() () ([Input] [])), (37, GPIO37() () ([Input] [])),
+        (38, GPIO38() () ([Input] [])), (39, GPIO39() () ([Input] []))));
     };
 }
 /// This macro can be used to generate code for each analog function of each GPIO.
@@ -894,159 +894,41 @@ macro_rules! if_pin_is_type {
     ((GPIO34, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
+    ((GPIO34,) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
     ((GPIO35, Input) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
+    ((GPIO35,) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     ((GPIO36, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
+    ((GPIO36,) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
     ((GPIO37, Input) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
+    ((GPIO37,) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     ((GPIO38, Input) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
+    ((GPIO38,) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
     ((GPIO39, Input) => $then_tt:tt else $else_tt:tt) => {
+        $then_tt
+    };
+    ((GPIO39,) => $then_tt:tt else $else_tt:tt) => {
         $then_tt
     };
     (($other:ident, $t:tt) => $then_tt:tt else $else_tt:tt) => {
         $else_tt
-    };
-}
-/// Dispatch `AnyPin` methods to the underlying GPIO types, if they have the given attribute.
-///
-/// The attribute can be `Input` or `Output`.
-///
-/// ```rust,ignore
-/// impl AnyPin<'_> {
-///     fn output_signals(
-///         &self,
-///         private: private::Internal,
-///     ) -> &'static [(AlternateFunction, OutputSignal)] {
-///         impl_for_pin_type!((self, target, Output) => {
-///             Pin::output_signals(&target, private)
-///         } else {
-///             panic!("Pin is not an output")
-///         });
-///     }
-/// }
-/// ```
-///
-/// The first two arguments are the identifier of the AnyPin, and the identifier that can be used in
-/// the generated code block, respectively.
-#[macro_export]
-#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-#[expect(clippy::crate_in_macro_def)]
-macro_rules! impl_for_pin_type {
-    (
-        ($any_pin:ident, $inner_ident:ident, $on_type:tt) => $code:tt else $otherwise:tt
-    ) => {
-        match $any_pin .number() { 0 => if_pin_is_type!((GPIO0, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO0::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 1 => if_pin_is_type!((GPIO1, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO1::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 2 => if_pin_is_type!((GPIO2, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO2::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 3 => if_pin_is_type!((GPIO3, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO3::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 4 => if_pin_is_type!((GPIO4, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO4::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 5 => if_pin_is_type!((GPIO5, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO5::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 6 => if_pin_is_type!((GPIO6, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO6::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 7 => if_pin_is_type!((GPIO7, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO7::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 8 => if_pin_is_type!((GPIO8, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO8::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 9 => if_pin_is_type!((GPIO9, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO9::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 10 => if_pin_is_type!((GPIO10, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO10::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 11 => if_pin_is_type!((GPIO11, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO11::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 12 => if_pin_is_type!((GPIO12, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO12::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 13 => if_pin_is_type!((GPIO13, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO13::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 14 => if_pin_is_type!((GPIO14, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO14::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 15 => if_pin_is_type!((GPIO15, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO15::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 16 => if_pin_is_type!((GPIO16, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO16::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 17 => if_pin_is_type!((GPIO17, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO17::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 18 => if_pin_is_type!((GPIO18, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO18::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 19 => if_pin_is_type!((GPIO19, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO19::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 20 => if_pin_is_type!((GPIO20, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO20::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 21 => if_pin_is_type!((GPIO21, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO21::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 22 => if_pin_is_type!((GPIO22, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO22::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 23 => if_pin_is_type!((GPIO23, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO23::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 25 => if_pin_is_type!((GPIO25, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO25::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 26 => if_pin_is_type!((GPIO26, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO26::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 27 => if_pin_is_type!((GPIO27, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO27::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 32 => if_pin_is_type!((GPIO32, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO32::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 33 => if_pin_is_type!((GPIO33, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO33::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 34 => if_pin_is_type!((GPIO34, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO34::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 35 => if_pin_is_type!((GPIO35, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO35::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 36 => if_pin_is_type!((GPIO36, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO36::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 37 => if_pin_is_type!((GPIO37, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO37::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 38 => if_pin_is_type!((GPIO38, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO38::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), 39 => if_pin_is_type!((GPIO39, $on_type) => { {
-        #[allow(unused_unsafe, unused_mut)] let mut $inner_ident = unsafe { crate
-        ::peripherals::GPIO39::steal() }; #[allow(unused_braces)] $code } } else {
-        $otherwise }), _ => $otherwise, }
     };
 }
 /// Defines the `InputSignal` and `OutputSignal` enums.

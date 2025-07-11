@@ -226,7 +226,7 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         .map(|pin| {
             // Input must come first
             if pin.input_only {
-                vec![quote! { Input }]
+                vec![quote! { Input }, quote! {}]
             } else {
                 vec![quote! { Input }, quote! { Output }]
             }
@@ -447,62 +447,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         }
     };
 
-    // Delegates AnyPin functions to GPIOn functions when the pin implements a
-    // certain attribute.
-    //
-    // In essence this expands to (in case of attr = Analog):
-    // `if typeof(anypin's current value) == Analog { call $code } else { panic }`
-    let impl_for_pin_type = {
-        let mut impl_branches = vec![];
-        for (gpionum, peri) in pin_numbers.iter().zip(pin_peris.iter()) {
-            impl_branches.push(quote! {
-                #gpionum => if_pin_is_type!((#peri, $on_type) => {{
-                    #[allow(unused_unsafe, unused_mut)]
-                    let mut $inner_ident = unsafe { crate::peripherals::#peri::steal() };
-                    #[allow(unused_braces)]
-                    $code
-                }} else {
-                    $otherwise
-                }),
-            });
-        }
-
-        quote! {
-            /// Dispatch `AnyPin` methods to the underlying GPIO types, if they have the given attribute.
-            ///
-            /// The attribute can be `Input` or `Output`.
-            ///
-            /// ```rust,ignore
-            /// impl AnyPin<'_> {
-            ///     fn output_signals(
-            ///         &self,
-            ///         private: private::Internal,
-            ///     ) -> &'static [(AlternateFunction, OutputSignal)] {
-            ///         impl_for_pin_type!((self, target, Output) => {
-            ///             Pin::output_signals(&target, private)
-            ///         } else {
-            ///             panic!("Pin is not an output")
-            ///         });
-            ///     }
-            /// }
-            /// ```
-            ///
-            /// The first two arguments are the identifier of the AnyPin, and the identifier that can be used in the
-            /// generated code block, respectively.
-            #[macro_export]
-            #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
-            #[expect(clippy::crate_in_macro_def)]
-            macro_rules! impl_for_pin_type {
-                (($any_pin:ident, $inner_ident:ident, $on_type:tt) => $code:tt else $otherwise:tt) => {
-                    match $any_pin.number() {
-                        #(#impl_branches)*
-                        _ => $otherwise,
-                    }
-                };
-            }
-        }
-    };
-
     let mut branches = vec![];
     for (((n, p), af), attrs) in pin_numbers
         .iter()
@@ -593,7 +537,6 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
         #for_each_lp
 
         #if_pin_is_type
-        #impl_for_pin_type
 
         /// Defines the `InputSignal` and `OutputSignal` enums.
         ///
