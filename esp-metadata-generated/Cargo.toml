@@ -4,7 +4,7 @@ version       = "0.0.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Generated metadata for Espressif devices"
-documentation = "https://docs.espressif.com/projects/rust/esp-metadata/latest/"
+documentation = "https://docs.espressif.com/projects/rust/esp-metadata-generated/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
