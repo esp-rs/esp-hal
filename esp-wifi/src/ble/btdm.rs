@@ -1,6 +1,6 @@
-use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
+use allocator_api2::boxed::Box;
 use esp_wifi_sys::c_types::{c_char, c_void};
 use portable_atomic::{AtomicBool, Ordering};
 
