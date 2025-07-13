@@ -2,13 +2,16 @@
 
 use core::fmt::Debug;
 
-use crate::dma::{DescriptorFlagFields, DmaDescriptorGeneric, Owner, PreparationGeneric};
+use crate::dma::{DmaLoopBufGeneric, DescriptorFlagFields, DmaDescriptorGeneric, Owner, PreparationGeneric};
 
 /// Convenience alias for the DMA descriptor used with the SDIO dedicated DMA controller.
 pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
 
 /// Convenience alias for SDIO dedicated DMA preparation.
 pub type Preparation = PreparationGeneric<DmaDescriptorFlags>;
+
+/// Convenience alias for SDIO dedicated DMA loop buffer.
+pub type DmaLoopBuf = DmaLoopBufGeneric<DmaDescriptorFlags>;
 
 bitfield::bitfield! {
     /// DMA descriptor flags for the dedicated SDIO DMA engine.
