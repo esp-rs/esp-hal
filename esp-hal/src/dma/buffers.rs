@@ -1469,6 +1469,9 @@ unsafe impl DmaRxBuffer for EmptyBuf {
     }
 }
 
+/// Convenience alias for general DMA loop buffer.
+pub type DmaLoopBuf = DmaLoopBufGeneric<DmaDescriptorFlags>;
+
 /// DMA Loop Buffer
 ///
 /// This consists of a single descriptor that points to itself and points to a
@@ -1479,17 +1482,17 @@ unsafe impl DmaRxBuffer for EmptyBuf {
 /// than this, the DMA channel will spend more time reading the descriptor than
 /// it does reading the buffer, which may leave it unable to keep up with the
 /// bandwidth requirements of some peripherals at high frequencies.
-pub struct DmaLoopBuf {
-    descriptor: &'static mut DmaDescriptor,
+pub struct DmaLoopBufGeneric<Flag: DescriptorFlagFields + 'static> {
+    descriptor: &'static mut DmaDescriptorGeneric<Flag>,
     buffer: &'static mut [u8],
 }
 
-impl DmaLoopBuf {
+impl<Flag: DescriptorFlagFields + 'static> DmaLoopBufGeneric<Flag> {
     /// Create a new [DmaLoopBuf].
     pub fn new(
-        descriptor: &'static mut DmaDescriptor,
+        descriptor: &'static mut DmaDescriptorGeneric<Flag>,
         buffer: &'static mut [u8],
-    ) -> Result<DmaLoopBuf, DmaBufError> {
+    ) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(buffer) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
@@ -1513,11 +1516,12 @@ impl DmaLoopBuf {
     }
 
     /// Consume the buf, returning the descriptor and buffer.
-    pub fn split(self) -> (&'static mut DmaDescriptor, &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut DmaDescriptorGeneric<Flag>, &'static mut [u8]) {
         (self.descriptor, self.buffer)
     }
 }
 
+// TODO: make this generic after DmaTxBuffer is generic
 unsafe impl DmaTxBuffer for DmaLoopBuf {
     type View = Self;
 
@@ -1545,7 +1549,7 @@ unsafe impl DmaTxBuffer for DmaLoopBuf {
     }
 }
 
-impl Deref for DmaLoopBuf {
+impl<Flag: DescriptorFlagFields> Deref for DmaLoopBufGeneric<Flag> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -1553,7 +1557,7 @@ impl Deref for DmaLoopBuf {
     }
 }
 
-impl DerefMut for DmaLoopBuf {
+impl<Flag: DescriptorFlagFields> DerefMut for DmaLoopBufGeneric<Flag> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.buffer
     }
