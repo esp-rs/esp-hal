@@ -1091,6 +1091,9 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
     }
 }
 
+/// Convenience alias for general DMA RX stream buffer.
+pub type DmaRxStreamBuf = DmaRxStreamBufGeneric<DmaDescriptorFlags>;
+
 /// DMA Streaming Receive Buffer.
 ///
 /// This is a contiguous buffer linked together by DMA descriptors, and the
@@ -1131,17 +1134,17 @@ unsafe impl DmaRxBuffer for DmaRxTxBuf {
 ///
 /// See [DmaRxStreamBufView] for APIs available whilst a transfer is in
 /// progress.
-pub struct DmaRxStreamBuf {
-    descriptors: &'static mut [DmaDescriptor],
+pub struct DmaRxStreamBufGeneric<Flag: DescriptorFlagFields + 'static> {
+    descriptors: &'static mut [DmaDescriptorGeneric<Flag>],
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl DmaRxStreamBuf {
+impl<Flag: DescriptorFlagFields + 'static> DmaRxStreamBufGeneric<Flag> {
     /// Creates a new [DmaRxStreamBuf] evenly distributing the buffer between
     /// the provided descriptors.
     pub fn new(
-        descriptors: &'static mut [DmaDescriptor],
+        descriptors: &'static mut [DmaDescriptorGeneric<Flag>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(descriptors) {
@@ -1191,11 +1194,12 @@ impl DmaRxStreamBuf {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut [DmaDescriptorGeneric<Flag>], &'static mut [u8]) {
         (self.descriptors, self.buffer)
     }
 }
 
+// TODO: make generic after making DmaRxBuffer generic
 unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     type View = DmaRxStreamBufView;
 
@@ -1433,7 +1437,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
         }
     }
 
-    fn into_view(self) -> EmptyBuf {
+    fn into_view(self) -> Self {
         self
     }
 
