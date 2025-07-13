@@ -351,12 +351,15 @@ pub enum TransferDirection {
     Out,
 }
 
+/// Convenience alias for general DMA preparation.
+pub type Preparation = PreparationGeneric<DmaDescriptorFlags>;
+
 /// Holds all the information needed to configure a DMA channel for a transfer.
 #[derive(PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Preparation {
+pub struct PreparationGeneric<Flag: DescriptorFlagFields> {
     /// The descriptor the DMA will start from.
-    pub start: *mut DmaDescriptor,
+    pub start: *mut DmaDescriptorGeneric<Flag>,
 
     /// The direction of the DMA transfer.
     pub direction: TransferDirection,
