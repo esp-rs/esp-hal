@@ -2,6 +2,9 @@ use super::Owner;
 
 /// Represents operations to get bitfields of DMA descriptor flags.
 pub trait DescriptorFlagFields {
+    /// Creates an empty descriptor flag.
+    fn empty() -> Self;
+
     /// Gets the specified size of the descriptor buffer.
     fn size(&self) -> usize;
 
