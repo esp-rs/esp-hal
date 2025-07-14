@@ -3,6 +3,7 @@
 use core::fmt::Debug;
 
 use crate::dma::{
+    ChannelTxGeneric,
     DescriptorFlagFields,
     DescriptorSetGeneric,
     DmaDescriptorGeneric,
@@ -35,6 +36,9 @@ pub type DmaRxBuf = DmaRxBufGeneric<DmaDescriptorFlags>;
 
 /// Convenience alias for the SDIO dedicated DMA RX/TX buffer.
 pub type DmaRxTxBuf = DmaRxTxBufGeneric<DmaDescriptorFlags>;
+
+/// Convenience alias for the SDIO dedicated DMA transmit channel.
+pub type ChannelTx<Dm, CH> = ChannelTxGeneric<Dm, CH, DmaDescriptorFlags>;
 
 bitfield::bitfield! {
     /// DMA descriptor flags for the dedicated SDIO DMA engine.
