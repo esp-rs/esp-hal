@@ -204,7 +204,7 @@ impl<'d> Sdio<'d> {
         self.pac_init()?;
         self.pac_enable_hs()?;
         self.pac_set_timing()?;
-        self.pac_dev_interrupt_enable(0xffu8.into())
+        self.pac_dev_interrupt_enable(enumset::EnumSet::all())
     }
 
     /// Performs low-level initialization of the SDIO peripheral.
@@ -313,16 +313,27 @@ impl<'d> Sdio<'d> {
 
     /// Sets which device interrupts to enable based on the provided mask.
     #[cfg(esp32)]
-    fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
+    fn pac_dev_interrupt_enable(
+        &self,
+        mask: enumset::EnumSet<DeviceInterrupt>,
+    ) -> Result<(), Error> {
         self.slc_block()._0int_ena().modify(|_, w| {
-            w.frhost_bit0_int_ena().variant(mask.general0());
-            w.frhost_bit1_int_ena().variant(mask.general1());
-            w.frhost_bit2_int_ena().variant(mask.general2());
-            w.frhost_bit3_int_ena().variant(mask.general3());
-            w.frhost_bit4_int_ena().variant(mask.general4());
-            w.frhost_bit5_int_ena().variant(mask.general5());
-            w.frhost_bit6_int_ena().variant(mask.general6());
-            w.frhost_bit7_int_ena().variant(mask.general7())
+            w.frhost_bit0_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General0));
+            w.frhost_bit1_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General1));
+            w.frhost_bit2_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General2));
+            w.frhost_bit3_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General3));
+            w.frhost_bit4_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General4));
+            w.frhost_bit5_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General5));
+            w.frhost_bit6_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General6));
+            w.frhost_bit7_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General7))
         });
 
         Ok(())
@@ -330,16 +341,27 @@ impl<'d> Sdio<'d> {
 
     /// Sets which device interrupts to enable based on the provided mask.
     #[cfg(esp32c6)]
-    fn pac_dev_interrupt_enable(&self, mask: DeviceInterrupt) -> Result<(), Error> {
+    fn pac_dev_interrupt_enable(
+        &self,
+        mask: enumset::EnumSet<DeviceInterrupt>,
+    ) -> Result<(), Error> {
         self.slc_block().slc0int_ena().modify(|_, w| {
-            w.sdio_slc_frhost_bit0_int_ena().variant(mask.general0());
-            w.sdio_slc_frhost_bit1_int_ena().variant(mask.general1());
-            w.sdio_slc_frhost_bit2_int_ena().variant(mask.general2());
-            w.sdio_slc_frhost_bit3_int_ena().variant(mask.general3());
-            w.sdio_slc_frhost_bit4_int_ena().variant(mask.general4());
-            w.sdio_slc_frhost_bit5_int_ena().variant(mask.general5());
-            w.sdio_slc_frhost_bit6_int_ena().variant(mask.general6());
-            w.sdio_slc_frhost_bit7_int_ena().variant(mask.general7())
+            w.sdio_slc_frhost_bit0_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General0));
+            w.sdio_slc_frhost_bit1_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General1));
+            w.sdio_slc_frhost_bit2_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General2));
+            w.sdio_slc_frhost_bit3_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General3));
+            w.sdio_slc_frhost_bit4_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General4));
+            w.sdio_slc_frhost_bit5_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General5));
+            w.sdio_slc_frhost_bit6_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General6));
+            w.sdio_slc_frhost_bit7_int_ena()
+                .variant(mask.contains(DeviceInterrupt::General7))
         });
 
         Ok(())

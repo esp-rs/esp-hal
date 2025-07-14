@@ -3,38 +3,42 @@
 use core::fmt::Debug;
 
 use crate::dma::{
+    ChannelTx as ChannelTxType,
     DescriptorFlagFields,
-    DescriptorSetGeneric,
-    DmaDescriptorGeneric,
-    DmaLoopBufGeneric,
-    DmaRxBufGeneric,
-    DmaRxTxBufGeneric,
-    DmaTxBufGeneric,
+    DescriptorSet as DescriptorSetType,
+    DmaDescriptor as DmaDescriptorType,
+    DmaLoopBuf as DmaLoopBufType,
+    DmaRxBuf as DmaRxBufType,
+    DmaRxTxBuf as DmaRxTxBufType,
+    DmaTxBuf as DmaTxBufType,
     Owner,
-    PreparationGeneric,
+    Preparation as PreparationType,
 };
 
-/// Convenience alias for the DMA descriptor used with the SDIO dedicated DMA controller.
-pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
+/// Convenience alias for the SDIO dedicated DMA descriptor.
+pub type DmaDescriptor = DmaDescriptorType<DmaDescriptorFlags>;
 
 /// Convenience alias for SDIO dedicated DMA preparation.
-pub type Preparation = PreparationGeneric<DmaDescriptorFlags>;
+pub type Preparation = PreparationType<DmaDescriptorFlags>;
 
 /// Convenience alias for SDIO dedicated DMA loop buffer.
-pub type DmaLoopBuf = DmaLoopBufGeneric<DmaDescriptorFlags>;
+pub type DmaLoopBuf = DmaLoopBufType<DmaDescriptorFlags>;
 
 /// Convenience alias for the SDIO dedicated DMA descriptor set.
 #[allow(unused)]
-pub(crate) type DescriptorSet<'a> = DescriptorSetGeneric<'a, DmaDescriptorFlags>;
+pub(crate) type DescriptorSet<'a> = DescriptorSetType<'a, DmaDescriptorFlags>;
 
 /// Convenience alias for the SDIO dedicated DMA RX buffer.
-pub type DmaTxBuf = DmaTxBufGeneric<DmaDescriptorFlags>;
+pub type DmaTxBuf = DmaTxBufType<DmaDescriptorFlags>;
 
 /// Convenience alias for the SDIO dedicated DMA RX buffer.
-pub type DmaRxBuf = DmaRxBufGeneric<DmaDescriptorFlags>;
+pub type DmaRxBuf = DmaRxBufType<DmaDescriptorFlags>;
 
 /// Convenience alias for the SDIO dedicated DMA RX/TX buffer.
-pub type DmaRxTxBuf = DmaRxTxBufGeneric<DmaDescriptorFlags>;
+pub type DmaRxTxBuf = DmaRxTxBufType<DmaDescriptorFlags>;
+
+/// Convenience alias for the SDIO dedicated DMA transmit channel.
+pub type ChannelTx<Dm, CH> = ChannelTxType<Dm, CH, DmaDescriptorFlags>;
 
 bitfield::bitfield! {
     /// DMA descriptor flags for the dedicated SDIO DMA engine.
