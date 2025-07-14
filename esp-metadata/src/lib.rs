@@ -605,7 +605,7 @@ impl Config {
             }
         }
 
-        generate_for_each_macro("peripheral", &all_peripherals)
+        generate_for_each_macro("peripheral", &[("all", &all_peripherals)])
     }
 
     pub fn active_cfgs(&self) -> Vec<String> {
@@ -632,8 +632,15 @@ impl Config {
     }
 }
 
-fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream {
+type Branch<'a> = (&'a str, &'a [TokenStream]);
+
+fn generate_for_each_macro(name: &str, branches: &[Branch<'_>]) -> TokenStream {
     let macro_name = format_ident!("for_each_{name}");
+
+    let flat_branches = branches.iter().flat_map(|b| b.1.iter());
+    let repeat_names = branches.iter().map(|b| TokenStream::from_str(b.0).unwrap());
+    let repeat_branches = branches.iter().map(|b| b.1);
+
     quote! {
         // This macro is called in esp-hal to implement a driver's
         // Instance trait for available peripherals. It works by defining, then calling an inner
@@ -658,7 +665,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
                 //     }
                 // }
                 // ```
-                #(_for_each_inner!(( #branches ));)*
+                #(_for_each_inner!(( #flat_branches ));)*
 
                 // Generate a single macro call with all branches.
                 // Usage:
@@ -669,7 +676,7 @@ fn generate_for_each_macro(name: &str, branches: &[TokenStream]) -> TokenStream 
                 //     }
                 // }
                 // ```
-                _for_each_inner!((all #((#branches)),*));
+                #( _for_each_inner!( (#repeat_names #( (#repeat_branches) ),*) ); )*
             };
         }
     }
@@ -934,11 +941,11 @@ pub fn generate_lib_rs() -> TokenStream {
         //!
         //! With this option, all data is passed through the macro all at once. This form can be used to,
         //! for example, generate struct fields. If the macro has multiple individual matcher options,
-        //! the repeated matcher will contain each item's data multiple times, once for each available
-        //! syntax option. Currently, using the repeated matcher is not recommended for these macros.
+        //! there are separate repeated matchers for each of the options.
         //!
-        //! > This issue will be likely resolved by naming the different syntax options, and providing
-        //! > different match arms for each in place of `all`.
+        //! To use this option, start the match pattern with the name of the individual matcher option. When
+        //! there is only a single individual matcher option, its repeated matcher is named `all` unless
+        //! otherwise specified by the macro.
         //!
         //! ```rust,no_run
         //! // Example usage to create a struct containing all GPIOs:
