@@ -7,6 +7,8 @@ use crate::dma::{
     DescriptorSetGeneric,
     DmaDescriptorGeneric,
     DmaLoopBufGeneric,
+    DmaRxBufGeneric,
+    DmaTxBufGeneric,
     Owner,
     PreparationGeneric,
 };
@@ -20,9 +22,15 @@ pub type Preparation = PreparationGeneric<DmaDescriptorFlags>;
 /// Convenience alias for SDIO dedicated DMA loop buffer.
 pub type DmaLoopBuf = DmaLoopBufGeneric<DmaDescriptorFlags>;
 
-/// Convenience alias for the general DMA descriptor set.
+/// Convenience alias for the SDIO dedicated DMA descriptor set.
 #[allow(unused)]
 pub(crate) type DescriptorSet<'a> = DescriptorSetGeneric<'a, DmaDescriptorFlags>;
+
+/// Convenience alias for the SDIO dedicated DMA RX buffer.
+pub type DmaTxBuf = DmaTxBufGeneric<DmaDescriptorFlags>;
+
+/// Convenience alias for the SDIO dedicated DMA RX buffer.
+pub type DmaRxBuf = DmaRxBufGeneric<DmaDescriptorFlags>;
 
 bitfield::bitfield! {
     /// DMA descriptor flags for the dedicated SDIO DMA engine.
