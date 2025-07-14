@@ -296,16 +296,16 @@ impl defmt::Format for DmaDescriptorFlags {
     }
 }
 
-/// Convenience alias for the DMA descriptor used with the general DMA controller.
-pub type DmaDescriptor = DmaDescriptorGeneric<DmaDescriptorFlags>;
+///// Convenience alias for the DMA descriptor used with the general DMA controller.
+// pub type DmaDescriptor = DmaDescriptor<DmaDescriptorFlags>;
 
 /// A DMA transfer descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
-pub struct DmaDescriptorGeneric<FLAGS: DescriptorFlagFields> {
+pub struct DmaDescriptor<Flags: DescriptorFlagFields = DmaDescriptorFlags> {
     /// Descriptor flags.
-    pub flags: FLAGS,
+    pub flags: Flags,
 
     /// Address of the buffer.
     pub buffer: *mut u8,
@@ -316,9 +316,9 @@ pub struct DmaDescriptorGeneric<FLAGS: DescriptorFlagFields> {
     pub next: *mut Self,
 }
 
-impl<FLAGS: DescriptorFlagFields> DmaDescriptorGeneric<FLAGS> {
+impl<Flags: DescriptorFlagFields> DmaDescriptor<Flags> {
     const _SIZE_CHECK: () = core::assert!(
-        core::mem::size_of::<FLAGS>() == core::mem::size_of::<u32>(),
+        core::mem::size_of::<Flags>() == core::mem::size_of::<u32>(),
         "descriptor flags must be the same size as `u32`"
     );
 
@@ -349,10 +349,10 @@ impl<FLAGS: DescriptorFlagFields> DmaDescriptorGeneric<FLAGS> {
     }
 }
 
-impl<FLAGS: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptorGeneric<FLAGS> {
+impl<Flags: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptor<Flags> {
     fn empty() -> Self {
         Self {
-            flags: FLAGS::empty(),
+            flags: Flags::empty(),
             buffer: core::ptr::null_mut(),
             next: core::ptr::null_mut(),
         }
@@ -1153,25 +1153,22 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
     buffer_size.div_ceil(chunk_size)
 }
 
-/// Convenience alias for the general DMA descriptor set.
-pub(crate) type DescriptorSet<'a> = DescriptorSetGeneric<'a, DmaDescriptorFlags>;
-
 /// Represents a container for a set of DMA descriptors.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(crate) struct DescriptorSetGeneric<'a, Flag: DescriptorFlagFields> {
-    descriptors: &'a mut [DmaDescriptorGeneric<Flag>],
+pub(crate) struct DescriptorSet<'a, Flag: DescriptorFlagFields = DmaDescriptorFlags> {
+    descriptors: &'a mut [DmaDescriptor<Flag>],
 }
 
-impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
+impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
-    fn new(descriptors: &'a mut [DmaDescriptorGeneric<Flag>]) -> Result<Self, DmaBufError> {
+    fn new(descriptors: &'a mut [DmaDescriptor<Flag>]) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
 
-        descriptors.fill(DmaDescriptorGeneric::empty());
+        descriptors.fill(DmaDescriptor::empty());
 
         Ok(unsafe { Self::new_unchecked(descriptors) })
     }
@@ -1183,22 +1180,22 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
     ///
     /// The caller must ensure that the descriptors are located in a supported
     /// memory region.
-    unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptorGeneric<Flag>]) -> Self {
+    unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor<Flag>]) -> Self {
         Self { descriptors }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
-    fn into_inner(self) -> &'a mut [DmaDescriptorGeneric<Flag>] {
+    fn into_inner(self) -> &'a mut [DmaDescriptor<Flag>] {
         self.descriptors
     }
 
     /// Returns a pointer to the first descriptor in the chain.
-    fn head(&mut self) -> *mut DmaDescriptorGeneric<Flag> {
+    fn head(&mut self) -> *mut DmaDescriptor<Flag> {
         self.descriptors.as_mut_ptr()
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptorGeneric<Flag>> {
+    fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptor<Flag>> {
         let mut was_last = false;
         self.descriptors.iter().take_while(move |d| {
             if was_last {
@@ -1213,7 +1210,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
     /// Returns an iterator over the linked descriptors.
     fn linked_iter_mut(
         &mut self,
-    ) -> impl Iterator<Item = &mut DmaDescriptorGeneric<Flag>> + use<'_, Flag> {
+    ) -> impl Iterator<Item = &mut DmaDescriptor<Flag>> + use<'_, Flag> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -1245,7 +1242,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
         &mut self,
         len: usize,
         chunk_size: usize,
-        prepare: fn(&mut DmaDescriptorGeneric<Flag>, usize),
+        prepare: fn(&mut DmaDescriptor<Flag>, usize),
     ) -> Result<(), DmaBufError> {
         Self::set_up_descriptors(self.descriptors, len, chunk_size, false, prepare)
     }
@@ -1270,11 +1267,11 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
 
     /// Returns a slice of descriptors that can cover a buffer of length `len`.
     fn descriptors_for_buffer_len(
-        descriptors: &mut [DmaDescriptorGeneric<Flag>],
+        descriptors: &mut [DmaDescriptor<Flag>],
         len: usize,
         chunk_size: usize,
         is_circular: bool,
-    ) -> Result<&mut [DmaDescriptorGeneric<Flag>], DmaBufError> {
+    ) -> Result<&mut [DmaDescriptor<Flag>], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
         let required_descriptors = descriptor_count(len, chunk_size, is_circular);
         if descriptors.len() < required_descriptors {
@@ -1291,11 +1288,11 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
     /// The actual descriptor setup is done in a callback, because different
     /// transfer directions require different descriptor setup.
     fn set_up_descriptors(
-        descriptors: &mut [DmaDescriptorGeneric<Flag>],
+        descriptors: &mut [DmaDescriptor<Flag>],
         len: usize,
         chunk_size: usize,
         is_circular: bool,
-        prepare: impl Fn(&mut DmaDescriptorGeneric<Flag>, usize),
+        prepare: impl Fn(&mut DmaDescriptor<Flag>, usize),
     ) -> Result<(), DmaBufError> {
         let descriptors =
             Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
@@ -1336,7 +1333,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
     /// repeatedly.
     fn set_up_buffer_ptrs(
         buffer: &mut [u8],
-        descriptors: &mut [DmaDescriptorGeneric<Flag>],
+        descriptors: &mut [DmaDescriptor<Flag>],
         chunk_size: usize,
         is_circular: bool,
     ) -> Result<(), DmaBufError> {
@@ -2100,12 +2097,9 @@ where
     }
 }
 
-/// Convenience alias for the general DMA transmit channel.
-pub type ChannelTx<Dm, CH> = ChannelTxGeneric<Dm, CH, DmaDescriptorFlags>;
-
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTxGeneric<Dm, CH, F: DescriptorFlagFields>
+pub struct ChannelTx<Dm, CH, F: DescriptorFlagFields = DmaDescriptorFlags>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
@@ -2117,7 +2111,7 @@ where
     pub(crate) _flag: PhantomData<F>,
 }
 
-impl<CH, F> ChannelTxGeneric<Blocking, CH, F>
+impl<CH, F> ChannelTx<Blocking, CH, F>
 where
     CH: DmaTxChannel,
     F: DescriptorFlagFields,
@@ -2141,14 +2135,14 @@ where
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelTxGeneric<Async, CH, F> {
+    pub(crate) fn into_async(mut self) -> ChannelTx<Async, CH, F> {
         if let Some(handler) = self.tx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
 
         self.tx_impl.set_async(true);
 
-        ChannelTxGeneric::<Async, CH, F> {
+        ChannelTx::<Async, CH, F> {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
@@ -2170,20 +2164,20 @@ where
     }
 }
 
-impl<CH, F> ChannelTxGeneric<Async, CH, F>
+impl<CH, F> ChannelTx<Async, CH, F>
 where
     CH: DmaTxChannel,
     F: DescriptorFlagFields,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelTxGeneric<Blocking, CH, F> {
+    pub(crate) fn into_blocking(self) -> ChannelTx<Blocking, CH, F> {
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
 
         self.tx_impl.set_async(false);
 
-        ChannelTxGeneric::<Blocking, CH, F> {
+        ChannelTx::<Blocking, CH, F> {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
@@ -2192,7 +2186,7 @@ where
     }
 }
 
-impl<Dm, CH, F> ChannelTxGeneric<Dm, CH, F>
+impl<Dm, CH, F> ChannelTx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
@@ -2239,7 +2233,7 @@ where
     }
 }
 
-impl<Dm, CH, F> crate::private::Sealed for ChannelTxGeneric<Dm, CH, F>
+impl<Dm, CH, F> crate::private::Sealed for ChannelTx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
@@ -2248,7 +2242,7 @@ where
 }
 
 #[allow(unused)]
-impl<Dm, CH, F> ChannelTxGeneric<Dm, CH, F>
+impl<Dm, CH, F> ChannelTx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
