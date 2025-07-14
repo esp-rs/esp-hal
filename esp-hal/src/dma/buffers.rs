@@ -679,6 +679,9 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
     }
 }
 
+/// Convenience alias for the general DMA RX buffer.
+pub type DmaRxBuf = DmaRxBufGeneric<DmaDescriptorFlags>;
+
 /// DMA receive buffer
 ///
 /// This is a contiguous buffer linked together by DMA descriptors of length
@@ -686,13 +689,13 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
 /// See [DmaTxBuf] for transmitting data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DmaRxBuf {
-    descriptors: DescriptorSet<'static>,
+pub struct DmaRxBufGeneric<Flag: DescriptorFlagFields + 'static> {
+    descriptors: DescriptorSetGeneric<'static, Flag>,
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl DmaRxBuf {
+impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxBufGeneric<Flag> {
     /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -701,7 +704,7 @@ impl DmaRxBuf {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported.
     pub fn new(
-        descriptors: &'static mut [DmaDescriptor],
+        descriptors: &'static mut [DmaDescriptorGeneric<Flag>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         Self::new_with_config(descriptors, buffer, BurstConfig::default())
@@ -716,12 +719,12 @@ impl DmaRxBuf {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new_with_config(
-        descriptors: &'static mut [DmaDescriptor],
+        descriptors: &'static mut [DmaDescriptorGeneric<Flag>],
         buffer: &'static mut [u8],
         config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
-            descriptors: DescriptorSet::new(descriptors)?,
+            descriptors: DescriptorSetGeneric::new(descriptors)?,
             buffer,
             burst: BurstConfig::default(),
         };
@@ -755,7 +758,7 @@ impl DmaRxBuf {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut [DmaDescriptorGeneric<Flag>], &'static mut [u8]) {
         (self.descriptors.into_inner(), self.buffer)
     }
 
@@ -847,6 +850,7 @@ impl DmaRxBuf {
     }
 }
 
+// TODO: make generic after making DmaRxBuffer generic
 unsafe impl DmaRxBuffer for DmaRxBuf {
     type View = BufView<DmaRxBuf>;
     type Final = DmaRxBuf;
