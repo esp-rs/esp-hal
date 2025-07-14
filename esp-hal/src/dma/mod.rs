@@ -234,6 +234,18 @@ bitfield::bitfield! {
     _owner, _set_owner: 31;
 }
 
+impl DmaDescriptorFlags {
+    /// Returns the length of valid bytes in the descriptor buffer.
+    pub fn length(&self) -> usize {
+        self.len()
+    }
+
+    /// Sets the length of valid bytes in the descriptor buffer.
+    pub fn set_length(&mut self, length: usize) {
+        self.set_len(length);
+    }
+}
+
 impl DescriptorFlagFields for DmaDescriptorFlags {
     fn empty() -> Self {
         Self(0)
@@ -304,9 +316,12 @@ impl defmt::Format for DmaDescriptorFlags {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
-pub struct DmaDescriptor<Flags: DescriptorFlagFields = DmaDescriptorFlags> {
+pub struct DmaDescriptor<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields,
+{
     /// Descriptor flags.
-    pub flags: Flags,
+    pub flags: F,
 
     /// Address of the buffer.
     pub buffer: *mut u8,
@@ -317,9 +332,9 @@ pub struct DmaDescriptor<Flags: DescriptorFlagFields = DmaDescriptorFlags> {
     pub next: *mut Self,
 }
 
-impl<Flags: DescriptorFlagFields> DmaDescriptor<Flags> {
+impl<F: DescriptorFlagFields> DmaDescriptor<F> {
     const _SIZE_CHECK: () = core::assert!(
-        core::mem::size_of::<Flags>() == core::mem::size_of::<u32>(),
+        core::mem::size_of::<F>() == core::mem::size_of::<u32>(),
         "descriptor flags must be the same size as `u32`"
     );
 
@@ -337,6 +352,11 @@ impl<Flags: DescriptorFlagFields> DmaDescriptor<Flags> {
         self.set_len(0);
     }
 
+    /// Sets the length of valid bytes in the descriptor buffer.
+    pub fn set_length(&mut self, length: usize) {
+        self.set_len(length);
+    }
+
     /// Resets the descriptor for a new transmit transfer. See
     /// [DmaDescriptorFlags::suc_eof] for more details on the `set_eof`
     /// parameter.
@@ -350,10 +370,10 @@ impl<Flags: DescriptorFlagFields> DmaDescriptor<Flags> {
     }
 }
 
-impl<Flags: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptor<Flags> {
+impl<F: DescriptorFlagFields> DescriptorFlagFields for DmaDescriptor<F> {
     fn empty() -> Self {
         Self {
-            flags: Flags::empty(),
+            flags: F::empty(),
             buffer: core::ptr::null_mut(),
             next: core::ptr::null_mut(),
         }
@@ -1157,14 +1177,17 @@ pub const fn descriptor_count(buffer_size: usize, chunk_size: usize, is_circular
 /// Represents a container for a set of DMA descriptors.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub(crate) struct DescriptorSet<'a, Flag: DescriptorFlagFields = DmaDescriptorFlags> {
-    descriptors: &'a mut [DmaDescriptor<Flag>],
+pub(crate) struct DescriptorSet<'a, F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields,
+{
+    descriptors: &'a mut [DmaDescriptor<F>],
 }
 
-impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
+impl<'a, F: DescriptorFlagFields + Clone> DescriptorSet<'a, F> {
     /// Creates a new `DescriptorSet` from a slice of descriptors and associates
     /// them with the given buffer.
-    fn new(descriptors: &'a mut [DmaDescriptor<Flag>]) -> Result<Self, DmaBufError> {
+    fn new(descriptors: &'a mut [DmaDescriptor<F>]) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(descriptors) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
@@ -1181,22 +1204,22 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
     ///
     /// The caller must ensure that the descriptors are located in a supported
     /// memory region.
-    unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor<Flag>]) -> Self {
+    unsafe fn new_unchecked(descriptors: &'a mut [DmaDescriptor<F>]) -> Self {
         Self { descriptors }
     }
 
     /// Consumes the `DescriptorSet` and returns the inner slice of descriptors.
-    fn into_inner(self) -> &'a mut [DmaDescriptor<Flag>] {
+    fn into_inner(self) -> &'a mut [DmaDescriptor<F>] {
         self.descriptors
     }
 
     /// Returns a pointer to the first descriptor in the chain.
-    fn head(&mut self) -> *mut DmaDescriptor<Flag> {
+    fn head(&mut self) -> *mut DmaDescriptor<F> {
         self.descriptors.as_mut_ptr()
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptor<Flag>> {
+    fn linked_iter(&self) -> impl Iterator<Item = &DmaDescriptor<F>> {
         let mut was_last = false;
         self.descriptors.iter().take_while(move |d| {
             if was_last {
@@ -1209,9 +1232,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = &mut DmaDescriptor<Flag>> + use<'_, Flag> {
+    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptor<F>> + use<'_, F> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -1243,7 +1264,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
         &mut self,
         len: usize,
         chunk_size: usize,
-        prepare: fn(&mut DmaDescriptor<Flag>, usize),
+        prepare: fn(&mut DmaDescriptor<F>, usize),
     ) -> Result<(), DmaBufError> {
         Self::set_up_descriptors(self.descriptors, len, chunk_size, false, prepare)
     }
@@ -1268,11 +1289,11 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
 
     /// Returns a slice of descriptors that can cover a buffer of length `len`.
     fn descriptors_for_buffer_len(
-        descriptors: &mut [DmaDescriptor<Flag>],
+        descriptors: &mut [DmaDescriptor<F>],
         len: usize,
         chunk_size: usize,
         is_circular: bool,
-    ) -> Result<&mut [DmaDescriptor<Flag>], DmaBufError> {
+    ) -> Result<&mut [DmaDescriptor<F>], DmaBufError> {
         // First, pick enough descriptors to cover the buffer.
         let required_descriptors = descriptor_count(len, chunk_size, is_circular);
         if descriptors.len() < required_descriptors {
@@ -1289,11 +1310,11 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
     /// The actual descriptor setup is done in a callback, because different
     /// transfer directions require different descriptor setup.
     fn set_up_descriptors(
-        descriptors: &mut [DmaDescriptor<Flag>],
+        descriptors: &mut [DmaDescriptor<F>],
         len: usize,
         chunk_size: usize,
         is_circular: bool,
-        prepare: impl Fn(&mut DmaDescriptor<Flag>, usize),
+        prepare: impl Fn(&mut DmaDescriptor<F>, usize),
     ) -> Result<(), DmaBufError> {
         let descriptors =
             Self::descriptors_for_buffer_len(descriptors, len, chunk_size, is_circular)?;
@@ -1334,7 +1355,7 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSet<'a, Flag> {
     /// repeatedly.
     fn set_up_buffer_ptrs(
         buffer: &mut [u8],
-        descriptors: &mut [DmaDescriptor<Flag>],
+        descriptors: &mut [DmaDescriptor<F>],
         chunk_size: usize,
         is_circular: bool,
     ) -> Result<(), DmaBufError> {
