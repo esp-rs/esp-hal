@@ -413,7 +413,7 @@ pub struct Preparation<Flag: DescriptorFlagFields = DmaDescriptorFlags> {
 ///
 /// The implementing type must keep all its descriptors and the buffers they
 /// point to valid while the buffer is being transferred.
-pub unsafe trait DmaTxBuffer {
+pub unsafe trait DmaTxBuffer<F: DescriptorFlagFields = DmaDescriptorFlags> {
     /// A type providing operations that are safe to perform on the buffer
     /// whilst the DMA is actively using it.
     type View;
@@ -422,7 +422,7 @@ pub unsafe trait DmaTxBuffer {
     /// information required to use this buffer.
     ///
     /// Note: This operation is idempotent.
-    fn prepare(&mut self) -> Preparation;
+    fn prepare(&mut self) -> Preparation<F>;
 
     /// This is called before the DMA starts using the buffer.
     fn into_view(self) -> Self::View;
@@ -614,11 +614,10 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaTxBuf<Flag> {
     }
 }
 
-// TODO: make generic after making DmaTxBuffer generic
-unsafe impl DmaTxBuffer for DmaTxBuf {
-    type View = BufView<DmaTxBuf>;
+unsafe impl<F: DescriptorFlagFields + Clone> DmaTxBuffer<F> for DmaTxBuf<F> {
+    type View = BufView<DmaTxBuf<F>>;
 
-    fn prepare(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation<F> {
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
                 let is_data_in_psram = !is_valid_ram_address(self.buffer.as_ptr() as usize);
@@ -644,7 +643,7 @@ unsafe impl DmaTxBuffer for DmaTxBuf {
         }
     }
 
-    fn into_view(self) -> BufView<DmaTxBuf> {
+    fn into_view(self) -> Self::View {
         BufView(self)
     }
 
@@ -1002,11 +1001,10 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxTxBuf<Flag> {
     }
 }
 
-// TODO: make generic after making DmaTxBuffer generic
-unsafe impl DmaTxBuffer for DmaRxTxBuf {
-    type View = BufView<DmaRxTxBuf>;
+unsafe impl<F: DescriptorFlagFields + Clone> DmaTxBuffer<F> for DmaRxTxBuf<F> {
+    type View = BufView<DmaRxTxBuf<F>>;
 
-    fn prepare(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation<F> {
         for desc in self.tx_descriptors.linked_iter_mut() {
             // In non-circular mode, we only set `suc_eof` for the last descriptor to signal
             // the end of the transfer.
@@ -1039,7 +1037,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
         }
     }
 
-    fn into_view(self) -> BufView<DmaRxTxBuf> {
+    fn into_view(self) -> Self::View {
         BufView(self)
     }
 
@@ -1520,11 +1518,10 @@ impl<Flag: DescriptorFlagFields + 'static> DmaLoopBuf<Flag> {
     }
 }
 
-// TODO: make this generic after DmaTxBuffer is generic
-unsafe impl DmaTxBuffer for DmaLoopBuf {
+unsafe impl<F: DescriptorFlagFields> DmaTxBuffer<F> for DmaLoopBuf<F> {
     type View = Self;
 
-    fn prepare(&mut self) -> Preparation {
+    fn prepare(&mut self) -> Preparation<F> {
         Preparation {
             start: self.descriptor,
             #[cfg(psram_dma)]
