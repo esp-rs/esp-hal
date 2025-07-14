@@ -1211,7 +1211,9 @@ impl<'a, Flag: DescriptorFlagFields + Clone> DescriptorSetGeneric<'a, Flag> {
     }
 
     /// Returns an iterator over the linked descriptors.
-    fn linked_iter_mut(&mut self) -> impl Iterator<Item = &mut DmaDescriptorGeneric<Flag>> + use<'_, Flag> {
+    fn linked_iter_mut(
+        &mut self,
+    ) -> impl Iterator<Item = &mut DmaDescriptorGeneric<Flag>> + use<'_, Flag> {
         let mut was_last = false;
         self.descriptors.iter_mut().take_while(move |d| {
             if was_last {
@@ -2098,21 +2100,27 @@ where
     }
 }
 
+/// Convenience alias for the general DMA transmit channel.
+pub type ChannelTx<Dm, CH> = ChannelTxGeneric<Dm, CH, DmaDescriptorFlags>;
+
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<Dm, CH>
+pub struct ChannelTxGeneric<Dm, CH, F: DescriptorFlagFields>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
     pub(crate) tx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
+    pub(crate) _flag: PhantomData<F>,
 }
 
-impl<CH> ChannelTx<Blocking, CH>
+impl<CH, F> ChannelTxGeneric<Blocking, CH, F>
 where
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
     /// Creates a new TX channel half.
     pub fn new(tx_impl: CH) -> Self {
@@ -2128,19 +2136,23 @@ where
             tx_impl,
             _phantom: PhantomData,
             _guard,
+            _flag: PhantomData,
         }
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelTx<Async, CH> {
+    pub(crate) fn into_async(mut self) -> ChannelTxGeneric<Async, CH, F> {
         if let Some(handler) = self.tx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
+
         self.tx_impl.set_async(true);
-        ChannelTx {
+
+        ChannelTxGeneric::<Async, CH, F> {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            _flag: PhantomData,
         }
     }
 
@@ -2158,28 +2170,33 @@ where
     }
 }
 
-impl<CH> ChannelTx<Async, CH>
+impl<CH, F> ChannelTxGeneric<Async, CH, F>
 where
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelTx<Blocking, CH> {
+    pub(crate) fn into_blocking(self) -> ChannelTxGeneric<Blocking, CH, F> {
         if let Some(interrupt) = self.tx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
+
         self.tx_impl.set_async(false);
-        ChannelTx {
+
+        ChannelTxGeneric::<Blocking, CH, F> {
             tx_impl: self.tx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            _flag: PhantomData,
         }
     }
 }
 
-impl<Dm, CH> ChannelTx<Dm, CH>
+impl<Dm, CH, F> ChannelTxGeneric<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
     /// Configure the channel priority.
     #[cfg(gdma)]
@@ -2222,18 +2239,20 @@ where
     }
 }
 
-impl<Dm, CH> crate::private::Sealed for ChannelTx<Dm, CH>
+impl<Dm, CH, F> crate::private::Sealed for ChannelTxGeneric<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
 }
 
 #[allow(unused)]
-impl<Dm, CH> ChannelTx<Dm, CH>
+impl<Dm, CH, F> ChannelTxGeneric<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
+    F: DescriptorFlagFields,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
