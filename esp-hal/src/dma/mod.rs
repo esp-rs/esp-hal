@@ -1837,19 +1837,22 @@ fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
 // DMA receive channel
 #[non_exhaustive]
 #[doc(hidden)]
-pub struct ChannelRx<Dm, CH>
+pub struct ChannelRx<Dm, CH, F = DmaDescriptorFlags>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
     pub(crate) rx_impl: CH,
     pub(crate) _phantom: PhantomData<Dm>,
     pub(crate) _guard: PeripheralGuard,
+    pub(crate) _flag: PhantomData<F>,
 }
 
-impl<CH> ChannelRx<Blocking, CH>
+impl<CH, F> ChannelRx<Blocking, CH, F>
 where
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
     /// Creates a new RX channel half.
     pub fn new(rx_impl: CH) -> Self {
@@ -1871,11 +1874,12 @@ where
             rx_impl,
             _phantom: PhantomData,
             _guard,
+            _flag: PhantomData,
         }
     }
 
     /// Converts a blocking channel to an async channel.
-    pub(crate) fn into_async(mut self) -> ChannelRx<Async, CH> {
+    pub(crate) fn into_async(mut self) -> ChannelRx<Async, CH, F> {
         if let Some(handler) = self.rx_impl.async_handler() {
             self.set_interrupt_handler(handler);
         }
@@ -1884,6 +1888,7 @@ where
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            _flag: PhantomData,
         }
     }
 
@@ -1901,12 +1906,13 @@ where
     }
 }
 
-impl<CH> ChannelRx<Async, CH>
+impl<CH, F> ChannelRx<Async, CH, F>
 where
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
     /// Converts an async channel into a blocking channel.
-    pub(crate) fn into_blocking(self) -> ChannelRx<Blocking, CH> {
+    pub(crate) fn into_blocking(self) -> ChannelRx<Blocking, CH, F> {
         if let Some(interrupt) = self.rx_impl.peripheral_interrupt() {
             crate::interrupt::disable(Cpu::current(), interrupt);
         }
@@ -1915,14 +1921,16 @@ where
             rx_impl: self.rx_impl,
             _phantom: PhantomData,
             _guard: self._guard,
+            _flag: PhantomData,
         }
     }
 }
 
-impl<Dm, CH> ChannelRx<Dm, CH>
+impl<Dm, CH, F> ChannelRx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
     /// Configure the channel.
     #[cfg(gdma)]
@@ -1963,18 +1971,20 @@ where
     }
 }
 
-impl<Dm, CH> crate::private::Sealed for ChannelRx<Dm, CH>
+impl<Dm, CH, F> crate::private::Sealed for ChannelRx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
 }
 
 #[allow(unused)]
-impl<Dm, CH> ChannelRx<Dm, CH>
+impl<Dm, CH, F> ChannelRx<Dm, CH, F>
 where
     Dm: DriverMode,
     CH: DmaRxChannel,
+    F: DescriptorFlagFields,
 {
     // TODO: used by I2S, which should be rewritten to use the Preparation-based
     // API.
@@ -2106,7 +2116,7 @@ where
 
 /// DMA transmit channel
 #[doc(hidden)]
-pub struct ChannelTx<Dm, CH, F: DescriptorFlagFields = DmaDescriptorFlags>
+pub struct ChannelTx<Dm, CH, F = DmaDescriptorFlags>
 where
     Dm: DriverMode,
     CH: DmaTxChannel,
