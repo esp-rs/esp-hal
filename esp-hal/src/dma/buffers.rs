@@ -345,9 +345,12 @@ pub enum TransferDirection {
 /// Holds all the information needed to configure a DMA channel for a transfer.
 #[derive(PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Preparation<Flag: DescriptorFlagFields = DmaDescriptorFlags> {
+pub struct Preparation<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields,
+{
     /// The descriptor the DMA will start from.
-    pub start: *mut DmaDescriptor<Flag>,
+    pub start: *mut DmaDescriptor<F>,
 
     /// The direction of the DMA transfer.
     pub direction: TransferDirection,
@@ -473,13 +476,16 @@ pub struct BufView<T>(T);
 /// FIFO. See [DmaRxBuf] for receiving data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DmaTxBuf<Flag: DescriptorFlagFields + 'static = DmaDescriptorFlags> {
-    descriptors: DescriptorSet<'static, Flag>,
+pub struct DmaTxBuf<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields + 'static,
+{
+    descriptors: DescriptorSet<'static, F>,
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl<Flag: DescriptorFlagFields + Clone + 'static> DmaTxBuf<Flag> {
+impl<F: DescriptorFlagFields + Clone + 'static> DmaTxBuf<F> {
     /// Creates a new [DmaTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -489,7 +495,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaTxBuf<Flag> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new(
-        descriptors: &'static mut [DmaDescriptor<Flag>],
+        descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         Self::new_with_config(descriptors, buffer, BurstConfig::default())
@@ -504,7 +510,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaTxBuf<Flag> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new_with_config(
-        descriptors: &'static mut [DmaDescriptor<Flag>],
+        descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
         config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
@@ -544,7 +550,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaTxBuf<Flag> {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'static mut [DmaDescriptor<Flag>], &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut [DmaDescriptor<F>], &'static mut [u8]) {
         (self.descriptors.into_inner(), self.buffer)
     }
 
@@ -659,13 +665,16 @@ unsafe impl<F: DescriptorFlagFields + Clone> DmaTxBuffer<F> for DmaTxBuf<F> {
 /// See [DmaTxBuf] for transmitting data.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DmaRxBuf<Flag: DescriptorFlagFields + 'static = DmaDescriptorFlags> {
-    descriptors: DescriptorSet<'static, Flag>,
+pub struct DmaRxBuf<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields + 'static,
+{
+    descriptors: DescriptorSet<'static, F>,
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxBuf<Flag> {
+impl<F: DescriptorFlagFields + Clone + 'static> DmaRxBuf<F> {
     /// Creates a new [DmaRxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -674,7 +683,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxBuf<Flag> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported.
     pub fn new(
-        descriptors: &'static mut [DmaDescriptor<Flag>],
+        descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         Self::new_with_config(descriptors, buffer, BurstConfig::default())
@@ -689,7 +698,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxBuf<Flag> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported for descriptors.
     pub fn new_with_config(
-        descriptors: &'static mut [DmaDescriptor<Flag>],
+        descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
         config: impl Into<BurstConfig>,
     ) -> Result<Self, DmaBufError> {
@@ -728,7 +737,7 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxBuf<Flag> {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'static mut [DmaDescriptor<Flag>], &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut [DmaDescriptor<F>], &'static mut [u8]) {
         (self.descriptors.into_inner(), self.buffer)
     }
 
@@ -871,14 +880,17 @@ unsafe impl<F: DescriptorFlagFields + Clone> DmaRxBuffer<F> for DmaRxBuf<F> {
 /// peripheral's FIFO. These are typically full-duplex transfers.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct DmaRxTxBuf<Flag: DescriptorFlagFields + 'static = DmaDescriptorFlags> {
-    rx_descriptors: DescriptorSet<'static, Flag>,
-    tx_descriptors: DescriptorSet<'static, Flag>,
+pub struct DmaRxTxBuf<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields + 'static,
+{
+    rx_descriptors: DescriptorSet<'static, F>,
+    tx_descriptors: DescriptorSet<'static, F>,
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxTxBuf<Flag> {
+impl<F: DescriptorFlagFields + Clone + 'static> DmaRxTxBuf<F> {
     /// Creates a new [DmaRxTxBuf] from some descriptors and a buffer.
     ///
     /// There must be enough descriptors for the provided buffer.
@@ -887,8 +899,8 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxTxBuf<Flag> {
     /// Both the descriptors and buffer must be in DMA-capable memory.
     /// Only DRAM is supported.
     pub fn new(
-        rx_descriptors: &'static mut [DmaDescriptor<Flag>],
-        tx_descriptors: &'static mut [DmaDescriptor<Flag>],
+        rx_descriptors: &'static mut [DmaDescriptor<F>],
+        tx_descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         let mut buf = Self {
@@ -937,8 +949,8 @@ impl<Flag: DescriptorFlagFields + Clone + 'static> DmaRxTxBuf<Flag> {
     pub fn split(
         self,
     ) -> (
-        &'static mut [DmaDescriptor<Flag>],
-        &'static mut [DmaDescriptor<Flag>],
+        &'static mut [DmaDescriptor<F>],
+        &'static mut [DmaDescriptor<F>],
         &'static mut [u8],
     ) {
         (
@@ -1128,17 +1140,20 @@ unsafe impl<F: DescriptorFlagFields + Clone> DmaRxBuffer<F> for DmaRxTxBuf<F> {
 ///
 /// See [DmaRxStreamBufView] for APIs available whilst a transfer is in
 /// progress.
-pub struct DmaRxStreamBuf<Flag: DescriptorFlagFields + 'static = DmaDescriptorFlags> {
-    descriptors: &'static mut [DmaDescriptor<Flag>],
+pub struct DmaRxStreamBuf<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields + 'static,
+{
+    descriptors: &'static mut [DmaDescriptor<F>],
     buffer: &'static mut [u8],
     burst: BurstConfig,
 }
 
-impl<Flag: DescriptorFlagFields + 'static> DmaRxStreamBuf<Flag> {
+impl<F: DescriptorFlagFields + 'static> DmaRxStreamBuf<F> {
     /// Creates a new [DmaRxStreamBuf] evenly distributing the buffer between
     /// the provided descriptors.
     pub fn new(
-        descriptors: &'static mut [DmaDescriptor<Flag>],
+        descriptors: &'static mut [DmaDescriptor<F>],
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(descriptors) {
@@ -1188,7 +1203,7 @@ impl<Flag: DescriptorFlagFields + 'static> DmaRxStreamBuf<Flag> {
     }
 
     /// Consume the buf, returning the descriptors and buffer.
-    pub fn split(self) -> (&'static mut [DmaDescriptor<Flag>], &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut [DmaDescriptor<F>], &'static mut [u8]) {
         (self.descriptors, self.buffer)
     }
 }
@@ -1481,15 +1496,18 @@ unsafe impl DmaRxBuffer for EmptyBuf {
 /// than this, the DMA channel will spend more time reading the descriptor than
 /// it does reading the buffer, which may leave it unable to keep up with the
 /// bandwidth requirements of some peripherals at high frequencies.
-pub struct DmaLoopBuf<Flag: DescriptorFlagFields + 'static = DmaDescriptorFlags> {
-    descriptor: &'static mut DmaDescriptor<Flag>,
+pub struct DmaLoopBuf<F = DmaDescriptorFlags>
+where
+    F: DescriptorFlagFields + 'static,
+{
+    descriptor: &'static mut DmaDescriptor<F>,
     buffer: &'static mut [u8],
 }
 
-impl<Flag: DescriptorFlagFields + 'static> DmaLoopBuf<Flag> {
+impl<F: DescriptorFlagFields + 'static> DmaLoopBuf<F> {
     /// Create a new [DmaLoopBuf].
     pub fn new(
-        descriptor: &'static mut DmaDescriptor<Flag>,
+        descriptor: &'static mut DmaDescriptor<F>,
         buffer: &'static mut [u8],
     ) -> Result<Self, DmaBufError> {
         if !is_slice_in_dram(buffer) {
@@ -1515,7 +1533,7 @@ impl<Flag: DescriptorFlagFields + 'static> DmaLoopBuf<Flag> {
     }
 
     /// Consume the buf, returning the descriptor and buffer.
-    pub fn split(self) -> (&'static mut DmaDescriptor<Flag>, &'static mut [u8]) {
+    pub fn split(self) -> (&'static mut DmaDescriptor<F>, &'static mut [u8]) {
         (self.descriptor, self.buffer)
     }
 }
