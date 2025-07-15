@@ -174,31 +174,41 @@ pub fn enable_direct(interrupt: Interrupt, cpu_interrupt: CpuInterrupt) -> Resul
 /// # Safety
 ///
 /// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
-pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    let interrupt_number = interrupt as isize;
-    let cpu_interrupt_number = which as isize;
-    unsafe {
-        let intr_map_base = match core {
-            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
-        };
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(cpu_interrupt_number as u32);
+pub unsafe fn map(cpu: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    let interrupt_number = interrupt as usize;
+    let cpu_interrupt_number = which as u32;
+    match cpu {
+        Cpu::ProCpu => unsafe {
+            (*core0_interrupt_peripheral())
+                .core_0_intr_map(interrupt_number)
+                .write(|w| w.bits(cpu_interrupt_number));
+        },
+        #[cfg(multi_core)]
+        Cpu::AppCpu => unsafe {
+            (*core1_interrupt_peripheral())
+                .core_1_intr_map(interrupt_number)
+                .write(|w| w.bits(cpu_interrupt_number));
+        },
     }
 }
 
 /// Get cpu interrupt assigned to peripheral interrupt
 pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<CpuInterrupt> {
-    let interrupt_number = interrupt as isize;
-
-    let intr_map_base = match cpu {
-        Cpu::ProCpu => unsafe { (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr() },
+    let cpu_intr = match cpu {
+        Cpu::ProCpu => unsafe {
+            (*core0_interrupt_peripheral())
+                .core_0_intr_map(interrupt as usize)
+                .read()
+                .bits()
+        },
         #[cfg(multi_core)]
-        Cpu::AppCpu => unsafe { (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr() },
+        Cpu::AppCpu => unsafe {
+            (*core1_interrupt_peripheral())
+                .core_1_intr_map(interrupt as usize)
+                .read()
+                .bits()
+        },
     };
-    let cpu_intr = unsafe { intr_map_base.offset(interrupt_number).read_volatile() };
     let cpu_intr = CpuInterrupt::from_u32(cpu_intr)?;
 
     if cpu_intr.is_peripheral() {
@@ -210,18 +220,7 @@ pub(crate) fn bound_cpu_interrupt_for(cpu: Cpu, interrupt: Interrupt) -> Option<
 
 /// Disable the given peripheral interrupt
 pub fn disable(core: Cpu, interrupt: Interrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let intr_map_base = match core {
-            Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
-            #[cfg(multi_core)]
-            Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
-        };
-        // To disable an interrupt, map it to a CPU peripheral interrupt
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(CpuInterrupt::Interrupt16Timer2Priority5 as _);
-    }
+    unsafe { map(core, interrupt, CpuInterrupt::Interrupt16Timer2Priority5) }
 }
 
 /// Clear the given CPU interrupt
@@ -238,30 +237,30 @@ pub fn status(core: Cpu) -> InterruptStatus {
         match core {
             Cpu::ProCpu => InterruptStatus::from(
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_0()
+                    .core_0_intr_status(0)
                     .read()
                     .bits(),
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_1()
+                    .core_0_intr_status(1)
                     .read()
                     .bits(),
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_2()
+                    .core_0_intr_status(2)
                     .read()
                     .bits(),
             ),
             #[cfg(multi_core)]
             Cpu::AppCpu => InterruptStatus::from(
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_0()
+                    .core_1_intr_status(0)
                     .read()
                     .bits(),
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_1()
+                    .core_1_intr_status(1)
                     .read()
                     .bits(),
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_2()
+                    .core_1_intr_status(2)
                     .read()
                     .bits(),
             ),
@@ -276,38 +275,38 @@ pub fn status(core: Cpu) -> InterruptStatus {
         match core {
             Cpu::ProCpu => InterruptStatus::from(
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_0()
+                    .core_0_intr_status(0)
                     .read()
                     .bits(),
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_1()
+                    .core_0_intr_status(1)
                     .read()
                     .bits(),
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_2()
+                    .core_0_intr_status(2)
                     .read()
                     .bits(),
                 (*core0_interrupt_peripheral())
-                    .pro_intr_status_3()
+                    .core_0_intr_status(3)
                     .read()
                     .bits(),
             ),
             #[cfg(multi_core)]
             Cpu::AppCpu => InterruptStatus::from(
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_0()
+                    .core_1_intr_status(0)
                     .read()
                     .bits(),
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_1()
+                    .core_1_intr_status(1)
                     .read()
                     .bits(),
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_2()
+                    .core_1_intr_status(2)
                     .read()
                     .bits(),
                 (*core1_interrupt_peripheral())
-                    .app_intr_status_3()
+                    .core_1_intr_status(3)
                     .read()
                     .bits(),
             ),
@@ -475,9 +474,9 @@ mod vectored {
     ) -> InterruptStatus {
         unsafe {
             let intr_map_base = match core {
-                Cpu::ProCpu => (*core0_interrupt_peripheral()).pro_mac_intr_map().as_ptr(),
+                Cpu::ProCpu => (*core0_interrupt_peripheral()).core_0_intr_map(0).as_ptr(),
                 #[cfg(multi_core)]
-                Cpu::AppCpu => (*core1_interrupt_peripheral()).app_mac_intr_map().as_ptr(),
+                Cpu::AppCpu => (*core1_interrupt_peripheral()).core_1_intr_map(0).as_ptr(),
             };
 
             let mut res = InterruptStatus::empty();

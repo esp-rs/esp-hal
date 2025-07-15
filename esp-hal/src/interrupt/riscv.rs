@@ -234,17 +234,8 @@ pub fn enable_direct(
 }
 
 /// Disable the given peripheral interrupt.
-pub fn disable(_core: Cpu, interrupt: Interrupt) {
-    unsafe {
-        let interrupt_number = interrupt as isize;
-        let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
-
-        // set to 0 to disable the peripheral interrupt on chips with an interrupt
-        // controller other than PLIC use the disabled interrupt 31 otherwise
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(DISABLED_CPU_INTERRUPT);
-    }
+pub fn disable(core: Cpu, interrupt: Interrupt) {
+    map_raw(core, interrupt, DISABLED_CPU_INTERRUPT)
 }
 
 /// Get status of peripheral interrupts
@@ -253,21 +244,21 @@ pub fn status(_core: Cpu) -> InterruptStatus {
     cfg_if::cfg_if! {
         if #[cfg(interrupts_status_registers = "3")] {
             InterruptStatus::from(
-                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
-                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
-                INTERRUPT_CORE0::regs().int_status_reg_2().read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
             )
         } else if #[cfg(interrupts_status_registers = "4")] {
             InterruptStatus::from(
-                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
-                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
-                INTERRUPT_CORE0::regs().intr_status_reg_2().read().bits(),
-                INTERRUPT_CORE0::regs().intr_status_reg_3().read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(2).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(3).read().bits(),
             )
         } else {
             InterruptStatus::from(
-                INTERRUPT_CORE0::regs().intr_status_reg_0().read().bits(),
-                INTERRUPT_CORE0::regs().intr_status_reg_1().read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(0).read().bits(),
+                INTERRUPT_CORE0::regs().core_0_intr_status(1).read().bits(),
             )
         }
     }
@@ -278,21 +269,25 @@ pub fn status(_core: Cpu) -> InterruptStatus {
 /// # Safety
 ///
 /// Do not use CPU interrupts in the [`RESERVED_INTERRUPTS`].
-pub unsafe fn map(_core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
-    let interrupt_number = interrupt as isize;
-    let cpu_interrupt_number = which as isize;
-    #[cfg(not(multi_core))]
-    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
-    #[cfg(multi_core)]
-    let intr_map_base = match _core {
-        Cpu::ProCpu => crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32,
-        Cpu::AppCpu => crate::soc::registers::INTERRUPT_MAP_BASE_APP_CPU as *mut u32,
-    };
+pub unsafe fn map(core: Cpu, interrupt: Interrupt, which: CpuInterrupt) {
+    map_raw(core, interrupt, which as u32)
+}
 
-    unsafe {
-        intr_map_base
-            .offset(interrupt_number)
-            .write_volatile(cpu_interrupt_number as u32 + EXTERNAL_INTERRUPT_OFFSET);
+fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt_number: u32) {
+    let interrupt_number = interrupt as usize;
+
+    match core {
+        Cpu::ProCpu => {
+            INTERRUPT_CORE0::regs()
+                .core_0_intr_map(interrupt_number)
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
+        #[cfg(multi_core)]
+        Cpu::AppCpu => {
+            INTERRUPT_CORE1::regs()
+                .core_1_intr_map(interrupt_number)
+                .write(|w| unsafe { w.bits(cpu_interrupt_number) });
+        }
     }
 }
 
@@ -304,9 +299,7 @@ unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
 
     let cpu_intr = unsafe { intr_map_base.offset(interrupt_number).read_volatile() };
     if cpu_intr > 0 && cpu_intr != DISABLED_CPU_INTERRUPT {
-        Some(unsafe {
-            core::mem::transmute::<u32, CpuInterrupt>(cpu_intr - EXTERNAL_INTERRUPT_OFFSET)
-        })
+        Some(unsafe { core::mem::transmute::<u32, CpuInterrupt>(cpu_intr) })
     } else {
         None
     }
@@ -424,9 +417,6 @@ mod classic {
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 0;
-
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static PRIORITY_TO_INTERRUPT: &[usize] =
@@ -591,9 +581,6 @@ mod plic {
 
     #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
     pub(super) static DISABLED_CPU_INTERRUPT: u32 = 31;
-
-    #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-    pub(super) static EXTERNAL_INTERRUPT_OFFSET: u32 = 0;
 
     // don't use interrupts reserved for CLIC (0,3,4,7)
     // for some reason also CPU interrupt 8 doesn't work by default since it's
