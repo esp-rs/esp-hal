@@ -853,24 +853,11 @@ mod rt {
 
     #[inline(always)]
     unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
-        unsafe extern "C" {
-            // defined in each hal
-            fn EspDefaultHandler(interrupt: Interrupt);
-        }
-
         let handler = unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler };
 
-        if core::ptr::eq(
-            handler as *const _,
-            EspDefaultHandler as *const unsafe extern "C" fn(),
-        ) {
-            unsafe { EspDefaultHandler(interrupt) };
-        } else {
-            let handler: fn(&mut TrapFrame) = unsafe {
-                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler)
-            };
-            handler(save_frame);
-        }
+        let handler: fn(&mut TrapFrame) =
+            unsafe { core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler) };
+        handler(save_frame);
     }
 
     // The compiler generates quite unfortunate code for

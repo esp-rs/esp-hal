@@ -728,23 +728,11 @@ mod rt {
                 // Don't use `Interrupt::try_from`. It's slower and placed in flash
                 let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
 
-                unsafe extern "C" {
-                    // defined in each hal
-                    fn EspDefaultHandler(interrupt: Interrupt);
-                }
-
                 let handler = unsafe { pac::__INTERRUPTS[interrupt as usize]._handler };
-                if core::ptr::eq(
-                    handler as *const _,
-                    EspDefaultHandler as *const unsafe extern "C" fn(),
-                ) {
-                    unsafe { EspDefaultHandler(interrupt) };
-                } else {
-                    let handler: fn(&mut Context) = unsafe {
-                        core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
-                    };
-                    handler(save_frame);
-                }
+                let handler: fn(&mut Context) = unsafe {
+                    core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
+                };
+                handler(save_frame);
             }
         }
     }
