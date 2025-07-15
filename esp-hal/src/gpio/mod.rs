@@ -1642,13 +1642,7 @@ impl<'lt> AnyPin<'lt> {
         GpioBank::_0
     }
 
-    #[inline]
-    /// Resets the GPIO to a known state.
-    ///
-    /// This function needs to be called before using the GPIO pin:
-    /// - Before converting it into signals
-    /// - Before using it as an input or output
-    pub(crate) fn init_gpio(&self) {
+    pub(crate) fn disable_usb_pads(&self) {
         #[cfg(soc_has_usb_device)]
         {
             /// Workaround to make D+ and D- work when the pin is assigned to
@@ -1678,8 +1672,17 @@ impl<'lt> AnyPin<'lt> {
                 (USB_DP, $gpio:ident) => { disable_usb_pads!($gpio) };
             }
         }
+    }
 
+    #[inline]
+    /// Resets the GPIO to a known state.
+    ///
+    /// This function needs to be called before using the GPIO pin:
+    /// - Before converting it into signals
+    /// - Before using it as an input or output
+    pub(crate) fn init_gpio(&self) {
         self.set_output_enable(false);
+        self.disable_usb_pads();
 
         GPIO::regs()
             .func_out_sel_cfg(self.number() as usize)
