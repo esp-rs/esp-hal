@@ -120,6 +120,20 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
             } else {
                 ReleaseType::Minor
             };
+
+            // Special case: some packages are perma-unstable, meaning they won't ever have a stable
+            // release. For these packages, we always use a patch release.
+            let amount = match package {
+                Package::EspRomSys if amount != ReleaseType::Patch => {
+                    log::debug!(
+                        "Bump '{:?}' is not acceptable for package esp-rom-sys - using 'Patch'",
+                        amount
+                    );
+                    ReleaseType::Patch
+                }
+                _ => amount,
+            };
+
             log::debug!("{} needs {:?} version bump", package, amount);
             Some(amount)
         } else {
