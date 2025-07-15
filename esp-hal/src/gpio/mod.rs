@@ -68,11 +68,12 @@ crate::unstable_module! {
 mod asynch;
 mod embedded_hal_impls;
 pub(crate) mod interrupt;
+use interrupt::*;
+
 mod placeholder;
 
 use core::fmt::Display;
 
-use interrupt::*;
 pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
@@ -82,9 +83,12 @@ use crate::{
     interrupt::{InterruptHandler, Priority},
     peripherals::{GPIO, IO_MUX, Interrupt},
     private::{self, Sealed},
+    sync::RawMutex,
 };
 
 define_io_mux_signals!();
+
+pub(crate) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 /// Represents a pin-peripheral connection that, when dropped, disconnects the
 /// peripheral from the pin.

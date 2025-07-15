@@ -1,7 +1,8 @@
+use std::error::Error;
+#[cfg(feature = "rt")]
 use std::{
     collections::HashMap,
     env,
-    error::Error,
     fs::{self, File},
     io::{BufRead, Write},
     path::{Path, PathBuf},
@@ -55,11 +56,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     chip.define_cfgs();
 
-    // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
-    // files:
-    let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    println!("cargo:rustc-link-search={}", out.display());
-
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
@@ -77,18 +73,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    if chip.is_xtensa() {
-        #[cfg(any(feature = "esp32", feature = "esp32s2"))]
-        File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
+    // Only emit linker directives if the `rt` feature is enabled
+    #[cfg(feature = "rt")]
+    {
+        // Place all linker scripts in `OUT_DIR`, and instruct Cargo how to find these
+        // files:
+        let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-        let (irtc, drtc) = if cfg!(feature = "esp32s3") {
-            ("rtc_fast_seg", "rtc_fast_seg")
-        } else {
-            ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
-        };
+        println!("cargo:rustc-link-search={}", out.display());
 
-        let alias = format!(
-            r#"
+        if chip.is_xtensa() {
+            #[cfg(any(feature = "esp32", feature = "esp32s2"))]
+            File::create(out.join("memory_extras.x"))?.write_all(&generate_memory_extras())?;
+
+            let (irtc, drtc) = if cfg!(feature = "esp32s3") {
+                ("rtc_fast_seg", "rtc_fast_seg")
+            } else {
+                ("rtc_fast_iram_seg", "rtc_fast_dram_seg")
+            };
+
+            let alias = format!(
+                r#"
             REGION_ALIAS("ROTEXT", irom_seg);
             REGION_ALIAS("RWTEXT", iram_seg);
             REGION_ALIAS("RODATA", drom_seg);
@@ -96,38 +101,39 @@ fn main() -> Result<(), Box<dyn Error>> {
             REGION_ALIAS("RTC_FAST_RWTEXT", {irtc});
             REGION_ALIAS("RTC_FAST_RWDATA", {drtc});
         "#
-        );
+            );
 
-        fs::write(out.join("alias.x"), alias)?;
-        fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
-    } else {
-        // RISC-V devices:
+            fs::write(out.join("alias.x"), alias)?;
+            fs::copy("ld/xtensa/hal-defaults.x", out.join("hal-defaults.x"))?;
+        } else {
+            // RISC-V devices:
 
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/asserts.x",
-            out.join("asserts.x"),
-        )?;
-        preprocess_file(
-            &config_symbols,
-            &cfg,
-            "ld/riscv/hal-defaults.x",
-            out.join("hal-defaults.x"),
-        )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/asserts.x",
+                out.join("asserts.x"),
+            )?;
+            preprocess_file(
+                &config_symbols,
+                &cfg,
+                "ld/riscv/hal-defaults.x",
+                out.join("hal-defaults.x"),
+            )?;
+        }
+
+        // With the architecture-specific linker scripts taken care of, we can copy all
+        // remaining linker scripts which are common to all devices:
+        copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
+        copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.name()), &out)?;
     }
-
-    // With the architecture-specific linker scripts taken care of, we can copy all
-    // remaining linker scripts which are common to all devices:
-    copy_dir_all(&config_symbols, &cfg, "ld/sections", &out)?;
-    copy_dir_all(&config_symbols, &cfg, format!("ld/{}", chip.name()), &out)?;
 
     Ok(())
 }
 
 // ----------------------------------------------------------------------------
 // Helper Functions
-
+#[cfg(feature = "rt")]
 fn copy_dir_all(
     config_symbols: &[&str],
     cfg: &HashMap<String, Value>,
@@ -158,6 +164,7 @@ fn copy_dir_all(
 }
 
 /// A naive pre-processor for linker scripts
+#[cfg(feature = "rt")]
 fn preprocess_file(
     config: &[&str],
     cfg: &HashMap<String, Value>,
@@ -200,6 +207,7 @@ fn preprocess_file(
     Ok(())
 }
 
+#[cfg(feature = "rt")]
 fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
     let mut result = String::new();
     let mut chars = line.chars().peekable();
@@ -237,7 +245,7 @@ fn substitute_config(cfg: &HashMap<String, Value>, line: &str) -> String {
     result
 }
 
-#[cfg(feature = "esp32")]
+#[cfg(all(feature = "esp32", feature = "rt"))]
 fn generate_memory_extras() -> Vec<u8> {
     let reserve_dram = if cfg!(feature = "__bluetooth") {
         "0x10000"
@@ -255,7 +263,7 @@ fn generate_memory_extras() -> Vec<u8> {
     .to_vec()
 }
 
-#[cfg(feature = "esp32s2")]
+#[cfg(all(feature = "esp32s2", feature = "rt"))]
 fn generate_memory_extras() -> Vec<u8> {
     let reserved_cache = if cfg!(feature = "psram") {
         "0x4000"

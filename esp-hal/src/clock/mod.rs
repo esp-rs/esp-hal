@@ -43,6 +43,7 @@
 //! let peripherals = esp_hal::init(config);
 //! # {after_snippet}
 //! ```
+#![cfg_attr(not(feature = "rt"), expect(unused))]
 
 use core::{cell::Cell, marker::PhantomData};
 
