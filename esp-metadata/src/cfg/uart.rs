@@ -20,6 +20,9 @@ pub(crate) struct UartInstanceConfig {
 
     /// IOMUX signal name of the instance's RTS signal.
     pub rts: String,
+
+    /// IOMUX signal name of the instance's DTR signal.
+    pub dtr: String,
 }
 
 /// Generates `for_each_uart!` which can be used to implement the UART
@@ -39,11 +42,12 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
             let tx = format_ident!("{}", instance_config.tx);
             let cts = format_ident!("{}", instance_config.cts);
             let rts = format_ident!("{}", instance_config.rts);
+            let dtr = format_ident!("{}", instance_config.dtr);
 
             // The order and meaning of these tokens must match their use in the
             // `for_each_uart!` call.
             quote! {
-                #instance, #sys, #rx, #tx, #cts, #rts
+                #instance, #sys, #rx, #tx, #cts, #rts, #dtr
             }
         })
         .collect::<Vec<_>>();
@@ -65,7 +69,7 @@ pub(crate) fn generate_uart_peripherals(uart: &UartProperties) -> TokenStream {
         /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
         /// - `$rx`, `$tx`, `$cts`, `$rts`: signal names.
         ///
-        /// Example data: `(UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS)`
+        /// Example data: `(UART0, Uart0, U0RXD, U0TXD, U0CTS, U0RTS, U0DTR)`
         #for_each
     }
 }
