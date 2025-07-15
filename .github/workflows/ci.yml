@@ -162,6 +162,10 @@ jobs:
           toolchain: nightly
           components: rustfmt,miri
 
+      # Run xtask tests
+      - name: Run xtask tests
+        run: cd xtask && cargo test --features release
+
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
 
