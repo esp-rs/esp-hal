@@ -864,7 +864,7 @@ where
 
         // Copy the filter to the peripheral.
         unsafe {
-            copy_to_data_register(self.regs().data_0().as_ptr(), registers);
+            copy_to_data_register(self.regs().data(0).as_ptr(), registers);
         }
     }
 
@@ -1349,7 +1349,7 @@ pub trait PrivateInstance: crate::private::Sealed {
 /// Read a frame from the peripheral.
 fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiError> {
     // Read the frame information and extract the frame id format and dlc.
-    let data_0 = register_block.data_0().read().tx_byte_0().bits();
+    let data_0 = register_block.data(0).read().tx_byte().bits();
 
     let is_standard_format = data_0 & (0b1 << 7) == 0;
     let is_data_frame = data_0 & (0b1 << 6) == 0;
@@ -1368,19 +1368,19 @@ fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiErr
     // Read the payload from the packet and construct a frame.
     let (id, data_ptr) = if is_standard_format {
         // Frame uses standard 11 bit id.
-        let data_1 = register_block.data_1().read().tx_byte_1().bits();
-        let data_2 = register_block.data_2().read().tx_byte_2().bits();
+        let data_1 = register_block.data(1).read().tx_byte().bits();
+        let data_2 = register_block.data(2).read().tx_byte().bits();
 
         let raw_id: u16 = ((data_1 as u16) << 3) | ((data_2 as u16) >> 5);
 
         let id = Id::from(StandardId::new(raw_id).unwrap());
-        (id, register_block.data_3().as_ptr())
+        (id, register_block.data(3).as_ptr())
     } else {
         // Frame uses extended 29 bit id.
-        let data_1 = register_block.data_1().read().tx_byte_1().bits();
-        let data_2 = register_block.data_2().read().tx_byte_2().bits();
-        let data_3 = register_block.data_3().read().tx_byte_3().bits();
-        let data_4 = register_block.data_4().read().tx_byte_4().bits();
+        let data_1 = register_block.data(1).read().tx_byte().bits();
+        let data_2 = register_block.data(2).read().tx_byte().bits();
+        let data_3 = register_block.data(3).read().tx_byte().bits();
+        let data_4 = register_block.data(4).read().tx_byte().bits();
 
         let raw_id: u32 = ((data_1 as u32) << 21)
             | ((data_2 as u32) << 13)
@@ -1388,7 +1388,7 @@ fn read_frame(register_block: &RegisterBlock) -> Result<EspTwaiFrame, EspTwaiErr
             | ((data_4 as u32) >> 3);
 
         let id = Id::from(ExtendedId::new(raw_id).unwrap());
-        (id, register_block.data_5().as_ptr())
+        (id, register_block.data(5).as_ptr())
     };
 
     let mut frame = if is_data_frame {
@@ -1423,8 +1423,8 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
     let data_0: u8 = (frame_format << 7) | (rtr_bit << 6) | (self_reception << 4) | dlc_bits;
 
     register_block
-        .data_0()
-        .write(|w| unsafe { w.tx_byte_0().bits(data_0) });
+        .data(0)
+        .write(|w| unsafe { w.tx_byte().bits(data_0) });
 
     // Assemble the identifier information of the packet and return where the data
     // buffer starts.
@@ -1433,32 +1433,32 @@ fn write_frame(register_block: &RegisterBlock, frame: &EspTwaiFrame) {
             let id = id.as_raw();
 
             register_block
-                .data_1()
-                .write(|w| unsafe { w.tx_byte_1().bits((id >> 3) as u8) });
+                .data(1)
+                .write(|w| unsafe { w.tx_byte().bits((id >> 3) as u8) });
 
             register_block
-                .data_2()
-                .write(|w| unsafe { w.tx_byte_2().bits((id << 5) as u8) });
+                .data(2)
+                .write(|w| unsafe { w.tx_byte().bits((id << 5) as u8) });
 
-            register_block.data_3().as_ptr()
+            register_block.data(3).as_ptr()
         }
         Id::Extended(id) => {
             let id = id.as_raw();
 
             register_block
-                .data_1()
-                .write(|w| unsafe { w.tx_byte_1().bits((id >> 21) as u8) });
+                .data(1)
+                .write(|w| unsafe { w.tx_byte().bits((id >> 21) as u8) });
             register_block
-                .data_2()
-                .write(|w| unsafe { w.tx_byte_2().bits((id >> 13) as u8) });
+                .data(2)
+                .write(|w| unsafe { w.tx_byte().bits((id >> 13) as u8) });
             register_block
-                .data_3()
-                .write(|w| unsafe { w.tx_byte_3().bits((id >> 5) as u8) });
+                .data(3)
+                .write(|w| unsafe { w.tx_byte().bits((id >> 5) as u8) });
             register_block
-                .data_4()
-                .write(|w| unsafe { w.tx_byte_4().bits((id << 3) as u8) });
+                .data(4)
+                .write(|w| unsafe { w.tx_byte().bits((id << 3) as u8) });
 
-            register_block.data_5().as_ptr()
+            register_block.data(5).as_ptr()
         }
     };
 
