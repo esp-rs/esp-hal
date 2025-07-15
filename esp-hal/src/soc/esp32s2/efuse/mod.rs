@@ -154,7 +154,7 @@ impl Efuse {
 
         let info = &RAW_MAP[tag];
         let efuse_val = Self::rtc_table_get_raw_efuse_value(tag) * info.multiplier;
-        efuse_val + info.base + Self::rtc_table_get_raw_efuse_value(info.dependency)
+        efuse_val + info.base + Self::rtc_table_get_parsed_efuse_value(info.dependency)
     }
 
     /// Calculates the coeff_b from the calculate_characterization_coefficient
