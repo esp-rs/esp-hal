@@ -725,10 +725,7 @@ mod rt {
 
             let configured_interrupts = configured_interrupts(core, status, LEVEL);
             for interrupt_nr in configured_interrupts.iterator() {
-                // Don't use `Interrupt::try_from`. It's slower and placed in flash
-                let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
-
-                let handler = unsafe { pac::__INTERRUPTS[interrupt as usize]._handler };
+                let handler = unsafe { pac::__INTERRUPTS[interrupt_nr as usize]._handler };
                 let handler: fn(&mut Context) = unsafe {
                     core::mem::transmute::<unsafe extern "C" fn(), fn(&mut Context)>(handler)
                 };

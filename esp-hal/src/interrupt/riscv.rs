@@ -843,21 +843,13 @@ mod rt {
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
-            // Don't use `Interrupt::try_from`. It's slower and placed in flash
-            let interrupt: Interrupt = unsafe { core::mem::transmute(interrupt_nr as u16) };
-            unsafe {
-                handle_interrupt(interrupt, context);
-            }
+            let handler = unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler };
+
+            let handler: fn(&mut TrapFrame) = unsafe {
+                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler)
+            };
+            handler(context);
         }
-    }
-
-    #[inline(always)]
-    unsafe fn handle_interrupt(interrupt: Interrupt, save_frame: &mut TrapFrame) {
-        let handler = unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler };
-
-        let handler: fn(&mut TrapFrame) =
-            unsafe { core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler) };
-        handler(save_frame);
     }
 
     // The compiler generates quite unfortunate code for
