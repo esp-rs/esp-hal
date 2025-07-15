@@ -123,7 +123,7 @@ impl CpuInterrupt {
 
 /// The interrupts reserved by the HAL
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
-pub static RESERVED_INTERRUPTS: &[usize] = &[
+pub static RESERVED_INTERRUPTS: &[u32] = &[
     CpuInterrupt::Interrupt1LevelPriority1 as _,
     CpuInterrupt::Interrupt19LevelPriority2 as _,
     CpuInterrupt::Interrupt23LevelPriority3 as _,
@@ -485,9 +485,8 @@ mod vectored {
                 let i = interrupt_nr as isize;
                 let cpu_interrupt = intr_map_base.offset(i).read_volatile();
                 // safety: cast is safe because of repr(u32)
-                let cpu_interrupt: CpuInterrupt =
-                    core::mem::transmute::<u32, CpuInterrupt>(cpu_interrupt);
-                let int_level = cpu_interrupt.level() as u8 as u32;
+                let cpu_interrupt = core::mem::transmute::<u32, CpuInterrupt>(cpu_interrupt);
+                let int_level = cpu_interrupt.level() as u32;
 
                 if int_level == level {
                     res.set(interrupt_nr);
