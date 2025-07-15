@@ -134,7 +134,7 @@ impl Efuse {
         if tag == 0 || tag >= RAW_MAP.len() {
             return 0;
         }
-        fn signed_bit_to_int(number: u32, length: u16) -> i32 {
+        fn signed_bit_to_int(number: u32, length: u32) -> i32 {
             if number >> (length - 1) != 0 {
                 -((number ^ (1 << (length - 1))) as i32)
             } else {
@@ -142,8 +142,8 @@ impl Efuse {
             }
         }
         let info = &RAW_MAP[tag];
-        let val = Self::read_field_le(EfuseField::new(info.block, info.begin_bit, info.length));
-        signed_bit_to_int(val, info.length)
+        let val = Self::read_field_le(info.field);
+        signed_bit_to_int(val, info.field.bit_count)
     }
 
     /// See <https://github.com/espressif/esp-idf/blob/a45d713b03fd96d8805d1cc116f02a4415b360c7/components/efuse/esp32s2/esp_efuse_rtc_table.c#L145>
