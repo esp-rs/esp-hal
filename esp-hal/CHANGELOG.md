@@ -42,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent bootloops when DRAM is close to being full. (#3635)
 - Fix PSRAM mapping on ESP32-S3 when the bootloader used the last page to access flash (#3637)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` are now unstable config options (#3711)
+- Fixed MCPWM output when using USB pins (#3795)
 
 ### Removed
 

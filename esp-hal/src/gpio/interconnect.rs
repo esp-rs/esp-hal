@@ -417,6 +417,7 @@ impl Signal<'_> {
                         .map(|(af, _)| *af)
                         .unwrap_or(AlternateFunction::GPIO)
                 };
+                pin.disable_usb_pads();
                 pin.set_alternate_function(af);
                 af == AlternateFunction::GPIO
             }
@@ -466,6 +467,7 @@ impl Signal<'_> {
                 .map(|(af, _)| *af)
                 .unwrap_or(AlternateFunction::GPIO)
         };
+        pin.disable_usb_pads();
         pin.set_alternate_function(af);
 
         let use_gpio_matrix = af == AlternateFunction::GPIO;
