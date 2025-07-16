@@ -43,7 +43,7 @@ enum Cli {
     /// Check the changelog for packages.
     CheckChangelog(CheckChangelogArgs),
     /// Re-generate metadata and the chip support table in the esp-hal README.
-    UpdateMetadata,
+    UpdateMetadata(UpdateMetadataArgs),
 }
 
 #[derive(Debug, Args)]
@@ -105,6 +105,13 @@ struct CheckChangelogArgs {
     normalize: bool,
 }
 
+#[derive(Debug, Args)]
+struct UpdateMetadataArgs {
+    /// Run in 'check' mode; exists with 0 if formatted correctly, 1 otherwise
+    #[arg(long)]
+    check: bool,
+}
+
 // ----------------------------------------------------------------------------
 // Application
 
@@ -164,7 +171,7 @@ fn main() -> Result<()> {
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
-        Cli::UpdateMetadata => xtask::update_metadata(&workspace),
+        Cli::UpdateMetadata(args) => xtask::update_metadata(&workspace, args.check),
     }
 }
 
