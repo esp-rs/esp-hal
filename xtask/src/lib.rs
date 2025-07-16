@@ -257,7 +257,7 @@ impl Package {
             Package::EspHal => {
                 // This checks if the `esp-hal` crate compiles with the no features (other than the
                 // chip selection)
-                
+
                 // This tests that disabling the `rt` feature works
                 cases.push(vec![]);
                 // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
@@ -536,11 +536,22 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     Ok(())
 }
 
-pub fn update_metadata(workspace: &Path) -> Result<()> {
+pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
 
     format_package(workspace, Package::EspMetadataGenerated, false)?;
+
+    if check {
+        let res = std::process::Command::new("git")
+            .args(["diff", "HEAD", "esp-metadata-generated"])
+            .output()?;
+        if !res.stdout.is_empty() {
+            return Err(anyhow::Error::msg(
+                "detected `esp-metadata-generated` changes. Run `cargo xtask update-metadata`, and commit the changes.",
+            ));
+        }
+    }
 
     Ok(())
 }
