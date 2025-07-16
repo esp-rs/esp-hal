@@ -104,7 +104,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
     let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
 
-    open_pull_request(&branch, args.manual_pull_request, !args.no_dry_run, &plan_source, &plan)
+    open_pull_request(&branch, !args.no_dry_run, args.manual_pull_request, &plan_source, &plan)
         .with_context(|| "Failed to open pull request")?;
 
     if !args.no_dry_run {
