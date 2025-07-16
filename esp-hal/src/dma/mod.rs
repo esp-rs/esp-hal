@@ -233,6 +233,18 @@ bitfield::bitfield! {
     _owner, _set_owner: 31;
 }
 
+impl DmaDescriptorFlags {
+    /// Returns the length of valid bytes in the descriptor buffer.
+    pub fn length(&self) -> usize {
+        self.len()
+    }
+
+    /// Sets the length of valid bytes in the descriptor buffer.
+    pub fn set_length(&mut self, length: usize) {
+        self.set_len(length);
+    }
+}
+
 impl DescriptorFlagFields for DmaDescriptorFlags {
     fn empty() -> Self {
         Self(0)
@@ -337,6 +349,11 @@ impl<F: DescriptorFlagFields> DmaDescriptor<F> {
         // Clear this to allow hardware to set it when it's
         // done receiving data for this descriptor.
         self.set_len(0);
+    }
+
+    /// Sets the length of valid bytes in the descriptor buffer.
+    pub fn set_length(&mut self, length: usize) {
+        self.set_len(length);
     }
 
     /// Resets the descriptor for a new transmit transfer. See
