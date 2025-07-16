@@ -1,6 +1,6 @@
 [package]
 name          = "esp-metadata-generated"
-version       = "0.0.1"
+version       = "0.1.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Generated metadata for Espressif devices"
@@ -11,7 +11,7 @@ license       = "MIT OR Apache-2.0"
 [dependencies]
 
 [build-dependencies]
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" } # TODO: remove
+esp-metadata = { version = "0.8.0", path = "../esp-metadata" } # TODO: remove
 
 [features]
 build-script = []

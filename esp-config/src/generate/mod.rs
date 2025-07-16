@@ -126,8 +126,6 @@ pub struct CfgConstraint {
 
 /// Generate the config from a YAML definition.
 ///
-/// The YAML follows the format outlined by [Config].
-///
 /// After deserializing the config and normalizing it, this will call
 /// [generate_config] to finally get the currently active configuration.
 pub fn generate_config_from_yaml_definition(

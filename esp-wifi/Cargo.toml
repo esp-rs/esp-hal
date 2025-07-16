@@ -1,6 +1,6 @@
 [package]
 name = "esp-wifi"
-version = "0.14.1"
+version = "0.15.0"
 edition = "2024"
 rust-version  = "1.88.0"
 description = "A WiFi, Bluetooth and ESP-NOW driver for use with Espressif chips and bare-metal Rust"
@@ -15,7 +15,7 @@ bench = false
 test  = false
 
 [dependencies]
-esp-hal = { version = "1.0.0-beta.1", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
 critical-section = "1.2.0"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
@@ -30,13 +30,13 @@ rand_core = "0.9.3"
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
-esp-config = { version = "0.4.0", path = "../esp-config" }
-esp-metadata-generated = { version = "0.0.1", path = "../esp-metadata-generated" }
+esp-config = { version = "0.5.0", path = "../esp-config" }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-wifi-sys = "0.7.1"
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
-xtensa-lx-rt = { version = "0.19.0", path = "../xtensa-lx-rt", optional = true }
+xtensa-lx-rt = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
 
 # Optional dependencies enabling ecosystem features
 serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
@@ -52,8 +52,8 @@ defmt            = { version = "1.0.1", optional = true }
 log-04           = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
-esp-metadata-generated = { version = "0.0.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["builtin-scheduler", "esp-alloc"]
