@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.19.0] - 2025-07-16
+
+### Added
+
 - Added simplified conditional documentation using the `#[enable_doc_switch]` macro (#3630)
 - `error!` and `warning!` (moved from `esp-build`) (#3645)
 - Added `doc_replace` macro (#3744)
@@ -17,12 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - MSRV is now 1.88.0 (#3742)
 - The `handler` macro no longer accepts priority as a string (#3643)
-
-### Fixed
-
-
-### Removed
-
 
 ## [v0.18.0] - 2025-06-03
 
@@ -94,4 +102,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.17.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-hal-procmacros-v0.17.0
 [v0.18.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.17.0...esp-hal-procmacros-v0.18.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...HEAD
+[v0.19.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.18.0...esp-hal-procmacros-v0.19.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-procmacros-v0.19.0...HEAD

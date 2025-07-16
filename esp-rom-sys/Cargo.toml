@@ -1,6 +1,6 @@
 [package]
 name          = "esp-rom-sys"
-version       = "0.1.0"
+version       = "0.1.1"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "ROM code support"
@@ -27,7 +27,7 @@ document-features   = "0.2.11"
 log-04              = { package = "log", version = "0.4.26", optional = true }
 
 [build-dependencies]
-esp-metadata-generated = { version = "0.0.1", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 #! ### Chip selection

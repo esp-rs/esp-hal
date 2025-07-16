@@ -9,13 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added `Config::generate_metadata` to generate code for firmware crates. (#3604)
 
 ### Changed
 
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.8.0] - 2025-07-16
+
+### Added
+
+- Added `Config::generate_metadata` to generate code for firmware crates. (#3604)
 
 ### Removed
 
@@ -69,4 +77,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.6.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-metadata-v0.6.0
 [v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.6.0...esp-metadata-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.7.0...esp-metadata-v0.8.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-metadata-v0.8.0...HEAD

@@ -12,16 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- MSRV is now 1.88.0 (#3742)
-- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
-- `defmt` and `log-04` can no longer be selected at the same time (#3675)
-- `esp_wifi::init` no longer requires the `RADIO_CLK` peripheral (#3687)
 
 ### Fixed
 
 
 ### Removed
 
+
+## [v0.15.0] - 2025-07-16
+
+### Changed
+
+- MSRV is now 1.88.0 (#3742)
+- Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
+- `defmt` and `log-04` can no longer be selected at the same time (#3675)
+- `esp_wifi::init` no longer requires the `RADIO_CLK` peripheral (#3687)
 
 ## [v0.14.1] - 2025-06-05
 
@@ -270,4 +275,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.13.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-wifi-v0.13.0
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.13.0...esp-wifi-v0.14.0
 [v0.14.1]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.0...esp-wifi-v0.14.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...HEAD
+[v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.14.1...esp-wifi-v0.15.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-wifi-v0.15.0...HEAD

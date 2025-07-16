@@ -12,10 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- MSRV is now 1.88.0 (#3742)
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.20.0] - 2025-07-16
+
+### Changed
+
+- MSRV is now 1.88.0 (#3742)
 
 ### Removed
 
@@ -53,4 +61,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.18.0]: https://github.com/esp-rs/esp-hal/releases/tag/xtensa-lx-rt-v0.18.0
 [v0.19.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.18.0...xtensa-lx-rt-v0.19.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.19.0...HEAD
+[v0.20.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.19.0...xtensa-lx-rt-v0.20.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-rt-v0.20.0...HEAD
