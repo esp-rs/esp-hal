@@ -169,6 +169,9 @@ jobs:
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
 
+      # Check metadata generation for all packages:
+      - run: cargo xtask update-metadata --check
+
       # Run tests in esp-config
       - run: cd esp-config && cargo test --features build,tui
 
