@@ -12,6 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
+### Fixed
+
+
+### Removed
+
+
+## [v0.2.0] - 2025-07-16
+
+### Changed
+
 - The `log` feature has been renamed to `log-04` (#3675)
 - `defmt` and `log-04` can no longer be selected at the same time (#3675)
 - A chip feature (e.g. `esp32`) is now required (#3688)
@@ -20,9 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a problem with calculating the otadata checksum (#3629)
-
-### Removed
-
 
 ## [v0.1.0] - 2025-06-03
 
@@ -38,4 +46,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `defmt` to 1.0 (#3416)
 
 [v0.1.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-bootloader-esp-idf-v0.1.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.1.0...HEAD
+[v0.2.0]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.1.0...esp-bootloader-esp-idf-v0.2.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-bootloader-esp-idf-v0.2.0...HEAD

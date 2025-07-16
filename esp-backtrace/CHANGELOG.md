@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+
+## [v0.17.0] - 2025-07-16
+
+### Removed
+
 - Removed support for ESP32-P4 (#3754)
 
 ## [v0.16.0] - 2025-06-03
@@ -89,4 +94,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.15.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-backtrace-v0.15.1
 [v0.16.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.15.1...esp-backtrace-v0.16.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...HEAD
+[v0.17.0]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.16.0...esp-backtrace-v0.17.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-backtrace-v0.17.0...HEAD

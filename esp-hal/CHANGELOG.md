@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.0.0-rc.0] - 2025-07-16
+
+### Added
+
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
@@ -17,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added GPIO11-GPIO17 to ESP32-C2. (#3726)
 - Added the feature `requires-unstable` (#3772)
 - `AnyPin::downcast`/`AnyPeripheral::downcast` to allow retrieving the original GPIO/peripheral type (#3783, #3784)
-- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778).
+- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778)
 - The `rt` feature (#3706)
 
 ### Changed
@@ -1300,4 +1314,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0...v0.23.1
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...esp-hal-v1.0.0-beta.0
 [v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...esp-hal-v1.0.0-beta.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...HEAD
+[v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...HEAD
