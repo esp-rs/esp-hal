@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # LCD - I8080/MOTO6800 Mode.
 //!
 //! ## Overview
@@ -14,7 +15,7 @@
 //! the I8080 protocol.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::lcd_cam::{LcdCam, lcd::i8080::{Config, I8080, TxEightBits}};
 //! # use esp_hal::dma_tx_buffer;
 //! # use esp_hal::dma::DmaTxBuf;
@@ -35,19 +36,13 @@
 //!
 //! let config = Config::default().with_frequency(Rate::from_mhz(20));
 //!
-//! let mut i8080 = I8080::new(
-//!     lcd_cam.lcd,
-//!     peripherals.DMA_CH0,
-//!     tx_pins,
-//!     config,
-//! )?
-//! .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
+//! let mut i8080 = I8080::new(lcd_cam.lcd, peripherals.DMA_CH0, tx_pins, config)?
+//!     .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
 //!
 //! dma_buf.fill(&[0x55]);
 //! let transfer = i8080.send(0x3Au8, 0, dma_buf)?; // RGB565
 //! transfer.wait();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::{

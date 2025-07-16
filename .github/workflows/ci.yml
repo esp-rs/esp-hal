@@ -24,7 +24,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  MSRV: "1.86.0"
+  MSRV: "1.88.0"
   DEFMT_LOG: trace
 
 # Cancel any currently running workflows from the same PR, branch, or
@@ -71,7 +71,7 @@ jobs:
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.87.0.0
+          version: 1.88.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -108,7 +108,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
 
       # Build the extra crates
       - name: Build the bench-server
@@ -133,8 +132,7 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: ${{ env.MSRV }}
-          components: rust-src
-      - uses: Swatinem/rust-cache@v2
+          components: rust-src,clippy
 
       - name: Stable toolchain checks
         run: rustc +${{ env.MSRV }} --version --verbose
@@ -163,13 +161,16 @@ jobs:
         with:
           toolchain: nightly
           components: rustfmt,miri
-      - uses: Swatinem/rust-cache@v2
+
+      # Run xtask tests
+      - name: Run xtask tests
+        run: cd xtask && cargo test --features release
 
       # Check the formatting of all packages:
       - run: cargo xtask fmt-packages --check
 
       # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build
+      - run: cd esp-config && cargo test --features build,tui
 
       # Run tests in esp-bootloader-esp-idf
       - run: cd esp-bootloader-esp-idf && cargo test --features=std

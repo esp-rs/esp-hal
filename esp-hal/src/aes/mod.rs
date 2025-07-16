@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Advanced Encryption Standard (AES).
 //!
 //! ## Overview
@@ -22,7 +23,7 @@
 //! Simple example of encrypting and decrypting a message using AES-128:
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::aes::{Aes, Mode};
 //! # let keytext = b"SUp4SeCp@sSw0rd";
 //! # let plaintext = b"message";
@@ -40,10 +41,9 @@
 //! aes.process(&mut block, Mode::Decryption128, keybuf);
 //!
 //! // The decryption happens in-place, so the plaintext is in `block`
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### AES-DMA
 //!
 //! Visit the [AES-DMA] test for a more advanced example of using AES-DMA

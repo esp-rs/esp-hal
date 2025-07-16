@@ -1,7 +1,6 @@
 //! WiFi frame injection example
 //!
 //! Periodically transmits a beacon frame.
-//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
@@ -50,12 +49,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let esp_wifi_ctrl = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =

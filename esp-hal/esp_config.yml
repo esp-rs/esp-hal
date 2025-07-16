@@ -22,6 +22,11 @@ options:
     - value: false
   stability: !Stable '1.0.0-beta.0'
 
+- name: place-rmt-driver-in-ram
+  description: Places the RMT driver in RAM for better performance
+  default:
+    - value: false
+
 # Ideally, we should be able to set any clock frequency for any chip. However,
 # currently only the 32 and C2 implements any sort of configurability, and
 # the rest have a fixed clock frequency.
@@ -55,6 +60,7 @@ options:
         validator: enumeration
         value:
         - '32'
+  active: 'chip == "esp32" || chip == "esp32c2"'
 
 - name: spi-address-workaround
   description: "Enables a workaround for the issue where SPI in

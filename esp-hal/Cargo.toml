@@ -1,8 +1,8 @@
 [package]
 name          = "esp-hal"
-version       = "1.0.0-beta.1"
+version       = "1.0.0-rc.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Bare-metal HAL for Espressif devices"
 documentation = "https://docs.espressif.com/projects/rust/esp-hal/latest/"
 keywords      = ["embedded", "embedded-hal", "esp32", "espressif", "hal"]
@@ -31,6 +31,8 @@ enumset                  = "1.1.6"
 paste                    = "1.0.15"
 portable-atomic          = { version = "1.11.0", default-features = false }
 
+esp-rom-sys              = { version = "0.1.1", path = "../esp-rom-sys" }
+
 # Unstable dependencies that are not (strictly) part of the public API
 bitfield                 = "0.19.0"
 delegate                 = "0.13.3"
@@ -41,8 +43,9 @@ fugit                    = "0.3.7"
 instability              = "0.3.7"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
-esp-config               = { version = "0.4.0", path = "../esp-config" }
-procmacros               = { version = "0.18.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
+esp-config               = { version = "0.5.0", path = "../esp-config" }
+esp-metadata-generated   = { version = "0.1.0", path = "../esp-metadata-generated" }
+procmacros               = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
 # They are needed when using the `unstable` feature.
@@ -70,33 +73,33 @@ ufmt-write               = { version = "0.1.0", optional = true }
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
 # corresponding feature.
-esp32   = { version = "0.37.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32c2 = { version = "0.26.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32c3 = { version = "0.29.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32c6 = { version = "0.20.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32h2 = { version = "0.16.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32s2 = { version = "0.28.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
-esp32s3 = { version = "0.32.0", features = ["critical-section", "rt"], git = "https://github.com/esp-rs/esp-pacs", rev = "782de0b", optional = true }
+esp32   = { version = "0.38.0", features = ["critical-section", "rt"], optional = true }
+esp32c2 = { version = "0.27.0", features = ["critical-section", "rt"], optional = true }
+esp32c3 = { version = "0.30.0", features = ["critical-section", "rt"], optional = true }
+esp32c6 = { version = "0.21.0", features = ["critical-section", "rt"], optional = true }
+esp32h2 = { version = "0.17.0", features = ["critical-section", "rt"], optional = true }
+esp32s2 = { version = "0.29.0", features = ["critical-section", "rt"], optional = true }
+esp32s3 = { version = "0.33.0", features = ["critical-section", "rt"], optional = true }
 
 [target.'cfg(target_arch = "riscv32")'.dependencies]
 riscv            = { version = "0.12.1" }
-esp-riscv-rt     = { version = "0.11.0", path = "../esp-riscv-rt" }
+esp-riscv-rt     = { version = "0.12.0", path = "../esp-riscv-rt", optional = true }
 
 [target.'cfg(target_arch = "xtensa")'.dependencies]
-xtensa-lx        = { version = "0.11.0", path = "../xtensa-lx" }
-xtensa-lx-rt     = { version = "0.19.0", path = "../xtensa-lx-rt" }
+xtensa-lx        = { version = "0.12.0", path = "../xtensa-lx" }
+xtensa-lx-rt     = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
 
 [build-dependencies]
 cfg-if       = "1.0.0"
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
-esp-config   = { version = "0.4.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
 serde        = { version = "1.0.219", default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
-default = []
+default = ["rt"]
 
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
@@ -118,28 +121,38 @@ __usb_otg = [
 esp32   = [
     "dep:esp32",
     "procmacros/rtc-slow",
+    "esp-rom-sys/esp32",
+    "esp-metadata-generated/esp32",
 ]
 # Target the ESP32-C2.
 esp32c2 = [
     "dep:esp32c2",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c2",
+    "esp-metadata-generated/esp32c2",
 ]
 # Target the ESP32-C3.
 esp32c3 = [
     "dep:esp32c3",
     "esp-riscv-rt/rtc-ram",
     "portable-atomic/unsafe-assume-single-core",
+    "esp-rom-sys/esp32c3",
+    "esp-metadata-generated/esp32c3",
 ]
 # Target the ESP32-C6.
 esp32c6 = [
     "dep:esp32c6",
     "esp-riscv-rt/rtc-ram",
     "procmacros/has-lp-core",
+    "esp-rom-sys/esp32c6",
+    "esp-metadata-generated/esp32c6",
 ]
 # Target the ESP32-H2.
 esp32h2 = [
     "dep:esp32h2",
     "esp-riscv-rt/rtc-ram",
+    "esp-rom-sys/esp32h2",
+    "esp-metadata-generated/esp32h2",
 ]
 # Target the ESP32-S2.
 esp32s2 = [
@@ -148,6 +161,8 @@ esp32s2 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s2",
+    "esp-metadata-generated/esp32s2",
 ]
 # Target the ESP32-S3.
 esp32s3 = [
@@ -155,6 +170,23 @@ esp32s3 = [
     "procmacros/has-ulp-core",
     "procmacros/rtc-slow",
     "__usb_otg",
+    "esp-rom-sys/esp32s3",
+    "esp-metadata-generated/esp32s3",
+]
+
+## Runtime support
+##
+## If you are depending on `esp-hal` as a library, you should *not* enable the `rt` feature under any circumstance.
+rt = [
+    "dep:xtensa-lx-rt",
+    "dep:esp-riscv-rt",
+    "esp32?/rt",
+    "esp32c2?/rt",
+    "esp32c3?/rt",
+    "esp32c6?/rt",
+    "esp32h2?/rt",
+    "esp32s2?/rt",
+    "esp32s3?/rt",
 ]
 
 
@@ -192,6 +224,7 @@ psram = []
 #! Unstable APIs are not covered by semver guarantees.
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
+## Never enable this feature in a library crate using esp-hal.
 unstable = [
     "dep:digest",
     "dep:embassy-embedded-hal",
@@ -203,6 +236,12 @@ unstable = [
     "dep:nb",
     "dep:ufmt-write",
 ]
+
+## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
+requires-unstable = []
 
 [lints.clippy]
 mixed_attributes_style = "allow"

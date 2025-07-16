@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.12.0] - 2025-07-16
+
+### Changed
+
+* This crate no longer uses the `links` field in its `Cargo.toml` (#3697)
+
 ## [v0.11.0] - 2025-06-03
 
 ### Changed
@@ -57,4 +63,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.10.0]: https://github.com/esp-rs/esp-hal/releases/tag/xtensa-lx-v0.10.0
 [v0.11.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-v0.10.0...xtensa-lx-v0.11.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-v0.11.0...HEAD
+[v0.12.0]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-v0.11.0...xtensa-lx-v0.12.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/xtensa-lx-v0.12.0...HEAD

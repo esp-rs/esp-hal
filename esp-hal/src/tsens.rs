@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Temperature Sensor (tsens)
 //!
 //! ## Overview
@@ -22,23 +23,21 @@
 //! second, and print it
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::tsens::{TemperatureSensor, Config};
 //! # use esp_hal::delay::Delay;
 //!
-//! let temperature_sensor = TemperatureSensor::new(
-//!         peripherals.TSENS,
-//!         Config::default())?;
+//! let temperature_sensor = TemperatureSensor::new(peripherals.TSENS, Config::default())?;
 //! let delay = Delay::new();
 //! delay.delay_micros(200);
 //! loop {
-//!   let temp = temperature_sensor.get_temperature();
-//!   println!("Temperature: {:.2}°C", temp.to_celcius());
-//!   delay.delay_millis(1_000);
+//!     let temp = temperature_sensor.get_temperature();
+//!     println!("Temperature: {:.2}°C", temp.to_celcius());
+//!     delay.delay_millis(1_000);
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //! - Temperature calibration range is not supported

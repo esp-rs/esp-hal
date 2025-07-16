@@ -15,10 +15,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+
+### Removed
+
+
+## [v0.15.0] - 2025-07-16
+
+### Fixed
+
 - Fixed timestamp when using `defmt-espflash` (#3725)
 
 ### Removed
 
+- Removed support for ESP32-P4 (#3754)
 
 ## [v0.14.0] - 2025-06-03
 
@@ -98,4 +107,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.13.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-println-v0.13.1
 [v0.14.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.13.1...esp-println-v0.14.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.14.0...HEAD
+[v0.15.0]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.14.0...esp-println-v0.15.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-println-v0.15.0...HEAD

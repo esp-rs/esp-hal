@@ -9,11 +9,9 @@
 //! Main features:
 //!
 //! - Standard HMAC-SHA-256 algorithm.
-//! - Hash result only accessible by configurable hardware peripheral (in
-//!   downstream mode).
+//! - Hash result only accessible by configurable hardware peripheral (in downstream mode).
 //! - Compatible to challenge-response authentication algorithm.
-//! - Generates required keys for the Digital Signature (DS) peripheral (in
-//!   downstream mode).
+//! - Generates required keys for the Digital Signature (DS) peripheral (in downstream mode).
 //! - Re-enables soft-disabled JTAG (in downstream mode).
 //!
 //! ## Configuration
@@ -181,7 +179,7 @@ impl<'d> Hmac<'d> {
         nb::block!(self.write_data(&[0x80])).unwrap();
         nb::block!(self.flush_data()).unwrap();
         self.next_command();
-        debug_assert!(self.byte_written % 4 == 0);
+        debug_assert!(self.byte_written.is_multiple_of(4));
 
         self.padding(msg_len);
 
@@ -278,7 +276,7 @@ impl<'d> Hmac<'d> {
         );
 
         self.byte_written = self.byte_written.wrapping_add(flushed);
-        if flushed > 0 && self.byte_written % 64 == 0 {
+        if flushed > 0 && self.byte_written.is_multiple_of(64) {
             self.regs()
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
@@ -308,7 +306,7 @@ impl<'d> Hmac<'d> {
                 .set_message_one()
                 .write(|w| w.set_text_one().set_bit());
             self.byte_written = self.byte_written.wrapping_add(pad_len);
-            debug_assert!(self.byte_written % 64 == 0);
+            debug_assert!(self.byte_written.is_multiple_of(64));
             while self.is_busy() {}
             self.next_command = NextCommand::MessagePad;
             self.next_command();

@@ -82,15 +82,13 @@
 //! Peripheral signals and GPIOs can be connected with the following
 //! constraints:
 //!
-//! - A peripheral input signal must be driven by exactly one signal, which can
-//!   be a GPIO input or a constant level.
-//! - A peripheral output signal can be connected to any number of GPIOs. These
-//!   GPIOs can be configured differently. The peripheral drivers will only
-//!   support a single connection (that is, they disconnect previously
-//!   configured signals on repeat calls to the same function), but you can use
-//!   `esp_hal::gpio::OutputSignal::connect_to` (note that the type is currently
-//!   hidden from the documentation) to connect multiple GPIOs to the same
-//!   output signal.
+//! - A peripheral input signal must be driven by exactly one signal, which can be a GPIO input or a
+//!   constant level.
+//! - A peripheral output signal can be connected to any number of GPIOs. These GPIOs can be
+//!   configured differently. The peripheral drivers will only support a single connection (that is,
+//!   they disconnect previously configured signals on repeat calls to the same function), but you
+//!   can use `esp_hal::gpio::OutputSignal::connect_to` (note that the type is currently hidden from
+//!   the documentation) to connect multiple GPIOs to the same output signal.
 //! - A GPIO input signal can be connected to any number of peripheral inputs.
 //! - A GPIO output can be driven by only one peripheral output.
 //!
@@ -419,6 +417,7 @@ impl Signal<'_> {
                         .map(|(af, _)| *af)
                         .unwrap_or(AlternateFunction::GPIO)
                 };
+                pin.disable_usb_pads();
                 pin.set_alternate_function(af);
                 af == AlternateFunction::GPIO
             }
@@ -468,6 +467,7 @@ impl Signal<'_> {
                 .map(|(af, _)| *af)
                 .unwrap_or(AlternateFunction::GPIO)
         };
+        pin.disable_usb_pads();
         pin.set_alternate_function(af);
 
         let use_gpio_matrix = af == AlternateFunction::GPIO;
@@ -914,6 +914,7 @@ impl NoOp {
     }
 }
 
+#[procmacros::doc_replace]
 /// ```rust,compile_fail
 /// // Regression test for <https://github.com/esp-rs/esp-hal/issues/3313>
 /// // This test case is expected to generate the following error:
@@ -928,7 +929,7 @@ impl NoOp {
 /// //    | |_______________________^ the trait `InputPin` is not implemented for `Output<'_>`
 /// // FIXME: due to <https://github.com/rust-lang/rust/issues/139924> this test may be ineffective.
 /// //        It can be manually verified by changing it to `no_run` for a `run-doc-tests` run.
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::gpio::{Output, Level, interconnect::PeripheralInput};
 ///
 /// fn function_expects_input<'d>(_: impl PeripheralInput<'d>) {}
@@ -939,7 +940,6 @@ impl NoOp {
 ///     Default::default()),
 /// );
 ///
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 fn _compile_tests() {}

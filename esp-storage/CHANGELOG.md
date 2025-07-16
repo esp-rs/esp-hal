@@ -15,10 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix incorrect usage of MaybeUninit (#3677)
 
 ### Removed
 
+
+## [v0.7.0] - 2025-07-16
+
+### Fixed
+
+- Fix incorrect usage of MaybeUninit (#3677)
+- Use `libesp_rom.a` from ESP-IDF on ESP32 as a replacement for our incomplete and less accurate port (#3688)
 
 ## [v0.6.0] - 2025-06-03
 
@@ -54,4 +60,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.5.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-storage-v0.5.0
 [v0.6.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.5.0...esp-storage-v0.6.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.6.0...HEAD
+[v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.6.0...esp-storage-v0.7.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-storage-v0.7.0...HEAD

@@ -3,7 +3,8 @@
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 //!
-//! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
+//! This gets an ip address via DHCP then performs an HTTP get request to some
+//! "random" server
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
@@ -56,7 +57,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
-        init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap()
+        init(timg0.timer0, rng.clone()).unwrap()
     );
 
     let (controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

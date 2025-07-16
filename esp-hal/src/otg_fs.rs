@@ -53,6 +53,15 @@ pub trait UsbDp: crate::private::Sealed {}
 /// Trait representing the USB D- (data minus) pin.
 pub trait UsbDm: crate::private::Sealed {}
 
+for_each_analog_function! {
+    (USB_DM, $gpio:ident) => {
+        impl UsbDm for crate::peripherals::$gpio<'_> {}
+    };
+    (USB_DP, $gpio:ident) => {
+        impl UsbDp for crate::peripherals::$gpio<'_> {}
+    };
+}
+
 /// USB peripheral.
 pub struct Usb<'d> {
     _usb0: peripherals::USB0<'d>,
@@ -168,8 +177,7 @@ pub mod asynch {
         ///
         /// # Arguments
         ///
-        /// * `ep_out_buffer` - An internal buffer used to temporarily store
-        ///   received packets.
+        /// * `ep_out_buffer` - An internal buffer used to temporarily store received packets.
         ///
         /// Must be large enough to fit all OUT endpoint max packet sizes.
         /// Endpoint allocation will fail if it is too small.

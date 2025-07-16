@@ -3,8 +3,8 @@
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 //!
-//! This gets an ip address via DHCP then performs an HTTP get request to some "random" server
-//!
+//! This gets an ip address via DHCP then performs an HTTP get request to some
+//! "random" server
 
 //% FEATURES: esp-wifi esp-wifi/wifi  esp-hal/unstable esp-wifi/smoltcp
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
@@ -55,7 +55,7 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone()).unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

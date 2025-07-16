@@ -28,9 +28,9 @@ cfg_if::cfg_if! {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(clippy::enum_variant_names, reason = "peripheral is unstable")]
 pub enum Resolution {
-    /// 13-bit resolution
+    /// 12-bit resolution
     #[default]
-    Resolution13Bit,
+    Resolution12Bit,
 }
 
 impl<ADCI> AdcConfig<ADCI>

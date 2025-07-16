@@ -1,6 +1,6 @@
 [package]
 name          = "esp-println"
-version       = "0.14.0"
+version       = "0.15.0"
 edition       = "2024"
 rust-version  = "1.86.0"
 description   = "Provides `print!` and `println!` implementations various Espressif devices"
@@ -32,20 +32,19 @@ defmt            = { version = "1.0.1", optional = true }
 log-04           = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-metadata = { version = "0.7.0", path = "../esp-metadata" }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 log-04       = { package = "log", version = "0.4.27" }
 
 [features]
 default          = ["auto", "colors", "critical-section"]
 
-esp32   = []
-esp32c2 = []
-esp32c3 = []
-esp32c6 = []
-esp32h2 = []
-esp32p4 = []
-esp32s2 = []
-esp32s3 = []
+esp32   = ["esp-metadata-generated/esp32"]
+esp32c2 = ["esp-metadata-generated/esp32c2"]
+esp32c3 = ["esp-metadata-generated/esp32c3"]
+esp32c6 = ["esp-metadata-generated/esp32c6"]
+esp32h2 = ["esp-metadata-generated/esp32h2"]
+esp32s2 = ["esp-metadata-generated/esp32s2"]
+esp32s3 = ["esp-metadata-generated/esp32s3"]
 
 ## Use a critical section around print calls. This ensures that the output is consistent.
 critical-section = ["dep:critical-section"]

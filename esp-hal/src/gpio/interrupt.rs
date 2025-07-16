@@ -2,17 +2,14 @@
 //!
 //! ## Requirements
 //!
-//! - On devices other than the P4, there is a single interrupt handler. GPIO
-//!   interrupt handling must not interfere with the async API in this single
-//!   handler.
-//! - Async operations take pins by `&mut self`, so they can only be accessed
-//!   after the operation is complete, or cancelled. They may be defined to
-//!   overwrite the configuration of the manual interrupt API, but not affect
-//!   the interrupt handler.
-//! - Manual `listen` operations don't need to be prepared for async operations,
-//!   but async operations need to be prepared to handle cases where the pin was
-//!   configured to listen for an event - or even that the user unlistened the
-//!   pin but left the interrupt status set.
+//! - On devices other than the P4, there is a single interrupt handler. GPIO interrupt handling
+//!   must not interfere with the async API in this single handler.
+//! - Async operations take pins by `&mut self`, so they can only be accessed after the operation is
+//!   complete, or cancelled. They may be defined to overwrite the configuration of the manual
+//!   interrupt API, but not affect the interrupt handler.
+//! - Manual `listen` operations don't need to be prepared for async operations, but async
+//!   operations need to be prepared to handle cases where the pin was configured to listen for an
+//!   event - or even that the user unlistened the pin but left the interrupt status set.
 //!
 //! The user should be careful when using the async API and the manual interrupt
 //! API together. For performance reasons, we will not prevent the user handler
@@ -61,17 +58,16 @@ use portable_atomic::{AtomicPtr, Ordering};
 use procmacros::ram;
 use strum::EnumCount;
 
+#[cfg(feature = "rt")]
+use crate::interrupt::{self, DEFAULT_INTERRUPT_HANDLER};
 use crate::{
-    gpio::{AnyPin, GpioBank, InputPin, set_int_enable},
-    interrupt::{self, DEFAULT_INTERRUPT_HANDLER, Priority},
+    gpio::{AnyPin, GPIO_LOCK, GpioBank, InputPin, set_int_enable},
+    interrupt::Priority,
     peripherals::{GPIO, Interrupt},
-    sync::RawMutex,
 };
 
 /// Convenience constant for `Option::None` pin
 pub(super) static USER_INTERRUPT_HANDLER: CFnPtr = CFnPtr::new();
-
-pub(super) static GPIO_LOCK: RawMutex = RawMutex::new();
 
 pub(super) struct CFnPtr(AtomicPtr<()>);
 impl CFnPtr {
@@ -91,6 +87,7 @@ impl CFnPtr {
     }
 }
 
+#[cfg(feature = "rt")]
 pub(crate) fn bind_default_interrupt_handler() {
     // We first check if a handler is set in the vector table.
     if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
@@ -143,6 +140,7 @@ pub(super) fn set_interrupt_priority(interrupt: Interrupt, priority: Priority) {
 /// status bits unchanged. This enables functions like `is_interrupt_set` to
 /// work correctly.
 #[ram]
+#[cfg(feature = "rt")]
 extern "C" fn default_gpio_interrupt_handler() {
     GPIO_LOCK.lock(|| {
         let banks = interrupt_status();

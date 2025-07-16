@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # PSRAM "virtual peripheral" driver (ESP32)
 //!
 //! ## Overview
@@ -17,29 +18,13 @@
 //! You need an ESP32 with at least 2 MB of PSRAM memory.
 //! Notice that PSRAM example **must** be built in release mode!
 //!
-//! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! ```rust, ignore
+//! # {before_snippet}
 //! # extern crate alloc;
 //! # use alloc::{string::String, vec::Vec};
-//! # use esp_alloc as _;
-//! # use esp_hal::psram;
-//!
-//! // Initialize PSRAM and add it as a heap memory region
-//! fn init_psram_heap(start: *mut u8, size: usize) {
-//!     unsafe {
-//!         esp_alloc::HEAP.add_region(esp_alloc::HeapRegion::new(
-//!             start,
-//!             size,
-//!             esp_alloc::MemoryCapability::External.into(),
-//!         ));
-//!     }
-//! }
-//!
-//! // Initialize PSRAM and add it to the heap
-//! let (start, size) = psram::init_psram(peripherals.PSRAM,
-//!     psram::PsramConfig::default());
-//!
-//! init_psram_heap(start, size);
+//! #
+//! // Add PSRAM to the heap.
+//! esp_alloc::psram_allocator!(&peripherals.PSRAM, esp_hal::psram);
 //!
 //! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
 //!
@@ -48,7 +33,7 @@
 //! }
 //!
 //! let string = String::from("A string allocated in PSRAM");
-//! # }
+//! # {after_snippet}
 //! ```
 
 pub use crate::soc::psram_common::*;
@@ -755,7 +740,7 @@ pub(crate) mod utils {
         }
     }
 
-    #[derive(Debug, Copy, Clone, PartialEq)]
+    #[derive(Default, Debug, Copy, Clone, PartialEq)]
     struct PsramCmd {
         cmd: u16,             // Command value
         cmd_bit_len: u16,     // Command byte length
@@ -766,22 +751,6 @@ pub(crate) mod utils {
         rx_data: *mut u32,    // Point to recevie data buffer
         rx_data_bit_len: u16, // Recevie Data byte length.
         dummy_bit_len: u32,
-    }
-
-    impl Default for PsramCmd {
-        fn default() -> Self {
-            Self {
-                cmd: Default::default(),
-                cmd_bit_len: Default::default(),
-                addr: Default::default(),
-                addr_bit_len: Default::default(),
-                tx_data: core::ptr::null(),
-                tx_data_bit_len: Default::default(),
-                rx_data: core::ptr::null_mut(),
-                rx_data_bit_len: Default::default(),
-                dummy_bit_len: Default::default(),
-            }
-        }
     }
 
     const PSRAM_ENTER_QMODE: u32 = 0x35;
@@ -1060,7 +1029,7 @@ pub(crate) mod utils {
 
             fn configure_gpio(gpio: u8, field: Field, bits: u8) {
                 unsafe {
-                    let ptr = crate::peripherals::io_mux_reg(gpio);
+                    let ptr = crate::gpio::io_mux_reg(gpio);
                     ptr.modify(|_, w| apply_to_field!(w, field, bits));
                 }
             }

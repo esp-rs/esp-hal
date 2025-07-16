@@ -1,3 +1,14 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_I2S0;",
+        cfg(not(any(esp32, esp32s2))) => "let dma_channel = peripherals.DMA_CH0;"
+    },
+    "mclk" => {
+        cfg(not(esp32)) => "let i2s = i2s.with_mclk(peripherals.GPIO0);",
+        _ => ""
+    }
+
+))]
 //! # Inter-IC Sound (I2S)
 //!
 //! ## Overview
@@ -28,14 +39,10 @@
 //! ### I2S Read
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Standard, DataFormat};
 //! # use esp_hal::dma_buffers;
-#![cfg_attr(any(esp32, esp32s2), doc = "let dma_channel = peripherals.DMA_I2S0;")]
-#![cfg_attr(
-    not(any(esp32, esp32s2)),
-    doc = "let dma_channel = peripherals.DMA_CH0;"
-)]
+//! # {dma_channel}
 //! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
 //!
 //! let i2s = I2s::new(
@@ -45,8 +52,9 @@
 //!     Rate::from_hz(44100),
 //!     dma_channel,
 //! );
-#![cfg_attr(not(esp32), doc = "let i2s = i2s.with_mclk(peripherals.GPIO0);")]
-//! let mut i2s_rx = i2s.i2s_rx
+//! # {mclk}
+//! let mut i2s_rx = i2s
+//!     .i2s_rx
 //!     .with_bclk(peripherals.GPIO1)
 //!     .with_ws(peripherals.GPIO2)
 //!     .with_din(peripherals.GPIO5)
@@ -64,7 +72,7 @@
 //! }
 //! # }
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //! - Only TDM Philips standard is supported.
@@ -601,7 +609,7 @@ where
     {
         let (ptr, len) = unsafe { words.write_buffer() };
 
-        if len % 4 != 0 {
+        if !len.is_multiple_of(4) {
             return Err(Error::IllegalArgument);
         }
 
@@ -668,7 +676,7 @@ where
 }
 
 /// A peripheral singleton compatible with the I2S master driver.
-pub trait Instance: RegisterAccessPrivate + super::IntoAnyI2s {}
+pub trait Instance: RegisterAccessPrivate + super::any::Degrade {}
 #[cfg(soc_has_i2s0)]
 impl Instance for crate::peripherals::I2S0<'_> {}
 #[cfg(soc_has_i2s1)]
@@ -691,7 +699,7 @@ mod private {
             OutputSignal,
             interconnect::{PeripheralInput, PeripheralOutput},
         },
-        i2s::AnyI2sInner,
+        i2s::any::Inner as AnyI2sInner,
         interrupt::InterruptHandler,
         peripherals::I2S0,
     };
@@ -1913,7 +1921,7 @@ pub mod asynch {
         pub async fn read_dma_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
             let (ptr, len) = (words.as_mut_ptr(), words.len());
 
-            if len % 4 != 0 {
+            if !len.is_multiple_of(4) {
                 return Err(Error::IllegalArgument);
             }
 
@@ -1949,7 +1957,7 @@ pub mod asynch {
         {
             let (ptr, len) = unsafe { words.write_buffer() };
 
-            if len % 4 != 0 {
+            if !len.is_multiple_of(4) {
                 return Err(Error::IllegalArgument);
             }
 

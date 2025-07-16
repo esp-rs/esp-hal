@@ -1,0 +1,57 @@
+[package]
+name          = "esp-rom-sys"
+version       = "0.1.1"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "ROM code support"
+documentation = "https://docs.espressif.com/projects/rust/esp-rom-sys/latest/"
+keywords      = ["embedded", "esp32", "espressif"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+links         = "esp_rom_sys"
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
+
+[lib]
+bench = false
+test  = false
+
+[dependencies]
+cfg-if              = "1.0.1"
+defmt               = { version = "1.0.1", optional = true }
+document-features   = "0.2.11"
+log-04              = { package = "log", version = "0.4.26", optional = true }
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[features]
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+# The following trailing spaces ("## ") are important to display the feature names.
+
+## 
+esp32   = []
+## 
+esp32c2 = []
+## 
+esp32c3 = []
+## 
+esp32c6 = []
+## 
+esp32h2 = []
+## 
+esp32s2 = []
+## 
+esp32s3 = []
+
+## Enable support for version 0.4 of the `log` crate
+log-04 = ["dep:log-04"]
+
+## Enable support for `defmt`
+defmt = ["dep:defmt"]

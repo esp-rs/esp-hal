@@ -161,12 +161,11 @@ impl DeadTimeCfg {
 /// A MCPWM operator
 ///
 /// The PWM Operator submodule has the following functions:
-/// * Generates a PWM signal pair, based on timing references obtained from the
-///   corresponding PWM timer.
-/// * Each signal out of the PWM signal pair includes a specific pattern of dead
-///   time. (Not yet implemented)
-/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet
+/// * Generates a PWM signal pair, based on timing references obtained from the corresponding PWM
+///   timer.
+/// * Each signal out of the PWM signal pair includes a specific pattern of dead time. (Not yet
 ///   implemented)
+/// * Superimposes a carrier on the PWM signal, if configured to do so. (Not yet implemented)
 /// * Handles response under fault conditions. (Not yet implemented)
 pub struct Operator<'d, const OP: u8, PWM> {
     phantom: PhantomData<&'d PWM>,
@@ -441,6 +440,12 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
     }
 }
 
+#[procmacros::doc_replace(
+    "clock_cfg" => {
+        cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
+        cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    }
+)]
 /// Two pins driven by the same timer and operator
 ///
 /// Useful for complementary or mirrored signals with or without
@@ -449,22 +454,14 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// # H-Bridge example
 ///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use esp_hal::mcpwm::{McPwm, PeripheralClockConfig};
 /// # use esp_hal::mcpwm::operator::{DeadTimeCfg, PwmPinConfig, PWMStream};
 /// // active high complementary using PWMA input
 /// let bridge_active = DeadTimeCfg::new_ahc();
 /// // use PWMB as input for both outputs
-/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA,
-/// true);
-#[cfg_attr(
-    esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
-)]
-#[cfg_attr(
-    not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
-)]
+/// let bridge_off = DeadTimeCfg::new_bypass().set_output_swap(PWMStream::PWMA, true);
+/// # {clock_cfg}
 /// let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 ///
 /// let mut pins = mcpwm.operator0.with_linked_pins(
@@ -483,8 +480,7 @@ impl<PWM: PwmPeripheral, const OP: u8, const IS_A: bool> embedded_hal::pwm::SetD
 /// pins.set_deadtime_cfg(bridge_active);
 /// // pin_a: _______-------_____________-------______
 /// // pin_b: ------_________-----------_________-----
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 pub struct LinkedPins<'d, PWM, const OP: u8> {
     pin_a: PwmPin<'d, PWM, OP, true>,

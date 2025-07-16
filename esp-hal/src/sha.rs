@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Secure Hash Algorithm (SHA) Accelerator
 //!
 //! ## Overview
@@ -30,7 +31,7 @@
 //!
 //! ## Examples
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::sha::Sha;
 //! # use esp_hal::sha::Sha256;
 //! # use nb::block;
@@ -51,8 +52,7 @@
 //! // the output.
 //! block!(hasher.finish(output.as_mut_slice()))?;
 //!
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 //! ## Implementation State
 //! - DMA-SHA Mode is not supported.
@@ -117,16 +117,12 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 }
 
 // A few notes on this implementation with regards to 'memcpy',
-// - The registers are *not* cleared after processing, so padding needs to be
-//   written out
-// - This component uses core::intrinsics::volatile_* which is unstable, but is
-//   the only way to
+// - The registers are *not* cleared after processing, so padding needs to be written out
+// - This component uses core::intrinsics::volatile_* which is unstable, but is the only way to
 // efficiently copy memory with volatile
-// - For this particular registers (and probably others), a full u32 needs to be
-//   written partial
+// - For this particular registers (and probably others), a full u32 needs to be written partial
 // register writes (i.e. in u8 mode) does not work
-//   - This means that we need to buffer bytes coming in up to 4 u8's in order
-//     to create a full u32
+//   - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
 
 /// An active digest
 ///
@@ -239,12 +235,12 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             );
             self.cursor = self.cursor.wrapping_add(flushed);
 
-            if flushed > 0 && self.cursor % A::CHUNK_LENGTH == 0 {
+            if flushed > 0 && self.cursor.is_multiple_of(A::CHUNK_LENGTH) {
                 self.process_buffer();
                 while self.is_busy() {}
             }
         }
-        debug_assert!(self.cursor % 4 == 0);
+        debug_assert!(self.cursor.is_multiple_of(4));
 
         let mod_cursor = self.cursor % A::CHUNK_LENGTH;
         if (A::CHUNK_LENGTH - mod_cursor) < A::CHUNK_LENGTH / 8 {

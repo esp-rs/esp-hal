@@ -8,6 +8,8 @@
 
 Metadata for Espressif devices, intended for use in [build scripts].
 
+Firmware crates are meant to depend on `esp-metadata-generated`, not on this crate directly. To update `esp-metadata-generated`, make your changes in `esp-metadata`, then run `cargo xtask update-metadata`.
+
 [build scripts]: https://doc.rust-lang.org/cargo/reference/build-scripts.html
 
 ## [Documentation](https://docs.espressif.com/projects/rust/esp-metadata/latest/)

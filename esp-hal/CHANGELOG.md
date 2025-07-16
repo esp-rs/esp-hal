@@ -9,13 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+
+### Changed
+
+
+### Fixed
+
+
+### Removed
+
+
+## [v1.0.0-rc.0] - 2025-07-16
+
+### Added
+
 - `i2c::master::BusTimeout::Disabled` for ESP32-S2 (#3591)
 - The `const CHANNEL: u8` parameter of RMT channels can now be erased via `Channel::degrade()`. (#3505)
 - ESP32-C6: GPIO6 now implements `AnalogPin` (#3668)
 - SPI master: Expose octal SPI-specific `with_sio` functions (#3702)
+- The functions of the `RadioClockController` have been split up to the modem peripheral structs. The clock management is now provided by the `ModemClockController`. (#3687)
+- Added GPIO11-GPIO17 to ESP32-C2. (#3726)
+- Added the feature `requires-unstable` (#3772)
+- `AnyPin::downcast`/`AnyPeripheral::downcast` to allow retrieving the original GPIO/peripheral type (#3783, #3784)
+- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778)
+- The `rt` feature (#3706)
 
 ### Changed
 
+- MSRV is now 1.88.0 (#3742)
 - `AnyI2c` has been moved from `esp_hal::i2c` to `esp_hal::i2c::master` (#3627)
 - `AnySpi` has been moved from `esp_hal::spi` to `esp_hal::spi::master` and `esp_hal::spi::slave` (#3627)
 - `DataMode` has been moved from `esp_hal::spi` to `esp_hal::spi::master` (#3627)
@@ -27,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Increase ESP32 DRAM memory region by 16K (#3703)
 - The I2C async interrupt handler is now placed into IRAM (#3722)
 - Adjusted ESP32-S2 and ESP-S3 memory region lengths to reflect those defined in ESP-IDF. (#3709)
+- Changed the various `ConfigError` variant names to use a consistent word order. (#3782)
+- Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
+- Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
+- Changed `interrupt::RESERVED_INTERRUPTS` from `&[usize]` to `&[u32]` (#3798)
 
 ### Fixed
 
@@ -34,11 +59,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent bootloops when DRAM is close to being full. (#3635)
 - Fix PSRAM mapping on ESP32-S3 when the bootloader used the last page to access flash (#3637)
 - `ESP_HAL_CONFIG_STACK_GUARD_OFFSET` and `ESP_HAL_CONFIG_STACK_GUARD_VALUE` are now unstable config options (#3711)
+- Fixed MCPWM output when using USB pins (#3795)
 
 ### Removed
 
 - `InterruptHandler` no longer implements `PartialEq`, `Eq` or `Hash`. (#3650)
 - `gpio::NUM_PINS` (#3658)
+- `RADIO_CLK` and `RadioClockController` have been removed (#3687)
+- Removed GPIO24 from ESP32. (#3726)
+- Removed GPIO15-GPIO21 from ESP32-H2. (#3726)
+- ESP32-S3: `AnalogPin` is no longer implemented for GPIO0 and GPIO21 (#3781)
 
 ## [v1.0.0-beta.1] - 2025-06-03
 
@@ -1284,4 +1314,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.23.1]: https://github.com/esp-rs/esp-hal/compare/v0.23.0...v0.23.1
 [v1.0.0-beta.0]: https://github.com/esp-rs/esp-hal/compare/v0.23.1...esp-hal-v1.0.0-beta.0
 [v1.0.0-beta.1]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.0...esp-hal-v1.0.0-beta.1
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...HEAD
+[v1.0.0-rc.0]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-beta.1...esp-hal-v1.0.0-rc.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-hal-v1.0.0-rc.0...HEAD

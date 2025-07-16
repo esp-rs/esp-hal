@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Event Task Matrix (ETM)
 //!
 //! ## Overview
@@ -14,17 +15,14 @@
 //!
 //! GPIO has several event channels, and the ETM events that each event
 //! channel can generate are:
-//! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO has
-//!   a rising edge
-//! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has
-//!   a falling edge
-//! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is
-//!   reversed
+//! - RISE_EDGE: Indicates that the output signal of the corresponding GPIO has a rising edge
+//! - FALL_EDGE: Indicates that the output signal of the corresponding GPIO has a falling edge
+//! - ANY_EDGE: Indicates that the output signal of the corresponding GPIO is reversed
 //!
 //! ## Examples
 //! ### Toggle an LED When a Button is Pressed
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::Channels;
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::etm::InputConfig;
@@ -47,8 +45,7 @@
 //! let button_event = gpio_ext
 //!     .channel0_event
 //!     .falling_edge(button, InputConfig { pull: Pull::Down });
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use core::marker::PhantomData;

@@ -1,7 +1,8 @@
 //! BLE Example
 //!
 //! - starts Bluetooth advertising
-//! - offers one service with three characteristics (one is read/write, one is write only, one is read/write/notify)
+//! - offers one service with three characteristics (one is read/write, one is write only, one is
+//!   read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
 //% FEATURES: esp-wifi esp-wifi/ble esp-hal/unstable
@@ -47,12 +48,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let esp_wifi_ctrl = init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap();
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {

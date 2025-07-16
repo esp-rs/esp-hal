@@ -14,10 +14,10 @@
 //! If all you want to do is to communicate to a single device, and you initiate
 //! transactions yourself, there are a number of ways to achieve this:
 //!
-//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated
-//!   functions to initiate transactions with simultaneous reads and writes, or
-//! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice`
-//!   from [`embassy-embedded-hal`].
+//! - Use the [`SpiBus`](embedded_hal::spi::SpiBus) trait and its associated functions to initiate
+//!   transactions with simultaneous reads and writes, or
+//! - Use the `ExclusiveDevice` struct from [`embedded-hal-bus`] or `SpiDevice` from
+//!   [`embassy-embedded-hal`].
 //!
 //! ### Shared SPI access
 //!
@@ -41,7 +41,7 @@ use core::marker::PhantomData;
 #[instability::unstable]
 pub use dma::*;
 use enumset::{EnumSet, EnumSetType};
-use procmacros::enable_doc_switch;
+use procmacros::doc_replace;
 #[cfg(place_spi_master_driver_in_ram)]
 use procmacros::ram;
 
@@ -602,7 +602,7 @@ impl Config {
 
         if self.frequency < source_freq / max_divider || self.frequency > source_freq / min_divider
         {
-            return Err(ConfigError::UnsupportedFrequency);
+            return Err(ConfigError::FrequencyOutOfRange);
         }
 
         Ok(())
@@ -633,8 +633,8 @@ struct SpiPinGuard {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConfigError {
-    /// The requested frequency is not supported.
-    UnsupportedFrequency,
+    /// The requested frequency is not in the supported range.
+    FrequencyOutOfRange,
 }
 
 impl core::error::Error for ConfigError {}
@@ -642,20 +642,23 @@ impl core::error::Error for ConfigError {}
 impl core::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            ConfigError::UnsupportedFrequency => {
-                write!(f, "The requested frequency is not supported")
+            ConfigError::FrequencyOutOfRange => {
+                write!(f, "The requested frequency is not in the supported range")
             }
         }
     }
 }
-
+#[procmacros::doc_replace]
 /// SPI peripheral driver
 ///
-/// ### SPI Initialization
+/// ## Example
+///
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
-/// # use esp_hal::spi::Mode;
-/// # use esp_hal::spi::master::{Config, Spi};
+/// # {before_snippet}
+/// use esp_hal::spi::{
+///     Mode,
+///     master::{Config, Spi},
+/// };
 /// let mut spi = Spi::new(
 ///     peripherals.SPI2,
 ///     Config::default()
@@ -665,8 +668,7 @@ impl core::fmt::Display for ConfigError {
 /// .with_sck(peripherals.GPIO0)
 /// .with_mosi(peripherals.GPIO1)
 /// .with_miso(peripherals.GPIO2);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -680,11 +682,27 @@ pub struct Spi<'d, Dm: DriverMode> {
 impl<Dm: DriverMode> Sealed for Spi<'_, Dm> {}
 
 impl<'d> Spi<'d, Blocking> {
+    #[procmacros::doc_replace]
     /// Constructs an SPI instance in 8bit dataframe mode.
     ///
-    /// # Errors
+    /// ## Errors
     ///
     /// See [`Spi::apply_config`].
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2);
+    /// # {after_snippet}
+    /// ```
     pub fn new(spi: impl Instance + 'd, config: Config) -> Result<Self, ConfigError> {
         let guard = PeripheralGuard::new(spi.info().peripheral);
 
@@ -727,7 +745,10 @@ impl<'d> Spi<'d, Blocking> {
         Ok(this)
     }
 
-    /// Converts the SPI instance into async mode.
+    /// Reconfigures the driver to operate in [`Async`] mode.
+    ///
+    /// See the [`Async`] documentation for an example on how to use this
+    /// method.
     pub fn into_async(mut self) -> Spi<'d, Async> {
         self.set_interrupt_handler(self.spi.info().async_handler);
         Spi {
@@ -738,34 +759,33 @@ impl<'d> Spi<'d, Blocking> {
         }
     }
 
-    #[enable_doc_switch]
+    #[doc_replace(
+        "dma_channel" => {
+            cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+            _ => "let dma_channel = peripherals.DMA_CH0;",
+        }
+    )]
     /// Configures the SPI instance to use DMA with the specified channel.
     ///
     /// This method prepares the SPI instance for DMA transfers using SPI
     /// and returns an instance of `SpiDma` that supports DMA
     /// operations.
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
-    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
-    /// # use esp_hal::dma_buffers;
-    #[doc_switch(
-        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-        _ => "let dma_channel = peripherals.DMA_CH0;",
-    )]
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-    ///     dma_buffers!(32000);
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     dma::{DmaRxBuf, DmaTxBuf},
+    ///     dma_buffers,
+    ///     spi::{
+    ///         Mode,
+    ///         master::{Config, Spi},
+    ///     },
+    /// };
+    /// # {dma_channel}
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
-    /// let dma_rx_buf = DmaRxBuf::new(
-    ///     rx_descriptors,
-    ///     rx_buffer
-    /// )?;
+    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
     ///
-    /// let dma_tx_buf = DmaTxBuf::new(
-    ///     tx_descriptors,
-    ///     tx_buffer
-    /// )?;
+    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
@@ -775,20 +795,21 @@ impl<'d> Spi<'d, Blocking> {
     /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     #[instability::unstable]
     pub fn with_dma(self, channel: impl DmaChannelFor<AnySpi<'d>>) -> SpiDma<'d, Blocking> {
         SpiDma::new(self.spi, self.pins, channel.degrade())
     }
 
-    #[enable_doc_switch]
-    #[doc_switch(
-        cfg(multi_core) => "Registers an interrupt handler for the peripheral on the current core.",
-        _ => "Registers an interrupt handler for the peripheral.",
+    #[doc_replace(
+        "header" => {
+            cfg(multi_core) => "Registers an interrupt handler for the peripheral on the current core.",
+            _ => "Registers an interrupt handler for the peripheral.",
+        }
     )]
-    #[doc = ""]
+    /// # {header}
+    ///
     /// Note that this will replace any previously registered interrupt
     /// handlers.
     ///
@@ -816,7 +837,10 @@ impl crate::interrupt::InterruptConfigurable for Spi<'_, Blocking> {
 }
 
 impl<'d> Spi<'d, Async> {
-    /// Converts the SPI instance into blocking mode.
+    /// Reconfigures the driver to operate in [`Blocking`] mode.
+    ///
+    /// See the [`Blocking`] documentation for an example on how to use this
+    /// method.
     pub fn into_blocking(self) -> Spi<'d, Blocking> {
         self.spi.disable_peri_interrupt();
         Spi {
@@ -827,17 +851,60 @@ impl<'d> Spi<'d, Async> {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Waits for the completion of previous operations.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer_in_place_async(&mut buffer).await?;
+    /// spi.flush_async().await?;
+    ///
+    /// # {after_snippet}
+    /// ```
     pub async fn flush_async(&mut self) -> Result<(), Error> {
         self.driver().flush_async().await
     }
 
+    #[procmacros::doc_replace]
     /// Sends `words` to the slave. Returns the `words` received from the slave.
     ///
     /// This function aborts the transfer when its Future is dropped. Some
     /// amount of data may have been transferred before the Future is
     /// dropped. Dropping the future may block for a short while to ensure
     /// the transfer is aborted.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer_in_place_async(&mut buffer).await?;
+    ///
+    /// # {after_snippet}
+    /// ```
     pub async fn transfer_in_place_async(&mut self, words: &mut [u8]) -> Result<(), Error> {
         // We need to flush because the blocking transfer functions may return while a
         // transfer is still in progress.
@@ -897,18 +964,33 @@ where
         pin.connect_with_guard(signal)
     }
 
+    #[procmacros::doc_replace]
     /// Assign the SCK (Serial Clock) pin for the SPI instance.
     ///
     /// Configures the specified pin to push-pull output and connects it to the
     /// SPI clock signal.
     ///
     /// Disconnects the previous pin that was assigned with `with_sck`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_sck(peripherals.GPIO0);
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn with_sck(mut self, sclk: impl PeripheralOutput<'d>) -> Self {
         self.pins.sclk_pin = self.connect_output_pin(sclk.into(), self.driver().info.sclk);
 
         self
     }
 
+    #[procmacros::doc_replace]
     /// Assign the MOSI (Master Out Slave In) pin for the SPI instance.
     ///
     /// Enables output functionality for the pin, and connects it as the MOSI
@@ -917,12 +999,26 @@ where
     ///
     /// Disconnects the previous pin that was assigned with `with_mosi` or
     /// `with_sio0`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_mosi(peripherals.GPIO1);
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn with_mosi(mut self, mosi: impl PeripheralOutput<'d>) -> Self {
         self.pins.sio0_pin = self.connect_sio_output_pin(mosi.into(), 0);
 
         self
     }
 
+    #[procmacros::doc_replace]
     /// Assign the MISO (Master In Slave Out) pin for the SPI instance.
     ///
     /// Enables input functionality for the pin, and connects it to the MISO
@@ -930,6 +1026,19 @@ where
     ///
     /// You want to use this for full-duplex SPI or
     /// [DataMode::SingleTwoDataLines]
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?.with_miso(peripherals.GPIO2);
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn with_miso(self, miso: impl PeripheralInput<'d>) -> Self {
         let miso = miso.into();
 
@@ -1010,24 +1119,61 @@ where
         self
     }
 
-    #[procmacros::enable_doc_switch]
+    #[doc_replace(
+        "max_frequency" => {
+            cfg(esp32h2) => " 48MHz",
+            _ => " 80MHz",
+        }
+    )]
     /// Change the bus configuration.
     ///
     /// # Errors
     ///
     /// If frequency passed in config exceeds
-    #[doc_switch(
-        cfg(esp32h2) => " 48MHz",
-        _ => " 80MHz",
-    )]
-    /// or is below 70kHz,
-    /// [`ConfigError::UnsupportedFrequency`] error will be returned.
+    /// # {max_frequency}
+    /// or is below 70kHz, [`ConfigError::FrequencyOutOfRange`] error will be returned.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?;
+    ///
+    /// spi.apply_config(&Config::default().with_frequency(Rate::from_khz(100)));
+    /// #
+    /// # {after_snippet}
+    /// ```
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         self.driver().apply_config(config)
     }
 
+    #[procmacros::doc_replace]
     /// Write bytes to SPI. After writing, flush is called to ensure all data
     /// has been transmitted.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
+    ///
+    /// let buffer = [0; 10];
+    /// spi.write(&buffer)?;
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn write(&mut self, words: &[u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().write(words)?;
@@ -1036,15 +1182,57 @@ where
         Ok(())
     }
 
+    #[procmacros::doc_replace]
     /// Read bytes from SPI. The provided slice is filled with data received
     /// from the slave.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.read(&mut buffer)?;
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn read(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().read(words)
     }
 
+    #[procmacros::doc_replace]
     /// Sends `words` to the slave. The received data will be written to
     /// `words`, overwriting its contents.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::spi::{
+    ///     Mode,
+    ///     master::{Config, Spi},
+    /// };
+    /// let mut spi = Spi::new(peripherals.SPI2, Config::default())?
+    ///     .with_sck(peripherals.GPIO0)
+    ///     .with_mosi(peripherals.GPIO1)
+    ///     .with_miso(peripherals.GPIO2)
+    ///     .into_async();
+    ///
+    /// let mut buffer = [0; 10];
+    /// spi.transfer(&mut buffer)?;
+    ///
+    /// # {after_snippet}
+    /// ```
     pub fn transfer(&mut self, words: &mut [u8]) -> Result<(), Error> {
         self.driver().setup_full_duplex()?;
         self.driver().transfer(words)
@@ -1189,15 +1377,18 @@ mod dma {
         sync::atomic::{Ordering, fence},
     };
 
-    use procmacros::enable_doc_switch;
-
     use super::*;
     use crate::{
         dma::{Channel, DmaRxBuf, DmaTxBuf, EmptyBuf, PeripheralDmaChannel, asynch::DmaRxFuture},
         spi::master::dma::asynch::DropGuard,
     };
 
-    #[enable_doc_switch]
+    #[doc_replace(
+        "dma_channel" => {
+            cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+            _ => "let dma_channel = peripherals.DMA_CH0;",
+        }
+    )]
     /// A DMA capable SPI instance.
     ///
     /// Using `SpiDma` is not recommended unless you wish
@@ -1206,27 +1397,21 @@ mod dma {
     /// to a DMA capable SPI bus that implements the
     /// embedded-hal traits.
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
-    /// # use esp_hal::spi::Mode;
-    /// # use esp_hal::spi::master::{Config, Spi};
-    /// # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
-    /// # use esp_hal::dma_buffers;
-    #[doc_switch(
-        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
-        _ => "let dma_channel = peripherals.DMA_CH0;",
-    )]
-    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-    ///     dma_buffers!(32000);
+    /// # {before_snippet}
+    /// use esp_hal::{
+    ///     dma::{DmaRxBuf, DmaTxBuf},
+    ///     dma_buffers,
+    ///     spi::{
+    ///         Mode,
+    ///         master::{Config, Spi},
+    ///     },
+    /// };
+    /// # {dma_channel}
+    /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
     ///
-    /// let dma_rx_buf = DmaRxBuf::new(
-    ///     rx_descriptors,
-    ///     rx_buffer
-    /// )?;
+    /// let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer)?;
     ///
-    /// let dma_tx_buf = DmaTxBuf::new(
-    ///     tx_descriptors,
-    ///     tx_buffer
-    /// )?;
+    /// let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer)?;
     ///
     /// let mut spi = Spi::new(
     ///     peripherals.SPI2,
@@ -1236,8 +1421,8 @@ mod dma {
     /// )?
     /// .with_dma(dma_channel)
     /// .with_buffers(dma_rx_buf, dma_tx_buf);
-    /// # Ok(())
-    /// # }
+    /// #
+    /// # {after_snippet}
     /// ```
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct SpiDma<'d, Dm>
@@ -2656,7 +2841,7 @@ mod ehal1 {
 
 /// SPI peripheral instance.
 #[cfg_attr(not(feature = "unstable"), expect(private_bounds))] // DmaEligible
-pub trait Instance: private::Sealed + IntoAnySpi + DmaEligible {
+pub trait Instance: private::Sealed + any::Degrade + DmaEligible {
     #[doc(hidden)]
     /// Returns the peripheral data and state describing this instance.
     fn parts(&self) -> (&'static Info, &'static State);
@@ -3301,16 +3486,16 @@ impl Driver {
             }
         }
         let rem = c_iter.remainder();
-        if !rem.is_empty() {
-            if let Some(w_reg) = w_iter.next() {
-                let word = match rem.len() {
-                    3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
-                    2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
-                    1 => rem[0] as u32,
-                    _ => unreachable!(),
-                };
-                w_reg.write(|w| w.buf().set(word));
-            }
+        if !rem.is_empty()
+            && let Some(w_reg) = w_iter.next()
+        {
+            let word = match rem.len() {
+                3 => (rem[0] as u32) | ((rem[1] as u32) << 8) | ((rem[2] as u32) << 16),
+                2 => (rem[0] as u32) | ((rem[1] as u32) << 8),
+                1 => rem[0] as u32,
+                _ => unreachable!(),
+            };
+            w_reg.write(|w| w.buf().set(word));
         }
     }
 
@@ -3686,7 +3871,7 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-crate::peripherals::for_each_spi_master! {
+for_each_spi_master! {
     ($peri:ident, $sys:ident, $sclk:ident [$($cs:ident),+] [$($sio:ident),*] $(, $is_qspi:tt)?) => {
         impl Instance for crate::peripherals::$peri<'_> {
             #[inline(always)]
@@ -3793,38 +3978,31 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
 
 impl Instance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn parts(&self) -> (&'static Info, &'static State);
-        }
+    #[inline]
+    fn parts(&self) -> (&'static Info, &'static State) {
+        any::delegate!(self, spi => { spi.parts() })
     }
 }
 
 impl AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
-            fn disable_peri_interrupt(&self);
-            fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
-        }
+    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+        any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
+    }
+
+    fn disable_peri_interrupt(&self) {
+        any::delegate!(self, spi => { spi.disable_peri_interrupt() })
+    }
+
+    fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority) {
+        any::delegate!(self, spi => { spi.enable_peri_interrupt(priority) })
     }
 
     fn set_interrupt_handler(&self, handler: InterruptHandler) {

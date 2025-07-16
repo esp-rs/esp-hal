@@ -1,3 +1,5 @@
+use esp_rom_sys::rom::md5;
+
 pub struct Crc32 {}
 
 impl Crc32 {
@@ -6,10 +8,26 @@ impl Crc32 {
     }
 
     pub fn crc(&self, data: &[u8]) -> u32 {
-        unsafe extern "C" {
-            fn esp_rom_crc32_le(crc: u32, buf: *const u8, len: u32) -> u32;
-        }
+        esp_rom_sys::rom::crc::crc32_le(u32::MAX, data)
+    }
+}
 
-        unsafe { esp_rom_crc32_le(u32::MAX, data.as_ptr(), data.len() as u32) }
+pub struct Md5 {
+    context: md5::Context,
+}
+
+impl Md5 {
+    pub fn new() -> Self {
+        Self {
+            context: md5::Context::new(),
+        }
+    }
+
+    pub fn update(&mut self, data: &[u8]) {
+        self.context.consume(data);
+    }
+
+    pub fn finalize(self) -> [u8; 16] {
+        self.context.compute().0
     }
 }

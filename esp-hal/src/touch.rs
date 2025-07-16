@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Capacitive Touch Sensor
 //!
 //! ## Overview
@@ -8,17 +9,16 @@
 //! ## Examples
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::touch::{Touch, TouchPad};
 //! let touch_pin0 = peripherals.GPIO2;
 //! let touch = Touch::continuous_mode(peripherals.TOUCH, None);
 //! let mut touchpad = TouchPad::new(touch_pin0, &touch);
 //! // ... give the peripheral some time for the measurement
 //! let touch_val = touchpad.read();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ## Implementation State:
 //!
 //! Mostly feature complete, missing:
@@ -179,21 +179,21 @@ impl<Tm: TouchMode, Dm: DriverMode> Touch<'_, Tm, Dm> {
 }
 // Async mode and OneShot does not seem to be a sensible combination....
 impl<'d> Touch<'d, OneShot, Blocking> {
+    #[procmacros::doc_replace]
     /// Initializes the touch peripheral and returns this marker struct.
     /// Optionally accepts configuration options.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// # use esp_hal::touch::{Touch, TouchConfig};
     /// let touch_cfg = Some(TouchConfig {
     ///     measurement_duration: Some(0x2000),
     ///     ..Default::default()
     /// });
     /// let touch = Touch::one_shot_mode(peripherals.TOUCH, touch_cfg);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn one_shot_mode(touch_peripheral: TOUCH<'d>, config: Option<TouchConfig>) -> Self {
         let rtccntl = LPWR::regs();
@@ -236,21 +236,21 @@ impl<'d> Touch<'d, OneShot, Blocking> {
     }
 }
 impl<'d> Touch<'d, Continuous, Blocking> {
+    #[procmacros::doc_replace]
     /// Initializes the touch peripheral in continuous mode and returns this
     /// marker struct. Optionally accepts configuration options.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// # use esp_hal::touch::{Touch, TouchConfig};
     /// let touch_cfg = Some(TouchConfig {
     ///     measurement_duration: Some(0x3000),
     ///     ..Default::default()
     /// });
     /// let touch = Touch::continuous_mode(peripherals.TOUCH, touch_cfg);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn continuous_mode(touch_peripheral: TOUCH<'d>, config: Option<TouchConfig>) -> Self {
         Self::initialize_common_continuous(config);
@@ -263,6 +263,7 @@ impl<'d> Touch<'d, Continuous, Blocking> {
     }
 }
 impl<'d> Touch<'d, Continuous, Async> {
+    #[procmacros::doc_replace]
     /// Initializes the touch peripheral in continuous async mode and returns
     /// this marker struct.
     ///
@@ -276,20 +277,18 @@ impl<'d> Touch<'d, Continuous, Async> {
     ///
     /// ## Parameters:
     ///
-    /// - `rtc`: The RTC peripheral is needed to configure the required
-    ///   interrupts.
+    /// - `rtc`: The RTC peripheral is needed to configure the required interrupts.
     /// - `config`: Optional configuration options.
     ///
     /// ## Example
     ///
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// # use esp_hal::rtc_cntl::Rtc;
     /// # use esp_hal::touch::{Touch, TouchConfig};
     /// let mut rtc = Rtc::new(peripherals.LPWR);
     /// let touch = Touch::async_mode(peripherals.TOUCH, &mut rtc, None);
-    /// # Ok(())
-    /// # }
+    /// # {after_snippet}
     /// ```
     pub fn async_mode(
         touch_peripheral: TOUCH<'d>,
@@ -414,9 +413,8 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// [1]: ../rtc_cntl/struct.Rtc.html#method.set_interrupt_handler
     ///
     /// ## Parameters:
-    /// - `threshold`: The threshold above/below which the pin is considered
-    ///   touched. Above/below depends on the configuration of `touch` in
-    ///   [`new`](Self::new) (defaults to below).
+    /// - `threshold`: The threshold above/below which the pin is considered touched. Above/below
+    ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
     ///
     /// ## Example
     pub fn enable_interrupt(&mut self, threshold: u16) {

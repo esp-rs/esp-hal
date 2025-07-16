@@ -2,8 +2,9 @@
 //!
 //! `IS_FIRST_SENDER` below must be set to false on one of the ESP's
 //!
-//! In case you want to use `self-testing`, get rid of everything related to the aforementioned `IS_FIRST_SENDER`
-//! and follow the advice in the comments related to this mode.
+//! In case you want to use `self-testing`, get rid of everything related to the
+//! aforementioned `IS_FIRST_SENDER` and follow the advice in the comments
+//! related to this mode.
 //!
 //! The following wiring is assumed:
 //! - TX/RX => GPIO2, connected internally and with internal pull-up resistor.
@@ -13,8 +14,9 @@
 //!
 //! Notes for external transceiver use:
 //!
-//! The default setup assumes that two microcontrollers are connected directly without an external
-//! transceiver. If you want to use an external transceiver, you need to:
+//! The default setup assumes that two microcontrollers are connected directly
+//! without an external transceiver. If you want to use an external transceiver,
+//! you need to:
 //! * uncomment the `rx_pin` line
 //! * use `new()` function to create the TWAI configuration.
 //! * change the `tx_pin` and `rx_pin` to the appropriate pins for your boards.
@@ -42,7 +44,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    // Without an external transceiver, we only need a single line between the two MCUs.
+    // Without an external transceiver, we only need a single line between the two
+    // MCUs.
     let (rx_pin, tx_pin) = unsafe { peripherals.GPIO2.split() };
     // Use these if you want to use an external transceiver:
     // let tx_pin = peripherals.GPIO2;
@@ -51,8 +54,8 @@ fn main() -> ! {
     // The speed of the bus.
     const TWAI_BAUDRATE: twai::BaudRate = twai::BaudRate::B125K;
 
-    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to open-drain
-    // Self-testing also works using the regular `new` function.
+    // !!! Use `new` when using a transceiver. `new_no_transceiver` sets TX to
+    // open-drain Self-testing also works using the regular `new` function.
 
     // Begin configuring the TWAI peripheral. The peripheral is in a reset like
     // state that prevents transmission but allows configuration.

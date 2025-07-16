@@ -93,6 +93,7 @@ impl Flex<'_> {
 }
 
 impl Input<'_> {
+    #[procmacros::doc_replace]
     /// Wait until the pin experiences a particular [`Event`].
     ///
     /// The GPIO driver will disable listening for the event once it occurs,
@@ -101,47 +102,118 @@ impl Input<'_> {
     ///
     /// Note that calling this function will overwrite previous
     /// [`listen`][Self::listen] operations for this pin.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for(Event::LowLevel).await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for(&mut self, event: Event) {
         self.pin.wait_for(event).await
     }
 
+    #[procmacros::doc_replace]
     /// Wait until the pin is high.
     ///
     /// See [Self::wait_for] for more information.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for_high().await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for_high(&mut self) {
         self.pin.wait_for_high().await
     }
 
+    #[procmacros::doc_replace]
     /// Wait until the pin is low.
     ///
     /// See [Self::wait_for] for more information.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for_low().await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for_low(&mut self) {
         self.pin.wait_for_low().await
     }
 
+    #[procmacros::doc_replace]
     /// Wait for the pin to undergo a transition from low to high.
     ///
     /// See [Self::wait_for] for more information.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for_rising_edge().await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for_rising_edge(&mut self) {
         self.pin.wait_for_rising_edge().await
     }
 
+    #[procmacros::doc_replace]
     /// Wait for the pin to undergo a transition from high to low.
     ///
     /// See [Self::wait_for] for more information.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for_falling_edge().await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for_falling_edge(&mut self) {
         self.pin.wait_for_falling_edge().await
     }
 
+    #[procmacros::doc_replace]
     /// Wait for the pin to undergo any transition, i.e low to high OR high
     /// to low.
     ///
     /// See [Self::wait_for] for more information.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::gpio::{Event, Input, InputConfig};
+    /// let mut input_pin = Input::new(peripherals.GPIO4, InputConfig::default());
+    ///
+    /// input_pin.wait_for_any_edge().await;
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub async fn wait_for_any_edge(&mut self) {
         self.pin.wait_for_any_edge().await

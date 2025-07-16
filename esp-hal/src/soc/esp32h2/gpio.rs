@@ -9,22 +9,19 @@
 //! Let's get through the functionality and configurations provided by this GPIO
 //! module:
 //!   - `gpio` block:
-//!       * Defines the pin configurations for various GPIO pins. Each line
-//!         represents a pin and its associated options such as input/output
-//!         mode, analog capability, and corresponding functions.
+//!       * Defines the pin configurations for various GPIO pins. Each line represents a pin and its
+//!         associated options such as input/output mode, analog capability, and corresponding
+//!         functions.
 //!   - `analog` block:
-//!       * Block defines the analog capabilities of various GPIO pins. Each
-//!         line represents a pin and its associated options such as mux
-//!         selection, function selection, and input enable.
+//!       * Block defines the analog capabilities of various GPIO pins. Each line represents a pin
+//!         and its associated options such as mux selection, function selection, and input enable.
 //!   - `enum InputSignal`:
-//!       * This enumeration defines input signals for the GPIO mux. Each input
-//!         signal is assigned a specific value.
+//!       * This enumeration defines input signals for the GPIO mux. Each input signal is assigned a
+//!         specific value.
 //!   - `enum OutputSignal`:
-//!       * This enumeration defines output signals for the GPIO mux. Each
-//!         output signal is assigned a specific value.
+//!       * This enumeration defines output signals for the GPIO mux. Each output signal is assigned
+//!         a specific value.
 //!
 //! This trait provides functions to read the interrupt status and NMI status
 //! registers for both the `PRO CPU` and `APP CPU`. The implementation uses the
 //! `gpio` peripheral to access the appropriate registers.
-
-include!(concat!(env!("OUT_DIR"), "/_generated_iomux_signals.rs"));

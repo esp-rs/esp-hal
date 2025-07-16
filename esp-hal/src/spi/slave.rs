@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(any(esp32, esp32s2)) => "let dma_channel = peripherals.DMA_SPI2;",
+        _ => "let dma_channel = peripherals.DMA_CH0;"
+    },
+))]
 //! # Serial Peripheral Interface - Slave Mode
 //!
 //! ## Overview
@@ -14,49 +20,42 @@
 //! ### SPI Slave with DMA
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::dma::{DmaRxBuf, DmaTxBuf};
 //! # use esp_hal::spi::Mode;
 //! # use esp_hal::spi::slave::Spi;
-#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
+//! # {dma_channel}
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO1;
 //! let mosi = peripherals.GPIO2;
 //! let cs = peripherals.GPIO3;
 //!
-//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-//! dma_buffers!(32000);
+//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000);
 //! let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
 //! let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-//! let mut spi = Spi::new(
-//!     peripherals.SPI2,
-//!     Mode::_0,
-//! )
-//! .with_sck(sclk)
-//! .with_mosi(mosi)
-//! .with_miso(miso)
-//! .with_cs(cs)
-//! .with_dma(dma_channel);
+//! let mut spi = Spi::new(peripherals.SPI2, Mode::_0)
+//!     .with_sck(sclk)
+//!     .with_mosi(mosi)
+//!     .with_miso(miso)
+//!     .with_cs(cs)
+//!     .with_dma(dma_channel);
 //!
-//! let transfer = spi
-//!     .transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
+//! let transfer = spi.transfer(50, dma_rx_buf, 50, dma_tx_buf)?;
 //!
 //! transfer.wait();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ## Implementation State
 //!
 //! This driver is currently **unstable**.
 //!
 //! There are several options for working with the SPI peripheral in slave mode,
 //! but the code currently only supports:
-//! - Single transfers (not segmented transfers)
-//! - Full duplex, single bit (not dual or quad SPI)
-//! - DMA mode (not CPU mode).
+//!     - Single transfers (not segmented transfers)
+//!     - Full duplex, single bit (not dual or quad SPI)
+//!     - DMA mode (not CPU mode).
 #![cfg_attr(esp32, doc = "- ESP32 only supports SPI mode 1 and 3.\n\n")]
 //! It also does not support blocking operations, as the actual
 //! transfer is controlled by the SPI master; if these are necessary,
@@ -578,7 +577,7 @@ pub mod dma {
 }
 
 /// A peripheral singleton compatible with the SPI slave driver.
-pub trait Instance: crate::private::Sealed + IntoAnySpi {
+pub trait Instance: crate::private::Sealed + any::Degrade {
     /// Returns the peripheral data describing this SPI instance.
     #[doc(hidden)]
     fn info(&self) -> &'static Info;
@@ -787,7 +786,7 @@ impl PartialEq for Info {
 
 unsafe impl Sync for Info {}
 
-crate::peripherals::for_each_spi_slave! {
+for_each_spi_slave! {
     ($peri:ident, $sys:ident, $sclk:ident, $mosi:ident, $miso:ident, $cs:ident) => {
         impl Instance for crate::peripherals::$peri<'_> {
             #[inline(always)]
@@ -826,22 +825,15 @@ impl<'d> DmaEligible for AnySpi<'d> {
     fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
         match &self.0 {
             #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
+            any::Inner::Spi2(_) => crate::dma::DmaPeripheral::Spi2,
             #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
+            any::Inner::Spi3(_) => crate::dma::DmaPeripheral::Spi3,
         }
     }
 }
 impl Instance for AnySpi<'_> {
-    delegate::delegate! {
-        to match &self.0 {
-            #[cfg(spi_master_spi2)]
-            AnySpiInner::Spi2(spi) => spi,
-            #[cfg(spi_master_spi3)]
-            AnySpiInner::Spi3(spi) => spi,
-        } {
-            fn info(&self) -> &'static Info;
-        }
+    fn info(&self) -> &'static Info {
+        any::delegate!(self, spi => { spi.info() })
     }
 }
 

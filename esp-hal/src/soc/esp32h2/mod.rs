@@ -15,8 +15,9 @@ crate::unstable_module! {
     pub mod trng;
 }
 pub mod gpio;
-pub mod peripherals;
 pub(crate) mod regi2c;
+
+pub(crate) use esp32h2 as pac;
 
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod registers {

@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! USB Serial/JTAG Controller (USB_SERIAL_JTAG)
 //!
 //! ## Overview
@@ -15,17 +16,16 @@
 //!
 //! The USB Serial/JTAG controller boasts the following features:
 //!
-//! - Hardwired for CDC-ACM (Communication Device Class - Abstract Control
-//!   Model) and JTAG adapter functionality
-//! - Integrates CDC-ACM adherent serial port emulation (plug-and-play on most
-//!   modern OSes); supports host controllable chip reset and entry into
-//!   download mode
-//! - Allows fast communication with CPU debugging core using a compact
-//!   representation of JTAG instructions
-//! - Two OUT Endpoints and three IN Endpoints in addition to Control Endpoint
-//!   0; Up to 64-byte data payload size
-//! - Internal PHY means that very few or no external components needed to
-//!   connect to a host computer
+//! - Hardwired for CDC-ACM (Communication Device Class - Abstract Control Model) and JTAG adapter
+//!   functionality
+//! - Integrates CDC-ACM adherent serial port emulation (plug-and-play on most modern OSes);
+//!   supports host controllable chip reset and entry into download mode
+//! - Allows fast communication with CPU debugging core using a compact representation of JTAG
+//!   instructions
+//! - Two OUT Endpoints and three IN Endpoints in addition to Control Endpoint 0; Up to 64-byte data
+//!   payload size
+//! - Internal PHY means that very few or no external components needed to connect to a host
+//!   computer
 //!
 //! ## Usage
 //!
@@ -43,20 +43,19 @@
 //!
 //! ### Sending and Receiving Data
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
 //!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
 //!
 //! // Write bytes out over the USB Serial/JTAG:
 //! usb_serial.write(b"Hello, world!")?;
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### Splitting the USB Serial/JTAG into TX and RX Components
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! use esp_hal::usb_serial_jtag::UsbSerialJtag;
 //!
 //! let mut usb_serial = UsbSerialJtag::new(peripherals.USB_DEVICE);
@@ -68,13 +67,12 @@
 //! // Serial/JTAG:
 //! tx.write(&[42u8])?;
 //! let byte = rx.read_byte()?;
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### How to output text using USB Serial/JTAG.
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::{delay::Delay, usb_serial_jtag::UsbSerialJtag, Blocking};
 //!
 //! let delay = Delay::new();
@@ -83,8 +81,7 @@
 //! usb_serial.set_interrupt_handler(usb_device);
 //! usb_serial.listen_rx_packet_recv_interrupt();
 //!
-//! critical_section::with(|cs|
-//! USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
+//! critical_section::with(|cs| USB_SERIAL.borrow_ref_mut(cs).replace(usb_serial));
 //!
 //! loop {
 //!     println!("Send keystrokes to see the interrupt trigger");
@@ -95,9 +92,8 @@
 //! # use critical_section::Mutex;
 //! # use core::{cell::RefCell, fmt::Write};
 //! # use esp_hal::usb_serial_jtag::UsbSerialJtag;
-//! static USB_SERIAL:
-//!     Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
-//!         Mutex::new(RefCell::new(None));
+//! static USB_SERIAL: Mutex<RefCell<Option<UsbSerialJtag<'static, esp_hal::Blocking>>>> =
+//!     Mutex::new(RefCell::new(None));
 //!
 //! #[handler]
 //! fn usb_device() {
@@ -115,7 +111,7 @@
 //!     });
 //! }
 //! ```
-//! 
+//!
 //! [embedded-hal]: https://docs.rs/embedded-hal/latest/embedded_hal/
 //! [embedded-io]: https://docs.rs/embedded-io/latest/embedded_io/
 //! [embedded-hal-async]: https://docs.rs/embedded-hal-async/latest/embedded_hal_async/

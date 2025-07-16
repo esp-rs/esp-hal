@@ -102,6 +102,7 @@ pub struct SingleStandardFilter {
 }
 
 impl SingleStandardFilter {
+    #[procmacros::doc_replace]
     /// Create a new filter that matches against a single 11-bit standard id.
     /// The filter can match against the packet's id, RTR bit, and first two
     /// bytes of the payload.
@@ -109,16 +110,11 @@ impl SingleStandardFilter {
     /// Example matching only even IDs, allowing any rtr value and any payload
     /// data:
     /// ```rust, no_run
-    #[doc = crate::before_snippet!()]
+    /// # {before_snippet}
     /// # use esp_hal::twai::filter::SingleStandardFilter;
     /// const FILTER: SingleStandardFilter =
-    ///     SingleStandardFilter::new(
-    ///         b"xxxxxxxxxx0",
-    ///         b"x",
-    ///         [b"xxxxxxxx", b"xxxxxxxx"]
-    ///     );
-    /// # Ok(())
-    /// # }
+    ///     SingleStandardFilter::new(b"xxxxxxxxxx0", b"x", [b"xxxxxxxx", b"xxxxxxxx"]);
+    /// # {after_snippet}
     /// ```
     pub const fn new(id: &BitFilter<11>, rtr: &BitFilter<1>, payload: [&BitFilter<8>; 2]) -> Self {
         // The bit values we desire to match against. This determines whether we want a

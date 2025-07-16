@@ -87,11 +87,11 @@ impl TimerQueue {
     }
 
     fn remove(&mut self, ets_timer: *mut ets_timer) {
-        if let Some(head) = self.head.as_mut() {
-            if core::ptr::eq(head.ets_timer, ets_timer) {
-                self.head = head.next.take();
-                return;
-            }
+        if let Some(head) = self.head.as_mut()
+            && core::ptr::eq(head.ets_timer, ets_timer)
+        {
+            self.head = head.next.take();
+            return;
         }
 
         let timer = self.find(ets_timer);

@@ -126,15 +126,13 @@ pub struct CfgConstraint {
 
 /// Generate the config from a YAML definition.
 ///
-/// The YAML follows the format outlined by [Config].
-///
 /// After deserializing the config and normalizing it, this will call
 /// [generate_config] to finally get the currently active configuration.
 pub fn generate_config_from_yaml_definition(
     yaml: &str,
     enable_unstable: bool,
     emit_md_tables: bool,
-    chip: Option<esp_metadata::Config>,
+    chip: Option<esp_metadata_generated::Chip>,
 ) -> Result<HashMap<String, Value>, Error> {
     let features: Vec<String> = env::vars()
         .filter(|(k, _)| k.starts_with("CARGO_FEATURE_"))
@@ -150,7 +148,14 @@ pub fn generate_config_from_yaml_definition(
 
     let cfg = generate_config(&config.krate, &options, enable_unstable, emit_md_tables);
 
-    if let Some(checks) = config.checks {
+    do_checks(config.checks.as_ref(), &cfg)?;
+
+    Ok(cfg)
+}
+
+/// Check the given actual values by applying checking the given checks
+pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> Result<(), Error> {
+    if let Some(checks) = checks {
         let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
         for (k, v) in cfg.iter() {
             eval_ctx
@@ -165,31 +170,33 @@ pub fn generate_config_from_yaml_definition(
                 .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
         }
         for check in checks {
-            if !evalexpr::eval_with_context(&check, &eval_ctx)
+            if !evalexpr::eval_with_context(check, &eval_ctx)
                 .and_then(|v| v.as_boolean())
                 .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
             {
                 return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
         }
-    }
-
-    Ok(cfg)
+    };
+    Ok(())
 }
 
 /// Evaluate the given YAML representation of a config definition.
 pub fn evaluate_yaml_config(
     yaml: &str,
-    chip: Option<esp_metadata::Config>,
+    chip: Option<esp_metadata_generated::Chip>,
     features: Vec<String>,
     ignore_feature_gates: bool,
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
     let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
     let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
-    if let Some(config) = chip {
+    if let Some(chip) = chip {
         eval_ctx
-            .set_value("chip".into(), evalexpr::Value::String(config.name()))
+            .set_value(
+                "chip".into(),
+                evalexpr::Value::String(chip.name().to_string()),
+            )
             .map_err(|err| Error::Parse(err.to_string()))?;
 
         eval_ctx
@@ -197,7 +204,7 @@ pub fn evaluate_yaml_config(
                 "feature".into(),
                 evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
                     if let evalexpr::Value::String(which) = arg {
-                        let res = config.contains(which);
+                        let res = chip.contains(which);
                         Ok(evalexpr::Value::Boolean(res))
                     } else {
                         Err(evalexpr::EvalexprError::CustomMessage(format!(
@@ -434,7 +441,7 @@ impl Display for Stability {
 }
 
 /// A display hint (for tooling only)
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisplayHint {
     /// No display hint
     None,
@@ -444,6 +451,25 @@ pub enum DisplayHint {
 
     /// Use a hexadecimal representation
     Hex,
+
+    /// Use a octal representation
+    Octal,
+}
+
+impl DisplayHint {
+    /// Converts a [Value] to String applying the correct display hint.
+    pub fn format_value(self, value: &Value) -> String {
+        match value {
+            Value::Bool(b) => b.to_string(),
+            Value::Integer(i) => match self {
+                DisplayHint::None => format!("{i}"),
+                DisplayHint::Binary => format!("0b{i:0b}"),
+                DisplayHint::Hex => format!("0x{i:X}"),
+                DisplayHint::Octal => format!("0o{i:o}"),
+            },
+            Value::String(s) => s.clone(),
+        }
+    }
 }
 
 /// A configuration option.
@@ -481,6 +507,11 @@ pub struct ConfigOption {
 }
 
 impl ConfigOption {
+    /// Get the corresponding ENV_VAR name given the crate-name
+    pub fn full_env_var(&self, crate_name: &str) -> String {
+        self.env_var(&format!("{}_CONFIG_", screaming_snake_case(crate_name)))
+    }
+
     fn env_var(&self, prefix: &str) -> String {
         format!("{}{}", prefix, screaming_snake_case(&self.name))
     }
@@ -1014,7 +1045,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c6).clone()),
+            Some(esp_metadata_generated::Chip::Esp32c6),
             vec![],
             false,
         )
@@ -1084,7 +1115,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32c3).clone()),
+            Some(esp_metadata_generated::Chip::Esp32c3),
             vec![],
             false,
         )
@@ -1136,7 +1167,7 @@ options:
 
         let (cfg, options) = evaluate_yaml_config(
             yml,
-            Some(esp_metadata::Config::for_chip(&esp_metadata::Chip::Esp32).clone()),
+            Some(esp_metadata_generated::Chip::Esp32),
             vec![],
             false,
         )

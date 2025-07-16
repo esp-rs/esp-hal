@@ -1,3 +1,15 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "clock_cfg" => {
+        cfg(not(esp32h2)) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;",
+        cfg(esp32h2) => "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
+    },
+    "clock_src" => {
+        cfg(esp32) => "Clock source is PWM_CLOCK",
+        cfg(esp32s3) => "Clock source is CRYPTO_PWM_CLOCK",
+        cfg(esp32c6) => "Clock source is CRYPTO_CLOCK",
+        cfg(esp32h2) => "Clock source is XTAL",
+    }
+))]
 //! # Motor Control Pulse Width Modulator (MCPWM)
 //!
 //! ## Overview
@@ -9,38 +21,33 @@
 //! - Digital motor control, e.g., brushed/brushless DC motor, RC servo motor
 //! - Switch mode-based digital power conversion
 //! - Power DAC, where the duty cycle is equivalent to a DAC analog value
-//! - Calculate external pulse width, and convert it into other analog values
-//!   like speed, distance
+//! - Calculate external pulse width, and convert it into other analog values like speed, distance
 //! - Generate Space Vector PWM (SVPWM) signals for Field Oriented Control (FOC)
 //!
 //! ## Configuration
 //!
 //! * PWM Timers 0, 1 and 2
 //!     * Every PWM timer has a dedicated 8-bit clock prescaler.
-//!     * The 16-bit counter in the PWM timer can work in count-up mode,
-//!       count-down mode or count-up-down mode.
-//!     * A hardware sync or software sync can trigger a reload on the PWM timer
-//!       with a phase register (Not yet implemented)
+//!     * The 16-bit counter in the PWM timer can work in count-up mode, count-down mode or
+//!       count-up-down mode.
+//!     * A hardware sync or software sync can trigger a reload on the PWM timer with a phase
+//!       register (Not yet implemented)
 //! * PWM Operators 0, 1 and 2
-//!     * Every PWM operator has two PWM outputs: PWMxA and PWMxB. They can work
-//!       independently, in symmetric and asymmetric configuration.
+//!     * Every PWM operator has two PWM outputs: PWMxA and PWMxB. They can work independently, in
+//!       symmetric and asymmetric configuration.
 //!     * Software, asynchronously override control of PWM signals.
-//!     * Configurable dead-time on rising and falling edges; each set up
-//!       independently. (Not yet implemented)
-//!     * All events can trigger CPU interrupts. (Not yet implemented)
-//!     * Modulating of PWM output by high-frequency carrier signals, useful
-//!       when gate drivers are insulated with a transformer. (Not yet
+//!     * Configurable dead-time on rising and falling edges; each set up independently. (Not yet
 //!       implemented)
-//!     * Period, time stamps and important control registers have shadow
-//!       registers with flexible updating methods.
+//!     * All events can trigger CPU interrupts. (Not yet implemented)
+//!     * Modulating of PWM output by high-frequency carrier signals, useful when gate drivers are
+//!       insulated with a transformer. (Not yet implemented)
+//!     * Period, time stamps and important control registers have shadow registers with flexible
+//!       updating methods.
 //! * Fault Detection Module (Not yet implemented)
 //! * Capture Module (Not yet implemented)
-#![doc = ""]
-#![cfg_attr(esp32, doc = "Clock source is PWM_CLOCK")]
-#![cfg_attr(esp32s3, doc = "Clock source is CRYPTO_PWM_CLOCK")]
-#![cfg_attr(esp32c6, doc = "Clock source is CRYPTO_CLOCK")]
-#![cfg_attr(esp32h2, doc = "Clock source is XTAL")]
-#![doc = ""]
+//!
+//! # {clock_src}
+//!
 //! ## Examples
 //!
 //! ### Output a 20 kHz signal
@@ -50,19 +57,12 @@
 //! `pin`.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::mcpwm::{operator::{DeadTimeCfg, PWMStream, PwmPinConfig}, timer::PwmWorkingMode, McPwm, PeripheralClockConfig};
 //! # let pin = peripherals.GPIO0;
 //!
 //! // initialize peripheral
-#![cfg_attr(
-    not(esp32h2),
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(40))?;"
-)]
-#![cfg_attr(
-    esp32h2,
-    doc = "let clock_cfg = PeripheralClockConfig::with_frequency(Rate::from_mhz(32))?;"
-)]
+//! # {clock_cfg}
 //! let mut mcpwm = McPwm::new(peripherals.MCPWM0, clock_cfg);
 //!
 //! // connect operator0 to timer0
@@ -80,8 +80,7 @@
 //!
 //! // pin will be high 50% of the time
 //! pwm_pin.set_timestamp(50);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 use operator::Operator;

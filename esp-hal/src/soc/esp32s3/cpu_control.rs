@@ -100,11 +100,12 @@ pub enum Error {
     CoreAlreadyRunning,
 }
 
+#[procmacros::doc_replace]
 /// Control CPU Cores
 ///
 /// ## Examples
 /// ```rust, no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// # use esp_hal::delay::Delay;
 /// # use esp_hal::system::{CpuControl, Stack};
 /// # use core::{cell::RefCell, ptr::addr_of_mut};
@@ -118,11 +119,8 @@ pub enum Error {
 /// let cpu1_fnctn = || {
 ///     cpu1_task(&delay, &counter);
 /// };
-/// let _guard = cpu_control
-///     .start_app_core(
-///         unsafe { &mut *addr_of_mut!(APP_CORE_STACK) },
-///         cpu1_fnctn
-///     )?;
+/// let _guard =
+///     cpu_control.start_app_core(unsafe { &mut *addr_of_mut!(APP_CORE_STACK) }, cpu1_fnctn)?;
 ///
 /// loop {
 ///     delay.delay(Duration::from_secs(1));
@@ -134,10 +132,7 @@ pub enum Error {
 /// # use esp_hal::delay::Delay;
 /// # use core::cell::RefCell;
 ///
-/// fn cpu1_task(
-///     delay: &Delay,
-///     counter: &critical_section::Mutex<RefCell<i32>>,
-/// ) -> ! {
+/// fn cpu1_task(delay: &Delay, counter: &critical_section::Mutex<RefCell<i32>>) -> ! {
 ///     loop {
 ///         delay.delay(Duration::from_millis(500));
 ///

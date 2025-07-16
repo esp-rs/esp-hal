@@ -5,10 +5,8 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use cargo::CargoAction;
-use clap::ValueEnum;
-use esp_metadata::{Chip, Config};
+use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumIter};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoToml},
@@ -34,9 +32,10 @@ pub mod semver_check;
     PartialOrd,
     Ord,
     Hash,
-    Display,
-    EnumIter,
-    ValueEnum,
+    clap::ValueEnum,
+    strum::Display,
+    strum::EnumIter,
+    strum::AsRefStr,
     serde::Deserialize,
     serde::Serialize,
 )]
@@ -50,9 +49,11 @@ pub enum Package {
     EspHal,
     EspHalEmbassy,
     EspHalProcmacros,
+    EspRomSys,
     EspIeee802154,
     EspLpHal,
     EspMetadata,
+    EspMetadataGenerated,
     EspPrintln,
     EspRiscvRt,
     EspStorage,
@@ -73,8 +74,11 @@ impl Package {
         matches!(
             self,
             EspBacktrace
+                | EspBootloaderEspIdf
                 | EspHal
                 | EspHalEmbassy
+                | EspMetadataGenerated
+                | EspRomSys
                 | EspIeee802154
                 | EspLpHal
                 | EspPrintln
@@ -135,7 +139,16 @@ impl Package {
     pub fn chip_features_matter(&self) -> bool {
         use Package::*;
 
-        matches!(self, EspHal | EspLpHal | EspWifi | EspHalEmbassy)
+        matches!(
+            self,
+            EspHal
+                | EspLpHal
+                | EspWifi
+                | EspHalEmbassy
+                | EspRomSys
+                | EspBootloaderEspIdf
+                | EspMetadataGenerated
+        )
     }
 
     /// Should documentation be built for the package, and should the package be
@@ -149,10 +162,12 @@ impl Package {
     }
 
     /// Build on host
-    pub fn build_on_host(&self) -> bool {
-        use Package::*;
-
-        matches!(self, EspConfig | EspMetadata)
+    pub fn build_on_host(&self, features: &[String]) -> bool {
+        match self {
+            Self::EspConfig | Self::EspMetadata => true,
+            Self::EspMetadataGenerated if features.iter().any(|f| f == "build-script") => true,
+            _ => false,
+        }
     }
 
     /// Given a device config, return the features which should be enabled for
@@ -164,6 +179,7 @@ impl Package {
             Package::EspConfig => features.push("build".to_owned()),
             Package::EspHal => {
                 features.push("unstable".to_owned());
+                features.push("rt".to_owned());
                 if config.contains("psram") {
                     // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
                     // defaults to `quad`) as it would require a separate build
@@ -178,6 +194,7 @@ impl Package {
             }
             Package::EspWifi => {
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
                 features.push("defmt".to_owned());
                 if config.contains("wifi") {
                     features.push("wifi".to_owned());
@@ -198,12 +215,14 @@ impl Package {
             }
             Package::EspHalEmbassy => {
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
                 features.push("defmt".to_owned());
                 features.push("executors".to_owned());
             }
             Package::EspIeee802154 => {
                 features.push("defmt".to_owned());
                 features.push("esp-hal/unstable".to_owned());
+                features.push("esp-hal/rt".to_owned());
             }
             Package::EspLpHal => {
                 if config.contains("lp_core") {
@@ -223,6 +242,7 @@ impl Package {
             Package::EspAlloc => {
                 features.push("defmt".to_owned());
             }
+            Package::EspMetadataGenerated => {}
             _ => {}
         }
 
@@ -233,21 +253,38 @@ impl Package {
     pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
 
-        if self == &Package::EspWifi {
-            // Minimal set of features that when enabled _should_ still compile:
-            cases.push(vec![
-                "esp-hal/unstable".to_owned(),
-                "builtin-scheduler".to_owned(),
-            ]);
+        match self {
+            Package::EspHal => {
+                // This checks if the `esp-hal` crate compiles with the no features (other than the
+                // chip selection)
+                
+                // This tests that disabling the `rt` feature works
+                cases.push(vec![]);
+                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
+                // enabled
+                cases.push(vec!["rt".to_owned()]);
+            }
+            Package::EspWifi => {
+                // Minimal set of features that when enabled _should_ still compile:
+                cases.push(vec![
+                    "esp-hal/rt".to_owned(),
+                    "esp-hal/unstable".to_owned(),
+                    "builtin-scheduler".to_owned(),
+                ]);
+            }
+            Package::EspMetadataGenerated => {
+                cases.push(vec!["build-script".to_owned()]);
+            }
+            _ => {}
         }
 
         cases
     }
 
     /// Return the target triple for a given package/chip pair.
-    pub fn target_triple(&self, chip: &Chip) -> Result<&'static str> {
+    pub fn target_triple(&self, chip: &Chip) -> Result<String> {
         if *self == Package::EspLpHal {
-            chip.lp_target()
+            chip.lp_target().map(ToString::to_string)
         } else {
             Ok(chip.target())
         }
@@ -288,7 +325,7 @@ impl Package {
     }
 }
 
-#[derive(Debug, Clone, Copy, Display, ValueEnum, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum Version {
     Major,
@@ -306,6 +343,7 @@ pub fn execute_app(
     repeat: usize,
     debug: bool,
     toolchain: Option<&str>,
+    timings: bool,
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -357,6 +395,9 @@ pub fn execute_app(
 
     if !debug {
         builder.add_arg("--release");
+    }
+    if timings {
+        builder.add_arg("--timings");
     }
 
     let toolchain = match toolchain {
@@ -456,7 +497,95 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
-pub fn update_chip_support_table(workspace: &Path) -> Result<()> {
+pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
+    log::info!("Formatting package: {}", package);
+    let path = workspace.join(package.as_ref());
+
+    // we need to list all source files since modules in `unstable_module!` macros
+    // won't get picked up otherwise
+    let source_files = walkdir::WalkDir::new(path.join("src"))
+        .into_iter()
+        .filter_map(|entry| {
+            let path = entry.unwrap().into_path();
+            if let Some("rs") = path.extension().unwrap_or_default().to_str() {
+                Some(String::from(path.to_str().unwrap()))
+            } else {
+                None
+            }
+        });
+
+    let mut cargo_args = CargoArgsBuilder::default()
+        .toolchain("nightly")
+        .subcommand("fmt")
+        .arg("--all")
+        .build();
+
+    if check {
+        cargo_args.push("--check".into());
+    }
+
+    cargo_args.push("--".into());
+    cargo_args.push(format!(
+        "--config-path={}/rustfmt.toml",
+        workspace.display()
+    ));
+    cargo_args.extend(source_files);
+
+    cargo::run(&cargo_args, &path)?;
+
+    Ok(())
+}
+
+pub fn update_metadata(workspace: &Path) -> Result<()> {
+    update_chip_support_table(workspace)?;
+    generate_metadata(workspace, save)?;
+
+    format_package(workspace, Package::EspMetadataGenerated, false)?;
+
+    Ok(())
+}
+
+fn generate_metadata(
+    workspace: &Path,
+    call_for_file: fn(&Path, TokenStream) -> Result<()>,
+) -> Result<()> {
+    use strum::IntoEnumIterator;
+
+    let out_path = workspace.join("esp-metadata-generated").join("src");
+
+    for chip in Chip::iter() {
+        let config = esp_metadata::Config::for_chip(&chip);
+        call_for_file(
+            &out_path.join(format!("_generated_{chip}.rs")),
+            config.generate_metadata(),
+        )?;
+    }
+
+    call_for_file(
+        &out_path.join("_build_script_utils.rs"),
+        esp_metadata::generate_build_script_utils(),
+    )?;
+
+    call_for_file(&out_path.join("lib.rs"), esp_metadata::generate_lib_rs())?;
+
+    Ok(())
+}
+
+fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
+    let source = tokens.to_string();
+
+    let syntax_tree = syn::parse_file(&source)?;
+    let mut source = String::from(
+        "// Do NOT edit this file directly. Make your changes to esp-metadata,\n// then run `cargo xtask update-metadata`.\n\n",
+    );
+    source.push_str(&prettyplease::unparse(&syntax_tree));
+
+    std::fs::write(out_path, source)?;
+
+    Ok(())
+}
+
+fn update_chip_support_table(workspace: &Path) -> Result<()> {
     let mut output = String::new();
     let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
 

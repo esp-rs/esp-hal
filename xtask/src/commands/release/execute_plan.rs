@@ -17,6 +17,10 @@ pub struct ApplyPlanArgs {
     /// update code.
     #[arg(long)]
     no_dry_run: bool,
+
+    /// Instead of opening the pull request, just print base URL and body.
+    #[arg(long)]
+    manual_pull_request: bool,
 }
 
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
@@ -100,7 +104,7 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
     let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
 
-    open_pull_request(&branch, !args.no_dry_run, &plan_source, &plan)
+    open_pull_request(&branch, !args.no_dry_run, args.manual_pull_request, &plan_source, &plan)
         .with_context(|| "Failed to open pull request")?;
 
     if !args.no_dry_run {
@@ -191,6 +195,7 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
 fn open_pull_request(
     branch: &Branch,
     dry_run: bool,
+    manual_pull_request: bool,
     release_plan_str: &str,
     release_plan: &Plan,
 ) -> Result<()> {
@@ -246,7 +251,7 @@ cargo xrelease publish-plan --no-dry-run
     );
 
     // https://stackoverflow.com/a/64565317
-    if open_pr_url.len() > 8201 {
+    if manual_pull_request || open_pr_url.len() > 8201 {
         println!();
         println!("PR description begins here.");
         println!();

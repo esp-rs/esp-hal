@@ -2,7 +2,6 @@
 //!
 //!
 //! Set SSID and PASSWORD env variable before running this example.
-//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/log-04 esp-wifi/csi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
@@ -42,7 +41,7 @@ fn main() -> ! {
     let mut rng = Rng::new(peripherals.RNG);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone()).unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

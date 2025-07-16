@@ -6,47 +6,60 @@
 # update the table in the esp-hal README.
 
 [device]
-name  = "esp32c2"
-arch  = "riscv"
-cores = 1
-trm   = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
+name   = "esp32c2"
+arch   = "riscv"
+target = "riscv32imc-unknown-none-elf"
+cores  = 1
+trm    = "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
 
 peripherals = [
-    # Peripherals available in the PAC:
-    "apb_ctrl",
-    "apb_saradc",
-    "assist_debug",
-    "dma",
-    "ecc",
-    "efuse",
-    "extmem",
-    "gpio",
-    "i2c0",
-    "interrupt_core0",
-    "io_mux",
-    "ledc",
-    "rng",
-    "rtc_cntl",
-    "sensitive",
-    "sha",
-    "spi0",
-    "spi1",
-    "spi2",
-    "system",
-    "systimer",
-    "timg0",
-    "uart0",
-    "uart1",
-    "xts_aes",
-]
+    { name = "APB_CTRL" },
+    { name = "APB_SARADC" },
+    { name = "BB" },
+    { name = "ASSIST_DEBUG" },
+    { name = "DMA" },
+    { name = "ECC" },
+    { name = "EFUSE" },
+    { name = "EXTMEM" },
+    { name = "GPIO" },
+    { name = "I2C_ANA_MST" },
+    { name = "I2C0", interrupts = { peri = "I2C_EXT0" } },
+    { name = "INTERRUPT_CORE0" },
+    { name = "IO_MUX" },
+    { name = "LEDC" },
+    { name = "RNG" },
+    { name = "LPWR", pac = "RTC_CNTL" },
+    { name = "MODEM_CLKRST" },
+    { name = "SENSITIVE" },
+    { name = "SHA" },
+    { name = "SPI0" },
+    { name = "SPI1" },
+    { name = "SPI2", interrupts = { peri = "SPI2" } },
+    { name = "SYSTEM" },
+    { name = "SYSTIMER" },
+    { name = "TIMG0" },
+    { name = "UART0", interrupts = { peri = "UART0" } },
+    { name = "UART1", interrupts = { peri = "UART1" } },
+    { name = "XTS_AES" },
 
-virtual_peripherals = [
-    "adc1",
+    { name = "DMA_CH0", virtual = true },
+
+    { name = "ADC1", virtual = true },
+    { name = "BT", virtual = true },
+    { name = "SW_INTERRUPT", virtual = true },
+    { name = "WIFI", virtual = true },
+    { name = "MEM2MEM1", virtual = true },
+    { name = "MEM2MEM2", virtual = true },
+    { name = "MEM2MEM3", virtual = true },
+    { name = "MEM2MEM4", virtual = true },
+    { name = "MEM2MEM5", virtual = true },
+    { name = "MEM2MEM6", virtual = true },
+    { name = "MEM2MEM7", virtual = true },
+    { name = "MEM2MEM8", virtual = true },
 ]
 
 symbols = [
     # Additional peripherals defined by us (the developers):
-    "assist_debug_sp_monitor",
     "gdma",
     "phy",
 
@@ -70,28 +83,37 @@ instances = [
     { name = "adc1" },
 ]
 
+[device.assist_debug]
+support_status = "partial"
+has_sp_monitor = true
+
 [device.gpio]
 support_status = "supported"
 gpio_function = 1
-input_signal_max = 100
-output_signal_max = 128
 constant_0_input = 0x1f
 constant_1_input = 0x1e
 pins = [
-    { pin =  0, kind = ["input", "output", "analog", "rtc"] },
-    { pin =  1, kind = ["input", "output", "analog", "rtc"] },
-    { pin =  2, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIQ" } },
-    { pin =  3, kind = ["input", "output", "analog", "rtc"] },
-    { pin =  4, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIHD" } },
-    { pin =  5, kind = ["input", "output", "analog", "rtc"], alternate_functions = { 2 = "FSPIWP" } },
-    { pin =  6, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICLK" } },
-    { pin =  7, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPID" } },
-    { pin =  8, kind = ["input", "output"] },
-    { pin =  9, kind = ["input", "output"] },
-    { pin = 10, kind = ["input", "output"],                  alternate_functions = { 2 = "FSPICS0" } },
-    { pin = 18, kind = ["input", "output"] },
-    { pin = 19, kind = ["input", "output"] },
-    { pin = 20, kind = ["input", "output"],                  alternate_functions = { 0 = "U0RXD" } },
+    { pin =  0,                                            analog = { 1 = "ADC1_CH0" }, rtc = { 0 = "RTC_GPIO0" } },
+    { pin =  1,                                            analog = { 1 = "ADC1_CH1" }, rtc = { 0 = "RTC_GPIO1" } },
+    { pin =  2, functions = {             2 = "FSPIQ"   }, analog = { 1 = "ADC1_CH2" }, rtc = { 0 = "RTC_GPIO2" } },
+    { pin =  3,                                            analog = { 1 = "ADC1_CH3" }, rtc = { 0 = "RTC_GPIO3" } },
+    { pin =  4, functions = { 0 = "MTMS", 2 = "FSPIHD"  }, analog = { 1 = "ADC1_CH4" }, rtc = { 0 = "RTC_GPIO4" } },
+    { pin =  5, functions = { 0 = "MTDI", 2 = "FSPIWP"  },                              rtc = { 0 = "RTC_GPIO5" } },
+    { pin =  6, functions = { 0 = "MTCK", 2 = "FSPICLK" } },
+    { pin =  7, functions = { 0 = "MTDO", 2 = "FSPID"   } },
+    { pin =  8 },
+    { pin =  9 },
+    { pin = 10 }, # Available without SiP flash
+    { pin = 11, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
+    { pin = 12, functions = { 0 = "SPIHD"  } }, # Available without SiP flash
+    { pin = 13, functions = { 0 = "SPIWP"  } }, # Available without SiP flash
+    { pin = 14, functions = { 0 = "SPICS0" } }, # Available without SiP flash
+    { pin = 15, functions = { 0 = "SPICLK" } }, # Available without SiP flash
+    { pin = 16, functions = { 0 = "SPID"   } }, # Available without SiP flash
+    { pin = 17, functions = { 0 = "SPIQ"   } }, # Available without SiP flash
+    { pin = 18 },
+    { pin = 19, functions = { 0 = "U0RXD" } },
+    { pin = 20, functions = { 0 = "U0TXD" } },
 ]
 input_signals = [
     { name = "SPIQ",          id = 0 },
@@ -127,13 +149,17 @@ input_signals = [
     { name = "SIG_FUNC_98",   id = 98 },
     { name = "SIG_FUNC_99",   id = 99 },
     { name = "SIG_FUNC_100",  id = 100 },
+
+    { name = "MTCK" },
+    { name = "MTMS" },
+    { name = "MTDI" },
 ]
 output_signals = [
     { name = "SPIQ",          id = 0 },
     { name = "SPID",          id = 1 },
     { name = "SPIHD",         id = 2 },
     { name = "SPIWP",         id = 3 },
-    { name = "SPICLK_MUX",    id = 4 },
+    { name = "SPICLK",        id = 4 },
     { name = "SPICS0",        id = 5 },
     { name = "U0TXD",         id = 6 },
     { name = "U0RTS",         id = 7 },
@@ -191,6 +217,8 @@ output_signals = [
     { name = "CLK_OUT2",      id = 124 },
     { name = "CLK_OUT3",      id = 125 },
     { name = "GPIO",          id = 128 },
+
+    { name = "MTDO" },
 ]
 
 [device.i2c_master]
@@ -246,7 +274,6 @@ instances = [
 [device.ledc]
 
 ## Miscellaneous
-[device.assist_debug]
 [device.dma]
 [device.io_mux]
 [device.temp_sensor]

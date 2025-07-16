@@ -146,7 +146,7 @@ mod single_core {
                 if #[cfg(riscv)] {
                     if token != 0 {
                         unsafe {
-                            esp_riscv_rt::riscv::interrupt::enable();
+                            riscv::interrupt::enable();
                         }
                     }
                 } else if #[cfg(xtensa)] {
@@ -251,8 +251,7 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
     ///
     /// - Each release call must be paired with an acquire call.
     /// - The returned token must be passed to the corresponding `release` call.
-    /// - The caller must ensure to release the locks in the reverse order they
-    ///   were acquired.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
     unsafe fn acquire(&self) -> RestoreState {
         cfg_if::cfg_if! {
             if #[cfg(single_core)] {
@@ -301,10 +300,8 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
     ///
     /// # Safety
     ///
-    /// - This function must only be called if the lock was acquired by the
-    ///   current thread.
-    /// - The caller must ensure to release the locks in the reverse order they
-    ///   were acquired.
+    /// - This function must only be called if the lock was acquired by the current thread.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
     /// - Each release call must be paired with an acquire call.
     unsafe fn release(&self, token: RestoreState) {
         unsafe {
@@ -362,8 +359,7 @@ impl RawMutex {
     ///
     /// - Each release call must be paired with an acquire call.
     /// - The returned token must be passed to the corresponding `release` call.
-    /// - The caller must ensure to release the locks in the reverse order they
-    ///   were acquired.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
     pub unsafe fn acquire(&self) -> RestoreState {
         unsafe { self.inner.acquire() }
     }
@@ -372,10 +368,8 @@ impl RawMutex {
     ///
     /// # Safety
     ///
-    /// - This function must only be called if the lock was acquired by the
-    ///   current thread.
-    /// - The caller must ensure to release the locks in the reverse order they
-    ///   were acquired.
+    /// - This function must only be called if the lock was acquired by the current thread.
+    /// - The caller must ensure to release the locks in the reverse order they were acquired.
     /// - Each release call must be paired with an acquire call.
     pub unsafe fn release(&self, token: RestoreState) {
         unsafe {

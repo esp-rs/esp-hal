@@ -23,26 +23,34 @@ static SLEEP_TICKS: AtomicU64 = AtomicU64::new(0);
 
 /// global atomic used to keep track of whether there is work to do since sev()
 /// is not available on either Xtensa or RISC-V
-#[cfg(low_power_wait)]
 static SIGNAL_WORK_THREAD_MODE: [AtomicBool; Cpu::COUNT] =
     [const { AtomicBool::new(false) }; Cpu::COUNT];
 
-pub(crate) fn pend_thread_mode(_core: usize) {
-    #[cfg(low_power_wait)]
-    {
-        // Signal that there is work to be done.
-        SIGNAL_WORK_THREAD_MODE[_core].store(true, Ordering::Relaxed);
+pub(crate) fn pend_thread_mode(core: usize) {
+    // Signal that there is work to be done.
+    SIGNAL_WORK_THREAD_MODE[core].store(true, Ordering::Relaxed);
 
-        // If we are pending a task on the current core, we're done. Otherwise, we
-        // need to make sure the other core wakes up.
-        #[cfg(multi_core)]
-        if _core != Cpu::current() as usize {
-            // We need to clear the interrupt from software. We don't actually
-            // need it to trigger and run the interrupt handler, we just need to
-            // kick waiti to return.
-            unsafe { SoftwareInterrupt::<3>::steal().raise() };
-        }
+    // If we are pending a task on the current core, we're done. Otherwise, we
+    // need to make sure the other core wakes up.
+    #[cfg(all(low_power_wait, multi_core))]
+    if core != Cpu::current() as usize {
+        // We need to clear the interrupt from software. We don't actually
+        // need it to trigger and run the interrupt handler, we just need to
+        // kick waiti to return.
+        unsafe { SoftwareInterrupt::<3>::steal().raise() };
     }
+}
+
+/// Callbacks to run code before/after polling the task queue.
+pub trait Callbacks {
+    /// Called just before polling the executor.
+    fn before_poll(&mut self);
+
+    /// Called after the executor is polled, if there is no work scheduled.
+    ///
+    /// Note that tasks can become ready at any point during the execution
+    /// of this function.
+    fn on_idle(&mut self);
 }
 
 /// Thread mode executor.
@@ -57,6 +65,7 @@ create one instance per core. The executors don't steal tasks from each other."
 )]
 pub struct Executor {
     inner: InnerExecutor,
+    cpu: Cpu,
     not_send: PhantomData<*mut ()>,
 }
 
@@ -69,14 +78,16 @@ impl Executor {
 This will use software-interrupt 3 which isn't available for anything else to wake the other core(s)."#
     )]
     pub fn new() -> Self {
+        let cpu = Cpu::current();
         Self {
             inner: InnerExecutor::new(
                 // Priority 1 means the timer queue can be accessed at interrupt priority 1 - for
                 // the thread mode executor it needs to be one higher than the base run level, to
                 // allow alarm interrupts to be handled.
                 Priority::Priority1,
-                (THREAD_MODE_CONTEXT + Cpu::current() as usize) as *mut (),
+                (THREAD_MODE_CONTEXT + cpu as usize) as *mut (),
             ),
+            cpu,
             not_send: PhantomData,
         }
     }
@@ -97,11 +108,64 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     ///
     /// - a [StaticCell](https://docs.rs/static_cell/latest/static_cell/) (safe)
     /// - a `static mut` (unsafe, not recommended)
-    /// - a local variable in a function you know never returns (like `fn main()
-    ///   -> !`), upgrading its lifetime with `transmute`. (unsafe)
+    /// - a local variable in a function you know never returns (like `fn main() -> !`), upgrading
+    ///   its lifetime with `transmute`. (unsafe)
     ///
     /// This function never returns.
     pub fn run(&'static mut self, init: impl FnOnce(Spawner)) -> ! {
+        #[cfg_attr(not(low_power_wait), expect(dead_code, reason = "cpu index is unused"))]
+        struct NoHooks(usize);
+
+        impl Callbacks for NoHooks {
+            fn before_poll(&mut self) {
+                #[cfg(low_power_wait)]
+                SIGNAL_WORK_THREAD_MODE[self.0].store(false, Ordering::Relaxed);
+            }
+
+            fn on_idle(&mut self) {}
+        }
+
+        self.run_inner(init, NoHooks(self.cpu as usize))
+    }
+
+    /// Run the executor with callbacks.
+    ///
+    /// See [Callbacks] on when the callbacks are called.
+    ///
+    /// See [Self::run] for more information about running the executor.
+    ///
+    /// This function never returns.
+    pub fn run_with_callbacks(
+        &'static mut self,
+        init: impl FnOnce(Spawner),
+        callbacks: impl Callbacks,
+    ) -> ! {
+        struct Hooks<'a, CB: Callbacks>(CB, &'a AtomicBool);
+
+        impl<CB: Callbacks> Callbacks for Hooks<'_, CB> {
+            fn before_poll(&mut self) {
+                // Clear the flag unconditionally since we'll use it to decide
+                // if on_idle should be called.
+                self.1.store(false, Ordering::Relaxed);
+
+                self.0.before_poll()
+            }
+
+            fn on_idle(&mut self) {
+                // Make sure we only call on_idle if the executor would otherwise go to sleep.
+                if !self.1.load(Ordering::Acquire) {
+                    self.0.on_idle();
+                }
+            }
+        }
+
+        self.run_inner(
+            init,
+            Hooks(callbacks, &SIGNAL_WORK_THREAD_MODE[self.cpu as usize]),
+        )
+    }
+
+    fn run_inner(&'static mut self, init: impl FnOnce(Spawner), mut hooks: impl Callbacks) -> ! {
         #[cfg(all(multi_core, low_power_wait))]
         unwrap!(esp_hal::interrupt::enable(
             esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
@@ -112,10 +176,9 @@ This will use software-interrupt 3 which isn't available for anything else to wa
 
         init(self.inner.inner.spawner());
 
-        #[cfg(low_power_wait)]
-        let cpu = Cpu::current() as usize;
-
         loop {
+            hooks.before_poll();
+
             unsafe { self.inner.inner.poll() };
 
             #[cfg(all(low_power_wait, low_power_wait_stats))]
@@ -127,6 +190,10 @@ This will use software-interrupt 3 which isn't available for anything else to wa
                 let after = Instant::now().as_ticks();
                 SLEEP_TICKS.fetch_add(after - before, Ordering::Relaxed);
             }
+            hooks.on_idle();
+
+            #[cfg(low_power_wait)]
+            Self::wait_impl(self.cpu as usize);
         }
     }
 
@@ -169,8 +236,6 @@ This will use software-interrupt 3 which isn't available for anything else to wa
                 _ => unsafe { core::arch::asm!("waiti 5") },
             }
         }
-        // If this races and some waker sets the signal, we'll reset it, but still poll.
-        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::Relaxed);
     }
 
     #[cfg(all(riscv, low_power_wait))]
@@ -184,9 +249,6 @@ This will use software-interrupt 3 which isn't available for anything else to wa
                 unsafe { core::arch::asm!("wfi") };
             }
         });
-        // if an interrupt occurred while waiting, it will be serviced here
-        // If this races and some waker sets the signal, we'll reset it, but still poll.
-        SIGNAL_WORK_THREAD_MODE[cpu].store(false, Ordering::Relaxed);
     }
 }
 

@@ -5,7 +5,6 @@
 //! - might be necessary to configure your WiFi access point accordingly
 //! - uses the given static IP
 //! - responds with some HTML content when connecting to port 8080
-//!
 
 //% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
@@ -50,7 +49,7 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone()).unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

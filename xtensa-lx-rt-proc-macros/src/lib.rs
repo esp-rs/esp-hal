@@ -261,9 +261,9 @@ pub fn interrupt(args: TokenStream, input: TokenStream) -> TokenStream {
     let naked = f.attrs.iter().any(|x| eq(x, "naked"));
 
     let ident_s = if naked {
-        format!("__naked_level_{}_interrupt", level)
+        format!("__naked_level_{level}_interrupt")
     } else {
-        format!("__level_{}_interrupt", level)
+        format!("__level_{level}_interrupt")
     };
 
     if naked && !(2..=7).contains(&level) {

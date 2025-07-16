@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Interrupt support
 //!
 //! ## Overview
@@ -29,9 +30,8 @@
 //! ### Using the peripheral driver to register an interrupt handler
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! let mut sw_int =
-//!     SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+//! # {before_snippet}
+//! let mut sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 //! critical_section::with(|cs| {
 //!     sw_int
 //!         .software_interrupt0
@@ -42,7 +42,7 @@
 //! });
 //!
 //! critical_section::with(|cs| {
-//!     if let Some(swint) = SWINT0.borrow_ref(cs).as_ref(){
+//!     if let Some(swint) = SWINT0.borrow_ref(cs).as_ref() {
 //!         swint.raise();
 //!     }
 //! });
@@ -57,8 +57,7 @@
 //! # use esp_hal::interrupt::Priority;
 //! # use esp_hal::interrupt::InterruptHandler;
 //! #
-//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> =
-//!     Mutex::new(RefCell::new(None));
+//! static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 //!
 //! #[handler(priority = Priority::Priority1)]
 //! fn swint0_handler() {
@@ -85,14 +84,23 @@ mod xtensa;
 
 pub mod software;
 
+#[cfg(feature = "rt")]
 #[unsafe(no_mangle)]
-extern "C" fn EspDefaultHandler(_interrupt: crate::peripherals::Interrupt) {
-    panic!("Unhandled interrupt: {:?}", _interrupt);
+extern "C" fn EspDefaultHandler() {
+    panic!("Unhandled interrupt");
 }
 
 /// Default (unhandled) interrupt handler
 pub const DEFAULT_INTERRUPT_HANDLER: InterruptHandler = InterruptHandler::new(
-    unsafe { core::mem::transmute::<*const (), extern "C" fn()>(EspDefaultHandler as *const ()) },
+    {
+        unsafe extern "C" {
+            fn EspDefaultHandler();
+        }
+
+        unsafe {
+            core::mem::transmute::<unsafe extern "C" fn(), extern "C" fn()>(EspDefaultHandler)
+        }
+    },
     Priority::min(),
 );
 

@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use toml_edit::{Item, TableLike, Value};
 
-use crate::{cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER, Package, Version};
+use crate::{Package, Version, cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER};
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {
     PreRelease(String),
     Patch,
@@ -217,6 +217,7 @@ fn bump_crate_version(
 
 pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
+        log::info!("Bumping version number: {version} by {amount:?}");
         match amount {
             VersionBump::Major => {
                 version.major += 1;
@@ -249,15 +250,11 @@ pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Resul
             if let Some(pre_version) = version.pre.as_str().strip_prefix(&format!("{pre}.")) {
                 let pre_version = pre_version.parse::<u32>()?;
                 version.pre = Prerelease::new(&format!("{pre}.{}", pre_version + 1)).unwrap();
-            } else if version.pre.as_str().is_empty() {
-                // Start a new pre-release
-                bump_version_number(&mut version, &amount);
-                version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
             } else {
-                bail!(
-                    "Unexpected pre-release version format found: {}",
-                    version.pre.as_str()
-                );
+                // if the pre version is _not_ the same as the one we had, it's a new pre-release
+                // use the new pre and reset the bump to 0
+                // equally, if the version is not a pre-release, we need to append the pre-release
+                version.pre = Prerelease::new(&format!("{pre}.0")).unwrap();
             }
         }
     }
@@ -359,21 +356,6 @@ mod test {
             ("0.1.0", VersionBump::Patch, "0.1.1"),
             ("0.1.0", VersionBump::Minor, "0.2.0"),
             ("0.1.0", VersionBump::Major, "1.0.0"),
-            (
-                "0.1.0",
-                VersionBump::PreRelease("alpha".to_string()),
-                "0.1.1-alpha.0",
-            ),
-            (
-                "0.1.0",
-                VersionBump::PreRelease("alpha".to_string()),
-                "0.2.0-alpha.0",
-            ),
-            (
-                "0.1.0",
-                VersionBump::PreRelease("alpha".to_string()),
-                "1.0.0-alpha.0",
-            ),
             // amount is ignored, assuming same release cycle
             ("0.1.0-beta.0", VersionBump::Minor, "0.1.0"),
             ("0.1.0-beta.0", VersionBump::Major, "0.1.0"),
@@ -386,6 +368,11 @@ mod test {
                 "0.1.0-beta.0",
                 VersionBump::PreRelease("beta".to_string()),
                 "0.1.0-beta.1",
+            ),
+            (
+                "0.1.0-beta.0",
+                VersionBump::PreRelease("rc".to_string()),
+                "0.1.0-rc.0",
             ),
         ];
 

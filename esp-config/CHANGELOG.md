@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.5.0] - 2025-07-16
+
+### Added
+
+- Add `ESP_HAL_CONFIG_PLACE_RMT_DRIVER_IN_RAM` configuration option to pin the RMT driver in RAM (#3778)
+
 ## [v0.4.0] - 2025-06-03
 
 ### Added
@@ -64,4 +70,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.3.1]: https://github.com/esp-rs/esp-hal/releases/tag/esp-config-v0.3.1
 [v0.4.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.3.1...esp-config-v0.4.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.4.0...HEAD
+[v0.5.0]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.4.0...esp-config-v0.5.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-config-v0.5.0...HEAD

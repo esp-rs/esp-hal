@@ -1,12 +1,14 @@
 //! Run a test of download, upload and download+upload in a blocking fashion.
 //!
-//! A prerequisite to running the benchmark examples is to run the benchmark server on your local machine. Simply run the following commands to do so.
+//! A prerequisite to running the benchmark examples is to run the benchmark
+//! server on your local machine. Simply run the following commands to do so.
 //! ```
 //! cd extras/bench-server
 //! cargo run --release
 //! ```
-//! Ensure you have set the IP of your local machine in the `HOST_IP` env variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env variable before running this example.
-//!
+//! Ensure you have set the IP of your local machine in the `HOST_IP` env
+//! variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env
+//! variable before running this example.
 
 //% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
@@ -66,7 +68,7 @@ fn main() -> ! {
 
     let mut rng = Rng::new(peripherals.RNG);
 
-    let esp_wifi_ctrl = init(timg0.timer0, rng.clone(), peripherals.RADIO_CLK).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0, rng.clone()).unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

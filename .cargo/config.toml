@@ -1,5 +1,6 @@
 [alias]
 xtask    = "run --package xtask --"
+xclean   = "xtask clean"
 xdoc     = "run --package xtask --features=deploy-docs,preview-docs --"
 xfmt     = "xtask fmt-packages"
 qa       = "xtask run example qa-test"

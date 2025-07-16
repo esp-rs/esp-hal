@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Reading of eFuses (ESP32)
 //!
 //! ## Overview
@@ -22,7 +23,7 @@
 //! ### Read data from the eFuse storage.
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::efuse::Efuse;
 //!
 //! let mac_address = Efuse::read_base_mac_address();
@@ -43,8 +44,7 @@
 //! println!("Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
 //! println!("Chip type {:?}", Efuse::chip_type());
 //! println!("Max CPU clock {:?}", Efuse::max_cpu_frequency());
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
 
 pub use self::fields::*;

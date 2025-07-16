@@ -47,43 +47,117 @@ impl defmt::Format for Rate {
 }
 
 impl Rate {
+    #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents hertz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_hz(1000);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_hz(val: u32) -> Self {
         Self(InnerRate::Hz(val))
     }
 
+    #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents kilohertz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_khz(1000);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_khz(val: u32) -> Self {
         Self(InnerRate::kHz(val))
     }
 
+    #[procmacros::doc_replace]
     /// Shorthand for creating a rate which represents megahertz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_mhz(1000);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_mhz(val: u32) -> Self {
         Self(InnerRate::MHz(val))
     }
 
+    #[procmacros::doc_replace]
     /// Convert the `Rate` to an interger number of Hz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_hz(1000);
+    /// let hz = rate.as_hz();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn as_hz(&self) -> u32 {
         self.0.to_Hz()
     }
 
+    #[procmacros::doc_replace]
     /// Convert the `Rate` to an interger number of kHz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_khz(1000);
+    /// let khz = rate.as_khz();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn as_khz(&self) -> u32 {
         self.0.to_kHz()
     }
 
+    #[procmacros::doc_replace]
     /// Convert the `Rate` to an interger number of MHz.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_mhz(1000);
+    /// let mhz = rate.as_mhz();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn as_mhz(&self) -> u32 {
         self.0.to_MHz()
     }
 
+    #[procmacros::doc_replace]
     /// Convert the `Rate` to a `Duration`.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Rate;
+    /// let rate = Rate::from_hz(1000);
+    /// let duration = rate.as_duration();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn as_duration(&self) -> Duration {
         Duration::from_micros(1_000_000 / self.as_hz() as u64)
@@ -166,14 +240,28 @@ impl Instant {
     /// Represents the moment the system booted.
     pub const EPOCH: Instant = Instant(InnerInstant::from_ticks(0));
 
+    #[procmacros::doc_replace(
+        "wrap_after" => {
+            cfg(esp32) => "36_558 years",
+            cfg(esp32s2) => "7_311 years",
+            _ => "more than 7 years"
+        }
+    )]
     /// Returns the current instant.
     ///
     /// The counter won’t measure time in sleep-mode.
     ///
     /// The timer has a 1 microsecond resolution and will wrap after
-    #[cfg_attr(esp32, doc = "36_558 years")]
-    #[cfg_attr(esp32s2, doc = "7_311 years")]
-    #[cfg_attr(not(any(esp32, esp32s2)), doc = "more than 7 years")]
+    /// # {wrap_after}
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Instant;
+    /// let now = Instant::now();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub fn now() -> Self {
         now()
@@ -184,13 +272,35 @@ impl Instant {
         Instant(InnerInstant::from_ticks(ticks))
     }
 
+    #[procmacros::doc_replace]
     /// Returns the elapsed `Duration` since boot.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Instant;
+    /// let now = Instant::now();
+    /// let duration = now.duration_since_epoch();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub fn duration_since_epoch(&self) -> Duration {
         *self - Self::EPOCH
     }
 
+    #[procmacros::doc_replace]
     /// Returns the elapsed `Duration` since this `Instant` was created.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Instant;
+    /// let now = Instant::now();
+    /// let duration = now.elapsed();
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub fn elapsed(&self) -> Duration {
         Self::now() - *self
@@ -278,31 +388,81 @@ impl Duration {
     /// A duration representing the maximum possible time.
     pub const MAX: Self = Self(InnerDuration::from_ticks(u64::MAX));
 
+    #[procmacros::doc_replace]
     /// Creates a duration which represents microseconds.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_micros(1000);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_micros(val: u64) -> Self {
         Self(InnerDuration::micros(val))
     }
 
+    #[procmacros::doc_replace]
     /// Creates a duration which represents milliseconds.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_millis(100);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_millis(val: u64) -> Self {
         Self(InnerDuration::millis(val))
     }
 
+    #[procmacros::doc_replace]
     /// Creates a duration which represents seconds.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_secs(1);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_secs(val: u64) -> Self {
         Self(InnerDuration::secs(val))
     }
 
+    #[procmacros::doc_replace]
     /// Creates a duration which represents minutes.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_minutes(1);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_minutes(val: u64) -> Self {
         Self(InnerDuration::minutes(val))
     }
 
+    #[procmacros::doc_replace]
     /// Creates a duration which represents hours.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_hours(1);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn from_hours(val: u64) -> Self {
         Self(InnerDuration::hours(val))
@@ -311,29 +471,101 @@ impl Duration {
     delegate::delegate! {
         #[inline]
         to self.0 {
+            #[procmacros::doc_replace]
             /// Convert the `Duration` to an interger number of microseconds.
+            ///
+            /// ## Example
+            ///
+            /// ```rust, no_run
+            /// # {before_snippet}
+            /// use esp_hal::time::Duration;
+            /// let duration = Duration::from_micros(1000);
+            /// let micros = duration.as_micros();
+            /// # {after_snippet}
+            /// ```
             #[call(to_micros)]
             pub const fn as_micros(&self) -> u64;
 
+            #[procmacros::doc_replace]
             /// Convert the `Duration` to an interger number of milliseconds.
+            ///
+            /// ## Example
+            ///
+            /// ```rust, no_run
+            /// # {before_snippet}
+            /// use esp_hal::time::Duration;
+            /// let duration = Duration::from_millis(100);
+            /// let millis = duration.as_millis();
+            /// # {after_snippet}
+            /// ```
             #[call(to_millis)]
             pub const fn as_millis(&self) -> u64;
 
+            #[procmacros::doc_replace]
             /// Convert the `Duration` to an interger number of seconds.
+            ///
+            /// ## Example
+            ///
+            /// ```rust, no_run
+            /// # {before_snippet}
+            /// use esp_hal::time::Duration;
+            /// let duration = Duration::from_secs(1);
+            /// let secs = duration.as_secs();
+            /// # {after_snippet}
+            /// ```
             #[call(to_secs)]
             pub const fn as_secs(&self) -> u64;
 
+            #[procmacros::doc_replace]
             /// Convert the `Duration` to an interger number of minutes.
+            ///
+            /// ## Example
+            ///
+            /// ```rust, no_run
+            /// # {before_snippet}
+            /// use esp_hal::time::Duration;
+            /// let duration = Duration::from_minutes(1);
+            /// let minutes = duration.as_minutes();
+            /// # {after_snippet}
+            /// ```
             #[call(to_minutes)]
             pub const fn as_minutes(&self) -> u64;
 
+            #[procmacros::doc_replace]
             /// Convert the `Duration` to an interger number of hours.
+            ///
+            /// ## Example
+            ///
+            /// ```rust, no_run
+            /// # {before_snippet}
+            /// use esp_hal::time::Duration;
+            /// let duration = Duration::from_hours(1);
+            /// let hours = duration.as_hours();
+            /// # {after_snippet}
+            /// ```
             #[call(to_hours)]
             pub const fn as_hours(&self) -> u64;
         }
     }
 
+    #[procmacros::doc_replace]
     /// Add two durations while checking for overflow.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_secs(1);
+    /// let duration2 = Duration::from_secs(2);
+    ///
+    /// if let Some(sum) = duration.checked_add(duration2) {
+    ///     println!("Sum: {}", sum);
+    /// } else {
+    ///     println!("Overflow occurred");
+    /// }
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn checked_add(self, rhs: Self) -> Option<Self> {
         if let Some(val) = self.0.checked_add(rhs.0) {
@@ -343,7 +575,24 @@ impl Duration {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Subtract two durations while checking for overflow.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_secs(3);
+    /// let duration2 = Duration::from_secs(1);
+    ///
+    /// if let Some(diff) = duration.checked_sub(duration2) {
+    ///     println!("Difference: {}", diff);
+    /// } else {
+    ///     println!("Underflow occurred");
+    /// }
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
         if let Some(val) = self.0.checked_sub(rhs.0) {
@@ -353,7 +602,20 @@ impl Duration {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Add two durations, returning the maximum value if overflow occurred.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_secs(1);
+    /// let duration2 = Duration::from_secs(2);
+    ///
+    /// let sum = duration.saturating_add(duration2);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn saturating_add(self, rhs: Self) -> Self {
         if let Some(val) = self.checked_add(rhs) {
@@ -363,8 +625,21 @@ impl Duration {
         }
     }
 
+    #[procmacros::doc_replace]
     /// Subtract two durations, returning the minimum value if the result would
     /// be negative.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::time::Duration;
+    /// let duration = Duration::from_secs(3);
+    /// let duration2 = Duration::from_secs(1);
+    ///
+    /// let diff = duration.saturating_sub(duration2);
+    /// # {after_snippet}
+    /// ```
     #[inline]
     pub const fn saturating_sub(self, rhs: Self) -> Self {
         if let Some(val) = self.checked_sub(rhs) {
@@ -471,7 +746,7 @@ fn now() -> Instant {
     Instant::from_ticks(ticks / div)
 }
 
-#[cfg(esp32)]
+#[cfg(all(esp32, feature = "rt"))]
 pub(crate) fn time_init() {
     let apb = crate::Clocks::get().apb_clock.as_hz();
     // we assume 80MHz APB clock source - there is no way to configure it in a

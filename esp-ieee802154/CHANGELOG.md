@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 
+## [v0.8.0] - 2025-07-16
+
+### Changed
+
+- `esp_ieee802154::Ieee802154::new` no longer requires the `RADIO_CLK` peripheral (#3687)
+- MSRV is now 1.88.0 (#3742)
+
 ## [v0.7.0] - 2025-06-03
 
 ### Changed
@@ -87,4 +94,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.6.0]: https://github.com/esp-rs/esp-hal/releases/tag/esp-ieee802154-v0.6.0
 [v0.7.0]: https://github.com/esp-rs/esp-hal/compare/esp-ieee802154-v0.6.0...esp-ieee802154-v0.7.0
-[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-ieee802154-v0.7.0...HEAD
+[v0.8.0]: https://github.com/esp-rs/esp-hal/compare/esp-ieee802154-v0.7.0...esp-ieee802154-v0.8.0
+[Unreleased]: https://github.com/esp-rs/esp-hal/compare/esp-ieee802154-v0.8.0...HEAD

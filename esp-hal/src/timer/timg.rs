@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Timer Group (TIMG)
 //!
 //! ## Overview
@@ -25,9 +26,8 @@
 //! ### General-purpose Timer
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::timg::TimerGroup;
-//! use esp_hal::timer::Timer;
+//! # {before_snippet}
+//! use esp_hal::timer::{Timer, timg::TimerGroup};
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let timer0 = timg0.timer0;
@@ -44,16 +44,16 @@
 //! }
 //!
 //! timer0.clear_interrupt();
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ### Watchdog Timer
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
-//! use esp_hal::timer::timg::TimerGroup;
-//! use esp_hal::timer::timg::MwdtStage;
-//! use esp_hal::timer::Timer;
+//! # {before_snippet}
+//! use esp_hal::timer::{
+//!     Timer,
+//!     timg::{MwdtStage, TimerGroup},
+//! };
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! let mut wdt = timg0.wdt;
@@ -96,12 +96,14 @@ cfg_if::cfg_if! {
     }
 }
 
-#[procmacros::enable_doc_switch]
-/// A timer group consisting of
-#[doc_switch(
-    cfg(timergroup_timg_has_timer1) => "2 timers",
-    _ => "a general purpose timer",
+#[procmacros::doc_replace(
+    "timers" => {
+        cfg(timergroup_timg_has_timer1) => "2 timers",
+        _ => "a general purpose timer",
+    }
 )]
+/// A timer group consisting of
+/// # {timers}
 /// and a watchdog timer.
 pub struct TimerGroup<'d, T>
 where
@@ -395,6 +397,10 @@ impl Timer<'_> {
     ///
     /// Use this method if you would like to keep working with the peripheral
     /// after you dropped the driver that consumes this.
+    ///
+    /// See [Peripheral singleton] section for more information.
+    ///
+    /// [Peripheral singleton]: crate#peripheral-singletons
     pub fn reborrow(&mut self) -> Timer<'_> {
         unsafe { self.clone_unchecked() }
     }

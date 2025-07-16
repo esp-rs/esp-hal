@@ -34,6 +34,10 @@ pub struct ExamplesArgs {
     /// The toolchain used to build the examples
     #[arg(long)]
     pub toolchain: Option<String>,
+
+    /// Emit crate build timings
+    #[arg(long)]
+    pub timings: bool,
 }
 
 #[derive(Debug, Args)]
@@ -52,6 +56,10 @@ pub struct TestsArgs {
     /// The toolchain used to build the tests
     #[arg(long)]
     pub toolchain: Option<String>,
+
+    /// Emit crate build timings
+    #[arg(long)]
+    pub timings: bool,
 }
 
 // ----------------------------------------------------------------------------
@@ -119,12 +127,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             crate::execute_app(
                 &package_path,
                 args.chip,
-                target,
+                &target,
                 test,
                 action.clone(),
                 args.repeat,
                 false,
                 args.toolchain.as_deref(),
+                args.timings,
             )?;
         }
         Ok(())
@@ -136,12 +145,13 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
             if crate::execute_app(
                 &package_path,
                 args.chip,
-                target,
+                &target,
                 &test,
                 action.clone(),
                 args.repeat,
                 false,
                 args.toolchain.as_deref(),
+                args.timings,
             )
             .is_err()
             {

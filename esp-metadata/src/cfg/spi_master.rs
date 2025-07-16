@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::format_ident;
+use quote::{format_ident, quote};
 
 use crate::{cfg::SpiMasterProperties, generate_for_each_macro};
 
@@ -32,18 +32,40 @@ pub(crate) fn generate_spi_master_peripherals(spi_slave: &SpiMasterProperties) -
             let sio = instance_config.sio.iter().map(|cs| format_ident!("{cs}"));
 
             let is_qspi = if instance_config.sio.len() > 2 {
-                quote::quote! { , true }
+                quote! { , true }
             } else {
-                quote::quote! {}
+                quote! {}
             };
 
             // The order and meaning of these tokens must match their use in the
             // `for_each_i2c_master!` call.
-            quote::quote! {
+            quote! {
                 #instance, #sys, #sclk [#(#cs),*] [#(#sio),*] #is_qspi
             }
         })
         .collect::<Vec<_>>();
 
-    generate_for_each_macro("spi_master", &instance_cfgs)
+    let for_each = generate_for_each_macro("spi_master", &[("all", &instance_cfgs)]);
+    quote! {
+        /// This macro can be used to generate code for each peripheral instance of the SPI master driver.
+        ///
+        /// For an explanation on the general syntax, as well as usage of individual/repeated
+        /// matchers, refer to [the crate-level documentation][crate#for_each-macros].
+        ///
+        /// This macro has one option for its "Individual matcher" case:
+        ///
+        /// Syntax: `($instance:ident, $sys:ident, $sclk:ident, [$($cs:ident),*] [$($sio:ident),* $($is_qspi:iteral)?])`
+        ///
+        /// Macro fragments:
+        ///
+        /// - `$instance`: the name of the SPI instance
+        /// - `$sys`: the name of the instance as it is in the `esp_hal::system::Peripheral` enum.
+        /// - `$cs`, `$sio`: chip select and SIO signal names.
+        /// - `$is_qspi`: a `true` literal present if the SPI instance supports QSPI.
+        ///
+        /// Example data:
+        /// - `(SPI2, Spi2, FSPICLK [FSPICS0, FSPICS1, FSPICS2, FSPICS3, FSPICS4, FSPICS5] [FSPID, FSPIQ, FSPIWP, FSPIHD, FSPIIO4, FSPIIO5, FSPIIO6, FSPIIO7], true)`
+        /// - `(SPI3, Spi3, SPI3_CLK [SPI3_CS0, SPI3_CS1, SPI3_CS2] [SPI3_D, SPI3_Q])`
+        #for_each
+    }
 }

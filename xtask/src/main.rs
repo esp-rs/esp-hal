@@ -34,14 +34,16 @@ enum Cli {
     /// Format all packages in the workspace with rustfmt
     #[clap(alias = "format-packages")]
     FmtPackages(FmtPackagesArgs),
+    /// Run cargo clean
+    Clean(CleanArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Semver Checks
     SemverCheck(SemverCheckArgs),
     /// Check the changelog for packages.
     CheckChangelog(CheckChangelogArgs),
-    /// Re-generate the chip support table in the esp-hal README.
-    UpdateChipSupportTable,
+    /// Re-generate metadata and the chip support table in the esp-hal README.
+    UpdateMetadata,
 }
 
 #[derive(Debug, Args)]
@@ -61,6 +63,13 @@ struct FmtPackagesArgs {
     #[arg(long)]
     check: bool,
 
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct CleanArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
@@ -151,15 +160,11 @@ fn main() -> Result<()> {
 
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
+        Cli::Clean(args) => clean(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
-        Cli::UpdateChipSupportTable => {
-            // Re-generate the chip support table in the esp-hal README.
-            // This is a no-op if the table is already up-to-date.
-            xtask::update_chip_support_table(&workspace)?;
-            Ok(())
-        }
+        Cli::UpdateMetadata => xtask::update_metadata(&workspace),
     }
 }
 
@@ -171,36 +176,21 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        log::info!("Formatting package: {}", package);
+        xtask::format_package(workspace, package, args.check)?;
+    }
+
+    Ok(())
+}
+
+fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
+    let mut packages = args.packages;
+    packages.sort();
+
+    for package in packages {
+        log::info!("Cleaning package: {}", package);
         let path = workspace.join(package.to_string());
 
-        // we need to list all source files since modules in `unstable_module!` macros
-        // won't get picked up otherwise
-        let source_files: Vec<String> = walkdir::WalkDir::new(path.join("src"))
-            .into_iter()
-            .filter_map(|entry| {
-                let path = entry.unwrap().into_path();
-                if let Some("rs") = path.extension().unwrap_or_default().to_str() {
-                    Some(String::from(path.to_str().unwrap()))
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let mut cargo_args = CargoArgsBuilder::default()
-            .toolchain("nightly")
-            .subcommand("fmt")
-            .arg("--all")
-            .build();
-
-        if args.check {
-            cargo_args.push("--".into());
-            cargo_args.push("--check".into());
-        }
-
-        cargo_args.push("--".into());
-        cargo_args.extend_from_slice(&source_files);
+        let cargo_args = CargoArgsBuilder::default().subcommand("clean").build();
 
         xtask::cargo::run(&cargo_args, &path)?;
     }
@@ -270,7 +260,7 @@ fn lint_package(
 
     let mut builder = CargoArgsBuilder::default().subcommand("clippy");
 
-    if !package.build_on_host() {
+    if !package.build_on_host(features) {
         if chip.is_xtensa() {
             // In case the user doesn't specify a toolchain, make sure we use +esp
             toolchain.get_or_insert("esp");
@@ -279,7 +269,7 @@ fn lint_package(
     }
 
     if let Some(toolchain) = toolchain {
-        if !package.build_on_host() && toolchain.starts_with("esp") {
+        if !package.build_on_host(features) && toolchain.starts_with("esp") {
             builder = builder.arg("-Zbuild-std=core,alloc");
         }
         builder = builder.toolchain(toolchain);
@@ -289,7 +279,9 @@ fn lint_package(
         builder = builder.arg(arg.to_string());
     }
 
-    builder = builder.arg(format!("--features={}", features.join(",")));
+    if !features.is_empty() {
+        builder = builder.arg(format!("--features={}", features.join(",")));
+    }
 
     let builder = if fix {
         builder.arg("--fix").arg("--lib").arg("--allow-dirty")
@@ -348,6 +340,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -384,6 +377,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 example: None,
                 debug: false,
                 toolchain: args.toolchain.clone(),
+                timings: false,
             },
             CargoAction::Build(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
@@ -459,6 +453,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./examples/target/")),
     )
@@ -476,6 +471,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             example: None,
             debug: true,
             toolchain: args.toolchain.clone(),
+            timings: false,
         },
         CargoAction::Build(PathBuf::from("./qa-test/target/")),
     )

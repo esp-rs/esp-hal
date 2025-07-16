@@ -1,3 +1,9 @@
+#![cfg_attr(docsrs, procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+    }
+))]
 //! # Direct Memory Access (DMA)
 //!
 //! ## Overview
@@ -16,11 +22,10 @@
 //! ### Initialize and utilize DMA controller in `SPI`
 //!
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::dma_buffers;
 //! # use esp_hal::spi::{master::{Config, Spi}, Mode};
-#![cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#![cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
+//! # {dma_channel}
 //! let sclk = peripherals.GPIO0;
 //! let miso = peripherals.GPIO2;
 //! let mosi = peripherals.GPIO4;
@@ -28,17 +33,18 @@
 //!
 //! let mut spi = Spi::new(
 //!     peripherals.SPI2,
-//!     Config::default().with_frequency(Rate::from_khz(100)).
-//! with_mode(Mode::_0) )?
+//!     Config::default()
+//!         .with_frequency(Rate::from_khz(100))
+//!         .with_mode(Mode::_0),
+//! )?
 //! .with_sck(sclk)
 //! .with_mosi(mosi)
 //! .with_miso(miso)
 //! .with_cs(cs)
 //! .with_dma(dma_channel);
-//! # Ok(())
-//! # }
+//! # {after_snippet}
 //! ```
-//! 
+//!
 //! ⚠️ Note: Descriptors should be sized as `(max_transfer_size + CHUNK_SIZE - 1) / CHUNK_SIZE`.
 //! I.e., to transfer buffers of size `1..=CHUNK_SIZE`, you need 1 descriptor.
 //!
@@ -440,19 +446,18 @@ pub enum DmaRxInterrupt {
 /// The default chunk size used for DMA transfers.
 pub const CHUNK_SIZE: usize = 4092;
 
+#[procmacros::doc_replace]
 /// Convenience macro to create DMA buffers and descriptors.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_buffers;
 ///
 /// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
 /// // and TX the same size.
-/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-///     dma_buffers!(32000, 32000);
-/// # Ok(())
-/// # }
+/// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(32000, 32000);
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_buffers {
@@ -464,19 +469,19 @@ macro_rules! dma_buffers {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create circular DMA buffers and descriptors.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_circular_buffers;
 ///
 /// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers!(32000, 32000);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers {
@@ -489,18 +494,18 @@ macro_rules! dma_circular_buffers {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_descriptors;
 ///
 /// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
 /// // only one parameter assumes RX and TX are the same size.
 /// let (rx_descriptors, tx_descriptors) = dma_descriptors!(32000, 32000);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors {
@@ -513,19 +518,18 @@ macro_rules! dma_descriptors {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create circular DMA descriptors.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_circular_descriptors;
 ///
 /// // Create RX and TX descriptors for transactions up to 32000
 /// // bytes - passing only one parameter assumes RX and TX are the same size.
-/// let (rx_descriptors, tx_descriptors) =
-///     dma_circular_descriptors!(32000, 32000);
-/// # Ok(())
-/// # }
+/// let (rx_descriptors, tx_descriptors) = dma_circular_descriptors!(32000, 32000);
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors {
@@ -562,20 +566,20 @@ macro_rules! as_mut_byte_array {
 }
 pub use as_mut_byte_array; // TODO: can be removed as soon as DMA is stabilized
 
+#[procmacros::doc_replace]
 /// Convenience macro to create DMA buffers and descriptors with specific chunk
 /// size.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_buffers_chunk_size;
 ///
 /// // TX and RX buffers are 32000 bytes - passing only one parameter makes TX
 /// // and RX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_buffers_chunk_size!(32000, 32000, 4032);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_buffers_chunk_size {
@@ -586,20 +590,20 @@ macro_rules! dma_buffers_chunk_size {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create circular DMA buffers and descriptors with
 /// specific chunk size.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_circular_buffers_chunk_size;
 ///
 /// // RX and TX buffers are 32000 bytes - passing only one parameter makes RX
 /// // and TX the same size.
 /// let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
 ///     dma_circular_buffers_chunk_size!(32000, 32000, 4032);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_circular_buffers_chunk_size {
@@ -608,19 +612,18 @@ macro_rules! dma_circular_buffers_chunk_size {
     ($size:expr, $chunk_size:expr) => {{ $crate::dma_circular_buffers_chunk_size!($size, $size, $chunk_size) }};
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create DMA descriptors with specific chunk size
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_descriptors_chunk_size;
 ///
 /// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
 /// // only one parameter assumes RX and TX are the same size.
-/// let (rx_descriptors, tx_descriptors) =
-///     dma_descriptors_chunk_size!(32000, 32000, 4032);
-/// # Ok(())
-/// # }
+/// let (rx_descriptors, tx_descriptors) = dma_descriptors_chunk_size!(32000, 32000, 4032);
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_descriptors_chunk_size {
@@ -631,20 +634,19 @@ macro_rules! dma_descriptors_chunk_size {
     };
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create circular DMA descriptors with specific chunk
 /// size
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_circular_descriptors_chunk_size;
 ///
 /// // Create RX and TX descriptors for transactions up to 32000 bytes - passing
 /// // only one parameter assumes RX and TX are the same size.
-/// let (rx_descriptors, tx_descriptors) =
-///     dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
-/// # Ok(())
-/// # }
+/// let (rx_descriptors, tx_descriptors) = dma_circular_descriptors_chunk_size!(32000, 32000, 4032);
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_circular_descriptors_chunk_size {
@@ -722,17 +724,17 @@ macro_rules! dma_descriptor_count {
     }};
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create a DmaTxBuf from buffer size. The buffer and
 /// descriptors are statically allocated and used to create the `DmaTxBuf`.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_tx_buffer;
 ///
 /// let tx_buf = dma_tx_buffer!(32000);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_tx_buffer {
@@ -743,6 +745,7 @@ macro_rules! dma_tx_buffer {
     }};
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create a [DmaRxStreamBuf] from buffer size and
 /// optional chunk size (uses max if unspecified).
 /// The buffer and descriptors are statically allocated and
@@ -752,13 +755,12 @@ macro_rules! dma_tx_buffer {
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_rx_stream_buffer;
 ///
 /// let buf = dma_rx_stream_buffer!(32000);
 /// let buf = dma_rx_stream_buffer!(32000, 1000);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_rx_stream_buffer {
@@ -773,16 +775,16 @@ macro_rules! dma_rx_stream_buffer {
     }};
 }
 
+#[procmacros::doc_replace]
 /// Convenience macro to create a [DmaLoopBuf] from a buffer size.
 ///
 /// ## Usage
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
+/// # {before_snippet}
 /// use esp_hal::dma_loop_buffer;
 ///
 /// let buf = dma_loop_buffer!(2000);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[macro_export]
 macro_rules! dma_loop_buffer {
@@ -1645,29 +1647,34 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
     }
 }
 
+#[procmacros::doc_replace(
+    "dma_channel" => {
+        cfg(pdma) => "let dma_channel = peripherals.DMA_SPI2;",
+        cfg(gdma) => "let dma_channel = peripherals.DMA_CH0;"
+    },
+    "note" => {
+        cfg(pdma) => "\n\nNote that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime.\n\n",
+        _ => ""
+    }
+)]
 /// Trait implemented for DMA channels that are compatible with a particular
 /// peripheral.
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaChannel` implementation.
-#[cfg_attr(pdma, doc = "")]
-#[cfg_attr(
-    pdma,
-    doc = "Note that using mismatching channels (e.g. trying to use `DMA_SPI2` with SPI3) may compile, but will panic in runtime."
-)]
-#[cfg_attr(pdma, doc = "")]
+/// # {note}
 /// ## Example
 ///
 /// The following example demonstrates how this trait can be used to only accept
 /// types compatible with a specific peripheral.
 ///
 /// ```rust,no_run
-#[doc = crate::before_snippet!()]
-/// use esp_hal::spi::master::{
-///     AnySpi, Spi, SpiDma, Config, Instance as SpiInstance
+/// # {before_snippet}
+/// use esp_hal::{
+///     Blocking,
+///     dma::DmaChannelFor,
+///     spi::master::{AnySpi, Config, Instance as SpiInstance, Spi, SpiDma},
 /// };
-/// use esp_hal::dma::DmaChannelFor;
-/// use esp_hal::Blocking;
 ///
 /// fn configures_spi_dma<'d>(
 ///     spi: Spi<'d, Blocking>,
@@ -1675,17 +1682,13 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// ) -> SpiDma<'d, Blocking> {
 ///     spi.with_dma(channel)
 /// }
-#[cfg_attr(pdma, doc = "let dma_channel = peripherals.DMA_SPI2;")]
-#[cfg_attr(gdma, doc = "let dma_channel = peripherals.DMA_CH0;")]
-#[doc = ""]
-/// let spi = Spi::new(
-///     peripherals.SPI2,
-///     Config::default(),
-/// )?;
+///
+/// # {dma_channel}
+///
+/// let spi = Spi::new(peripherals.SPI2, Config::default())?;
 ///
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
-/// # Ok(())
-/// # }
+/// # {after_snippet}
 /// ```
 #[allow(private_bounds)]
 pub trait DmaChannelFor<P: DmaEligible>:

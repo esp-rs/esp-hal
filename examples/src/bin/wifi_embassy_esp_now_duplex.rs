@@ -1,6 +1,7 @@
 //! Embassy ESP-NOW Example (Duplex)
 //!
-//! Asynchronously broadcasts, receives and sends messages via esp-now in multiple embassy tasks
+//! Asynchronously broadcasts, receives and sends messages via esp-now in
+//! multiple embassy tasks
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
@@ -47,12 +48,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let esp_wifi_ctrl = &*mk_static!(
         EspWifiController<'static>,
-        init(
-            timg0.timer0,
-            Rng::new(peripherals.RNG),
-            peripherals.RADIO_CLK,
-        )
-        .unwrap()
+        init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap()
     );
 
     let wifi = peripherals.WIFI;

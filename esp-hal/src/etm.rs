@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # Event Task Matrix (ETM)
 //!
 //! ## Overview
@@ -24,7 +25,7 @@
 //!
 //! ### Control LED by the button via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
@@ -44,10 +45,10 @@
 //!     },
 //! );
 //! let button_event = gpio_ext
-//! .channel0_event
-//! .falling_edge(button, InputConfig { pull: Pull::Down });
+//!     .channel0_event
+//!     .falling_edge(button, InputConfig { pull: Pull::Down });
 //!
-//! let etm = Etm::new(peripherals.SOC_ETM);
+//! let etm = Etm::new(peripherals.ETM);
 //! let channel0 = etm.channel0;
 //!
 //! // make sure the configured channel doesn't get dropped - dropping it will
@@ -58,10 +59,10 @@
 //! loop {}
 //! # }
 //! ```
-//! 
+//!
 //! ### Control LED by the systimer via ETM
 //! ```rust, no_run
-#![doc = crate::before_snippet!()]
+//! # {before_snippet}
 //! # use esp_hal::gpio::etm::{Channels, InputConfig, OutputConfig};
 //! # use esp_hal::etm::Etm;
 //! # use esp_hal::gpio::Pull;
@@ -90,7 +91,7 @@
 //!
 //! let timer_event = Event::new(&alarm0);
 //!
-//! let etm = Etm::new(peripherals.SOC_ETM);
+//! let etm = Etm::new(peripherals.ETM);
 //! let channel0 = etm.channel0;
 //!
 //! // make sure the configured channel doesn't get dropped - dropping it will
@@ -102,7 +103,7 @@
 //! # }
 //! ```
 
-use crate::{peripherals::SOC_ETM, system::GenericPeripheralGuard};
+use crate::{peripherals::ETM, system::GenericPeripheralGuard};
 
 /// Unconfigured EtmChannel.
 #[non_exhaustive]
@@ -117,7 +118,7 @@ impl<const C: u8> EtmChannel<C> {
         E: EtmEvent,
         T: EtmTask,
     {
-        let etm = SOC_ETM::regs();
+        let etm = ETM::regs();
         let guard = GenericPeripheralGuard::new();
 
         etm.ch(C as usize)
@@ -141,11 +142,13 @@ impl<const C: u8> EtmChannel<C> {
 }
 
 fn disable_channel(channel: u8) {
-    let etm = SOC_ETM::regs();
     if channel < 32 {
-        etm.ch_ena_ad0_clr().write(|w| w.ch_clr(channel).set_bit());
+        ETM::regs()
+            .ch_ena_ad0_clr()
+            .write(|w| w.ch_clr(channel).set_bit());
     } else {
-        etm.ch_ena_ad1_clr()
+        ETM::regs()
+            .ch_ena_ad1_clr()
             .write(|w| w.ch_clr(channel - 32).set_bit());
     }
 }
@@ -182,7 +185,7 @@ macro_rules! create_etm {
             ///
             /// Provides access to all the [EtmChannel]
             pub struct Etm<'d> {
-                _peripheral: crate::peripherals::SOC_ETM<'d>,
+                _peripheral: crate::peripherals::ETM<'d>,
                 $(
                     /// An individual ETM channel, identified by its index number.
                     pub [< channel $num >]: EtmChannel<$num>,
@@ -191,7 +194,7 @@ macro_rules! create_etm {
 
             impl<'d> Etm<'d> {
                 /// Creates a new `Etm` instance.
-                pub fn new(peripheral: crate::peripherals::SOC_ETM<'d>) -> Self {
+                pub fn new(peripheral: crate::peripherals::ETM<'d>) -> Self {
                     Self {
                         _peripheral: peripheral,
                         $([< channel $num >]: EtmChannel { },)+

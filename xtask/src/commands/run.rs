@@ -53,7 +53,10 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     // Determine the appropriate build target, and cargo features for the given
     // package and chip:
     let target = args.package.target_triple(&chip)?;
-    let features = vec![chip.to_string(), "unstable".to_string()];
+    let mut features = args
+        .package
+        .feature_rules(&esp_metadata::Config::for_chip(&chip));
+    features.push(chip.to_string());
 
     // We need `nightly` for building the doc tests, unfortunately:
     let toolchain = if chip.is_xtensa() { "esp" } else { "nightly" };
@@ -72,8 +75,13 @@ pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
     let args = builder.build();
     log::debug!("{args:#?}");
 
+    let envs = vec![
+        ("RUSTDOCFLAGS", "--cfg docsrs --cfg not_really_docsrs"),
+        ("ESP_HAL_DOCTEST", "1"),
+    ];
+
     // Execute `cargo doc` from the package root:
-    crate::cargo::run(&args, &package_path)?;
+    crate::cargo::run_with_env(&args, &package_path, envs, false)?;
 
     Ok(())
 }
@@ -179,12 +187,13 @@ pub fn run_examples(
                 && crate::execute_app(
                     package_path,
                     args.chip,
-                    target,
+                    &target,
                     &example,
                     CargoAction::Run,
                     1,
                     args.debug,
                     args.toolchain.as_deref(),
+                    args.timings,
                 )
                 .is_err()
             {
