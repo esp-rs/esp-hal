@@ -458,7 +458,6 @@ pub mod dma {
             self.info.regs()
         }
 
-        #[allow(clippy::too_many_arguments)]
         unsafe fn start_transfer_dma<Dm: DriverMode>(
             &self,
             read_buffer_len: usize,
