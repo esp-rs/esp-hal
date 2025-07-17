@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- PSRAM on ESP32-S2 (#3811)
 
 ### Removed
 

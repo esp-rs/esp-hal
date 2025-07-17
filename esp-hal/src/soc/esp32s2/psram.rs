@@ -465,12 +465,7 @@ pub(crate) mod utils {
             match mode {
                 CommandMode::PsramCmdQpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_QIO_MODE);
-                    // this should be `fcmd_quad` - apparently our ESP32-S2 SVD isn't correct for
-                    // SPI1 and SPI0. i.e. GP-SPI vs MEM-SPI
-                    //
-                    // TODO fix the SVD and change this back!
-                    // (i.e. in our SVD FCMD_QUAD is bit 9 while it should be bit 8)
-                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_dual().set_bit());
+                    SPI1::regs().ctrl().modify(|_, w| w.fcmd_quad().set_bit());
                 }
                 CommandMode::PsramCmdSpi => {
                     esp_rom_spi_set_op_mode(1, ESP_ROM_SPIFLASH_SLOWRD_MODE);
