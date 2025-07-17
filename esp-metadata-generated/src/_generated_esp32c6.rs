@@ -132,6 +132,12 @@ macro_rules! property {
     ("i2c_master.fifo_size", str) => {
         stringify!(32)
     };
+    ("lp_i2c_master.fifo_size") => {
+        16
+    };
+    ("lp_i2c_master.fifo_size", str) => {
+        stringify!(16)
+    };
     ("interrupts.status_registers") => {
         3
     };
@@ -155,6 +161,18 @@ macro_rules! property {
     };
     ("timergroup.timg_has_timer1") => {
         false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
+    ("lp_uart.ram_size") => {
+        32
+    };
+    ("lp_uart.ram_size", str) => {
+        stringify!(32)
     };
     ("wifi.has_wifi6") => {
         true
