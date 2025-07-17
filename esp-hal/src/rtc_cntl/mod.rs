@@ -562,27 +562,25 @@ impl RtcClock {
         let rtc_cntl = LPWR::regs();
 
         if clk_8m_en {
+            // clk_ll_rc_fast_enable
             rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
-            unsafe {
-                rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
-            }
+
+            rtc_cntl
+                .timer1()
+                .modify(|_, w| unsafe { w.ck8m_wait().bits(5) });
+
             crate::rom::ets_delay_us(50);
         } else {
+            // clk_ll_rc_fast_disable
             rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().set_bit());
             rtc_cntl
                 .timer1()
                 .modify(|_, w| unsafe { w.ck8m_wait().bits(20) });
         }
 
-        if d256_en {
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.enb_ck8m_div().clear_bit());
-        } else {
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.enb_ck8m_div().set_bit());
-        }
+        rtc_cntl
+            .clk_conf()
+            .modify(|_, w| w.enb_ck8m_div().bit(!d256_en));
     }
 
     pub(crate) fn read_xtal_freq_mhz() -> Option<u32> {
@@ -726,12 +724,9 @@ impl RtcClock {
 
         // Prepare calibration
         timg0.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel()
-                .bits(cal_clk as u8)
-                .rtc_cali_start_cycling()
-                .clear_bit()
-                .rtc_cali_max()
-                .bits(slowclk_cycles as u16)
+            w.rtc_cali_clk_sel().bits(cal_clk as u8);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_max().bits(slowclk_cycles as u16)
         });
 
         // Figure out how long to wait for calibration to finish
@@ -1027,20 +1022,13 @@ impl Rwdt {
             // Apply default settings for WDT
             unsafe {
                 rtc_cntl.wdtconfig0().modify(|_, w| {
-                    w.wdt_stg0()
-                        .bits(RwdtStageAction::ResetSystem as u8)
-                        .wdt_cpu_reset_length()
-                        .bits(7)
-                        .wdt_sys_reset_length()
-                        .bits(7)
-                        .wdt_stg1()
-                        .bits(RwdtStageAction::Off as u8)
-                        .wdt_stg2()
-                        .bits(RwdtStageAction::Off as u8)
-                        .wdt_stg3()
-                        .bits(RwdtStageAction::Off as u8)
-                        .wdt_en()
-                        .set_bit()
+                    w.wdt_stg0().bits(RwdtStageAction::ResetSystem as u8);
+                    w.wdt_cpu_reset_length().bits(7);
+                    w.wdt_sys_reset_length().bits(7);
+                    w.wdt_stg1().bits(RwdtStageAction::Off as u8);
+                    w.wdt_stg2().bits(RwdtStageAction::Off as u8);
+                    w.wdt_stg3().bits(RwdtStageAction::Off as u8);
+                    w.wdt_en().set_bit()
                 });
             }
         }
@@ -1055,63 +1043,17 @@ impl Rwdt {
         let timeout_raw = (timeout.as_millis() * (RtcClock::cycles_to_1ms() as u64)) as u32;
         self.set_write_protection(false);
 
-        unsafe {
-            #[cfg(esp32)]
-            match stage {
-                RwdtStage::Stage0 => rtc_cntl
-                    .wdtconfig1()
-                    .modify(|_, w| w.wdt_stg0_hold().bits(timeout_raw)),
-                RwdtStage::Stage1 => rtc_cntl
-                    .wdtconfig2()
-                    .modify(|_, w| w.wdt_stg1_hold().bits(timeout_raw)),
-                RwdtStage::Stage2 => rtc_cntl
-                    .wdtconfig3()
-                    .modify(|_, w| w.wdt_stg2_hold().bits(timeout_raw)),
-                RwdtStage::Stage3 => rtc_cntl
-                    .wdtconfig4()
-                    .modify(|_, w| w.wdt_stg3_hold().bits(timeout_raw)),
-            };
+        let config_reg = match stage {
+            RwdtStage::Stage0 => rtc_cntl.wdtconfig1(),
+            RwdtStage::Stage1 => rtc_cntl.wdtconfig2(),
+            RwdtStage::Stage2 => rtc_cntl.wdtconfig3(),
+            RwdtStage::Stage3 => rtc_cntl.wdtconfig4(),
+        };
 
-            #[cfg(any(esp32c6, esp32h2))]
-            match stage {
-                RwdtStage::Stage0 => rtc_cntl.config1().modify(|_, w| {
-                    w.wdt_stg0_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage1 => rtc_cntl.config2().modify(|_, w| {
-                    w.wdt_stg1_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage2 => rtc_cntl.config3().modify(|_, w| {
-                    w.wdt_stg2_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage3 => rtc_cntl.config4().modify(|_, w| {
-                    w.wdt_stg3_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-            };
+        #[cfg(not(esp32))]
+        let timeout_raw = timeout_raw >> (1 + Efuse::rwdt_multiplier());
 
-            #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-            match stage {
-                RwdtStage::Stage0 => rtc_cntl.wdtconfig1().modify(|_, w| {
-                    w.wdt_stg0_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage1 => rtc_cntl.wdtconfig2().modify(|_, w| {
-                    w.wdt_stg1_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage2 => rtc_cntl.wdtconfig3().modify(|_, w| {
-                    w.wdt_stg2_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-                RwdtStage::Stage3 => rtc_cntl.wdtconfig4().modify(|_, w| {
-                    w.wdt_stg3_hold()
-                        .bits(timeout_raw >> (1 + Efuse::rwdt_multiplier()))
-                }),
-            };
-        }
+        config_reg.modify(|_, w| unsafe { w.hold().bits(timeout_raw) });
 
         self.set_write_protection(true);
     }
@@ -1121,21 +1063,14 @@ impl Rwdt {
         let rtc_cntl = LP_WDT::regs();
 
         self.set_write_protection(false);
-
-        match stage {
-            RwdtStage::Stage0 => rtc_cntl
-                .wdtconfig0()
-                .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) }),
-            RwdtStage::Stage1 => rtc_cntl
-                .wdtconfig0()
-                .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) }),
-            RwdtStage::Stage2 => rtc_cntl
-                .wdtconfig0()
-                .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) }),
-            RwdtStage::Stage3 => rtc_cntl
-                .wdtconfig0()
-                .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) }),
-        };
+        rtc_cntl.wdtconfig0().modify(|_, w| unsafe {
+            match stage {
+                RwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
+                RwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
+                RwdtStage::Stage2 => w.wdt_stg2().bits(action as u8),
+                RwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
+            }
+        });
 
         self.set_write_protection(true);
     }

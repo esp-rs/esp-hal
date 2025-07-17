@@ -685,20 +685,13 @@ where
 
             #[cfg_attr(esp32, allow(unused_unsafe))]
             reg_block.wdtconfig0().write(|w| unsafe {
-                w.wdt_en()
-                    .bit(true)
-                    .wdt_stg0()
-                    .bits(MwdtStageAction::ResetSystem as u8)
-                    .wdt_cpu_reset_length()
-                    .bits(7)
-                    .wdt_sys_reset_length()
-                    .bits(7)
-                    .wdt_stg1()
-                    .bits(MwdtStageAction::Off as u8)
-                    .wdt_stg2()
-                    .bits(MwdtStageAction::Off as u8)
-                    .wdt_stg3()
-                    .bits(MwdtStageAction::Off as u8)
+                w.wdt_en().bit(true);
+                w.wdt_stg0().bits(MwdtStageAction::ResetSystem as u8);
+                w.wdt_cpu_reset_length().bits(7);
+                w.wdt_sys_reset_length().bits(7);
+                w.wdt_stg1().bits(MwdtStageAction::Off as u8);
+                w.wdt_stg2().bits(MwdtStageAction::Off as u8);
+                w.wdt_stg3().bits(MwdtStageAction::Off as u8)
             });
 
             #[cfg(any(esp32c2, esp32c3, esp32c6))]
@@ -743,22 +736,14 @@ where
             .wdtconfig1()
             .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
 
-        unsafe {
-            match stage {
-                MwdtStage::Stage0 => reg_block
-                    .wdtconfig2()
-                    .write(|w| w.wdt_stg0_hold().bits(timeout_raw)),
-                MwdtStage::Stage1 => reg_block
-                    .wdtconfig3()
-                    .write(|w| w.wdt_stg1_hold().bits(timeout_raw)),
-                MwdtStage::Stage2 => reg_block
-                    .wdtconfig4()
-                    .write(|w| w.wdt_stg2_hold().bits(timeout_raw)),
-                MwdtStage::Stage3 => reg_block
-                    .wdtconfig5()
-                    .write(|w| w.wdt_stg3_hold().bits(timeout_raw)),
-            };
-        }
+        let config_register = match stage {
+            MwdtStage::Stage0 => reg_block.wdtconfig2(),
+            MwdtStage::Stage1 => reg_block.wdtconfig3(),
+            MwdtStage::Stage2 => reg_block.wdtconfig4(),
+            MwdtStage::Stage3 => reg_block.wdtconfig5(),
+        };
+
+        config_register.write(|w| unsafe { w.hold().bits(timeout_raw) });
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block
@@ -779,28 +764,14 @@ where
 
         self.set_write_protection(false);
 
-        match stage {
-            MwdtStage::Stage0 => {
-                reg_block
-                    .wdtconfig0()
-                    .modify(|_, w| unsafe { w.wdt_stg0().bits(action as u8) });
+        reg_block.wdtconfig0().modify(|_, w| unsafe {
+            match stage {
+                MwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
+                MwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
+                MwdtStage::Stage2 => w.wdt_stg2().bits(action as u8),
+                MwdtStage::Stage3 => w.wdt_stg3().bits(action as u8),
             }
-            MwdtStage::Stage1 => {
-                reg_block
-                    .wdtconfig0()
-                    .modify(|_, w| unsafe { w.wdt_stg1().bits(action as u8) });
-            }
-            MwdtStage::Stage2 => {
-                reg_block
-                    .wdtconfig0()
-                    .modify(|_, w| unsafe { w.wdt_stg2().bits(action as u8) });
-            }
-            MwdtStage::Stage3 => {
-                reg_block
-                    .wdtconfig0()
-                    .modify(|_, w| unsafe { w.wdt_stg3().bits(action as u8) });
-            }
-        }
+        });
 
         self.set_write_protection(true);
     }
