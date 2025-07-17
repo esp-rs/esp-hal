@@ -184,7 +184,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
             #[cfg(all(low_power_wait, low_power_wait_stats))]
             let before = Instant::now().as_ticks();
             #[cfg(low_power_wait)]
-            Self::wait_impl(cpu);
+            Self::wait_impl(self.cpu as usize);
             #[cfg(all(low_power_wait, low_power_wait_stats))]
             {
                 let after = Instant::now().as_ticks();
