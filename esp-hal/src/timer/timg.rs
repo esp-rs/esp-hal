@@ -726,15 +726,30 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        let timeout_raw = (timeout.as_micros() * 10_000 / 125) as u32;
+        // Assume default 80MHz clock source
+        let timeout_ticks = timeout.as_micros() * 10_000 / 125;
 
         let reg_block = unsafe { &*TG::register_block() };
 
+        let (prescaler, timeout) = if timeout_ticks > u32::MAX as u64 {
+            let prescaler = timeout_ticks
+                .div_ceil(u32::MAX as u64 + 1)
+                .min(u16::MAX as u64) as u16;
+            let timeout = timeout_ticks
+                .div_ceil(prescaler as u64)
+                .min(u32::MAX as u64);
+            (prescaler, timeout as u32)
+        } else {
+            (1, timeout_ticks as u32)
+        };
+
         self.set_write_protection(false);
 
-        reg_block
-            .wdtconfig1()
-            .write(|w| unsafe { w.wdt_clk_prescale().bits(1) });
+        reg_block.wdtconfig1().write(|w| unsafe {
+            #[cfg(timergroup_timg_has_divcnt_rst)]
+            w.wdt_divcnt_rst().set_bit();
+            w.wdt_clk_prescale().bits(prescaler)
+        });
 
         let config_register = match stage {
             MwdtStage::Stage0 => reg_block.wdtconfig2(),
@@ -743,7 +758,7 @@ where
             MwdtStage::Stage3 => reg_block.wdtconfig5(),
         };
 
-        config_register.write(|w| unsafe { w.hold().bits(timeout_raw) });
+        config_register.write(|w| unsafe { w.hold().bits(timeout) });
 
         #[cfg(any(esp32c2, esp32c3, esp32c6))]
         reg_block

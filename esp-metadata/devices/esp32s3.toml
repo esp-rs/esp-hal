@@ -596,6 +596,7 @@ instances = [
 
 [device.timergroup]
 timg_has_timer1 = true
+timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
