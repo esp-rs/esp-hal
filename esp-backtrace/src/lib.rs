@@ -2,6 +2,14 @@
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+//! ## Additional configuration
+//!
+//! We've exposed some configuration options that don't fit into cargo
+//! features. These can be set via environment variables, or via cargo's `[env]`
+//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
+//! for this crate:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_backtrace_config_table.md"))]
 #![no_std]
 
 #[cfg(feature = "defmt")]
