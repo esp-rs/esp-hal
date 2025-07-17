@@ -371,6 +371,7 @@ instances = [
 
 [device.timergroup]
 instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
 
 [device.uart]
 support_status = "supported"
