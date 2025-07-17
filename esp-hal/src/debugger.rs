@@ -10,9 +10,10 @@ pub fn debugger_connected() -> bool {
     #[cfg(riscv)]
     {
         crate::peripherals::ASSIST_DEBUG::regs()
-            .core_0_debug_mode()
+            .cpu(0)
+            .debug_mode()
             .read()
-            .core_0_debug_module_active()
+            .debug_module_active()
             .bit_is_set()
     }
 

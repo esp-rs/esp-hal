@@ -162,7 +162,7 @@ pub(crate) fn esp32_rtc_update_to_xtal(freq: XtalClock, _div: u32) {
         .modify(|_, w| w.soc_clk_sel().xtal());
     LPWR::regs()
         .store5()
-        .modify(|_, w| unsafe { w.scratch5().bits(value) });
+        .modify(|_, w| unsafe { w.data().bits(value) });
 
     // lower the voltage
     LPWR::regs()
@@ -199,7 +199,7 @@ pub(crate) fn set_cpu_freq(cpu_freq_mhz: crate::clock::CpuClock) {
     LPWR::regs().clk_conf().modify(|_, w| w.soc_clk_sel().pll());
     LPWR::regs()
         .store5()
-        .modify(|_, w| unsafe { w.scratch5().bits(value) });
+        .modify(|_, w| unsafe { w.data().bits(value) });
 
     esp32_update_cpu_freq(cpu_freq_mhz.mhz());
 }

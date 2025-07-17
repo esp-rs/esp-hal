@@ -141,7 +141,7 @@ pub(crate) fn esp32c6_rtc_apb_freq_update(apb_freq: ApbClock) {
 
     LP_AON::regs()
         .store5()
-        .modify(|_, w| unsafe { w.lp_aon_store5().bits(value) });
+        .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
 fn clk_ll_mspi_fast_set_hs_divider(divider: u32) {

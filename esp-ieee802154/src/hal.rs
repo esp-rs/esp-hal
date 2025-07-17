@@ -2,6 +2,7 @@ use core::ops::{BitAnd, BitOr};
 
 use esp_hal::peripherals::IEEE802154;
 
+use super::IEEE802154_FRAME_EXT_ADDR_SIZE;
 use crate::pib::CcaMode;
 
 #[allow(unused)]
@@ -276,50 +277,34 @@ pub(crate) fn set_multipan_enable_mask(mask: u8) {
 
 #[inline(always)]
 pub(crate) fn set_multipan_panid(index: MultipanIndex, panid: u16) {
-    unsafe {
-        let pan_id = IEEE802154::regs()
-            .inf0_pan_id()
-            .as_ptr()
-            .offset(4 * index as isize);
-        pan_id.write_volatile(panid as u32);
-    }
+    IEEE802154::regs()
+        .inf(index as usize)
+        .pan_id()
+        .write(|w| unsafe { w.pan_id().bits(panid) });
 }
 
 #[inline(always)]
 pub(crate) fn set_multipan_short_addr(index: MultipanIndex, value: u16) {
-    unsafe {
-        let short_addr = IEEE802154::regs()
-            .inf0_short_addr()
-            .as_ptr()
-            .offset(4 * index as isize);
-        short_addr.write_volatile(value as u32);
-    }
+    IEEE802154::regs()
+        .inf(index as usize)
+        .short_addr()
+        .write(|w| unsafe { w.short_addr().bits(value) });
 }
 
 #[inline(always)]
-pub(crate) fn set_multipan_ext_addr(index: MultipanIndex, ext_addr: *const u8) {
-    unsafe {
-        let mut ext_addr_ptr = IEEE802154::regs()
-            .inf0_extend_addr0()
-            .as_ptr()
-            .offset(4 * index as isize);
+pub(crate) fn set_multipan_ext_addr(
+    index: MultipanIndex,
+    ext_addr: [u8; IEEE802154_FRAME_EXT_ADDR_SIZE],
+) {
+    let inf = IEEE802154::regs().inf(index as usize);
 
-        ext_addr_ptr.write_volatile(
-            (ext_addr.offset(0).read_volatile() as u32)
-                | ((ext_addr.offset(1).read_volatile() as u32) << 8)
-                | ((ext_addr.offset(2).read_volatile() as u32) << 16)
-                | ((ext_addr.offset(3).read_volatile() as u32) << 24),
-        );
+    let ext_addr0 = u32::from_le_bytes(unwrap!(ext_addr[0..3].try_into()));
+    let ext_addr1 = u32::from_le_bytes(unwrap!(ext_addr[4..7].try_into()));
 
-        ext_addr_ptr = ext_addr_ptr.offset(1);
-
-        ext_addr_ptr.write_volatile(
-            (ext_addr.offset(4).read_volatile() as u32)
-                | ((ext_addr.offset(5).read_volatile() as u32) << 8)
-                | ((ext_addr.offset(6).read_volatile() as u32) << 16)
-                | ((ext_addr.offset(7).read_volatile() as u32) << 24),
-        );
-    }
+    inf.extend_addr0()
+        .write(|w| unsafe { w.extend_addr0().bits(ext_addr0) });
+    inf.extend_addr1()
+        .write(|w| unsafe { w.extend_addr1().bits(ext_addr1) });
 }
 
 #[inline(always)]

@@ -646,7 +646,7 @@ impl SleepTimeConfig {
 
         // Calibrate rtc slow clock
         // TODO: do an actual calibration instead of a read
-        let slowclk_period = unsafe { lp_aon().store1().read().lp_aon_store1().bits() };
+        let slowclk_period = unsafe { lp_aon().store1().read().data().bits() };
 
         // Calibrate rtc fast clock, only PMU supported chips sleep process is needed.
         const FAST_CLK_SRC_CAL_CYCLES: u32 = 2048;
@@ -730,7 +730,7 @@ impl SleepTimeConfig {
         #[rustfmt::skip] // ASCII art
         //  When the SOC wakeup (lp timer or GPIO wakeup) and Modem wakeup (Beacon wakeup) complete,
         // the soc wakeup will be delayed until the RF is turned on in Modem state.
-        // 
+        //
         //              modem wakeup                      TBTT, RF on by HW
         //                   |                                    |
         //                  \|/                                  \|/
@@ -744,7 +744,7 @@ impl SleepTimeConfig {
         //                   |                                                                  |
         //                   |<--      PMU guard time, also the maximum time for the SOC     -->|
         //                   |                           wake-up delay                          |
-        // 
+        //
         const CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP: bool = true;
 
         let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP {

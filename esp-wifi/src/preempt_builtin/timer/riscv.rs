@@ -39,14 +39,14 @@ pub(crate) fn disable_multitasking() {
 extern "C" fn FROM_CPU_INTR2(trap_frame: &mut TrapFrame) {
     // clear FROM_CPU_INTR3
     SystemPeripheral::regs()
-        .cpu_intr_from_cpu_2()
-        .modify(|_, w| w.cpu_intr_from_cpu_2().clear_bit());
+        .cpu_intr_from_cpu(2)
+        .modify(|_, w| w.cpu_intr().clear_bit());
 
     task_switch(trap_frame);
 }
 
 pub(crate) fn yield_task() {
     SystemPeripheral::regs()
-        .cpu_intr_from_cpu_2()
-        .modify(|_, w| w.cpu_intr_from_cpu_2().set_bit());
+        .cpu_intr_from_cpu(2)
+        .modify(|_, w| w.cpu_intr().set_bit());
 }
