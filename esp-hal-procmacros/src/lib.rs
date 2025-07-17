@@ -213,6 +213,22 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
+///
+/// You can also attach callbacks to the executor:
+/// ``` rust
+/// struct MyCallbacks;
+///
+/// impl Callbacks for MyCallbacks {
+///     fn before_poll(&mut self) {}
+///     fn on_idle(&mut self) {}
+/// }
+///
+/// #[main(callbacks = MyCallbacks)]
+/// async fn main(_s: embassy_executor::Spawner) {
+///     // Function body
+/// }
+/// ```
+
 #[cfg(feature = "embassy")]
 #[proc_macro_attribute]
 pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
