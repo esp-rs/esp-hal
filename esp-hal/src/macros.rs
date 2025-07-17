@@ -315,3 +315,155 @@ macro_rules! metadata {
         };
     };
 }
+
+#[procmacros::doc_replace]
+/// Extract fields from [`Peripherals`][crate::peripherals::Peripherals] into named groups.
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// # {before_snippet}
+/// #
+/// use esp_hal::assign_resources;
+///
+/// assign_resources! {
+///     Resources<'d> {
+///         display: DisplayResources<'d> {
+///             spi:  SPI2,
+///             sda:  GPIO6,
+///             sclk: GPIO7,
+///             cs:   GPIO8,
+///             dc:   GPIO9,
+///         },
+///         axl: AccelerometerResources<'d> {
+///             i2c: I2C0,
+///             sda: GPIO12,
+///             scl: GPIO13,
+///         },
+///     }
+/// }
+///
+/// # struct Display<'d>(core::marker::PhantomData<&'d ()>);
+/// fn init_display<'d>(r: DisplayResources<'d>) -> Display<'d> {
+///     // use `r.spi`, `r.sda`, `r.sclk`, `r.cs`, `r.dc`
+///     todo!()
+/// }
+///
+/// # struct Accelerometer<'d>(core::marker::PhantomData<&'d ()>);
+/// fn init_accelerometer<'d>(r: AccelerometerResources<'d>) -> Accelerometer<'d> {
+///     // use `r.i2c`, `r.sda`, `r.scl`
+///     todo!()
+/// }
+///
+/// // let peripherals = esp_hal::init(...);
+/// let resources = split_resources!(peripherals);
+///
+/// let display = init_display(resources.display);
+/// let axl = init_accelerometer(resources.axl);
+///
+/// // Other fields (`peripherals.UART0`, ...) of the `peripherals` struct can still be accessed.
+/// # {after_snippet}
+/// ```
+// Based on https://crates.io/crates/assign-resources
+#[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+macro_rules! assign_resources {
+    {
+        $(#[$struct_meta:meta])*
+        $vis:vis $struct_name:ident<$struct_lt:lifetime> {
+            $(
+                $(#[$group_meta:meta])*
+                $group_name:ident : $group_struct:ident<$group_lt:lifetime> {
+                    $(
+                        $(#[$resource_meta:meta])*
+                        $resource_name:ident : $resource_field:ident
+                    ),*
+                    $(,)?
+                }
+            ),+
+            $(,)?
+        }
+    } => {
+        // Group structs
+        $(
+            $(#[$group_meta])*
+            #[allow(missing_docs)]
+            $vis struct $group_struct<$group_lt> {
+                $(
+                    $(#[$resource_meta])*
+                    pub $resource_name: $crate::peripherals::$resource_field<$group_lt>,
+                )+
+            }
+
+            impl<$group_lt> $group_struct<$group_lt> {
+                /// Unsafely create an instance of the assigned peripherals out of thin air.
+                ///
+                /// # Safety
+                ///
+                /// You must ensure that you're only using one instance of the contained peripherals at a time.
+                pub unsafe fn steal() -> Self {
+                    unsafe {
+                        Self {
+                            $($resource_name: $crate::peripherals::$resource_field::steal()),*
+                        }
+                    }
+                }
+
+                /// Creates a new reference to the peripheral group with a shorter lifetime.
+                ///
+                /// Use this method if you would like to keep working with the peripherals after
+                /// you dropped the drivers that consume this.
+                pub fn reborrow(&mut self) -> $group_struct<'_> {
+                    $group_struct {
+                        $($resource_name: self.$resource_name.reborrow()),*
+                    }
+                }
+            }
+        )+
+
+        // Outer struct
+        $(#[$struct_meta])*
+        /// Assigned resources.
+        $vis struct $struct_name<$struct_lt> {
+            $( pub $group_name: $group_struct<$struct_lt>, )+
+        }
+
+        impl<$struct_lt> $struct_name<$struct_lt> {
+            /// Unsafely create an instance of the assigned peripherals out of thin air.
+            ///
+            /// # Safety
+            ///
+            /// You must ensure that you're only using one instance of the contained peripherals at a time.
+            pub unsafe fn steal() -> Self {
+                unsafe {
+                    Self {
+                        $($group_name: $group_struct::steal()),*
+                    }
+                }
+            }
+
+            /// Creates a new reference to the assigned peripherals with a shorter lifetime.
+            ///
+            /// Use this method if you would like to keep working with the peripherals after
+            /// you dropped the drivers that consume this.
+            pub fn reborrow(&mut self) -> $struct_name<'_> {
+                $struct_name {
+                    $($group_name: self.$group_name.reborrow()),*
+                }
+            }
+        }
+
+        /// Extracts resources from the `Peripherals` struct.
+        #[macro_export]
+        macro_rules! split_resources {
+            ($peris:ident) => {
+                $struct_name {
+                    $($group_name: $group_struct {
+                        $($resource_name: $peris.$resource_field),*
+                    }),*
+                }
+            }
+        }
+    };
+}
