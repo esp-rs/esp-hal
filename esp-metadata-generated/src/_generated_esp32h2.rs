@@ -156,6 +156,12 @@ macro_rules! property {
     ("timergroup.timg_has_timer1") => {
         false
     };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
 }
 /// Macro to get the address range of the given memory region.
 #[macro_export]

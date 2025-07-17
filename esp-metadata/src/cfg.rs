@@ -329,6 +329,13 @@ driver_configs![
             fifo_size: u32,
         }
     },
+    LpI2cMasterProperties {
+        driver: lp_i2c_master,
+        name: "LP I2C master",
+        properties: {
+            fifo_size: u32,
+        }
+    },
     I2cSlaveProperties {
         driver: i2c_slave,
         name: "I2C slave",
@@ -468,7 +475,16 @@ driver_configs![
     UartProperties<UartInstanceConfig> {
         driver: uart,
         name: "UART",
-        properties: {}
+        properties: {
+            ram_size: u32,
+        }
+    },
+    LpUartProperties {
+        driver: lp_uart,
+        name: "LP UART",
+        properties: {
+            ram_size: u32,
+        }
     },
     UlpFsmProperties {
         driver: ulp_fsm,

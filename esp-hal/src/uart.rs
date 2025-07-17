@@ -2340,7 +2340,7 @@ pub(super) fn intr_handler(uart: &Info, state: &State) {
 }
 
 /// Low-power UART
-#[cfg(soc_has_lp_uart)]
+#[cfg(lp_uart)]
 #[instability::unstable]
 pub mod lp_uart {
     use crate::{
@@ -2631,8 +2631,8 @@ pub struct State {
 impl Info {
     // Currently we don't support merging adjacent FIFO memory, so the max size is
     // 128 bytes, the max threshold is 127 bytes.
-    const UART_FIFO_SIZE: u16 = 128;
-    const RX_FIFO_MAX_THRHD: u16 = 127;
+    const UART_FIFO_SIZE: u16 = property!("uart.ram_size");
+    const RX_FIFO_MAX_THRHD: u16 = Self::UART_FIFO_SIZE - 1;
     const TX_FIFO_MAX_THRHD: u16 = Self::RX_FIFO_MAX_THRHD;
 
     /// Returns the register block for this UART instance.

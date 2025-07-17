@@ -607,6 +607,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
     { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
 ]
+ram_size = 128
 
 [device.ethernet]
 support_status = "not_supported"

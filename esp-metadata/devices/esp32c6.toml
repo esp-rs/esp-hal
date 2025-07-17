@@ -425,6 +425,10 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.lp_i2c_master]
+support_status = "partial"
+fifo_size = 16
+
 [device.i2c_slave]
 support_status = "not_supported"
 
@@ -457,6 +461,11 @@ instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
+ram_size = 128
+
+[device.lp_uart]
+support_status = "partial"
+ram_size = 32
 
 [device.ds]
 support_status = "not_supported"

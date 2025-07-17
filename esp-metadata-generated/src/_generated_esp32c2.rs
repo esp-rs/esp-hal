@@ -144,6 +144,12 @@ macro_rules! property {
     ("timergroup.timg_has_timer1") => {
         false
     };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
+    };
     ("wifi.has_wifi6") => {
         false
     };
