@@ -1376,7 +1376,8 @@ fn set_filter(
     }
 }
 
-#[allow(clippy::too_many_arguments, unused)]
+#[expect(clippy::too_many_arguments)]
+#[allow(unused)]
 /// Configures the clock and timing parameters for the I2C peripheral.
 fn configure_clock(
     register_block: &RegisterBlock,

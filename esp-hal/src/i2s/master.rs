@@ -330,7 +330,6 @@ where
 impl<'d> I2s<'d, Blocking> {
     /// Construct a new I2S peripheral driver instance for the first I2S
     /// peripheral
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         i2s: impl Instance + 'd,
         standard: Standard,

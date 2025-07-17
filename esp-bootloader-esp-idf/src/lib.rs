@@ -153,7 +153,7 @@ pub struct EspAppDesc {
 impl EspAppDesc {
     /// Needs to be public since it's used by the macro
     #[doc(hidden)]
-    #[allow(clippy::too_many_arguments, reason = "For internal use only")]
+    #[expect(clippy::too_many_arguments, reason = "For internal use only")]
     pub const fn new_internal(
         version: &str,
         project_name: &str,

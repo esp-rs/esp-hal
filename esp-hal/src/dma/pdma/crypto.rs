@@ -476,10 +476,9 @@ impl PdmaChannel for DMA_CRYPTO<'_> {
             asynch::handle_in_interrupt::<DMA_CRYPTO<'static>>();
             asynch::handle_out_interrupt::<DMA_CRYPTO<'static>>();
         }
-        #[allow(non_upper_case_globals)]
-        pub(crate) static interrupt_handler: InterruptHandler =
+        pub(crate) static INTERRUPT_HANDLER: InterruptHandler =
             InterruptHandler::new(__esp_hal_internal_interrupt_handler, Priority::max());
-        interrupt_handler
+        INTERRUPT_HANDLER
     }
     fn rx_async_flag(&self) -> &'static AtomicBool {
         static FLAG: AtomicBool = AtomicBool::new(false);

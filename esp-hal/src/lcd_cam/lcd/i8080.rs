@@ -621,7 +621,7 @@ pub struct TxEightBits<'d> {
 }
 
 impl<'d> TxEightBits<'d> {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     /// Creates a new `TxEightBits` instance with the provided output pins.
     pub fn new(
         pin_0: impl PeripheralOutput<'d>,
@@ -676,7 +676,7 @@ pub struct TxSixteenBits<'d> {
 }
 
 impl<'d> TxSixteenBits<'d> {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     /// Creates a new `TxSixteenBits` instance with the provided output pins.
     pub fn new(
         pin_0: impl PeripheralOutput<'d>,
