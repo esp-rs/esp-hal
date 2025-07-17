@@ -366,6 +366,8 @@ macro_rules! metadata {
 /// ```
 // Based on https://crates.io/crates/assign-resources
 #[macro_export]
+#[cfg(feature = "unstable")]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 macro_rules! assign_resources {
     {
         $(#[$struct_meta:meta])*
