@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `callback` arg to embassy::main macro (#3813)
 
 ### Changed
 
