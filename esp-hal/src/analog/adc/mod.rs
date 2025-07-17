@@ -104,7 +104,6 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
     /// The underlying GPIO pin
     pub pin: PIN,
     /// Calibration scheme used for the configured ADC pin
-    #[cfg_attr(esp32, allow(unused))]
     pub cal_scheme: CS,
     _phantom: PhantomData<ADCI>,
 }
@@ -112,7 +111,7 @@ pub struct AdcPin<PIN, ADCI, CS = ()> {
 /// Configuration for the ADC.
 #[cfg(feature = "unstable")]
 pub struct AdcConfig<ADCI> {
-    #[cfg_attr(not(esp32), allow(unused))]
+    #[cfg_attr(not(esp32), expect(unused))]
     resolution: Resolution,
     attenuations: [Option<Attenuation>; NUM_ATTENS],
     _phantom: PhantomData<ADCI>,

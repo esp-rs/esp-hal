@@ -2927,7 +2927,6 @@ impl DmaDriver {
         self.driver.regs()
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[cfg_attr(place_spi_master_driver_in_ram, ram)]
     unsafe fn start_transfer_dma<Dm: DriverMode>(
         &self,
@@ -3696,7 +3695,7 @@ impl Driver {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn setup_half_duplex(
         &self,
         is_write: bool,

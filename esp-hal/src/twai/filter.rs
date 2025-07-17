@@ -401,7 +401,7 @@ impl DualStandardFilter {
     /// The masks indicate which bits of the code the filter should match
     /// against. Set bits in the mask indicate that the corresponding bit in
     /// the code should match.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub fn new_from_code_mask(
         first_id_code: StandardId,
         first_id_mask: StandardId,

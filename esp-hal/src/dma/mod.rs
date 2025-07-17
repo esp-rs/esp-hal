@@ -987,7 +987,6 @@ impl DescriptorChain {
         self.descriptors.last().unwrap()
     }
 
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn fill_for_rx(
         &mut self,
         circular: bool,
@@ -1000,7 +999,6 @@ impl DescriptorChain {
         })
     }
 
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
     pub fn fill_for_tx(
         &mut self,
         is_circular: bool,
@@ -1690,7 +1688,6 @@ impl<DEG: DmaChannel> DmaChannelConvert<DEG> for DEG {
 /// let spi_dma = configures_spi_dma(spi, dma_channel);
 /// # {after_snippet}
 /// ```
-#[allow(private_bounds)]
 pub trait DmaChannelFor<P: DmaEligible>:
     DmaChannel + DmaChannelConvert<PeripheralDmaChannel<P>>
 {
@@ -1709,7 +1706,6 @@ where
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaRxChannel` implementation.
-#[allow(private_bounds)]
 pub trait RxChannelFor<P: DmaEligible>: DmaChannelConvert<PeripheralRxChannel<P>> {}
 impl<P, RX> RxChannelFor<P> for RX
 where
@@ -1725,7 +1721,6 @@ where
 ///
 /// You can use this in places where a peripheral driver would expect a
 /// `DmaTxChannel` implementation.
-#[allow(private_bounds)]
 pub trait TxChannelFor<PER: DmaEligible>: DmaChannelConvert<PeripheralTxChannel<PER>> {}
 impl<P, TX> TxChannelFor<P> for TX
 where
