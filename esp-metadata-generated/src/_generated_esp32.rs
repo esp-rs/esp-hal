@@ -156,6 +156,9 @@ macro_rules! property {
     ("timergroup.timg_has_timer1") => {
         true
     };
+    ("timergroup.timg_has_divcnt_rst") => {
+        false
+    };
     ("uart.ram_size") => {
         128
     };

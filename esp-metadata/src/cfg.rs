@@ -460,6 +460,8 @@ driver_configs![
         properties: {
             #[serde(default)]
             timg_has_timer1: bool,
+            #[serde(default)]
+            timg_has_divcnt_rst: bool,
         }
     },
     TouchProperties {
