@@ -64,6 +64,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | GPIO               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
 | HMAC               |       |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | I2C master         | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
+| LP I2C master      |       |          |          | ⚒️      |          |          |          |
 | I2C slave          | ❌    |          | ❌       | ❌       | ❌       | ❌       | ❌       |
 | I2S                | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | Interrupts         | ⚒️   | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
@@ -90,6 +91,7 @@ For help getting started with this HAL, please refer to [The Rust on ESP Book] a
 | Touch              | ⚒️   |          |          |          |          | ❌       | ❌       |
 | TWAI               | ⚒️   |          | ⚒️      | ⚒️      | ⚒️      | ⚒️      | ⚒️      |
 | UART               | ✔️   | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      | ✔️      |
+| LP UART            |       |          |          | ⚒️      |          |          |          |
 | ULP (FSM)          | ⚒️   |          |          |          |          | ⚒️      | ⚒️      |
 | ULP (RISC-V)       |       |          |          | ⚒️      |          | ⚒️      | ⚒️      |
 | USB OTG FS         |       |          |          |          |          | ⚒️      | ⚒️      |

@@ -18,13 +18,17 @@
 #![deny(missing_docs)]
 #![no_std]
 
+#[allow(unused_imports, reason = "Only used for some MCUs currently")]
+#[macro_use]
+extern crate esp_metadata_generated;
+
 use core::arch::global_asm;
 
 pub mod delay;
 pub mod gpio;
-#[cfg(esp32c6)]
+#[cfg(lp_i2c_master)]
 pub mod i2c;
-#[cfg(esp32c6)]
+#[cfg(lp_uart)]
 pub mod uart;
 
 #[cfg(feature = "esp32c6")]

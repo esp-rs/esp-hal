@@ -12,7 +12,7 @@ const I2C_LL_INTR_MASK: u32 = (1 << LP_I2C_TRANS_COMPLETE_INT_ST_S)
     | (1 << LP_I2C_END_DETECT_INT_ST_S)
     | (1 << LP_I2C_NACK_INT_ST_S);
 
-const LP_I2C_FIFO_LEN: u32 = 16;
+const LP_I2C_FIFO_LEN: u32 = property!("lp_i2c_master.fifo_size");
 
 #[doc(hidden)]
 pub unsafe fn conjure() -> LpI2c {
