@@ -228,7 +228,6 @@ pub fn entry(args: TokenStream, input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
-
 #[cfg(feature = "embassy")]
 #[proc_macro_attribute]
 pub fn embassy_main(args: TokenStream, item: TokenStream) -> TokenStream {
