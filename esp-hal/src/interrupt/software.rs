@@ -110,21 +110,15 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
             }
         }
 
-        match NUM {
-            0 => system
-                .cpu_intr_from_cpu_0()
-                .write(|w| w.cpu_intr_from_cpu_0().set_bit()),
-            1 => system
-                .cpu_intr_from_cpu_1()
-                .write(|w| w.cpu_intr_from_cpu_1().set_bit()),
-            2 => system
-                .cpu_intr_from_cpu_2()
-                .write(|w| w.cpu_intr_from_cpu_2().set_bit()),
-            3 => system
-                .cpu_intr_from_cpu_3()
-                .write(|w| w.cpu_intr_from_cpu_3().set_bit()),
+        let reg = match NUM {
+            0 => system.cpu_intr_from_cpu(0),
+            1 => system.cpu_intr_from_cpu(1),
+            2 => system.cpu_intr_from_cpu(2),
+            3 => system.cpu_intr_from_cpu(3),
             _ => unreachable!(),
         };
+
+        reg.write(|w| w.cpu_intr().set_bit());
     }
 
     /// Resets this software-interrupt
@@ -137,21 +131,15 @@ impl<const NUM: u8> SoftwareInterrupt<'_, NUM> {
             }
         }
 
-        match NUM {
-            0 => system
-                .cpu_intr_from_cpu_0()
-                .write(|w| w.cpu_intr_from_cpu_0().clear_bit()),
-            1 => system
-                .cpu_intr_from_cpu_1()
-                .write(|w| w.cpu_intr_from_cpu_1().clear_bit()),
-            2 => system
-                .cpu_intr_from_cpu_2()
-                .write(|w| w.cpu_intr_from_cpu_2().clear_bit()),
-            3 => system
-                .cpu_intr_from_cpu_3()
-                .write(|w| w.cpu_intr_from_cpu_3().clear_bit()),
+        let reg = match NUM {
+            0 => system.cpu_intr_from_cpu(0),
+            1 => system.cpu_intr_from_cpu(1),
+            2 => system.cpu_intr_from_cpu(2),
+            3 => system.cpu_intr_from_cpu(3),
             _ => unreachable!(),
         };
+
+        reg.write(|w| w.cpu_intr().clear_bit());
     }
 }
 

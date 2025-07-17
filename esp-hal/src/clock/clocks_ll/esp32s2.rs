@@ -38,7 +38,7 @@ pub(crate) fn set_cpu_clock(cpu_clock_speed: CpuClock) {
     let value = (((80 * MHZ) >> 12) & UINT16_MAX) | ((((80 * MHZ) >> 12) & UINT16_MAX) << 16);
     LPWR::regs()
         .store5()
-        .modify(|_, w| unsafe { w.scratch5().bits(value) });
+        .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
 // Mask for clock bits used by both WIFI and Bluetooth, bit 0, 3, 6, 7, 8, 9
