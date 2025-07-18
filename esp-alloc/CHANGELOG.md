@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Changed
-- Make stats structs fields public
+- Make stats structs fields public (#3828)
 
 ### Fixed
 
