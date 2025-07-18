@@ -7,7 +7,7 @@
 //! `"-C", "force-frame-pointers",` in your `.cargo/config.toml`); this is **not** required for
 //! Xtensa.
 //!
-//! You can get an array of backtrace addresses (currently limited to 10) via `arch::backtrace()` if
+//! You can get an array of backtrace addresses (limited to 10 entries by default) via `arch::backtrace()` if
 //! you want to create a backtrace yourself (i.e. not using the panic or exception handler).
 //!
 //! ## Features
