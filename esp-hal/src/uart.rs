@@ -1139,6 +1139,18 @@ where
         self
     }
 
+    /// Inverts polarity of RX signal if `invertedd`
+    #[instability::unstable]
+    pub fn with_polarity(self, inverted: bool) -> Self {
+        self.uart
+            .info()
+            .regs()
+            .conf0()
+            .modify(|_, w| w.rxd_inv().bit(inverted));
+
+        self
+    }
+
     /// Change the configuration.
     ///
     /// ## Errors
