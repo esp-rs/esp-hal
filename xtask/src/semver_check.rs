@@ -131,6 +131,7 @@ pub(crate) fn remove_unstable_items(path: &Path) -> Result<(), anyhow::Error> {
         "#[cfg(any(doc, feature = \"unstable\"))]",
         "#[<cfg>(feature = \"unstable\")]",
         "#[cfg(feature = \"unstable\")]",
+        "#[doc(cfg(feature = \"unstable\"))]",
     ];
 
     for (id, item) in &mut krate.index {
