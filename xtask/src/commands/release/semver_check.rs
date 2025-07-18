@@ -61,7 +61,7 @@ pub mod checker {
 
     use crate::{
         Package,
-        semver_check::{build_doc_json, minimum_update, remove_unstable_items},
+        semver_check::{build_doc_json, minimum_update},
     };
 
     pub fn generate_baseline(
@@ -78,8 +78,6 @@ pub mod checker {
                 let package_path = crate::windows_safe_path(&workspace.join(&package_name));
 
                 let current_path = build_doc_json(package, chip, &package_path)?;
-
-                remove_unstable_items(&current_path)?;
 
                 let file_name = if package.chip_features_matter() {
                     chip.to_string()

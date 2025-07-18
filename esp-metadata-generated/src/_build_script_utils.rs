@@ -2184,6 +2184,7 @@ struct Config {
 impl Config {
     fn define_cfgs(&self) {
         println!("cargo:rustc-check-cfg=cfg(not_really_docsrs)");
+        println!("cargo:rustc-check-cfg=cfg(semver_checks)");
         println!("cargo:rustc-check-cfg=cfg(esp32)");
         println!("cargo:rustc-check-cfg=cfg(xtensa)");
         println!("cargo:rustc-check-cfg=cfg(multi_core)");
