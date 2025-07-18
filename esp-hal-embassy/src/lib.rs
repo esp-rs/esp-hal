@@ -35,7 +35,7 @@
 //! queue flavour, then you need to pass as many timers as you start executors.
 //! In other cases, you can pass a single timer.
 //!
-//! ## Configuration
+//! ## Additional Configuration
 //!
 //! You can configure the behaviour of the embassy runtime by using the
 //! following environment variables:
