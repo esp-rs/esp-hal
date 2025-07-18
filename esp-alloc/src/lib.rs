@@ -192,16 +192,16 @@ pub enum MemoryCapability {
 #[derive(Debug)]
 pub struct RegionStats {
     /// Total usable size of the heap region in bytes.
-    size: usize,
+    pub size: usize,
 
     /// Currently used size of the heap region in bytes.
-    used: usize,
+    pub used: usize,
 
     /// Free size of the heap region in bytes.
-    free: usize,
+    pub free: usize,
 
     /// Capabilities of the memory region.
-    capabilities: EnumSet<MemoryCapability>,
+    pub capabilities: EnumSet<MemoryCapability>,
 }
 
 impl Display for RegionStats {
@@ -302,25 +302,25 @@ impl HeapRegion {
 #[derive(Debug)]
 pub struct HeapStats {
     /// Granular stats for all the configured memory regions.
-    region_stats: [Option<RegionStats>; 3],
+    pub region_stats: [Option<RegionStats>; 3],
 
     /// Total size of all combined heap regions in bytes.
-    size: usize,
+    pub size: usize,
 
     /// Current usage of the heap across all configured regions in bytes.
-    current_usage: usize,
+    pub current_usage: usize,
 
     /// Estimation of the max used heap in bytes.
     #[cfg(feature = "internal-heap-stats")]
-    max_usage: usize,
+    pub max_usage: usize,
 
     /// Estimation of the total allocated bytes since initialization.
     #[cfg(feature = "internal-heap-stats")]
-    total_allocated: usize,
+    pub total_allocated: usize,
 
     /// Estimation of the total freed bytes since initialization.
     #[cfg(feature = "internal-heap-stats")]
-    total_freed: usize,
+    pub total_freed: usize,
 }
 
 impl Display for HeapStats {
