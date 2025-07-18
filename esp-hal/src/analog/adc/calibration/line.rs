@@ -66,7 +66,7 @@ where
             .map(|code| (code, ADCI::cal_mv(atten)))
             .unwrap_or_else(|| {
                 // As a fallback try to calibrate using reference voltage source.
-                // This method is not too good because actual reference voltage may varies
+                // This method is not too good because actual reference voltage varies
                 // in range 1000..=1200 mV and this value currently cannot be read from efuse.
                 (
                     AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Ref),
@@ -114,7 +114,8 @@ where
         let transformed = {
             use defmt::println;
             println!(
-                "Tranforming {} + {} into {}",
+                "Transforming {} -> {} + {} into {}",
+                val,
                 transformed,
                 self.offset,
                 (transformed as i32 + self.offset, 0)

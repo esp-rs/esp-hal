@@ -6,7 +6,7 @@ use super::{AdcCalScheme, AdcCalSource, AdcChannel, AdcConfig, AdcPin, Attenuati
 #[cfg(any(esp32s2, esp32s3))]
 use crate::efuse::Efuse;
 use crate::{
-    peripherals::{APB_SARADC, SENS},
+    peripherals::{APB_SARADC, I2C_ANA_MST, LPWR, SENS},
     soc::regi2c,
     system::{GenericPeripheralGuard, Peripheral},
 };
@@ -252,6 +252,19 @@ impl RegisterAccess for crate::peripherals::ADC1<'_> {
     fn set_init_code(data: u16) {
         let [msb, lsb] = data.to_be_bytes();
 
+        use defmt::println;
+        println!("Writing {} HIGH={} LOW={}", data, msb, lsb);
+
+        LPWR::regs().ana_conf().modify(|_, w| {
+            w.sar_i2c_force_pd().clear_bit();
+            w.sar_i2c_force_pu().set_bit()
+        });
+        I2C_ANA_MST::regs()
+            .config1()
+            .modify(|_, w| w.sar().clear_bit());
+        I2C_ANA_MST::regs()
+            .config0()
+            .modify(|_, w| w.sar_cfg2().set_bit());
         regi2c::ADC_SAR1_INITIAL_CODE_HIGH.write_field(msb);
         regi2c::ADC_SAR1_INITIAL_CODE_LOW.write_field(lsb);
     }
@@ -477,6 +490,8 @@ where
             .sar_amp_ctrl2()
             .modify(|_, w| unsafe { w.sar_amp_wait3().bits(1) });
 
+        // TODO: ADC2 arbiter: https://github.com/espressif/esp-idf/blob/84df38aab927d50f7ee22d34516d7263f3e96068/components/hal/adc_oneshot_hal.c#L92
+
         Adc {
             _adc: adc_instance,
             active_channel: None,
@@ -500,6 +515,8 @@ where
 
         // Get converted value
         let converted_value = ADCI::read_data();
+        use defmt::println;
+        println!("Actual raw={}", converted_value);
         ADCI::reset();
 
         // Postprocess converted value according to calibration scheme used for pin
@@ -557,6 +574,8 @@ where
         PIN: AdcChannel,
         CS: AdcCalScheme<ADCI>,
     {
+        ADCI::set_en_pad(PIN::CHANNEL);
+
         // Set ADC unit calibration according used scheme for pin
         let init_code = pin.cal_scheme.adc_cal();
         if self.last_init_code != init_code {
@@ -565,8 +584,6 @@ where
             ADCI::set_init_code(init_code);
             self.last_init_code = init_code;
         }
-
-        ADCI::set_en_pad(PIN::CHANNEL);
 
         ADCI::clear_start_sample();
         ADCI::start_sample();
