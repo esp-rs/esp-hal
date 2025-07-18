@@ -1,7 +1,17 @@
 #![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-#![doc = include_str!("../README.md")]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
+//! Supports the ESP32, ESP32-C2/C3/C6, ESP32-H2, ESP32-P4, and ESP32-S2/S3. Optional exception and
+//! panic handlers are included, both of which can be enabled via their respective features.
+//!
+//! Please note that when targeting a RISC-V device, you **need** to force frame pointers (i.e.
+//! `"-C", "force-frame-pointers",` in your `.cargo/config.toml`); this is **not** required for
+//! Xtensa.
+//!
+//! You can get an array of backtrace addresses (currently limited to 10) via `arch::backtrace()` if
+//! you want to create a backtrace yourself (i.e. not using the panic or exception handler).
+//!
+//! ## Features
+#![doc = document_features::document_features!()]
 //! ## Additional configuration
 //!
 //! We've exposed some configuration options that don't fit into cargo
@@ -10,6 +20,7 @@
 //! for this crate:
 #![doc = ""]
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_backtrace_config_table.md"))]
+#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
 #[cfg(feature = "defmt")]

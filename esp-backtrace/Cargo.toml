@@ -25,6 +25,7 @@ esp-config  = { version = "0.5.0", path = "../esp-config" }
 esp-println = { version = "0.15.0", optional = true, default-features = false, path = "../esp-println" }
 heapless    = "0.8"
 semihosting = { version = "0.1.20", optional = true }
+document-features = "0.2.11"
 
 [build-dependencies]
 esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
@@ -40,21 +41,27 @@ esp32h2 = ["esp-println?/esp32h2"]
 esp32s2 = ["esp-println?/esp32s2", "semihosting?/openocd-semihosting"]
 esp32s3 = ["esp-println?/esp32s3", "semihosting?/openocd-semihosting", "print-float-registers"]
 
-# Use esp-println
+## Use `esp-println`
 println = ["dep:esp-println"]
 
-# Use defmt
+## Use `defmt`
 defmt = ["dep:defmt"]
 
 print-float-registers = [] # TODO support esp32p4
 
 # You may optionally enable one or more of the below features to provide
 # additional functionality:
+## Print messages in red (only used for panic and exception handlers)
 colors               = []
+## Invoke the extern function custom_halt() instead of doing a loop {} in case of a panic or exception
 custom-halt          = []
+## Invoke the extern function `custom_pre_backtrace()` before handling a panic or exception
 custom-pre-backtrace = []
+## Include an exception handler, will add `esp-println` as a dependency
 exception-handler    = []
+## Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception
 halt-cores           = []
+## Include a panic handler, will add `esp-println` as a dependency
 panic-handler        = []
 
 [lints.rust]
