@@ -1,14 +1,16 @@
 #![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-//! Supports the ESP32, ESP32-C2/C3/C6, ESP32-H2, ESP32-P4, and ESP32-S2/S3. Optional exception and
-//! panic handlers are included, both of which can be enabled via their respective features.
+//! This is a lightweight crate for obtaining backtraces during panics, exceptions, and hard faults
+//! on Espressif devices. It provides optional panic and exception handlers and supports a range of
+//! output options, all configurable through feature flags.
 //!
 //! Please note that when targeting a RISC-V device, you **need** to force frame pointers (i.e.
 //! `"-C", "force-frame-pointers",` in your `.cargo/config.toml`); this is **not** required for
 //! Xtensa.
 //!
-//! You can get an array of backtrace addresses (limited to 10 entries by default) via `arch::backtrace()` if
-//! you want to create a backtrace yourself (i.e. not using the panic or exception handler).
+//! You can get an array of backtrace addresses (limited to 10 entries by default) via
+//! `arch::backtrace()` if you want to create a backtrace yourself (i.e. not using the panic or
+//! exception handler).
 //!
 //! ## Features
 #![doc = document_features::document_features!()]
