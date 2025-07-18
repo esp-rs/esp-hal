@@ -404,7 +404,9 @@ driver_configs![
     RngProperties {
         driver: rng,
         name: "RNG",
-        properties: {}
+        properties: {
+            apb_cycle_wait_num: u32,
+        }
     },
     RsaProperties {
         driver: rsa,

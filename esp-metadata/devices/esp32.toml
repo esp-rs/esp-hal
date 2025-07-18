@@ -591,12 +591,14 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 timg_has_timer1 = true
 timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
@@ -616,6 +618,11 @@ support_status = "not_supported"
 [device.camera]
 support_status = "not_supported"
 [device.rgb_display]
+support_status = "partial"
+
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
 
 # Other drivers which are partially supported but have no other configuration:
 
@@ -623,7 +630,6 @@ support_status = "not_supported"
 [device.aes]
 [device.rsa]
 [device.sha]
-[device.rng]
 
 ## Interfaces
 [device.i2s]

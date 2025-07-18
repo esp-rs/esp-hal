@@ -138,6 +138,12 @@ macro_rules! property {
     ("interrupts.status_registers", str) => {
         stringify!(2)
     };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
     ("spi_master.has_octal") => {
         false
     };

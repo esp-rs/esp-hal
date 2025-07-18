@@ -122,8 +122,7 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
-    // stealing RNG is safe since we own it (passed into `init`)
-    let mut rng = hal::rng::Rng::new(unsafe { hal::peripherals::RNG::steal() });
+    let rng = hal::rng::Rng::new();
     rng.random()
 }
 
@@ -286,8 +285,7 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
     unsafe {
         let dst = core::slice::from_raw_parts_mut(dst, len as usize);
 
-        // stealing RNG is safe since we own it (passed into `init`)
-        let mut rng = esp_hal::rng::Rng::new(esp_hal::peripherals::RNG::steal());
+        let rng = esp_hal::rng::Rng::new();
         for chunk in dst.chunks_mut(4) {
             let bytes = rng.random().to_le_bytes();
             chunk.copy_from_slice(&bytes[..chunk.len()]);

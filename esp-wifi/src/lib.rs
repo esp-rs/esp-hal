@@ -112,11 +112,10 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
-use esp_hal as hal;
+use esp_hal::{self as hal};
 use hal::{
     Blocking,
     clock::{Clocks, init_radio_clocks},
-    rng::{Rng, Trng},
     time::Rate,
     timer::{AnyTimer, PeriodicTimer, timg::Timer as TimgTimer},
 };
@@ -290,14 +289,6 @@ where
     }
 }
 
-/// A marker trait for suitable Rng sources for esp-wifi
-pub trait EspWifiRngSource: rand_core::RngCore + private::Sealed {}
-
-impl EspWifiRngSource for Rng {}
-impl private::Sealed for Rng {}
-impl EspWifiRngSource for Trng<'_> {}
-impl private::Sealed for Trng<'_> {}
-
 /// Initialize for using WiFi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
@@ -318,17 +309,11 @@ impl private::Sealed for Trng<'_> {}
 /// use esp_hal::{rng::Rng, timer::timg::TimerGroup};
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let init = esp_wifi::init(
-///     timg0.timer0,
-///     Rng::new(peripherals.RNG),
-///     peripherals.RADIO_CLK,
-/// )
-/// .unwrap();
+/// let init = esp_wifi::init(timg0.timer0).unwrap();
 /// # }
 /// ```
 pub fn init<'d>(
     timer: impl EspWifiTimerSource + 'd,
-    _rng: impl EspWifiRngSource + 'd,
 ) -> Result<EspWifiController<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);

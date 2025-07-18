@@ -15,7 +15,6 @@ use esp_hal::{
     handler,
     interrupt::software::{SoftwareInterrupt, SoftwareInterruptControl},
     peripherals::Peripherals,
-    rng::Rng,
     timer::timg::TimerGroup,
 };
 use hil_test as _;
@@ -97,7 +96,7 @@ mod tests {
     #[test]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let _init = esp_wifi::init(timg0.timer1, Rng::new(peripherals.RNG)).unwrap();
+        let _init = esp_wifi::init(timg0.timer1).unwrap();
 
         let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -140,7 +139,7 @@ mod tests {
                     }
 
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
-                    let _init = esp_wifi::init(timg0.timer1, Rng::new(peripherals.RNG)).unwrap();
+                    let _init = esp_wifi::init(timg0.timer1).unwrap();
 
                     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -177,9 +176,6 @@ mod tests {
 // creating a new test suite is not necessary as we don't want to flash/run
 // anything.
 #[allow(unused)] // compile test
-fn esp_wifi_can_be_initialized_with_any_timer(
-    timer: esp_hal::timer::AnyTimer<'static>,
-    rng: esp_hal::rng::Rng,
-) {
-    esp_wifi::init(timer, rng);
+fn esp_wifi_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
+    esp_wifi::init(timer);
 }
