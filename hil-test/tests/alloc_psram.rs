@@ -175,7 +175,7 @@ mod tests {
         #[repr(C, align(4))]
         struct AlignedBuf<const N: usize>([u8; N]);
 
-        let mut rng = esp_hal::rng::Rng::new(unsafe { esp_hal::peripherals::RNG::steal() });
+        let rng = esp_hal::rng::Rng::new();
 
         for _ in 0..100 {
             let mut buf = [0u8; 1024];

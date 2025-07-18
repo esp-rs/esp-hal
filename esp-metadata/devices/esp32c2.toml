@@ -77,6 +77,9 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
 
+[device.soc]
+cpu_has_csr_pc = true
+
 [device.adc]
 support_status = "partial"
 instances = [
@@ -248,11 +251,13 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 instances = [{ name = "timg0" }]
 timg_has_divcnt_rst = true
 
@@ -264,13 +269,16 @@ instances = [
 ]
 ram_size = 128
 
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
 # [device.aes] Product portfolio lists AES, but TRM only has XTS_AES?
 [device.ecc]
 [device.sha]
-[device.rng]
 
 ## Interfaces
 [device.ledc]

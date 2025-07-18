@@ -277,6 +277,7 @@ impl Chip {
                     "interrupts_status_registers=\"3\"",
                     "rmt_ram_start=\"1073047552\"",
                     "rmt_channel_ram_size=\"64\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "timergroup_timg_has_timer1",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
@@ -419,6 +420,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1073047552\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
@@ -481,6 +483,7 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
+                    "soc",
                     "adc",
                     "assist_debug",
                     "dma",
@@ -508,6 +511,7 @@ impl Chip {
                     "timergroup_timg0",
                     "uart_uart0",
                     "uart_uart1",
+                    "soc_cpu_has_csr_pc",
                     "assist_debug_has_sp_monitor",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
@@ -526,6 +530,7 @@ impl Chip {
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"16\"",
                     "interrupts_status_registers=\"2\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "timergroup_timg_has_divcnt_rst",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
@@ -584,6 +589,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=assist_debug",
                     "cargo:rustc-cfg=dma",
@@ -611,6 +617,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg0",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
@@ -629,6 +636,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
@@ -700,6 +708,7 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
+                    "soc",
                     "adc",
                     "aes",
                     "assist_debug",
@@ -735,6 +744,7 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "soc_cpu_has_csr_pc",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -756,6 +766,7 @@ impl Chip {
                     "interrupts_status_registers=\"2\"",
                     "rmt_ram_start=\"1610703872\"",
                     "rmt_channel_ram_size=\"48\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "timergroup_timg_has_divcnt_rst",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
@@ -823,6 +834,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
                     "cargo:rustc-cfg=assist_debug",
@@ -858,6 +870,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -879,6 +892,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610703872\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
@@ -991,6 +1005,7 @@ impl Chip {
                     "gpio_support_deepsleep_wakeup",
                     "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
+                    "soc",
                     "adc",
                     "aes",
                     "assist_debug",
@@ -1035,6 +1050,8 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "soc_cpu_has_csr_pc",
+                    "soc_cpu_has_prv_mode",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1059,6 +1076,7 @@ impl Chip {
                     "interrupts_status_registers=\"3\"",
                     "rmt_ram_start=\"1610638336\"",
                     "rmt_channel_ram_size=\"48\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "timergroup_timg_has_divcnt_rst",
                     "uart_ram_size=\"128\"",
                     "lp_uart_ram_size=\"32\"",
@@ -1169,6 +1187,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
                     "cargo:rustc-cfg=assist_debug",
@@ -1213,6 +1232,8 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=soc_cpu_has_csr_pc",
+                    "cargo:rustc-cfg=soc_cpu_has_prv_mode",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1237,6 +1258,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610638336\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
@@ -1332,6 +1354,7 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
+                    "soc",
                     "adc",
                     "aes",
                     "assist_debug",
@@ -1372,6 +1395,8 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "soc_cpu_has_csr_pc",
+                    "soc_cpu_has_prv_mode",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1395,6 +1420,7 @@ impl Chip {
                     "interrupts_status_registers=\"2\"",
                     "rmt_ram_start=\"1610642432\"",
                     "rmt_channel_ram_size=\"48\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "timergroup_timg_has_divcnt_rst",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
@@ -1484,6 +1510,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
                     "cargo:rustc-cfg=assist_debug",
@@ -1524,6 +1551,8 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=soc_cpu_has_csr_pc",
+                    "cargo:rustc-cfg=soc_cpu_has_prv_mode",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1547,6 +1576,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610642432\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
@@ -1693,6 +1723,7 @@ impl Chip {
                     "interrupts_status_registers=\"3\"",
                     "rmt_ram_start=\"1061250048\"",
                     "rmt_channel_ram_size=\"64\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
                     "uart_ram_size=\"128\"",
@@ -1836,6 +1867,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"3\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1061250048\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"64\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
@@ -2003,6 +2035,7 @@ impl Chip {
                     "interrupts_status_registers=\"4\"",
                     "rmt_ram_start=\"1610704896\"",
                     "rmt_channel_ram_size=\"48\"",
+                    "rng_apb_cycle_wait_num=\"16\"",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
                     "uart_ram_size=\"128\"",
@@ -2166,6 +2199,7 @@ impl Chip {
                     "cargo:rustc-cfg=interrupts_status_registers=\"4\"",
                     "cargo:rustc-cfg=rmt_ram_start=\"1610704896\"",
                     "cargo:rustc-cfg=rmt_channel_ram_size=\"48\"",
+                    "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
@@ -2337,9 +2371,11 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(uart_support_wakeup_int)");
         println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
+        println!("cargo:rustc-check-cfg=cfg(soc)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug)");
         println!("cargo:rustc-check-cfg=cfg(ecc)");
         println!("cargo:rustc-check-cfg=cfg(systimer)");
+        println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_csr_pc)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug_has_sp_monitor)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_has_fsm_timeouts)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_has_hw_bus_clear)");
@@ -2409,6 +2445,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(lp_uart)");
         println!("cargo:rustc-check-cfg=cfg(ulp_riscv)");
         println!("cargo:rustc-check-cfg=cfg(ieee802154)");
+        println!("cargo:rustc-check-cfg=cfg(soc_cpu_has_prv_mode)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_can_estimate_nack_reason)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_has_reliable_fsm_reset)");
         println!("cargo:rustc-check-cfg=cfg(wifi_has_wifi6)");
@@ -2464,6 +2501,7 @@ impl Config {
             "cargo:rustc-check-cfg=cfg(rmt_ram_start, values(\"1073047552\",\"1610703872\",\"1610638336\",\"1610642432\",\"1061250048\",\"1610704896\"))"
         );
         println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
+        println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");

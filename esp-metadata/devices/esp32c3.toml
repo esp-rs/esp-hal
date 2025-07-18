@@ -86,6 +86,9 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
 
+[device.soc]
+cpu_has_csr_pc = true
+
 [device.adc]
 support_status = "partial"
 instances = [
@@ -294,11 +297,13 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
 
@@ -313,6 +318,10 @@ ram_size = 128
 [device.ds]
 support_status = "not_supported"
 
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -320,7 +329,6 @@ support_status = "not_supported"
 [device.rsa]
 [device.sha]
 [device.hmac]
-[device.rng]
 
 ## Interfaces
 [device.i2s]

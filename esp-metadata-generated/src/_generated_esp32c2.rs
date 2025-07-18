@@ -36,6 +36,12 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp8684_technical_reference_manual_en.pdf"
     };
+    ("soc.cpu_has_csr_pc") => {
+        true
+    };
+    ("soc.cpu_has_prv_mode") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -137,6 +143,12 @@ macro_rules! property {
     };
     ("interrupts.status_registers", str) => {
         stringify!(2)
+    };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
     };
     ("spi_master.has_octal") => {
         false

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
 
 ### Fixed
 

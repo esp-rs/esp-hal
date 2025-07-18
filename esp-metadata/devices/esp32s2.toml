@@ -414,12 +414,14 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "SPI3_CLK", mosi = "SPI3_D", miso = "SPI3_Q", cs = "SPI3_CS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 timg_has_timer1 = true
 timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
@@ -444,6 +446,10 @@ support_status = "not_supported"
 [device.ds]
 support_status = "not_supported"
 
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
@@ -451,7 +457,6 @@ support_status = "not_supported"
 [device.rsa]
 [device.hmac]
 [device.sha]
-[device.rng]
 
 ## Interfaces
 [device.i2s]

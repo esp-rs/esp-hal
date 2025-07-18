@@ -2687,6 +2687,9 @@ pub fn new<'d>(
         esp_wifi_result!(esp_wifi_set_country(&country))?;
     }
 
+    // At some point the "High-speed ADC" entropy source became available.
+    unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+
     controller.set_power_saving(PowerSaveMode::default())?;
 
     Ok((
@@ -2718,6 +2721,10 @@ impl Drop for WifiController<'_> {
         if let Err(e) = crate::wifi::wifi_deinit() {
             warn!("Failed to cleanly deinit wifi: {:?}", e);
         }
+
+        esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+            esp_hal::Internal::conjure()
+        });
     }
 }
 
