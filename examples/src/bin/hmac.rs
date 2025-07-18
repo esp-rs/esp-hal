@@ -76,7 +76,7 @@ type HmacSha256 = HmacSw<Sha256>;
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut rng = Rng::new(peripherals.RNG);
+    let rng = Rng::new();
 
     // Set sw key
     let key = [0_u8; 32].as_ref();

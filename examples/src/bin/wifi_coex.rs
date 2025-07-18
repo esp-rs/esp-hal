@@ -74,9 +74,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let mut rng = Rng::new(peripherals.RNG);
-
-    let esp_wifi_ctrl = init(timg0.timer0, rng.clone()).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
 
@@ -123,6 +121,7 @@ fn main() -> ! {
     }]);
     socket_set.add(dhcp_socket);
 
+    let rng = Rng::new();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::Client(ClientConfiguration {

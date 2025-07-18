@@ -29,7 +29,6 @@ use esp_hal::{
     clock::CpuClock,
     gpio::{Input, InputConfig, Pull},
     main,
-    rng::Rng,
     time,
     timer::timg::TimerGroup,
 };
@@ -48,7 +47,7 @@ fn main() -> ! {
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
 
-    let esp_wifi_ctrl = init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap();
+    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
