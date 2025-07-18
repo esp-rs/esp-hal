@@ -196,26 +196,18 @@ pub(crate) fn regi2c_read(block: u8, _host_id: u8, reg_add: u8) -> u8 {
     I2C_ANA_MST::regs().config2().read().data().bits()
 }
 
-pub(crate) fn regi2c_write(block: u8, host_id: u8, reg_add: u8, data: u8) {
-    use defmt::println;
+pub(crate) fn regi2c_write(block: u8, _host_id: u8, reg_add: u8, data: u8) {
     i2c_rtc_enable_block(block);
 
-    I2C_ANA_MST::regs().config2().write(|w| unsafe {
-        let v = w
-            .slave_id()
+    I2C_ANA_MST::regs().config2().modify(|_, w| unsafe {
+        w.slave_id()
             .bits(block)
             .addr()
             .bits(reg_add)
             .wr_cntl()
             .bit(true)
             .data()
-            .bits(data);
-
-        println!(
-            "regi2c_write({=u8:#x}, {=u8:#x}, {=u8:#x}, {=u8:#x}) = {=u32:#x}",
-            block, host_id, reg_add, data, v.bits
-        );
-        v
+            .bits(data)
     });
 
     while I2C_ANA_MST::regs().config2().read().busy().bit_is_set() {}

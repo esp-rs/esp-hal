@@ -82,16 +82,6 @@ where
         // of it already.
         let gain = mv as u32 * GAIN_SCALE / code as u32;
 
-        use defmt::println;
-        #[cfg(esp32s2)]
-        println!(
-            "code={} mv={} gain={} offset={}",
-            code,
-            mv,
-            gain,
-            ADCI::coeff_b(atten)
-        );
-
         Self {
             basic,
             gain,
@@ -111,17 +101,7 @@ where
         let transformed = val as u32 * self.gain / GAIN_SCALE;
 
         #[cfg(esp32s2)]
-        let transformed = {
-            use defmt::println;
-            println!(
-                "Transforming {} -> {} + {} into {}",
-                val,
-                transformed,
-                self.offset,
-                (transformed as i32 + self.offset, 0)
-            );
-            i32::max(transformed as i32 + self.offset, 0)
-        };
+        let transformed = { i32::max(transformed as i32 + self.offset, 0) };
 
         transformed as u16
     }
