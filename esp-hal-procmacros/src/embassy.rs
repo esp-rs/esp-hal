@@ -29,7 +29,9 @@ pub fn main(args: TokenStream, item: TokenStream) -> TokenStream {
     let args = syn::parse_macro_input!(args as Args);
     let f = syn::parse_macro_input!(item as syn::ItemFn);
 
-    run(&args.meta, f, main_fn()).unwrap_or_else(|x| x).into()
+    run(&args.meta, f, main_fn(&args.meta))
+        .unwrap_or_else(|x| x)
+        .into()
 }
 
 pub fn run(
@@ -156,20 +158,43 @@ impl Drop for Ctxt {
     }
 }
 
-pub fn main_fn() -> TokenStream2 {
+pub fn main_fn(args: &[Meta]) -> TokenStream2 {
     let root = match proc_macro_crate::crate_name("esp-hal") {
         Ok(proc_macro_crate::FoundCrate::Name(ref name)) => quote::format_ident!("{name}"),
         _ => quote::format_ident!("esp_hal"),
     };
 
-    quote! {
-        #[#root::main]
-        fn main() -> ! {
-            let mut executor = ::esp_hal_embassy::Executor::new();
-            let executor = unsafe { __make_static(&mut executor) };
-            executor.run(|spawner| {
-                spawner.must_spawn(__embassy_main(spawner));
-            })
+    let mut callbacks = None;
+    for arg in args {
+        if let Meta::NameValue(meta) = arg {
+            if meta.path.is_ident("callbacks") {
+                callbacks = Some(meta.value.clone());
+            }
+        }
+    }
+
+    if let Some(callbacks) = callbacks {
+        quote! {
+            #[#root::main]
+            fn main() -> ! {
+                let mut executor = ::esp_hal_embassy::Executor::new();
+                let executor = unsafe { __make_static(&mut executor) };
+                let callbacks = #callbacks;
+                executor.run_with_callbacks(|spawner| {
+                    spawner.must_spawn(__embassy_main(spawner));
+                }, callbacks)
+            }
+        }
+    } else {
+        quote! {
+            #[#root::main]
+            fn main() -> ! {
+                let mut executor = ::esp_hal_embassy::Executor::new();
+                let executor = unsafe { __make_static(&mut executor) };
+                executor.run(|spawner| {
+                    spawner.must_spawn(__embassy_main(spawner));
+                })
+            }
         }
     }
 }
