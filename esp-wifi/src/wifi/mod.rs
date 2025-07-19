@@ -4,7 +4,10 @@ pub mod event;
 mod internal;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
-use alloc::{collections::vec_deque::VecDeque, string::{String, ToString}};
+use alloc::{
+    collections::vec_deque::VecDeque,
+    string::{String, ToString},
+};
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -1846,13 +1849,15 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
 
     // Extract country code from ESP-IDF structure
     let country_code = {
-        let cc_bytes = unsafe {
-            core::slice::from_raw_parts(record.country.cc.as_ptr() as *const u8, 3)
-        };
-        
+        let cc_bytes =
+            unsafe { core::slice::from_raw_parts(record.country.cc.as_ptr() as *const u8, 3) };
+
         // Find the null terminator or end of array
-        let cc_len = cc_bytes.iter().position(|&b| b == 0).unwrap_or(cc_bytes.len());
-        
+        let cc_len = cc_bytes
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(cc_bytes.len());
+
         if cc_len >= 2 {
             // Validate that we have at least 2 valid ASCII characters
             let cc_slice = &cc_bytes[..cc_len.min(2)];
@@ -3193,4 +3198,3 @@ impl core::future::Future for MultiWifiEventFuture {
         }
     }
 }
-
