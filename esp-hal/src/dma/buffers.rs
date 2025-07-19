@@ -1535,7 +1535,7 @@ impl DmaTxStreamBufView {
         }
 
         fn truncate_by(n: usize, by: usize) -> usize {
-            (n >= by).then_some(n - by).unwrap_or(n)
+            (n >= by).then(|| n - by).unwrap_or(n)
         }
 
         let n_chunks = self.buf.descriptors.len();

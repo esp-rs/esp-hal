@@ -435,6 +435,7 @@ where
         self.i2s.reset_tx();
 
         // Enable corresponding interrupts if needed
+        self.i2s.listen(I2sInterrupt::TxDone);
 
         // configure DMA outlink
         unsafe {
@@ -483,6 +484,7 @@ where
     pub fn read<'t, RXBUF>(
         mut self,
         mut buf: RXBUF,
+        chunk_size: usize,
     ) -> Result<I2sReadDmaTransfer<'d, Dm, RXBUF>, Error>
     where
         RXBUF: DmaRxBuffer,
@@ -495,6 +497,7 @@ where
         self.i2s.reset_rx();
 
         // Enable corresponding interrupts if needed
+        self.i2s.listen(I2sInterrupt::RxDone);
 
         // configure DMA inlink
         unsafe {
@@ -505,10 +508,11 @@ where
         self.rx_channel.start_transfer()?;
 
         // start: set I2S_RX_START
-        self.i2s.rx_start();
+        self.i2s.rx_start(chunk_size);
         Ok(I2sReadDmaTransfer {
             i2s_rx: ManuallyDrop::new(self),
             buffer_view: ManuallyDrop::new(buf.into_view()),
+            chunk_size,
         })
     }
 }
@@ -555,7 +559,7 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> I2sWriteDmaTransfer<'d, Dm, BUFFER
 
     /// Checks if the DMA transfer is done.
     pub fn is_done(&self) -> bool {
-        self.i2s_tx.tx_channel.is_done()
+        self.i2s_tx.i2s.interrupts().contains(I2sInterrupt::TxDone)
     }
 
     /// Stops and restarts the DMA transfer.
@@ -590,6 +594,7 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> I2sWriteDmaTransfer<'d, Dm, BUFFER
 /// An in-progress async circular DMA read transfer.
 pub struct I2sReadDmaTransfer<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> {
     i2s_rx: ManuallyDrop<I2sRx<'d, Dm>>,
+    chunk_size: usize,
     buffer_view: ManuallyDrop<BUFFER::View>,
 }
 
@@ -629,13 +634,14 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> I2sReadDmaTransfer<'d, Dm, BUFFER>
 
     /// Returns true if the transfer is done.
     pub fn is_done(&self) -> bool {
-        self.i2s_rx.rx_channel.is_done()
+        self.i2s_rx.i2s.interrupts().contains(I2sInterrupt::RxDone)
     }
 
     /// Stops and restarts the DMA transfer.
     pub fn restart(self) -> Result<Self, Error> {
+        let chunk_size = self.chunk_size;
         let (i2s, buf) = self.stop();
-        i2s.read(buf)
+        i2s.read(buf, chunk_size)
     }
 
     /// Checks if the transfer has an error.
@@ -1470,7 +1476,11 @@ mod private {
             });
         }
 
-        fn rx_start(&self) {
+        fn rx_start(&self, len: usize) {
+            let len = len - 1;
+            self.regs()
+                .rxeof_num()
+                .write(|w| unsafe { w.rx_eof_num().bits(len as u16) });
             self.regs().rx_conf().modify(|_, w| w.rx_start().set_bit());
         }
 
@@ -1812,8 +1822,6 @@ pub mod asynch {
     impl<BUFFER: DmaRxBuffer> I2sReadDmaTransfer<'_, Async, BUFFER> {
         /// Waits for DMA process to be made and additional room to be
         /// available.
-        ///
-        /// Returns [crate::dma::DmaError::Late] if DMA is already completed.
         pub async fn wait_for_available(&mut self) -> Result<(), Error> {
             DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel).await?;
             Ok(())

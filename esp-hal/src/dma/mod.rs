@@ -2528,60 +2528,6 @@ pub(crate) mod dma_private {
     }
 }
 
-/// DMA transaction for TX only transfers
-///
-/// # Safety
-///
-/// Never use [core::mem::forget] on an in-progress transfer
-#[non_exhaustive]
-#[must_use]
-pub struct DmaTransferTx<'a, I>
-where
-    I: dma_private::DmaSupportTx,
-{
-    instance: &'a mut I,
-}
-
-impl<'a, I> DmaTransferTx<'a, I>
-where
-    I: dma_private::DmaSupportTx,
-{
-    #[cfg_attr(esp32c2, allow(dead_code))]
-    pub(crate) fn new(instance: &'a mut I) -> Self {
-        Self { instance }
-    }
-
-    /// Wait for the transfer to finish.
-    pub fn wait(self) -> Result<(), DmaError> {
-        self.instance.peripheral_wait_dma(false, true);
-
-        if self
-            .instance
-            .tx()
-            .pending_out_interrupts()
-            .contains(DmaTxInterrupt::DescriptorError)
-        {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.tx().is_done()
-    }
-}
-
-impl<I> Drop for DmaTransferTx<'_, I>
-where
-    I: dma_private::DmaSupportTx,
-{
-    fn drop(&mut self) {
-        self.instance.peripheral_wait_dma(true, false);
-    }
-}
-
 /// DMA transaction for RX only transfers
 ///
 /// # Safety
@@ -2594,37 +2540,6 @@ where
     I: dma_private::DmaSupportRx,
 {
     instance: &'a mut I,
-}
-
-impl<'a, I> DmaTransferRx<'a, I>
-where
-    I: dma_private::DmaSupportRx,
-{
-    #[cfg_attr(esp32c2, allow(dead_code))]
-    pub(crate) fn new(instance: &'a mut I) -> Self {
-        Self { instance }
-    }
-
-    /// Wait for the transfer to finish.
-    pub fn wait(self) -> Result<(), DmaError> {
-        self.instance.peripheral_wait_dma(true, false);
-
-        if self
-            .instance
-            .rx()
-            .pending_in_interrupts()
-            .contains(DmaRxInterrupt::DescriptorError)
-        {
-            Err(DmaError::DescriptorError)
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Check if the transfer is finished.
-    pub fn is_done(&mut self) -> bool {
-        self.instance.rx().is_done()
-    }
 }
 
 impl<I> Drop for DmaTransferRx<'_, I>
@@ -2829,63 +2744,6 @@ pub(crate) mod asynch {
     use core::task::Poll;
 
     use super::*;
-
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
-    pub struct DmaTxFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
-    }
-
-    impl<'a, CH> DmaTxFuture<'a, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        #[cfg_attr(esp32c2, allow(dead_code))]
-        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
-            Self { tx }
-        }
-    }
-
-    impl<CH> core::future::Future for DmaTxFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        type Output = Result<(), DmaError>;
-
-        fn poll(
-            self: core::pin::Pin<&mut Self>,
-            cx: &mut core::task::Context<'_>,
-        ) -> Poll<Self::Output> {
-            if self.tx.is_done() {
-                self.tx.clear_interrupts();
-                Poll::Ready(Ok(()))
-            } else if self
-                .tx
-                .pending_out_interrupts()
-                .contains(DmaTxInterrupt::DescriptorError)
-            {
-                self.tx.clear_interrupts();
-                Poll::Ready(Err(DmaError::DescriptorError))
-            } else {
-                self.tx.waker().register(cx.waker());
-                self.tx
-                    .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
-                Poll::Pending
-            }
-        }
-    }
-
-    impl<CH> Drop for DmaTxFuture<'_, CH>
-    where
-        CH: DmaTxChannel,
-    {
-        fn drop(&mut self) {
-            self.tx
-                .unlisten_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
-        }
-    }
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaRxFuture<'a, CH>
