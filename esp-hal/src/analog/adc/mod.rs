@@ -224,7 +224,7 @@ impl<ADCI> AdcCalScheme<ADCI> for () {
 }
 
 /// A helper trait to get access to ADC calibration efuses.
-#[cfg(not(any(esp32, esp32s2)))]
+#[cfg(not(any(esp32, esp32h2)))]
 trait AdcCalEfuse {
     /// Get ADC calibration init code
     ///
@@ -240,6 +240,11 @@ trait AdcCalEfuse {
     ///
     /// Returns digital value for reference voltage for a given attenuation
     fn cal_code(atten: Attenuation) -> Option<u16>;
+
+    #[cfg(esp32s2)]
+    /// Get the coeff_b from efuse.
+    /// Use in the equation: millivolts = coeff_a*adc + coeff_b
+    fn coeff_b(atten: Attenuation) -> Option<i32>;
 }
 
 macro_rules! impl_adc_interface {
