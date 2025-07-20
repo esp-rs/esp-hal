@@ -435,6 +435,7 @@ where
         self.i2s.reset_tx();
 
         // Enable corresponding interrupts if needed
+        #[cfg(not(any(esp32, esp32s2)))]
         self.i2s.listen(I2sInterrupt::TxDone);
 
         // configure DMA outlink
@@ -497,6 +498,7 @@ where
         self.i2s.reset_rx();
 
         // Enable corresponding interrupts if needed
+        #[cfg(not(any(esp32, esp32s2)))]
         self.i2s.listen(I2sInterrupt::RxDone);
 
         // configure DMA inlink
@@ -558,6 +560,7 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> I2sWriteDmaTransfer<'d, Dm, BUFFER
     }
 
     /// Checks if the DMA transfer is done.
+    #[cfg(not(any(esp32, esp32s2)))]
     pub fn is_done(&self) -> bool {
         self.i2s_tx.i2s.interrupts().contains(I2sInterrupt::TxDone)
     }
@@ -633,6 +636,7 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> I2sReadDmaTransfer<'d, Dm, BUFFER>
     }
 
     /// Returns true if the transfer is done.
+    #[cfg(not(any(esp32, esp32s2)))]
     pub fn is_done(&self) -> bool {
         self.i2s_rx.i2s.interrupts().contains(I2sInterrupt::RxDone)
     }

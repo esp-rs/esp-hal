@@ -2746,6 +2746,63 @@ pub(crate) mod asynch {
     use super::*;
 
     #[must_use = "futures do nothing unless you `.await` or poll them"]
+    pub struct DmaTxFuture<'a, CH>
+    where
+        CH: DmaTxChannel,
+    {
+        pub(crate) tx: &'a mut ChannelTx<Async, CH>,
+    }
+
+    impl<'a, CH> DmaTxFuture<'a, CH>
+    where
+        CH: DmaTxChannel,
+    {
+        #[cfg_attr(esp32c2, allow(dead_code))]
+        pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
+            Self { tx }
+        }
+    }
+
+    impl<CH> core::future::Future for DmaTxFuture<'_, CH>
+    where
+        CH: DmaTxChannel,
+    {
+        type Output = Result<(), DmaError>;
+
+        fn poll(
+            self: core::pin::Pin<&mut Self>,
+            cx: &mut core::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            if self.tx.is_done() {
+                self.tx.clear_interrupts();
+                Poll::Ready(Ok(()))
+            } else if self
+                .tx
+                .pending_out_interrupts()
+                .contains(DmaTxInterrupt::DescriptorError)
+            {
+                self.tx.clear_interrupts();
+                Poll::Ready(Err(DmaError::DescriptorError))
+            } else {
+                self.tx.waker().register(cx.waker());
+                self.tx
+                    .listen_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
+                Poll::Pending
+            }
+        }
+    }
+
+    impl<CH> Drop for DmaTxFuture<'_, CH>
+    where
+        CH: DmaTxChannel,
+    {
+        fn drop(&mut self) {
+            self.tx
+                .unlisten_out(DmaTxInterrupt::TotalEof | DmaTxInterrupt::DescriptorError);
+        }
+    }
+
+    #[must_use = "futures do nothing unless you `.await` or poll them"]
     pub struct DmaRxFuture<'a, CH>
     where
         CH: DmaRxChannel,
