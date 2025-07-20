@@ -14,7 +14,6 @@ use esp_hal::{
     Async,
     delay::Delay,
     dma::{DmaDescriptor, DmaTxStreamBuf},
-    dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{DataFormat, I2s, I2sTx, Standard},
     peripherals::I2S0,
@@ -75,7 +74,9 @@ async fn writer(
         .unwrap();
 
     loop {
-        tx_transfer.wait_for_available().await.unwrap();
+        while tx_transfer.available_bytes() == 0 {
+            tx_transfer.wait_for_available().await.unwrap();
+        }
         tx_transfer.push_with(|buffer| {
             for b in buffer.iter_mut() {
                 *b = samples.next().unwrap();
@@ -104,7 +105,7 @@ fn enable_loopback() {
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use esp_hal::dma::DmaRxStreamBuf;
+    use esp_hal::{dma::DmaRxStreamBuf, dma_buffers_chunk_size};
 
     use super::*;
 
@@ -141,8 +142,9 @@ mod tests {
     async fn test_i2s_loopback_async(ctx: Context) {
         let spawner = embassy_executor::Spawner::for_current_executor().await;
 
+        // We need more than 3 descriptors for continuous transfer to work
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
+            esp_hal::dma_buffers_chunk_size!(BUFFER_SIZE, BUFFER_SIZE, BUFFER_SIZE / 3);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -179,11 +181,12 @@ mod tests {
             .unwrap();
         spawner.must_spawn(writer(tx_buffer, tx_descriptors, i2s_tx));
 
-        // let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;
         let mut samples = SampleSource::new();
         for _ in 0..30 {
-            rx_transfer.wait_for_available().await.unwrap();
+            while rx_transfer.available_bytes() == 0 {
+                rx_transfer.wait_for_available().await.unwrap();
+            }
             let data = rx_transfer.peek();
             let len = data.len();
             for &b in data {
@@ -201,7 +204,11 @@ mod tests {
 
     #[test]
     fn test_i2s_loopback(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
+        // NOTE: 32000 bits of buffer maybe too large, but for some reason it fails with buffer
+        // size 16000 as it seems DMA can be quick enough to run out of descriptors in that
+        // case.
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+            dma_buffers_chunk_size!(32000, 32000, 4000);
 
         let i2s = I2s::new(
             ctx.i2s,

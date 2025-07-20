@@ -1435,6 +1435,7 @@ impl DmaTxStreamBuf {
         let mut chunks = buffer.chunks_exact_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
             desc.buffer = chunk.as_mut_ptr();
+            desc.set_owner(Owner::Dma);
             desc.set_size(chunk.len());
         }
         let remainder = chunks.into_remainder();
@@ -1529,7 +1530,8 @@ impl DmaTxStreamBufView {
     pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
         let chunk_size = self.buf.descriptors[0].size();
         let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
-        let bytes_pushed = f(&mut self.buf.buffer[dma_start..]);
+        let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
+        let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
 
         let mut bytes_filled = 0;
         for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
