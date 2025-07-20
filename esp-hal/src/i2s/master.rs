@@ -41,9 +41,9 @@
 //! ```rust, no_run
 //! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Standard, DataFormat};
-//! # use esp_hal::dma_buffers;
+//! # use esp_hal::dma_buffers_chunk_size;
 //! # {dma_channel}
-//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers!(4 * 4092, 0);
+//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_sizse!(4 * 4092, 0, 4092);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
@@ -58,16 +58,19 @@
 //!     .with_bclk(peripherals.GPIO1)
 //!     .with_ws(peripherals.GPIO2)
 //!     .with_din(peripherals.GPIO5)
-//!     .build(rx_descriptors);
+//!     .build();
 //!
-//! let mut transfer = i2s_rx.read_dma_circular(&mut rx_buffer)?;
+//! let mut transfer = i2s_rx.read(
+//!     DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
+//!     4092,
+//! )?;
 //!
 //! loop {
-//!     let avail = transfer.available()?;
+//!     let avail = transfer.available_bytes();
 //!
 //!     if avail > 0 {
 //!         let mut rcv = [0u8; 5000];
-//!         transfer.pop(&mut rcv[..avail])?;
+//!         transfer.pop(&mut rcv[..avail]);
 //!     }
 //! }
 //! # }
@@ -1002,6 +1005,12 @@ mod private {
 
         fn tx_stop(&self) {
             self.regs().conf().modify(|_, w| w.tx_start().clear_bit());
+        }
+
+        fn rx_stop(&self) {
+            self.regs()
+                .rx_conf()
+                .modify(|_, w| w.rx_start().clear_bit());
         }
 
         fn wait_for_tx_done(&self) {
