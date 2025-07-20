@@ -1806,11 +1806,10 @@ pub mod asynch {
         Async,
         dma::{
             DmaEligible,
-            ReadBuffer,
+            DmaTxBuffer,
             RxCircularState,
-            TxCircularState,
             WriteBuffer,
-            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture, DmaTxFuture},
+            asynch::{DmaRxDoneChFuture, DmaRxFuture, DmaTxDoneChFuture},
         },
     };
 
@@ -1901,17 +1900,43 @@ pub mod asynch {
             Ok(self.state.push(&data[..to_send])?)
         }
 
-        /// Push bytes into the DMA buffer via the given closure.
-        /// The closure *must* return the actual number of bytes written.
-        /// The closure *might* get called with a slice which is smaller than
-        /// the total available buffer. Only useful for circular DMA
-        /// transfers
-        pub async fn push_with(
-            &mut self,
-            f: impl FnOnce(&mut [u8]) -> usize,
-        ) -> Result<usize, Error> {
-            let _avail = self.available().await;
-            Ok(self.state.push_with(f)?)
+        /// Checks if the DMA transfer is done.
+        pub fn is_done(&self) -> bool {
+            self.i2s_tx.tx_channel.is_done()
+        }
+
+        /// Stops and restarts the DMA transfer.
+        pub fn restart(self) -> Result<Self, Error> {
+            let (i2s, buf) = self.stop();
+            i2s.write(buf)
+        }
+
+        /// Checks if the DMA transfer has an error.
+        pub fn has_error(&self) -> bool {
+            self.i2s_tx.tx_channel.has_error()
+        }
+
+        /// Waits for any DMA process to be made.
+        pub async fn process(&mut self) -> Result<(), Error> {
+            DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel).await?;
+            Ok(())
+        }
+
+        fn release(mut self) -> (I2sTx<'d, Async>, BUFFER::View) {
+            // SAFETY: Since forget is called on self, we know that self.i2s_tx and
+            // self.buffer_view won't be touched again.
+            let result = unsafe {
+                (
+                    ManuallyDrop::take(&mut self.i2s_tx),
+                    ManuallyDrop::take(&mut self.buffer_view),
+                )
+            };
+            core::mem::forget(self);
+            result
+        }
+
+        fn stop_peripheral(&mut self) {
+            self.i2s_tx.i2s.tx_stop();
         }
     }
 

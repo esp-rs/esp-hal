@@ -2990,14 +2990,24 @@ pub(crate) mod asynch {
             } else if self
                 .tx
                 .pending_out_interrupts()
+                .contains(DmaTxInterrupt::TotalEof)
+            {
+                self.tx.clear_interrupts();
+                return Poll::Ready(Err(DmaError::Late));
+            } else if self
+                .tx
+                .pending_out_interrupts()
                 .contains(DmaTxInterrupt::DescriptorError)
             {
                 self.tx.clear_interrupts();
                 Poll::Ready(Err(DmaError::DescriptorError))
             } else {
                 self.tx.waker().register(cx.waker());
-                self.tx
-                    .listen_out(DmaTxInterrupt::Done | DmaTxInterrupt::DescriptorError);
+                self.tx.listen_out(
+                    DmaTxInterrupt::Done
+                        | DmaTxInterrupt::DescriptorError
+                        | DmaTxInterrupt::TotalEof,
+                );
                 Poll::Pending
             }
         }
