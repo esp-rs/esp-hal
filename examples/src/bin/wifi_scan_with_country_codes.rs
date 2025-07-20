@@ -12,6 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeSet, string::String, vec::Vec};
+
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
@@ -30,7 +31,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let esp_wifi_ctrl = init(timg0.timer0, Rng::new(peripherals.RNG)).unwrap();
 
-    let (mut controller, _interfaces) = 
+    let (mut controller, _interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(WifiMode::Sta).unwrap();
@@ -42,15 +43,22 @@ fn main() -> ! {
     let scan_results = controller.scan_n(20).unwrap();
 
     println!("Found {} access points:\n", scan_results.len());
-    println!("{:<25} | {:<8} | {:<5} | {:<8}", "SSID", "Channel", "RSSI", "Country");
+    println!(
+        "{:<25} | {:<8} | {:<5} | {:<8}",
+        "SSID", "Channel", "RSSI", "Country"
+    );
     println!("{:-<50}", "");
-    
+
     // Display scan results with country codes
     for ap in &scan_results {
         let country_display = ap.country_code.as_deref().unwrap_or("Unknown");
         println!(
             "{:<25} | {:<8} | {:<5} | {:<8}",
-            if ap.ssid.len() > 24 { &ap.ssid[..24] } else { &ap.ssid },
+            if ap.ssid.len() > 24 {
+                &ap.ssid[..24]
+            } else {
+                &ap.ssid
+            },
             ap.channel,
             ap.signal_strength,
             country_display
@@ -69,8 +77,13 @@ fn main() -> ! {
     };
 
     println!("\nUnique country codes detected: {:?}", unique_countries);
-    println!("Total APs with country info: {}", 
-        scan_results.iter().filter(|ap| ap.country_code.is_some()).count());
+    println!(
+        "Total APs with country info: {}",
+        scan_results
+            .iter()
+            .filter(|ap| ap.country_code.is_some())
+            .count()
+    );
 
     loop {
         let mut delay = esp_hal::delay::Delay::new();

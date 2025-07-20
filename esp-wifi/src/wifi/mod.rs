@@ -1849,8 +1849,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
 
     // Extract country code from ESP-IDF structure
     let country_code = {
-        let cc_bytes =
-            unsafe { core::slice::from_raw_parts(record.country.cc.as_ptr(), 3) };
+        let cc_bytes = unsafe { core::slice::from_raw_parts(record.country.cc.as_ptr(), 3) };
 
         // Find the null terminator or end of array
         let cc_len = cc_bytes
