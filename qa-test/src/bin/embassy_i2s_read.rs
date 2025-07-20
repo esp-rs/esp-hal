@@ -20,7 +20,6 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     dma::DmaRxStreamBuf,
-    dma_buffers,
     dma_buffers_chunk_size,
     i2s::master::{DataFormat, I2s, Standard},
     time::Rate,
