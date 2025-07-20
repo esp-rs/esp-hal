@@ -42,8 +42,9 @@
 //! # {before_snippet}
 //! # use esp_hal::i2s::master::{I2s, Standard, DataFormat};
 //! # use esp_hal::dma_buffers_chunk_size;
+//! # use esp_hal::dma::DmaRxStreamBuf;
 //! # {dma_channel}
-//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_sizse!(4 * 4092, 0, 4092);
+//! let (mut rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_size!(4 * 4092, 0, 4092);
 //!
 //! let i2s = I2s::new(
 //!     peripherals.I2S0,
@@ -485,7 +486,7 @@ where
 {
     /// Start reading from the I2S RX unit. Notice because of the DMA transfer,
     /// the buffer must be aligned to 32-bit.
-    pub fn read<'t, RXBUF>(
+    pub fn read<RXBUF>(
         mut self,
         mut buf: RXBUF,
         chunk_size: usize,
@@ -1008,9 +1009,7 @@ mod private {
         }
 
         fn rx_stop(&self) {
-            self.regs()
-                .rx_conf()
-                .modify(|_, w| w.rx_start().clear_bit());
+            self.regs().conf().modify(|_, w| w.rx_start().clear_bit());
         }
 
         fn wait_for_tx_done(&self) {
