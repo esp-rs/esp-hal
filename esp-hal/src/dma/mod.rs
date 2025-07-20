@@ -2757,7 +2757,7 @@ pub(crate) mod asynch {
     where
         CH: DmaTxChannel,
     {
-        #[cfg_attr(esp32c2, allow(dead_code))]
+        #[cfg_attr(not(esp32), allow(dead_code))]
         pub fn new(tx: &'a mut ChannelTx<Async, CH>) -> Self {
             Self { tx }
         }
