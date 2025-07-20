@@ -1526,51 +1526,29 @@ impl DmaTxStreamBufView {
 
     /// Pushes a buffer into the stream buffer.
     /// Returns the number of bytes pushed.
-    pub fn push(&mut self, buf: &[u8]) -> usize {
-        let bytes = self.available_bytes();
-        let bytes_to_fill = buf.len().min(bytes);
-        let buf = &buf[..bytes_to_fill];
-        if buf.is_empty() {
-            return 0;
-        }
-
-        fn truncate_by(n: usize, by: usize) -> usize {
-            if n >= by { n - by } else { n }
-        }
-
-        let n_chunks = self.buf.descriptors.len();
+    pub fn push_with(&mut self, f: impl FnOnce(&mut [u8]) -> usize) -> usize {
         let chunk_size = self.buf.descriptors[0].size();
-        let dma_size = self.buf.buffer.len();
         let dma_start = self.descriptor_idx * chunk_size + self.descriptor_offset;
-        let dma_end = truncate_by(dma_start + buf.len(), dma_size);
+        let bytes_pushed = f(&mut self.buf.buffer[dma_start..]);
 
-        if dma_start < dma_end {
-            self.buf.buffer[dma_start..dma_end].copy_from_slice(buf);
-        } else {
-            self.buf.buffer[dma_start..].copy_from_slice(&buf[..dma_size - dma_start]);
-            self.buf.buffer[..dma_end].copy_from_slice(&buf[dma_size - dma_start..]);
-        }
-
-        let descs = (self.descriptor_idx..n_chunks).chain(0..self.descriptor_idx);
         let mut bytes_filled = 0;
-
-        for d in descs {
+        for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
             let desc = &mut self.buf.descriptors[d];
             let bytes_in_d = desc.size() - self.descriptor_offset;
-            if bytes_in_d + bytes_filled > buf.len() {
-                // I will have empty space in `desc`
+            // There is at least one byte left in `desc`.
+            if bytes_in_d + bytes_filled > bytes_pushed {
                 self.descriptor_idx = d;
-                self.descriptor_offset = self.descriptor_offset + buf.len() - bytes_filled;
+                self.descriptor_offset = self.descriptor_offset + bytes_pushed - bytes_filled;
                 break;
             }
-            // fill `desc` with data from `buf`
             bytes_filled += bytes_in_d;
             self.descriptor_offset = 0;
 
+            // Put the current descriptor at the end of the list
             desc.set_owner(Owner::Dma);
             desc.set_length(desc.size());
             desc.set_suc_eof(true);
-            let p = d.checked_sub(1).unwrap_or(n_chunks - 1);
+            let p = d.checked_sub(1).unwrap_or(self.buf.descriptors.len() - 1);
             if p != d {
                 let [prev, desc] = self.buf.descriptors.get_disjoint_mut([p, d]).unwrap();
                 desc.next = null_mut();
@@ -1579,7 +1557,26 @@ impl DmaTxStreamBufView {
             }
         }
 
-        bytes_to_fill
+        bytes_pushed
+    }
+
+    /// Pushes a buffer into the stream buffer.
+    /// Returns the number of bytes pushed.
+    pub fn push(&mut self, data: &[u8]) -> usize {
+        let mut remaining = data.len();
+        let mut offset = 0;
+
+        while self.available_bytes() >= remaining && remaining > 0 {
+            let written = self.push_with(|buffer| {
+                let len = usize::min(buffer.len(), data.len() - offset);
+                buffer[..len].copy_from_slice(&data[offset..][..len]);
+                len
+            });
+            offset += written;
+            remaining -= written;
+        }
+
+        offset
     }
 }
 
