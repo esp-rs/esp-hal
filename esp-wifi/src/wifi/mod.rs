@@ -247,8 +247,7 @@ pub struct AccessPointInfo {
 
     /// The country code of the access point (if available from beacon frames).
     /// This is a 2-character ISO country code (e.g., "US", "DE", "JP").
-    #[cfg_attr(feature = "defmt", defmt(Debug2Format))]
-    pub country_code: Option<String>,
+    pub country_code: Option<[u8;2]>,
 }
 
 /// Configuration for a Wi-Fi access point.
@@ -1848,7 +1847,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
     ssid.push_str(ssid_ref);
 
     // Extract country code from ESP-IDF structure
-    let country_code = {
+    let country_code: Option<[u8;2]> = {
         let cc_bytes = unsafe { core::slice::from_raw_parts(record.country.cc.as_ptr(), 3) };
 
         // Find the null terminator or end of array
@@ -1861,7 +1860,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
             // Validate that we have at least 2 valid ASCII characters
             let cc_slice = &cc_bytes[..cc_len.min(2)];
             if cc_slice.iter().all(|&b| b.is_ascii_uppercase()) {
-                core::str::from_utf8(cc_slice).ok().map(|s| s.to_string())
+                cc_slice[0..2]
             } else {
                 None
             }
