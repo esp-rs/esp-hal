@@ -71,12 +71,15 @@ pub(crate) struct PeriInstance<I = EmptyInstanceConfig> {
 }
 
 /// A single cell in the peripheral support table.
+#[derive(Default)]
 pub(crate) struct SupportItem {
     /// The human-readable name of the driver in the table (leftmost cell.)
     pub name: &'static str,
     /// The ID of the driver ([device.<config_group>]) in the TOML, that this
     /// item corresponds to.
     pub config_group: &'static str,
+    /// If true, this driver is not shown in the peripheral support table.
+    pub hide_from_peri_table: bool,
 }
 
 /// Define driver configuration structs, and a PeriConfig struct
@@ -87,6 +90,9 @@ macro_rules! driver_configs {
     (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
     (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Unset };  // Not a property
+
+    (@default $default:literal) => { $default };
+    (@default $default:literal $opt:literal) => { $opt };
 
     // Creates a single struct
     (@one
@@ -129,6 +135,7 @@ macro_rules! driver_configs {
             driver: $driver:ident,
             // Driver name, used in the generated documentation.
             name: $name:literal,
+            $(hide_from_peri_table: $hide:literal,)?
             $(has_computed_properties: $computed:literal,)?
             properties: $tokens:tt
         },
@@ -156,6 +163,7 @@ macro_rules! driver_configs {
                         SupportItem {
                             name: $name,
                             config_group: stringify!($driver),
+                            hide_from_peri_table: driver_configs!(@default false $($hide)?),
                         },
                     )+
                 ]
@@ -224,6 +232,13 @@ macro_rules! driver_configs {
 
 // TODO: sort this similar to how the product portfolio is organized
 driver_configs![
+    SocProperties {
+        driver: soc,
+        name: "SOC",
+        hide_from_peri_table: true,
+        properties: {}
+    },
+
     AdcProperties {
         driver: adc,
         name: "ADC",

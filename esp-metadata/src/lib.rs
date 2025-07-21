@@ -979,7 +979,12 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     // Calculate the width of the first column.
     let driver_col_width = std::iter::once("Driver")
-        .chain(PeriConfig::drivers().iter().map(|i| i.name))
+        .chain(
+            PeriConfig::drivers()
+                .iter()
+                .filter(|i| !i.hide_from_peri_table)
+                .map(|i| i.name),
+        )
         .map(|c| c.len())
         .max()
         .unwrap();
@@ -1003,7 +1008,15 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    for SupportItem { name, config_group } in PeriConfig::drivers() {
+    for SupportItem {
+        name,
+        config_group,
+        hide_from_peri_table,
+    } in PeriConfig::drivers()
+    {
+        if *hide_from_peri_table {
+            continue;
+        }
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);
