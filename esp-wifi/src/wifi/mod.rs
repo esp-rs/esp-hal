@@ -217,6 +217,49 @@ pub enum SecondaryChannel {
     Below,
 }
 
+/// Access point country information.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+pub struct Country([u8; 2]);
+
+impl Country {
+    fn try_from_c(info: &wifi_country_t) -> Option<Self> {
+        // Find the null terminator or end of array
+        let cc_len = info
+            .cc
+            .iter()
+            .position(|&b| b == 0)
+            .unwrap_or(info.cc.len());
+
+        if cc_len < 2 {
+            return None;
+        }
+
+        // Validate that we have at least 2 valid ASCII characters
+        let cc_slice = &info.cc[..cc_len.min(2)];
+        if cc_slice.iter().all(|&b| b.is_ascii_uppercase()) {
+            Some(Self([cc_slice[0], cc_slice[1]]))
+        } else {
+            None
+        }
+    }
+
+    /// Returns the country code as a string slice.
+    pub fn country_code(&self) -> &str {
+        unsafe {
+            // SAFETY: we have verified in the constructor that the bytes are upper-case ASCII.
+            core::str::from_utf8_unchecked(&self.0)
+        }
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Country {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        self.country_code().format(fmt)
+    }
+}
+
 /// Information about a detected Wi-Fi access point.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -241,6 +284,9 @@ pub struct AccessPointInfo {
 
     /// The authentication method used by the access point.
     pub auth_method: Option<AuthMethod>,
+
+    /// The country information of the access point (if available from beacon frames).
+    pub country: Option<Country>,
 }
 
 /// Configuration for a Wi-Fi access point.
@@ -1851,6 +1897,7 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
         },
         signal_strength: record.rssi,
         auth_method: Some(AuthMethod::from_raw(record.authmode)),
+        country: Country::try_from_c(&record.country),
     }
 }
 
