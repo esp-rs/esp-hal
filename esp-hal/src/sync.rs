@@ -146,7 +146,7 @@ mod single_core {
                 if #[cfg(riscv)] {
                     if token != 0 {
                         unsafe {
-                            esp_riscv_rt::riscv::interrupt::enable();
+                            riscv::interrupt::enable();
                         }
                     }
                 } else if #[cfg(xtensa)] {
