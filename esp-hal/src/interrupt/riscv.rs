@@ -14,8 +14,8 @@
 
 #[cfg(feature = "rt")]
 pub use esp_riscv_rt::TrapFrame;
+use esp_riscv_rt::riscv::register::{mcause, mtvec};
 use procmacros::ram;
-use riscv::register::{mcause, mtvec};
 
 #[cfg(not(plic))]
 pub use self::classic::*;
@@ -551,7 +551,7 @@ mod classic {
         pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
             // Both C6 and H2 have 5 bits of code. The riscv crate masks 31 bits, which then
             // causes a bounds check to be present.
-            let interrupt_id: usize = riscv::register::mcause::read().bits() & 0x1f;
+            let interrupt_id: usize = esp_riscv_rt::riscv::register::mcause::read().bits() & 0x1f;
             let intr = INTERRUPT_CORE0::regs();
             let interrupt_priority = intr.cpu_int_pri(interrupt_id).read().bits();
 
@@ -560,7 +560,7 @@ mod classic {
                 // leave interrupts disabled if interrupt is of max priority.
                 intr.cpu_int_thresh()
                     .write(|w| unsafe { w.bits(interrupt_priority + 1) }); // set the prio threshold to 1 more than current interrupt prio
-                unsafe { riscv::interrupt::enable() };
+                unsafe { esp_riscv_rt::riscv::interrupt::enable() };
             }
             prev_interrupt_priority
         }
@@ -568,7 +568,7 @@ mod classic {
         #[unsafe(link_section = ".trap")]
         #[unsafe(no_mangle)]
         unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-            riscv::interrupt::disable();
+            esp_riscv_rt::riscv::interrupt::disable();
             let intr = INTERRUPT_CORE0::regs();
             intr.cpu_int_thresh()
                 .write(|w| unsafe { w.bits(stored_prio) });
@@ -735,7 +735,7 @@ mod plic {
         #[unsafe(no_mangle)]
         #[unsafe(link_section = ".trap")]
         pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-            let interrupt_id: usize = riscv::register::mcause::read().code(); // MSB is whether its exception or interrupt.
+            let interrupt_id: usize = esp_riscv_rt::riscv::register::mcause::read().code(); // MSB is whether its exception or interrupt.
             let interrupt_priority = PLIC_MX::regs()
                 .mxint_pri(interrupt_id)
                 .read()
@@ -754,7 +754,7 @@ mod plic {
                     .write(|w| unsafe { w.cpu_mxint_thresh().bits(interrupt_priority + 1) });
 
                 unsafe {
-                    riscv::interrupt::enable();
+                    esp_riscv_rt::riscv::interrupt::enable();
                 }
             }
             prev_interrupt_priority as u32
@@ -763,7 +763,7 @@ mod plic {
         #[unsafe(no_mangle)]
         #[unsafe(link_section = ".trap")]
         pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-            riscv::interrupt::disable();
+            esp_riscv_rt::riscv::interrupt::disable();
             PLIC_MX::regs()
                 .mxint_thresh()
                 .write(|w| unsafe { w.cpu_mxint_thresh().bits(stored_prio as u8) });
@@ -818,7 +818,12 @@ mod rt {
 
         unsafe {
             let vec_table = (&_vector_table as *const u32).addr();
-            mtvec::write(vec_table, mtvec::TrapMode::Vectored);
+            mtvec::write({
+                let mut mtvec = mtvec::Mtvec::from_bits(0);
+                mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
+                mtvec.set_address(vec_table);
+                mtvec
+            });
 
             crate::interrupt::init_vectoring();
         };
