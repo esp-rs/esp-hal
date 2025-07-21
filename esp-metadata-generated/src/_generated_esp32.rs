@@ -186,6 +186,35 @@ macro_rules! memory_range {
         1073405952..1073741824
     };
 }
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_key_length {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((128)); _for_each_inner!((192)); _for_each_inner!((256));
+        _for_each_inner!((all(128), (192), (256)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_exponentiation {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((512)); _for_each_inner!((1024)); _for_each_inner!((1536));
+        _for_each_inner!((2048)); _for_each_inner!((2560)); _for_each_inner!((3072));
+        _for_each_inner!((3584)); _for_each_inner!((4096)); _for_each_inner!((all(512),
+        (1024), (1536), (2048), (2560), (3072), (3584), (4096)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_multiplication {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((512)); _for_each_inner!((1024)); _for_each_inner!((1536));
+        _for_each_inner!((2048)); _for_each_inner!((all(512), (1024), (1536), (2048)));
+    };
+}
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated

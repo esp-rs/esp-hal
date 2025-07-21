@@ -1,11 +1,13 @@
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod rsa;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
 pub(crate) mod uart;
 
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use rsa::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
@@ -443,7 +445,11 @@ driver_configs![
     RsaProperties {
         driver: rsa,
         name: "RSA",
-        properties: {}
+        has_computed_properties: true,
+        properties: {
+            exponentiation: RsaLengths,
+            multiplication: RsaLengths,
+        }
     },
     SdHostProperties {
         driver: sd_host,

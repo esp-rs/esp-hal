@@ -474,6 +474,8 @@ impl Config {
         let cores = number(self.device.cores);
         let trm = &self.device.trm;
 
+        let mut for_each_macros = vec![];
+
         let peripheral_properties =
             self.device
                 .peri_config
@@ -489,7 +491,15 @@ impl Config {
                     Value::Boolean(value) => quote! {
                         (#name) => { #value };
                     },
-                    Value::Unset | Value::NumberList(_) | Value::StringList(_) => {
+                    Value::NumberList(numbers) => {
+                        let numbers = numbers.into_iter().map(number).collect::<Vec<_>>();
+                        for_each_macros.push(generate_for_each_macro(
+                            &name.replace(".", "_"),
+                            &[("all", &numbers)],
+                        ));
+                        quote! {}
+                    }
+                    Value::Unset | Value::StringList(_) => {
                         quote! {}
                     }
                 });
@@ -528,6 +538,8 @@ impl Config {
             macro_rules! memory_range {
                 #(#region_branches)*
             }
+
+            #(#for_each_macros)*
         });
 
         tokens

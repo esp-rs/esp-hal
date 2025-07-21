@@ -411,6 +411,11 @@ support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
 
+[device.rsa]
+support_status = "partial"
+exponentiation = { increment = 32, max = 4096 }
+multiplication = { increment = 32, max = 2048 }
+
 [device.sha]
 support_status = "partial"
 algo = [
@@ -472,7 +477,6 @@ apb_cycle_wait_num = 16 # TODO
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.rsa]
 [device.hmac]
 
 ## Interfaces

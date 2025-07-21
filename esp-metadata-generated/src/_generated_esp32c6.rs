@@ -204,6 +204,92 @@ macro_rules! memory_range {
         1082130432..1082654720
     };
 }
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_aes_key_length {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((128)); _for_each_inner!((256)); _for_each_inner!((all(128),
+        (256)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_exponentiation {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((32)); _for_each_inner!((64)); _for_each_inner!((96));
+        _for_each_inner!((128)); _for_each_inner!((160)); _for_each_inner!((192));
+        _for_each_inner!((224)); _for_each_inner!((256)); _for_each_inner!((288));
+        _for_each_inner!((320)); _for_each_inner!((352)); _for_each_inner!((384));
+        _for_each_inner!((416)); _for_each_inner!((448)); _for_each_inner!((480));
+        _for_each_inner!((512)); _for_each_inner!((544)); _for_each_inner!((576));
+        _for_each_inner!((608)); _for_each_inner!((640)); _for_each_inner!((672));
+        _for_each_inner!((704)); _for_each_inner!((736)); _for_each_inner!((768));
+        _for_each_inner!((800)); _for_each_inner!((832)); _for_each_inner!((864));
+        _for_each_inner!((896)); _for_each_inner!((928)); _for_each_inner!((960));
+        _for_each_inner!((992)); _for_each_inner!((1024)); _for_each_inner!((1056));
+        _for_each_inner!((1088)); _for_each_inner!((1120)); _for_each_inner!((1152));
+        _for_each_inner!((1184)); _for_each_inner!((1216)); _for_each_inner!((1248));
+        _for_each_inner!((1280)); _for_each_inner!((1312)); _for_each_inner!((1344));
+        _for_each_inner!((1376)); _for_each_inner!((1408)); _for_each_inner!((1440));
+        _for_each_inner!((1472)); _for_each_inner!((1504)); _for_each_inner!((1536));
+        _for_each_inner!((1568)); _for_each_inner!((1600)); _for_each_inner!((1632));
+        _for_each_inner!((1664)); _for_each_inner!((1696)); _for_each_inner!((1728));
+        _for_each_inner!((1760)); _for_each_inner!((1792)); _for_each_inner!((1824));
+        _for_each_inner!((1856)); _for_each_inner!((1888)); _for_each_inner!((1920));
+        _for_each_inner!((1952)); _for_each_inner!((1984)); _for_each_inner!((2016));
+        _for_each_inner!((2048)); _for_each_inner!((2080)); _for_each_inner!((2112));
+        _for_each_inner!((2144)); _for_each_inner!((2176)); _for_each_inner!((2208));
+        _for_each_inner!((2240)); _for_each_inner!((2272)); _for_each_inner!((2304));
+        _for_each_inner!((2336)); _for_each_inner!((2368)); _for_each_inner!((2400));
+        _for_each_inner!((2432)); _for_each_inner!((2464)); _for_each_inner!((2496));
+        _for_each_inner!((2528)); _for_each_inner!((2560)); _for_each_inner!((2592));
+        _for_each_inner!((2624)); _for_each_inner!((2656)); _for_each_inner!((2688));
+        _for_each_inner!((2720)); _for_each_inner!((2752)); _for_each_inner!((2784));
+        _for_each_inner!((2816)); _for_each_inner!((2848)); _for_each_inner!((2880));
+        _for_each_inner!((2912)); _for_each_inner!((2944)); _for_each_inner!((2976));
+        _for_each_inner!((3008)); _for_each_inner!((3040)); _for_each_inner!((3072));
+        _for_each_inner!((all(32), (64), (96), (128), (160), (192), (224), (256), (288),
+        (320), (352), (384), (416), (448), (480), (512), (544), (576), (608), (640),
+        (672), (704), (736), (768), (800), (832), (864), (896), (928), (960), (992),
+        (1024), (1056), (1088), (1120), (1152), (1184), (1216), (1248), (1280), (1312),
+        (1344), (1376), (1408), (1440), (1472), (1504), (1536), (1568), (1600), (1632),
+        (1664), (1696), (1728), (1760), (1792), (1824), (1856), (1888), (1920), (1952),
+        (1984), (2016), (2048), (2080), (2112), (2144), (2176), (2208), (2240), (2272),
+        (2304), (2336), (2368), (2400), (2432), (2464), (2496), (2528), (2560), (2592),
+        (2624), (2656), (2688), (2720), (2752), (2784), (2816), (2848), (2880), (2912),
+        (2944), (2976), (3008), (3040), (3072)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rsa_multiplication {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((32)); _for_each_inner!((64)); _for_each_inner!((96));
+        _for_each_inner!((128)); _for_each_inner!((160)); _for_each_inner!((192));
+        _for_each_inner!((224)); _for_each_inner!((256)); _for_each_inner!((288));
+        _for_each_inner!((320)); _for_each_inner!((352)); _for_each_inner!((384));
+        _for_each_inner!((416)); _for_each_inner!((448)); _for_each_inner!((480));
+        _for_each_inner!((512)); _for_each_inner!((544)); _for_each_inner!((576));
+        _for_each_inner!((608)); _for_each_inner!((640)); _for_each_inner!((672));
+        _for_each_inner!((704)); _for_each_inner!((736)); _for_each_inner!((768));
+        _for_each_inner!((800)); _for_each_inner!((832)); _for_each_inner!((864));
+        _for_each_inner!((896)); _for_each_inner!((928)); _for_each_inner!((960));
+        _for_each_inner!((992)); _for_each_inner!((1024)); _for_each_inner!((1056));
+        _for_each_inner!((1088)); _for_each_inner!((1120)); _for_each_inner!((1152));
+        _for_each_inner!((1184)); _for_each_inner!((1216)); _for_each_inner!((1248));
+        _for_each_inner!((1280)); _for_each_inner!((1312)); _for_each_inner!((1344));
+        _for_each_inner!((1376)); _for_each_inner!((1408)); _for_each_inner!((1440));
+        _for_each_inner!((1472)); _for_each_inner!((1504)); _for_each_inner!((1536));
+        _for_each_inner!((all(32), (64), (96), (128), (160), (192), (224), (256), (288),
+        (320), (352), (384), (416), (448), (480), (512), (544), (576), (608), (640),
+        (672), (704), (736), (768), (800), (832), (864), (896), (928), (960), (992),
+        (1024), (1056), (1088), (1120), (1152), (1184), (1216), (1248), (1280), (1312),
+        (1344), (1376), (1408), (1440), (1472), (1504), (1536)));
+    };
+}
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
 ///
 /// For an explanation on the general syntax, as well as usage of individual/repeated

@@ -7,7 +7,6 @@ use crate::rsa::{
     RsaModularExponentiation,
     RsaModularMultiplication,
     RsaMultiplication,
-    implement_op,
 };
 
 impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
@@ -58,25 +57,6 @@ impl<Dm: crate::DriverMode> Rsa<'_, Dm> {
     pub(super) fn is_idle(&self) -> bool {
         self.regs().interrupt().read().interrupt().bit_is_set()
     }
-}
-
-/// Module defining marker types for various RSA operand sizes.
-pub mod operand_sizes {
-    //! Marker types for the operand sizes
-    use paste::paste;
-
-    use super::{Multi, RsaMode, implement_op};
-
-    implement_op!(
-        (512, multi),
-        (1024, multi),
-        (1536, multi),
-        (2048, multi),
-        (2560),
-        (3072),
-        (3584),
-        (4096)
-    );
 }
 
 impl<'d, T: RsaMode, Dm: crate::DriverMode, const N: usize> RsaModularMultiplication<'_, 'd, T, Dm>

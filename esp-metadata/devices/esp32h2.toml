@@ -368,6 +368,11 @@ support_status = "partial"
 ram_start = 0x60007400
 channel_ram_size = 48
 
+[device.rsa]
+support_status = "partial"
+exponentiation = { increment = 32, max = 3072 }
+multiplication = { increment = 32, max = 1536 }
+
 [device.sha]
 support_status = "partial"
 algo = ["SHA-1", "SHA-224", "SHA-256"]
@@ -408,7 +413,6 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Crypto
 [device.ecc]
-[device.rsa]
 [device.hmac]
 
 ## Interfaces
