@@ -818,7 +818,12 @@ mod rt {
 
         unsafe {
             let vec_table = (&_vector_table as *const u32).addr();
-            mtvec::write(vec_table, mtvec::TrapMode::Vectored);
+            mtvec::write({
+                let mut mtvec = mtvec::Mtvec::from_bits(0);
+                mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
+                mtvec.set_address(vec_table);
+                mtvec
+            });
 
             crate::interrupt::init_vectoring();
         };
