@@ -197,6 +197,7 @@ impl Chip {
 
         // Used by our documentation builds to prevent the huge red warning banner.
         cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
+        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(semver_checks)"));
 
         let mut cfg_values: IndexMap<String, Vec<String>> = IndexMap::new();
 

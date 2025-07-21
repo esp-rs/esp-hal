@@ -194,6 +194,11 @@
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
+// Don't trip up on broken/private links when running semver-checks
+#![cfg_attr(
+    semver_checks,
+    allow(rustdoc::private_intra_doc_links, rustdoc::broken_intra_doc_links)
+)]
 #![no_std]
 
 // MUST be the first module
@@ -527,7 +532,6 @@ pub(crate) mod private {
     }
 }
 
-#[cfg(feature = "unstable")]
 #[doc(hidden)]
 pub use private::Internal;
 
