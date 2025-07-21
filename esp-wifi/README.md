@@ -37,7 +37,10 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
   - `timer_compat.rs`: code to emulate timer related functionality
 
 ## Bluetooth stack
-For use with `esp-wifi` the preferred bluetooth stack is considered to be [`trouBLE`](https://github.com/embassy-rs/trouble/tree/main). Detailed [examples](https://github.com/embassy-rs/trouble/tree/main/examples/esp32) with `esp-wifi`/`esp-hal` can be found in the official repository of the aforementioned project.
+For use with `esp-wifi` the preferred bluetooth stack is considered to be [`trouBLE`]. Detailed [examples] with `esp-wifi`/`esp-hal` can be found in the official repository of the aforementioned project.
+
+[`trouBLE`]: https://github.com/embassy-rs/trouble/tree/main
+[examples]: https://github.com/embassy-rs/trouble/tree/main/examples/esp32
 
 ## Driver version
 
