@@ -137,6 +137,12 @@ instances = [
     { name = "adc1" },
 ]
 
+[device.aes]
+support_status = "partial"
+dma = true
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+key_length = [128, 256]
+
 [device.assist_debug]
 support_status = "partial"
 has_sp_monitor = true
@@ -488,7 +494,6 @@ apb_cycle_wait_num = 16 # TODO
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.aes]
 [device.ecc]
 [device.rsa]
 [device.sha]

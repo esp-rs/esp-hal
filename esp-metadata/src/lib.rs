@@ -401,13 +401,26 @@ impl Config {
             );
             all.extend(self.device.peri_config.driver_instances());
 
-            all.extend(self.device.peri_config.properties().filter_map(
-                |(name, value)| match value {
-                    Value::Boolean(true) => Some(name.to_string()),
-                    Value::Number(value) => Some(format!("{name}=\"{value}\"")),
-                    _ => None,
-                },
-            ));
+            all.extend(
+                self.device
+                    .peri_config
+                    .properties()
+                    .filter_map(|(name, value)| match value {
+                        Value::Boolean(true) => Some(vec![name.to_string()]),
+                        Value::NumberList(values) => {
+                            Some(values.iter().map(|val| format!("{name}_{val}")).collect())
+                        }
+                        Value::StringList(values) => Some(
+                            values
+                                .iter()
+                                .map(|val| format!("{name}_{}", val.to_lowercase()))
+                                .collect(),
+                        ),
+                        Value::Number(value) => Some(vec![format!("{name}=\"{value}\"")]),
+                        _ => None,
+                    })
+                    .flatten(),
+            );
             all
         })
     }
@@ -461,7 +474,6 @@ impl Config {
                 .peri_config
                 .properties()
                 .flat_map(|(name, value)| match value {
-                    Value::Unset => quote! {},
                     Value::Number(value) => {
                         let value = number(value); // ensure no numeric suffix is added
                         quote! {
@@ -472,6 +484,9 @@ impl Config {
                     Value::Boolean(value) => quote! {
                         (#name) => { #value };
                     },
+                    Value::Unset | Value::NumberList(_) | Value::StringList(_) => {
+                        quote! {}
+                    }
                 });
 
         // Not public API, can use a private macro:

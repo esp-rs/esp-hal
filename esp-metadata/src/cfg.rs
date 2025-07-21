@@ -18,6 +18,10 @@ pub(crate) enum Value {
     Number(u32),
     /// A boolean value. If true, the value is included in the cfg symbols.
     Boolean(bool),
+    /// A list of numeric values. A separate symbol is generated for each value.
+    NumberList(Vec<u32>),
+    /// A list of strings. A separate symbol is generated for each string.
+    StringList(Vec<String>),
 }
 
 impl From<Option<u32>> for Value {
@@ -88,6 +92,8 @@ macro_rules! driver_configs {
     (@ignore $t:tt) => {};
     (@property (u32)           $self:ident, $config:ident) => { Value::Number($self.$config) };
     (@property (bool)          $self:ident, $config:ident) => { Value::Boolean($self.$config) };
+    (@property (Vec<u32>)      $self:ident, $config:ident) => { Value::NumberList($self.$config.clone()) };
+    (@property (Vec<String>)   $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
     (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Unset };  // Not a property
 
@@ -252,7 +258,13 @@ driver_configs![
     AesProperties {
         driver: aes,
         name: "AES",
-        properties: {}
+        properties: {
+            key_length: Vec<u32>,
+            #[serde(default)]
+            dma: bool,
+            #[serde(default)]
+            dma_mode: Vec<String>,
+        }
     },
     AssistDebugProperties {
         driver: assist_debug,

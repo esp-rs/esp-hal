@@ -36,6 +36,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
     };
+    ("aes.dma") => {
+        true
+    };
     ("gpio.has_bank_1") => {
         true
     };

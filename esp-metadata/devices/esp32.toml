@@ -106,6 +106,10 @@ instances = [
     { name = "adc2" },
 ]
 
+[device.aes]
+support_status = "partial"
+key_length = [128, 192, 256]
+
 [device.dac]
 support_status = "partial"
 instances = [
@@ -627,7 +631,6 @@ apb_cycle_wait_num = 16 # TODO
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.aes]
 [device.rsa]
 [device.sha]
 

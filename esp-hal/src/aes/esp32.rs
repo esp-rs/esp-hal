@@ -1,4 +1,4 @@
-use crate::aes::{ALIGN_SIZE, Aes, Aes128, Aes192, Aes256, AesFlavour, Endianness, Mode};
+use crate::aes::{ALIGN_SIZE, Aes, Endianness, Mode};
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {
@@ -65,16 +65,4 @@ impl Aes<'_> {
         self.alignment_helper
             .volatile_read_regset(self.regs().text(0).as_ptr(), block, text_len);
     }
-}
-
-impl AesFlavour for Aes128 {
-    type KeyType<'b> = &'b [u8; 16];
-}
-
-impl AesFlavour for Aes192 {
-    type KeyType<'b> = &'b [u8; 24];
-}
-
-impl AesFlavour for Aes256 {
-    type KeyType<'b> = &'b [u8; 32];
 }

@@ -261,6 +261,9 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
+                    "aes_key_length_128",
+                    "aes_key_length_192",
+                    "aes_key_length_256",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
                     "gpio_constant_0_input=\"48\"",
@@ -404,6 +407,9 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_192",
+                    "cargo:rustc-cfg=aes_key_length_256",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"48\"",
@@ -745,6 +751,15 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
+                    "aes_key_length_128",
+                    "aes_key_length_256",
+                    "aes_dma",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -871,6 +886,15 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_256",
+                    "cargo:rustc-cfg=aes_dma",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1052,6 +1076,15 @@ impl Chip {
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_has_prv_mode",
+                    "aes_key_length_128",
+                    "aes_key_length_256",
+                    "aes_dma",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1234,6 +1267,15 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_256",
+                    "cargo:rustc-cfg=aes_dma",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1397,6 +1439,15 @@ impl Chip {
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_has_prv_mode",
+                    "aes_key_length_128",
+                    "aes_key_length_256",
+                    "aes_dma",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1553,6 +1604,15 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_256",
+                    "cargo:rustc-cfg=aes_dma",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1706,6 +1766,17 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "aes_key_length_128",
+                    "aes_key_length_192",
+                    "aes_key_length_256",
+                    "aes_dma",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
+                    "aes_dma_mode_gcm",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -1850,6 +1921,17 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_192",
+                    "cargo:rustc-cfg=aes_key_length_256",
+                    "cargo:rustc-cfg=aes_dma",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_dma_mode_gcm",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -2013,6 +2095,15 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
+                    "aes_key_length_128",
+                    "aes_key_length_256",
+                    "aes_dma",
+                    "aes_dma_mode_ecb",
+                    "aes_dma_mode_cbc",
+                    "aes_dma_mode_ofb",
+                    "aes_dma_mode_ctr",
+                    "aes_dma_mode_cfb8",
+                    "aes_dma_mode_cfb128",
                     "assist_debug_has_region_monitor",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
@@ -2177,6 +2268,15 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
+                    "cargo:rustc-cfg=aes_key_length_128",
+                    "cargo:rustc-cfg=aes_key_length_256",
+                    "cargo:rustc-cfg=aes_dma",
+                    "cargo:rustc-cfg=aes_dma_mode_ecb",
+                    "cargo:rustc-cfg=aes_dma_mode_cbc",
+                    "cargo:rustc-cfg=aes_dma_mode_ofb",
+                    "cargo:rustc-cfg=aes_dma_mode_ctr",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb8",
+                    "cargo:rustc-cfg=aes_dma_mode_cfb128",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -2338,6 +2438,9 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(uart_uart0)");
         println!("cargo:rustc-check-cfg=cfg(uart_uart1)");
         println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
+        println!("cargo:rustc-check-cfg=cfg(aes_key_length_128)");
+        println!("cargo:rustc-check-cfg=cfg(aes_key_length_192)");
+        println!("cargo:rustc-check-cfg=cfg(aes_key_length_256)");
         println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
         println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_separate_filter_config_registers)");
@@ -2396,6 +2499,13 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(soc_has_tsens)");
         println!("cargo:rustc-check-cfg=cfg(hmac)");
         println!("cargo:rustc-check-cfg=cfg(usb_serial_jtag)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ecb)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cbc)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ofb)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ctr)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb8)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb128)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug_has_region_monitor)");
         println!("cargo:rustc-check-cfg=cfg(esp32c6)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
@@ -2465,6 +2575,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(soc_has_crypto_dma)");
         println!("cargo:rustc-check-cfg=cfg(riscv_coproc_supported)");
         println!("cargo:rustc-check-cfg=cfg(usb_otg)");
+        println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_gcm)");
         println!("cargo:rustc-check-cfg=cfg(spi_master_has_octal)");
         println!("cargo:rustc-check-cfg=cfg(esp32s3)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_interrupt_core1)");
