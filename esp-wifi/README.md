@@ -12,7 +12,7 @@ Note that this crate currently requires you to enable the `unstable` feature on 
 
 ## Current support
 
-If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists. An empty cell means that the feature is present in the chip but not implemented yet.
+If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists.
 
 |          | [Wifi](https://github.com/esp-rs/esp-wifi/issues/94) | [BLE](https://github.com/esp-rs/esp-wifi/issues/93) | [Coex](https://github.com/esp-rs/esp-wifi/issues/92) | ESP-NOW |
 | :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: |
@@ -28,19 +28,11 @@ If a cell contains an em dash (&mdash;) this means that the particular feature i
 
 - Support for non-open SoftAP
 
-## Directory Structure
-
-- `src/preempt_builtin/`: systimer code used for timing and task switching
-- `src/preempt/`: a bare minimum RISCV and Xtensa round-robin task scheduler
-- `src/compat/`: code needed to emulate enough of an (RT)OS to use the driver
-  - `common.rs`: basics like semaphores and recursive mutexes
-  - `timer_compat.rs`: code to emulate timer related functionality
-
 ## Bluetooth stack
-For use with `esp-wifi` the preferred bluetooth stack is considered to be [`trouBLE`]. Detailed [examples] with `esp-wifi`/`esp-hal` can be found in the official repository of the aforementioned project.
+We recommend using [`TrouBLE`] as the Bluetooth stack. You can find detailed examples [here].
 
-[`trouBLE`]: https://github.com/embassy-rs/trouble/tree/main
-[examples]: https://github.com/embassy-rs/trouble/tree/main/examples/esp32
+[`TrouBLE`]: https://github.com/embassy-rs/trouble/tree/main
+[here]: https://github.com/embassy-rs/trouble/tree/main/examples/esp32
 
 ## Driver version
 
