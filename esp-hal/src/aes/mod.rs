@@ -73,75 +73,66 @@ mod aes_spec_impl;
 
 const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
-/// Represents the various key sizes allowed for AES encryption and decryption.
-pub enum Key {
-    /// 128-bit AES key
-    #[cfg(aes_key_length_128)]
-    Key16([u8; 16]),
-    /// 192-bit AES key
-    #[cfg(aes_key_length_192)]
-    Key24([u8; 24]),
-    /// 256-bit AES key
-    #[cfg(aes_key_length_256)]
-    Key32([u8; 32]),
-}
-
-// Implementing From for easy conversion from array to Key enum.
-#[cfg(aes_key_length_128)]
-impl From<[u8; 16]> for Key {
-    fn from(key: [u8; 16]) -> Self {
-        Key::Key16(key)
-    }
-}
-
-#[cfg(aes_key_length_192)]
-impl From<[u8; 24]> for Key {
-    fn from(key: [u8; 24]) -> Self {
-        Key::Key24(key)
-    }
-}
-
-#[cfg(aes_key_length_256)]
-impl From<[u8; 32]> for Key {
-    fn from(key: [u8; 32]) -> Self {
-        Key::Key32(key)
-    }
-}
-
-impl Key {
-    /// Returns a slice representation of the AES key.
-    fn as_slice(&self) -> &[u8] {
-        match self {
-            #[cfg(aes_key_length_128)]
-            Key::Key16(key) => key,
-            #[cfg(aes_key_length_192)]
-            Key::Key24(key) => key,
-            #[cfg(aes_key_length_256)]
-            Key::Key32(key) => key,
+for_each_aes_key_length! {
+    ($len:literal) => {
+        // Implementing From for easy conversion from array to Key enum.
+        impl From<[u8; $len / 8]> for Key {
+            fn from(key: [u8; $len / 8]) -> Self {
+                paste::paste! {
+                    Key::[<Key $len>](key)
+                }
+            }
         }
-    }
-}
 
-/// Defines the operating modes for AES encryption and decryption.
-pub enum Mode {
-    /// Encryption mode with 128-bit key
-    #[cfg(aes_key_length_128)]
-    Encryption128 = 0,
-    /// Encryption mode with 192-bit key
-    #[cfg(aes_key_length_192)]
-    Encryption192 = 1,
-    /// Encryption mode with 256-bit key
-    #[cfg(aes_key_length_256)]
-    Encryption256 = 2,
-    /// Decryption mode with 128-bit key
-    #[cfg(aes_key_length_128)]
-    Decryption128 = 4,
-    /// Decryption mode with 192-bit key
-    #[cfg(aes_key_length_192)]
-    Decryption192 = 5,
-    /// Decryption mode with 256-bit key
-    #[cfg(aes_key_length_256)]
-    Decryption256 = 6,
+        paste::paste! {
+            #[doc = concat!("Marker type for AES-", stringify!($len))]
+            pub struct [<Aes $len>];
+
+            impl crate::private::Sealed for [<Aes $len>] {}
+            impl AesFlavour for [<Aes $len>] {
+                type KeyType<'b> = &'b [u8; $len / 8];
+            }
+        }
+    };
+
+    (bits $( ($len:literal) ),*) => {
+        paste::paste! {
+            /// Represents the various key sizes allowed for AES encryption and decryption.
+            pub enum Key {
+                $(
+                    #[doc = concat!(stringify!($len), "-bit AES key")]
+                    [<Key $len>]([u8; $len / 8]),
+                )*
+            }
+
+            impl Key {
+                /// Returns a slice representation of the AES key.
+                fn as_slice(&self) -> &[u8] {
+                    match self {
+                        $(
+                            Self::[<Key $len>](key) => key.as_ref(),
+                        )*
+                    }
+                }
+            }
+        }
+    };
+
+    (modes $(($bits:literal, $encrypt:literal, $decrypt:literal)),*) => {
+        paste::paste! {
+            /// Defines the operating modes for AES encryption and decryption.
+            #[repr(C)]
+            pub enum Mode {
+                $(
+                    #[doc= concat!("Encryption mode with ", stringify!($len), "-bit key")]
+                    [<Encryption $bits>] = $encrypt,
+
+                    #[doc= concat!("Decryption mode with ", stringify!($len), "-bit key")]
+                    [<Decryption $bits>] = $decrypt,
+                )*
+            }
+        }
+    };
 }
 
 /// AES peripheral container
@@ -208,40 +199,6 @@ pub trait AesFlavour: crate::private::Sealed {
     /// The size of this type depends on various factors, such as the device
     /// being targeted and the desired key size.
     type KeyType<'b>;
-}
-
-/// Marker type for AES-128
-#[cfg(aes_key_length_128)]
-pub struct Aes128;
-
-/// Marker type for AES-192
-#[cfg(aes_key_length_192)]
-pub struct Aes192;
-
-/// Marker type for AES-256
-#[cfg(aes_key_length_256)]
-pub struct Aes256;
-
-#[cfg(aes_key_length_128)]
-impl crate::private::Sealed for Aes128 {}
-#[cfg(aes_key_length_192)]
-impl crate::private::Sealed for Aes192 {}
-#[cfg(aes_key_length_256)]
-impl crate::private::Sealed for Aes256 {}
-
-#[cfg(aes_key_length_128)]
-impl AesFlavour for Aes128 {
-    type KeyType<'b> = &'b [u8; 16];
-}
-
-#[cfg(aes_key_length_192)]
-impl AesFlavour for Aes192 {
-    type KeyType<'b> = &'b [u8; 24];
-}
-
-#[cfg(aes_key_length_256)]
-impl AesFlavour for Aes256 {
-    type KeyType<'b> = &'b [u8; 32];
 }
 
 /// State matrix endianness

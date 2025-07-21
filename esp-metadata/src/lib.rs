@@ -407,9 +407,8 @@ impl Config {
                     .properties()
                     .filter_map(|(name, value)| match value {
                         Value::Boolean(true) => Some(vec![name.to_string()]),
-                        Value::NumberList(values) => {
-                            Some(values.iter().map(|val| format!("{name}_{val}")).collect())
-                        }
+                        Value::NumberList(_) => None,
+                        Value::Generic(v) => v.cfgs(),
                         Value::StringList(values) => Some(
                             values
                                 .iter()
@@ -498,6 +497,12 @@ impl Config {
                             &[("all", &numbers)],
                         ));
                         quote! {}
+                    }
+                    Value::Generic(v) => {
+                        if let Some(for_each) = v.for_each_macro() {
+                            for_each_macros.push(for_each);
+                        }
+                        v.property_macro_branches()
                     }
                     Value::Unset | Value::StringList(_) => {
                         quote! {}

@@ -6,7 +6,11 @@ use std::str::FromStr;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 
-use crate::{cfg::Value, generate_for_each_macro, number};
+use crate::{
+    cfg::{GenericProperty, Value},
+    generate_for_each_macro,
+    number,
+};
 
 /// Additional properties (besides those defined in cfg.rs) for [device.gpio].
 /// These don't get turned into symbols, but are used to generate code.
@@ -21,6 +25,8 @@ pub(crate) struct GpioPinsAndSignals {
     /// The list of peripheral output signals.
     pub output_signals: Vec<IoMuxSignal>,
 }
+
+impl GenericProperty for GpioPinsAndSignals {}
 
 /// Properties of a single GPIO pin.
 #[derive(Debug, Default, Clone, serde::Deserialize, serde::Serialize)]

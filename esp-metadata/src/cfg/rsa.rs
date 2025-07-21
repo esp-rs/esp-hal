@@ -1,4 +1,4 @@
-use crate::cfg::Value;
+use crate::cfg::{GenericProperty, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RsaLengths {
@@ -13,6 +13,8 @@ impl RsaLengths {
             .collect()
     }
 }
+
+impl GenericProperty for RsaLengths {}
 
 impl super::RsaProperties {
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, Value)> {
