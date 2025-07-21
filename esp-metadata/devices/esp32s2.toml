@@ -411,6 +411,19 @@ support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
 
+[device.sha]
+support_status = "partial"
+algo = [
+    "SHA-1",
+    "SHA-224",
+    "SHA-256",
+    "SHA-384",
+    "SHA-512",
+    "SHA-512/224",
+    "SHA-512/256",
+    "SHA-512/t",
+]
+
 [device.spi_master]
 support_status = "supported"
 has_octal = true
@@ -461,7 +474,6 @@ apb_cycle_wait_num = 16 # TODO
 ## Crypto
 [device.rsa]
 [device.hmac]
-[device.sha]
 
 ## Interfaces
 [device.i2s]

@@ -463,7 +463,10 @@ driver_configs![
     ShaProperties {
         driver: sha,
         name: "SHA",
-        properties: {}
+        properties: {
+            #[serde(default)]
+            algo: Vec<String>,
+        }
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {
         driver: spi_master,

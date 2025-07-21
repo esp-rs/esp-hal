@@ -413,7 +413,12 @@ impl Config {
                         Value::StringList(values) => Some(
                             values
                                 .iter()
-                                .map(|val| format!("{name}_{}", val.to_lowercase()))
+                                .map(|val| {
+                                    format!(
+                                        "{name}_{}",
+                                        val.to_lowercase().replace("-", "_").replace("/", "_")
+                                    )
+                                })
                                 .collect(),
                         ),
                         Value::Number(value) => Some(vec![format!("{name}=\"{value}\"")]),
