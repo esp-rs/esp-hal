@@ -1,4 +1,4 @@
-use crate::aes::{ALIGN_SIZE, Aes, Aes128, Aes256, AesFlavour, Mode};
+use crate::aes::{ALIGN_SIZE, Aes, Mode};
 
 impl Aes<'_> {
     pub(super) fn init(&mut self) {
@@ -50,12 +50,4 @@ impl Aes<'_> {
             text_out_len,
         );
     }
-}
-
-impl AesFlavour for Aes128 {
-    type KeyType<'b> = &'b [u8; 16];
-}
-
-impl AesFlavour for Aes256 {
-    type KeyType<'b> = &'b [u8; 32];
 }

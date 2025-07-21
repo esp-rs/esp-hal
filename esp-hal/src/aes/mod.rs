@@ -76,28 +76,32 @@ const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 /// Represents the various key sizes allowed for AES encryption and decryption.
 pub enum Key {
     /// 128-bit AES key
+    #[cfg(aes_key_length_128)]
     Key16([u8; 16]),
     /// 192-bit AES key
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(aes_key_length_192)]
     Key24([u8; 24]),
     /// 256-bit AES key
+    #[cfg(aes_key_length_256)]
     Key32([u8; 32]),
 }
 
 // Implementing From for easy conversion from array to Key enum.
+#[cfg(aes_key_length_128)]
 impl From<[u8; 16]> for Key {
     fn from(key: [u8; 16]) -> Self {
         Key::Key16(key)
     }
 }
 
-#[cfg(any(esp32, esp32s2))]
+#[cfg(aes_key_length_192)]
 impl From<[u8; 24]> for Key {
     fn from(key: [u8; 24]) -> Self {
         Key::Key24(key)
     }
 }
 
+#[cfg(aes_key_length_256)]
 impl From<[u8; 32]> for Key {
     fn from(key: [u8; 32]) -> Self {
         Key::Key32(key)
@@ -108,9 +112,11 @@ impl Key {
     /// Returns a slice representation of the AES key.
     fn as_slice(&self) -> &[u8] {
         match self {
+            #[cfg(aes_key_length_128)]
             Key::Key16(key) => key,
-            #[cfg(any(esp32, esp32s2))]
+            #[cfg(aes_key_length_192)]
             Key::Key24(key) => key,
+            #[cfg(aes_key_length_256)]
             Key::Key32(key) => key,
         }
     }
@@ -119,18 +125,22 @@ impl Key {
 /// Defines the operating modes for AES encryption and decryption.
 pub enum Mode {
     /// Encryption mode with 128-bit key
+    #[cfg(aes_key_length_128)]
     Encryption128 = 0,
     /// Encryption mode with 192-bit key
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(aes_key_length_192)]
     Encryption192 = 1,
     /// Encryption mode with 256-bit key
+    #[cfg(aes_key_length_256)]
     Encryption256 = 2,
     /// Decryption mode with 128-bit key
+    #[cfg(aes_key_length_128)]
     Decryption128 = 4,
     /// Decryption mode with 192-bit key
-    #[cfg(any(esp32, esp32s2))]
+    #[cfg(aes_key_length_192)]
     Decryption192 = 5,
     /// Decryption mode with 256-bit key
+    #[cfg(aes_key_length_256)]
     Decryption256 = 6,
 }
 
@@ -201,19 +211,38 @@ pub trait AesFlavour: crate::private::Sealed {
 }
 
 /// Marker type for AES-128
+#[cfg(aes_key_length_128)]
 pub struct Aes128;
 
 /// Marker type for AES-192
-#[cfg(any(esp32, esp32s2))]
+#[cfg(aes_key_length_192)]
 pub struct Aes192;
 
 /// Marker type for AES-256
+#[cfg(aes_key_length_256)]
 pub struct Aes256;
 
+#[cfg(aes_key_length_128)]
 impl crate::private::Sealed for Aes128 {}
-#[cfg(any(esp32, esp32s2))]
+#[cfg(aes_key_length_192)]
 impl crate::private::Sealed for Aes192 {}
+#[cfg(aes_key_length_256)]
 impl crate::private::Sealed for Aes256 {}
+
+#[cfg(aes_key_length_128)]
+impl AesFlavour for Aes128 {
+    type KeyType<'b> = &'b [u8; 16];
+}
+
+#[cfg(aes_key_length_192)]
+impl AesFlavour for Aes192 {
+    type KeyType<'b> = &'b [u8; 24];
+}
+
+#[cfg(aes_key_length_256)]
+impl AesFlavour for Aes256 {
+    type KeyType<'b> = &'b [u8; 32];
+}
 
 /// State matrix endianness
 #[cfg(any(esp32, esp32s2))]
@@ -230,7 +259,7 @@ pub enum Endianness {
 /// transfer, which can significantly speed up operations when dealing with
 /// large data volumes. It supports various cipher modes such as ECB, CBC, OFB,
 /// CTR, CFB8, and CFB128.
-#[cfg(any(esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
+#[cfg(aes_dma)]
 pub mod dma {
     use core::mem::ManuallyDrop;
 
@@ -246,6 +275,7 @@ pub mod dma {
             PeripheralDmaChannel,
         },
         peripherals::AES,
+        system::{Peripheral, PeripheralClockControl},
     };
 
     const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
@@ -254,17 +284,23 @@ pub mod dma {
     #[derive(Clone, Copy, PartialEq, Eq)]
     pub enum CipherMode {
         /// Electronic Codebook Mode
+        #[cfg(aes_dma_mode_ecb)]
         Ecb = 0,
         /// Cipher Block Chaining Mode
         Cbc,
         /// Output Feedback Mode
+        #[cfg(aes_dma_mode_ofb)]
         Ofb,
         /// Counter Mode.
+        #[cfg(aes_dma_mode_ctr)]
         Ctr,
         /// Cipher Feedback Mode with 8-bit shifting.
+        #[cfg(aes_dma_mode_cfb8)]
         Cfb8,
         /// Cipher Feedback Mode with 128-bit shifting.
+        #[cfg(aes_dma_mode_cfb128)]
         Cfb128,
+        // TODO: GCM needs different handling, not supported yet
     }
 
     /// A DMA capable AES instance.
@@ -371,28 +407,8 @@ pub mod dma {
             })
         }
 
-        #[cfg(any(esp32c3, esp32s2, esp32s3))]
         fn reset_aes(&self) {
-            use crate::peripherals::SYSTEM;
-
-            SYSTEM::regs()
-                .perip_rst_en1()
-                .modify(|_, w| w.crypto_aes_rst().set_bit());
-            SYSTEM::regs()
-                .perip_rst_en1()
-                .modify(|_, w| w.crypto_aes_rst().clear_bit());
-        }
-
-        #[cfg(any(esp32c6, esp32h2))]
-        fn reset_aes(&self) {
-            use crate::peripherals::PCR;
-
-            PCR::regs()
-                .aes_conf()
-                .modify(|_, w| w.aes_rst_en().set_bit());
-            PCR::regs()
-                .aes_conf()
-                .modify(|_, w| w.aes_rst_en().clear_bit());
+            PeripheralClockControl::reset(Peripheral::Aes);
         }
 
         fn dma_peripheral(&self) -> DmaPeripheral {

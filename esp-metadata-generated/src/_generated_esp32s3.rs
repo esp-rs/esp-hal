@@ -36,6 +36,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
     };
+    ("aes.dma") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         false
     };

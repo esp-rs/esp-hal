@@ -42,6 +42,9 @@ macro_rules! property {
     ("soc.cpu_has_prv_mode") => {
         false
     };
+    ("aes.dma") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
