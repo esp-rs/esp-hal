@@ -16,8 +16,10 @@ use crate::dma::{
     Preparation as PreparationType,
 };
 
+mod buffer;
 mod descriptor;
 
+pub use buffer::AtomicBuffer;
 pub use descriptor::{AtomicDmaDescriptor, AtomicDmaDescriptors};
 
 /// Convenience alias for the SDIO dedicated DMA descriptor.
