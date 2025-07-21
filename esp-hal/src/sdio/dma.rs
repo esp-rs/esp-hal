@@ -16,6 +16,10 @@ use crate::dma::{
     Preparation as PreparationType,
 };
 
+mod descriptor;
+
+pub use descriptor::{AtomicDmaDescriptor, AtomicDmaDescriptors};
+
 /// Convenience alias for the SDIO dedicated DMA descriptor.
 pub type DmaDescriptor = DmaDescriptorType<DmaDescriptorFlags>;
 
@@ -67,11 +71,33 @@ impl DmaDescriptorFlags {
     pub const fn new() -> Self {
         Self(0)
     }
+
+    /// Converts a [`u32`] into a [DmaDescriptorFlags].
+    pub const fn from_u32(val: u32) -> Self {
+        Self(val)
+    }
+
+    /// Converts a [DmaDescriptorFlags] into a [`u32`].
+    pub const fn into_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl Default for DmaDescriptorFlags {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl From<u32> for DmaDescriptorFlags {
+    fn from(val: u32) -> Self {
+        Self::from_u32(val)
+    }
+}
+
+impl From<DmaDescriptorFlags> for u32 {
+    fn from(val: DmaDescriptorFlags) -> Self {
+        val.into_u32()
     }
 }
 
@@ -135,5 +161,22 @@ impl DescriptorFlagFields for DmaDescriptorFlags {
 
     fn set_owner(&mut self, owner: Owner) {
         self._set_owner(owner.into());
+    }
+}
+
+impl DmaDescriptor {
+    /// Creates a new [DmaDescriptor].
+    pub const fn new() -> Self {
+        Self {
+            flags: DmaDescriptorFlags::new(),
+            buffer: core::ptr::null_mut(),
+            next: core::ptr::null_mut(),
+        }
+    }
+}
+
+impl Default for DmaDescriptor {
+    fn default() -> Self {
+        Self::new()
     }
 }
