@@ -14,8 +14,8 @@
 
 #[cfg(feature = "rt")]
 pub use esp_riscv_rt::TrapFrame;
-use riscv::register::{mcause, mtvec};
 use procmacros::ram;
+use riscv::register::{mcause, mtvec};
 
 #[cfg(not(plic))]
 pub use self::classic::*;
