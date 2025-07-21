@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Country Code is returned from the Wi-Fi scan results
+- `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 
 
 ### Changed
