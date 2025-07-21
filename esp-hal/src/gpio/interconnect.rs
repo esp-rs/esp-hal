@@ -473,7 +473,7 @@ impl Signal<'_> {
         let use_gpio_matrix = af == AlternateFunction::GPIO;
 
         assert!(
-            signal.can_use_gpio_matrix() || use_gpio_matrix,
+            signal.can_use_gpio_matrix() || !use_gpio_matrix,
             "{:?} cannot be routed through the GPIO matrix",
             signal
         );
