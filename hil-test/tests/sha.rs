@@ -16,7 +16,7 @@ use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
-    rng::Rng,
+    rng::{Rng, TrngSource},
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };
 use hil_test as _;
@@ -88,7 +88,6 @@ fn assert_digest<'a, S: ShaAlgorithm, const N: usize>(sha: &'a mut Sha<'static>,
 
 #[allow(unused_mut)]
 fn with_random_data(
-    mut rng: Rng,
     mut f: impl FnMut(
         (&[u8], &mut [u8]),
         (&[u8], &mut [u8]),
@@ -104,6 +103,8 @@ fn with_random_data(
     let mut sha256_random = [0u8; BUFFER_LEN];
     let mut sha384_random = [0u8; BUFFER_LEN];
     let mut sha512_random = [0u8; BUFFER_LEN];
+
+    let rng = Rng::new();
 
     // Fill source data with random data
     rng.read(&mut sha1_random);
@@ -157,7 +158,7 @@ fn with_random_data(
 }
 
 pub struct Context {
-    rng: Rng,
+    _rng_source: TrngSource<'static>,
     sha: Sha<'static>,
 }
 
@@ -179,7 +180,7 @@ mod tests {
 
         let peripherals = esp_hal::init(config);
         Context {
-            rng: Rng::new(peripherals.RNG),
+            _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
             sha: Sha::new(peripherals.SHA),
         }
     }
@@ -252,7 +253,7 @@ mod tests {
     #[test]
     fn test_sha_rolling(mut ctx: Context) {
         #[allow(unused)]
-        with_random_data(ctx.rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
             let mut sha1_remaining = sha1_p.0;
             let mut sha224_remaining = sha224_p.0;
             let mut sha256_remaining = sha256_p.0;
@@ -335,7 +336,7 @@ mod tests {
     #[test]
     fn test_for_digest_rolling(mut ctx: Context) {
         #[allow(unused)]
-        with_random_data(ctx.rng, |sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
+        with_random_data(|sha1_p, sha224_p, sha256_p, sha384_p, sha512_p| {
             // The Digest::update will consume the entirety of remaining. We don't need to
             // loop until remaining is fully consumed.
 

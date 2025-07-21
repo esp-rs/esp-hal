@@ -236,7 +236,12 @@ driver_configs![
         driver: soc,
         name: "SOC",
         hide_from_peri_table: true,
-        properties: {}
+        properties: {
+            #[serde(default)]
+            cpu_has_csr_pc: bool,
+            #[serde(default)]
+            cpu_has_prv_mode: bool,
+        }
     },
 
     AdcProperties {
@@ -419,7 +424,9 @@ driver_configs![
     RngProperties {
         driver: rng,
         name: "RNG",
-        properties: {}
+        properties: {
+            apb_cycle_wait_num: u32,
+        }
     },
     RsaProperties {
         driver: rsa,

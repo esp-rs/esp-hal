@@ -36,6 +36,12 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
     };
+    ("soc.cpu_has_csr_pc") => {
+        true
+    };
+    ("soc.cpu_has_prv_mode") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -149,6 +155,12 @@ macro_rules! property {
     };
     ("rmt.channel_ram_size", str) => {
         stringify!(48)
+    };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
     };
     ("spi_master.has_octal") => {
         false

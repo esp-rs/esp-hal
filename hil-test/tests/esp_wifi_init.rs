@@ -15,8 +15,7 @@ use esp_hal::xtensa_lx::interrupt::free as interrupt_free;
 use esp_hal::{
     clock::CpuClock,
     interrupt::{Priority, software::SoftwareInterruptControl},
-    peripherals::{Peripherals, RNG, TIMG0},
-    rng::Rng,
+    peripherals::{Peripherals, TIMG0},
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -30,19 +29,12 @@ esp_bootloader_esp_idf::esp_app_desc!();
 async fn try_init(
     signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
     timer: TIMG0<'static>,
-    rng: RNG<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
 
-    let init = esp_wifi::init(timg0.timer0, Rng::new(rng));
-
-    match init {
-        Ok(_) => {
-            signal.signal(None);
-        }
-        Err(err) => {
-            signal.signal(Some(err));
-        }
+    match esp_wifi::init(timg0.timer0) {
+        Ok(_) => signal.signal(None),
+        Err(err) => signal.signal(Some(err)),
     }
 }
 
@@ -62,8 +54,7 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init =
-            critical_section::with(|_| esp_wifi::init(timg0.timer0, Rng::new(peripherals.RNG)));
+        let init = critical_section::with(|_| esp_wifi::init(timg0.timer0));
 
         assert!(matches!(
             init,
@@ -74,7 +65,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = interrupt_free(|| esp_wifi::init(timg0.timer0, Rng::new(peripherals.RNG)));
+        let init = interrupt_free(|| esp_wifi::init(timg0.timer0));
 
         assert!(matches!(
             init,
@@ -95,9 +86,7 @@ mod tests {
         let signal =
             mk_static!(Signal<CriticalSectionRawMutex, Option<InitializationError>>, Signal::new());
 
-        spawner
-            .spawn(try_init(signal, peripherals.TIMG0, peripherals.RNG))
-            .ok();
+        spawner.spawn(try_init(signal, peripherals.TIMG0)).ok();
 
         let res = signal.wait().await;
 
