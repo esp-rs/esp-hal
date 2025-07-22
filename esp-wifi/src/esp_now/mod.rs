@@ -622,8 +622,8 @@ impl<'d> EspNow<'d> {
         };
 
         check_error!({ esp_now_init() }).expect("esp-now-init failed");
-        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) }).ok();
-        check_error!({ esp_now_register_send_cb(Some(send_cb)) }).ok();
+        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) }).unwrap();
+        check_error!({ esp_now_register_send_cb(Some(send_cb)) }).unwrap();
 
         esp_now
             .add_peer(PeerInfo {
@@ -633,7 +633,7 @@ impl<'d> EspNow<'d> {
                 channel: None,
                 encrypt: false,
             })
-            .ok();
+            .unwrap();
 
         esp_now
     }
