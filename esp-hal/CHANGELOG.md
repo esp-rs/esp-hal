@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `rng` module has been rewritten (#3829)
+- Update `embassy-usb` to v0.5.0 (#3848)
 
 ### Fixed
 

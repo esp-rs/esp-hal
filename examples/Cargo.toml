@@ -16,7 +16,7 @@ embassy-futures     = "0.1.1"
 embassy-net = { version = "0.6.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-sync        = "0.6.2"
 embassy-time        = "0.4.0"
-embassy-usb         = { version = "0.4.0", default-features = false }
+embassy-usb         = { version = "0.5.0", default-features = false }
 embedded-hal-async  = "1.0.0"
 embedded-io         = { version = "0.6.1", default-features = false }
 embedded-io-async   = "0.6.1"
