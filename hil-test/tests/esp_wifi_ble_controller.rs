@@ -102,6 +102,36 @@ mod tests {
             }
         }
     }
+
+    // This test case is a regression test for #3760 and asserts that dropping the controller during
+    // reset does not generate an exception.
+    #[test]
+    fn test_dropping_controller_during_reset(peripherals: Peripherals) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        let init = esp_wifi::init(timg0.timer0).unwrap();
+
+        let mut connector = BleConnector::new(&init, peripherals.BT);
+
+        // send reset cmd
+        pub const fn opcode(ogf: u8, ocf: u16) -> [u8; 2] {
+            let opcode = ((ogf as u16) << 10) + ocf as u16;
+            opcode.to_le_bytes()
+        }
+
+        let opcode = opcode(CONTROLLER_OGF, RESET_OCF);
+
+        let mut buf = [0u8; 4];
+        buf[0] = H4_TYPE_COMMAND;
+        buf[1] = opcode[0];
+        buf[2] = opcode[1];
+        buf[3] = 0; // payload length - RESET COMMAND doesn't have any parameters
+
+        connector.write(&buf).unwrap();
+
+        core::mem::drop(connector);
+
+        esp_hal::delay::Delay::new().delay_millis(10);
+    }
 }
 
 fn read_packet(connector: &mut BleConnector, buf: &mut [u8]) -> usize {
