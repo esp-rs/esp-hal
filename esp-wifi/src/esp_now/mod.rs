@@ -56,31 +56,30 @@ macro_rules! check_error {
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names)] // FIXME avoid Error suffix, could use better names
 pub enum Error {
     /// ESP-NOW is not initialized.
-    NotInitialized  = 12389,
+    NotInitialized    = 12389,
 
     /// Invalid argument.
-    InvalidArgument = 12390,
+    InvalidArgument   = 12390,
 
     /// Indicates that there was insufficient memory to complete the operation.
-    OutOfMemory     = 12391,
+    OutOfMemory       = 12391,
 
     /// ESP-NOW peer list is full.
-    PeerListFull    = 12392,
+    PeerListFull      = 12392,
 
     /// ESP-NOW peer is not found.
-    NotFound        = 12393,
+    NotFound          = 12393,
 
     /// Internal error.
-    InternalError   = 12394,
+    Internal          = 12394,
 
     /// ESP-NOW peer already exists.
-    PeerExists      = 12395,
+    PeerExists        = 12395,
 
-    /// Interface error.
-    InterfaceError  = 12396,
+    /// The Wi-Fi interface used for ESP-NOW doesn't match the expected one for the peer.
+    InterfaceMismatch = 12396,
 
     /// Represents any other error not covered by the above variants, with an
     /// associated error code.
@@ -95,9 +94,9 @@ impl Error {
             12391 => Error::OutOfMemory,
             12392 => Error::PeerListFull,
             12393 => Error::NotFound,
-            12394 => Error::InternalError,
+            12394 => Error::Internal,
             12395 => Error::PeerExists,
-            12396 => Error::InterfaceError,
+            12396 => Error::InterfaceMismatch,
             _ => Error::Other(code),
         }
     }
