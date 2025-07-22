@@ -1160,7 +1160,6 @@ impl DmaRxStreamBuf {
         }
 
         // Check that the last descriptor can hold the excess
-        // FIXME: shouldn't this be `buffer.len() % chunk_size` ?
         let excess = buffer.len() % descriptors.len();
         if chunk_size + excess > 4095 {
             return Err(DmaBufError::InsufficientDescriptors);
@@ -1474,7 +1473,6 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             next = desc;
 
             desc.reset_for_tx(false);
-            // NOTE: Sending zeros to DMA so that DMA doesn't stop immediately.
             desc.set_length(desc.size());
         }
         Preparation {
