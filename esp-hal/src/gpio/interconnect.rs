@@ -424,17 +424,23 @@ impl Signal<'_> {
             Signal::Level(_) => true,
         };
 
+        if !signal.can_use_gpio_matrix() {
+            assert!(
+                !use_gpio_matrix,
+                "{:?} cannot be routed through the GPIO matrix",
+                signal
+            );
+            // At this point we have set up the AF. The signal does not have a `func_in_sel_cfg`
+            // register, and we must not try to write to it.
+            return;
+        }
+
         let input = match self {
             Signal::Pin(pin) => pin.number(),
             Signal::Level(Level::Low) => property!("gpio.constant_0_input"),
             Signal::Level(Level::High) => property!("gpio.constant_1_input"),
         };
 
-        assert!(
-            signal.can_use_gpio_matrix() || !use_gpio_matrix,
-            "{:?} cannot be routed through the GPIO matrix",
-            signal
-        );
         // No need for a critical section, this is a write and not a modify operation.
         let offset = property!("gpio.func_in_sel_offset");
         GPIO::regs()
