@@ -452,9 +452,16 @@ pub(crate) fn ble_init() {
 
         API_vhci_host_register_callback(&VHCI_HOST_CALLBACK);
     }
+
+    // At some point the "High-speed ADC" entropy source became available.
+    unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
 }
 
 pub(crate) fn ble_deinit() {
+    esp_hal::rng::TrngSource::decrease_entropy_source_counter(unsafe {
+        esp_hal::Internal::conjure()
+    });
+
     unsafe extern "C" {
         fn btdm_controller_deinit();
     }

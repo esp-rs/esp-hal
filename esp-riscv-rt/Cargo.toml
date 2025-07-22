@@ -17,11 +17,11 @@ test  = false
 
 [dependencies]
 document-features = "0.2.11"
-riscv             = "0.12.1"
-riscv-rt-macros   = "0.4.0"
+riscv             = "0.14.0"
+riscv-rt-macros   = "0.5.0"
 
 [features]
-## Indicate that the device supports `mie` and `mip` instructions.
+## Indicate that the device supports `mie` and `mip` CSRs.
 has-mie-mip = []
 ## Indicate that the device has RTC RAM.
 rtc-ram = []

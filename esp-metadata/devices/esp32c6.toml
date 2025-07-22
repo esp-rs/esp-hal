@@ -127,11 +127,21 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
 
+[device.soc]
+cpu_has_csr_pc = true
+cpu_has_prv_mode = true
+
 [device.adc]
 support_status = "partial"
 instances = [
     { name = "adc1" },
 ]
+
+[device.aes]
+support_status = "partial"
+dma = true
+dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128"]
+key_length = [128, 256]
 
 [device.assist_debug]
 support_status = "partial"
@@ -425,6 +435,10 @@ has_arbitration_en = true
 has_tx_fifo_watermark = true
 bus_timeout_is_exponential = true
 
+[device.lp_i2c_master]
+support_status = "partial"
+fifo_size = 16
+
 [device.i2c_slave]
 support_status = "not_supported"
 
@@ -437,6 +451,10 @@ support_status = "partial"
 ram_start = 0x60006400
 channel_ram_size = 48
 
+[device.sha]
+support_status = "partial"
+algo = ["SHA-1", "SHA-224", "SHA-256"]
+
 [device.spi_master]
 support_status = "supported"
 instances = [
@@ -444,12 +462,15 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
+timg_has_divcnt_rst = true
 
 [device.uart]
 support_status = "supported"
@@ -457,6 +478,11 @@ instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
+ram_size = 128
+
+[device.lp_uart]
+support_status = "partial"
+ram_size = 32
 
 [device.ds]
 support_status = "not_supported"
@@ -465,15 +491,16 @@ support_status = "not_supported"
 support_status = "partial"
 has_wifi6 = true
 
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
+
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.aes]
 [device.ecc]
 [device.rsa]
-[device.sha]
 [device.hmac]
-[device.rng]
 
 ## Interfaces
 [device.i2s]

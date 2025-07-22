@@ -611,20 +611,21 @@ macro_rules! impl_sha {
 // Two working modes
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
-//
-// TODO: Allow/Implement SHA512_(u16)
+#[cfg(sha_algo_sha_1)]
 impl_sha!(Sha1, 0, 20, 64);
-#[cfg(not(esp32))]
+#[cfg(sha_algo_sha_224)]
 impl_sha!(Sha224, 1, 28, 64);
+#[cfg(sha_algo_sha_256)]
 impl_sha!(Sha256, 2, 32, 64);
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(sha_algo_sha_384)]
 impl_sha!(Sha384, 3, 48, 128);
-#[cfg(any(esp32, esp32s2, esp32s3))]
+#[cfg(sha_algo_sha_512)]
 impl_sha!(Sha512, 4, 64, 128);
-#[cfg(any(esp32s2, esp32s3))]
+#[cfg(sha_algo_sha_512_224)]
 impl_sha!(Sha512_224, 5, 28, 128);
-#[cfg(any(esp32s2, esp32s3))]
+#[cfg(sha_algo_sha_512_256)]
 impl_sha!(Sha512_256, 6, 32, 128);
+// TODO: Allow/Implement SHA512_(u16)
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
     let sha = sha.register_block();

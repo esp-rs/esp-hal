@@ -1,6 +1,28 @@
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
-#![doc = include_str!("../README.md")]
+//! This is a lightweight crate for obtaining backtraces during panics, exceptions, and hard faults
+//! on Espressif devices. It provides optional panic and exception handlers and supports a range of
+//! output options, all configurable through feature flags.
+#![cfg_attr(
+    target_arch = "riscv32",
+    doc = "Please note that you **need** to force frame pointers (i.e. `\"-C\", \"force-frame-pointers\",` in your `.cargo/config.toml`)"
+)]
+//! You can get an array of backtrace addresses (limited to 10 entries by default) via
+//! `arch::backtrace()` if you want to create a backtrace yourself (i.e. not using the panic or
+//! exception handler).
+//!
+//! ## Features
+#![doc = document_features::document_features!()]
+//! ## Additional configuration
+//!
+//! We've exposed some configuration options that don't fit into cargo
+//! features. These can be set via environment variables, or via cargo's `[env]`
+//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
+//! for this crate:
+#![doc = ""]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_backtrace_config_table.md"))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
@@ -19,12 +41,6 @@ impl Backtrace {
     #[inline]
     pub fn capture() -> Self {
         arch::backtrace()
-    }
-
-    #[inline]
-    #[cfg(feature = "exception-handler")]
-    fn from_sp(sp: u32) -> Self {
-        arch::backtrace_internal(sp, 0)
     }
 
     /// Returns the backtrace frames as a slice.
@@ -105,35 +121,21 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".rwtext")]
 unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
-    pre_backtrace();
-
-    println!("\n\nException occurred '{}'", cause);
-    println!("{:?}", context);
-
-    let backtrace = Backtrace::from_sp(context.A1);
-    for frame in backtrace.frames() {
-        println!("0x{:x}", frame.program_counter());
-    }
-
-    abort();
+    panic!("\n\nException occurred '{}'\n{:?}", cause, context);
 }
 
 #[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
 #[unsafe(export_name = "ExceptionHandler")]
 fn exception_handler(context: &arch::TrapFrame) -> ! {
-    pre_backtrace();
-
     let mepc = context.pc;
     let code = context.mcause & 0xff;
     let mtval = context.mtval;
 
     if code == 14 {
-        println!("");
-        println!(
+        panic!(
             "Stack overflow detected at 0x{:x} called by 0x{:x}",
             mepc, context.ra
         );
-        println!("");
     } else {
         let code = match code {
             0 => "Instruction address misaligned",
@@ -155,26 +157,11 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
             _ => "UNKNOWN",
         };
 
-        println!(
-            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
-            code, mepc, mtval
+        panic!(
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
+            code, mepc, mtval, context
         );
-
-        println!("{:?}", context);
-
-        let backtrace = Backtrace::from_sp(context.s0 as u32);
-        let frames = backtrace.frames();
-        if frames.is_empty() {
-            println!(
-                "No backtrace available - make sure to force frame-pointers. (see https://crates.io/crates/esp-backtrace)"
-            );
-        }
-        for frame in backtrace.frames() {
-            println!("0x{:x}", frame.program_counter());
-        }
     }
-
-    abort();
 }
 
 // Ensure that the address is in DRAM and that it is 16-byte aligned.

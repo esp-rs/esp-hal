@@ -77,6 +77,9 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
 
+[device.soc]
+cpu_has_csr_pc = true
+
 [device.adc]
 support_status = "partial"
 instances = [
@@ -241,6 +244,10 @@ bus_timeout_is_exponential = true
 support_status = "partial"
 status_registers = 2
 
+[device.sha]
+support_status = "partial"
+algo = ["SHA-1", "SHA-224", "SHA-256"]
+
 [device.spi_master]
 support_status = "supported"
 instances = [
@@ -248,12 +255,15 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "FSPICLK",  mosi = "FSPID",  miso = "FSPIQ",  cs = "FSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 instances = [{ name = "timg0" }]
+timg_has_divcnt_rst = true
 
 [device.uart]
 support_status = "supported"
@@ -261,14 +271,17 @@ instances = [
     { name = "uart0", sys_instance = "Uart0", tx = "U0TXD", rx = "U0RXD", cts = "U0CTS", rts = "U0RTS" },
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
 ]
+ram_size = 128
+
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
 
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
 # [device.aes] Product portfolio lists AES, but TRM only has XTS_AES?
 [device.ecc]
-[device.sha]
-[device.rng]
 
 ## Interfaces
 [device.ledc]

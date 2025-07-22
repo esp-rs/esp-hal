@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
+
 
 ### Changed
 
+- `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
 
 ### Fixed
 

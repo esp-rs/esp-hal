@@ -36,6 +36,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
     };
+    ("aes.dma") => {
+        true
+    };
     ("gpio.has_bank_1") => {
         true
     };
@@ -150,11 +153,26 @@ macro_rules! property {
     ("rmt.channel_ram_size", str) => {
         stringify!(64)
     };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
     ("spi_master.has_octal") => {
         true
     };
     ("timergroup.timg_has_timer1") => {
         true
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
     };
     ("wifi.has_wifi6") => {
         false

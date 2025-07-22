@@ -36,6 +36,9 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
     };
+    ("aes.dma") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         false
     };
@@ -150,11 +153,26 @@ macro_rules! property {
     ("rmt.channel_ram_size", str) => {
         stringify!(48)
     };
+    ("rng.apb_cycle_wait_num") => {
+        16
+    };
+    ("rng.apb_cycle_wait_num", str) => {
+        stringify!(16)
+    };
     ("spi_master.has_octal") => {
         true
     };
     ("timergroup.timg_has_timer1") => {
         true
+    };
+    ("timergroup.timg_has_divcnt_rst") => {
+        false
+    };
+    ("uart.ram_size") => {
+        128
+    };
+    ("uart.ram_size", str) => {
+        stringify!(128)
     };
     ("wifi.has_wifi6") => {
         false

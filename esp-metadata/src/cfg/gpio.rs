@@ -376,24 +376,17 @@ pub(crate) fn generate_gpios(gpio: &super::GpioProperties) -> TokenStream {
     let io_mux_accessor = if gpio.remap_iomux_pin_registers {
         let iomux_pin_regs = gpio.pins_and_signals.pins.iter().map(|pin| {
             let pin = number(pin.pin);
-            let reg = format_ident!("GPIO{pin}");
             let accessor = format_ident!("gpio{pin}");
 
-            quote! { #pin => transmute::<&'static io_mux::#reg, &'static io_mux::GPIO0>(iomux.#accessor()), }
+            quote! { #pin => iomux.#accessor(), }
         });
 
         quote! {
             pub(crate) fn io_mux_reg(gpio_num: u8) -> &'static crate::pac::io_mux::GPIO0 {
-                use core::mem::transmute;
-
-                use crate::{pac::io_mux, peripherals::IO_MUX};
-
-                let iomux = IO_MUX::regs();
-                unsafe {
-                    match gpio_num {
-                        #(#iomux_pin_regs)*
-                        other => panic!("GPIO {} does not exist", other),
-                    }
+                let iomux = crate::peripherals::IO_MUX::regs();
+                match gpio_num {
+                    #(#iomux_pin_regs)*
+                    other => panic!("GPIO {} does not exist", other),
                 }
             }
 

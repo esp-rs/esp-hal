@@ -197,6 +197,7 @@ impl Chip {
 
         // Used by our documentation builds to prevent the huge red warning banner.
         cfgs.push(String::from("cargo:rustc-check-cfg=cfg(not_really_docsrs)"));
+        cfgs.push(String::from("cargo:rustc-check-cfg=cfg(semver_checks)"));
 
         let mut cfg_values: IndexMap<String, Vec<String>> = IndexMap::new();
 
@@ -400,13 +401,31 @@ impl Config {
             );
             all.extend(self.device.peri_config.driver_instances());
 
-            all.extend(self.device.peri_config.properties().filter_map(
-                |(name, value)| match value {
-                    Value::Boolean(true) => Some(name.to_string()),
-                    Value::Number(value) => Some(format!("{name}=\"{value}\"")),
-                    _ => None,
-                },
-            ));
+            all.extend(
+                self.device
+                    .peri_config
+                    .properties()
+                    .filter_map(|(name, value)| match value {
+                        Value::Boolean(true) => Some(vec![name.to_string()]),
+                        Value::NumberList(values) => {
+                            Some(values.iter().map(|val| format!("{name}_{val}")).collect())
+                        }
+                        Value::StringList(values) => Some(
+                            values
+                                .iter()
+                                .map(|val| {
+                                    format!(
+                                        "{name}_{}",
+                                        val.to_lowercase().replace("-", "_").replace("/", "_")
+                                    )
+                                })
+                                .collect(),
+                        ),
+                        Value::Number(value) => Some(vec![format!("{name}=\"{value}\"")]),
+                        _ => None,
+                    })
+                    .flatten(),
+            );
             all
         })
     }
@@ -460,7 +479,6 @@ impl Config {
                 .peri_config
                 .properties()
                 .flat_map(|(name, value)| match value {
-                    Value::Unset => quote! {},
                     Value::Number(value) => {
                         let value = number(value); // ensure no numeric suffix is added
                         quote! {
@@ -471,6 +489,9 @@ impl Config {
                     Value::Boolean(value) => quote! {
                         (#name) => { #value };
                     },
+                    Value::Unset | Value::NumberList(_) | Value::StringList(_) => {
+                        quote! {}
+                    }
                 });
 
         // Not public API, can use a private macro:
@@ -978,7 +999,12 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
 
     // Calculate the width of the first column.
     let driver_col_width = std::iter::once("Driver")
-        .chain(PeriConfig::drivers().iter().map(|i| i.name))
+        .chain(
+            PeriConfig::drivers()
+                .iter()
+                .filter(|i| !i.hide_from_peri_table)
+                .map(|i| i.name),
+        )
         .map(|c| c.len())
         .max()
         .unwrap();
@@ -1002,7 +1028,15 @@ pub fn generate_chip_support_status(output: &mut impl Write) -> std::fmt::Result
     writeln!(output)?;
 
     // Driver support status
-    for SupportItem { name, config_group } in PeriConfig::drivers() {
+    for SupportItem {
+        name,
+        config_group,
+        hide_from_peri_table,
+    } in PeriConfig::drivers()
+    {
+        if *hide_from_peri_table {
+            continue;
+        }
         write!(output, "| {name:driver_col_width$} |")?;
         for chip in Chip::iter() {
             let config = Config::for_chip(&chip);

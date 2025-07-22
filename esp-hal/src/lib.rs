@@ -194,6 +194,11 @@
 #![deny(missing_docs, rust_2018_idioms, rustdoc::all)]
 #![allow(rustdoc::private_doc_tests)] // compile tests are done via rustdoc
 #![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
+// Don't trip up on broken/private links when running semver-checks
+#![cfg_attr(
+    semver_checks,
+    allow(rustdoc::private_intra_doc_links, rustdoc::broken_intra_doc_links)
+)]
 #![no_std]
 
 // MUST be the first module
@@ -527,7 +532,6 @@ pub(crate) mod private {
     }
 }
 
-#[cfg(feature = "unstable")]
 #[doc(hidden)]
 pub use private::Internal;
 
@@ -649,9 +653,8 @@ pub fn init(config: Config) -> Peripherals {
 
             match config.watchdog.rwdt() {
                 WatchdogStatus::Enabled(duration) => {
+                    rtc.rwdt.set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
                     rtc.rwdt.enable();
-                    rtc.rwdt
-                        .set_timeout(crate::rtc_cntl::RwdtStage::Stage0, duration);
                 }
                 WatchdogStatus::Disabled => {
                     rtc.rwdt.disable();
@@ -662,8 +665,8 @@ pub fn init(config: Config) -> Peripherals {
             match config.watchdog.timg0() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg0_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new();
-                    timg0_wd.enable();
                     timg0_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                    timg0_wd.enable();
                 }
                 WatchdogStatus::Disabled => {
                     crate::timer::timg::Wdt::<crate::peripherals::TIMG0<'static>>::new().disable();
@@ -674,8 +677,8 @@ pub fn init(config: Config) -> Peripherals {
             match config.watchdog.timg1() {
                 WatchdogStatus::Enabled(duration) => {
                     let mut timg1_wd = crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new();
-                    timg1_wd.enable();
                     timg1_wd.set_timeout(crate::timer::timg::MwdtStage::Stage0, duration);
+                    timg1_wd.enable();
                 }
                 WatchdogStatus::Disabled => {
                     crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();

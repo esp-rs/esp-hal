@@ -161,7 +161,7 @@ pub(crate) fn esp32c3_rtc_apb_freq_update(apb_freq: ApbClock) {
 
     LPWR::regs()
         .store5()
-        .modify(|_, w| unsafe { w.scratch5().bits(value) });
+        .modify(|_, w| unsafe { w.data().bits(value) });
 }
 
 // Mask for clock bits used by both WIFI and Bluetooth, 0, 1, 2, 3, 7, 8, 9, 10,

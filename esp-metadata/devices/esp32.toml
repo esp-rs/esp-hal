@@ -106,6 +106,10 @@ instances = [
     { name = "adc2" },
 ]
 
+[device.aes]
+support_status = "partial"
+key_length = [128, 192, 256]
+
 [device.dac]
 support_status = "partial"
 instances = [
@@ -583,6 +587,10 @@ support_status = "partial"
 ram_start = 0x3ff56800
 channel_ram_size = 64
 
+[device.sha]
+support_status = "partial"
+algo = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]
+
 [device.spi_master]
 support_status = "supported"
 instances = [
@@ -591,13 +599,16 @@ instances = [
 ]
 
 [device.spi_slave]
+support_status = "partial"
 instances = [
     { name = "spi2", sys_instance = "Spi2", sclk = "HSPICLK", mosi = "HSPID", miso = "HSPIQ", cs = "HSPICS0" },
     { name = "spi3", sys_instance = "Spi3", sclk = "VSPICLK", mosi = "VSPID", miso = "VSPIQ", cs = "VSPICS0" },
 ]
 
 [device.timergroup]
+support_status = "partial"
 timg_has_timer1 = true
+timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
 
 [device.uart]
@@ -607,6 +618,7 @@ instances = [
     { name = "uart1", sys_instance = "Uart1", tx = "U1TXD", rx = "U1RXD", cts = "U1CTS", rts = "U1RTS" },
     { name = "uart2", sys_instance = "Uart2", tx = "U2TXD", rx = "U2RXD", cts = "U2CTS", rts = "U2RTS" },
 ]
+ram_size = 128
 
 [device.ethernet]
 support_status = "not_supported"
@@ -614,14 +626,16 @@ support_status = "not_supported"
 [device.camera]
 support_status = "not_supported"
 [device.rgb_display]
+support_status = "partial"
+
+[device.rng]
+support_status = "partial"
+apb_cycle_wait_num = 16 # TODO
 
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.aes]
 [device.rsa]
-[device.sha]
-[device.rng]
 
 ## Interfaces
 [device.i2s]

@@ -31,9 +31,13 @@ esp32s3-ulp       = { version = "0.3.0", features = ["critical-section"], option
 nb                = { version = "1.1.0",  optional = true }
 procmacros        = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 riscv             = { version = "0.11.1", features = ["critical-section-single-hart"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 
 [dev-dependencies]
 panic-halt = "0.2.0"
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
 default = ["embedded-hal"]
@@ -47,11 +51,11 @@ debug = [
 
 # Chip Support Feature Flags
 # Target the ESP32-C6.
-esp32c6 = ["dep:esp32c6-lp",  "procmacros/is-lp-core", "dep:nb"]
+esp32c6 = ["dep:esp32c6-lp",  "esp-metadata-generated/esp32c6", "procmacros/is-lp-core", "dep:nb"]
 # Target the ESP32-S2.
-esp32s2 = ["dep:esp32s2-ulp", "procmacros/is-ulp-core"]
+esp32s2 = ["dep:esp32s2-ulp", "esp-metadata-generated/esp32s2", "procmacros/is-ulp-core"]
 # Target the ESP32-S3.
-esp32s3 = ["dep:esp32s3-ulp", "procmacros/is-ulp-core"]
+esp32s3 = ["dep:esp32s3-ulp", "esp-metadata-generated/esp32s3", "procmacros/is-ulp-core"]
 
 #! ### Trait Implementation Feature Flags
 ## Implement the traits defined in the `1.0.0` releases of `embedded-hal` and
