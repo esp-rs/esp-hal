@@ -27,9 +27,3 @@ INCLUDE "stack.x"
 INCLUDE "dram2.x"
 INCLUDE "metadata.x"
 /* End of Shared sections */
-
-EXTERN(DefaultHandler);
-
-EXTERN(WIFI_EVENT); /* Force inclusion of WiFi libraries */
-
-INCLUDE "device.x"
