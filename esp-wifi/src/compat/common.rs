@@ -8,10 +8,12 @@ use core::{
 };
 
 use allocator_api2::{boxed::Box, vec::Vec};
+use esp_hal::time::{Duration, Instant};
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::malloc::free;
 use crate::{
+    CONFIG,
     binary::c_types::{c_int, c_void},
     compat::malloc::InternalMemory,
     hal::sync::Locked,
@@ -432,9 +434,34 @@ unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
         fn esp_rom_delay_us(us: u32);
     }
 
-    unsafe {
-        esp_rom_delay_us(us);
+    const MIN_YIELD_TIME: u32 = 1_000_000 / CONFIG.tick_rate_hz;
+    if us < MIN_YIELD_TIME {
+        // Short wait, just sleep
+        unsafe { esp_rom_delay_us(us) };
+    } else {
+        const MIN_YIELD_DURATION: Duration = Duration::from_micros(MIN_YIELD_TIME as u64);
+        let sleep_for = Duration::from_micros(us as u64);
+        let start = Instant::now();
+        loop {
+            // Yield to other tasks
+            yield_task();
+
+            let elapsed = start.elapsed();
+            if elapsed.as_micros() > us as u64 {
+                break;
+            }
+
+            let remaining = sleep_for - elapsed;
+
+            if remaining < MIN_YIELD_DURATION {
+                // If the remaining time is less than the minimum yield time, we can just sleep
+                // for the remaining time.
+                unsafe { esp_rom_delay_us(remaining.as_micros() as u32) };
+                break;
+            }
+        }
     }
+
     0
 }
 
