@@ -37,7 +37,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{EspWifiController, ble::controller::BleConnector, init};
+use esp_wifi::{EspWifiController, ble::controller::BleConnector};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -60,8 +60,9 @@ async fn main(_spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, init(timg0.timer0).unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
@@ -85,7 +86,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
+    let connector = BleConnector::new(esp_wifi_ctrl, bluetooth.reborrow());
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);

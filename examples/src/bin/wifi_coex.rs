@@ -41,7 +41,6 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_wifi::{
     ble::controller::BleConnector,
-    init,
     wifi::{ClientConfiguration, Configuration},
 };
 use smoltcp::{
@@ -73,8 +72,9 @@ fn main() -> ! {
     }
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
 

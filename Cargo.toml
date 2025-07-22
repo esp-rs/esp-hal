@@ -15,6 +15,8 @@ exclude  = [
     "esp-metadata",
     "esp-metadata-generated",
     "esp-println",
+    "esp-radio-preempt-baremetal",
+    "esp-radio-preempt-driver",
     "esp-riscv-rt",
     "esp-wifi",
     "esp-storage",

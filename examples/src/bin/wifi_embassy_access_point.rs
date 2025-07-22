@@ -35,7 +35,6 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_wifi::{
     EspWifiController,
-    init,
     wifi::{
         AccessPointConfiguration,
         Configuration,
@@ -69,10 +68,11 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, init(timg0.timer0).unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
 
-    let (controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+    let (controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let device = interfaces.ap;
 

@@ -33,7 +33,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::{ble::controller::BleConnector, init};
+use esp_wifi::ble::controller::BleConnector;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -46,8 +46,9 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {

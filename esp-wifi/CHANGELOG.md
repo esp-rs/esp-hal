@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
+- The `builtin-scheduler` feature has been removed. Your project will have to specify a task scheduler. (#3855)
 
 ### Fixed
 

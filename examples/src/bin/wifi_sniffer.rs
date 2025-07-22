@@ -20,7 +20,7 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::{init, wifi};
+use esp_wifi::wifi;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -36,7 +36,9 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    esp_radio_preempt_baremetal::init(timg0.timer0);
+
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =

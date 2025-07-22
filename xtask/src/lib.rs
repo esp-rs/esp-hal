@@ -58,6 +58,8 @@ pub enum Package {
     EspRiscvRt,
     EspStorage,
     EspWifi,
+    EspRadioPreemptDriver,
+    EspRadioPreemptBaremetal,
     Examples,
     HilTest,
     QaTest,
@@ -82,6 +84,7 @@ impl Package {
                 | EspIeee802154
                 | EspLpHal
                 | EspPrintln
+                | EspRadioPreemptBaremetal
                 | EspStorage
                 | EspWifi
         )
@@ -148,6 +151,7 @@ impl Package {
                 | EspRomSys
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
+                | EspRadioPreemptBaremetal
         )
     }
 
@@ -243,6 +247,7 @@ impl Package {
                 features.push("defmt".to_owned());
             }
             Package::EspMetadataGenerated => {}
+            Package::EspRadioPreemptBaremetal => features.push("esp-hal/unstable".to_owned()),
             _ => {}
         }
 
@@ -266,14 +271,13 @@ impl Package {
             }
             Package::EspWifi => {
                 // Minimal set of features that when enabled _should_ still compile:
-                cases.push(vec![
-                    "esp-hal/rt".to_owned(),
-                    "esp-hal/unstable".to_owned(),
-                    "builtin-scheduler".to_owned(),
-                ]);
+                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
             }
             Package::EspMetadataGenerated => {
                 cases.push(vec!["build-script".to_owned()]);
+            }
+            Package::EspRadioPreemptBaremetal => {
+                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
             }
             _ => {}
         }

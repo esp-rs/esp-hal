@@ -17,7 +17,6 @@ pub(crate) struct EspWifiConfig {
     pub(crate) country_code: &'static str,
     pub(crate) country_code_operating_class: u8,
     pub(crate) mtu: usize,
-    pub(crate) tick_rate_hz: u32,
     pub(crate) listen_interval: u16,
     pub(crate) beacon_timeout: u16,
     pub(crate) ap_beacon_timeout: u16,

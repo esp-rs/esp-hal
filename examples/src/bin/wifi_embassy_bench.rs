@@ -32,7 +32,6 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_wifi::{
     EspWifiController,
-    init,
     wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
 };
 
@@ -77,11 +76,12 @@ async fn main(spawner: Spawner) -> ! {
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, init(timg0.timer0,).unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let wifi_interface = interfaces.sta;
 

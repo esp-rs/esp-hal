@@ -1,8 +1,6 @@
-pub(crate) use crate::preempt_builtin::timer::setup_timebase as setup_timer;
-use crate::{
-    hal::{trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt},
-    preempt_builtin::task_switch,
-};
+use esp_hal::{trapframe::TrapFrame, xtensa_lx, xtensa_lx_rt};
+
+use crate::task::task_switch;
 
 // ESP32 uses Software1 (priority 3) for task switching, because it reserves
 // Software0 for the Bluetooth stack.
@@ -25,6 +23,7 @@ pub(crate) fn disable_multitasking() {
 }
 
 #[allow(non_snake_case)]
+#[esp_hal::ram]
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
 #[cfg_attr(esp32, unsafe(export_name = "Software1"))]
 fn task_switch_interrupt(context: &mut TrapFrame) {
@@ -34,6 +33,7 @@ fn task_switch_interrupt(context: &mut TrapFrame) {
     task_switch(context);
 }
 
+#[inline]
 pub(crate) fn yield_task() {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
