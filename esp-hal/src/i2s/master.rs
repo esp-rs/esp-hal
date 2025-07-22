@@ -1822,7 +1822,13 @@ pub mod asynch {
         /// Waits for DMA process to be made and additional room to be
         /// available.
         ///
-        /// Returns [crate::dma::DmaError::Late] if DMA is already completed.
+        /// In particular, it waits for [crate::dma::DmaTxInterrupt::Done]
+        /// which is trigger every time a descriptor in the list has been filled.
+        /// In addition, if [crate::dma::DmaTxInterrupt::TotalEof] has been triggered,
+        /// it means that the descriptor list is most likely used up and user needs to
+        /// manually reset the I2S and DMA channel.
+        ///
+        /// Returns [crate::dma::DmaError::Late] if DMA descriptors are used up.
         pub async fn wait_for_available(&mut self) -> Result<(), Error> {
             DmaTxDoneChFuture::new(&mut self.i2s_tx.tx_channel).await?;
             Ok(())
@@ -1832,6 +1838,9 @@ pub mod asynch {
     impl<BUFFER: DmaRxBuffer> I2sRxDmaTransfer<'_, Async, BUFFER> {
         /// Waits for DMA process to be made and additional room to be
         /// available.
+        ///
+        /// In particular, it waits for [crate::dma::DmaRxInterrupt::Done]
+        /// which is trigger every time a descriptor in the list has been filled.
         pub async fn wait_for_available(&mut self) -> Result<(), Error> {
             DmaRxDoneChFuture::new(&mut self.i2s_rx.rx_channel).await?;
             Ok(())

@@ -1405,7 +1405,27 @@ impl DmaRxStreamBufView {
     }
 }
 
-/// A continuous DMA transfer buffer for Tx.
+/// DMA Streaming Transmit Buffer.
+///
+/// This is symmetric implementation to [DmaTxStreamBuf], used for continuously
+/// streaming data to a peripheral's FIFO.
+///
+/// The list starts out like so `A(full) -> B(full) -> C(full) -> D(full) -> NULL`.
+///
+/// As the DMA writes to FIFO, the list progresses like so:
+/// - `A(full)  -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(full)  -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(full)  -> D(full) -> NULL`
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+///
+/// As you call [DmaTxStreamBufView::push] the list (approximately) progresses like so:
+/// - `A(empty) -> B(empty) -> C(empty) -> D(full) -> NULL`
+/// - `B(empty) -> C(empty) -> D(full)  -> A(full) -> NULL`
+/// - `C(empty) -> D(full)  -> A(full)  -> B(full) -> NULL`
+/// - `D(full)  -> A(full)  -> B(full)  -> C(full) -> NULL`
+///
+/// If all the descriptors fill up, the [DmaTxInterrupt::TotalEof] interrupt will fire and DMA
+/// will stop writing, at which point it is up to you to resume/restart the transfer.
 pub struct DmaTxStreamBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
