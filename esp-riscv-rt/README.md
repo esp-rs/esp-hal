@@ -8,7 +8,9 @@
 
 Minimal runtime / startup for RISC-V devices from Espressif.
 
-Much of the code in this package originated in the [rust-embedded/riscv] repository.
+This is using [rust-embedded/riscv] under the hood as much as possible and uses custom implementation where needed.
+
+We use the `single-hart` feature since starting up harts != 0 is handled by the HAL, not the runtime.
 
 [rust-embedded/riscv]: https://github.com/rust-embedded/riscv
 

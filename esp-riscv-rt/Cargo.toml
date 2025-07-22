@@ -19,12 +19,12 @@ test  = false
 document-features = "0.2.11"
 defmt             = {version = "1.0.1", optional = true}
 riscv             = "0.14.0"
-riscv-rt-macros   = "0.5.0"
+# TODO wait for a release
+riscv-rt          = {version = "0.15.0", git = "https://github.com/rust-embedded/riscv.git", rev = "f81db37f67829161f5c58e29140fa7f073e4c7e3", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart"]}
 
 [features]
-## Indicate that the device supports `mie` and `mip` CSRs.
-has-mie-mip = []
-
+## Indicate that the device does NOT support `mie` and `mip` CSRs.
+no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
 
@@ -32,4 +32,4 @@ rtc-ram = []
 defmt = ["dep:defmt"]
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["has-mie-mip", "rtc-ram"]
+ci = ["rtc-ram"]
