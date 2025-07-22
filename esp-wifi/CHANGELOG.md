@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed a BLE panic caused by unimplemented functions (#3762)
+- Fixed the BLE stack crashing in certain cases (#3854)
 
 
 ### Removed

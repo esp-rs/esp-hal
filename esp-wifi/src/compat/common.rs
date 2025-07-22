@@ -413,12 +413,12 @@ pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
 pub(crate) unsafe extern "C" fn sleep(
-    seconds: crate::binary::c_types::c_uint,
+    millis: crate::binary::c_types::c_uint,
 ) -> crate::binary::c_types::c_uint {
     trace!("sleep");
 
     unsafe {
-        usleep(seconds * 1_000);
+        usleep(millis * 1_000);
     }
     0
 }

@@ -946,7 +946,7 @@ unsafe extern "C" fn ble_npl_eventq_get(
 
     let mut event: usize = 0;
     loop {
-        while unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
+        if unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
             let event = event as *mut ble_npl_event;
             let evt = unsafe { (*event).dummy } as *mut Event;
             trace!("got {:x}", evt as usize);
@@ -1250,6 +1250,10 @@ pub(crate) fn ble_deinit() {
     });
 
     unsafe {
+        // Prevent ASSERT r_ble_ll_reset:1069 ... ...
+        // TODO: the cause of the issue is that the BLE controller can be dropped while the driver
+        // is in the process of handling a HCI command.
+        crate::compat::common::sleep(10);
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
