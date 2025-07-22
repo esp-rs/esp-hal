@@ -158,8 +158,8 @@ fn exception_handler(context: &arch::TrapFrame) -> ! {
         };
 
         panic!(
-            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}",
-            code, mepc, mtval
+            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
+            code, mepc, mtval, context
         );
     }
 }
