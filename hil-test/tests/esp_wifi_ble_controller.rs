@@ -11,7 +11,7 @@
 //! THIS DOESN'T ACTUALLY TEST THE RADIO HOWEVER.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/ble
+//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/ble defmt
 
 #![no_std]
 #![no_main]

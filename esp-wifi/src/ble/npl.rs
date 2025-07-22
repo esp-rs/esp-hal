@@ -913,6 +913,11 @@ unsafe extern "C" fn ble_npl_eventq_put(queue: *const ble_npl_eventq, event: *co
     let evt = unsafe { (*event).dummy } as *mut Event;
     assert!(!evt.is_null());
 
+    if unsafe { (*evt).queued } {
+        trace!("Event already queued, skipping put");
+        return;
+    }
+
     unsafe {
         (*evt).queued = true;
     }
@@ -944,18 +949,17 @@ unsafe extern "C" fn ble_npl_eventq_get(
         while unsafe { (*queue).try_dequeue(addr_of_mut!(event).cast()) } {
             let event = event as *mut ble_npl_event;
             let evt = unsafe { (*event).dummy } as *mut Event;
-            if unsafe { (*evt).queued } {
-                trace!("got {:x}", evt as usize);
-                unsafe {
-                    (*evt).queued = false;
-                }
-                return event as *const ble_npl_event;
+            trace!("got {:x}", evt as usize);
+            unsafe {
+                (*evt).queued = false;
             }
+            return event as *const ble_npl_event;
         }
 
         if let Some(timeout) = timeout
             && start.elapsed() >= timeout
         {
+            debug!("No event in queue after timeout: {:?}", timeout);
             return core::ptr::null();
         }
 
