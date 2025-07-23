@@ -344,9 +344,9 @@ mod test {
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
         dep_graph.insert(
             Package::EspIeee802154,
-            vec![Package::EspHal, Package::EspWifi],
+            vec![Package::EspHal, Package::EspRadio],
         );
-        dep_graph.insert(Package::EspWifi, vec![Package::EspHal]);
+        dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
         dep_graph.insert(Package::EspAlloc, vec![]);
 
         let sorted = topological_sort(&dep_graph);
@@ -355,7 +355,7 @@ mod test {
             [
                 Package::EspAlloc,
                 Package::EspHal,
-                Package::EspWifi,
+                Package::EspRadio,
                 Package::EspIeee802154
             ]
         );

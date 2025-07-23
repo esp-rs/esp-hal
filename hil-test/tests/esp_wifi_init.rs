@@ -1,8 +1,8 @@
-//! Test we get an error when attempting to initialize esp-wifi with interrupts
+//! Test we get an error when attempting to initialize esp-radio with interrupts
 //! disabled in common ways
 
 //% CHIPS: esp32 esp32s2 esp32c2 esp32c3 esp32c6 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi embassy
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi embassy
 
 #![no_std]
 #![no_main]
@@ -19,7 +19,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
-use esp_wifi::InitializationError;
+use esp_radio::InitializationError;
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
@@ -38,7 +38,7 @@ async fn try_init(
     let timg0 = TimerGroup::new(timer);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    match esp_wifi::init() {
+    match esp_radio::init() {
         Ok(_) => signal.signal(None),
         Err(err) => signal.signal(Some(err)),
     }
@@ -77,7 +77,7 @@ mod tests {
 
         assert!(matches!(
             init,
-            Err(esp_wifi::InitializationError::InterruptsDisabled),
+            Err(esp_radio::InitializationError::InterruptsDisabled),
         ));
     }
 
@@ -90,7 +90,7 @@ mod tests {
 
         assert!(matches!(
             init,
-            Err(esp_wifi::InitializationError::InterruptsDisabled),
+            Err(esp_radio::InitializationError::InterruptsDisabled),
         ));
     }
 
@@ -113,7 +113,7 @@ mod tests {
 
         assert!(matches!(
             res,
-            Some(esp_wifi::InitializationError::InterruptsDisabled),
+            Some(esp_radio::InitializationError::InterruptsDisabled),
         ));
     }
 }

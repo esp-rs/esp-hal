@@ -359,7 +359,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     build_documentation(
         workspace,
         BuildDocumentationArgs {
-            packages: vec![Package::EspHal, Package::EspWifi, Package::EspHalEmbassy],
+            packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
             chips: vec![args.chip],
             ..Default::default()
         },

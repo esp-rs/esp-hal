@@ -213,19 +213,19 @@ name    = "twai"
 harness = false
 
 [[test]]
-name              = "esp_wifi_floats"
+name              = "esp_radio_floats"
 harness           = false
-required-features = ["esp-wifi", "esp-alloc"]
+required-features = ["esp-radio", "esp-alloc"]
 
 [[test]]
-name              = "esp_wifi_ble_controller"
+name              = "esp_radio_ble_controller"
 harness           = false
-required-features = ["esp-wifi", "esp-alloc"]
+required-features = ["esp-radio", "esp-alloc"]
 
 [[test]]
-name              = "esp_wifi_init"
+name              = "esp_radio_init"
 harness           = false
-required-features = ["esp-wifi", "esp-alloc"]
+required-features = ["esp-radio", "esp-alloc"]
 
 [[test]]
 name    = "otadata"
@@ -255,7 +255,7 @@ esp-hal            = { path = "../esp-hal" }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
 esp-radio-preempt-baremetal = { path = "../esp-radio-preempt-baremetal", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
-esp-wifi           = { path = "../esp-wifi", optional = true }
+esp-radio           = { path = "../esp-radio", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
@@ -282,8 +282,8 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-wifi?/defmt", "esp-hal-embassy?/defmt"]
-esp-wifi = ["dep:esp-wifi", "dep:esp-radio-preempt-baremetal"]
+defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-radio?/defmt", "esp-hal-embassy?/defmt"]
+esp-radio = ["dep:esp-radio", "dep:esp-radio-preempt-baremetal"]
 
 # Device support (required!):
 esp32 = [
@@ -291,7 +291,7 @@ esp32 = [
     "esp-backtrace/esp32",
     "esp-hal/esp32",
     "esp-hal-embassy?/esp32",
-    "esp-wifi?/esp32",
+    "esp-radio?/esp32",
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
@@ -301,7 +301,7 @@ esp32c2 = [
     "esp-backtrace/esp32c2",
     "esp-hal/esp32c2",
     "esp-hal-embassy?/esp32c2",
-    "esp-wifi?/esp32c2",
+    "esp-radio?/esp32c2",
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
@@ -311,7 +311,7 @@ esp32c3 = [
     "esp-backtrace/esp32c3",
     "esp-hal/esp32c3",
     "esp-hal-embassy?/esp32c3",
-    "esp-wifi?/esp32c3",
+    "esp-radio?/esp32c3",
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
@@ -321,7 +321,7 @@ esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-hal/esp32c6",
     "esp-hal-embassy?/esp32c6",
-    "esp-wifi?/esp32c6",
+    "esp-radio?/esp32c6",
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
@@ -331,7 +331,7 @@ esp32h2 = [
     "esp-backtrace/esp32h2",
     "esp-hal/esp32h2",
     "esp-hal-embassy?/esp32h2",
-    "esp-wifi?/esp32h2",
+    "esp-radio?/esp32h2",
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
@@ -342,7 +342,7 @@ esp32s2 = [
     "esp-backtrace/esp32s2",
     "esp-hal/esp32s2",
     "esp-hal-embassy?/esp32s2",
-    "esp-wifi?/esp32s2",
+    "esp-radio?/esp32s2",
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
@@ -353,7 +353,7 @@ esp32s3 = [
     "esp-backtrace/esp32s3",
     "esp-hal/esp32s3",
     "esp-hal-embassy?/esp32s3",
-    "esp-wifi?/esp32s3",
+    "esp-radio?/esp32s3",
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",

@@ -1,6 +1,6 @@
 #![cfg_attr(
     all(docsrs, not(not_really_docsrs)),
-    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-wifi</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
+    doc = "<div style='padding:30px;background:#810;color:#fff;text-align:center;'><p>You might want to <a href='https://docs.espressif.com/projects/rust/'>browse the <code>esp-radio</code> documentation on the esp-rs website</a> instead.</p><p>The documentation here on <a href='https://docs.rs'>docs.rs</a> is built for a single chip only (ESP32-C3, in particular), while on the esp-rs website you can select your exact chip from the list of supported devices. Available peripherals and their APIs might change depending on the chip.</p></div>\n\n<br/>\n\n"
 )]
 //! This documentation is built for the
 #![cfg_attr(esp32, doc = "**ESP32**")]
@@ -23,7 +23,7 @@
 //! Ensure that the right features are enabled for your chip. See [Examples](https://github.com/esp-rs/esp-hal/tree/main/examples#examples) for more examples.
 //!
 //! ```toml
-//! [dependencies.esp-wifi]
+//! [dependencies.esp-radio]
 //! # A supported chip needs to be specified, as well as specific use-case features
 #![doc = concat!(r#"features = [""#, chip!(), r#"", "wifi", "esp-now"]"#)]
 //! ```
@@ -35,12 +35,12 @@
 //!
 //! To make it work also for your debug builds add this to your `Cargo.toml`
 //! ```toml
-//! [profile.dev.package.esp-wifi]
+//! [profile.dev.package.esp-radio]
 //! opt-level = 3
 //! ```
 //! ## Globally disable logging
 //!
-//! `esp-wifi` contains a lot of trace-level logging statements.
+//! `esp-radio` contains a lot of trace-level logging statements.
 //! For maximum performance you might want to disable logging via
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
@@ -54,12 +54,12 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 //!
-//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_WIFI_PHY_ENABLE_USB` is enabled by default.
+//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default.
 //!
 //! In addition pay attention to these configuration keys:
-//! - `ESP_WIFI_RX_QUEUE_SIZE`
-//! - `ESP_WIFI_TX_QUEUE_SIZE`
-//! - `ESP_WIFI_MAX_BURST_SIZE`
+//! - `ESP_RADIO_RX_QUEUE_SIZE`
+//! - `ESP_RADIO_TX_QUEUE_SIZE`
+//! - `ESP_RADIO_MAX_BURST_SIZE`
 //!
 //! # Features flags
 //!
@@ -78,7 +78,7 @@
 //! section inside `.cargo/config.toml`. Below is a table of tunable parameters
 //! for this crate:
 #![doc = ""]
-#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_wifi_config_table.md"))]
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_radio_config_table.md"))]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
@@ -170,38 +170,38 @@ const _: () = {
     };
 };
 
-pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_WIFI_CONFIG_DYNAMIC_TX_BUF_NUM"),
-    ampdu_rx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_WIFI_CONFIG_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_WIFI_CONFIG_COUNTRY_CODE"),
+pub(crate) const CONFIG: config::EspRadioConfig = config::EspRadioConfig {
+    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
+    tx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE"),
+    static_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM"),
+    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
+    static_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
+    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
+    ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE"),
+    ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE"),
+    amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE"),
+    rx_ba_win: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_BA_WIN"),
+    max_burst_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"),
+    country_code: esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE"),
     country_code_operating_class: esp_config_int!(
         u8,
-        "ESP_WIFI_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
+        "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
     ),
-    mtu: esp_config_int!(usize, "ESP_WIFI_CONFIG_MTU"),
-    listen_interval: esp_config_int!(u16, "ESP_WIFI_CONFIG_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_CONFIG_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_WIFI_CONFIG_SCAN_METHOD"),
+    mtu: esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU"),
+    listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
+    beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT"),
+    ap_beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT"),
+    failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
+    scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
 };
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct EspWifiController<'d> {
+pub struct EspRadioController<'d> {
     _inner: PhantomData<&'d ()>,
 }
 
-impl Drop for EspWifiController<'_> {
+impl Drop for EspRadioController<'_> {
     fn drop(&mut self) {
         // Disable coexistence
         #[cfg(coex)]
@@ -220,7 +220,7 @@ impl Drop for EspWifiController<'_> {
 /// Initialize for using WiFi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
-pub fn init<'d>() -> Result<EspWifiController<'d>, InitializationError> {
+pub fn init<'d>() -> Result<EspRadioController<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }
@@ -236,7 +236,7 @@ pub fn init<'d>() -> Result<EspWifiController<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    info!("esp-wifi configuration {:?}", crate::CONFIG);
+    info!("esp-radio configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
 
@@ -257,7 +257,7 @@ pub fn init<'d>() -> Result<EspWifiController<'d>, InitializationError> {
         error => return Err(InitializationError::General(error)),
     }
 
-    Ok(EspWifiController {
+    Ok(EspRadioController {
         _inner: PhantomData,
     })
 }

@@ -1,7 +1,7 @@
 //! Cp0Disable exception regression test
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi
 
 #![no_std]
 #![no_main]
@@ -32,7 +32,7 @@ static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell
 
 #[handler]
 fn wait() {
-    // Ensure esp-wifi interrupts this handler.
+    // Ensure esp-radio interrupts this handler.
     Delay::new().delay_millis(100);
     critical_section::with(|cs| {
         SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
@@ -97,7 +97,7 @@ mod tests {
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
-        let _init = esp_wifi::init().unwrap();
+        let _init = esp_radio::init().unwrap();
 
         let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -107,7 +107,7 @@ mod tests {
                 .borrow_ref_mut(cs)
                 .replace(sw_ints.software_interrupt0);
             // Fire a low-priority interrupt to ensure the FPU is disabled while
-            // esp-wifi switches tasks
+            // esp-radio switches tasks
             SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
         });
 
@@ -141,7 +141,7 @@ mod tests {
 
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
                     esp_radio_preempt_baremetal::init(timg0.timer0);
-                    let _init = esp_wifi::init().unwrap();
+                    let _init = esp_radio::init().unwrap();
 
                     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -151,7 +151,7 @@ mod tests {
                             .borrow_ref_mut(cs)
                             .replace(sw_ints.software_interrupt0);
                         // Fire a low-priority interrupt to ensure the FPU is disabled while
-                        // esp-wifi switches tasks
+                        // esp-radio switches tasks
                         SWINT0.borrow_ref(cs).as_ref().unwrap().raise();
                     });
 

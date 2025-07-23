@@ -42,7 +42,7 @@ macro_rules! before_snippet {
 pub mod rom;
 
 /// This is needed by `libesp_rom.a` (if used)
-/// Other crates (i.e. esp-wifi) also rely on this being defined somewhere
+/// Other crates (i.e. esp-radio) also rely on this being defined somewhere
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __assert_func(
     file: *const core::ffi::c_char,

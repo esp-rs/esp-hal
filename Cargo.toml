@@ -18,7 +18,7 @@ exclude  = [
     "esp-radio-preempt-baremetal",
     "esp-radio-preempt-driver",
     "esp-riscv-rt",
-    "esp-wifi",
+    "esp-radio",
     "esp-storage",
     "examples",
     "extras/bench-server",

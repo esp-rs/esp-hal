@@ -5,7 +5,7 @@
 //!   read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: esp-wifi esp-wifi/ble esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/ble esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 #![no_std]
@@ -33,7 +33,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::ble::controller::BleConnector;
+use esp_radio::ble::controller::BleConnector;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 

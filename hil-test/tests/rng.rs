@@ -56,7 +56,7 @@ mod tests {
 
         let source = TrngSource::new(p.RNG, p.ADC1);
 
-        // Unsafely increase the counter. Practically, this may be done in esp-wifi.
+        // Unsafely increase the counter. Practically, this may be done in esp-radio.
         unsafe { TrngSource::increase_entropy_source_counter() };
 
         let _trng = Trng::try_new().unwrap();
