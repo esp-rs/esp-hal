@@ -14,3 +14,23 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 +esp_radio_preempt_baremetal::init(timg0.timer0);
 +let esp_wifi_ctrl = esp_wifi::init().unwrap();
 ```
+
+## Importing
+
+`esp_wifi` crate has been renamed to `esp_radio`
+
+```diff 
+- esp-wifi = "0.15.0"
++ esp-radio = {{currentVersion}}
+``` 
+
+```diff
+- use esp_wifi::{
+-    init,
+-    wifi::{ClientConfiguration, Configuration},
+- }
++ use esp_radio::{
++    init,
++    wifi::{ClientConfiguration, Configuration},
++ }
+```
