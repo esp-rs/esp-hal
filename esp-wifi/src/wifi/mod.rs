@@ -142,35 +142,34 @@ use crate::binary::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
-#[allow(clippy::upper_case_acronyms)] // FIXME
 pub enum AuthMethod {
     /// No authentication (open network).
     None,
 
     /// Wired Equivalent Privacy (WEP) authentication.
-    WEP,
+    Wep,
 
     /// Wi-Fi Protected Access (WPA) authentication.
-    WPA,
+    Wpa,
 
     /// Wi-Fi Protected Access 2 (WPA2) Personal authentication (default).
     #[default]
-    WPA2Personal,
+    Wpa2Personal,
 
     /// WPA/WPA2 Personal authentication (supports both).
-    WPAWPA2Personal,
+    WpaWpa2Personal,
 
     /// WPA2 Enterprise authentication.
-    WPA2Enterprise,
+    Wpa2Enterprise,
 
     /// WPA3 Personal authentication.
-    WPA3Personal,
+    Wpa3Personal,
 
     /// WPA2/WPA3 Personal authentication (supports both).
-    WPA2WPA3Personal,
+    Wpa2Wpa3Personal,
 
     /// WLAN Authentication and Privacy Infrastructure (WAPI).
-    WAPIPersonal,
+    WapiPersonal,
 }
 
 /// Supported Wi-Fi protocols.
@@ -672,7 +671,7 @@ impl Default for EapClientConfiguration {
         EapClientConfiguration {
             ssid: String::new(),
             bssid: None,
-            auth_method: AuthMethod::WPA2Enterprise,
+            auth_method: AuthMethod::Wpa2Enterprise,
             identity: None,
             username: None,
             password: None,
@@ -851,28 +850,28 @@ impl AuthMethodExt for AuthMethod {
     fn to_raw(&self) -> wifi_auth_mode_t {
         match self {
             AuthMethod::None => include::wifi_auth_mode_t_WIFI_AUTH_OPEN,
-            AuthMethod::WEP => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
-            AuthMethod::WPA => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
-            AuthMethod::WPA2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
-            AuthMethod::WPAWPA2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK,
-            AuthMethod::WPA2Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE,
-            AuthMethod::WPA3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
-            AuthMethod::WPA2WPA3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
-            AuthMethod::WAPIPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
+            AuthMethod::Wep => include::wifi_auth_mode_t_WIFI_AUTH_WEP,
+            AuthMethod::Wpa => include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK,
+            AuthMethod::Wpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK,
+            AuthMethod::WpaWpa2Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK,
+            AuthMethod::Wpa2Enterprise => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE,
+            AuthMethod::Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK,
+            AuthMethod::Wpa2Wpa3Personal => include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK,
+            AuthMethod::WapiPersonal => include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK,
         }
     }
 
     fn from_raw(raw: wifi_auth_mode_t) -> Self {
         match raw {
             include::wifi_auth_mode_t_WIFI_AUTH_OPEN => AuthMethod::None,
-            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::WEP,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthMethod::WPA,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthMethod::WPA2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => AuthMethod::WPAWPA2Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => AuthMethod::WPA2Enterprise,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::WPA3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::WPA2WPA3Personal,
-            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WAPIPersonal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WEP => AuthMethod::Wep,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_PSK => AuthMethod::Wpa,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_PSK => AuthMethod::Wpa2Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA_WPA2_PSK => AuthMethod::WpaWpa2Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_ENTERPRISE => AuthMethod::Wpa2Enterprise,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA3_PSK => AuthMethod::Wpa3Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WPA2_WPA3_PSK => AuthMethod::Wpa2Wpa3Personal,
+            include::wifi_auth_mode_t_WIFI_AUTH_WAPI_PSK => AuthMethod::WapiPersonal,
             _ => unreachable!(),
         }
     }
@@ -1291,73 +1290,72 @@ pub enum WifiEvent {
 #[repr(i32)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, FromPrimitive)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(clippy::enum_variant_names)] // FIXME remove prefix
 pub enum InternalWifiError {
     /// Out of memory
-    EspErrNoMem          = 0x101,
+    NoMem            = 0x101,
 
     /// Invalid argument
-    EspErrInvalidArg     = 0x102,
+    InvalidArg       = 0x102,
 
     /// WiFi driver was not installed by esp_wifi_init
-    EspErrWifiNotInit    = 0x3001,
+    NotInit          = 0x3001,
 
     /// WiFi driver was not started by esp_wifi_start
-    EspErrWifiNotStarted = 0x3002,
+    NotStarted       = 0x3002,
 
     /// WiFi driver was not stopped by esp_wifi_stop
-    EspErrWifiNotStopped = 0x3003,
+    NotStopped       = 0x3003,
 
     /// WiFi interface error
-    EspErrWifiIf         = 0x3004,
+    Interface        = 0x3004,
 
     /// WiFi mode error
-    EspErrWifiMode       = 0x3005,
+    Mode             = 0x3005,
 
     /// WiFi internal state error
-    EspErrWifiState      = 0x3006,
+    State            = 0x3006,
 
     /// WiFi internal control block of station or soft-AP error
-    EspErrWifiConn       = 0x3007,
+    Conn             = 0x3007,
 
     /// WiFi internal NVS module error
-    EspErrWifiNvs        = 0x3008,
+    Nvs              = 0x3008,
 
     /// MAC address is invalid
-    EspErrWifiMac        = 0x3009,
+    InvalidMac       = 0x3009,
 
     /// SSID is invalid
-    EspErrWifiSsid       = 0x300A,
+    InvalidSsid      = 0x300A,
 
     /// Password is invalid
-    EspErrWifiPassword   = 0x300B,
+    InvalidPassword  = 0x300B,
 
     /// Timeout error
-    EspErrWifiTimeout    = 0x300C,
+    Timeout          = 0x300C,
 
-    /// WiFi is in sleep state(RF closed) and wakeup fail
-    EspErrWifiWakeFail   = 0x300D,
+    /// WiFi is in sleep state (RF closed) and wakeup failed
+    WakeFail         = 0x300D,
 
     /// The caller would block
-    EspErrWifiWouldBlock = 0x300E,
+    WouldBlock       = 0x300E,
 
     /// Station still in disconnect status
-    EspErrWifiNotConnect = 0x300F,
+    NotConnected     = 0x300F,
 
     /// Failed to post the event to WiFi task
-    EspErrWifiPost       = 0x3012,
+    PostFail         = 0x3012,
 
     /// Invalid WiFi state when init/deinit is called
-    EspErrWifiInitState  = 0x3013,
+    InvalidInitState = 0x3013,
 
     /// Returned when WiFi is stopping
-    EspErrWifiStopState  = 0x3014,
+    StopState        = 0x3014,
 
     /// The WiFi connection is not associated
-    EspErrWifiNotAssoc   = 0x3015,
+    NotAssociated    = 0x3015,
 
     /// The WiFi TX is disallowed
-    EspErrWifiTxDisallow = 0x3016,
+    TxDisallowed     = 0x3016,
 }
 
 /// Get the STA MAC address
@@ -2322,9 +2320,7 @@ fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
     };
 
     if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(
-            InternalWifiError::EspErrInvalidArg,
-        ));
+        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
     }
 
     unsafe {
@@ -2367,9 +2363,7 @@ fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
     };
 
     if config.auth_method == AuthMethod::None && !config.password.is_empty() {
-        return Err(WifiError::InternalError(
-            InternalWifiError::EspErrInvalidArg,
-        ));
+        return Err(WifiError::InternalError(InternalWifiError::InvalidArg));
     }
 
     unsafe {
