@@ -211,6 +211,14 @@ impl Package {
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
+                if config.contains("csi")
+                    || config.contains("bt")
+                    || config.contains("esp-now")
+                    || config.contains("sniffer")
+                    || config.contains("coex")
+                {
+                    features.push("unstable".to_owned());
+                }
             }
             Package::EspHalProcmacros => {
                 features.push("embassy".to_owned());

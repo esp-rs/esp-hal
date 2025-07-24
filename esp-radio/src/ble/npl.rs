@@ -138,6 +138,7 @@ impl OsMbufPool {
 
 /// Chained memory buffer.
 #[repr(C)]
+#[instability::unstable]
 pub struct OsMbuf {
     /// Current pointer to data in the structure
     om_data: *const u8,
@@ -279,6 +280,8 @@ unsafe extern "C" {
 }
 
 #[repr(C)]
+/// Contains pointers to external functions used by the BLE stack.
+#[instability::unstable]
 pub struct ExtFuncsT {
     ext_version: u32,
     esp_intr_alloc: Option<
@@ -428,6 +431,8 @@ unsafe extern "C" fn esp_intr_free(_ret_handle: *mut *mut c_void) -> i32 {
 }
 
 #[repr(C)]
+/// Contains pointers to functions used by the BLE NPL (Non-Preemptive Layer).
+#[instability::unstable]
 pub struct npl_funcs_t {
     p_ble_npl_os_started: Option<unsafe extern "C" fn() -> bool>,
     p_ble_npl_get_current_task_id: Option<unsafe extern "C" fn() -> *const c_void>,
@@ -564,6 +569,8 @@ static mut G_NPL_FUNCS: npl_funcs_t = npl_funcs_t {
 };
 
 #[repr(C)]
+/// Contains pointers to functions used for BLE coexistence with Wi-Fi.
+#[instability::unstable]
 pub struct OsiCoexFuncsT {
     magic: u32,
     version: u32,
@@ -1053,6 +1060,8 @@ unsafe extern "C" fn ble_npl_os_started() -> bool {
 }
 
 #[repr(C)]
+/// Contains information about the BLE NPL (Non-Preemptive Layer) elements.
+#[instability::unstable]
 pub struct BleNplCountInfoT {
     evt_count: u16,
     evtq_count: u16,
@@ -1400,6 +1409,8 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     0
 }
 
+/// Sends HCI data to the Bluetooth controller.
+#[instability::unstable]
 pub fn send_hci(data: &[u8]) {
     let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
     hci_out.push(data);

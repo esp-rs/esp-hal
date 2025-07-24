@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/esp-now esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/esp-now esp-radio/unstable esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -17,7 +17,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
+use esp_radio::esp_now::{PeerInfo, BROADCAST_ADDRESS};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 

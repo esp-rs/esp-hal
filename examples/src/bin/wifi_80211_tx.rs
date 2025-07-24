@@ -2,7 +2,7 @@
 //!
 //! Periodically transmits a beacon frame.
 
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/sniffer esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/sniffer esp-radio/unstable esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -19,7 +19,7 @@ use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
     elements::{DSSSParameterSetElement, RawIEEE80211Element, SSIDElement},
-    mgmt_frame::{BeaconFrame, body::BeaconBody, header::ManagementFrameHeader},
+    mgmt_frame::{body::BeaconBody, header::ManagementFrameHeader, BeaconFrame},
     scroll::Pwrite,
     supported_rates,
 };

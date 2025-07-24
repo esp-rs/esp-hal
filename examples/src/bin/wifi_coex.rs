@@ -10,7 +10,7 @@
 
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 //% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-radio/ble esp-radio/coex
-//% FEATURES: esp-hal/unstable
+//% FEATURES: esp-radio/unstable esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -18,15 +18,15 @@
 use core::net::Ipv4Addr;
 
 use bleps::{
-    Ble,
-    HciConnector,
     ad_structure::{
+        create_advertising_data,
         AdStructure,
         BR_EDR_NOT_SUPPORTED,
         LE_GENERAL_DISCOVERABLE,
-        create_advertising_data,
     },
     att::Uuid,
+    Ble,
+    HciConnector,
 };
 use blocking_network_stack::Stack;
 use embedded_io::*;
