@@ -144,6 +144,9 @@ pub mod ble;
 #[cfg(feature = "esp-now")]
 pub mod esp_now;
 
+#[cfg(all(feature = "ieee802154", any(esp32c6, esp32h2)))]
+pub mod ieee802154;
+
 pub mod config;
 
 pub(crate) mod common_adapter;

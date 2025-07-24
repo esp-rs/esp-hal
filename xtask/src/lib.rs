@@ -50,7 +50,6 @@ pub enum Package {
     EspHalEmbassy,
     EspHalProcmacros,
     EspRomSys,
-    EspIeee802154,
     EspLpHal,
     EspMetadata,
     EspMetadataGenerated,
@@ -81,7 +80,6 @@ impl Package {
                 | EspHalEmbassy
                 | EspMetadataGenerated
                 | EspRomSys
-                | EspIeee802154
                 | EspLpHal
                 | EspPrintln
                 | EspRadioPreemptBaremetal
@@ -223,11 +221,6 @@ impl Package {
                 features.push("defmt".to_owned());
                 features.push("executors".to_owned());
             }
-            Package::EspIeee802154 => {
-                features.push("defmt".to_owned());
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-            }
             Package::EspLpHal => {
                 if config.contains("lp_core") {
                     features.push("embedded-io".to_owned());
@@ -296,10 +289,7 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        let device = Config::for_chip(chip);
-
         let check = match self {
-            Package::EspIeee802154 => device.contains("ieee802154"),
             Package::EspLpHal => chip.has_lp_core(),
             Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
                 chip.is_xtensa()
