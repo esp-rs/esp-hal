@@ -1,22 +1,17 @@
 use core::fmt::Display;
 use std::{collections::HashMap, env, fmt, fs, io::Write, path::PathBuf};
 
-use evalexpr::{ContextWithMutableFunctions, ContextWithMutableVariables};
 use serde::{Deserialize, Serialize};
+use somni_expr::TypeSet128;
 
-use crate::generate::{
-    evalexpr_extensions::{I128, I128NumericTypes},
-    validator::Validator,
-    value::Value,
-};
+use crate::generate::{validator::Validator, value::Value};
 
-pub(crate) mod evalexpr_extensions;
 mod markdown;
 pub(crate) mod validator;
 pub(crate) mod value;
 
 /// Configuration errors.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Error {
     /// Parse errors.
     Parse(String),
@@ -42,12 +37,32 @@ impl Error {
     }
 }
 
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Parse(message) => write!(f, "{message}"),
             Error::Validation(message) => write!(f, "{message}"),
         }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        None
+    }
+
+    fn description(&self) -> &str {
+        "description() is deprecated; use Display"
+    }
+
+    fn cause(&self) -> Option<&dyn core::error::Error> {
+        self.source()
     }
 }
 
@@ -156,23 +171,18 @@ pub fn generate_config_from_yaml_definition(
 /// Check the given actual values by applying checking the given checks
 pub fn do_checks(checks: Option<&Vec<String>>, cfg: &HashMap<String, Value>) -> Result<(), Error> {
     if let Some(checks) = checks {
-        let mut eval_ctx = evalexpr::HashMapContext::<I128NumericTypes>::new();
+        let mut eval_ctx = somni_expr::Context::<TypeSet128>::new_with_types();
         for (k, v) in cfg.iter() {
-            eval_ctx
-                .set_value(
-                    k.clone(),
-                    match v {
-                        Value::Bool(v) => evalexpr::Value::Boolean(*v),
-                        Value::Integer(v) => evalexpr::Value::Int(I128(*v)),
-                        Value::String(v) => evalexpr::Value::String(v.clone()),
-                    },
-                )
-                .map_err(|err| Error::Parse(format!("Error setting value for {k} ({err})")))?;
+            match v {
+                Value::Bool(v) => eval_ctx.add_variable(k, *v),
+                Value::Integer(v) => eval_ctx.add_variable(k, *v),
+                Value::String(v) => eval_ctx.add_variable::<&str>(k, v),
+            }
         }
         for check in checks {
-            if !evalexpr::eval_with_context(check, &eval_ctx)
-                .and_then(|v| v.as_boolean())
-                .map_err(|err| Error::Validation(format!("Validation error: '{check}' ({err})")))?
+            if !eval_ctx
+                .evaluate::<bool>(check)
+                .map_err(|err| Error::Parse(format!("Validation error: {err:?}")))?
             {
                 return Err(Error::Validation(format!("Validation error: '{check}'")));
             }
@@ -190,96 +200,27 @@ pub fn evaluate_yaml_config(
 ) -> Result<(Config, Vec<ConfigOption>), Error> {
     let config: Config = serde_yaml::from_str(yaml).map_err(|err| Error::Parse(err.to_string()))?;
     let mut options = Vec::new();
-    let mut eval_ctx = evalexpr::HashMapContext::<evalexpr::DefaultNumericTypes>::new();
+    let mut eval_ctx = somni_expr::Context::new();
     if let Some(chip) = chip {
-        eval_ctx
-            .set_value(
-                "chip".into(),
-                evalexpr::Value::String(chip.name().to_string()),
-            )
-            .map_err(|err| Error::Parse(err.to_string()))?;
-
-        eval_ctx
-            .set_function(
-                "feature".into(),
-                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
-                    if let evalexpr::Value::String(which) = arg {
-                        let res = chip.contains(which);
-                        Ok(evalexpr::Value::Boolean(res))
-                    } else {
-                        Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {arg:?}"
-                        )))
-                    }
-                }),
-            )
-            .map_err(|err| Error::Parse(err.to_string()))?;
-
-        eval_ctx
-            .set_function(
-                "cargo_feature".into(),
-                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
-                    if let evalexpr::Value::String(which) = arg {
-                        let res = features.contains(&which.to_uppercase().replace("-", "_"));
-                        Ok(evalexpr::Value::Boolean(res))
-                    } else {
-                        Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {arg:?}"
-                        )))
-                    }
-                }),
-            )
-            .map_err(|err| Error::Parse(err.to_string()))?;
-
-        eval_ctx
-            .set_function(
-                "ignore_feature_gates".into(),
-                evalexpr::Function::<evalexpr::DefaultNumericTypes>::new(move |arg| {
-                    if let evalexpr::Value::Empty = arg {
-                        Ok(evalexpr::Value::Boolean(ignore_feature_gates))
-                    } else {
-                        Err(evalexpr::EvalexprError::CustomMessage(format!(
-                            "Bad argument: {arg:?}"
-                        )))
-                    }
-                }),
-            )
-            .map_err(|err| Error::Parse(err.to_string()))?;
+        eval_ctx.add_variable("chip", chip.name());
+        eval_ctx.add_variable("ignore_feature_gates", ignore_feature_gates);
+        eval_ctx.add_function("feature", move |feature: &str| chip.contains(feature));
+        eval_ctx.add_function("cargo_feature", |feature: &str| {
+            features.contains(&feature.to_uppercase().replace("-", "_"))
+        });
     }
-    for option in config.options.clone() {
-        let active = evalexpr::eval_with_context(&option.active, &eval_ctx)
-            .map_err(|err| {
-                Error::Parse(format!(
-                    "Error evaluating '{}', error = {:?}",
-                    option.active, err
-                ))
-            })?
-            .as_boolean()
-            .map_err(|err| {
-                Error::Parse(format!(
-                    "Error evaluating '{}', error = {:?}",
-                    option.active, err
-                ))
-            })?;
+    for option in &config.options {
+        let active = eval_ctx
+            .evaluate::<bool>(&option.active)
+            .map_err(|err| Error::Parse(format!("{err:?}")))?;
 
         let constraint = {
             let mut active_constraint = None;
             if let Some(constraints) = &option.constraints {
                 for constraint in constraints {
-                    if evalexpr::eval_with_context(&constraint.if_, &eval_ctx)
-                        .map_err(|err| {
-                            Error::Parse(format!(
-                                "Error evaluating '{}', error = {err:?}",
-                                constraint.if_
-                            ))
-                        })?
-                        .as_boolean()
-                        .map_err(|err| {
-                            Error::Parse(format!(
-                                "Error evaluating '{}', error = {:?}",
-                                constraint.if_, err
-                            ))
-                        })?
+                    if eval_ctx
+                        .evaluate::<bool>(&constraint.if_)
+                        .map_err(|err| Error::Parse(format!("{err:?}")))?
                     {
                         active_constraint = Some(constraint.type_.clone());
                         break;
@@ -299,14 +240,12 @@ pub fn evaluate_yaml_config(
 
         let default_value = {
             let mut default_value = None;
-            for value in option.default.clone() {
-                if evalexpr::eval_with_context(&value.if_, &eval_ctx)
-                    .and_then(|v| v.as_boolean())
-                    .map_err(|err| {
-                        Error::Parse(format!("Error evaluating '{}', error = {err:?}", value.if_))
-                    })?
+            for value in &option.default {
+                if eval_ctx
+                    .evaluate::<bool>(&value.if_)
+                    .map_err(|err| Error::Parse(format!("{err:?}")))?
                 {
-                    default_value = Some(value.value);
+                    default_value = Some(value.value.clone());
                     break;
                 }
             }
@@ -323,13 +262,12 @@ pub fn evaluate_yaml_config(
 
         let option = ConfigOption {
             name: option.name.clone(),
-            description: option.description,
-            default_value: default_value.ok_or(Error::Parse(format!(
-                "No default value found for {}",
-                option.name
-            )))?,
+            description: option.description.clone(),
+            default_value: default_value.ok_or_else(|| {
+                Error::Parse(format!("No default value found for {}", option.name))
+            })?,
             constraint,
-            stability: option.stability,
+            stability: option.stability.clone(),
             active,
             display_hint: option.display_hint.unwrap_or(DisplayHint::None),
         };

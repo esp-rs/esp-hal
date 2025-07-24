@@ -22,7 +22,7 @@ document-features = "0.2.11"
 # used by the `build` and `tui` feature
 serde = { version = "1.0.197", default-features = false, features = ["derive"], optional = true }
 serde_yaml     = { version =  "0.9", optional = true }
-evalexpr = { version = "12.0.2", optional = true }
+somni-expr = { version = "0.1.0", optional = true }
 esp-metadata = { version = "0.8.0", path = "../esp-metadata", features = ["clap"], optional = true }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"], optional = true }
 
@@ -42,7 +42,7 @@ pretty_assertions = "1.4.1"
 
 [features]
 ## Enable the generation and parsing of a config
-build = ["dep:serde", "dep:serde_yaml", "dep:evalexpr", "dep:esp-metadata-generated"]
+build = ["dep:serde", "dep:serde_yaml", "dep:somni-expr", "dep:esp-metadata-generated"]
 
 ## The TUI
 tui = [

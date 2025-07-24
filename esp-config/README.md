@@ -92,16 +92,16 @@ checks:
   - 'ESP_BOOTLOADER_ESP_IDF_CONFIG_PARTITION_TABLE_OFFSET >= 32768'
 ```
 
-`if` and `active` are [evalexpr](https://crates.io/crates/evalexpr) expressions returning a boolean.
+`if` and `active` are [somni-expr](https://crates.io/crates/somni-expr) expressions evaluating to a boolean.
 
 The expression supports these custom functions:
 |Function|Description|
 |---|---|
 |feature(String)|`true` if the given chip feature is present|
 |cargo_feature(String)|`true` if the given Cargo feature is active|
-|ignore_feature_gates()|Usually `false` but tooling will set this to `true` to hint that the expression is evaluated by e.g. a TUI|
+|ignore_feature_gates|Usually `false` but tooling will set this to `true` to hint that the expression is evaluated by e.g. a TUI|
 
-`ignore_feature_gates()` is useful to enable otherwise disabled functionality - e.g. to offer all possible options regardless of any active / non-active features.
+`ignore_feature_gates` is useful to enable otherwise disabled functionality - e.g. to offer all possible options regardless of any active / non-active features.
 
 The `chip` variable is populated with the name of the targeted chip (if the crate is using chip specific features).
 
