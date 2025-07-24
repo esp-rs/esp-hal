@@ -635,8 +635,14 @@ impl<'d> EspNow<'d> {
         };
 
         check_error_expect!({ esp_now_init() }, "esp-now-init failed");
-        check_error_expect!({ esp_now_register_recv_cb(Some(rcv_cb)) }, "receiving callback failed");
-        check_error_expect!({ esp_now_register_send_cb(Some(send_cb)) }, "sending callback failed");
+        check_error_expect!(
+            { esp_now_register_recv_cb(Some(rcv_cb)) },
+            "receiving callback failed"
+        );
+        check_error_expect!(
+            { esp_now_register_send_cb(Some(send_cb)) },
+            "sending callback failed"
+        );
 
         esp_now
             .add_peer(PeerInfo {
