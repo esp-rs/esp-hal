@@ -42,8 +42,6 @@ jobs:
               - 'esp-hal-embassy/**'
             esp-hal-procmacros:
               - 'esp-hal-procmacros/**'
-            esp-ieee802154:
-              - 'esp-ieee802154/**'
             esp-lp-hal:
               - 'esp-lp-hal/**'
             esp-metadata:
@@ -126,14 +124,6 @@ jobs:
           changeLogPath: esp-hal-procmacros/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-procmacros/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-ieee802154)
-        if: steps.changes.outputs.esp-ieee802154 == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-ieee802154/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-ieee802154/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-lp-hal)
         if: steps.changes.outputs.esp-lp-hal == 'true'
