@@ -24,8 +24,8 @@ use hil_test as _;
 esp_bootloader_esp_idf::esp_app_desc!();
 
 // Compile-time test to check that esp-radio can be reinitialized.
-fn _esp_wifi_can_be_reinited() {
-    let p = esp_hal::init(esp_hal::Config::default());
+fn _esp_radio_can_be_reinited() {
+    let mut p = esp_hal::init(esp_hal::Config::default());
 
     let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
@@ -111,7 +111,7 @@ mod tests {
     fn test_dropping_controller_during_reset(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
-        let init = esp_wifi::init().unwrap();
+        let init = esp_radio::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 
