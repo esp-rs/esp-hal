@@ -52,6 +52,19 @@ macro_rules! check_error {
     };
 }
 
+macro_rules! check_error_expect {
+    ($block:block, $msg:literal) => {
+        match unsafe { $block } {
+            0 => (),
+            res => panic!(
+                "{}: {:?}",
+                $msg,
+                EspNowError::Error(Error::from_code(res as u32))
+            ),
+        }
+    };
+}
+
 /// Internal errors that can occur with ESP-NOW.
 #[repr(u32)]
 #[derive(Debug)]
@@ -621,9 +634,15 @@ impl<'d> EspNow<'d> {
             _phantom: PhantomData,
         };
 
-        check_error!({ esp_now_init() }).expect("esp-now-init failed");
-        check_error!({ esp_now_register_recv_cb(Some(rcv_cb)) }).ok();
-        check_error!({ esp_now_register_send_cb(Some(send_cb)) }).ok();
+        check_error_expect!({ esp_now_init() }, "esp-now-init failed");
+        check_error_expect!(
+            { esp_now_register_recv_cb(Some(rcv_cb)) },
+            "receiving callback failed"
+        );
+        check_error_expect!(
+            { esp_now_register_send_cb(Some(send_cb)) },
+            "sending callback failed"
+        );
 
         esp_now
             .add_peer(PeerInfo {
@@ -633,7 +652,7 @@ impl<'d> EspNow<'d> {
                 channel: None,
                 encrypt: false,
             })
-            .ok();
+            .expect("adding peer failed");
 
         esp_now
     }
