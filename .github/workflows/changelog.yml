@@ -171,7 +171,7 @@ jobs:
         if: steps.changes.outputs.esp-radio == 'true'
         uses: dangoslen/changelog-enforcer@v3
         with:
-          changeLogPath: /CHANGELOG.md
+          changeLogPath: esp-radio/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the /CHANGELOG.md file."
 
