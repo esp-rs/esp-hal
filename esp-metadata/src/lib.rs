@@ -407,9 +407,8 @@ impl Config {
                     .properties()
                     .filter_map(|(name, value)| match value {
                         Value::Boolean(true) => Some(vec![name.to_string()]),
-                        Value::NumberList(values) => {
-                            Some(values.iter().map(|val| format!("{name}_{val}")).collect())
-                        }
+                        Value::NumberList(_) => None,
+                        Value::Generic(v) => v.cfgs(),
                         Value::StringList(values) => Some(
                             values
                                 .iter()
@@ -474,6 +473,8 @@ impl Config {
         let cores = number(self.device.cores);
         let trm = &self.device.trm;
 
+        let mut for_each_macros = vec![];
+
         let peripheral_properties =
             self.device
                 .peri_config
@@ -489,7 +490,21 @@ impl Config {
                     Value::Boolean(value) => quote! {
                         (#name) => { #value };
                     },
-                    Value::Unset | Value::NumberList(_) | Value::StringList(_) => {
+                    Value::NumberList(numbers) => {
+                        let numbers = numbers.into_iter().map(number).collect::<Vec<_>>();
+                        for_each_macros.push(generate_for_each_macro(
+                            &name.replace(".", "_"),
+                            &[("all", &numbers)],
+                        ));
+                        quote! {}
+                    }
+                    Value::Generic(v) => {
+                        if let Some(for_each) = v.for_each_macro() {
+                            for_each_macros.push(for_each);
+                        }
+                        v.property_macro_branches()
+                    }
+                    Value::Unset | Value::StringList(_) => {
                         quote! {}
                     }
                 });
@@ -528,6 +543,8 @@ impl Config {
             macro_rules! memory_range {
                 #(#region_branches)*
             }
+
+            #(#for_each_macros)*
         });
 
         tokens

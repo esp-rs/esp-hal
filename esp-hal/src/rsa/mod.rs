@@ -40,8 +40,6 @@ use crate::{
 #[cfg_attr(esp32, path = "esp32.rs")]
 mod rsa_spec_impl;
 
-pub use rsa_spec_impl::operand_sizes;
-
 /// RSA peripheral container
 pub struct Rsa<'d, Dm: crate::DriverMode> {
     rsa: RSA<'d>,
@@ -173,44 +171,30 @@ pub trait Multi: RsaMode {
     type OutputType;
 }
 
-macro_rules! implement_op {
-    (($x:literal, multi)) => {
-        paste! {
-            #[doc = concat!($x, "-bit RSA operation.")]
-            pub struct [<Op $x>];
+/// Defines the exponentiation and multiplication lengths for RSA operations.
+pub mod operand_sizes {
+    for_each_rsa_exponentiation!(
+        ($x:literal) => {
+            paste::paste! {
+                #[doc = concat!(stringify!($x), "-bit RSA operation.")]
+                pub struct [<Op $x>];
 
-            impl Multi for [<Op $x>] {
+                impl crate::private::Sealed for [<Op $x>] {}
+                impl crate::rsa::RsaMode for [<Op $x>] {
+                    type InputType = [u32; $x / 32];
+                }
+            }
+        };
+    );
+
+    for_each_rsa_multiplication!(
+        ($x:literal) => {
+            impl crate::rsa::Multi for paste::paste!( [<Op $x>] ) {
                 type OutputType = [u32; $x * 2 / 32];
             }
-
-            impl crate::private::Sealed for [<Op $x>] {}
-
-            impl RsaMode for [<Op $x>] {
-                type InputType = [u32; $x / 32];
-            }
-        }
-    };
-
-    (($x:literal)) => {
-        paste! {
-            /// Represents an RSA operation for the given bit size.
-            pub struct [<Op $x>];
-
-            impl crate::private::Sealed for [<Op $x>] {}
-
-            impl RsaMode for [<Op $x>] {
-                type InputType = [u32; $x / 32];
-            }
-        }
-    };
-
-    ($x:tt, $($y:tt),+) => {
-        implement_op!($x);
-        implement_op!($($y),+);
-    };
+        };
+    );
 }
-
-use implement_op;
 
 /// Support for RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.

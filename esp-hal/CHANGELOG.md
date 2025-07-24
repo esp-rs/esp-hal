@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `rng` module has been rewritten (#3829)
 - Update `embassy-usb` to v0.5.0 (#3848)
+- `aes::Key` variants have been renamed from bytes to bits (e.g. `Key16 -> Key128`) (#3845)
 
 ### Fixed
 

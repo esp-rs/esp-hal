@@ -108,7 +108,11 @@ instances = [
 
 [device.aes]
 support_status = "partial"
-key_length = [128, 192, 256]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 192, encrypt_mode = 1, decrypt_mode = 5 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+] }
 
 [device.dac]
 support_status = "partial"
@@ -587,6 +591,11 @@ support_status = "partial"
 ram_start = 0x3ff56800
 channel_ram_size = 64
 
+[device.rsa]
+support_status = "partial"
+exponentiation = { increment = 512, max = 4096 }
+multiplication = { increment = 512, max = 2048 }
+
 [device.sha]
 support_status = "partial"
 algo = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]
@@ -633,9 +642,6 @@ support_status = "partial"
 apb_cycle_wait_num = 16 # TODO
 
 # Other drivers which are partially supported but have no other configuration:
-
-## Crypto
-[device.rsa]
 
 ## Interfaces
 [device.i2s]

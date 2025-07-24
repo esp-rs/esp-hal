@@ -1,14 +1,32 @@
+pub(crate) mod aes;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod rsa;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
 pub(crate) mod uart;
 
+pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use rsa::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
+
+pub(crate) trait GenericProperty {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        None
+    }
+
+    fn for_each_macro(&self) -> Option<proc_macro2::TokenStream> {
+        None
+    }
+
+    fn property_macro_branches(&self) -> proc_macro2::TokenStream {
+        quote::quote! {}
+    }
+}
 
 /// Represents a value in the driver configuration.
 pub(crate) enum Value {
@@ -18,10 +36,12 @@ pub(crate) enum Value {
     Number(u32),
     /// A boolean value. If true, the value is included in the cfg symbols.
     Boolean(bool),
-    /// A list of numeric values. A separate symbol is generated for each value.
+    /// A list of numeric values. A for-each macro is generated for the list.
     NumberList(Vec<u32>),
     /// A list of strings. A separate symbol is generated for each string.
     StringList(Vec<String>),
+    /// A generic object.
+    Generic(Box<dyn GenericProperty>),
 }
 
 impl From<Option<u32>> for Value {
@@ -95,7 +115,7 @@ macro_rules! driver_configs {
     (@property (Vec<u32>)      $self:ident, $config:ident) => { Value::NumberList($self.$config.clone()) };
     (@property (Vec<String>)   $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
-    (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Unset };  // Not a property
+    (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Generic(Box::new($self.$config.clone())) };
 
     (@default $default:literal) => { $default };
     (@default $default:literal $opt:literal) => { $opt };
@@ -259,7 +279,7 @@ driver_configs![
         driver: aes,
         name: "AES",
         properties: {
-            key_length: Vec<u32>,
+            key_length: AesKeyLength,
             #[serde(default)]
             dma: bool,
             #[serde(default)]
@@ -443,7 +463,11 @@ driver_configs![
     RsaProperties {
         driver: rsa,
         name: "RSA",
-        properties: {}
+        has_computed_properties: true,
+        properties: {
+            exponentiation: RsaLengths,
+            multiplication: RsaLengths,
+        }
     },
     SdHostProperties {
         driver: sd_host,

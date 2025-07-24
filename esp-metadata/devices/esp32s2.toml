@@ -112,7 +112,11 @@ instances = [
 support_status = "partial"
 dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
-key_length = [128, 192, 256]
+key_length = { options = [
+    { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
+    { bits = 192, encrypt_mode = 1, decrypt_mode = 5 },
+    { bits = 256, encrypt_mode = 2, decrypt_mode = 6 }
+] }
 
 [device.dac]
 support_status = "partial"
@@ -411,6 +415,11 @@ support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
 
+[device.rsa]
+support_status = "partial"
+exponentiation = { increment = 32, max = 4096 }
+multiplication = { increment = 32, max = 2048 }
+
 [device.sha]
 support_status = "partial"
 algo = [
@@ -472,7 +481,6 @@ apb_cycle_wait_num = 16 # TODO
 # Other drivers which are partially supported but have no other configuration:
 
 ## Crypto
-[device.rsa]
 [device.hmac]
 
 ## Interfaces
