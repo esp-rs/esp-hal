@@ -25,13 +25,6 @@ pub unsafe extern "C" fn _dispatch_exception() {
     panic!();
 }
 
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn _dispatch_core_interrupt() {
-    // never called but needed for riscv-rt to link
-    panic!();
-}
-
 /// Registers saved in trap handler
 #[derive(Debug, Default, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
