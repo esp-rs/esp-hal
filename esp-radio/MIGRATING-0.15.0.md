@@ -3,7 +3,7 @@
 ## Initialization
 
 The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_radio_preempt_baremetal`.
-`esp_radio_preempt_baremetal` needs to be initialized before calling `esp_wifi::init`. Failure to do so will result in an error.
+`esp_radio_preempt_baremetal` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
 
 Depending on your chosen OS, you may need to use other `esp_radio_preempt_driver` implementations.
 
