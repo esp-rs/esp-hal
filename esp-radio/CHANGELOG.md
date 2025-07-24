@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `esp_wifi::deinit_unchecked` and `esp_wifi::EspWifiController::deinit` - you can just drop `EspWifiController` instead (#3553)
 - `defmt` and `log-04` can no longer be selected at the same time (#3675)
 - `esp_wifi::init` no longer requires the `RADIO_CLK` peripheral (#3687)
+- `esp-ieee802154`: `Ieee802154::new` no longer requires the `RADIO_CLK` peripheral (#3687)
 
 ## [v0.14.1] - 2025-06-05
 
@@ -70,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enterprise WPA fixed for ESP32-S2 (#3406)
 - COEX on ESP32 is now working (#3403)
 - Correctly de-init wifi if the WifiController is dropped (#3550)
+- `esp-ieee802154`: Fixed compatibility with `defmt` (#3374)
 
 ## [0.13.0] - 2025-02-24
 
@@ -148,6 +150,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added `have-strchr` feature to disable including `strchr` (#2096)
 - Adding a way to deinitialize the WiFi stack (#2187)
+- `esp-ieee802154`: Added board-specific consts for c6 and h2 when caluclating transmit power conversion (#2114)
+- `esp-ieee802154`: Added defmt and log features (#2183)
+- `esp-ieee802154`: Make RX queue size configurable using esp-config (#2324)
 
 ### Changed
 
@@ -156,12 +161,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated drivers to v5.3.1 (#2239)
 - Rename `initialize` to `init` (#2295)
 - `esp-wifi` no longer enables features on `esp-hal-embassy` (like `esp-hal-embassy/esp32c6`) (#2306)
+- `esp-ieee802154`: Modified CCA threshold value to default of -60 (#2114)
+- `esp-ieee802154`: The driver now take RADIO_CLK by value to avoid a collision with esp-wifi's usage (#2183)
+- `esp-ieee802154`: binary-logs feature renamed to sys-logs (#2183)
+- `esp-ieee802154`: Updated PHY driver to v5.3.1 (#2239)
 
 ### Fixed
 
 - Feature `sys-logs` doesn't break the build anymore (#2117)
 - Fixed a panic when overflow-checks are enabled (#2164)
 - Create mutexes in heap memory, fixes running out of mutexes when connecting and disconnecting to a WPA2-ENTERPRISE ap multiple times (#2202)
+- `esp-ieee802154`: Fixed possible integer underflow in array access (#2114)
+- `esp-ieee802154`: Fixed compile error when building sys-logs feature (#2114)
 
 ### Removed
 
@@ -192,6 +203,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement `queue_msg_waiting` on the os_adapter (#1925)
 - Added API for promiscuous mode (#1935)
 - Implement `bt_hci::transport::Transport` traits for BLE (#1933)
+- `esp-ieee802154`: Added additional checks to prevent various array access panics while processing frames (#1923)
+- `esp-ieee802154`: Added range check to avoid panic when indexing into RX_BUFFER slice (#1682)
 
 ### Changed
 
@@ -216,6 +229,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add support for `Protocol::P802D11BGNAX` (#1742)
+- `esp-ieee802154`: initial release (#1800)
 
 ### Fixed
 
