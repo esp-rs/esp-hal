@@ -8,7 +8,8 @@
 //! Note: On ESP32-C2 and ESP32-C3 you need a wifi-heap size of 70000, on
 //! ESP32-C6 you need 80000 and a tx_queue_size of 10
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/ble esp-wifi/coex esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/unstable esp-wifi/ble esp-wifi/coex
+//% FEATURES: esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]

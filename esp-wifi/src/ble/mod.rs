@@ -19,7 +19,9 @@ use self::btdm as ble;
 #[cfg(any(esp32c2, esp32c6, esp32h2))]
 use self::npl as ble;
 
-pub mod controller;
+unstable_module! {
+    pub mod controller;
+}
 
 pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::binary::c_types::c_void {
     unsafe { crate::compat::malloc::malloc(size as usize).cast() }
@@ -108,7 +110,10 @@ impl HciOutCollector {
 static BLE_HCI_READ_DATA: Mutex<RefCell<Vec<u8>>> = Mutex::new(RefCell::new(Vec::new()));
 
 #[derive(Debug, Clone)]
+/// Represents a received BLE packet.
+#[instability::unstable]
 pub struct ReceivedPacket {
+    /// The data of the received packet.
     pub data: Box<[u8]>,
 }
 
@@ -119,6 +124,8 @@ impl defmt::Format for ReceivedPacket {
     }
 }
 
+/// Checks if there is any HCI data available to read.
+#[instability::unstable]
 pub fn have_hci_read_data() -> bool {
     critical_section::with(|cs| {
         let queue = BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -141,6 +148,8 @@ pub(crate) fn read_next(data: &mut [u8]) -> usize {
     })
 }
 
+/// Reads the next HCI packet from the BLE controller.
+#[instability::unstable]
 pub fn read_hci(data: &mut [u8]) -> usize {
     critical_section::with(|cs| {
         let mut hci_read_data = BLE_HCI_READ_DATA.borrow_ref_mut(cs);

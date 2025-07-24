@@ -10,7 +10,7 @@
 //! variable. E.g `HOST_IP="192.168.0.24"` and also set SSID and PASSWORD env
 //! variable before running this example.
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
+//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/unstable esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
