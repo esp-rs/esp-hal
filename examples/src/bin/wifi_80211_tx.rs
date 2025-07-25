@@ -14,7 +14,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, delay::Delay, main, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::{init, wifi};
+use esp_wifi::wifi;
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -41,8 +41,9 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =

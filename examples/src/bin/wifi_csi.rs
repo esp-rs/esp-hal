@@ -16,10 +16,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::{
-    init,
-    wifi::{ClientConfiguration, Configuration, CsiConfig},
-};
+use esp_wifi::wifi::{ClientConfiguration, Configuration, CsiConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::DhcpOption,
@@ -39,7 +36,9 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    esp_radio_preempt_baremetal::init(timg0.timer0);
+
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

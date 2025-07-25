@@ -723,12 +723,9 @@ pub unsafe extern "C" fn task_create(
 pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c_void) {
     trace!("task delete called for {:?}", task_handle);
 
-    let task = if task_handle.is_null() {
-        crate::preempt::current_task()
-    } else {
-        task_handle as *mut _
-    };
-    crate::preempt::schedule_task_deletion(task);
+    unsafe {
+        crate::preempt::schedule_task_deletion(task_handle);
+    }
 }
 
 /// **************************************************************************
@@ -756,10 +753,10 @@ pub unsafe extern "C" fn task_delay(tick: u32) {
 /// Name: esp_task_ms_to_tick
 ///
 /// Description:
-///   Transform from millim seconds to system ticks
+///   Transform from milliseconds to system ticks
 ///
 /// Input Parameters:
-///   ms - Millim seconds
+///   ms - Milliseconds
 ///
 /// Returned Value:
 ///   System ticks
@@ -774,13 +771,10 @@ pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
 /// Name: esp_task_get_current_task
 ///
 /// Description:
-///   Transform from millim seconds to system ticks
-///
-/// Input Parameters:
-///   ms - Millim seconds
+///   Retrieves the current task
 ///
 /// Returned Value:
-///   System ticks
+///   A pointer to the current task
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_current_task() -> *mut crate::binary::c_types::c_void {

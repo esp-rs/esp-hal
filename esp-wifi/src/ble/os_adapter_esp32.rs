@@ -67,7 +67,7 @@ pub(super) struct osi_funcs_s {
             u32,
         ) -> i32,
     >,
-    task_delete: Option<unsafe extern "C" fn(*const ())>,
+    task_delete: Option<unsafe extern "C" fn(*mut ())>,
     is_in_isr: Option<unsafe extern "C" fn() -> i32>,
     cause_sw_intr_to_core: Option<unsafe extern "C" fn(i32, i32) -> i32>,
     malloc: Option<unsafe extern "C" fn(u32) -> *mut crate::binary::c_types::c_void>,

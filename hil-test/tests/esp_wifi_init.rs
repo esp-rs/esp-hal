@@ -25,14 +25,20 @@ use static_cell::StaticCell;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+#[allow(unused)] // compile test
+fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
+    esp_radio_preempt_baremetal::init(timer);
+}
+
 #[embassy_executor::task]
 async fn try_init(
     signal: &'static Signal<CriticalSectionRawMutex, Option<InitializationError>>,
     timer: TIMG0<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    match esp_wifi::init(timg0.timer0) {
+    match esp_wifi::init() {
         Ok(_) => signal.signal(None),
         Err(err) => signal.signal(Some(err)),
     }
@@ -52,9 +58,22 @@ mod tests {
     }
 
     #[test]
+    fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
+        // esp-radio-preempt-baremetal must be initialized before esp-wifi.
+        let init = esp_wifi::init();
+
+        assert!(matches!(
+            init,
+            Err(esp_wifi::InitializationError::SchedulerNotInitialized),
+        ));
+    }
+
+    #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = critical_section::with(|_| esp_wifi::init(timg0.timer0));
+        esp_radio_preempt_baremetal::init(timg0.timer0);
+
+        let init = critical_section::with(|_| esp_wifi::init());
 
         assert!(matches!(
             init,
@@ -65,7 +84,9 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = interrupt_free(|| esp_wifi::init(timg0.timer0));
+        esp_radio_preempt_baremetal::init(timg0.timer0);
+
+        let init = interrupt_free(|| esp_wifi::init());
 
         assert!(matches!(
             init,

@@ -1,0 +1,62 @@
+[package]
+name          = "esp-radio-preempt-baremetal"
+version       = "0.0.1"
+edition       = "2024"
+rust-version  = "1.86.0"
+description   = "Bare-metal task scheduler for esp-wifi"
+documentation = "https://docs.espressif.com/projects/rust/esp-radio-preempt-baremetal/latest/"
+keywords      = ["esp32", "espressif", "no-std"]
+categories    = ["embedded", "hardware-support", "no-std"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+
+[package.metadata.docs.rs]
+default-target = "riscv32imac-unknown-none-elf"
+features       = ["esp32c6"]
+
+[lib]
+bench = false
+
+[dependencies]
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = [
+    "requires-unstable",
+    "__esp_wifi_builtin_scheduler",
+] }
+
+cfg-if = "1"
+
+# Unstable dependencies that are not (strictly) part of the public API
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
+document-features  = "0.2.11"
+esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
+esp-config = { version = "0.5.0", path = "../esp-config" }
+esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt            = { version = "1.0", optional = true }
+log-04           = { package = "log", version = "0.4.27", optional = true }
+
+[build-dependencies]
+esp-config             = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[dev-dependencies]
+esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"] }
+
+[features]
+default = ["esp-alloc"]
+esp-alloc = ["dep:esp-alloc"]
+esp32 = ["esp-hal/esp32", "esp-metadata-generated/esp32"]
+esp32c2 = ["esp-hal/esp32c2", "esp-metadata-generated/esp32c2"]
+esp32c3 = ["esp-hal/esp32c3", "esp-metadata-generated/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6", "esp-metadata-generated/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-metadata-generated/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2", "esp-metadata-generated/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3", "esp-metadata-generated/esp32s3"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04", "esp-hal/log-04"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+defmt = ["dep:defmt", "esp-hal/defmt"]

@@ -1,11 +1,12 @@
-pub use esp_hal::trapframe::TrapFrame;
-use esp_wifi_sys::c_types;
+use core::ffi::c_void;
 
-use super::*;
+pub use esp_hal::trapframe::TrapFrame;
+
+use crate::task::Context;
 
 pub(crate) fn new_task_context(
-    task: extern "C" fn(*mut c_types::c_void),
-    param: *mut c_types::c_void,
+    task: extern "C" fn(*mut c_void),
+    param: *mut c_void,
     stack_top: *mut (),
 ) -> TrapFrame {
     let stack_top = stack_top as usize;

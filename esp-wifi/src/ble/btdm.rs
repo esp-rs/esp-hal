@@ -245,15 +245,12 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(task: *const ()) {
+unsafe extern "C" fn task_delete(task: *mut ()) {
     trace!("task delete called for {:?}", task);
 
-    let task = if task.is_null() {
-        crate::preempt::current_task()
-    } else {
-        task as *mut _
-    };
-    crate::preempt::schedule_task_deletion(task);
+    unsafe {
+        crate::preempt::schedule_task_deletion(task.cast());
+    }
 }
 
 #[ram]

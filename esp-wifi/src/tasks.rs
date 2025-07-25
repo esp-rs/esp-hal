@@ -7,7 +7,9 @@ use crate::{
 /// Initializes the `timer` task for the Wi-Fi driver.
 pub(crate) fn init_tasks() {
     // schedule the timer task
-    task_create(timer_task, core::ptr::null_mut(), 8192);
+    unsafe {
+        task_create(timer_task, core::ptr::null_mut(), 8192);
+    }
 }
 
 /// Entry point for the timer task responsible for handling scheduled timer

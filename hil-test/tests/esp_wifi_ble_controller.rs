@@ -25,16 +25,17 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 // Compile-time test to check that esp-wifi can be reinitialized.
 fn _esp_wifi_can_be_reinited() {
-    let mut p = esp_hal::init(esp_hal::Config::default());
+    let p = esp_hal::init(esp_hal::Config::default());
+
+    let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
     {
-        let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0.reborrow());
-        let _init = esp_wifi::init(timg0.timer0).unwrap();
+        let _init = esp_wifi::init().unwrap();
     }
 
     {
-        let timg0 = TimerGroup::new(p.TIMG0.reborrow());
-        let _init = esp_wifi::init(timg0.timer0).unwrap();
+        let _init = esp_wifi::init().unwrap();
     }
 }
 
@@ -59,7 +60,8 @@ mod tests {
     #[test]
     fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = esp_wifi::init(timg0.timer0).unwrap();
+        esp_radio_preempt_baremetal::init(timg0.timer0);
+        let init = esp_wifi::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 
@@ -108,7 +110,8 @@ mod tests {
     #[test]
     fn test_dropping_controller_during_reset(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let init = esp_wifi::init(timg0.timer0).unwrap();
+        esp_radio_preempt_baremetal::init(timg0.timer0);
+        let init = esp_wifi::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 

@@ -96,7 +96,8 @@ mod tests {
     #[test]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        let _init = esp_wifi::init(timg0.timer1).unwrap();
+        esp_radio_preempt_baremetal::init(timg0.timer0);
+        let _init = esp_wifi::init().unwrap();
 
         let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -139,7 +140,8 @@ mod tests {
                     }
 
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
-                    let _init = esp_wifi::init(timg0.timer1).unwrap();
+                    esp_radio_preempt_baremetal::init(timg0.timer0);
+                    let _init = esp_wifi::init().unwrap();
 
                     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -170,12 +172,4 @@ mod tests {
         let result = super::run_float_calc(2.0);
         assert_eq!(result, 4.0);
     }
-}
-
-// Here is a random test that doesn't fit anywhere else - and since it's alone,
-// creating a new test suite is not necessary as we don't want to flash/run
-// anything.
-#[allow(unused)] // compile test
-fn esp_wifi_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
-    esp_wifi::init(timer);
 }

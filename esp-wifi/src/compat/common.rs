@@ -428,45 +428,13 @@ pub(crate) unsafe extern "C" fn sleep(
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-unsafe extern "C" fn usleep(us: u32) -> crate::binary::c_types::c_int {
-    trace!("usleep");
-    unsafe extern "C" {
-        fn esp_rom_delay_us(us: u32);
-    }
-
-    const MIN_YIELD_TIME: u32 = 1_000_000 / CONFIG.tick_rate_hz;
-    if us < MIN_YIELD_TIME {
-        // Short wait, just sleep
-        unsafe { esp_rom_delay_us(us) };
-    } else {
-        const MIN_YIELD_DURATION: Duration = Duration::from_micros(MIN_YIELD_TIME as u64);
-        let sleep_for = Duration::from_micros(us as u64);
-        let start = Instant::now();
-        loop {
-            // Yield to other tasks
-            yield_task();
-
-            let elapsed = start.elapsed();
-            if elapsed.as_micros() > us as u64 {
-                break;
-            }
-
-            let remaining = sleep_for - elapsed;
-
-            if remaining < MIN_YIELD_DURATION {
-                // If the remaining time is less than the minimum yield time, we can just sleep
-                // for the remaining time.
-                unsafe { esp_rom_delay_us(remaining.as_micros() as u32) };
-                break;
-            }
-        }
-    }
-
+unsafe extern "C" fn usleep(us: u32) -> c_int {
+    esp_radio_preempt_driver::usleep(us);
     0
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn putchar(c: i32) -> crate::binary::c_types::c_int {
+unsafe extern "C" fn putchar(c: i32) -> c_int {
     trace!("putchar {}", c as u8 as char);
     c
 }

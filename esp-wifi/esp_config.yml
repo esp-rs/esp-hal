@@ -144,14 +144,6 @@ options:
       - type:
           validator: positive_integer
 
-  - name: tick_rate_hz
-    description: 'Tick rate of the internal task scheduler in hertz'
-    default:
-      - value: 100
-    constraints:
-      - type:
-          validator: positive_integer
-
   - name: listen_interval
     description: 'Interval for station to listen to beacon from AP.
                  The unit of listen interval is one beacon interval.

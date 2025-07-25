@@ -318,7 +318,7 @@ pub struct ExtFuncsT {
             u32,
         ) -> i32,
     >,
-    task_delete: Option<unsafe extern "C" fn(*const c_void)>,
+    task_delete: Option<unsafe extern "C" fn(*mut c_void)>,
     osi_assert: Option<unsafe extern "C" fn(u32, *const c_void, u32, u32)>,
     os_random: Option<unsafe extern "C" fn() -> u32>,
     ecc_gen_key_pair: Option<unsafe extern "C" fn(*const u8, *const u8) -> i32>,
@@ -408,15 +408,12 @@ unsafe extern "C" fn task_create(
     1
 }
 
-unsafe extern "C" fn task_delete(task: *const c_void) {
+unsafe extern "C" fn task_delete(task: *mut c_void) {
     trace!("task delete called for {:?}", task);
 
-    let task = if task.is_null() {
-        crate::preempt::current_task()
-    } else {
-        task as *mut _
-    };
-    crate::preempt::schedule_task_deletion(task);
+    unsafe {
+        crate::preempt::schedule_task_deletion(task);
+    }
 }
 
 unsafe extern "C" fn osi_assert(ln: u32, fn_name: *const c_void, param1: u32, param2: u32) {

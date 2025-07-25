@@ -24,10 +24,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_wifi::{
-    init,
-    wifi::{ClientConfiguration, Configuration},
-};
+use esp_wifi::wifi::{ClientConfiguration, Configuration};
 use smoltcp::iface::{SocketSet, SocketStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -46,8 +43,9 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = init(timg0.timer0).unwrap();
+    let esp_wifi_ctrl = esp_wifi::init().unwrap();
 
     let (mut controller, interfaces) =
         esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

@@ -113,11 +113,10 @@ use core::marker::PhantomData;
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal::{self as hal};
+use esp_radio_preempt_driver as preempt;
 use hal::{
-    Blocking,
     clock::{Clocks, init_radio_clocks},
     time::Rate,
-    timer::{AnyTimer, PeriodicTimer, timg::Timer as TimgTimer},
 };
 
 #[cfg(feature = "wifi")]
@@ -132,11 +131,6 @@ mod binary {
     pub use esp_wifi_sys::*;
 }
 mod compat;
-
-#[cfg(feature = "builtin-scheduler")]
-mod preempt_builtin;
-
-pub mod preempt;
 
 mod radio;
 mod time;
@@ -176,33 +170,6 @@ const _: () = {
     };
 };
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Tunable parameters for the WiFi driver
-#[allow(unused)] // currently there are no ble tunables
-struct Config {
-    rx_queue_size: usize,
-    tx_queue_size: usize,
-    static_rx_buf_num: usize,
-    dynamic_rx_buf_num: usize,
-    static_tx_buf_num: usize,
-    dynamic_tx_buf_num: usize,
-    ampdu_rx_enable: bool,
-    ampdu_tx_enable: bool,
-    amsdu_tx_enable: bool,
-    rx_ba_win: usize,
-    max_burst_size: usize,
-    country_code: &'static str,
-    country_code_operating_class: u8,
-    mtu: usize,
-    tick_rate_hz: u32,
-    listen_interval: u16,
-    beacon_timeout: u16,
-    ap_beacon_timeout: u16,
-    failure_retry_cnt: u8,
-    scan_method: u32,
-}
-
 pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
     rx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_RX_QUEUE_SIZE"),
     tx_queue_size: esp_config_int!(usize, "ESP_WIFI_CONFIG_TX_QUEUE_SIZE"),
@@ -221,15 +188,12 @@ pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
         "ESP_WIFI_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
     ),
     mtu: esp_config_int!(usize, "ESP_WIFI_CONFIG_MTU"),
-    tick_rate_hz: esp_config_int!(u32, "ESP_WIFI_CONFIG_TICK_RATE_HZ"),
     listen_interval: esp_config_int!(u16, "ESP_WIFI_CONFIG_LISTEN_INTERVAL"),
     beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_BEACON_TIMEOUT"),
     ap_beacon_timeout: esp_config_int!(u16, "ESP_WIFI_CONFIG_AP_BEACON_TIMEOUT"),
     failure_retry_cnt: esp_config_int!(u8, "ESP_WIFI_CONFIG_FAILURE_RETRY_CNT"),
     scan_method: esp_config_int!(u32, "ESP_WIFI_CONFIG_SCAN_METHOD"),
 };
-
-type TimeBase = PeriodicTimer<'static, Blocking>;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -253,70 +217,16 @@ impl Drop for EspWifiController<'_> {
     }
 }
 
-/// A trait to allow better UX for initializing esp-wifi.
-///
-/// This trait is meant to be used only for the `init` function.
-pub trait EspWifiTimerSource: private::Sealed {
-    /// Returns the timer source.
-    ///
-    /// # Safety
-    ///
-    /// It is UB to call this method outside of [`init`].
-    unsafe fn timer(self) -> TimeBase;
-}
-
-impl private::Sealed for TimeBase {}
-impl private::Sealed for AnyTimer<'_> {}
-impl private::Sealed for TimgTimer<'_> {}
-#[cfg(systimer)]
-impl private::Sealed for esp_hal::timer::systimer::Alarm<'_> {}
-
-impl<T> EspWifiTimerSource for T
-where
-    T: esp_hal::timer::any::Degrade + private::Sealed,
-{
-    unsafe fn timer(self) -> TimeBase {
-        let any_timer: AnyTimer<'_> = self.degrade();
-        let any_timer: AnyTimer<'static> = unsafe {
-            // Safety: this method is only safe to be called from within `init`.
-            // This 'static lifetime is a fake one, the timer is only used for the lifetime
-            // of the `EspWifiController` instance. The lifetime bounds on `init` and
-            // `EspWifiTimerSource` ensure that the timer is not used after the
-            // `EspWifiController` is dropped.
-            core::mem::transmute(any_timer)
-        };
-        TimeBase::new(any_timer)
-    }
-}
-
 /// Initialize for using WiFi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
-///
-/// # The `timer` argument
-///
-/// The `timer` argument is a timer source that is used by the WiFi driver to
-/// schedule internal tasks. The timer source can be any of the following:
-///
-/// - A timg `Timer` instance
-/// - A systimer `Alarm` instance
-/// - An `AnyTimer` instance
-///
-/// # Examples
-///
-/// ```rust, no_run
-#[doc = esp_hal::before_snippet!()]
-/// use esp_hal::{rng::Rng, timer::timg::TimerGroup};
-///
-/// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// let init = esp_wifi::init(timg0.timer0).unwrap();
-/// # }
-/// ```
-pub fn init<'d>(
-    timer: impl EspWifiTimerSource + 'd,
-) -> Result<EspWifiController<'d>, InitializationError> {
+pub fn init<'d>() -> Result<EspWifiController<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
+    }
+
+    if !preempt::initialized() {
+        return Err(InitializationError::SchedulerNotInitialized);
     }
 
     // A minimum clock of 80MHz is required to operate WiFi module.
@@ -331,13 +241,6 @@ pub fn init<'d>(
     phy_mem_init();
 
     setup_radio_isr();
-
-    // Enable timer tick interrupt
-    #[cfg(feature = "builtin-scheduler")]
-    preempt_builtin::setup_timer(unsafe { timer.timer() });
-
-    #[cfg(not(feature = "builtin-scheduler"))]
-    let _ = timer; // mark used to suppress warning
 
     // This initializes the task switcher
     preempt::enable();
@@ -370,10 +273,6 @@ fn is_interrupts_disabled() -> bool {
         || hal::interrupt::current_runlevel() >= hal::interrupt::Priority::Priority1;
 }
 
-pub(crate) mod private {
-    pub trait Sealed {}
-}
-
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during [`init`].
@@ -390,6 +289,8 @@ pub enum InitializationError {
     /// Tried to initialize while interrupts are disabled.
     /// This is not supported.
     InterruptsDisabled,
+    /// The scheduler is not initialized.
+    SchedulerNotInitialized,
 }
 
 #[cfg(feature = "wifi")]

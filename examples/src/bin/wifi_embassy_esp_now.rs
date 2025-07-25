@@ -20,7 +20,6 @@ use esp_println::println;
 use esp_wifi::{
     EspWifiController,
     esp_now::{BROADCAST_ADDRESS, PeerInfo},
-    init,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -44,11 +43,12 @@ async fn main(_spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
+    esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, init(timg0.timer0).unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
+    let (mut controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, wifi).unwrap();
     controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
