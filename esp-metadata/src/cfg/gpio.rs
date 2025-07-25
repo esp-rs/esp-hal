@@ -186,7 +186,7 @@ pub(crate) struct IoMuxSignal {
 }
 
 impl super::GpioProperties {
-    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, Value)> {
+    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
         let input_max = self
             .pins_and_signals
             .input_signals
@@ -203,8 +203,8 @@ impl super::GpioProperties {
             .unwrap_or(0) as u32;
 
         [
-            ("gpio.input_signal_max", Value::Number(input_max)),
-            ("gpio.output_signal_max", Value::Number(output_max)),
+            ("gpio.input_signal_max", false, Value::Number(input_max)),
+            ("gpio.output_signal_max", false, Value::Number(output_max)),
         ]
         .into_iter()
     }

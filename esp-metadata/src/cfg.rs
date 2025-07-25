@@ -116,6 +116,8 @@ macro_rules! driver_configs {
     (@property (Vec<String>)   $self:ident, $config:ident) => { Value::StringList($self.$config.clone()) };
     (@property (Option<u32>)   $self:ident, $config:ident) => { Value::from($self.$config) };
     (@property ($($other:ty)*) $self:ident, $config:ident) => { Value::Generic(Box::new($self.$config.clone())) };
+    (@is_optional Option<$t:ty>) => { true };
+    (@is_optional $t:ty) => { false };
 
     (@default $default:literal) => { $default };
     (@default $default:literal $opt:literal) => { $opt };
@@ -143,10 +145,11 @@ macro_rules! driver_configs {
         }
 
         impl $struct {
-            fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+            fn properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
                 [$( // for each property, generate a tuple
                     (
                         /* name: */  concat!(stringify!($group), ".", stringify!($config)),
+                        /* is_optional: */ driver_configs!(@is_optional $ty $(<$generic>)?),
                         /* value: */ driver_configs!(@property ($ty $(<$generic>)?) self, $config),
                     ),
                 )*].into_iter()
@@ -222,7 +225,9 @@ macro_rules! driver_configs {
             }
 
             /// Returns an iterator over all properties of all peripherals.
-            pub fn properties(&self) -> impl Iterator<Item = (&str, Value)> {
+            ///
+            /// (property name, optional?, value)
+            pub fn properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
                 // Collect into a vector. This compiles faster than chaining iterators.
                 let mut properties = vec![];
                 $(
