@@ -1122,6 +1122,8 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"1\"",
+                    "timergroup_default_wdt_clock_source=\"1\"",
                     "uart_ram_size=\"128\"",
                     "lp_uart_ram_size=\"32\"",
                     "wifi_has_wifi6",
@@ -1314,6 +1316,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"1\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"1\"",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=wifi_has_wifi6",
@@ -1486,6 +1490,8 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"2\"",
+                    "timergroup_default_wdt_clock_source=\"1\"",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -1652,6 +1658,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"2\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"1\"",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -2656,6 +2664,8 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
+        println!("cargo:rustc-check-cfg=cfg(timergroup_default_clock_source, values(\"1\",\"2\"))");
+        println!("cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source, values(\"1\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
         for cfg in self.cfgs {
             println!("{cfg}");

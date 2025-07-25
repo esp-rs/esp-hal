@@ -174,6 +174,18 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         true
     };
+    ("timergroup.default_clock_source") => {
+        2
+    };
+    ("timergroup.default_clock_source", str) => {
+        stringify!(2)
+    };
+    ("timergroup.default_wdt_clock_source") => {
+        1
+    };
+    ("timergroup.default_wdt_clock_source", str) => {
+        stringify!(1)
+    };
     ("uart.ram_size") => {
         128
     };
