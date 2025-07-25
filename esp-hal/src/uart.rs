@@ -2931,9 +2931,9 @@ impl Info {
             #[cfg(not(any(esp32, esp32s2)))]
             ClockSource::Xtal => clocks.xtal_clock.as_hz(),
             #[cfg(not(any(esp32, esp32s2)))]
-            ClockSource::RcFast => crate::soc::constants::RC_FAST_CLK.as_hz(),
-            #[cfg(any(esp32, esp32s2))]
-            ClockSource::RefTick => crate::soc::constants::REF_TICK.as_hz(),
+            ClockSource::RcFast => property!("soc.rc_fast_clk_default"), // TODO: adjustable
+            #[cfg(soc_ref_tick_hz_is_set)]
+            ClockSource::RefTick => property!("soc.ref_tick_hz"),
         };
 
         cfg_if::cfg_if! {

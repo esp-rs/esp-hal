@@ -19,12 +19,4 @@ pub(crate) mod registers {
     pub const INTERRUPT_MAP_BASE: u32 = 0x600c2000;
 }
 
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub(crate) mod constants {
-    use crate::time::Rate;
-
-    /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
-}
-
 pub(crate) fn pre_init() {}

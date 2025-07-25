@@ -42,6 +42,12 @@ macro_rules! property {
     ("soc.cpu_has_prv_mode") => {
         false
     };
+    ("soc.rc_fast_clk_default") => {
+        17500000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(17500000)
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
