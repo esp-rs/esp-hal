@@ -2,7 +2,7 @@ use core::cell::RefCell;
 
 use critical_section::Mutex;
 
-use crate::hal::{
+use super::hal::{
     set_cca_mode,
     set_cca_threshold,
     set_coordinator,

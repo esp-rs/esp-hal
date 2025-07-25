@@ -214,6 +214,14 @@ options:
     description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL."
     default:
       - value: true
+      
+  - name: ieee802154_rx_queue_size
+    description: Size of the RX queue in frames
+    default:
+      - value: 10
+    constraints:
+      - type:
+          validator: positive_integer
 
 checks:
   - 'ESP_RADIO_CONFIG_RX_BA_WIN < ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM'

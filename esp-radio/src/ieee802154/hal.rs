@@ -2,8 +2,7 @@ use core::ops::{BitAnd, BitOr};
 
 use esp_hal::peripherals::IEEE802154;
 
-use super::IEEE802154_FRAME_EXT_ADDR_SIZE;
-use crate::pib::CcaMode;
+use super::{IEEE802154_FRAME_EXT_ADDR_SIZE, pib::CcaMode};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]

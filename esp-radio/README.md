@@ -8,21 +8,25 @@
 
 A WiFi, BLE and ESP-NOW driver for Espressif microcontrollers.
 
+This package also includes low-level [IEEE 802.15.4] driver for the ESP32-C6 and ESP32-H2
+
 Note that this crate currently requires you to enable the `unstable` feature on `esp-hal`.
+
+[IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 
 ## Current support
 
 If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists.
 
-|          | `Wi-Fi`| `BLE` | `Coex` | ESP-NOW |
-| :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: |
-|  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-C6 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
-| ESP32-H2 |                       &mdash;                        |                          ✓                          |                       &mdash;                        | &mdash; |
-| ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    |
-| ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
+|          | `Wi-Fi`| `BLE` | `Coex (Wi-Fi + BLE)` | `ESP-NOW` | `IEEE 802.15.4`
+| :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: | :-----: |
+|  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
+| ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |    
+| ESP32-C3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
+| ESP32-C6 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |    ✓    |
+| ESP32-H2 |                       &mdash;                        |                          ✓                          |                       &mdash;                        | &mdash; |    ✓    |
+| ESP32-S2 |                          ✓                           |                       &mdash;                       |                       &mdash;                        |    ✓    | &mdash; |
+| ESP32-S3 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    | &mdash; |
 
 ## Missing / To be done
 
