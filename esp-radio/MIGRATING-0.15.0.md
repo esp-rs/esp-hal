@@ -24,7 +24,7 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 + esp-radio = "{{currentVersion}}"
 ``` 
 
-## `EspRadio` prefix is gone
+## `EspRadio` prefix has been removed
 
 ```diff
 - use esp_radio::EspRadioController;
