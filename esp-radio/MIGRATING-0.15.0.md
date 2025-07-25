@@ -21,16 +21,5 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 ```diff 
 - esp-wifi = "0.15.0"
-+ esp-radio = {{currentVersion}}
++ esp-radio = "{{currentVersion}}"
 ``` 
-
-```diff
-- use esp_wifi::{
--    init,
--    wifi::{ClientConfiguration, Configuration},
-- }
-+ use esp_radio::{
-+    init,
-+    wifi::{ClientConfiguration, Configuration},
-+ }
-```

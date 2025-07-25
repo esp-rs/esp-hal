@@ -173,7 +173,7 @@ jobs:
         with:
           changeLogPath: esp-radio/CHANGELOG.md
           skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the /CHANGELOG.md file."
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio/CHANGELOG.md file."
 
       - name: Check that changelog updated (xtensa-lx)
         if: steps.changes.outputs.xtensa-lx == 'true'
