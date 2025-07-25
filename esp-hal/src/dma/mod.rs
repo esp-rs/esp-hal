@@ -1901,7 +1901,7 @@ where
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
                 let mut uses_psram = false;
-                let psram_range = crate::soc::psram_range();
+                let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
                     // we are forcing the DMA alignment to the cache line size
                     // required when we are using dcache
@@ -2167,7 +2167,7 @@ where
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
                 let mut uses_psram = false;
-                let psram_range = crate::soc::psram_range();
+                let psram_range = crate::psram::psram_range();
                 for des in chain.descriptors.iter() {
                     // we are forcing the DMA alignment to the cache line size
                     // required when we are using dcache

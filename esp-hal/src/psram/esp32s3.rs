@@ -1,49 +1,5 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # PSRAM "virtual peripheral" driver (ESP32-S3)
-//!
-//! ## Overview
-//!
-//! The `PSRAM` module provides support for accessing and controlling the
-//! `Pseudo Static Random Access Memory (PSRAM)` on the `ESP32-S3`.
-//!
-//! The `PSRAM` module enables users to interface with the `PSRAM` memory
-//! present on the `ESP32-S3` chip. `PSRAM` provides additional external memory
-//! to supplement the internal memory of the `ESP32-S3`, allowing for increased
-//! storage capacity and improved performance in certain applications.
-//!
-//! The mapped start address for PSRAM depends on the amount of mapped flash
-//! memory.
-//!
-//! ## Examples
-//!
-//! ### Octal/Quad PSRAM
-//! This example shows how to use PSRAM as heap-memory via esp-alloc.
-//! You need an ESP32-S3 with at least 2 MB of PSRAM memory.
-//! Either `Octal` or `Quad` PSRAM will be used, depending on the
-//! setting of `ESP_HAL_CONFIG_PSRAM_MODE`.
-//!
-//! Notice that PSRAM example **must** be built in release mode!
-//!
-//! ```rust, ignore
-//! # {before_snippet}
-//! # extern crate alloc;
-//! # use alloc::{string::String, vec::Vec};
-//! #
-//! // Add PSRAM to the heap.
-//! esp_alloc::psram_allocator!(&peripherals.PSRAM, esp_hal::psram);
-//!
-//! let mut large_vec: Vec<u32> = Vec::with_capacity(500 * 1024 / 4);
-//!
-//! for i in 0..(500 * 1024 / 4) {
-//!     large_vec.push((i & 0xff) as u32);
-//! }
-//!
-//! let string = String::from("A string allocated in PSRAM");
-//! # {after_snippet}
-//! ```
-
+use super::PsramSize;
 use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
-pub use crate::soc::psram_common::*;
 
 const EXTMEM_ORIGIN: u32 = 0x3C000000;
 
@@ -220,7 +176,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
     };
 
     unsafe {
-        crate::soc::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
+        super::MAPPED_PSRAM.memory_range = start as usize..start as usize + config.size.get();
     }
 }
 
