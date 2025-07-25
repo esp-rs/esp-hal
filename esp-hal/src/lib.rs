@@ -225,10 +225,6 @@ pub(crate) use peripherals::pac;
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use xtensa_lx_rt::{self, xtensa_lx};
 
-#[cfg(soc_has_efuse)]
-#[instability::unstable]
-#[cfg_attr(not(feature = "unstable"), allow(unused))]
-pub use self::soc::efuse;
 #[cfg(lp_core)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
@@ -333,6 +329,7 @@ unstable_module! {
     pub mod otg_fs;
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
+    pub mod efuse;
 }
 
 unstable_driver! {
