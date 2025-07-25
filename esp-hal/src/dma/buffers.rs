@@ -4,9 +4,9 @@ use core::{
 };
 
 use super::*;
-use crate::soc::{is_slice_in_dram, is_slice_in_psram};
+use crate::soc::is_slice_in_dram;
 #[cfg(psram_dma)]
-use crate::soc::{is_valid_psram_address, is_valid_ram_address};
+use crate::soc::{is_slice_in_psram, is_valid_psram_address, is_valid_ram_address};
 
 /// Error returned from Dma[Rx|Tx|RxTx]Buf operations.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -321,7 +321,14 @@ impl BurstConfig {
     ) -> Result<(), DmaBufError> {
         // buffer can be either DRAM or PSRAM (if supported)
         let is_in_dram = is_slice_in_dram(buffer);
-        let is_in_psram = cfg!(psram_dma) && is_slice_in_psram(buffer);
+        cfg_if::cfg_if! {
+            if #[cfg(psram_dma)]{
+                let is_in_psram = is_slice_in_psram(buffer);
+            } else {
+                let is_in_psram = false;
+            }
+        }
+
         if !(is_in_dram || is_in_psram) {
             return Err(DmaBufError::UnsupportedMemoryRegion);
         }
