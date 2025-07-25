@@ -216,6 +216,11 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
             } else {
                 unsafe {
                     (*<Self as TimerGroupInstance>::register_block())
+                        .t(0)
+                        .config()
+                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
+                    #[cfg(timergroup_timg_has_timer1)]
+                    (*<Self as TimerGroupInstance>::register_block())
                         .t(1)
                         .config()
                         .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
