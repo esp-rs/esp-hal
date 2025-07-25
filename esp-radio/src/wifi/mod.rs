@@ -1148,11 +1148,9 @@ impl CsiConfig {
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<PacketBuffer>> =
-    Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
 
-pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<PacketBuffer>> =
-    Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
