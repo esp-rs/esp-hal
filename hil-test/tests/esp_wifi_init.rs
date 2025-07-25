@@ -2,7 +2,7 @@
 //! disabled in common ways
 
 //% CHIPS: esp32 esp32s2 esp32c2 esp32c3 esp32c6 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi embassy
+//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi esp-wifi/unstable embassy
 
 #![no_std]
 #![no_main]

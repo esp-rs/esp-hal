@@ -99,6 +99,7 @@
         ble or wifi."
     )
 )]
+#![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 
 #[macro_use]
 extern crate esp_metadata_generated;
@@ -127,6 +128,28 @@ use crate::{
     tasks::init_tasks,
 };
 
+// can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
+#[doc(hidden)]
+macro_rules! unstable_module {
+    ($(
+        $(#[$meta:meta])*
+        pub mod $module:ident;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub mod $module;
+
+            $(#[$meta])*
+            #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            #[allow(unused)]
+            pub(crate) mod $module;
+        )*
+    };
+}
+
 mod binary {
     pub use esp_wifi_sys::*;
 }
@@ -135,15 +158,17 @@ mod compat;
 mod radio;
 mod time;
 
+pub(crate) use unstable_module;
+
 #[cfg(feature = "wifi")]
 pub mod wifi;
 
-#[cfg(feature = "ble")]
-pub mod ble;
-
-#[cfg(feature = "esp-now")]
-pub mod esp_now;
-
+unstable_module! {
+    #[cfg(feature = "esp-now")]
+    pub mod esp_now;
+    #[cfg(feature = "ble")]
+    pub mod ble;
+}
 pub mod config;
 
 pub(crate) mod common_adapter;
@@ -197,6 +222,8 @@ pub(crate) const CONFIG: config::EspWifiConfig = config::EspWifiConfig {
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+/// Represents the ESP-WiFi controller.
 pub struct EspWifiController<'d> {
     _inner: PhantomData<&'d ()>,
 }
@@ -220,6 +247,7 @@ impl Drop for EspWifiController<'_> {
 /// Initialize for using WiFi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
+#[instability::unstable]
 pub fn init<'d>() -> Result<EspWifiController<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
@@ -277,6 +305,7 @@ fn is_interrupts_disabled() -> bool {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during [`init`].
 #[non_exhaustive]
+#[instability::unstable]
 pub enum InitializationError {
     /// A general error occurred.
     /// The internal error code is reported.
@@ -302,6 +331,7 @@ impl From<WifiError> for InitializationError {
 
 /// Enable verbose logging within the WiFi driver
 /// Does nothing unless the `sys-logs` feature is enabled.
+#[instability::unstable]
 pub fn wifi_set_log_verbose() {
     #[cfg(all(feature = "sys-logs", not(esp32h2)))]
     unsafe {

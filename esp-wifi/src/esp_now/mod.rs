@@ -69,6 +69,7 @@ macro_rules! check_error_expect {
 #[repr(u32)]
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum Error {
     /// ESP-NOW is not initialized.
     NotInitialized    = 12389,
@@ -100,6 +101,7 @@ pub enum Error {
 }
 
 impl Error {
+    #[instability::unstable]
     pub fn from_code(code: u32) -> Error {
         match code {
             12389 => Error::NotInitialized,
@@ -118,6 +120,7 @@ impl Error {
 /// Common errors that can occur while using ESP-NOW driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum EspNowError {
     /// Internal Error.
     Error(Error),
@@ -138,6 +141,7 @@ impl From<WifiError> for EspNowError {
 /// Holds the count of peers in an ESP-NOW communication context.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct PeerCount {
     /// The total number of peers.
     pub total_count: i32,
@@ -149,6 +153,7 @@ pub struct PeerCount {
 /// ESP-NOW rate of specified interface.
 #[repr(u32)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum WifiPhyRate {
     /// < 1 Mbps with long preamble
     Rate1mL = 0,
@@ -223,6 +228,7 @@ pub enum WifiPhyRate {
 /// ESP-NOW peer information parameters.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct PeerInfo {
     /// Interface to use
     pub interface: EspNowWifiInterface,
@@ -245,6 +251,7 @@ pub struct PeerInfo {
 /// Information about a received packet.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub struct ReceiveInfo {
     /// The source address of the received packet.
     pub src_address: [u8; 6],
@@ -259,6 +266,7 @@ pub struct ReceiveInfo {
 /// Stores information about the received data, including the packet content and
 /// associated information.
 #[derive(Clone)]
+#[instability::unstable]
 pub struct ReceivedData {
     data: Box<[u8]>,
     pub info: ReceiveInfo,
@@ -266,6 +274,7 @@ pub struct ReceivedData {
 
 impl ReceivedData {
     /// Returns the received payload.
+    #[instability::unstable]
     pub fn data(&self) -> &[u8] {
         &self.data
     }
@@ -290,6 +299,7 @@ impl Debug for ReceivedData {
 /// The interface to use for this peer
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
 pub enum EspNowWifiInterface {
     /// Use the AP interface
     Ap,
@@ -317,6 +327,7 @@ impl EspNowWifiInterface {
 }
 
 /// Manages the `EspNow` instance lifecycle while ensuring it remains active.
+#[instability::unstable]
 pub struct EspNowManager<'d> {
     _rc: EspNowRc<'d>,
 }
@@ -324,11 +335,13 @@ pub struct EspNowManager<'d> {
 impl EspNowManager<'_> {
     /// Set primary WiFi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
+    #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_set_channel(channel, 0) })
     }
 
     /// Get the version of ESP-NOW.
+    #[instability::unstable]
     pub fn version(&self) -> Result<u32, EspNowError> {
         let mut version = 0u32;
         check_error!({ esp_now_get_version(&mut version as *mut u32) })?;
@@ -336,6 +349,7 @@ impl EspNowManager<'_> {
     }
 
     /// Add a peer to the list of known peers.
+    #[instability::unstable]
     pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
@@ -350,6 +364,7 @@ impl EspNowManager<'_> {
 
     /// Set CSI configuration and register the receiving callback.
     #[cfg(feature = "csi")]
+    #[instability::unstable]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,
@@ -363,11 +378,13 @@ impl EspNowManager<'_> {
     }
 
     /// Remove the given peer.
+    #[instability::unstable]
     pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
         check_error!({ esp_now_del_peer(peer_address.as_ptr()) })
     }
 
     /// Modify a peer information.
+    #[instability::unstable]
     pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         let raw_peer = esp_now_peer_info_t {
             peer_addr: peer.peer_address,
@@ -381,6 +398,7 @@ impl EspNowManager<'_> {
     }
 
     /// Get peer by MAC address.
+    #[instability::unstable]
     pub fn peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
@@ -414,6 +432,7 @@ impl EspNowManager<'_> {
     /// Only returns peers which address is unicast, for multicast/broadcast
     /// addresses, the function will skip the entry and find the next in the
     /// peer list.
+    #[instability::unstable]
     pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
         let mut raw_peer = esp_now_peer_info_t {
             peer_addr: [0u8; 6],
@@ -443,11 +462,13 @@ impl EspNowManager<'_> {
     }
 
     /// Check is peer is known.
+    #[instability::unstable]
     pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
         unsafe { esp_now_is_peer_exist(peer_address.as_ptr()) }
     }
 
     /// Get the number of peers.
+    #[instability::unstable]
     pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
         let mut peer_num = esp_now_peer_num_t {
             total_num: 0,
@@ -462,6 +483,7 @@ impl EspNowManager<'_> {
     }
 
     /// Set the primary master key.
+    #[instability::unstable]
     pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_pmk(pmk.as_ptr()) })
     }
@@ -470,11 +492,13 @@ impl EspNowManager<'_> {
     ///
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
+    #[instability::unstable]
     pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
         check_error!({ esp_now_set_wake_window(wake_window) })
     }
 
     /// Configure ESP-NOW rate.
+    #[instability::unstable]
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         check_error!({ esp_wifi_config_espnow_rate(wifi_interface_t_WIFI_IF_STA, rate as u32,) })
     }
@@ -487,6 +511,7 @@ impl EspNowManager<'_> {
 /// **DO NOT USE** a lock implementation that disables interrupts since the
 /// completion of a sending requires waiting for a callback invoked in an
 /// interrupt.
+#[instability::unstable]
 pub struct EspNowSender<'d> {
     _rc: EspNowRc<'d>,
 }
@@ -495,6 +520,7 @@ impl EspNowSender<'_> {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
+    #[instability::unstable]
     pub fn send<'s>(
         &'s mut self,
         dst_addr: &[u8; 6],
@@ -519,11 +545,13 @@ impl EspNowSender<'_> {
 /// since the callback which signals the completion of sending will never be
 /// invoked.
 #[must_use]
+#[instability::unstable]
 pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
 
 impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
     /// invoked with status of the sending.
+    #[instability::unstable]
     pub fn wait(self) -> Result<(), EspNowError> {
         // prevent redundant waiting since we waits for the callback in the Drop
         // implementation
@@ -548,12 +576,14 @@ impl Drop for SendWaiter<'_> {
 
 /// This is the receiver part of ESP-NOW. You can get this receiver by splitting
 /// an `EspNow` instance.
+#[instability::unstable]
 pub struct EspNowReceiver<'d> {
     _rc: EspNowRc<'d>,
 }
 
 impl EspNowReceiver<'_> {
     /// Receives data from the ESP-NOW queue.
+    #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData> {
         critical_section::with(|cs| {
             let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
@@ -613,6 +643,7 @@ impl Drop for EspNowRc<'_> {
 ///
 /// For convenience, by default there will be a broadcast peer added on the STA
 /// interface.
+#[instability::unstable]
 pub struct EspNow<'d> {
     manager: EspNowManager<'d>,
     sender: EspNowSender<'d>,
@@ -659,37 +690,44 @@ impl<'d> EspNow<'d> {
 
     /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
+    #[instability::unstable]
     pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
         (self.manager, self.sender, self.receiver)
     }
 
     /// Set primary WiFi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
+    #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
         self.manager.set_channel(channel)
     }
 
     /// Get the version of ESP-NOW.
+    #[instability::unstable]
     pub fn version(&self) -> Result<u32, EspNowError> {
         self.manager.version()
     }
 
     /// Add a peer to the list of known peers.
+    #[instability::unstable]
     pub fn add_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         self.manager.add_peer(peer)
     }
 
     /// Remove the given peer.
+    #[instability::unstable]
     pub fn remove_peer(&self, peer_address: &[u8; 6]) -> Result<(), EspNowError> {
         self.manager.remove_peer(peer_address)
     }
 
     /// Modify a peer information.
+    #[instability::unstable]
     pub fn modify_peer(&self, peer: PeerInfo) -> Result<(), EspNowError> {
         self.manager.modify_peer(peer)
     }
 
     /// Get peer by MAC address.
+    #[instability::unstable]
     pub fn peer(&self, peer_address: &[u8; 6]) -> Result<PeerInfo, EspNowError> {
         self.manager.peer(peer_address)
     }
@@ -699,21 +737,25 @@ impl<'d> EspNow<'d> {
     /// Only returns peers which address is unicast, for multicast/broadcast
     /// addresses, the function will skip the entry and find the next in the
     /// peer list.
+    #[instability::unstable]
     pub fn fetch_peer(&self, from_head: bool) -> Result<PeerInfo, EspNowError> {
         self.manager.fetch_peer(from_head)
     }
 
     /// Check is peer is known.
+    #[instability::unstable]
     pub fn peer_exists(&self, peer_address: &[u8; 6]) -> bool {
         self.manager.peer_exists(peer_address)
     }
 
     /// Get the number of peers.
+    #[instability::unstable]
     pub fn peer_count(&self) -> Result<PeerCount, EspNowError> {
         self.manager.peer_count()
     }
 
     /// Set the primary master key.
+    #[instability::unstable]
     pub fn set_pmk(&self, pmk: &[u8; 16]) -> Result<(), EspNowError> {
         self.manager.set_pmk(pmk)
     }
@@ -722,11 +764,13 @@ impl<'d> EspNow<'d> {
     ///
     /// Window is milliseconds the chip keep waked each interval, from 0 to
     /// 65535.
+    #[instability::unstable]
     pub fn set_wake_window(&self, wake_window: u16) -> Result<(), EspNowError> {
         self.manager.set_wake_window(wake_window)
     }
 
     /// Configure ESP-NOW rate.
+    #[instability::unstable]
     pub fn set_rate(&self, rate: WifiPhyRate) -> Result<(), EspNowError> {
         self.manager.set_rate(rate)
     }
@@ -734,6 +778,7 @@ impl<'d> EspNow<'d> {
     /// Send data to peer.
     ///
     /// The peer needs to be added to the peer list first.
+    #[instability::unstable]
     pub fn send<'s>(
         &'s mut self,
         dst_addr: &[u8; 6],
@@ -743,6 +788,7 @@ impl<'d> EspNow<'d> {
     }
 
     /// Receive data.
+    #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData> {
         self.receiver.receive()
     }
@@ -809,6 +855,7 @@ unsafe extern "C" fn rcv_cb(
     });
 }
 
+#[instability::unstable]
 pub use asynch::SendFuture;
 
 mod asynch {
@@ -825,6 +872,7 @@ mod asynch {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
+        #[instability::unstable]
         pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
             ReceiveFuture(PhantomData)
         }
@@ -832,6 +880,7 @@ mod asynch {
 
     impl EspNowSender<'_> {
         /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
+        #[instability::unstable]
         pub fn send_async<'s, 'r>(
             &'s mut self,
             addr: &'r [u8; 6],
@@ -850,12 +899,14 @@ mod asynch {
         /// This function takes mutable reference to self because the
         /// implementation of `ReceiveFuture` is not logically thread
         /// safe.
+        #[instability::unstable]
         pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
             self.receiver.receive_async()
         }
 
         /// The returned future must not be dropped before it's ready to avoid
         /// getting wrong status for sendings.
+        #[instability::unstable]
         pub fn send_async<'s, 'r>(
             &'s mut self,
             dst_addr: &'r [u8; 6],
@@ -868,6 +919,7 @@ mod asynch {
     /// A `future` representing the result of an asynchronous ESP-NOW send
     /// operation.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
+    #[instability::unstable]
     pub struct SendFuture<'s, 'r> {
         _sender: PhantomData<&'s mut EspNowSender<'s>>,
         addr: &'r [u8; 6],
@@ -906,6 +958,7 @@ mod asynch {
     /// simultaneously since the callback can only wake one future, leaving
     /// the rest of them unwakable.
     #[must_use = "futures do nothing unless you `.await` or poll them"]
+    #[instability::unstable]
     pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
 
     impl core::future::Future for ReceiveFuture<'_> {

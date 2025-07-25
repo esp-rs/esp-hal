@@ -25,6 +25,7 @@ enumset   = { version = "1.1.6", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 embedded-io-async = { version = "0.6.1" }
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
+instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
@@ -57,6 +58,11 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 
 [features]
 default = ["esp-alloc"]
+
+#! ### Unstable APIs
+#! Unstable APIs are drivers and features that are not yet ready for general use.
+#! They may be incomplete, have bugs, or be subject to change without notice.
+unstable = []
 
 # Chip Support Feature Flags
 # Target the ESP32-C2.
@@ -135,7 +141,6 @@ coex = []
 
 ## Enable WiFi channel state information. See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_wifi.html#_CPPv4N18wifi_init_config_t10csi_enableE)",
 csi = []
-
 #! ### Ecosystem Feature Flags
 
 ## Provide implementations of smoltcp traits

@@ -16,6 +16,7 @@ pub(crate) mod sealed {
     }
 }
 /// The type of handlers of events.
+#[instability::unstable]
 pub type Handler<T> = dyn FnMut(&T) + Sync + Send;
 
 fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
@@ -40,6 +41,7 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 // ```
 // event::update_handler::<event::ApStaconnected, _>(...)
 // ```
+#[instability::unstable]
 pub trait EventExt: sealed::Event + Sized + 'static {
     /// Get the handler for this event, replacing it with the default handler.
     fn take_handler() -> Box<Handler<Self>> {
@@ -162,6 +164,7 @@ impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
 
 /// Handle the given event using the registered event handlers.
+#[instability::unstable]
 pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
     Event::handler().with(|handler| {
         if let Some(handler) = handler {

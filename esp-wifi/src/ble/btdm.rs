@@ -468,7 +468,8 @@ pub(crate) fn ble_deinit() {
         crate::common_adapter::chip_specific::phy_disable();
     }
 }
-
+/// Sends HCI data to the BLE controller.
+#[instability::unstable]
 pub fn send_hci(data: &[u8]) {
     let hci_out = unsafe { (*addr_of_mut!(HCI_OUT_COLLECTOR)).assume_init_mut() };
     hci_out.push(data);
