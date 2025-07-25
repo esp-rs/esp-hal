@@ -1282,7 +1282,7 @@ impl Clock for RtcFastClock {
                 // TODO: Is the value correct?
                 Rate::from_hz(40_000_000 / 2)
             }
-            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(17_500_000),
+            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
         }
     }
 }

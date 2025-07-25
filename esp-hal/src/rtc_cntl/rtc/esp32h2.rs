@@ -205,7 +205,7 @@ impl Clock for RtcFastClock {
     fn frequency(&self) -> Rate {
         match self {
             RtcFastClock::RtcFastClockXtalD2 => Rate::from_hz(16_000_000),
-            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(8_000_000),
+            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
         }
     }
 }

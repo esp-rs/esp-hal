@@ -111,6 +111,9 @@ symbols = [
 
 memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
+[soc]
+rc_fast_clk_default = 17_500_000
+
 [device.adc]
 support_status = "partial"
 instances = [
