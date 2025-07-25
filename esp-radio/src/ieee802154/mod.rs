@@ -65,7 +65,7 @@ struct QueueConfig {
     rx_queue_size: usize,
 }
 
-pub(self) const CONFIG: QueueConfig = QueueConfig {
+const CONFIG: QueueConfig = QueueConfig {
     rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_IEEE802154_RX_QUEUE_SIZE"),
 };
 

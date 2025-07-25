@@ -42,6 +42,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         "#
     );
+    assert!(
+        !cfg!(feature = "ieee802154") || chip.contains("ieee802154"),
+        r#"
+
+        IEEE 802.15.4 is not supported on this target.
+
+        "#
+    );
 
     if let Ok(level) = std::env::var("OPT_LEVEL")
         && level != "2"
