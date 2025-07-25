@@ -75,10 +75,7 @@ mod tests {
 
         let init = critical_section::with(|_| esp_radio::init());
 
-        assert!(matches!(
-            init,
-            Err(InitializationError::InterruptsDisabled),
-        ));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
     }
 
     #[test]
@@ -88,10 +85,7 @@ mod tests {
 
         let init = interrupt_free(|| esp_radio::init());
 
-        assert!(matches!(
-            init,
-            Err(InitializationError::InterruptsDisabled),
-        ));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
     }
 
     #[test]
