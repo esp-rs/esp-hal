@@ -640,6 +640,8 @@ pub fn init(config: Config) -> Peripherals {
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
 
+    Clocks::init(config.cpu_clock);
+
     // Handle watchdog configuration with defaults
     cfg_if::cfg_if! {
         if #[cfg(feature = "unstable")]
@@ -699,8 +701,6 @@ pub fn init(config: Config) -> Peripherals {
             crate::timer::timg::Wdt::<crate::peripherals::TIMG1<'static>>::new().disable();
         }
     }
-
-    Clocks::init(config.cpu_clock);
 
     #[cfg(esp32)]
     crate::time::time_init();
