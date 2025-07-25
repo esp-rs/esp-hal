@@ -1,59 +1,7 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # Reading of eFuses (ESP32)
-//!
-//! ## Overview
-//!
-//! The `efuse` module provides functionality for reading eFuse data
-//! from the `ESP32` chip, allowing access to various chip-specific information
-//! such as:
-//!
-//!   * MAC address
-//!   * Chip type, revision
-//!   * Core count
-//!   * Max CPU frequency
-//!
-//! and more. It is useful for retrieving chip-specific configuration and
-//! identification data during runtime.
-//!
-//! The `Efuse` struct represents the eFuse peripheral and is responsible for
-//! reading various eFuse fields and values.
-//!
-//! ## Examples
-//!
-//! ### Read data from the eFuse storage.
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use esp_hal::efuse::Efuse;
-//!
-//! let mac_address = Efuse::read_base_mac_address();
-//!
-//! println!(
-//!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
-//!     mac_address[0],
-//!     mac_address[1],
-//!     mac_address[2],
-//!     mac_address[3],
-//!     mac_address[4],
-//!     mac_address[5]
-//! );
-//!
-//! println!("MAC address {:02x?}", Efuse::mac_address());
-//! println!("Flash Encryption {:?}", Efuse::flash_encryption());
-//! println!("Core Count {}", Efuse::core_count());
-//! println!("Bluetooth enabled {}", Efuse::is_bluetooth_enabled());
-//! println!("Chip type {:?}", Efuse::chip_type());
-//! println!("Max CPU clock {:?}", Efuse::max_cpu_frequency());
-//! # {after_snippet}
-//! ```
-
-pub use self::fields::*;
-use crate::{peripherals::EFUSE, soc::efuse_field::EfuseField, time::Rate};
+use crate::{peripherals::EFUSE, time::Rate};
 
 mod fields;
-
-/// A struct representing the eFuse functionality of the chip.
-pub struct Efuse;
+pub use fields::*;
 
 /// Representing different types of ESP32 chips.
 #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -74,7 +22,7 @@ pub enum ChipType {
     Unknown,
 }
 
-impl Efuse {
+impl super::Efuse {
     /// Returns the number of CPUs available on the chip.
     ///
     /// While ESP32 chips usually come with two mostly equivalent CPUs (protocol

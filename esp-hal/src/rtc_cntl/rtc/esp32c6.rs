@@ -18,9 +18,10 @@ use crate::{
             esp32c6_rtc_update_to_xtal_raw,
         },
     },
+    efuse::Efuse,
     peripherals::TIMG0,
     rtc_cntl::RtcClock,
-    soc::{efuse::Efuse, regi2c},
+    soc::regi2c,
     time::Rate,
 };
 
