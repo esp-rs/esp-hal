@@ -36,9 +36,6 @@ pub(crate) mod constants {
     /// System clock frequency for the parallel I/O (PARL IO) peripheral, in
     /// Hertz.
     pub const PARL_IO_SCLK: u32 = 96_000_000;
-
-    /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
 
 pub(crate) fn pre_init() {

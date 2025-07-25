@@ -33,9 +33,6 @@ pub(crate) mod constants {
     pub const RMT_CLOCK_SRC: u8 = 1;
     /// RMT Clock source frequency.
     pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(80);
-
-    /// A reference clock tick of 1 MHz.
-    pub const RC_FAST_CLK: Rate = Rate::from_khz(17500);
 }
 
 #[unsafe(link_section = ".rwtext")]
