@@ -18,11 +18,6 @@ pub(crate) mod regi2c;
 
 pub(crate) use esp32c3 as pac;
 
-#[allow(unused)]
-pub(crate) mod registers {
-    pub const INTERRUPT_MAP_BASE: u32 = 0x600c2000;
-}
-
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
     use crate::time::Rate;

@@ -294,10 +294,11 @@ fn map_raw(core: Cpu, interrupt: Interrupt, cpu_interrupt_number: u32) {
 /// Get cpu interrupt assigned to peripheral interrupt
 #[inline]
 unsafe fn assigned_cpu_interrupt(interrupt: Interrupt) -> Option<CpuInterrupt> {
-    let interrupt_number = interrupt as isize;
-    let intr_map_base = crate::soc::registers::INTERRUPT_MAP_BASE as *mut u32;
+    let cpu_intr = INTERRUPT_CORE0::regs()
+        .core_0_intr_map(interrupt as usize)
+        .read()
+        .bits();
 
-    let cpu_intr = unsafe { intr_map_base.offset(interrupt_number).read_volatile() };
     if cpu_intr > 0 && cpu_intr != DISABLED_CPU_INTERRUPT {
         Some(unsafe { core::mem::transmute::<u32, CpuInterrupt>(cpu_intr) })
     } else {
