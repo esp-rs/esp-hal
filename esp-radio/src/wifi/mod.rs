@@ -62,12 +62,12 @@ use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
 use crate::{
-    EspRadioController,
+    Controller,
     common_adapter::*,
     config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
-    wifi::private::EspRadioPacketBuffer,
+    wifi::private::PacketBuffer,
 };
 
 const MTU: usize = crate::CONFIG.mtu;
@@ -1148,10 +1148,10 @@ impl CsiConfig {
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<EspRadioPacketBuffer>> =
+pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<PacketBuffer>> =
     Locked::new(VecDeque::new());
 
-pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<EspRadioPacketBuffer>> =
+pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<PacketBuffer>> =
     Locked::new(VecDeque::new());
 
 /// Common errors.
@@ -1452,10 +1452,10 @@ unsafe extern "C" fn recv_cb_sta(
     len: u16,
     eb: *mut c_types::c_void,
 ) -> esp_err_t {
-    let packet = EspRadioPacketBuffer { buffer, len, eb };
+    let packet = PacketBuffer { buffer, len, eb };
     // We must handle the result outside of the lock because
-    // EspRadioPacketBuffer::drop must not be called in a critical section.
-    // Dropping an EspRadioPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+    // PacketBuffer::drop must not be called in a critical section.
+    // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
@@ -1483,10 +1483,10 @@ unsafe extern "C" fn recv_cb_ap(
     len: u16,
     eb: *mut c_types::c_void,
 ) -> esp_err_t {
-    let packet = EspRadioPacketBuffer { buffer, len, eb };
+    let packet = PacketBuffer { buffer, len, eb };
     // We must handle the result outside of the critical section because
-    // EspRadioPacketBuffer::drop must not be called in a critical section.
-    // Dropping an EspRadioPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+    // PacketBuffer::drop must not be called in a critical section.
+    // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
     // which will try to lock an internal mutex. If the mutex is already taken,
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
@@ -1708,27 +1708,27 @@ mod private {
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     /// Take care not to drop this while in a critical section.
     ///
-    /// Dropping an EspRadioPacketBuffer will call
+    /// Dropping an PacketBuffer will call
     /// `esp_wifi_internal_free_rx_buffer` which will try to lock an
     /// internal mutex. If the mutex is already taken, the function will try
     /// to trigger a context switch, which will fail if we are in a critical
     /// section.
-    pub struct EspRadioPacketBuffer {
+    pub struct PacketBuffer {
         pub(crate) buffer: *mut c_types::c_void,
         pub(crate) len: u16,
         pub(crate) eb: *mut c_types::c_void,
     }
 
-    unsafe impl Send for EspRadioPacketBuffer {}
+    unsafe impl Send for PacketBuffer {}
 
-    impl Drop for EspRadioPacketBuffer {
+    impl Drop for PacketBuffer {
         fn drop(&mut self) {
-            trace!("Dropping EspRadioPacketBuffer, freeing memory");
+            trace!("Dropping PacketBuffer, freeing memory");
             unsafe { esp_wifi_internal_free_rx_buffer(self.eb) };
         }
     }
 
-    impl EspRadioPacketBuffer {
+    impl PacketBuffer {
         pub fn as_slice_mut(&mut self) -> &mut [u8] {
             unsafe { core::slice::from_raw_parts_mut(self.buffer as *mut u8, self.len as usize) }
         }
@@ -1758,7 +1758,7 @@ impl WifiDeviceMode {
         }
     }
 
-    fn data_queue_rx(&self) -> &'static Locked<VecDeque<EspRadioPacketBuffer>> {
+    fn data_queue_rx(&self) -> &'static Locked<VecDeque<PacketBuffer>> {
         match self {
             WifiDeviceMode::Sta => &DATA_QUEUE_RX_STA,
             WifiDeviceMode::Ap => &DATA_QUEUE_RX_AP,
@@ -2213,8 +2213,8 @@ impl WifiRxToken {
         });
 
         // We handle the received data outside of the lock because
-        // EspRadioPacketBuffer::drop must not be called in a critical section.
-        // Dropping an EspRadioPacketBuffer will call `esp_wifi_internal_free_rx_buffer`
+        // PacketBuffer::drop must not be called in a critical section.
+        // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
         // which will try to lock an internal mutex. If the mutex is already
         // taken, the function will try to trigger a context switch, which will
         // fail if we are in an interrupt-free context.
@@ -2652,7 +2652,7 @@ pub struct Interfaces<'d> {
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
 pub fn new<'d>(
-    _inited: &'d EspRadioController<'d>,
+    _inited: &'d Controller<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if crate::is_interrupts_disabled() {

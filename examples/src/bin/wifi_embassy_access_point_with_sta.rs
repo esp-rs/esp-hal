@@ -40,7 +40,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
-    EspRadioController,
+    Controller,
     wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
@@ -78,7 +78,7 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspRadioController<'static>, esp_radio::init().unwrap());
+    let esp_wifi_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
     let (mut controller, interfaces) =
         esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
