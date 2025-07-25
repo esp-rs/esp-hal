@@ -732,8 +732,15 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        // Assume default 80MHz clock source
-        let timeout_ticks = timeout.as_micros() * 10_000 / 125;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let timeout_ticks = timeout.as_micros() * clk_src.as_mhz() as u64;
 
         let reg_block = unsafe { &*TG::register_block() };
 
