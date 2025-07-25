@@ -181,8 +181,9 @@ pub(crate) fn esp32c6_cpu_get_ls_divider() -> u8 {
 
 // clk_ll_cpu_get_hs_divider
 pub(crate) fn esp32c6_cpu_get_hs_divider() -> u8 {
-    let force_120m = PCR::regs().cpu_freq_conf().read().cpu_hs_120m_force().bit();
-    let cpu_hs_div = PCR::regs().cpu_freq_conf().read().cpu_hs_div_num().bits();
+    let cpu_freq_conf = PCR::regs().cpu_freq_conf().read();
+    let force_120m = cpu_freq_conf.cpu_hs_120m_force().bit();
+    let cpu_hs_div = cpu_freq_conf.cpu_hs_div_num().bits();
     if cpu_hs_div == 0 && force_120m {
         return 4;
     }
