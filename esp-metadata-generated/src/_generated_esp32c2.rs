@@ -42,6 +42,12 @@ macro_rules! property {
     ("soc.cpu_has_prv_mode") => {
         false
     };
+    ("soc.rc_fast_clk_default") => {
+        17500000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(17500000)
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -158,6 +164,18 @@ macro_rules! property {
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
+    };
+    ("timergroup.default_clock_source") => {
+        0
+    };
+    ("timergroup.default_clock_source", str) => {
+        stringify!(0)
+    };
+    ("timergroup.default_wdt_clock_source") => {
+        0
+    };
+    ("timergroup.default_wdt_clock_source", str) => {
+        stringify!(0)
     };
     ("uart.ram_size") => {
         128

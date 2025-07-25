@@ -42,6 +42,12 @@ macro_rules! property {
     ("soc.cpu_has_prv_mode") => {
         true
     };
+    ("soc.rc_fast_clk_default") => {
+        8000000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(8000000)
+    };
     ("aes.dma") => {
         true
     };
@@ -173,6 +179,18 @@ macro_rules! property {
     };
     ("timergroup.timg_has_divcnt_rst") => {
         true
+    };
+    ("timergroup.default_clock_source") => {
+        2
+    };
+    ("timergroup.default_clock_source", str) => {
+        stringify!(2)
+    };
+    ("timergroup.default_wdt_clock_source") => {
+        2
+    };
+    ("timergroup.default_wdt_clock_source", str) => {
+        stringify!(2)
     };
     ("uart.ram_size") => {
         128

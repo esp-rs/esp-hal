@@ -24,9 +24,6 @@ pub(crate) use esp32c6 as pac;
 pub(crate) mod constants {
     use crate::time::Rate;
 
-    /// The default clock source for the timer group.
-    pub const TIMG_DEFAULT_CLK_SRC: u8 = 1;
-
     /// The clock frequency for the I2S peripheral in Hertz.
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for the I2S peripheral.
@@ -39,9 +36,6 @@ pub(crate) mod constants {
 
     /// The clock frequency for the Parallel IO peripheral in Hertz.
     pub const PARL_IO_SCLK: u32 = 240_000_000;
-
-    /// RC FAST Clock value (Hertz).
-    pub const RC_FAST_CLK: Rate = Rate::from_khz(17_500);
 }
 
 pub(crate) fn pre_init() {

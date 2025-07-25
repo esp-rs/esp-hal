@@ -168,6 +168,12 @@ macro_rules! property {
     ("timergroup.timg_has_divcnt_rst") => {
         false
     };
+    ("timergroup.default_clock_source") => {
+        0
+    };
+    ("timergroup.default_clock_source", str) => {
+        stringify!(0)
+    };
     ("uart.ram_size") => {
         128
     };

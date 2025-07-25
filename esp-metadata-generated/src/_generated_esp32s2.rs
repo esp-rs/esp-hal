@@ -36,6 +36,24 @@ macro_rules! property {
     ("trm") => {
         "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
     };
+    ("soc.cpu_has_csr_pc") => {
+        false
+    };
+    ("soc.cpu_has_prv_mode") => {
+        false
+    };
+    ("soc.ref_tick_hz") => {
+        1000000
+    };
+    ("soc.ref_tick_hz", str) => {
+        stringify!(1000000)
+    };
+    ("soc.rc_fast_clk_default") => {
+        8000000
+    };
+    ("soc.rc_fast_clk_default", str) => {
+        stringify!(8000000)
+    };
     ("aes.dma") => {
         true
     };
@@ -167,6 +185,12 @@ macro_rules! property {
     };
     ("timergroup.timg_has_divcnt_rst") => {
         false
+    };
+    ("timergroup.default_clock_source") => {
+        0
+    };
+    ("timergroup.default_clock_source", str) => {
+        stringify!(0)
     };
     ("uart.ram_size") => {
         128

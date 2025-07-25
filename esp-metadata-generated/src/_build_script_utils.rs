@@ -215,6 +215,7 @@ impl Chip {
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
                     "ulp_supported",
+                    "soc",
                     "adc",
                     "aes",
                     "dac",
@@ -261,6 +262,10 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "uart_uart2",
+                    "soc_ref_tick_hz=\"1000000\"",
+                    "soc_ref_tick_hz_is_set",
+                    "soc_rc_fast_clk_default=\"8000000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
                     "gpio_constant_0_input=\"48\"",
@@ -271,6 +276,7 @@ impl Chip {
                     "gpio_output_signal_max=\"256\"",
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
+                    "i2c_master_i2c0_data_register_ahb_address_is_set",
                     "i2c_master_max_bus_timeout=\"1048575\"",
                     "i2c_master_ll_intr_mask=\"262143\"",
                     "i2c_master_fifo_size=\"32\"",
@@ -362,6 +368,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=ulp_supported",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
                     "cargo:rustc-cfg=dac",
@@ -408,6 +415,10 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=uart_uart2",
+                    "cargo:rustc-cfg=soc_ref_tick_hz=\"1000000\"",
+                    "cargo:rustc-cfg=soc_ref_tick_hz_is_set",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8000000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"48\"",
@@ -418,6 +429,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_output_signal_max=\"256\"",
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
+                    "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address_is_set",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"1048575\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"262143\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
@@ -520,6 +532,8 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
+                    "soc_rc_fast_clk_default=\"17500000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "assist_debug_has_sp_monitor",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"31\"",
@@ -543,6 +557,10 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"0\"",
+                    "timergroup_default_clock_source_is_set",
+                    "timergroup_default_wdt_clock_source=\"0\"",
+                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -629,6 +647,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"31\"",
@@ -652,6 +672,10 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -759,6 +783,8 @@ impl Chip {
                     "uart_uart0",
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
+                    "soc_rc_fast_clk_default=\"17500000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -792,6 +818,10 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"0\"",
+                    "timergroup_default_clock_source_is_set",
+                    "timergroup_default_wdt_clock_source=\"0\"",
+                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -895,6 +925,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -928,6 +960,10 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -1086,6 +1122,8 @@ impl Chip {
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_has_prv_mode",
+                    "soc_rc_fast_clk_default=\"17500000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -1122,6 +1160,10 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"1\"",
+                    "timergroup_default_clock_source_is_set",
+                    "timergroup_default_wdt_clock_source=\"1\"",
+                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "lp_uart_ram_size=\"32\"",
                     "wifi_has_wifi6",
@@ -1278,6 +1320,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"17500000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -1314,6 +1358,10 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"1\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"1\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=wifi_has_wifi6",
@@ -1451,6 +1499,8 @@ impl Chip {
                     "uart_uart1",
                     "soc_cpu_has_csr_pc",
                     "soc_cpu_has_prv_mode",
+                    "soc_rc_fast_clk_default=\"8000000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -1486,6 +1536,10 @@ impl Chip {
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
                     "timergroup_timg_has_divcnt_rst",
+                    "timergroup_default_clock_source=\"2\"",
+                    "timergroup_default_clock_source_is_set",
+                    "timergroup_default_wdt_clock_source=\"2\"",
+                    "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -1617,6 +1671,8 @@ impl Chip {
                     "cargo:rustc-cfg=uart_uart1",
                     "cargo:rustc-cfg=soc_cpu_has_csr_pc",
                     "cargo:rustc-cfg=soc_cpu_has_prv_mode",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8000000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -1652,6 +1708,10 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
                     "cargo:rustc-cfg=timergroup_timg_has_divcnt_rst",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"2\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"2\"",
+                    "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -1737,6 +1797,7 @@ impl Chip {
                     "uart_support_wakeup_int",
                     "ulp_supported",
                     "riscv_coproc_supported",
+                    "soc",
                     "adc",
                     "aes",
                     "dac",
@@ -1780,6 +1841,10 @@ impl Chip {
                     "timergroup_timg1",
                     "uart_uart0",
                     "uart_uart1",
+                    "soc_ref_tick_hz=\"1000000\"",
+                    "soc_ref_tick_hz_is_set",
+                    "soc_rc_fast_clk_default=\"8000000\"",
+                    "soc_rc_fast_clk_default_is_set",
                     "aes_dma",
                     "aes_dma_mode_ecb",
                     "aes_dma_mode_cbc",
@@ -1799,6 +1864,7 @@ impl Chip {
                     "i2c_master_separate_filter_config_registers",
                     "i2c_master_has_arbitration_en",
                     "i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
+                    "i2c_master_i2c0_data_register_ahb_address_is_set",
                     "i2c_master_max_bus_timeout=\"16777215\"",
                     "i2c_master_ll_intr_mask=\"131071\"",
                     "i2c_master_fifo_size=\"32\"",
@@ -1816,6 +1882,8 @@ impl Chip {
                     "sha_algo_sha_512_t",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
+                    "timergroup_default_clock_source=\"0\"",
+                    "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -1897,6 +1965,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=ulp_supported",
                     "cargo:rustc-cfg=riscv_coproc_supported",
+                    "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
                     "cargo:rustc-cfg=dac",
@@ -1940,6 +2009,10 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_timg1",
                     "cargo:rustc-cfg=uart_uart0",
                     "cargo:rustc-cfg=uart_uart1",
+                    "cargo:rustc-cfg=soc_ref_tick_hz=\"1000000\"",
+                    "cargo:rustc-cfg=soc_ref_tick_hz_is_set",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8000000\"",
+                    "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
                     "cargo:rustc-cfg=aes_dma",
                     "cargo:rustc-cfg=aes_dma_mode_ecb",
                     "cargo:rustc-cfg=aes_dma_mode_cbc",
@@ -1959,6 +2032,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_separate_filter_config_registers",
                     "cargo:rustc-cfg=i2c_master_has_arbitration_en",
                     "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address=\"1610690588\"",
+                    "cargo:rustc-cfg=i2c_master_i2c0_data_register_ahb_address_is_set",
                     "cargo:rustc-cfg=i2c_master_max_bus_timeout=\"16777215\"",
                     "cargo:rustc-cfg=i2c_master_ll_intr_mask=\"131071\"",
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"32\"",
@@ -1976,6 +2050,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_512_t",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -2159,6 +2235,8 @@ impl Chip {
                     "sha_algo_sha_512_t",
                     "spi_master_has_octal",
                     "timergroup_timg_has_timer1",
+                    "timergroup_default_clock_source=\"0\"",
+                    "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
                     "has_dram_region",
                 ],
@@ -2338,6 +2416,8 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_512_t",
                     "cargo:rustc-cfg=spi_master_has_octal",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
+                    "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
+                    "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
@@ -2430,6 +2510,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(pm_support_ext1_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(pm_support_touch_sensor_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(ulp_supported)");
+        println!("cargo:rustc-check-cfg=cfg(soc)");
         println!("cargo:rustc-check-cfg=cfg(adc)");
         println!("cargo:rustc-check-cfg=cfg(aes)");
         println!("cargo:rustc-check-cfg=cfg(dac)");
@@ -2474,9 +2555,12 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(uart_uart0)");
         println!("cargo:rustc-check-cfg=cfg(uart_uart1)");
         println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
+        println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz_is_set)");
+        println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
         println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
         println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_separate_filter_config_registers)");
+        println!("cargo:rustc-check-cfg=cfg(i2c_master_i2c0_data_register_ahb_address_is_set)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_1)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_256)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_384)");
@@ -2511,7 +2595,6 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(uart_support_wakeup_int)");
         println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
-        println!("cargo:rustc-check-cfg=cfg(soc)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug)");
         println!("cargo:rustc-check-cfg=cfg(ecc)");
         println!("cargo:rustc-check-cfg=cfg(systimer)");
@@ -2526,6 +2609,8 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(i2c_master_bus_timeout_is_exponential)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_224)");
         println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_divcnt_rst)");
+        println!("cargo:rustc-check-cfg=cfg(timergroup_default_clock_source_is_set)");
+        println!("cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source_is_set)");
         println!("cargo:rustc-check-cfg=cfg(esp32c3)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_ds)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_fe)");
@@ -2628,6 +2713,10 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(soc_has_dma_ch4)");
         println!("cargo:rustc-check-cfg=cfg(octal_psram)");
         println!("cargo:rustc-check-cfg=cfg(camera)");
+        println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz, values(\"1000000\"))");
+        println!(
+            "cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default, values(\"8000000\",\"17500000\"))"
+        );
         println!("cargo:rustc-check-cfg=cfg(gpio_gpio_function, values(\"2\",\"1\"))");
         println!("cargo:rustc-check-cfg=cfg(gpio_constant_0_input, values(\"48\",\"31\",\"60\"))");
         println!("cargo:rustc-check-cfg=cfg(gpio_constant_1_input, values(\"56\",\"30\"))");
@@ -2655,6 +2744,12 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(rmt_channel_ram_size, values(\"64\",\"48\"))");
         println!("cargo:rustc-check-cfg=cfg(rng_apb_cycle_wait_num, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(uart_ram_size, values(\"128\"))");
+        println!(
+            "cargo:rustc-check-cfg=cfg(timergroup_default_clock_source, values(\"0\",\"1\",\"2\"))"
+        );
+        println!(
+            "cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source, values(\"0\",\"1\",\"2\"))"
+        );
         println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
         for cfg in self.cfgs {

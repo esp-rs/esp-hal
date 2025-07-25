@@ -17,14 +17,16 @@ impl RsaLengths {
 impl GenericProperty for RsaLengths {}
 
 impl super::RsaProperties {
-    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, Value)> {
+    pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
         [
             (
                 "rsa.exponentiation",
+                false,
                 Value::NumberList(self.exponentiation.generate()),
             ),
             (
                 "rsa.multiplication",
+                false,
                 Value::NumberList(self.multiplication.generate()),
             ),
         ]

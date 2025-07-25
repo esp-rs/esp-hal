@@ -25,8 +25,6 @@ pub(crate) mod constants {
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for I2S operations.
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
-    /// A reference clock tick of 1 MHz.
-    pub const REF_TICK: Rate = Rate::from_mhz(1);
 }
 
 pub(crate) unsafe fn configure_cpu_caches() {}
