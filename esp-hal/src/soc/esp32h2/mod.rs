@@ -23,9 +23,6 @@ pub(crate) use esp32h2 as pac;
 pub(crate) mod constants {
     use crate::time::Rate;
 
-    /// Default clock source for the timer group (TIMG) peripheral.
-    pub const TIMG_DEFAULT_CLK_SRC: u8 = 2;
-
     /// Default clock source for the I2S peripheral.
     pub const I2S_DEFAULT_CLK_SRC: u8 = 1;
     /// Clock frequency for the I2S peripheral, in Hertz.

@@ -479,6 +479,8 @@ instances = [
 support_status = "partial"
 instances = [{ name = "timg0" }, { name = "timg1" }]
 timg_has_divcnt_rst = true
+default_clock_source = 1
+default_wdt_clock_source = 1
 
 [device.uart]
 support_status = "supported"
