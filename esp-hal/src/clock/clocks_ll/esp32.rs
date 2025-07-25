@@ -5,7 +5,7 @@ use crate::{
     soc::regi2c,
 };
 
-const REF_CLK_FREQ: u32 = 1000000;
+const REF_CLK_FREQ: u32 = property!("soc.ref_tick_hz");
 
 const MHZ: u32 = 1000000;
 const UINT16_MAX: u32 = 0xffff;
