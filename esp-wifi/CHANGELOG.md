@@ -10,12 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
-
+- `unstable` feature (#3865)
 
 ### Changed
 
 - `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
 - The `builtin-scheduler` feature has been removed. Your project will have to specify a task scheduler. (#3855)
+- `ble`, `esp-now`, `csi`, `sniffer`, and `smoltcp` features and APIs marked as unstable (#3865)
 
 ### Fixed
 
