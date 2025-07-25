@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp_wifi::init` no longer needs an `RNG` driver. (#3829)
 - The `builtin-scheduler` feature has been removed. Your project will have to specify a task scheduler. (#3855)
 - Rename `esp-wifi` to `esp-radio`. (#3858)
+- Get rid of `EspRadio` prefix in `esp-radio` structs. (#3869)
 
 ### Fixed
 
