@@ -26,7 +26,6 @@ esp-backtrace       = { path = "../esp-backtrace", features = ["exception-handle
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal             = { path = "../esp-hal", features = ["log-04"] }
 esp-hal-embassy     = { path = "../esp-hal-embassy", optional = true }
-# esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log-04"] }
 esp-radio-preempt-baremetal = { path = "../esp-radio-preempt-baremetal", features = ["log-04"], optional = true }
 esp-storage         = { path = "../esp-storage", optional = true }
