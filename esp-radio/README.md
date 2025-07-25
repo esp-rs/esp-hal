@@ -14,7 +14,7 @@ Note that this crate currently requires you to enable the `unstable` feature on 
 
 If a cell contains an em dash (&mdash;) this means that the particular feature is not present for a chip. A check mark (✓) means that some driver implementation exists.
 
-|          | [Wifi](https://github.com/esp-rs/esp-radio/issues/94) | [BLE](https://github.com/esp-rs/esp-radio/issues/93) | [Coex](https://github.com/esp-rs/esp-radio/issues/92) | ESP-NOW |
+|          | `Wi-Fi`| `BLE` | `Coex` | ESP-NOW |
 | :------: | :--------------------------------------------------: | :-------------------------------------------------: | :--------------------------------------------------: | :-----: |
 |  ESP32   |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
 | ESP32-C2 |                          ✓                           |                          ✓                          |                          ✓                           |    ✓    |
