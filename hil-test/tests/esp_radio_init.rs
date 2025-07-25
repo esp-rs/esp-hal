@@ -59,12 +59,12 @@ mod tests {
 
     #[test]
     fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
-        // esp-radio-preempt-baremetal must be initialized before esp-wifi.
-        let init = esp_wifi::init();
+        // esp-radio-preempt-baremetal must be initialized before esp-radio.
+        let init = esp_radio::init();
 
         assert!(matches!(
             init,
-            Err(esp_wifi::InitializationError::SchedulerNotInitialized),
+            Err(InitializationError::SchedulerNotInitialized),
         ));
     }
 
@@ -73,11 +73,11 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
 
-        let init = critical_section::with(|_| esp_wifi::init());
+        let init = critical_section::with(|_| esp_radio::init());
 
         assert!(matches!(
             init,
-            Err(esp_radio::InitializationError::InterruptsDisabled),
+            Err(InitializationError::InterruptsDisabled),
         ));
     }
 
@@ -86,11 +86,11 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
 
-        let init = interrupt_free(|| esp_wifi::init());
+        let init = interrupt_free(|| esp_radio::init());
 
         assert!(matches!(
             init,
-            Err(esp_radio::InitializationError::InterruptsDisabled),
+            Err(InitializationError::InterruptsDisabled),
         ));
     }
 

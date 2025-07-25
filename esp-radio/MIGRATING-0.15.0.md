@@ -12,7 +12,7 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 ```diff
 -let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
 +esp_radio_preempt_baremetal::init(timg0.timer0);
-+let esp_wifi_ctrl = esp_wifi::init().unwrap();
++let esp_wifi_ctrl = esp_radio::init().unwrap();
 ```
 
 ## Importing

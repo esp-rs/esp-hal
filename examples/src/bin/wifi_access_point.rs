@@ -66,7 +66,7 @@ fn main() -> ! {
         );
     });
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
         esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();

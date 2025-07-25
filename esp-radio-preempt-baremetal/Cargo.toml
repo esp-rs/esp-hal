@@ -20,7 +20,7 @@ bench = false
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = [
     "requires-unstable",
-    "__esp_wifi_builtin_scheduler",
+    "__esp_radio_builtin_scheduler",
 ] }
 
 cfg-if = "1"

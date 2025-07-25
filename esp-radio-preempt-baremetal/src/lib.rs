@@ -10,7 +10,7 @@
 //! esp_radio_preempt_baremetal::init(timg0.timer0);
 //!
 //! // You can now start esp-wifi:
-//! // let esp_wifi_controller = esp_wifi::init().unwrap();
+//! // let esp_wifi_controller = esp_radio::init().unwrap();
 //! # }
 //! ```
 

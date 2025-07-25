@@ -25,7 +25,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 // Compile-time test to check that esp-radio can be reinitialized.
 fn _esp_radio_can_be_reinited() {
-    let mut p = esp_hal::init(esp_hal::Config::default());
+    let p = esp_hal::init(esp_hal::Config::default());
 
     let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
