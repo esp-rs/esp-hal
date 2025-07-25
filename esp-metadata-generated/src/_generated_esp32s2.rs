@@ -174,12 +174,6 @@ macro_rules! property {
     ("timergroup.default_clock_source", str) => {
         stringify!(0)
     };
-    ("timergroup.default_wdt_clock_source") => {
-        0
-    };
-    ("timergroup.default_wdt_clock_source", str) => {
-        stringify!(0)
-    };
     ("uart.ram_size") => {
         128
     };
