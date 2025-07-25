@@ -11,7 +11,6 @@
 //!    * I2S_SCLK: 160_000_000 - I2S clock frequency
 
 crate::unstable_module! {
-    pub mod efuse;
     pub mod lp_core;
     pub mod trng;
 }

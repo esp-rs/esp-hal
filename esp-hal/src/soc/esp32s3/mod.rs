@@ -10,7 +10,6 @@
 //!    * I2S_DEFAULT_CLK_SRC: 2 - I2S clock source
 
 crate::unstable_module! {
-    pub mod efuse;
     #[cfg(feature = "psram")]
     pub mod psram;
     pub mod trng;

@@ -5,7 +5,7 @@
 
 #![allow(clippy::empty_docs)]
 
-use super::EfuseField;
+use crate::efuse::EfuseField;
 
 /// Disable programming of individual eFuses
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 32);
