@@ -1,6 +1,6 @@
 //! Access point
 //!
-//! Creates an open access-point with SSID `esp-wifi`.
+//! Creates an open access-point with SSID `esp-radio`.
 //! You can connect to it using a static IP in range 192.168.2.2 ..
 //! 192.168.2.255, gateway 192.168.2.1
 //!
@@ -10,7 +10,7 @@
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -28,7 +28,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_wifi::wifi::{
+use esp_radio::wifi::{
     AccessPointConfiguration,
     Configuration,
     event::{self, EventExt},
@@ -66,10 +66,10 @@ fn main() -> ! {
         );
     });
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let mut device = interfaces.ap;
     let iface = create_interface(&mut device);
@@ -82,7 +82,7 @@ fn main() -> ! {
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-wifi".into(),
+        ssid: "esp-radio".into(),
         ..Default::default()
     });
     let res = controller.set_configuration(&client_config);
@@ -112,7 +112,7 @@ fn main() -> ! {
         .unwrap();
 
     println!(
-        "Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/"
+        "Start busy loop on main. Connect to the AP `esp-radio` and point your browser to http://192.168.2.1:8080/"
     );
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
@@ -160,7 +160,7 @@ fn main() -> ! {
                         b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
                         <body>\
-                            <h1>Hello Rust! Hello esp-wifi!</h1>\
+                            <h1>Hello Rust! Hello esp-radio!</h1>\
                         </body>\
                     </html>\r\n\
                     ",
@@ -200,7 +200,7 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

@@ -57,7 +57,7 @@ pub enum Package {
     EspPrintln,
     EspRiscvRt,
     EspStorage,
-    EspWifi,
+    EspRadio,
     EspRadioPreemptDriver,
     EspRadioPreemptBaremetal,
     Examples,
@@ -86,7 +86,7 @@ impl Package {
                 | EspPrintln
                 | EspRadioPreemptBaremetal
                 | EspStorage
-                | EspWifi
+                | EspRadio
         )
     }
 
@@ -146,7 +146,7 @@ impl Package {
             self,
             EspHal
                 | EspLpHal
-                | EspWifi
+                | EspRadio
                 | EspHalEmbassy
                 | EspRomSys
                 | EspBootloaderEspIdf
@@ -196,7 +196,7 @@ impl Package {
                     features.push("__bluetooth".to_owned());
                 }
             }
-            Package::EspWifi => {
+            Package::EspRadio => {
                 features.push("esp-hal/unstable".to_owned());
                 features.push("esp-hal/rt".to_owned());
                 features.push("defmt".to_owned());
@@ -269,7 +269,7 @@ impl Package {
                 // enabled
                 cases.push(vec!["rt".to_owned()]);
             }
-            Package::EspWifi => {
+            Package::EspRadio => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
             }

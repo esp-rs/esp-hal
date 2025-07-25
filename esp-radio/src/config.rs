@@ -2,7 +2,7 @@
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Tunable parameters for the WiFi driver
 #[allow(unused)] // currently there are no ble tunables
-pub(crate) struct EspWifiConfig {
+pub(crate) struct EspRadioConfig {
     pub(crate) rx_queue_size: usize,
     pub(crate) tx_queue_size: usize,
     pub(crate) static_rx_buf_num: usize,

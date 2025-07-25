@@ -49,8 +49,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         && level != "s"
     {
         let message = format!(
-            "esp-wifi should be built with optimization level 2, 3 or s - yours is {level}.
-                See https://github.com/esp-rs/esp-wifi",
+            "esp-radio should be built with optimization level 2, 3 or s - yours is {level}.
+                See https://github.com/esp-rs/esp-radio",
         );
         print_warning(message);
     }
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // `esp_wifi_sys::include::CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM`
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
-        .expect("Failed to read esp_config.yml for esp-wifi");
+        .expect("Failed to read esp_config.yml for esp-radio");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, Some(chip)).unwrap();
 
     Ok(())

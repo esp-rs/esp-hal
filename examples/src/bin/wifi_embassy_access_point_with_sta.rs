@@ -3,7 +3,7 @@
 //! Set SSID and PASSWORD env variable before running the example.
 //!
 //! - gets an ip address via DHCP
-//! - creates an open access-point with SSID `esp-wifi`
+//! - creates an open access-point with SSID `esp-radio`
 //! - if you either:
 //!   - connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway 192.168.2.1
 //!   - open http://192.168.2.1:8080/ in your browser
@@ -16,7 +16,7 @@
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
-//% FEATURES: embassy esp-wifi esp-wifi/wifi esp-hal/unstable
+//% FEATURES: embassy esp-radio esp-radio/wifi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -39,8 +39,8 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
-use esp_wifi::{
-    EspWifiController,
+use esp_radio::{
+    EspRadioController,
     wifi::{
         AccessPointConfiguration,
         ClientConfiguration,
@@ -78,10 +78,10 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspRadioController<'static>, esp_radio::init().unwrap());
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let wifi_ap_device = interfaces.ap;
     let wifi_sta_device = interfaces.sta;
@@ -128,7 +128,7 @@ async fn main(spawner: Spawner) -> ! {
             ..Default::default()
         },
         AccessPointConfiguration {
-            ssid: "esp-wifi".into(),
+            ssid: "esp-radio".into(),
             ..Default::default()
         },
     );
@@ -153,7 +153,7 @@ async fn main(spawner: Spawner) -> ! {
         }
         Timer::after(Duration::from_millis(500)).await;
     }
-    println!("Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/");
+    println!("Connect to the AP `esp-radio` and point your browser to http://192.168.2.1:8080/");
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
     println!("Or connect to the ap `{SSID}` and point your browser to http://{sta_address}:8080/");
 
@@ -259,7 +259,7 @@ async fn main(spawner: Spawner) -> ! {
                         b"HTTP/1.0 500 Internal Server Error\r\n\r\n\
                         <html>\
                             <body>\
-                                <h1>Hello Rust! Hello esp-wifi! STA failed to send request.</h1>\
+                                <h1>Hello Rust! Hello esp-radio! STA failed to send request.</h1>\
                             </body>\
                         </html>\r\n\
                         ",
@@ -304,7 +304,7 @@ async fn main(spawner: Spawner) -> ! {
                     b"HTTP/1.0 200 OK\r\n\r\n\
                     <html>\
                         <body>\
-                            <h1>Hello Rust! Hello esp-wifi! STA is not connected.</h1>\
+                            <h1>Hello Rust! Hello esp-radio! STA is not connected.</h1>\
                         </body>\
                     </html>\r\n\
                     ",
@@ -335,7 +335,7 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("Wifi started!");
 
     loop {
-        match esp_wifi::wifi::ap_state() {
+        match esp_radio::wifi::ap_state() {
             WifiState::ApStarted => {
                 println!("About to connect...");
 

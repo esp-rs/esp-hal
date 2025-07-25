@@ -3,7 +3,7 @@ name          = "esp-radio-preempt-baremetal"
 version       = "0.0.1"
 edition       = "2024"
 rust-version  = "1.86.0"
-description   = "Bare-metal task scheduler for esp-wifi"
+description   = "Bare-metal task scheduler for esp-radio"
 documentation = "https://docs.espressif.com/projects/rust/esp-radio-preempt-baremetal/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
@@ -20,7 +20,7 @@ bench = false
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = [
     "requires-unstable",
-    "__esp_wifi_builtin_scheduler",
+    "__esp_radio_builtin_scheduler",
 ] }
 
 cfg-if = "1"

@@ -30,7 +30,7 @@ esp-ieee802154      = { path = "../esp-ieee802154", optional = true }
 esp-println         = { path = "../esp-println", features = ["log-04"] }
 esp-radio-preempt-baremetal = { path = "../esp-radio-preempt-baremetal", features = ["log-04"], optional = true }
 esp-storage         = { path = "../esp-storage", optional = true }
-esp-wifi            = { path = "../esp-wifi", features = ["log-04"], optional = true }
+esp-radio           = { path = "../esp-radio", features = ["log-04"], optional = true }
 heapless            = "0.8.0"
 hmac                = { version = "0.12.1", default-features = false }
 ieee80211           = { version = "0.4.0", default-features = false }
@@ -47,15 +47,15 @@ edge-nal            = { version = "0.5.0" }
 edge-nal-embassy    = { version = "0.5.0" }
 
 [features]
-esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-wifi?/esp32",   "esp-bootloader-esp-idf/esp32", "esp-radio-preempt-baremetal?/esp32"]
-esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-hal-embassy?/esp32c2", "esp-println/esp32c2", "esp-storage?/esp32c2", "esp-wifi?/esp32c2", "esp-bootloader-esp-idf/esp32c2", "esp-radio-preempt-baremetal?/esp32c2"]
-esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-wifi?/esp32c3", "esp-bootloader-esp-idf/esp32c3", "esp-radio-preempt-baremetal?/esp32c3"]
-esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-wifi?/esp32c6", "esp-bootloader-esp-idf/esp32c6", "esp-radio-preempt-baremetal?/esp32c6", "esp-ieee802154?/esp32c6"]
-esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-wifi?/esp32h2", "esp-bootloader-esp-idf/esp32h2", "esp-radio-preempt-baremetal?/esp32h2", "esp-ieee802154?/esp32h2"]
-esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2", "esp-println/esp32s2", "esp-storage?/esp32s2", "esp-wifi?/esp32s2", "esp-bootloader-esp-idf/esp32s2", "esp-radio-preempt-baremetal?/esp32s2"]
-esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-wifi?/esp32s3", "esp-bootloader-esp-idf/esp32s3", "esp-radio-preempt-baremetal?/esp32s3"]
+esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-radio?/esp32",   "esp-bootloader-esp-idf/esp32", "esp-radio-preempt-baremetal?/esp32"]
+esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-hal-embassy?/esp32c2", "esp-println/esp32c2", "esp-storage?/esp32c2", "esp-radio?/esp32c2", "esp-bootloader-esp-idf/esp32c2", "esp-radio-preempt-baremetal?/esp32c2"]
+esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-radio?/esp32c3", "esp-bootloader-esp-idf/esp32c3", "esp-radio-preempt-baremetal?/esp32c3"]
+esp32c6 = ["esp-hal/esp32c6", "esp-backtrace/esp32c6", "esp-hal-embassy?/esp32c6", "esp-println/esp32c6", "esp-storage?/esp32c6", "esp-radio?/esp32c6", "esp-bootloader-esp-idf/esp32c6", "esp-radio-preempt-baremetal?/esp32c6", "esp-ieee802154?/esp32c6"]
+esp32h2 = ["esp-hal/esp32h2", "esp-backtrace/esp32h2", "esp-hal-embassy?/esp32h2", "esp-println/esp32h2", "esp-storage?/esp32h2", "esp-radio?/esp32h2", "esp-bootloader-esp-idf/esp32h2", "esp-radio-preempt-baremetal?/esp32h2", "esp-ieee802154?/esp32h2"]
+esp32s2 = ["esp-hal/esp32s2", "esp-backtrace/esp32s2", "esp-hal-embassy?/esp32s2", "esp-println/esp32s2", "esp-storage?/esp32s2", "esp-radio?/esp32s2", "esp-bootloader-esp-idf/esp32s2", "esp-radio-preempt-baremetal?/esp32s2"]
+esp32s3 = ["esp-hal/esp32s3", "esp-backtrace/esp32s3", "esp-hal-embassy?/esp32s3", "esp-println/esp32s3", "esp-storage?/esp32s3", "esp-radio?/esp32s3", "esp-bootloader-esp-idf/esp32s3", "esp-radio-preempt-baremetal?/esp32s3"]
 
-esp-wifi = ["dep:esp-wifi", "dep:esp-radio-preempt-baremetal"]
+esp-radio = ["dep:esp-radio", "dep:esp-radio-preempt-baremetal"]
 
 embassy  = ["dep:esp-hal-embassy"]
 

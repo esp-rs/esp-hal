@@ -2,7 +2,7 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/esp-now esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -17,7 +17,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_wifi::esp_now::{BROADCAST_ADDRESS, PeerInfo};
+use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -32,11 +32,11 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_wifi::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
-    controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
+    let (mut controller, interfaces) = esp_radio::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
+    controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
     let mut esp_now = interfaces.esp_now;
@@ -55,7 +55,7 @@ fn main() -> ! {
                 if !esp_now.peer_exists(&r.info.src_address) {
                     esp_now
                         .add_peer(PeerInfo {
-                            interface: esp_wifi::esp_now::EspNowWifiInterface::Sta,
+                            interface: esp_radio::esp_now::EspNowWifiInterface::Sta,
                             peer_address: r.info.src_address,
                             lmk: None,
                             channel: None,

@@ -1,5 +1,5 @@
 [package]
-name = "esp-wifi"
+name = "esp-radio"
 version = "0.15.0"
 edition = "2024"
 rust-version  = "1.88.0"

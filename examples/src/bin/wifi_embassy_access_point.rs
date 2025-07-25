@@ -1,6 +1,6 @@
 //! Embassy access point
 //!
-//! - creates an open access-point with SSID `esp-wifi`
+//! - creates an open access-point with SSID `esp-radio`
 //! - you can connect to it using a static IP in range 192.168.2.2 .. 192.168.2.255, gateway
 //!   192.168.2.1
 //! - open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request
@@ -10,7 +10,7 @@
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
-//% FEATURES: embassy esp-wifi esp-wifi/wifi esp-hal/unstable
+//% FEATURES: embassy esp-radio esp-radio/wifi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -33,8 +33,8 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
-use esp_wifi::{
-    EspWifiController,
+use esp_radio::{
+    EspRadioController,
     wifi::{
         AccessPointConfiguration,
         Configuration,
@@ -70,9 +70,9 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspRadioController<'static>, esp_radio::init().unwrap());
 
-    let (controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, peripherals.WIFI).unwrap();
+    let (controller, interfaces) = esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let device = interfaces.ap;
 
@@ -121,7 +121,7 @@ async fn main(spawner: Spawner) -> ! {
         Timer::after(Duration::from_millis(500)).await;
     }
     println!(
-        "Connect to the AP `esp-wifi` and point your browser to http://{gw_ip_addr_str}:8080/"
+        "Connect to the AP `esp-radio` and point your browser to http://{gw_ip_addr_str}:8080/"
     );
     println!("DHCP is enabled so there's no need to configure a static IP, just in case:");
     while !stack.is_config_up() {
@@ -182,7 +182,7 @@ async fn main(spawner: Spawner) -> ! {
                 b"HTTP/1.0 200 OK\r\n\r\n\
             <html>\
                 <body>\
-                    <h1>Hello Rust! Hello esp-wifi!</h1>\
+                    <h1>Hello Rust! Hello esp-radio!</h1>\
                 </body>\
             </html>\r\n\
             ",
@@ -250,7 +250,7 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_wifi::wifi::wifi_state() {
+        match esp_radio::wifi::wifi_state() {
             WifiState::ApStarted => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::ApStop).await;
@@ -260,7 +260,7 @@ async fn connection(mut controller: WifiController<'static>) {
         }
         if !matches!(controller.is_started(), Ok(true)) {
             let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-                ssid: "esp-wifi".try_into().unwrap(),
+                ssid: "esp-radio".try_into().unwrap(),
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();

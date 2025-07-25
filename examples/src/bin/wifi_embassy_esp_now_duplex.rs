@@ -5,7 +5,7 @@
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
-//% FEATURES: embassy esp-wifi esp-wifi/esp-now esp-hal/unstable
+//% FEATURES: embassy esp-radio esp-radio/esp-now esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -18,8 +18,8 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::{
-    EspWifiController,
+use esp_radio::{
+    EspRadioController,
     esp_now::{BROADCAST_ADDRESS, EspNowManager, EspNowReceiver, EspNowSender, PeerInfo},
 };
 
@@ -46,11 +46,11 @@ async fn main(spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(EspWifiController<'static>, esp_wifi::init().unwrap());
+    let esp_wifi_ctrl = &*mk_static!(EspRadioController<'static>, esp_radio::init().unwrap());
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_wifi::wifi::new(esp_wifi_ctrl, wifi).unwrap();
-    controller.set_mode(esp_wifi::wifi::WifiMode::Sta).unwrap();
+    let (mut controller, interfaces) = esp_radio::wifi::new(&esp_wifi_ctrl, wifi).unwrap();
+    controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
     let esp_now = interfaces.esp_now;
@@ -122,7 +122,7 @@ async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNow
             if !manager.peer_exists(&r.info.src_address) {
                 manager
                     .add_peer(PeerInfo {
-                        interface: esp_wifi::esp_now::EspNowWifiInterface::Sta,
+                        interface: esp_radio::esp_now::EspNowWifiInterface::Sta,
                         peer_address: r.info.src_address,
                         lmk: None,
                         channel: None,

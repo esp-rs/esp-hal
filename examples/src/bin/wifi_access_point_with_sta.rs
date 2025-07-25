@@ -3,14 +3,14 @@
 //! Set SSID and PASSWORD env variable before running this example.
 //!
 //! Gets an ip address via DHCP, creates an open access-point with SSID
-//! `esp-wifi` You can connect to it using a static IP in range 192.168.2.2 ..
+//! `esp-radio` You can connect to it using a static IP in range 192.168.2.2 ..
 //! 192.168.2.255, gateway 192.168.2.1 Open http://192.168.2.1:8080/ in your browser - the example will perform an HTTP get request to some "random" server
 //!
 //! On Android you might need to choose _Keep Accesspoint_ when it tells you the
 //! WiFi has no internet connection, Chrome might not want to load the URL - you
 //! can use a shell and try `curl` and `ping`
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -30,7 +30,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_wifi::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration};
+use esp_radio::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,
@@ -52,10 +52,10 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let mut ap_device = interfaces.ap;
     let ap_interface = create_interface(&mut ap_device);
@@ -81,7 +81,7 @@ fn main() -> ! {
             ..Default::default()
         },
         AccessPointConfiguration {
-            ssid: "esp-wifi".into(),
+            ssid: "esp-radio".into(),
             ..Default::default()
         },
     );
@@ -125,7 +125,7 @@ fn main() -> ! {
     }
 
     println!(
-        "Start busy loop on main. Connect to the AP `esp-wifi` and point your browser to http://192.168.2.1:8080/"
+        "Start busy loop on main. Connect to the AP `esp-radio` and point your browser to http://192.168.2.1:8080/"
     );
     println!("Use a static IP in the range 192.168.2.2 .. 192.168.2.255, use gateway 192.168.2.1");
 
@@ -239,7 +239,7 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

@@ -6,10 +6,10 @@
 //! This gets an ip address via DHCP then performs an HTTP get request to some
 //! "random" server
 
-//% FEATURES: esp-wifi esp-wifi/wifi  esp-hal/unstable esp-wifi/smoltcp
+//% FEATURES: esp-radio esp-radio/wifi  esp-hal/unstable esp-radio/smoltcp
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
-// esp-wifi/utils
+// esp-radio/utils
 
 #![no_std]
 #![no_main]
@@ -29,7 +29,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_wifi::wifi::{ClientConfiguration, Configuration};
+use esp_radio::wifi::{ClientConfiguration, Configuration};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -51,10 +51,10 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);
@@ -65,7 +65,7 @@ fn main() -> ! {
     // we can set a hostname here (or add other DHCP options)
     dhcp_socket.set_outgoing_options(&[DhcpOption {
         kind: 12,
-        data: b"esp-wifi",
+        data: b"esp-radio",
     }]);
     socket_set.add(dhcp_socket);
 
@@ -74,7 +74,7 @@ fn main() -> ! {
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
     controller
-        .set_power_saving(esp_wifi::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::config::PowerSaveMode::None)
         .unwrap();
 
     let client_config = Configuration::Client(ClientConfiguration {
@@ -172,7 +172,7 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

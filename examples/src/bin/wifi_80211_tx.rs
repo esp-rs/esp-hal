@@ -2,7 +2,7 @@
 //!
 //! Periodically transmits a beacon frame.
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/sniffer esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -14,7 +14,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, delay::Delay, main, time::Duration, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::wifi;
+use esp_radio::wifi;
 use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
@@ -26,7 +26,7 @@ use ieee80211::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-const SSID: &str = "esp-wifi 802.11 injection";
+const SSID: &str = "esp-radio 802.11 injection";
 /// This is an arbitrary MAC address, used for the fake beacon frames.
 const MAC_ADDRESS: [u8; 6] = [0x00, 0x80, 0x41, 0x13, 0x37, 0x42];
 
@@ -43,11 +43,11 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
@@ -104,7 +104,7 @@ fn main() -> ! {
     // Only use the actually written bytes.
     let beacon = &beacon[..length];
 
-    println!("Scan for WiFi networks and find `esp-wifi 802.11 injection`");
+    println!("Scan for WiFi networks and find `esp-radio 802.11 injection`");
 
     loop {
         sniffer.send_raw_frame(true, beacon, false).unwrap();

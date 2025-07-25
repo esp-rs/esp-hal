@@ -3,8 +3,9 @@
 //!
 //! Set SSID and PASSWORD env variable before running this example.
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/smoltcp esp-wifi/log-04 esp-wifi/csi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-radio/log-04 esp-radio/csi
+//% FEATURES: esp-hal/unstable
 
 #![no_std]
 #![no_main]
@@ -16,7 +17,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::wifi::{ClientConfiguration, Configuration, CsiConfig};
+use esp_radio::wifi::{ClientConfiguration, Configuration, CsiConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::DhcpOption,
@@ -38,10 +39,10 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);
@@ -52,7 +53,7 @@ fn main() -> ! {
     // we can set a hostname here (or add other DHCP options)
     dhcp_socket.set_outgoing_options(&[DhcpOption {
         kind: 12,
-        data: b"esp-wifi",
+        data: b"esp-radio",
     }]);
     socket_set.add(dhcp_socket);
 
@@ -73,7 +74,7 @@ fn main() -> ! {
 
     let csi = CsiConfig::default();
     controller
-        .set_csi(csi, |data: esp_wifi::wifi::wifi_csi_info_t| {
+        .set_csi(csi, |data: esp_radio::wifi::wifi_csi_info_t| {
             let rx_ctrl = data.rx_ctrl;
             // Signed bitfields are broken in rust-bingen, see https://github.com/esp-rs/esp-wifi-sys/issues/482
             let rssi = if rx_ctrl.rssi() > 127 {
@@ -133,7 +134,7 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_wifi::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

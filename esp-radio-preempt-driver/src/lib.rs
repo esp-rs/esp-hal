@@ -1,10 +1,10 @@
-//! # esp-wifi task scheduler interface.
+//! # esp-radio task scheduler interface.
 //!
-//! `esp-wifi` requires a task scheduler to operate. This crate allows the task scheduler to be
+//! `esp-radio` requires a task scheduler to operate. This crate allows the task scheduler to be
 //! tailored to specific software platforms (such as ArielOS). Trying to use multiple scheduler
 //! crates in a firmware project will not build.
 //!
-//! If you want to use esp-wifi without any OS, you can use the [`esp-radio-preempt-baremetal`]
+//! If you want to use esp-radio without any OS, you can use the [`esp-radio-preempt-baremetal`]
 //! crate as the task scheduler.
 //!
 //! ## Implementing a scheduler driver
@@ -110,7 +110,7 @@ macro_rules! scheduler_impl {
 
 /// The scheduler interface.
 ///
-/// This trait needs to be implemented by a driver crate to integrate esp-wifi with a software
+/// This trait needs to be implemented by a driver crate to integrate esp-radio with a software
 /// platform.
 pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_wifi::init` to verify that the scheduler is properly set up.
@@ -120,10 +120,10 @@ pub trait Scheduler: Send + Sync + 'static {
     /// specified number of microseconds.
     fn usleep(&self, us: u32);
 
-    /// This function is called by `esp-wifi` to start the task scheduler.
+    /// This function is called by `esp-radio` to start the task scheduler.
     fn enable(&self);
 
-    /// This function is called by `esp-wifi` to stop the task scheduler.
+    /// This function is called by `esp-radio` to stop the task scheduler.
     fn disable(&self);
 
     /// This function is called by `esp_wifi::init` to yield control to another task.
@@ -155,7 +155,7 @@ pub trait Scheduler: Send + Sync + 'static {
     fn current_task_thread_semaphore(&self) -> *mut c_void;
 }
 
-// API used (mostly) by esp-wifi
+// API used (mostly) by esp-radio
 
 /// Returns whether the task scheduler has been initialized.
 #[inline]

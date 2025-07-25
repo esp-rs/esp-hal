@@ -21,6 +21,7 @@ use esp_hal::{
 };
 #[cfg(not(feature = "esp32"))]
 use esp_hal_embassy::InterruptExecutor;
+#[cfg(not(feature = "esp32"))]
 use hil_test::mk_static;
 
 esp_bootloader_esp_idf::esp_app_desc!();

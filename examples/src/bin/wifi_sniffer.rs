@@ -2,7 +2,7 @@
 //!
 //! Sniffs for beacon frames.
 
-//% FEATURES: esp-wifi esp-wifi/wifi esp-wifi/sniffer esp-hal/unstable
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/sniffer esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
@@ -20,7 +20,7 @@ use critical_section::Mutex;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_wifi::wifi;
+use esp_radio::wifi;
 use ieee80211::{match_frames, mgmt_frame::BeaconFrame};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -38,11 +38,11 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_wifi::init().unwrap();
+    let esp_wifi_ctrl = esp_radio::init().unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =
-        esp_wifi::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();

@@ -1,4 +1,4 @@
-//! This crate allows using esp-wifi on top of esp-hal, without any other OS.
+//! This crate allows using esp-radio on top of esp-hal, without any other OS.
 //!
 //! This crate needs to be initialized with an esp-hal timer before the scheduler can be started.
 //!
@@ -9,8 +9,8 @@
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
 //! esp_radio_preempt_baremetal::init(timg0.timer0);
 //!
-//! // You can now start esp-wifi:
-//! // let esp_wifi_controller = esp_wifi::init().unwrap();
+//! // You can now start esp-radio:
+//! // let esp_wifi_controller = esp_radio::init().unwrap();
 //! # }
 //! ```
 

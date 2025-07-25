@@ -300,7 +300,7 @@ pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
 
 static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
-// We're use either WIFI or BT here, since esp-wifi also supports the ESP32-H2 as the only
+// We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
 // chip, with BT but without WIFI.
 #[cfg(not(esp32h2))]
 type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;

@@ -1,8 +1,8 @@
-//! Test we get an error when attempting to initialize esp-wifi with interrupts
+//! Test we get an error when attempting to initialize esp-radio with interrupts
 //! disabled in common ways
 
 //% CHIPS: esp32 esp32s2 esp32c2 esp32c3 esp32c6 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/wifi embassy
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi embassy
 
 #![no_std]
 #![no_main]
@@ -19,7 +19,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
-use esp_wifi::InitializationError;
+use esp_radio::InitializationError;
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
@@ -38,7 +38,7 @@ async fn try_init(
     let timg0 = TimerGroup::new(timer);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    match esp_wifi::init() {
+    match esp_radio::init() {
         Ok(_) => signal.signal(None),
         Err(err) => signal.signal(Some(err)),
     }
@@ -59,12 +59,12 @@ mod tests {
 
     #[test]
     fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
-        // esp-radio-preempt-baremetal must be initialized before esp-wifi.
-        let init = esp_wifi::init();
+        // esp-radio-preempt-baremetal must be initialized before esp-radio.
+        let init = esp_radio::init();
 
         assert!(matches!(
             init,
-            Err(esp_wifi::InitializationError::SchedulerNotInitialized),
+            Err(InitializationError::SchedulerNotInitialized),
         ));
     }
 
@@ -73,12 +73,9 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
 
-        let init = critical_section::with(|_| esp_wifi::init());
+        let init = critical_section::with(|_| esp_radio::init());
 
-        assert!(matches!(
-            init,
-            Err(esp_wifi::InitializationError::InterruptsDisabled),
-        ));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
     }
 
     #[test]
@@ -86,12 +83,9 @@ mod tests {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
 
-        let init = interrupt_free(|| esp_wifi::init());
+        let init = interrupt_free(|| esp_radio::init());
 
-        assert!(matches!(
-            init,
-            Err(esp_wifi::InitializationError::InterruptsDisabled),
-        ));
+        assert!(matches!(init, Err(InitializationError::InterruptsDisabled),));
     }
 
     #[test]
@@ -113,7 +107,7 @@ mod tests {
 
         assert!(matches!(
             res,
-            Some(esp_wifi::InitializationError::InterruptsDisabled),
+            Some(esp_radio::InitializationError::InterruptsDisabled),
         ));
     }
 }

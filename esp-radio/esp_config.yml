@@ -1,4 +1,4 @@
-crate: esp-wifi
+crate: esp-radio
 
 options:
   - name: rx_queue_size
@@ -216,5 +216,5 @@ options:
       - value: true
 
 checks:
-  - 'ESP_WIFI_CONFIG_RX_BA_WIN < ESP_WIFI_CONFIG_DYNAMIC_RX_BUF_NUM'
-  - 'ESP_WIFI_CONFIG_RX_BA_WIN < (ESP_WIFI_CONFIG_STATIC_RX_BUF_NUM * 2)'
+  - 'ESP_RADIO_CONFIG_RX_BA_WIN < ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM'
+  - 'ESP_RADIO_CONFIG_RX_BA_WIN < (ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM * 2)'

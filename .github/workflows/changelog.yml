@@ -56,8 +56,8 @@ jobs:
               - 'esp-rom-sys/**'
             esp-storage:
               - 'esp-storage/**'
-            esp-wifi:
-              - 'esp-wifi/**'
+            esp-radio:
+              - 'esp-radio/**'
             xtensa-lx:
               - 'xtensa-lx/**'
             xtensa-lx-rt:
@@ -167,13 +167,13 @@ jobs:
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-storage/CHANGELOG.md file."
 
-      - name: Check that changelog updated (esp-wifi)
-        if: steps.changes.outputs.esp-wifi == 'true'
+      - name: Check that changelog updated (esp-radio)
+        if: steps.changes.outputs.esp-radio == 'true'
         uses: dangoslen/changelog-enforcer@v3
         with:
-          changeLogPath: esp-wifi/CHANGELOG.md
+          changeLogPath: esp-radio/CHANGELOG.md
           skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-wifi/CHANGELOG.md file."
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio/CHANGELOG.md file."
 
       - name: Check that changelog updated (xtensa-lx)
         if: steps.changes.outputs.xtensa-lx == 'true'

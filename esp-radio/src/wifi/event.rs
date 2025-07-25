@@ -30,7 +30,7 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 /// Register a new event handler like:
 ///
 /// ```rust, no_run
-/// # use esp_wifi::wifi::event::{self, *};
+/// # use esp_radio::wifi::event::{self, *};
 /// # fn new_handler(_: &ApStaconnected) {}
 /// event::ApStaconnected::update_handler(|_cs, event| {
 ///     new_handler(event);

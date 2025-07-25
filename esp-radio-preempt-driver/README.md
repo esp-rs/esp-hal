@@ -6,7 +6,7 @@
 ![Crates.io](https://img.shields.io/crates/l/esp-radio-preempt-driver?labelColor=1C2C2E&style=flat-square)
 [![Matrix](https://img.shields.io/matrix/esp-rs:matrix.org?label=join%20matrix&labelColor=1C2C2E&color=BEC5C9&logo=matrix&style=flat-square)](https://matrix.to/#/#esp-rs:matrix.org)
 
-This crate provides the interface to create task schedulers for [`esp-wifi`](https://crates.io/crates/esp-wifi).
+This crate provides the interface to create task schedulers for [`esp-radio`](https://crates.io/crates/esp-radio).
 
 ## Minimum Supported Rust Version (MSRV)
 

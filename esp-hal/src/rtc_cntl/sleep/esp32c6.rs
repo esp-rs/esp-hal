@@ -745,9 +745,9 @@ impl SleepTimeConfig {
         //                   |<--      PMU guard time, also the maximum time for the SOC     -->|
         //                   |                           wake-up delay                          |
         //
-        const CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP: bool = true;
+        const CONFIG_ESP_RADIO_ENHANCED_LIGHT_SLEEP: bool = true;
 
-        let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_WIFI_ENHANCED_LIGHT_SLEEP {
+        let (rf_on_protect_time_us, sync_time_us) = if CONFIG_ESP_RADIO_ENHANCED_LIGHT_SLEEP {
             (
                 MachineConstants::HP_REGDMA_RF_ON_WORK_TIME_US,
                 MachineConstants::HP_CLOCK_DOMAIN_SYNC_TIME_US,

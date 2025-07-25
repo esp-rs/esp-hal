@@ -11,31 +11,31 @@
 //! THIS DOESN'T ACTUALLY TEST THE RADIO HOWEVER.
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: unstable esp-wifi esp-alloc esp-wifi/ble defmt
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/ble defmt
 
 #![no_std]
 #![no_main]
 
 use embedded_io::{Read, Write};
 use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup};
-use esp_wifi::ble::controller::BleConnector;
+use esp_radio::ble::controller::BleConnector;
 use hil_test as _;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-// Compile-time test to check that esp-wifi can be reinitialized.
-fn _esp_wifi_can_be_reinited() {
+// Compile-time test to check that esp-radio can be reinitialized.
+fn _esp_radio_can_be_reinited() {
     let p = esp_hal::init(esp_hal::Config::default());
 
     let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
     {
-        let _init = esp_wifi::init().unwrap();
+        let _init = esp_radio::init().unwrap();
     }
 
     {
-        let _init = esp_wifi::init().unwrap();
+        let _init = esp_radio::init().unwrap();
     }
 }
 
@@ -61,7 +61,7 @@ mod tests {
     fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
-        let init = esp_wifi::init().unwrap();
+        let init = esp_radio::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 
@@ -111,7 +111,7 @@ mod tests {
     fn test_dropping_controller_during_reset(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
         esp_radio_preempt_baremetal::init(timg0.timer0);
-        let init = esp_wifi::init().unwrap();
+        let init = esp_radio::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
 
