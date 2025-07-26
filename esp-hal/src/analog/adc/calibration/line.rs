@@ -45,6 +45,9 @@ pub struct AdcCalLine<ADCI> {
     /// number with 16 fractional bits.
     gain: u32,
 
+    #[cfg(esp32s2)]
+    offset: i32,
+
     _phantom: PhantomData<ADCI>,
 }
 
@@ -63,7 +66,7 @@ where
             .map(|code| (code, ADCI::cal_mv(atten)))
             .unwrap_or_else(|| {
                 // As a fallback try to calibrate using reference voltage source.
-                // This method is not too good because actual reference voltage may varies
+                // This method is not too good because actual reference voltage varies
                 // in range 1000..=1200 mV and this value currently cannot be read from efuse.
                 (
                     AdcConfig::<ADCI>::adc_calibrate(atten, AdcCalSource::Ref),
@@ -82,6 +85,8 @@ where
         Self {
             basic,
             gain,
+            #[cfg(esp32s2)]
+            offset: ADCI::coeff_b(atten).unwrap_or(0),
             _phantom: PhantomData,
         }
     }
@@ -93,12 +98,17 @@ where
     fn adc_val(&self, val: u16) -> u16 {
         let val = self.basic.adc_val(val);
 
-        (val as u32 * self.gain / GAIN_SCALE) as u16
+        let transformed = val as u32 * self.gain / GAIN_SCALE;
+
+        #[cfg(esp32s2)]
+        let transformed = { i32::max(transformed as i32 + self.offset, 0) };
+
+        transformed as u16
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s2, esp32s3))]
 impl AdcHasLineCal for crate::peripherals::ADC1<'_> {}
 
-#[cfg(any(esp32c3, esp32s3))]
+#[cfg(any(esp32c3, esp32s2, esp32s3))]
 impl AdcHasLineCal for crate::peripherals::ADC2<'_> {}
