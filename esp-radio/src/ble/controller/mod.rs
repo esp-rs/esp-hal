@@ -1,7 +1,7 @@
 use embedded_io::{Error, ErrorType, Read, Write};
 
 use super::{read_hci, read_next, send_hci};
-use crate::EspRadioController;
+use crate::Controller;
 
 /// A blocking HCI connector
 pub struct BleConnector<'d> {
@@ -16,7 +16,7 @@ impl Drop for BleConnector<'_> {
 
 impl<'d> BleConnector<'d> {
     pub fn new(
-        _init: &'d EspRadioController<'d>,
+        _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
     ) -> BleConnector<'d> {
         crate::ble::ble_init();
