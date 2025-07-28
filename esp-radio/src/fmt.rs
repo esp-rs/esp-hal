@@ -305,7 +305,7 @@ impl LowerHex for Bytes<'_> {
 
 #[cfg(feature = "defmt")]
 impl defmt::Format for Bytes<'_> {
-    fn format(&self, fmt: defmt::Formatter) {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(fmt, "{:02x}", self.0)
     }
 }
