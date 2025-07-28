@@ -318,7 +318,6 @@ fn is_interrupts_disabled() -> bool {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error which can be returned during [`init`].
 #[non_exhaustive]
-#[instability::unstable]
 pub enum InitializationError {
     /// A general error occurred.
     /// The internal error code is reported.

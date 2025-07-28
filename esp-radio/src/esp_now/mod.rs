@@ -10,11 +10,18 @@
 //! For more information see https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
-use core::{cell::RefCell, fmt::Debug, marker::PhantomData};
+use core::{
+    cell::RefCell,
+    fmt::Debug,
+    marker::PhantomData,
+    task::{Context, Poll},
+};
 
 use critical_section::Mutex;
+use esp_hal::asynch::AtomicWaker;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
+use super::*;
 #[cfg(feature = "csi")]
 use crate::wifi::CsiConfig;
 use crate::{
@@ -801,7 +808,7 @@ unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t
 
         ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
-        asynch::ESP_NOW_TX_WAKER.wake();
+        ESP_NOW_TX_WAKER.wake();
     })
 }
 
@@ -851,130 +858,119 @@ unsafe extern "C" fn rcv_cb(
 
         queue.push_back(ReceivedData { data, info });
 
-        asynch::ESP_NOW_RX_WAKER.wake();
+        ESP_NOW_RX_WAKER.wake();
     });
 }
 
-#[instability::unstable]
-pub use asynch::SendFuture;
+pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
+pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
-mod asynch {
-    use core::task::{Context, Poll};
-
-    use esp_hal::asynch::AtomicWaker;
-
-    use super::*;
-
-    pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
-
-    impl EspNowReceiver<'_> {
-        /// This function takes mutable reference to self because the
-        /// implementation of `ReceiveFuture` is not logically thread
-        /// safe.
-        #[instability::unstable]
-        pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
-            ReceiveFuture(PhantomData)
-        }
-    }
-
-    impl EspNowSender<'_> {
-        /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
-        #[instability::unstable]
-        pub fn send_async<'s, 'r>(
-            &'s mut self,
-            addr: &'r [u8; 6],
-            data: &'r [u8],
-        ) -> SendFuture<'s, 'r> {
-            SendFuture {
-                _sender: PhantomData,
-                addr,
-                data,
-                sent: false,
-            }
-        }
-    }
-
-    impl EspNow<'_> {
-        /// This function takes mutable reference to self because the
-        /// implementation of `ReceiveFuture` is not logically thread
-        /// safe.
-        #[instability::unstable]
-        pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
-            self.receiver.receive_async()
-        }
-
-        /// The returned future must not be dropped before it's ready to avoid
-        /// getting wrong status for sendings.
-        #[instability::unstable]
-        pub fn send_async<'s, 'r>(
-            &'s mut self,
-            dst_addr: &'r [u8; 6],
-            data: &'r [u8],
-        ) -> SendFuture<'s, 'r> {
-            self.sender.send_async(dst_addr, data)
-        }
-    }
-
-    /// A `future` representing the result of an asynchronous ESP-NOW send
-    /// operation.
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
+impl EspNowReceiver<'_> {
+    /// This function takes mutable reference to self because the
+    /// implementation of `ReceiveFuture` is not logically thread
+    /// safe.
     #[instability::unstable]
-    pub struct SendFuture<'s, 'r> {
-        _sender: PhantomData<&'s mut EspNowSender<'s>>,
+    pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
+        ReceiveFuture(PhantomData)
+    }
+}
+
+impl EspNowSender<'_> {
+    /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
+    #[instability::unstable]
+    pub fn send_async<'s, 'r>(
+        &'s mut self,
         addr: &'r [u8; 6],
         data: &'r [u8],
-        sent: bool,
-    }
-
-    impl core::future::Future for SendFuture<'_, '_> {
-        type Output = Result<(), EspNowError>;
-
-        fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            if !self.sent {
-                ESP_NOW_TX_WAKER.register(cx.waker());
-                ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
-                if let Err(e) = check_error!({
-                    esp_now_send(self.addr.as_ptr(), self.data.as_ptr(), self.data.len())
-                }) {
-                    return Poll::Ready(Err(e));
-                }
-                self.sent = true;
-            }
-
-            if !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {
-                Poll::Pending
-            } else {
-                Poll::Ready(if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
-                    Ok(())
-                } else {
-                    Err(EspNowError::SendFailed)
-                })
-            }
+    ) -> SendFuture<'s, 'r> {
+        SendFuture {
+            _sender: PhantomData,
+            addr,
+            data,
+            sent: false,
         }
     }
+}
 
-    /// It's not logically safe to poll multiple instances of `ReceiveFuture`
-    /// simultaneously since the callback can only wake one future, leaving
-    /// the rest of them unwakable.
-    #[must_use = "futures do nothing unless you `.await` or poll them"]
+impl EspNow<'_> {
+    /// This function takes mutable reference to self because the
+    /// implementation of `ReceiveFuture` is not logically thread
+    /// safe.
     #[instability::unstable]
-    pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+    pub fn receive_async(&mut self) -> ReceiveFuture<'_> {
+        self.receiver.receive_async()
+    }
 
-    impl core::future::Future for ReceiveFuture<'_> {
-        type Output = ReceivedData;
+    /// The returned future must not be dropped before it's ready to avoid
+    /// getting wrong status for sendings.
+    #[instability::unstable]
+    pub fn send_async<'s, 'r>(
+        &'s mut self,
+        dst_addr: &'r [u8; 6],
+        data: &'r [u8],
+    ) -> SendFuture<'s, 'r> {
+        self.sender.send_async(dst_addr, data)
+    }
+}
 
-        fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-            ESP_NOW_RX_WAKER.register(cx.waker());
+/// A `future` representing the result of an asynchronous ESP-NOW send
+/// operation.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+#[instability::unstable]
+pub struct SendFuture<'s, 'r> {
+    _sender: PhantomData<&'s mut EspNowSender<'s>>,
+    addr: &'r [u8; 6],
+    data: &'r [u8],
+    sent: bool,
+}
 
-            if let Some(data) = critical_section::with(|cs| {
-                let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-                queue.pop_front()
+impl core::future::Future for SendFuture<'_, '_> {
+    type Output = Result<(), EspNowError>;
+
+    fn poll(mut self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if !self.sent {
+            ESP_NOW_TX_WAKER.register(cx.waker());
+            ESP_NOW_SEND_CB_INVOKED.store(false, Ordering::Release);
+            if let Err(e) = check_error!({
+                esp_now_send(self.addr.as_ptr(), self.data.as_ptr(), self.data.len())
             }) {
-                Poll::Ready(data)
-            } else {
-                Poll::Pending
+                return Poll::Ready(Err(e));
             }
+            self.sent = true;
+        }
+
+        if !ESP_NOW_SEND_CB_INVOKED.load(Ordering::Acquire) {
+            Poll::Pending
+        } else {
+            Poll::Ready(if ESP_NOW_SEND_STATUS.load(Ordering::Relaxed) {
+                Ok(())
+            } else {
+                Err(EspNowError::SendFailed)
+            })
+        }
+    }
+}
+
+/// It's not logically safe to poll multiple instances of `ReceiveFuture`
+/// simultaneously since the callback can only wake one future, leaving
+/// the rest of them unwakable.
+#[must_use = "futures do nothing unless you `.await` or poll them"]
+#[instability::unstable]
+pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+
+impl core::future::Future for ReceiveFuture<'_> {
+    type Output = ReceivedData;
+
+    fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        ESP_NOW_RX_WAKER.register(cx.waker());
+
+        if let Some(data) = critical_section::with(|cs| {
+            let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
+            queue.pop_front()
+        }) {
+            Poll::Ready(data)
+        } else {
+            Poll::Pending
         }
     }
 }

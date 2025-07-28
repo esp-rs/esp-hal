@@ -19,7 +19,7 @@ use ieee80211::{
     common::{CapabilitiesInformation, FCFFlags},
     element_chain,
     elements::{DSSSParameterSetElement, RawIEEE80211Element, SSIDElement},
-    mgmt_frame::{body::BeaconBody, header::ManagementFrameHeader, BeaconFrame},
+    mgmt_frame::{BeaconFrame, body::BeaconBody, header::ManagementFrameHeader},
     scroll::Pwrite,
     supported_rates,
 };

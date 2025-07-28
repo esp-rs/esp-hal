@@ -63,11 +63,6 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 [features]
 default = ["esp-alloc"]
 
-#! ### Unstable APIs
-#! Unstable APIs are drivers and features that are not yet ready for general use.
-#! They may be incomplete, have bugs, or be subject to change without notice.
-unstable = []
-
 # Chip Support Feature Flags
 # Target the ESP32-C2.
 esp32c2 = [
@@ -163,6 +158,17 @@ log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
+
+#! ### Unstable APIs
+#! Unstable APIs are drivers and features that are not yet ready for general use.
+#! They may be incomplete, have bugs, or be subject to change without notice.
+unstable = []
+
+## Libraries that depend on `esp-radio` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-radio as a dev-dependency.
+requires-unstable = []
 
 [package.metadata.docs.rs]
 features = [

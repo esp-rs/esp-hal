@@ -17,7 +17,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::esp_now::{PeerInfo, BROADCAST_ADDRESS};
+use esp_radio::esp_now::{BROADCAST_ADDRESS, PeerInfo};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
