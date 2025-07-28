@@ -1,54 +1,9 @@
-#![cfg_attr(docsrs, procmacros::doc_replace)]
-//! # Reading of eFuses (ESP32-C2)
-//!
-//! ## Overview
-//! The `efuse` module provides functionality for reading eFuse data
-//! from the `ESP32-C2` chip, allowing access to various chip-specific
-//! information such as:
-//!
-//!   * MAC address
-//!   * ADC calibration information
-//!
-//! and more. It is useful for retrieving chip-specific configuration and
-//! identification data during runtime.
-//!
-//! The `Efuse` struct represents the eFuse peripheral and is responsible for
-//! reading various eFuse fields and values.
-//!
-//! ## Examples
-//!
-//! ### Read data from the eFuse storage.
-//!
-//! ```rust, no_run
-//! # {before_snippet}
-//! # use esp_hal::efuse::Efuse;
-//!
-//! let mac_address = Efuse::read_base_mac_address();
-//!
-//! println!(
-//!     "MAC: {:#X}:{:#X}:{:#X}:{:#X}:{:#X}:{:#X}",
-//!     mac_address[0],
-//!     mac_address[1],
-//!     mac_address[2],
-//!     mac_address[3],
-//!     mac_address[4],
-//!     mac_address[5]
-//! );
-//!
-//! println!("MAC address {:02x?}", Efuse::mac_address());
-//! println!("Flash Encryption {:?}", Efuse::flash_encryption());
-//! # {after_snippet}
-//! ```
-
-pub use self::fields::*;
-use crate::{analog::adc::Attenuation, peripherals::EFUSE, soc::efuse_field::EfuseField};
+use crate::{analog::adc::Attenuation, peripherals::EFUSE};
 
 mod fields;
+pub use fields::*;
 
-/// A struct representing the eFuse functionality of the chip.
-pub struct Efuse;
-
-impl Efuse {
+impl super::Efuse {
     /// Get status of SPI boot encryption.
     pub fn flash_encryption() -> bool {
         !Self::read_field_le::<u8>(SPI_BOOT_CRYPT_CNT)

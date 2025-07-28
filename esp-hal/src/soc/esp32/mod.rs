@@ -6,7 +6,6 @@
 //! for interacting with various system-related peripherals on `ESP32` chip.
 
 crate::unstable_module! {
-    pub mod efuse;
     pub mod trng;
 }
 pub mod cpu_control;

@@ -5,7 +5,7 @@
 
 #![allow(clippy::empty_docs)]
 
-use super::EfuseField;
+use crate::efuse::EfuseField;
 
 /// Efuse write disable mask
 pub const WR_DIS: EfuseField = EfuseField::new(0, 0, 0, 16);
