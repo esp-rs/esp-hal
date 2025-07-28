@@ -170,7 +170,7 @@ const _: () = {
     };
 };
 
-pub(crate) const CONFIG: config::EspRadioConfig = config::EspRadioConfig {
+pub(crate) const CONFIG: config::Config = config::Config {
     rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
     tx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE"),
     static_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM"),
@@ -197,11 +197,11 @@ pub(crate) const CONFIG: config::EspRadioConfig = config::EspRadioConfig {
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct EspRadioController<'d> {
+pub struct Controller<'d> {
     _inner: PhantomData<&'d ()>,
 }
 
-impl Drop for EspRadioController<'_> {
+impl Drop for Controller<'_> {
     fn drop(&mut self) {
         // Disable coexistence
         #[cfg(coex)]
@@ -220,7 +220,7 @@ impl Drop for EspRadioController<'_> {
 /// Initialize for using WiFi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
-pub fn init<'d>() -> Result<EspRadioController<'d>, InitializationError> {
+pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }
@@ -257,7 +257,7 @@ pub fn init<'d>() -> Result<EspRadioController<'d>, InitializationError> {
         error => return Err(InitializationError::General(error)),
     }
 
-    Ok(EspRadioController {
+    Ok(Controller {
         _inner: PhantomData,
     })
 }
