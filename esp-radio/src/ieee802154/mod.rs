@@ -36,7 +36,6 @@ pub use self::{
     raw::RawReceived,
 };
 
-mod fmt;
 mod frame;
 mod hal;
 mod pib;
