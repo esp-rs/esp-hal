@@ -20,14 +20,10 @@ pub(crate) use esp32s2 as pac;
 
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
-    use crate::time::Rate;
-
     /// System clock frequency for the I2S peripheral, in Hertz.
     pub const I2S_SCLK: u32 = 160_000_000;
     /// Default clock source for the I2S peripheral.
     pub const I2S_DEFAULT_CLK_SRC: u32 = 2;
-    /// Reference clock tick frequency, set to 1 MHz.
-    pub const REF_TICK: Rate = Rate::from_mhz(1);
 }
 
 /// Write back a specific range of data in the cache.
