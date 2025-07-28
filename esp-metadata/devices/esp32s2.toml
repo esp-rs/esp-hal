@@ -453,6 +453,7 @@ support_status = "partial"
 timg_has_timer1 = true
 timg_has_divcnt_rst = false
 instances = [{ name = "timg0" }, { name = "timg1" }]
+default_clock_source = 0 # use_xtal = false
 
 [device.uart]
 support_status = "supported"

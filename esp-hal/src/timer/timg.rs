@@ -71,8 +71,6 @@ use core::marker::PhantomData;
 use super::Error;
 #[cfg(timergroup_timg1)]
 use crate::peripherals::TIMG1;
-#[cfg(any(esp32c6, esp32h2))]
-use crate::soc::constants::TIMG_DEFAULT_CLK_SRC;
 use crate::{
     asynch::AtomicWaker,
     clock::Clocks,
@@ -84,6 +82,10 @@ use crate::{
     time::{Duration, Instant, Rate},
 };
 
+#[cfg(timergroup_default_clock_source_is_set)]
+const DEFAULT_CLK_SRC: u8 = property!("timergroup.default_clock_source");
+#[cfg(timergroup_default_wdt_clock_source_is_set)]
+const DEFAULT_WDT_CLK_SRC: u8 = property!("timergroup.default_wdt_clock_source");
 const NUM_TIMG: usize = 1 + cfg!(timergroup_timg1) as usize;
 
 cfg_if::cfg_if! {
@@ -143,19 +145,19 @@ impl TimerGroupInstance for TIMG0<'_> {
 
     fn configure_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // ESP32 has only APB clock source, do nothing
-            } else if #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))] {
+            if #[cfg(not(timergroup_default_clock_source_is_set))] {
+                // Clock source is not configurable
+            } else if #[cfg(soc_has_pcr)] {
+                crate::peripherals::PCR::regs()
+                    .timergroup0_timer_clk_conf()
+                    .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
+            } else {
                 unsafe {
                     (*<Self as TimerGroupInstance>::register_block())
                         .t(0)
                         .config()
-                        .modify(|_, w| w.use_xtal().clear_bit());
+                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
                 }
-            } else if #[cfg(any(esp32c6, esp32h2))] {
-                crate::peripherals::PCR::regs()
-                    .timergroup0_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg0_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
             }
         }
     }
@@ -171,18 +173,18 @@ impl TimerGroupInstance for TIMG0<'_> {
 
     fn configure_wdt_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3))] {
-                // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
-            } else if #[cfg(any(esp32c2, esp32c3))] {
+            if #[cfg(not(timergroup_default_wdt_clock_source_is_set))] {
+                // Clock source is not configurable
+            } else if #[cfg(soc_has_pcr)] {
+                crate::peripherals::PCR::regs()
+                    .timergroup0_wdt_clk_conf()
+                    .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(DEFAULT_WDT_CLK_SRC) });
+            } else {
                 unsafe {
                     (*<Self as TimerGroupInstance>::register_block())
                         .wdtconfig0()
-                        .modify(|_, w| w.wdt_use_xtal().clear_bit());
+                        .modify(|_, w| w.wdt_use_xtal().bit(DEFAULT_WDT_CLK_SRC == 1));
                 }
-            } else if #[cfg(any(esp32c6, esp32h2))] {
-                crate::peripherals::PCR::regs()
-                    .timergroup0_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg0_wdt_clk_sel().bits(1) });
             }
         }
     }
@@ -205,19 +207,23 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
 
     fn configure_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c2, esp32c3))] {
-                // ESP32 has only APB clock source, do nothing
-                // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
-            } else if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(not(timergroup_default_clock_source_is_set))] {
+                // Clock source is not configurable
+            } else if #[cfg(soc_has_pcr)] {
                 crate::peripherals::PCR::regs()
                     .timergroup1_timer_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
-            } else if #[cfg(any(esp32s2, esp32s3))] {
+                    .modify(|_, w| unsafe { w.tg1_timer_clk_sel().bits(DEFAULT_CLK_SRC) });
+            } else {
                 unsafe {
+                    (*<Self as TimerGroupInstance>::register_block())
+                        .t(0)
+                        .config()
+                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
+                    #[cfg(timergroup_timg_has_timer1)]
                     (*<Self as TimerGroupInstance>::register_block())
                         .t(1)
                         .config()
-                        .modify(|_, w| w.use_xtal().clear_bit());
+                        .modify(|_, w| w.use_xtal().bit(DEFAULT_CLK_SRC == 1));
                 }
             }
         }
@@ -233,13 +239,18 @@ impl TimerGroupInstance for crate::peripherals::TIMG1<'_> {
 
     fn configure_wdt_src_clk() {
         cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32s2, esp32s3, esp32c2, esp32c3))] {
-                // ESP32-C2 and ESP32-C3 don't have t1config only t0config, do nothing
-                // ESP32, ESP32-S2, and ESP32-S3 use only ABP, do nothing
-            } else if #[cfg(any(esp32c6, esp32h2))] {
+            if #[cfg(not(timergroup_default_wdt_clock_source_is_set))] {
+                // Clock source is not configurable
+            } else if #[cfg(soc_has_pcr)] {
                 crate::peripherals::PCR::regs()
                     .timergroup1_wdt_clk_conf()
-                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(TIMG_DEFAULT_CLK_SRC) });
+                    .modify(|_, w| unsafe { w.tg1_wdt_clk_sel().bits(DEFAULT_WDT_CLK_SRC) });
+            } else {
+                unsafe {
+                    (*<Self as TimerGroupInstance>::register_block())
+                        .wdtconfig0()
+                        .modify(|_, w| w.wdt_use_xtal().bit(DEFAULT_WDT_CLK_SRC == 1));
+                }
             }
         }
     }
@@ -726,8 +737,15 @@ where
 
     /// Set the timeout, in microseconds, of the watchdog timer
     pub fn set_timeout(&mut self, stage: MwdtStage, timeout: Duration) {
-        // Assume default 80MHz clock source
-        let timeout_ticks = timeout.as_micros() * 10_000 / 125;
+        cfg_if::cfg_if! {
+            if #[cfg(esp32h2)] {
+                // ESP32-H2 is using PLL_48M_CLK source instead of APB_CLK
+                let clk_src = Clocks::get().pll_48m_clock;
+            } else {
+                let clk_src = Clocks::get().apb_clock;
+            }
+        }
+        let timeout_ticks = timeout.as_micros() * clk_src.as_mhz() as u64;
 
         let reg_block = unsafe { &*TG::register_block() };
 

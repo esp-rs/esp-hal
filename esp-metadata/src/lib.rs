@@ -405,23 +405,32 @@ impl Config {
                 self.device
                     .peri_config
                     .properties()
-                    .filter_map(|(name, value)| match value {
-                        Value::Boolean(true) => Some(vec![name.to_string()]),
-                        Value::NumberList(_) => None,
-                        Value::Generic(v) => v.cfgs(),
-                        Value::StringList(values) => Some(
-                            values
-                                .iter()
-                                .map(|val| {
-                                    format!(
-                                        "{name}_{}",
-                                        val.to_lowercase().replace("-", "_").replace("/", "_")
-                                    )
-                                })
-                                .collect(),
-                        ),
-                        Value::Number(value) => Some(vec![format!("{name}=\"{value}\"")]),
-                        _ => None,
+                    .filter_map(|(name, optional, value)| {
+                        let is_unset = matches!(value, Value::Unset);
+                        let mut syms = match value {
+                            Value::Boolean(true) => Some(vec![name.to_string()]),
+                            Value::NumberList(_) => None,
+                            Value::Generic(v) => v.cfgs(),
+                            Value::StringList(values) => Some(
+                                values
+                                    .iter()
+                                    .map(|val| {
+                                        format!(
+                                            "{name}_{}",
+                                            val.to_lowercase().replace("-", "_").replace("/", "_")
+                                        )
+                                    })
+                                    .collect(),
+                            ),
+                            Value::Number(value) => Some(vec![format!("{name}=\"{value}\"")]),
+                            _ => None,
+                        };
+
+                        if optional && !is_unset {
+                            syms.get_or_insert_default().push(format!("{name}_is_set"));
+                        }
+
+                        syms
                     })
                     .flatten(),
             );
@@ -479,7 +488,7 @@ impl Config {
             self.device
                 .peri_config
                 .properties()
-                .flat_map(|(name, value)| match value {
+                .flat_map(|(name, _optional, value)| match value {
                     Value::Number(value) => {
                         let value = number(value); // ensure no numeric suffix is added
                         quote! {
@@ -662,6 +671,7 @@ impl Config {
         cfgs
     }
 
+    /// For each symbol generates a cargo directive that activates it.
     pub fn list_of_cfgs(&self) -> Vec<String> {
         self.active_cfgs()
             .iter()
