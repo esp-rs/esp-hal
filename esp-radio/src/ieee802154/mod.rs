@@ -3,10 +3,10 @@
 //! Implements the PHY/MAC layers of the IEEE 802.15.4 protocol stack, and
 //! supports sending and receiving of raw frames.
 //!
-//! This library is intended to be used to implement support for higher-level
+//! This module is intended to be used to implement support for higher-level
 //! communication protocols, for example [esp-openthread].
 //!
-//! Note that this crate currently requires you to enable the `unstable` feature
+//! Note that this module currently requires you to enable the `unstable` feature
 //! on `esp-hal`.
 //!
 //! NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
@@ -14,19 +14,6 @@
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
-//!
-//! ## Feature Flags
-#![doc = document_features::document_features!()]
-//! ## Additional configuration
-//!
-//! We've exposed some configuration options that don't fit into cargo
-//! features. These can be set via environment variables, or via cargo's `[env]`
-//! section inside `.cargo/config.toml`. Below is a table of tunable parameters
-//! for this crate:
-#![doc = ""]
-#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_ieee802154_config_table.md"))]
-#![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
-#![no_std]
 
 use core::cell::RefCell;
 
@@ -48,7 +35,6 @@ pub use self::{
     raw::RawReceived,
 };
 
-mod fmt;
 mod frame;
 mod hal;
 mod pib;
@@ -77,8 +63,8 @@ struct QueueConfig {
     rx_queue_size: usize,
 }
 
-pub(crate) const CONFIG: QueueConfig = QueueConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_IEEE802154_CONFIG_RX_QUEUE_SIZE"),
+const CONFIG: QueueConfig = QueueConfig {
+    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_IEEE802154_RX_QUEUE_SIZE"),
 };
 
 /// IEEE 802.15.4 driver configuration

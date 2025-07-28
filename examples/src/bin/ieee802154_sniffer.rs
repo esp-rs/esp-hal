@@ -5,7 +5,7 @@
 //! identical to ieee802154_receive_all_frames
 
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-ieee802154 esp-hal/unstable
+//% FEATURES: esp-hal/unstable esp-radio/ieee802154
 
 #![no_std]
 #![no_main]
@@ -16,8 +16,8 @@ use esp_hal::{
     system::software_reset,
     uart::{self, Uart},
 };
-use esp_ieee802154::{Config, Ieee802154};
 use esp_println::println;
+use esp_radio::ieee802154::{Config, Ieee802154};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 

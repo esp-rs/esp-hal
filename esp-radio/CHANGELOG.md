@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `builtin-scheduler` feature has been removed. Your project will have to specify a task scheduler. (#3855)
 - `esp-wifi` has been renamed to `esp-radio`. (#3858)
 - Removed `EspWifi` prefix from structs in the package codebase. (#3869)
+- Rename `esp-wifi` to `esp-radio`. (#3858)
+- `esp-ieee802154` package has been folded into `esp-radio`. (#3861)
 
 ### Fixed
 

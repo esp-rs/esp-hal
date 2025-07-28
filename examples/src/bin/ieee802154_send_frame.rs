@@ -1,13 +1,13 @@
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-ieee802154 esp-hal/unstable
+//% FEATURES: esp-hal/unstable esp-radio/ieee802154
 
 #![no_std]
 #![no_main]
 
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main};
-use esp_ieee802154::{Config, Frame, Ieee802154};
 use esp_println::println;
+use esp_radio::ieee802154::{Config, Frame, Ieee802154};
 use ieee802154::mac::{
     Address,
     FrameContent,
