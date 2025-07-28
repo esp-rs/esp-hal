@@ -7,7 +7,15 @@
 use crate::{
     Blocking,
     DriverMode,
-    dma::{Channel, DmaChannelFor, DmaEligible, DmaRxBuf, PeripheralDmaChannel, RegisterAccess},
+    dma::{
+        Channel,
+        DmaChannelFor,
+        DmaEligible,
+        DmaRxBuf,
+        DmaTxBuf,
+        PeripheralDmaChannel,
+        RegisterAccess,
+    },
     peripherals,
 };
 
@@ -88,10 +96,13 @@ impl<'d> UhciPer<'d, Blocking> {
             w.clk_en().set_bit()
         });
         reg.conf1().modify(|_, w| unsafe { w.bits(0) });
+
+        // For TX
+        reg.escape_conf().modify(|_, w| unsafe { w.bits(0) });
     }
 
     /// todo
-    pub fn configure(&mut self, buffer: &mut DmaRxBuf) {
+    pub fn configure(&mut self, buffer_rx: &mut DmaRxBuf, buffer_tx: &mut DmaTxBuf) {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
         // We should do UHCI_UART_IDLE_EOF_EN too
@@ -106,10 +117,39 @@ impl<'d> UhciPer<'d, Blocking> {
         unsafe {
             self.channel
                 .rx
-                .prepare_transfer(self.uhci.dma_peripheral(), buffer)
+                .prepare_transfer(self.uhci.dma_peripheral(), buffer_rx)
                 .unwrap()
         };
+        // self.channel.rx.start_transfer().unwrap();
+
+        // Tx
+        unsafe {
+            self.channel
+                .tx
+                .prepare_transfer(self.uhci.dma_peripheral(), buffer_tx)
+                .unwrap()
+        };
+        // self.channel.tx.start_transfer().unwrap();
+    }
+
+    /// todo
+    pub fn start_transfer_tx(&mut self) {
+        self.channel.tx.start_transfer().unwrap();
+    }
+
+    /// todo
+    pub fn start_transfer_rx(&mut self) {
         self.channel.rx.start_transfer().unwrap();
+    }
+
+    /// todo
+    pub fn stop_transfer_rx(&mut self) {
+        self.channel.rx.stop_transfer();
+    }
+
+    /// todo
+    pub fn stop_transfer_tx(&mut self) {
+        self.channel.tx.stop_transfer();
     }
 
     // Via UHCI_RX_RST
