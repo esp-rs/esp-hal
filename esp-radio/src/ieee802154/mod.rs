@@ -14,7 +14,6 @@
 //!
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
-#![no_std]
 
 use core::cell::RefCell;
 

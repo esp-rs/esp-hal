@@ -387,7 +387,7 @@ fn ZB_MAC() {
         unsafe {
             trace!(
                 "Received raw {:?}",
-                super::fmt::Bytes(&*core::ptr::addr_of!(RX_BUFFER))
+                crate::fmt::Bytes(&*core::ptr::addr_of!(RX_BUFFER))
             );
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
