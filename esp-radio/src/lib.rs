@@ -228,7 +228,6 @@ pub(crate) const CONFIG: config::Config = config::Config {
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Controller for the ESP Radio driver.
-#[instability::unstable]
 pub struct Controller<'d> {
     _inner: PhantomData<&'d ()>,
 }
