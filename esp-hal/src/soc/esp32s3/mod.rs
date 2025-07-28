@@ -11,8 +11,6 @@
 
 crate::unstable_module! {
     pub mod efuse;
-    #[cfg(feature = "psram")]
-    pub mod psram;
     pub mod trng;
     pub mod ulp_core;
 }

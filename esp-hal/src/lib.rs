@@ -233,9 +233,6 @@ pub use self::soc::efuse;
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use self::soc::lp_core;
-#[instability::unstable]
-#[cfg(feature = "psram")]
-pub use self::soc::psram;
 #[cfg(ulp_riscv_core)]
 #[instability::unstable]
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
@@ -334,6 +331,8 @@ unstable_module! {
     pub mod etm;
     #[cfg(soc_has_usb0)]
     pub mod otg_fs;
+    #[cfg(psram)] // DMA needs some things from here
+    pub mod psram;
 }
 
 unstable_driver! {

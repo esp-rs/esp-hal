@@ -17,34 +17,6 @@ mod implementation;
 
 mod efuse_field;
 
-#[cfg(feature = "psram")]
-mod psram_common;
-
-// Using static mut should be fine since we are only writing to it once during
-// initialization. As other tasks and interrupts are not running yet, the worst
-// that can happen is, that the user creates a DMA buffer before initializing
-// the HAL. This will access the PSRAM range, returning an empty range - which
-// is, at that point, true. The user has no (safe) means to allocate in PSRAM
-// before initializing the HAL.
-#[cfg(feature = "psram")]
-static mut MAPPED_PSRAM: MappedPsram = MappedPsram { memory_range: 0..0 };
-
-pub(crate) fn psram_range() -> Range<usize> {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "psram")] {
-            #[allow(static_mut_refs)]
-            unsafe { MAPPED_PSRAM.memory_range.clone() }
-        } else {
-            0..0
-        }
-    }
-}
-
-#[cfg(feature = "psram")]
-pub struct MappedPsram {
-    memory_range: Range<usize>,
-}
-
 // Indicates the state of setting the mac address
 // 0 -- unset
 // 1 -- in the process of being set
@@ -116,18 +88,28 @@ pub(crate) fn is_slice_in_dram<T>(slice: &[T]) -> bool {
 }
 
 #[allow(unused)]
+#[cfg(psram)]
 pub(crate) fn is_valid_psram_address(address: usize) -> bool {
-    addr_in_range(address, psram_range())
+    addr_in_range(address, crate::psram::psram_range())
 }
 
 #[allow(unused)]
+#[cfg(psram)]
 pub(crate) fn is_slice_in_psram<T>(slice: &[T]) -> bool {
-    slice_in_range(slice, psram_range())
+    slice_in_range(slice, crate::psram::psram_range())
 }
 
 #[allow(unused)]
 pub(crate) fn is_valid_memory_address(address: usize) -> bool {
-    is_valid_ram_address(address) || is_valid_psram_address(address)
+    if is_valid_ram_address(address) {
+        return true;
+    }
+    #[cfg(psram)]
+    if is_valid_psram_address(address) {
+        return true;
+    }
+
+    false
 }
 
 fn slice_in_range<T>(slice: &[T], range: Range<usize>) -> bool {
