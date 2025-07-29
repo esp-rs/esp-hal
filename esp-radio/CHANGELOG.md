@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
-- Added `reinit` method to `BleConnector` to properly reset the BLE modem.
+- Added `reinit` method to `BleConnector` to properly reset the BLE modem (#3877)
 
 
 ### Changed
