@@ -18,7 +18,7 @@ use esp_wifi_sys::include::{
 };
 use heapless::spsc::Queue;
 
-use crate::{
+use super::{
     frame::{
         FRAME_SIZE,
         FRAME_VERSION_1,
@@ -349,9 +349,9 @@ fn next_operation() {
     });
 
     match previous_operation {
-        Ieee802154State::Receive => crate::rx_available(),
-        Ieee802154State::Transmit => crate::tx_done(),
-        Ieee802154State::TxAck => crate::tx_done(),
+        Ieee802154State::Receive => super::rx_available(),
+        Ieee802154State::Transmit => super::tx_done(),
+        Ieee802154State::TxAck => super::tx_done(),
         _ => (),
     }
 }
