@@ -165,14 +165,13 @@ pub(crate) use unstable_module;
 #[cfg(feature = "wifi")]
 pub mod wifi;
 
-#[cfg(feature = "ieee802154")]
-pub mod ieee802154;
-
 unstable_module! {
     #[cfg(feature = "esp-now")]
     pub mod esp_now;
     #[cfg(feature = "ble")]
     pub mod ble;
+    #[cfg(feature = "ieee802154")]
+    pub mod ieee802154;
 }
 pub mod config;
 
