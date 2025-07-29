@@ -22,6 +22,11 @@ pub(crate) fn setup_timebase(mut timer: TimeBase) {
     // The timer needs to tick at Priority 1 to prevent accidentally interrupting
     // priority 1 limited locks.
     let cb: extern "C" fn() = unsafe { core::mem::transmute(timer_tick_handler as *const ()) };
+
+    #[cfg(target_arch = "riscv32")]
+    let handler = InterruptHandler::new_not_nested(cb, Priority::Priority1);
+
+    #[cfg(target_arch = "xtensa")]
     let handler = InterruptHandler::new(cb, Priority::Priority1);
 
     timer.set_interrupt_handler(handler);
@@ -46,7 +51,7 @@ pub(crate) fn disable_timebase() {
 }
 
 #[esp_hal::ram]
-extern "C" fn timer_tick_handler(context: &mut TrapFrame) {
+extern "C" fn timer_tick_handler(_context: &mut TrapFrame) {
     clear_timer_interrupt();
 
     // `task_switch` must be called on a single interrupt priority level only.
@@ -56,6 +61,10 @@ extern "C" fn timer_tick_handler(context: &mut TrapFrame) {
     if cfg!(esp32) {
         yield_task();
     } else {
-        crate::task::task_switch(context);
+        #[cfg(target_arch = "xtensa")]
+        crate::task::task_switch(_context);
+
+        #[cfg(target_arch = "riscv32")]
+        crate::task::task_switch();
     }
 }

@@ -650,9 +650,6 @@ r#"
     sw a6, 14*4(sp)
     sw a7, 15*4(sp)
 
-    addi s0, sp, 16*4
-    sw s0, 30*4(sp)
-
     # jump to handler loaded in direct handler
     add a0, sp, zero # load trap-frame address in a0
     jalr ra, ra # jump to label loaded in _start_trapX

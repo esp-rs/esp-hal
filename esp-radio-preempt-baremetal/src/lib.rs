@@ -28,12 +28,13 @@ mod timer;
 use core::ffi::c_void;
 
 use allocator_api2::boxed::Box;
+#[cfg_attr(riscv, expect(unused_imports))]
+use esp_hal::trapframe::TrapFrame;
 use esp_hal::{
     Blocking,
     sync::Locked,
     time::{Duration, Instant, Rate},
     timer::{AnyTimer, PeriodicTimer},
-    trapframe::TrapFrame,
 };
 
 use crate::{task::Context, timer::TIMER};
@@ -153,6 +154,7 @@ impl SchedulerState {
         }
     }
 
+    #[cfg(target_arch = "xtensa")]
     fn switch_task(&mut self, trap_frame: &mut TrapFrame) {
         task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
 
@@ -164,6 +166,26 @@ impl SchedulerState {
         unsafe { self.current_task = (*self.current_task).next };
 
         task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
+    }
+
+    #[cfg(target_arch = "riscv32")]
+    fn switch_task(&mut self) {
+        if !self.to_delete.is_null() {
+            let task_to_delete = core::mem::take(&mut self.to_delete);
+            self.delete_task(task_to_delete);
+        }
+
+        let task = self.current_task;
+        let context = unsafe { &mut (*task).trap_frame };
+        let old_ctx = core::ptr::addr_of_mut!(*context);
+
+        let task = unsafe { (*self.current_task).next };
+        let context = unsafe { &mut (*task).trap_frame };
+        let new_ctx = core::ptr::addr_of_mut!(*context);
+
+        if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
+            unsafe { self.current_task = (*self.current_task).next };
+        }
     }
 
     fn schedule_task_deletion(&mut self, task: *mut Context) -> bool {
