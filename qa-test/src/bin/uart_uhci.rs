@@ -11,7 +11,7 @@ use esp_hal::clock::CpuClock;
 use esp_hal::dma::{Channel, DmaRxBuf, DmaTxBuf};
 use esp_hal::time::{Duration, Instant};
 use esp_hal::uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx};
-use esp_hal::uart_uhci::UhciPer;
+use esp_hal::uart::uhci::UhciPer;
 use esp_hal::{dma_buffers, main};
 use esp_println::println;
 

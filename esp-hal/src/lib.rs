@@ -250,9 +250,6 @@ pub mod time;
 #[cfg(any(soc_has_uart0, soc_has_uart1, soc_has_uart2))]
 pub mod uart;
 
-/// todo
-pub mod uart_uhci;
-
 mod macros;
 
 #[cfg(feature = "rt")]
