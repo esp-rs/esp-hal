@@ -12,7 +12,9 @@ use crate::{
         DmaChannelFor,
         DmaEligible,
         DmaRxBuf,
+        DmaRxBuffer,
         DmaTxBuf,
+        DmaTxBuffer,
         PeripheralDmaChannel,
     },
     peripherals,
@@ -91,61 +93,74 @@ impl<'d> UhciPer<'d, Blocking> {
         reg.escape_conf().modify(|_, w| unsafe { w.bits(0) });
     }
 
-    /// todo
-    pub fn configure(&mut self, buffer_rx: &mut DmaRxBuf, buffer_tx: &mut DmaTxBuf) {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
-        reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
-        // We should do UHCI_UART_IDLE_EOF_EN too
-        reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
-
-        // Also UHCI_LEN_EOF_EN, this shouldn't be needed, in theory
-        reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
-
-        // Dma stuff
-        // https://www.espressif.com/sites/default/files/documentation/esp32-c6_technical_reference_manual_en.pdf
-        // Page 134
-        unsafe {
-            self.channel
-                .rx
-                .prepare_transfer(self.uhci.dma_peripheral(), buffer_rx)
-                .unwrap()
-        };
-        // self.channel.rx.start_transfer().unwrap();
-
-        // Tx
-        unsafe {
-            self.channel
-                .tx
-                .prepare_transfer(self.uhci.dma_peripheral(), buffer_tx)
-                .unwrap()
-        };
-        // self.channel.tx.start_transfer().unwrap();
-    }
-
-    /// todo
-    pub fn start_transfer_tx(&mut self) {
-        self.channel.tx.start_transfer().unwrap();
-    }
-
-    /// todo
-    pub fn start_transfer_rx(&mut self) {
-        self.channel.rx.start_transfer().unwrap();
-    }
-
-    /// todo
-    pub fn stop_transfer_rx(&mut self) {
-        self.channel.rx.stop_transfer();
-    }
-
-    /// todo
-    pub fn stop_transfer_tx(&mut self) {
-        self.channel.tx.stop_transfer();
-    }
-
     // Via UHCI_RX_RST
     fn reset(&self) {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.rx_rst().set_bit());
         reg.conf0().modify(|_, w| w.rx_rst().clear_bit());
+        // Tx, unsure
+        reg.conf0().modify(|_, w| w.tx_rst().set_bit());
+        reg.conf0().modify(|_, w| w.tx_rst().clear_bit());
+    }
+
+    /// todo
+    pub fn configure(&mut self) {
+        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+
+        // Idk if there is a better way to check it, but it works
+        match &self._uart.tx.uart.0 {
+            super::any::Inner::Uart0(_) => {
+                info!("Uhci will use uart0");
+                reg.conf0().modify(|_, w| w.uart0_ce().set_bit());
+            }
+            super::any::Inner::Uart1(_) => {
+                info!("Uhci will use uart1");
+                reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
+            }
+        }
+
+        // We should do UHCI_UART_IDLE_EOF_EN too
+        reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
+
+        // Also UHCI_LEN_EOF_EN, this shouldn't be needed, in theory
+        reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
+    }
+
+    /// todo
+    // No way to specify read_buffer_len, in spi slave its only applied to esp32
+    pub fn read<T: DmaRxBuffer>(&mut self, rx_buffer: &mut T) {
+        unsafe {
+            self.channel
+                .rx
+                .prepare_transfer(self.uhci.dma_peripheral(), rx_buffer)
+                .unwrap()
+        };
+
+        self.channel.rx.start_transfer().unwrap();
+
+        // info!("Is done: {}, ", self.channel.rx.is_done());
+
+        // Based on spi slave dma, is this a good idea? infinite loop to wait for something?
+        while !self.channel.rx.is_done() {}
+
+        // info!("Is done: {}, ", self.channel.rx.is_done());
+
+        self.channel.rx.stop_transfer();
+    }
+
+    /// todo
+    pub fn write<T: DmaTxBuffer>(&mut self, tx_buffer: &mut T) {
+        unsafe {
+            self.channel
+                .tx
+                .prepare_transfer(self.uhci.dma_peripheral(), tx_buffer)
+                .unwrap()
+        };
+
+        self.channel.rx.start_transfer().unwrap();
+
+        while !self.channel.rx.is_done() {}
+
+        self.channel.rx.stop_transfer();
     }
 }
