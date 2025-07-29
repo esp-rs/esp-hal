@@ -10,6 +10,7 @@ pub(super) const NUM_ATTENS: usize = 10;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 /// ADC2 status variants
 pub enum Adc2Usage {
@@ -433,5 +434,11 @@ mod adc_implementation {
             (GPIO25<'_>, 8),
             (GPIO26<'_>, 9),
         ]
+    }
+}
+
+impl Drop for ADC2<'_> {
+    fn drop(&mut self) {
+        release_adc2();
     }
 }
