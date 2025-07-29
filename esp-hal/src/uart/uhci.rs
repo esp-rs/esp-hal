@@ -1,19 +1,7 @@
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
     dma::{
-        AnyGdmaChannel,
-        Channel,
-        DmaChannel,
-        DmaChannelFor,
-        DmaEligible,
-        DmaRxBuf,
-        DmaTxBuf,
-        PeripheralDmaChannel,
-    },
-    peripherals,
-    uart::Uart,
+        asynch::{DmaRxFuture, DmaTxFuture}, AnyGdmaChannel, Channel, DmaChannel, DmaChannelFor, DmaEligible, DmaRxBuf, DmaTxBuf, PeripheralDmaChannel
+    }, peripherals, uart::Uart, Async, Blocking, DriverMode
 };
 
 crate::any_peripheral! {
@@ -143,15 +131,16 @@ impl<'d> UhciPer<'d, Blocking> {
 
     /// todo
     pub fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
+        // Do we want this to be specified as an argument? It will return when there is no
+        // communication anyway, idk when we would want to cut it into pieces
+        self.read_limit(rx_buffer.len());
+
         unsafe {
             self.channel
                 .rx
                 .prepare_transfer(self.uhci.dma_peripheral(), rx_buffer)
                 .unwrap()
         };
-
-        // Do we want this to be specified as an argument? It will return when there is no communication anyway, idk when we would want to cut it into pieces
-        self.read_limit(rx_buffer.len());
 
         self.channel.rx.start_transfer().unwrap();
 
@@ -213,24 +202,20 @@ impl<'d> UhciPer<'d, Async> {
 
     /// todo
     pub async fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
+        self.read_limit(rx_buffer.len());
+
+        let dma_future = DmaRxFuture::new(&mut self.channel.rx);
+
         unsafe {
-            self.channel
+            dma_future
                 .rx
                 .prepare_transfer(self.uhci.dma_peripheral(), rx_buffer)
                 .unwrap()
         };
 
-        self.read_limit(rx_buffer.len());
+        dma_future.rx.start_transfer().unwrap();
 
-        self.channel.rx.start_transfer().unwrap();
-
-        // info!("Is done: {}, ", self.channel.rx.is_done());
-
-        // Based on spi slave dma, is this a good idea? infinite loop to wait for something?
-        // This never exits when a message overflows the DMA buffer
-        while !self.channel.rx.is_done() {}
-
-        // info!("Is done: {}, ", self.channel.rx.is_done());
+        dma_future.await.unwrap();
 
         self.channel.rx.stop_transfer();
     }
@@ -241,18 +226,20 @@ impl<'d> UhciPer<'d, Async> {
 
         tx_buffer.set_length(length);
 
+        let dma_future = DmaTxFuture::new(&mut self.channel.tx);
+
         // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
 
         unsafe {
-            self.channel
+            dma_future
                 .tx
                 .prepare_transfer(self.uhci.dma_peripheral(), tx_buffer)
                 .unwrap()
         };
 
-        self.channel.tx.start_transfer().unwrap();
+        dma_future.tx.start_transfer().unwrap();
 
-        while !self.channel.tx.is_done() {}
+        dma_future.await.unwrap();
 
         self.channel.tx.stop_transfer();
     }
