@@ -764,12 +764,12 @@ mod rt {
 
         for interrupt_nr in configured_interrupts.iterator() {
             let handler =
-                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as u32;
+                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as usize;
             let not_nested = (handler & 1) == 1;
             let handler = handler & !1;
 
             let handler: fn(&mut TrapFrame) =
-                unsafe { core::mem::transmute::<u32, fn(&mut TrapFrame)>(handler) };
+                unsafe { core::mem::transmute::<usize, fn(&mut TrapFrame)>(handler) };
 
             if not_nested || prio == Priority::Priority15 {
                 handler(context);

@@ -167,7 +167,7 @@ impl InterruptHandler {
     pub fn handler(&self) -> extern "C" fn() {
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
-                unsafe { core::mem::transmute::<u32, extern "C" fn()>((self.f as u32) | !self.nested as u32) }
+                unsafe { core::mem::transmute::<usize, extern "C" fn()>((self.f as usize) | !self.nested as usize) }
             } else {
                 self.f
             }
