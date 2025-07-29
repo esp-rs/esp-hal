@@ -114,6 +114,8 @@ use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
+#[cfg(esp32)]
+use hal::analog::adc::{Adc2Usage, release_adc2, try_claim_adc2};
 use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
@@ -217,6 +219,10 @@ impl Drop for Controller<'_> {
 
         // This shuts down the task switcher and timer tick interrupt.
         preempt::disable();
+
+        #[cfg(esp32)]
+        // Allow using `ADC2` again
+        release_adc2();
     }
 }
 
@@ -224,6 +230,14 @@ impl Drop for Controller<'_> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
+    #[cfg(esp32)]
+    if let Err(current_usage) = try_claim_adc2(Adc2Usage::Radio) {
+        panic!(
+            "ADC2 is already in use by {:?}. On ESP32, ADC2 cannot be used simultaneously with WiFi/Bluetooth.",
+            current_usage
+        );
+    };
+
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }

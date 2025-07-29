@@ -1,9 +1,53 @@
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
 use super::{AdcConfig, Attenuation};
 use crate::peripherals::{ADC1, ADC2, RTC_IO, SENS};
 
 pub(super) const NUM_ATTENS: usize = 10;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+/// ADC2 status variants
+pub enum Adc2Usage {
+    /// ADC2 is not used
+    Unused = 0,
+    /// ADC2 is used by `analog`
+    Analog = 1,
+    /// ADC2 is used by `Wi-Fi` or `Bluetooth`
+    Radio  = 2,
+}
+
+// ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
+// state to prevent unexpected behaviour
+static ADC2_USAGE: AtomicU8 = AtomicU8::new(Adc2Usage::Unused as u8);
+
+#[doc(hidden)]
+/// Tries to "claim" `ADC2` peripheral and set its status
+pub fn try_claim_adc2(usage: Adc2Usage) -> Result<(), Adc2Usage> {
+    let previous = ADC2_USAGE.swap(usage as u8, Ordering::AcqRel);
+
+    if previous == Adc2Usage::Unused as u8 {
+        Ok(())
+    } else {
+        ADC2_USAGE.store(previous, Ordering::Release);
+        let current_usage = match previous {
+            1 => Adc2Usage::Analog,
+            2 => Adc2Usage::Radio,
+            _ => Adc2Usage::Unused,
+        };
+        Err(current_usage)
+    }
+}
+
+#[doc(hidden)]
+/// Resets `ADC2` usage status to `Unused`
+pub fn release_adc2() {
+    ADC2_USAGE.store(Adc2Usage::Unused as u8, Ordering::Release);
+}
 
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,6 +88,8 @@ pub trait RegisterAccess {
     fn read_done_sar() -> bool;
 
     fn read_data_sar() -> u16;
+
+    fn instance_number() -> u8;
 }
 
 impl RegisterAccess for ADC1<'_> {
@@ -118,6 +164,10 @@ impl RegisterAccess for ADC1<'_> {
             .read()
             .meas1_data_sar()
             .bits()
+    }
+
+    fn instance_number() -> u8 {
+        1
     }
 }
 
@@ -194,6 +244,10 @@ impl RegisterAccess for ADC2<'_> {
             .meas2_data_sar()
             .bits()
     }
+
+    fn instance_number() -> u8 {
+        2
+    }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
@@ -211,6 +265,15 @@ where
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
     pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
+        if ADCI::instance_number() == 2 {
+            if let Err(current_usage) = try_claim_adc2(Adc2Usage::Analog) {
+                panic!(
+                    "ADC2 is already in use by {:?}. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth.",
+                    current_usage
+                );
+            }
+        }
+
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
