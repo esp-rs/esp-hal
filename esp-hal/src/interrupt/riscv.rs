@@ -774,8 +774,9 @@ mod rt {
             if not_nested || prio == Priority::Priority15 {
                 handler(context);
             } else {
-                let current = prio as u8 - 1;
-                let elevated = current + 1;
+                let current = current_runlevel() as u8;
+                let current = if current > 0 { current - 1 } else { 0 };
+                let elevated = prio as u8;
                 unsafe {
                     change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
                     riscv::interrupt::nested(|| handler(context));
