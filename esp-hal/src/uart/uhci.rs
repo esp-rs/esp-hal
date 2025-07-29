@@ -1,9 +1,3 @@
-// pub struct UhciPer<'d, Dm> where
-// Dm: DriverMode, {
-// uhci: esp_hal::peripherals::UHCI0<'static>,
-// dma_channel: Channel<Dm, PeripheralDmaChannel<AnySpi<'d>>>,
-// }
-
 use crate::{
     Blocking,
     DriverMode,
@@ -12,9 +6,7 @@ use crate::{
         DmaChannelFor,
         DmaEligible,
         DmaRxBuf,
-        DmaRxBuffer,
         DmaTxBuf,
-        DmaTxBuffer,
         PeripheralDmaChannel,
     },
     peripherals,
@@ -52,7 +44,7 @@ pub struct UhciPer<'d, Dm>
 where
     Dm: DriverMode,
 {
-    _uart: Uart<'d, Blocking>,
+    _uart: Uart<'d, Dm>,
     uhci: AnyUhci<'static>,
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
 }

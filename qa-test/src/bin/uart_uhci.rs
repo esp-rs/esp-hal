@@ -8,12 +8,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock,
-    dma::{Channel, DmaRxBuf, DmaTxBuf},
-    dma_buffers,
-    main,
-    time::{Duration, Instant},
-    uart::{AtCmdConfig, Config, RxConfig, Uart, UartRx, UartTx, uhci::UhciPer},
+    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, uart::{uhci::UhciPer, Config, RxConfig, Uart}
 };
 use esp_println::println;
 
