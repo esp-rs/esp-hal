@@ -153,11 +153,11 @@ impl InterruptHandler {
 
     /// Creates a new [InterruptHandler] which will call the given function at
     /// the given priority with disabled interrupt nesting.
+    #[cfg(riscv)]
     pub const fn new_not_nested(f: extern "C" fn(), prio: Priority) -> Self {
         Self {
             f,
             prio,
-            #[cfg(riscv)]
             nested: false,
         }
     }

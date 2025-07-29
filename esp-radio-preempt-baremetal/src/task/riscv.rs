@@ -1,5 +1,15 @@
 use core::ffi::c_void;
 
+unsafe extern "C" {
+    fn sys_switch();
+}
+
+#[unsafe(no_mangle)]
+static mut CURRENT_CTX_PTR: *mut Registers = core::ptr::null_mut();
+
+#[unsafe(no_mangle)]
+static mut NEXT_CTX_PTR: *mut Registers = core::ptr::null_mut();
+
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
 #[repr(C)]
@@ -100,21 +110,10 @@ pub(crate) fn new_task_context(
     }
 }
 
-// switch to next task
-// MUST be called from inside an ISR without interrupt nesting
+/// Switch to next task
+///
+/// *MUST* be called from inside an ISR without interrupt nesting.
 pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
-    unsafe extern "C" {
-        fn sys_switch();
-    }
-
-    #[unsafe(no_mangle)]
-    static mut CURRENT_CTX_PTR: *mut crate::task::arch_specific::Registers =
-        core::ptr::null_mut::<crate::task::arch_specific::Registers>();
-
-    #[unsafe(no_mangle)]
-    static mut NEXT_CTX_PTR: *mut crate::task::arch_specific::Registers =
-        core::ptr::null_mut::<crate::task::arch_specific::Registers>();
-
     unsafe {
         if !CURRENT_CTX_PTR.is_null() || !NEXT_CTX_PTR.is_null() {
             return false;
