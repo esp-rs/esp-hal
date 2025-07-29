@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A reimplemntation of the `assign_resources!` macro (#3809)
 - `TrngSource` to manage random number generator entropy (#3829)
+- On RISC-V you can opt-out of nested interrupts for an interrupt handler by using `new_not_nested` (#3875)
 
 ### Changed
 
