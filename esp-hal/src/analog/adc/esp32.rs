@@ -4,7 +4,10 @@ use core::{
 };
 
 use super::{AdcConfig, Attenuation};
-use crate::peripherals::{ADC1, ADC2, RTC_IO, SENS};
+use crate::{
+    peripherals::{ADC1, ADC2, RTC_IO, SENS},
+    private::{self},
+};
 
 pub(super) const NUM_ATTENS: usize = 10;
 
@@ -27,7 +30,7 @@ static ADC2_USAGE: AtomicU8 = AtomicU8::new(Adc2Usage::Unused as u8);
 
 #[doc(hidden)]
 /// Tries to "claim" `ADC2` peripheral and set its status
-pub fn try_claim_adc2(usage: Adc2Usage) -> Result<(), Adc2Usage> {
+pub fn try_claim_adc2(usage: Adc2Usage, _: private::Internal) -> Result<(), Adc2Usage> {
     let expected = Adc2Usage::Unused as u8;
     let desired = usage as u8;
 
@@ -46,7 +49,7 @@ pub fn try_claim_adc2(usage: Adc2Usage) -> Result<(), Adc2Usage> {
 
 #[doc(hidden)]
 /// Resets `ADC2` usage status to `Unused`
-pub fn release_adc2() {
+pub fn release_adc2(_: private::Internal) {
     ADC2_USAGE.store(Adc2Usage::Unused as u8, Ordering::Release);
 }
 
@@ -271,12 +274,12 @@ where
     /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
     /// will panic.
     pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
-        if ADCI::instance_number() == 2 {
-            if try_claim_adc2(Adc2Usage::Analog).is_err() {
-                panic!(
-                    "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
-                );
-            }
+        if ADCI::instance_number() == 2
+            && try_claim_adc2(Adc2Usage::Analog, private::Internal).is_err()
+        {
+            panic!(
+                "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
+            );
         }
 
         let sensors = SENS::regs();
@@ -443,6 +446,6 @@ mod adc_implementation {
 
 impl Drop for ADC2<'_> {
     fn drop(&mut self) {
-        release_adc2();
+        release_adc2(private::Internal);
     }
 }

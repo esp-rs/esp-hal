@@ -222,7 +222,7 @@ impl Drop for Controller<'_> {
 
         #[cfg(esp32)]
         // Allow using `ADC2` again
-        release_adc2();
+        release_adc2(unsafe { esp_hal::Internal::conjure() });
     }
 }
 
@@ -231,7 +231,7 @@ impl Drop for Controller<'_> {
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
-    try_claim_adc2(Adc2Usage::Analog)?;
+    try_claim_adc2(Adc2Usage::Analog, unsafe { hal::Internal::conjure() })?;
 
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
