@@ -39,35 +39,35 @@ fn main() -> ! {
         .with_tx(peripherals.GPIO2)
         .with_rx(peripherals.GPIO3);
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(100);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(25);
     let mut dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
 
     let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-    println!("Before configuring buffers");
     uhci.configure();
-    println!("After configuring buffers");
 
     loop {
-        println!("After");
+        println!("Waiting for message");
         uhci.read(&mut dma_rx);
+
+        let received = dma_rx.number_of_received_bytes();
         println!("Received dma bytes: {}", dma_rx.number_of_received_bytes());
 
-        let mut buf: [u8; 100] = [0; 100];
-        let received = dma_rx.read_received_data(&mut buf);
+        let rec_slice = dma_rx.as_slice();
         if received > 0 {
-            let vec = buf.to_vec();
+            let vec = rec_slice.to_vec();
             match core::str::from_utf8(&vec) {
                 Ok(x) => {
-                    println!("Received DMA message: {}", x);
-                    
+                    println!("Received DMA message: \"{}\"", x);
+                    dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice[0..received]);
+                    uhci.write(&mut dma_tx, received);
                 }
                 Err(x) => println!("Error string: {}", x),
             }
         }
 
-        let delay_start = Instant::now();
-        while delay_start.elapsed() < Duration::from_secs(3) {}
+        // let delay_start = Instant::now();
+        // while delay_start.elapsed() < Duration::from_secs(3) {}
     }
 }

@@ -128,7 +128,7 @@ impl<'d> UhciPer<'d, Blocking> {
 
     /// todo
     // No way to specify read_buffer_len, in spi slave its only applied to esp32
-    pub fn read<T: DmaRxBuffer>(&mut self, rx_buffer: &mut T) {
+    pub fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
         unsafe {
             self.channel
                 .rx
@@ -141,6 +141,7 @@ impl<'d> UhciPer<'d, Blocking> {
         // info!("Is done: {}, ", self.channel.rx.is_done());
 
         // Based on spi slave dma, is this a good idea? infinite loop to wait for something?
+        // This never exits when a message overflows the DMA buffer
         while !self.channel.rx.is_done() {}
 
         // info!("Is done: {}, ", self.channel.rx.is_done());
@@ -149,7 +150,13 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 
     /// todo
-    pub fn write<T: DmaTxBuffer>(&mut self, tx_buffer: &mut T) {
+    pub fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
+        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
+
+        tx_buffer.set_length(length);
+
+        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
+
         unsafe {
             self.channel
                 .tx
@@ -157,10 +164,10 @@ impl<'d> UhciPer<'d, Blocking> {
                 .unwrap()
         };
 
-        self.channel.rx.start_transfer().unwrap();
+        self.channel.tx.start_transfer().unwrap();
 
-        while !self.channel.rx.is_done() {}
+        while !self.channel.tx.is_done() {}
 
-        self.channel.rx.stop_transfer();
+        self.channel.tx.stop_transfer();
     }
 }
