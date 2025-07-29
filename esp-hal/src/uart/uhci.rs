@@ -1,8 +1,11 @@
 use crate::{
+    Async,
     Blocking,
     DriverMode,
     dma::{
+        AnyGdmaChannel,
         Channel,
+        DmaChannel,
         DmaChannelFor,
         DmaEligible,
         DmaRxBuf,
@@ -49,28 +52,10 @@ where
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
 }
 
-impl<'d> UhciPer<'d, Blocking> {
-    /// todo
-    pub fn new(
-        uart: Uart<'d, Blocking>,
-        uhci: peripherals::UHCI0<'static>,
-        channel: impl DmaChannelFor<AnyUhci<'d>>,
-    ) -> Self {
-        let channel = Channel::new(channel.degrade());
-        channel.runtime_ensure_compatible(&uhci);
-
-        let self_uhci = Self {
-            _uart: uart,
-            uhci: uhci.into(),
-            channel,
-        };
-
-        self_uhci.clean_turn_on();
-        self_uhci.reset();
-
-        self_uhci
-    }
-
+impl<'d, Dm> UhciPer<'d, Dm>
+where
+    Dm: DriverMode,
+{
     // uhci_ll_enable_bus_clock
     fn clean_turn_on(&self) {
         let reg: &esp32c6::uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
@@ -132,10 +117,102 @@ impl<'d> UhciPer<'d, Blocking> {
 
         reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
     }
+}
+
+impl<'d> UhciPer<'d, Blocking> {
+    /// todo
+    pub fn new(
+        uart: Uart<'d, Blocking>,
+        uhci: peripherals::UHCI0<'static>,
+        channel: impl DmaChannelFor<AnyUhci<'d>>,
+    ) -> Self {
+        let channel = Channel::new(channel.degrade());
+        channel.runtime_ensure_compatible(&uhci);
+
+        let self_uhci = Self {
+            _uart: uart,
+            uhci: uhci.into(),
+            channel,
+        };
+
+        self_uhci.clean_turn_on();
+        self_uhci.reset();
+
+        self_uhci
+    }
 
     /// todo
-    // No way to specify read_buffer_len, in spi slave its only applied to esp32
     pub fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
+        unsafe {
+            self.channel
+                .rx
+                .prepare_transfer(self.uhci.dma_peripheral(), rx_buffer)
+                .unwrap()
+        };
+
+        // Do we want this to be specified as an argument? It will return when there is no communication anyway, idk when we would want to cut it into pieces
+        self.read_limit(rx_buffer.len());
+
+        self.channel.rx.start_transfer().unwrap();
+
+        // info!("Is done: {}, ", self.channel.rx.is_done());
+
+        // Based on spi slave dma, is this a good idea? infinite loop to wait for something?
+        // This never exits when a message overflows the DMA buffer
+        while !self.channel.rx.is_done() {}
+
+        // info!("Is done: {}, ", self.channel.rx.is_done());
+
+        self.channel.rx.stop_transfer();
+    }
+
+    /// todo
+    pub fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
+        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
+
+        tx_buffer.set_length(length);
+
+        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
+
+        unsafe {
+            self.channel
+                .tx
+                .prepare_transfer(self.uhci.dma_peripheral(), tx_buffer)
+                .unwrap()
+        };
+
+        self.channel.tx.start_transfer().unwrap();
+
+        while !self.channel.tx.is_done() {}
+
+        self.channel.tx.stop_transfer();
+    }
+}
+
+impl<'d> UhciPer<'d, Async> {
+    /// todo
+    pub fn new(
+        uart: Uart<'d, Async>,
+        uhci: peripherals::UHCI0<'static>,
+        channel: impl DmaChannelFor<AnyUhci<'d>>,
+    ) -> Self {
+        let channel = Channel::new(channel.degrade()).into_async();
+        channel.runtime_ensure_compatible(&uhci);
+
+        let self_uhci = Self {
+            _uart: uart,
+            uhci: uhci.into(),
+            channel,
+        };
+
+        self_uhci.clean_turn_on();
+        self_uhci.reset();
+
+        self_uhci
+    }
+
+    /// todo
+    pub async fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
         unsafe {
             self.channel
                 .rx
@@ -159,7 +236,7 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 
     /// todo
-    pub fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
+    pub async fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
         // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
 
         tx_buffer.set_length(length);
