@@ -148,7 +148,7 @@ pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
         esp_hal::riscv::register::mepc::write(sys_switch as usize);
     }
 
-    return true;
+    true
 }
 
 core::arch::global_asm!(
