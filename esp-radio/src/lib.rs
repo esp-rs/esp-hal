@@ -231,12 +231,7 @@ impl Drop for Controller<'_> {
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
-    if let Err(current_usage) = try_claim_adc2(Adc2Usage::Radio) {
-        panic!(
-            "ADC2 is already in use by {:?}. On ESP32, ADC2 cannot be used simultaneously with WiFi/Bluetooth.",
-            current_usage
-        );
-    };
+    try_claim_adc2(Adc2Usage::Analog)?;
 
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
@@ -308,12 +303,22 @@ pub enum InitializationError {
     InterruptsDisabled,
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
+    #[cfg(esp32)]
+    // ADC2 cannot be used with `radio` functionality on `esp32`.
+    Adc2IsUsed,
 }
 
 #[cfg(feature = "wifi")]
 impl From<WifiError> for InitializationError {
     fn from(value: WifiError) -> Self {
         InitializationError::WifiError(value)
+    }
+}
+
+#[cfg(esp32)]
+impl From<Adc2Usage> for InitializationError {
+    fn from(_usage: Adc2Usage) -> Self {
+        InitializationError::Adc2IsUsed
     }
 }
 
