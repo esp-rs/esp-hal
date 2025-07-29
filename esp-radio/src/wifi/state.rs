@@ -8,7 +8,6 @@ use super::WifiEvent;
 #[atomic_enum]
 #[derive(PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[instability::unstable]
 pub enum WifiState {
     StaStarted,
     StaConnected,
@@ -81,7 +80,6 @@ pub(crate) fn reset_sta_state() {
 ///
 /// This does not support AP-STA mode. Use one of `sta_state` or
 /// `ap_state` instead.
-#[instability::unstable]
 pub fn wifi_state() -> WifiState {
     use super::WifiMode;
     match WifiMode::current() {

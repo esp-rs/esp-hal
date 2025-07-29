@@ -2665,7 +2665,6 @@ pub struct Interfaces<'d> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
-#[instability::unstable]
 pub fn new<'d>(
     _inited: &'d Controller<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,

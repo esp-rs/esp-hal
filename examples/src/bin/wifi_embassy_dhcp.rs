@@ -8,7 +8,7 @@
 //!
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 
-//% FEATURES: embassy esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
+//% FEATURES: embassy esp-radio esp-radio/wifi esp-hal/unstable
 //% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
 
 #![no_std]
