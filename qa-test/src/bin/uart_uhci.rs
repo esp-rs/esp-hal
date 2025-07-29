@@ -56,8 +56,7 @@ fn main() -> ! {
 
         let rec_slice = &dma_rx.as_slice()[0..received];
         if received > 0 {
-            let vec = rec_slice.to_vec();
-            match core::str::from_utf8(&vec) {
+            match core::str::from_utf8(&rec_slice) {
                 Ok(x) => {
                     println!("Received DMA message: \"{}\"", x);
                     dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
