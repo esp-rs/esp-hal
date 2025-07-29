@@ -135,19 +135,43 @@ pub trait InterruptConfigurable: crate::private::Sealed {
 pub struct InterruptHandler {
     f: extern "C" fn(),
     prio: Priority,
+    #[cfg(riscv)]
+    nested: bool,
 }
 
 impl InterruptHandler {
     /// Creates a new [InterruptHandler] which will call the given function at
     /// the given priority.
     pub const fn new(f: extern "C" fn(), prio: Priority) -> Self {
-        Self { f, prio }
+        Self {
+            f,
+            prio,
+            #[cfg(riscv)]
+            nested: true,
+        }
+    }
+
+    /// Creates a new [InterruptHandler] which will call the given function at
+    /// the given priority with disabled interrupt nesting.
+    pub const fn new_not_nested(f: extern "C" fn(), prio: Priority) -> Self {
+        Self {
+            f,
+            prio,
+            #[cfg(riscv)]
+            nested: false,
+        }
     }
 
     /// The function to be called
     #[inline]
     pub fn handler(&self) -> extern "C" fn() {
-        self.f
+        cfg_if::cfg_if! {
+            if #[cfg(riscv)] {
+                unsafe { core::mem::transmute::<u32, extern "C" fn()>((self.f as u32) | !self.nested as u32) }
+            } else {
+                self.f
+            }
+        }
     }
 
     /// Priority to be used when registering the interrupt

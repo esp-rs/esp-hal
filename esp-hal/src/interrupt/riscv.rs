@@ -542,45 +542,6 @@ mod classic {
 
         prev_interrupt_priority
     }
-
-    #[cfg(feature = "rt")]
-    mod rt {
-        use super::*;
-
-        #[unsafe(link_section = ".trap")]
-        #[unsafe(no_mangle)]
-        pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-            // Both C6 and H2 have 5 bits of code. The riscv crate masks 31 bits, which then
-            // causes a bounds check to be present.
-            let interrupt_id: usize = riscv::register::mcause::read().bits() & 0x1f;
-            let intr = INTERRUPT_CORE0::regs();
-            let interrupt_priority = intr.cpu_int_pri(interrupt_id).read().bits();
-
-            let prev_interrupt_priority = intr.cpu_int_thresh().read().bits();
-            if interrupt_priority < 15 {
-                // leave interrupts disabled if interrupt is of max priority.
-                intr.cpu_int_thresh()
-                    .write(|w| unsafe { w.bits(interrupt_priority + 1) }); // set the prio threshold to 1 more than current interrupt prio
-                unsafe { riscv::interrupt::enable() };
-            }
-            prev_interrupt_priority
-        }
-
-        #[unsafe(link_section = ".trap")]
-        #[unsafe(no_mangle)]
-        unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-            riscv::interrupt::disable();
-            let intr = INTERRUPT_CORE0::regs();
-            intr.cpu_int_thresh()
-                .write(|w| unsafe { w.bits(stored_prio) });
-        }
-
-        /// Globally exported so assembly code can call it.
-        #[unsafe(no_mangle)]
-        unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
-            super::priority(cpu_interrupt)
-        }
-    }
 }
 
 #[cfg(plic)]
@@ -723,53 +684,6 @@ mod plic {
 
         prev_interrupt_priority
     }
-
-    #[cfg(feature = "rt")]
-    mod rt {
-        use super::*;
-        /// Get interrupt priority - called by assembly code
-        #[unsafe(no_mangle)]
-        pub(super) unsafe extern "C" fn priority(cpu_interrupt: CpuInterrupt) -> Priority {
-            super::priority(cpu_interrupt)
-        }
-
-        #[unsafe(no_mangle)]
-        #[unsafe(link_section = ".trap")]
-        pub(super) unsafe extern "C" fn _handle_priority() -> u32 {
-            let interrupt_id: usize = riscv::register::mcause::read().code(); // MSB is whether its exception or interrupt.
-            let interrupt_priority = PLIC_MX::regs()
-                .mxint_pri(interrupt_id)
-                .read()
-                .cpu_mxint_pri()
-                .bits();
-
-            let prev_interrupt_priority = PLIC_MX::regs()
-                .mxint_thresh()
-                .read()
-                .cpu_mxint_thresh()
-                .bits();
-            if interrupt_priority < 15 {
-                // leave interrupts disabled if interrupt is of max priority.
-                PLIC_MX::regs()
-                    .mxint_thresh()
-                    .write(|w| unsafe { w.cpu_mxint_thresh().bits(interrupt_priority + 1) });
-
-                unsafe {
-                    riscv::interrupt::enable();
-                }
-            }
-            prev_interrupt_priority as u32
-        }
-
-        #[unsafe(no_mangle)]
-        #[unsafe(link_section = ".trap")]
-        pub(super) unsafe extern "C" fn _restore_priority(stored_prio: u32) {
-            riscv::interrupt::disable();
-            PLIC_MX::regs()
-                .mxint_thresh()
-                .write(|w| unsafe { w.cpu_mxint_thresh().bits(stored_prio as u8) });
-        }
-    }
 }
 
 #[cfg(feature = "rt")]
@@ -849,12 +763,25 @@ mod rt {
         let configured_interrupts = vectored::configured_interrupts(core, status, prio);
 
         for interrupt_nr in configured_interrupts.iterator() {
-            let handler = unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler };
+            let handler =
+                unsafe { pac::__EXTERNAL_INTERRUPTS[interrupt_nr as usize]._handler } as u32;
+            let not_nested = (handler & 1) == 1;
+            let handler = handler & !1;
 
-            let handler: fn(&mut TrapFrame) = unsafe {
-                core::mem::transmute::<unsafe extern "C" fn(), fn(&mut TrapFrame)>(handler)
-            };
-            handler(context);
+            let handler: fn(&mut TrapFrame) =
+                unsafe { core::mem::transmute::<u32, fn(&mut TrapFrame)>(handler) };
+
+            if not_nested || prio == Priority::Priority15 {
+                handler(context);
+            } else {
+                let current = prio as u8 - 1;
+                let elevated = current + 1;
+                unsafe {
+                    change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
+                    riscv::interrupt::nested(|| handler(context));
+                    change_current_runlevel(unwrap!(Priority::try_from(current as u32)));
+                }
+            }
         }
     }
 

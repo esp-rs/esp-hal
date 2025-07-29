@@ -719,27 +719,9 @@ r#"
     sw s0, 30*4(sp)
 
     add a0, sp, zero
-    "#,
-    // store current priority, set threshold, enable interrupts
-    r#"
-    addi sp, sp, -16 #build stack
-    sw ra, 0(sp)
-    jal ra, _handle_priority
-    lw ra, 0(sp)
-    sw a0, 0(sp) #reuse old stack, a0 is return of _handle_priority
-    addi a0, sp, 16 #the proper stack pointer is an argument to the HAL handler
-    "#,
     // jump to handler loaded in direct handler
-    r#"
     jalr ra, ra #jump to label loaded in _start_trapx
-    "#,
-    // restore threshold
-    r#"
-    lw a0, 0(sp) #load stored priority
-    jal ra, _restore_priority
-    addi sp, sp, 16 #pop
-    "#,
-    r#"
+
     lw t1, 31*4(sp)
     csrrw x0, mepc, t1
 
