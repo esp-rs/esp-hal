@@ -126,6 +126,21 @@ impl<'d> UhciPer<'d, Blocking> {
         reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
     }
 
+    fn read_limit(&mut self, mut limit: usize) {
+        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        // let val = reg.pkt_thres().read().pkt_thrs().bits();
+        // info!("Read limit value: {} to set: {}", val, limit);
+
+        // limit is 12 bits
+        if limit > 4095 {
+            // Above this value, it will probably split the messages, anyway, the point is below it
+            // it will not freeze itself
+            limit = 4095
+        }
+
+        reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
+    }
+
     /// todo
     // No way to specify read_buffer_len, in spi slave its only applied to esp32
     pub fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
@@ -135,6 +150,8 @@ impl<'d> UhciPer<'d, Blocking> {
                 .prepare_transfer(self.uhci.dma_peripheral(), rx_buffer)
                 .unwrap()
         };
+
+        self.read_limit(rx_buffer.len());
 
         self.channel.rx.start_transfer().unwrap();
 
