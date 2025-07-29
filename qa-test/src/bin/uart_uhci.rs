@@ -32,53 +32,21 @@ fn main() -> ! {
         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
         .with_baudrate(115200);
 
-    let mut uart1 = Uart::new(peripherals.UART1, config)
+    let uart = Uart::new(peripherals.UART1, config)
         .unwrap()
         .with_tx(peripherals.GPIO2)
         .with_rx(peripherals.GPIO3);
-
-    let (mut rx, mut tx) = uart1.split();
-
-    for _ in 0..2 {
-        println!("Before");
-        tx.write(b"Before uart").unwrap();
-        if rx.read_ready() {
-            let mut buf: [u8; 64] = [0u8; 64];
-            let size = rx.read_buffered(&mut buf).unwrap();
-            println!("Before received on rx: {:?}", buf);
-        } else {
-            println!("Nothing on rx");
-        }
-        let delay_start = Instant::now();
-        while delay_start.elapsed() < Duration::from_secs(2) {}
-    }
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(100);
     let mut dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-    let mut uhci = UhciPer::new(peripherals.UHCI0, peripherals.DMA_CH0);
-    uhci.init();
+    let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
     println!("Before configuring buffers");
     uhci.configure(&mut dma_rx, &mut dma_tx);
     println!("After configuring buffers");
-
-    /*
-    in_peri_sel
-        fn set_peripheral(&self, peripheral: u8) {
-            self.ch()
-                .in_peri_sel()
-                .modify(|_, w| unsafe { w.peri_in_sel().bits(peripheral) });
-        }
-
-
-    in
-
-    AnyGdmaRxChannel
-    */
-
-    // How do I clear this buffer? dma_rx.as_mut_slice().fill(0); doesn't work, RxBuffer doesn't have anything interesting either
     uhci.start_transfer_rx();
+    
     loop {
         println!("After");
         let mut buf: [u8; 100] = [0; 100];
@@ -98,24 +66,8 @@ fn main() -> ! {
                 }
                 Err(x) => println!("Error string: {}", x),
             }
-            /*
-            uhci.stop_transfer_tx();
-            uhci.stop_transfer_rx();
-
-            uhci.start_transfer_rx();
-            */
         }
 
-        // tx.write(b"After uart").unwrap();
-        /*
-        if rx.read_ready() {
-            let mut buf: [u8; 64] = [0u8; 64];
-            let size = rx.read_buffered(&mut buf).unwrap();
-            println!("After received on rx: {:?}", buf);
-        } else {
-            println!("Nothing on rx");
-        }
-        */
         let delay_start = Instant::now();
         while delay_start.elapsed() < Duration::from_secs(3) {}
     }

@@ -14,9 +14,9 @@ use crate::{
         DmaRxBuf,
         DmaTxBuf,
         PeripheralDmaChannel,
-        RegisterAccess,
     },
     peripherals,
+    uart::Uart,
 };
 
 crate::any_peripheral! {
@@ -50,6 +50,7 @@ pub struct UhciPer<'d, Dm>
 where
     Dm: DriverMode,
 {
+    _uart: Uart<'d, Blocking>,
     uhci: AnyUhci<'static>,
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
 }
@@ -57,34 +58,23 @@ where
 impl<'d> UhciPer<'d, Blocking> {
     /// todo
     pub fn new(
+        uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
         channel: impl DmaChannelFor<AnyUhci<'d>>,
     ) -> Self {
-        // let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-        // dma_circular_buffers!(1024, 1024);
-        // let rx_descriptors: &mut [esp_hal::dma::DmaDescriptor; 3] = rx_descriptors;
-        // let tx_descriptors: &mut [esp_hal::dma::DmaDescriptor; 3] = tx_descriptors;
-        // let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-        // let channel = Channel::new(dma_channel);
-        // Yes, but: No runtime checks; GDMA channels are compatible with any peripheral
-        // channel.runtime_ensure_compatible(&uhci);
-        // let dma_channel: Channel<esp_hal::Blocking, _> = Channel::new(dma_channel);
-        // let idk: u32 = dma_channel;
-        // Self { uhci, dma_channel }
-
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&uhci);
 
-        Self {
+        let self_uhci = Self {
+            _uart: uart,
             uhci: uhci.into(),
             channel,
-        }
-    }
+        };
 
-    /// todo
-    pub fn init(&self) {
-        self.clean_turn_on();
-        self.reset(); // Not sure
+        self_uhci.clean_turn_on();
+        self_uhci.reset();
+
+        self_uhci
     }
 
     // uhci_ll_enable_bus_clock
