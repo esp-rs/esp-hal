@@ -113,49 +113,6 @@ pub struct TrapFrame {
     /// Argument register a7, typically used to pass the eighth argument to a
     /// function.
     pub a7: usize,
-    /// Saved register s0, used to hold values across function calls.
-    pub s0: usize,
-    /// Saved register s1, used to hold values across function calls.
-    pub s1: usize,
-    /// Saved register s2, used to hold values across function calls.
-    pub s2: usize,
-    /// Saved register s3, used to hold values across function calls.
-    pub s3: usize,
-    /// Saved register s4, used to hold values across function calls.
-    pub s4: usize,
-    /// Saved register s5, used to hold values across function calls.
-    pub s5: usize,
-    /// Saved register s6, used to hold values across function calls.
-    pub s6: usize,
-    /// Saved register s7, used to hold values across function calls.
-    pub s7: usize,
-    /// Saved register s8, used to hold values across function calls.
-    pub s8: usize,
-    /// Saved register s9, used to hold values across function calls.
-    pub s9: usize,
-    /// Saved register s10, used to hold values across function calls.
-    pub s10: usize,
-    /// Saved register s11, used to hold values across function calls.
-    pub s11: usize,
-    /// Global pointer register, holds the address of the global data area.
-    pub gp: usize,
-    /// Thread pointer register, holds the address of the thread-local storage
-    /// area.
-    pub tp: usize,
-    /// Stack pointer register, holds the address of the top of the stack.
-    pub sp: usize,
-    /// Program counter, stores the address of the next instruction to be
-    /// executed.
-    pub pc: usize,
-    /// Machine status register, holds the current status of the processor,
-    /// including interrupt enable bits and privilege mode.
-    pub mstatus: usize,
-    /// Machine cause register, contains the reason for the trap (e.g.,
-    /// exception or interrupt number).
-    pub mcause: usize,
-    /// Machine trap value register, contains additional information about the
-    /// trap (e.g., faulting address).
-    pub mtval: usize,
 }
 
 /// Trap entry point rust (_start_trap_rust)
@@ -514,162 +471,162 @@ _start_trap: // Handle exceptions in vectored mode
     csrr t0, mscratch
     // now SP is in RAM - continue
 
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, _start_trap_rust_hal /* Load the HAL trap handler */
     j _start_trap_direct
 _start_trap1:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt1
     j _start_trap_direct
 _start_trap2:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt2
     j _start_trap_direct
 _start_trap3:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt3
     j _start_trap_direct
 _start_trap4:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt4
     j _start_trap_direct
 _start_trap5:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt5
     j _start_trap_direct
 _start_trap6:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt6
     j _start_trap_direct
 _start_trap7:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt7
     j _start_trap_direct
 _start_trap8:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt8
     j _start_trap_direct
 _start_trap9:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt9
     j _start_trap_direct
 _start_trap10:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt10
     j _start_trap_direct
 _start_trap11:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt11
     j _start_trap_direct
 _start_trap12:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt12
     j _start_trap_direct
 _start_trap13:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt13
     j _start_trap_direct
 _start_trap14:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt14
     j _start_trap_direct
 _start_trap15:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt15
     j _start_trap_direct
 _start_trap16:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt16
     j _start_trap_direct
 _start_trap17:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt17
     j _start_trap_direct
 _start_trap18:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt18
     j _start_trap_direct
 _start_trap19:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt19
     j _start_trap_direct
 _start_trap20:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt20
     j _start_trap_direct
 _start_trap21:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt21
     j _start_trap_direct
 _start_trap22:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt22
     j _start_trap_direct
 _start_trap23:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt23
     j _start_trap_direct
 _start_trap24:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt24
     j _start_trap_direct
 _start_trap25:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt25
     j _start_trap_direct
 _start_trap26:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt26
     j _start_trap_direct
 _start_trap27:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt27
     j _start_trap_direct
 _start_trap28:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt28
     j _start_trap_direct
 _start_trap29:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt29
     j _start_trap_direct
 _start_trap30:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt30
     j _start_trap_direct
 _start_trap31:
-    addi sp, sp, -40*4
+    addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt31
     j _start_trap_direct
@@ -692,41 +649,13 @@ r#"
     sw a5, 13*4(sp)
     sw a6, 14*4(sp)
     sw a7, 15*4(sp)
-    sw s0, 16*4(sp)
-    sw s1, 17*4(sp)
-    sw s2, 18*4(sp)
-    sw s3, 19*4(sp)
-    sw s4, 20*4(sp)
-    sw s5, 21*4(sp)
-    sw s6, 22*4(sp)
-    sw s7, 23*4(sp)
-    sw s8, 24*4(sp)
-    sw s9, 25*4(sp)
-    sw s10, 26*4(sp)
-    sw s11, 27*4(sp)
-    sw gp, 28*4(sp)
-    sw tp, 29*4(sp)
-    csrrs t1, mepc, x0
-    sw t1, 31*4(sp)
-    csrrs t1, mstatus, x0
-    sw t1, 32*4(sp)
-    csrrs t1, mcause, x0
-    sw t1, 33*4(sp)
-    csrrs t1, mtval, x0
-    sw t1, 34*4(sp)
 
-    addi s0, sp, 40*4
+    addi s0, sp, 16*4
     sw s0, 30*4(sp)
 
-    add a0, sp, zero
-    // jump to handler loaded in direct handler
-    jalr ra, ra #jump to label loaded in _start_trapx
-
-    lw t1, 31*4(sp)
-    csrrw x0, mepc, t1
-
-    lw t1, 32*4(sp)
-    csrrw x0, mstatus, t1
+    # jump to handler loaded in direct handler
+    add a0, sp, zero # load trap-frame address in a0
+    jalr ra, ra # jump to label loaded in _start_trapX
 
     lw ra, 0*4(sp)
     lw t0, 1*4(sp)
@@ -744,21 +673,8 @@ r#"
     lw a5, 13*4(sp)
     lw a6, 14*4(sp)
     lw a7, 15*4(sp)
-    lw s0, 16*4(sp)
-    lw s1, 17*4(sp)
-    lw s2, 18*4(sp)
-    lw s3, 19*4(sp)
-    lw s4, 20*4(sp)
-    lw s5, 21*4(sp)
-    lw s6, 22*4(sp)
-    lw s7, 23*4(sp)
-    lw s8, 24*4(sp)
-    lw s9, 25*4(sp)
-    lw s10, 26*4(sp)
-    lw s11, 27*4(sp)
-    lw gp, 28*4(sp)
-    lw tp, 29*4(sp)
-    lw sp, 30*4(sp)
+
+    addi sp, sp, 16*4
 
     # SP was restored from the original SP
     mret
