@@ -35,7 +35,7 @@ fn main() -> ! {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
 
-    let mut uhci = UhciPer::<'_, Blocking>::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
+    let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
     uhci.configure();
 
     loop {

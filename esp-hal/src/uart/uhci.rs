@@ -1,7 +1,20 @@
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        asynch::{DmaRxFuture, DmaTxFuture}, AnyGdmaChannel, Channel, DmaChannel, DmaChannelFor, DmaEligible, DmaRxBuf, DmaTxBuf, PeripheralDmaChannel
-    }, peripherals, uart::Uart, Async, Blocking, DriverMode
+        AnyGdmaChannel,
+        Channel,
+        DmaChannel,
+        DmaChannelFor,
+        DmaEligible,
+        DmaRxBuf,
+        DmaTxBuf,
+        PeripheralDmaChannel,
+        asynch::{DmaRxFuture, DmaTxFuture},
+    },
+    peripherals,
+    uart::Uart,
 };
 
 crate::any_peripheral! {
@@ -176,30 +189,18 @@ impl<'d> UhciPer<'d, Blocking> {
 
         self.channel.tx.stop_transfer();
     }
+
+    /// todo
+    pub fn into_async(self) -> UhciPer<'d, Async> {
+        UhciPer {
+            _uart: self._uart.into_async(),
+            uhci: self.uhci,
+            channel: self.channel.into_async(),
+        }
+    }
 }
 
 impl<'d> UhciPer<'d, Async> {
-    /// todo
-    pub fn new(
-        uart: Uart<'d, Async>,
-        uhci: peripherals::UHCI0<'static>,
-        channel: impl DmaChannelFor<AnyUhci<'d>>,
-    ) -> Self {
-        let channel = Channel::new(channel.degrade()).into_async();
-        channel.runtime_ensure_compatible(&uhci);
-
-        let self_uhci = Self {
-            _uart: uart,
-            uhci: uhci.into(),
-            channel,
-        };
-
-        self_uhci.clean_turn_on();
-        self_uhci.reset();
-
-        self_uhci
-    }
-
     /// todo
     pub async fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
         self.read_limit(rx_buffer.len());

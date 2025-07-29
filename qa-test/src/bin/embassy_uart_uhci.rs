@@ -38,14 +38,14 @@ async fn run_uart(peripherals: Peripherals) {
     let uart = Uart::new(peripherals.UART1, config)
         .unwrap()
         .with_tx(peripherals.GPIO2)
-        .with_rx(peripherals.GPIO3).into_async();
+        .with_rx(peripherals.GPIO3);
 
     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(25);
     let mut dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
 
-    let mut uhci = UhciPer::<'_, Async>::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
+    let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
     uhci.configure();
 
     loop {
