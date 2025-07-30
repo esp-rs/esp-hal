@@ -28,6 +28,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    if (cfg!(feature = "ble")
+        || cfg!(feature = "coex")
+        || cfg!(feature = "csi")
+        || cfg!(feature = "esp-now")
+        || cfg!(feature = "ieee802154")
+        || cfg!(feature = "smoltcp")
+        || cfg!(feature = "sniffer"))
+        && !cfg!(feature = "unstable")
+    {
+        panic!(
+            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`.\n\n"
+        )
+    }
+
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
     // implementation detail.
