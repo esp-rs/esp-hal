@@ -266,6 +266,7 @@ impl Chip {
                     "soc_ref_tick_hz_is_set",
                     "soc_rc_fast_clk_default=\"8000000\"",
                     "soc_rc_fast_clk_default_is_set",
+                    "aes_endianness_configurable",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"2\"",
                     "gpio_constant_0_input=\"48\"",
@@ -419,6 +420,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_ref_tick_hz_is_set",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default=\"8000000\"",
                     "cargo:rustc-cfg=soc_rc_fast_clk_default_is_set",
+                    "cargo:rustc-cfg=aes_endianness_configurable",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"2\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"48\"",
@@ -792,6 +794,7 @@ impl Chip {
                     "aes_dma_mode_ctr",
                     "aes_dma_mode_cfb8",
                     "aes_dma_mode_cfb128",
+                    "aes_has_split_text_registers",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -934,6 +937,7 @@ impl Chip {
                     "cargo:rustc-cfg=aes_dma_mode_ctr",
                     "cargo:rustc-cfg=aes_dma_mode_cfb8",
                     "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1131,6 +1135,7 @@ impl Chip {
                     "aes_dma_mode_ctr",
                     "aes_dma_mode_cfb8",
                     "aes_dma_mode_cfb128",
+                    "aes_has_split_text_registers",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1329,6 +1334,7 @@ impl Chip {
                     "cargo:rustc-cfg=aes_dma_mode_ctr",
                     "cargo:rustc-cfg=aes_dma_mode_cfb8",
                     "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1508,6 +1514,7 @@ impl Chip {
                     "aes_dma_mode_ctr",
                     "aes_dma_mode_cfb8",
                     "aes_dma_mode_cfb128",
+                    "aes_has_split_text_registers",
                     "assist_debug_has_sp_monitor",
                     "assist_debug_has_region_monitor",
                     "gpio_gpio_function=\"1\"",
@@ -1680,6 +1687,7 @@ impl Chip {
                     "cargo:rustc-cfg=aes_dma_mode_ctr",
                     "cargo:rustc-cfg=aes_dma_mode_cfb8",
                     "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=assist_debug_has_sp_monitor",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -1853,6 +1861,8 @@ impl Chip {
                     "aes_dma_mode_cfb8",
                     "aes_dma_mode_cfb128",
                     "aes_dma_mode_gcm",
+                    "aes_has_split_text_registers",
+                    "aes_endianness_configurable",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
                     "gpio_constant_0_input=\"60\"",
@@ -2021,6 +2031,8 @@ impl Chip {
                     "cargo:rustc-cfg=aes_dma_mode_cfb8",
                     "cargo:rustc-cfg=aes_dma_mode_cfb128",
                     "cargo:rustc-cfg=aes_dma_mode_gcm",
+                    "cargo:rustc-cfg=aes_has_split_text_registers",
+                    "cargo:rustc-cfg=aes_endianness_configurable",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
                     "cargo:rustc-cfg=gpio_constant_0_input=\"60\"",
@@ -2205,6 +2217,7 @@ impl Chip {
                     "aes_dma_mode_ctr",
                     "aes_dma_mode_cfb8",
                     "aes_dma_mode_cfb128",
+                    "aes_has_split_text_registers",
                     "assist_debug_has_region_monitor",
                     "gpio_has_bank_1",
                     "gpio_gpio_function=\"1\"",
@@ -2389,6 +2402,7 @@ impl Chip {
                     "cargo:rustc-cfg=aes_dma_mode_ctr",
                     "cargo:rustc-cfg=aes_dma_mode_cfb8",
                     "cargo:rustc-cfg=aes_dma_mode_cfb128",
+                    "cargo:rustc-cfg=aes_has_split_text_registers",
                     "cargo:rustc-cfg=assist_debug_has_region_monitor",
                     "cargo:rustc-cfg=gpio_has_bank_1",
                     "cargo:rustc-cfg=gpio_gpio_function=\"1\"",
@@ -2563,6 +2577,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(uart_uart2)");
         println!("cargo:rustc-check-cfg=cfg(soc_ref_tick_hz_is_set)");
         println!("cargo:rustc-check-cfg=cfg(soc_rc_fast_clk_default_is_set)");
+        println!("cargo:rustc-check-cfg=cfg(aes_endianness_configurable)");
         println!("cargo:rustc-check-cfg=cfg(gpio_has_bank_1)");
         println!("cargo:rustc-check-cfg=cfg(gpio_remap_iomux_pin_registers)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_separate_filter_config_registers)");
@@ -2635,6 +2650,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_ctr)");
         println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb8)");
         println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb128)");
+        println!("cargo:rustc-check-cfg=cfg(aes_has_split_text_registers)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug_has_region_monitor)");
         println!("cargo:rustc-check-cfg=cfg(esp32c6)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");

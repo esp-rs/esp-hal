@@ -51,6 +51,12 @@ macro_rules! property {
     ("aes.dma") => {
         true
     };
+    ("aes.has_split_text_registers") => {
+        true
+    };
+    ("aes.endianness_configurable") => {
+        false
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };

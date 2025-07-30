@@ -24,7 +24,7 @@
 //!
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::aes::{Aes, Mode};
+//! # use esp_hal::aes::{Aes, Operation};
 //! # let keytext = b"SUp4SeCp@sSw0rd";
 //! # let plaintext = b"message";
 //! # let mut keybuf = [0_u8; 16];
@@ -34,11 +34,11 @@
 //! block[..plaintext.len()].copy_from_slice(plaintext);
 //!
 //! let mut aes = Aes::new(peripherals.AES);
-//! aes.process(&mut block, Mode::Encryption128, keybuf);
+//! aes.encrypt(&mut block, keybuf);
 //!
 //! // The encryption happens in-place, so the ciphertext is in `block`
 //!
-//! aes.process(&mut block, Mode::Decryption128, keybuf);
+//! aes.decrypt(&mut block, keybuf);
 //!
 //! // The decryption happens in-place, so the plaintext is in `block`
 //! # {after_snippet}
@@ -50,28 +50,8 @@
 //! mode.
 //!
 //! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
-//!
-//! ## Implementation State
-//!
-//! * AES-DMA mode is currently not supported on ESP32
-//! * AES-DMA Initialization Vector (IV) is currently not supported
 
-use crate::{
-    pac,
-    peripherals::AES,
-    reg_access::{AlignmentHelper, NativeEndianess},
-    system::GenericPeripheralGuard,
-};
-
-#[cfg_attr(esp32, path = "esp32.rs")]
-#[cfg_attr(esp32s3, path = "esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "esp32s2.rs")]
-#[cfg_attr(esp32c3, path = "esp32cX.rs")]
-#[cfg_attr(esp32c6, path = "esp32cX.rs")]
-#[cfg_attr(esp32h2, path = "esp32cX.rs")]
-mod aes_spec_impl;
-
-const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
+use crate::{pac, peripherals::AES, system::GenericPeripheralGuard};
 
 for_each_aes_key_length! {
     ($len:literal) => {
@@ -122,23 +102,45 @@ for_each_aes_key_length! {
         paste::paste! {
             /// Defines the operating modes for AES encryption and decryption.
             #[repr(C)]
-            pub enum Mode {
+            #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+            enum Mode {
                 $(
-                    #[doc= concat!("Encryption mode with ", stringify!($len), "-bit key")]
                     [<Encryption $bits>] = $encrypt,
-
-                    #[doc= concat!("Decryption mode with ", stringify!($len), "-bit key")]
                     [<Decryption $bits>] = $decrypt,
                 )*
+            }
+
+            impl Key {
+                fn encrypt_mode(&self) -> Mode {
+                    match self {
+                        $(Self::[<Key $bits>](_) => Mode::[<Encryption $bits>],)*
+                    }
+                }
+
+                fn decrypt_mode(&self) -> Mode {
+                    match self {
+                        $(Self::[<Key $bits>](_) => Mode::[<Decryption $bits>],)*
+                    }
+                }
             }
         }
     };
 }
 
+/// Defines the operating modes for AES encryption and decryption.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Operation {
+    /// Produce ciphertext from plaintext
+    Encrypt,
+
+    /// Produce plaintext from ciphertext
+    Decrypt,
+}
+
 /// AES peripheral container
 pub struct Aes<'d> {
     aes: AES<'d>,
-    alignment_helper: AlignmentHelper<NativeEndianess>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Aes as u8 }>,
 }
 
@@ -147,48 +149,120 @@ impl<'d> Aes<'d> {
     pub fn new(aes: AES<'d>) -> Self {
         let guard = GenericPeripheralGuard::new();
 
-        let mut ret = Self {
-            aes,
-            alignment_helper: AlignmentHelper::native_endianess(),
-            _guard: guard,
-        };
-        ret.init();
+        #[cfg_attr(not(aes_dma), expect(unused_mut))]
+        let mut this = Self { aes, _guard: guard };
 
-        ret
+        #[cfg(aes_dma)]
+        this.write_dma(false);
+
+        this
     }
 
     fn regs(&self) -> &pac::aes::RegisterBlock {
         self.aes.register_block()
     }
 
-    /// Encrypts/Decrypts the given buffer based on `mode` parameter
-    pub fn process<K>(&mut self, block: &mut [u8; 16], mode: Mode, key: K)
-    where
-        K: Into<Key>,
-    {
-        // Convert from into Key enum
-        self.write_key(key.into().as_slice());
-        self.write_mode(mode);
-        self.set_block(block);
-        self.start();
-        while !(self.is_idle()) {}
-        self.block(block);
+    /// Configures how the state matrix would be laid out
+    #[cfg(aes_endianness_configurable)]
+    pub fn write_endianness(
+        &mut self,
+        input_text_word_endianess: Endianness,
+        input_text_byte_endianess: Endianness,
+        output_text_word_endianess: Endianness,
+        output_text_byte_endianess: Endianness,
+        key_word_endianess: Endianness,
+        key_byte_endianess: Endianness,
+    ) {
+        let mut to_write = 0_u32;
+        to_write |= key_byte_endianess as u32;
+        to_write |= (key_word_endianess as u32) << 1;
+        to_write |= (input_text_byte_endianess as u32) << 2;
+        to_write |= (input_text_word_endianess as u32) << 3;
+        to_write |= (output_text_byte_endianess as u32) << 4;
+        to_write |= (output_text_word_endianess as u32) << 5;
+        self.regs().endian().write(|w| unsafe { w.bits(to_write) });
+    }
+
+    fn start(&self) {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().start().write(|w| w.start().set_bit());
+            } else {
+                self.regs().trigger().write(|w| w.trigger().set_bit());
+            }
+        }
     }
 
     fn is_idle(&mut self) -> bool {
-        self.read_idle()
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                self.regs().idle().read().idle().bit_is_set()
+            } else {
+                self.regs().state().read().state().bits() == 0
+            }
+        }
     }
 
-    fn set_block(&mut self, block: &[u8; 16]) {
+    fn write_key(&mut self, input: &[u8]) {
+        for (i, word) in read_words(input).enumerate() {
+            self.regs().key(i).write(|w| unsafe { w.bits(word) });
+        }
+    }
+
+    fn write_block(&mut self, block: &[u8]) {
+        for (i, word) in read_words(block).enumerate() {
+            cfg_if::cfg_if! {
+                if #[cfg(aes_has_split_text_registers)] {
+                    self.regs().text_in(i).write(|w| unsafe { w.bits(word) });
+                } else {
+                    self.regs().text(i).write(|w| unsafe { w.bits(word) });
+                }
+            }
+        }
+    }
+
+    fn read_block(&self, block: &mut [u8]) {
+        cfg_if::cfg_if! {
+            if #[cfg(aes_has_split_text_registers)] {
+                write_words(block, |i| self.regs().text_out(i).read().bits());
+            } else {
+                write_words(block, |i| self.regs().text(i).read().bits());
+            }
+        }
+    }
+
+    fn write_mode(&self, mode: Mode) {
+        self.regs().mode().write(|w| unsafe { w.bits(mode as _) });
+    }
+
+    #[cfg(aes_dma)]
+    fn write_dma(&mut self, enable_dma: bool) {
+        self.regs()
+            .dma_enable()
+            .write(|w| w.dma_enable().bit(enable_dma));
+    }
+
+    fn process(&mut self, block: &mut [u8; 16], mode: Mode, key: Key) {
+        self.write_key(key.as_slice());
+        self.write_mode(mode);
         self.write_block(block);
-    }
-
-    fn block(&self, block: &mut [u8; 16]) {
+        self.start();
+        while !(self.is_idle()) {}
         self.read_block(block);
     }
 
-    fn start(&mut self) {
-        self.write_start();
+    /// Encrypts the given buffer with the given key.
+    pub fn encrypt(&mut self, block: &mut [u8; 16], key: impl Into<Key>) {
+        let key = key.into();
+        let mode = key.encrypt_mode();
+        self.process(block, mode, key)
+    }
+
+    /// Decrypts the given buffer with the given key.
+    pub fn decrypt(&mut self, block: &mut [u8; 16], key: impl Into<Key>) {
+        let key = key.into();
+        let mode = key.decrypt_mode();
+        self.process(block, mode, key)
     }
 }
 
@@ -222,7 +296,7 @@ pub mod dma {
 
     use crate::{
         Blocking,
-        aes::{Key, Mode},
+        aes::{Key, Operation},
         dma::{
             Channel,
             DmaChannelFor,
@@ -287,21 +361,12 @@ pub mod dma {
     impl<'d> AesDma<'d> {
         /// Writes the encryption key to the AES hardware, checking that its
         /// length matches expected constraints.
-        pub fn write_key<K>(&mut self, key: K)
-        where
-            K: Into<Key>,
-        {
+        pub fn write_key(&mut self, key: impl Into<Key>) {
             let key = key.into(); // Convert into Key enum
-            debug_assert!(key.as_slice().len() <= 8 * ALIGN_SIZE);
-            debug_assert_eq!(key.as_slice().len() % ALIGN_SIZE, 0);
-            self.aes.write_key(key.as_slice());
-        }
-
-        /// Writes a block of data to the AES hardware, ensuring the block's
-        /// length is properly aligned.
-        pub fn write_block(&mut self, block: &[u8]) {
-            debug_assert_eq!(block.len(), 4 * ALIGN_SIZE);
-            self.aes.write_key(block);
+            let key = key.as_slice();
+            debug_assert!(key.len() <= 8 * ALIGN_SIZE);
+            debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
+            self.aes.write_key(key);
         }
 
         /// Perform a DMA transfer.
@@ -313,7 +378,7 @@ pub mod dma {
             number_of_blocks: usize,
             mut output: RXBUF,
             mut input: TXBUF,
-            mode: Mode,
+            mode: Operation,
             cipher_mode: CipherMode,
             key: K,
         ) -> Result<AesTransfer<'d, RXBUF, TXBUF>, (crate::dma::DmaError, Self, RXBUF, TXBUF)>
@@ -347,11 +412,16 @@ pub mod dma {
                 return Err((err, self, output, input));
             }
 
+            let key = key.into();
             self.enable_dma(true);
             self.enable_interrupt();
-            self.aes.write_mode(mode);
+            self.aes.write_mode(if mode == Operation::Encrypt {
+                key.encrypt_mode()
+            } else {
+                key.decrypt_mode()
+            });
             self.set_cipher_mode(cipher_mode);
-            self.write_key(key.into());
+            self.write_key(key);
 
             self.set_num_block(number_of_blocks as u32);
 
@@ -398,7 +468,7 @@ pub mod dma {
         }
 
         fn start_transform(&self) {
-            self.aes.write_start();
+            self.aes.start();
         }
 
         fn finish_transform(&self) {
@@ -479,7 +549,7 @@ pub mod dma {
             self.aes_dma.channel.rx.stop_transfer();
             self.aes_dma.channel.tx.stop_transfer();
 
-            // SAFETY: This is Drop, we know that self.i8080 and self.buf_view
+            // SAFETY: This is Drop, we know that self.aes_dma and self.buf_view
             // won't be touched again.
             unsafe {
                 ManuallyDrop::drop(&mut self.aes_dma);
@@ -489,5 +559,26 @@ pub mod dma {
             let _ = RX::from_view(rx_view);
             let _ = TX::from_view(tx_view);
         }
+    }
+}
+
+// Utilities
+
+fn read_words(slice: &[u8]) -> impl Iterator<Item = u32> {
+    fn bytes<const N: usize>(slice: &[u8]) -> impl Iterator<Item = [u8; N]> {
+        slice.chunks(N).map(|c| {
+            let mut bytes = [0; N];
+            bytes[0..c.len()].copy_from_slice(c);
+            bytes
+        })
+    }
+
+    bytes::<4>(slice).map(u32::from_le_bytes)
+}
+
+fn write_words(slice: &mut [u8], next: impl Fn(usize) -> u32) {
+    for (i, chunk) in slice.chunks_mut(4).enumerate() {
+        let bytes = next(i).to_le_bytes();
+        chunk.copy_from_slice(&bytes[0..chunk.len()]);
     }
 }

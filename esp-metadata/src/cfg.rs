@@ -293,6 +293,8 @@ driver_configs![
             dma: bool,
             #[serde(default)]
             dma_mode: Vec<String>,
+            has_split_text_registers: bool,
+            endianness_configurable: bool,
         }
     },
     AssistDebugProperties {

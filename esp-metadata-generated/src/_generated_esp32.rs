@@ -57,6 +57,12 @@ macro_rules! property {
     ("aes.dma") => {
         false
     };
+    ("aes.has_split_text_registers") => {
+        false
+    };
+    ("aes.endianness_configurable") => {
+        true
+    };
     ("gpio.has_bank_1") => {
         true
     };
