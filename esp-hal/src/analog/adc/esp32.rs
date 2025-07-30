@@ -25,7 +25,7 @@ pub enum Error {
 #[doc(hidden)]
 /// Tries to "claim" `ADC2` peripheral and set its status
 pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
-    if ADC2_IN_USE.fetch_or(true, Ordering::AcqRel) {
+    if ADC2_IN_USE.fetch_or(true, Ordering::Relaxed) {
         Err(Error::Adc2InUse)
     } else {
         Ok(())
@@ -35,7 +35,7 @@ pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
 #[doc(hidden)]
 /// Resets `ADC2` usage status to `Unused`
 pub fn release_adc2(_: private::Internal) {
-    ADC2_IN_USE.store(false, Ordering::Release);
+    ADC2_IN_USE.store(false, Ordering::Relaxed);
 }
 
 /// The sampling/readout resolution of the ADC.
