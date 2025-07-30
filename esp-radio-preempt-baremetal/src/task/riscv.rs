@@ -4,11 +4,11 @@ unsafe extern "C" {
     fn sys_switch();
 }
 
-#[unsafe(no_mangle)]
-static mut _CURRENT_CTX_PTR: *mut Registers = core::ptr::null_mut();
+static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
-#[unsafe(no_mangle)]
-static mut _NEXT_CTX_PTR: *mut Registers = core::ptr::null_mut();
+static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+    portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
@@ -119,16 +119,18 @@ pub(crate) fn new_task_context(
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
 pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
-    unsafe {
-        if !_CURRENT_CTX_PTR.is_null() || !_NEXT_CTX_PTR.is_null() {
-            return false;
-        }
+    if !_CURRENT_CTX_PTR
+        .load(portable_atomic::Ordering::SeqCst)
+        .is_null()
+        || !_NEXT_CTX_PTR
+            .load(portable_atomic::Ordering::SeqCst)
+            .is_null()
+    {
+        return false;
     }
 
-    unsafe {
-        _CURRENT_CTX_PTR = old_ctx;
-        _NEXT_CTX_PTR = new_ctx;
-    }
+    _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
+    _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 
     let old = esp_hal::riscv::register::mepc::read();
     unsafe {
@@ -159,8 +161,6 @@ pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
 core::arch::global_asm!(
     r#"
 .section .trap, "ax"
-.extern _CURRENT_CTX_PTR
-.extern _NEXT_CTX_PTR
 
 .globl sys_switch
 .align 4
@@ -171,7 +171,7 @@ sys_switch:
     sw t1, 4(sp)
 
     # t0 => current context
-    la t0, _CURRENT_CTX_PTR
+    la t0, {_CURRENT_CTX_PTR}
     lw t0, 0(t0)
 
     # store registers to old context - PC needs to be set by the "caller"
@@ -215,13 +215,13 @@ sys_switch:
     sw t1, 30*4(t0)
 
     # t0 => next context
-    la t0, _NEXT_CTX_PTR
+    la t0, {_NEXT_CTX_PTR}
     lw t0, 0(t0)
 
     # signal that the task switch is done - safe to do it already now - interrupts are disabled
-    la t1, _NEXT_CTX_PTR
+    la t1, {_NEXT_CTX_PTR}
     sw x0, 0(t1)
-    la t1, _CURRENT_CTX_PTR
+    la t1, {_CURRENT_CTX_PTR}
     sw x0, 0(t1)
 
     # set the next task's PC as MEPC
@@ -269,5 +269,7 @@ sys_switch:
     # jump to next task's PC
     mret
 
-    "#
+    "#, 
+    _CURRENT_CTX_PTR = sym _CURRENT_CTX_PTR,
+    _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
