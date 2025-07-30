@@ -48,7 +48,7 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_radio::init().unwrap();
+    let esp_radio_ctrl = esp_radio::init().unwrap();
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
@@ -65,7 +65,7 @@ fn main() -> ! {
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     loop {
-        let connector = BleConnector::new(&esp_wifi_ctrl, bluetooth.reborrow());
+        let connector = BleConnector::new(&esp_radio_ctrl, bluetooth.reborrow());
         let hci = HciConnector::new(connector, now);
         let mut ble = Ble::new(&hci);
 

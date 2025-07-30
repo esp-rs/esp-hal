@@ -112,9 +112,9 @@ esp32s3 = [
 ## Use `esp-alloc` for dynamic allocations.
 ##
 ## If you opt-out you need to provide implementations for the following functions:
-## - `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
-## - `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
-## - `pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8)`
+## - `pub extern "C" fn esp_radio_free_internal_heap() -> usize`
+## - `pub extern "C" fn esp_radio_allocate_from_internal_ram(size: usize) -> *mut u8`
+## - `pub extern "C" fn esp_radio_deallocate_internal_ram(ptr: *mut u8)`
 esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
