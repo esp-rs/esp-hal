@@ -33,7 +33,7 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 ## Memory allocation functions
 
-The names of functions that the user needs to opt-out to use their own allocator have been changed to match `esp-radio` crate name.
+The names of functions for which the user must provide an implementation in order to use their own allocator have been changed to match `esp-radio` crate name.
 
 ```diff
 - pub extern "C" fn esp_wifi_free_internal_heap() ...
