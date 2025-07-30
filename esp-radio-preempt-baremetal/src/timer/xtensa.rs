@@ -38,3 +38,18 @@ pub(crate) fn yield_task() {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
 }
+
+#[esp_hal::ram]
+pub(crate) extern "C" fn timer_tick_handler(_context: &mut TrapFrame) {
+    super::clear_timer_interrupt();
+
+    // `task_switch` must be called on a single interrupt priority level only.
+    // Because on ESP32 the software interrupt is triggered at priority 3 but
+    // the timer interrupt is triggered at priority 1, we need to trigger the
+    // software interrupt manually.
+    if cfg!(esp32) {
+        yield_task();
+    } else {
+        crate::task::task_switch(_context);
+    }
+}
