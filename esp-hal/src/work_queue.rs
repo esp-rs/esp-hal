@@ -68,15 +68,17 @@ impl<T: Sync> Inner<T> {
     /// Places a work item at the end of the queue.
     fn enqueue(&mut self, ptr: *mut WorkItem<T>) {
         if self.tail.is_null() {
-            // Queue is empty, set both `head` and `tail`.
-            self.tail = ptr;
+            // Queue is empty, set `head`.
             self.head = ptr;
         } else {
+            // Queue contains something, append to `tail`.
             unsafe {
                 // Safety: we just checked that `tail` is not null.
                 (*self.tail).next = ptr;
             }
         }
+        // Move `tail` to the newly inserted item.
+        self.tail = ptr;
     }
 
     /// Places a work item at the front of the queue.

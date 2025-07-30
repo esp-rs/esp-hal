@@ -151,14 +151,20 @@ mod tests {
         let mut ecb_encrypt = AesContext::ecb(Operation::Encrypt, KEY_256);
         let handle2 = ecb_encrypt.process_in_place(&mut buffer2).unwrap();
 
+        let mut buffer3 = PLAINTEXT_BUF;
+        let mut ecb_encrypt = AesContext::ecb(Operation::Encrypt, KEY_128);
+        let handle3 = ecb_encrypt.process_in_place(&mut buffer3).unwrap();
+
         core::mem::drop(handle1);
 
         let mut aes = AesBackend::new(p.AES);
         let _backend = aes.start();
 
+        handle3.wait_blocking();
         handle2.wait_blocking();
 
-        assert_eq!(buffer2, CIPHERTEXT_ECB_256);
         assert_eq!(buffer1, PLAINTEXT_BUF);
+        assert_eq!(buffer2, CIPHERTEXT_ECB_256);
+        assert_eq!(buffer3, CIPHERTEXT_ECB_128);
     }
 }
