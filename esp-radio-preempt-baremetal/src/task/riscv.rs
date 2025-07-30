@@ -119,6 +119,17 @@ pub(crate) fn new_task_context(
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
 pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
+    // Check that there isn't a switch "in-progress"
+    //
+    // While this shouldn't happen: from observation it does!
+    //
+    // This happens if the timer tick interrupt gets asserted while the task switch is in
+    // progress (i.e. the sw-int is served).
+    //
+    // In that case returning via `mret` will first service the pending interrupt before actually
+    // ending up in `sys_switch`.
+    //
+    // Setting MPIE to 0 _should_ prevent that from happening.
     if !_CURRENT_CTX_PTR
         .load(portable_atomic::Ordering::SeqCst)
         .is_null()
@@ -215,11 +226,10 @@ sys_switch:
     sw t1, 30*4(t0)
 
     # t0 => next context
-    la t0, {_NEXT_CTX_PTR}
-    lw t0, 0(t0)
+    la t1, {_NEXT_CTX_PTR}
+    lw t0, 0(t1)
 
     # signal that the task switch is done - safe to do it already now - interrupts are disabled
-    la t1, {_NEXT_CTX_PTR}
     sw x0, 0(t1)
     la t1, {_CURRENT_CTX_PTR}
     sw x0, 0(t1)
