@@ -113,7 +113,8 @@ macro_rules! scheduler_impl {
 /// This trait needs to be implemented by a driver crate to integrate esp-radio with a software
 /// platform.
 pub trait Scheduler: Send + Sync + 'static {
-    /// This function is called by `esp_radio::init` to verify that the scheduler is properly set up.
+    /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
+    /// up.
     fn initialized(&self) -> bool;
 
     /// This function is called by `esp_radio::init` to put the current task to sleep for the
