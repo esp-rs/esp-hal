@@ -25,9 +25,10 @@ pub enum Error {
 #[doc(hidden)]
 /// Tries to "claim" `ADC2` peripheral and set its status
 pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
-    match ADC2_IN_USE.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire) {
-        Ok(_) => Ok(()),
-        Err(_) => Err(Error::Adc2InUse),
+    if ADC2_IN_USE.fetch_or(true, Ordering::AcqRel) {
+        Err(Error::Adc2InUse)
+    } else {
+        Ok(())
     }
 }
 
