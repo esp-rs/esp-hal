@@ -24,6 +24,12 @@ impl<'d> BleConnector<'d> {
         Self { _device: device }
     }
 
+    pub fn reinit(&mut self) {
+        // Reinitialize the BLE controller
+        crate::ble::ble_deinit();
+        crate::ble::ble_init();
+    }
+
     pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
         Ok(read_next(buf))
     }
