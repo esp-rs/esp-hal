@@ -1,6 +1,6 @@
 use core::{
     marker::PhantomData,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 use super::{AdcConfig, Attenuation};
@@ -11,46 +11,30 @@ use crate::{
 
 pub(super) const NUM_ATTENS: usize = 10;
 
-#[doc(hidden)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-/// ADC2 status variants
-pub enum Adc2Usage {
-    /// ADC2 is not used
-    Unused = 0,
-    /// ADC2 is used by `analog`
-    Analog = 1,
-    /// ADC2 is used by `Wi-Fi` or `Bluetooth`
-    Radio  = 2,
-}
-
 // ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
 // state to prevent unexpected behaviour
-static ADC2_USAGE: AtomicU8 = AtomicU8::new(Adc2Usage::Unused as u8);
+static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
+
+/// ADC Error
+#[derive(Debug)]
+pub enum Error {
+    /// `ADC2` is used together with `radio`.
+    Adc2InUse,
+}
 
 #[doc(hidden)]
 /// Tries to "claim" `ADC2` peripheral and set its status
-pub fn try_claim_adc2(usage: Adc2Usage, _: private::Internal) -> Result<(), Adc2Usage> {
-    let expected = Adc2Usage::Unused as u8;
-    let desired = usage as u8;
-
-    match ADC2_USAGE.compare_exchange(expected, desired, Ordering::AcqRel, Ordering::Acquire) {
+pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
+    match ADC2_IN_USE.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire) {
         Ok(_) => Ok(()),
-        Err(current) => {
-            let current_usage = match current {
-                1 => Adc2Usage::Analog,
-                2 => Adc2Usage::Radio,
-                _ => Adc2Usage::Unused,
-            };
-            Err(current_usage)
-        }
+        Err(_) => Err(Error::Adc2InUse),
     }
 }
 
 #[doc(hidden)]
 /// Resets `ADC2` usage status to `Unused`
 pub fn release_adc2(_: private::Internal) {
-    ADC2_USAGE.store(Adc2Usage::Unused as u8, Ordering::Release);
+    ADC2_IN_USE.store(false, Ordering::Release);
 }
 
 /// The sampling/readout resolution of the ADC.
@@ -274,9 +258,7 @@ where
     /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
     /// will panic.
     pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
-        if ADCI::instance_number() == 2
-            && try_claim_adc2(Adc2Usage::Analog, private::Internal).is_err()
-        {
+        if ADCI::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
             panic!(
                 "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
             );

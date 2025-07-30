@@ -115,7 +115,7 @@ use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
 #[cfg(esp32)]
-use hal::analog::adc::{Adc2Usage, release_adc2, try_claim_adc2};
+use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
@@ -231,7 +231,9 @@ impl Drop for Controller<'_> {
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
-    try_claim_adc2(Adc2Usage::Analog, unsafe { hal::Internal::conjure() })?;
+    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+        return Err(InitializationError::Adc2IsUsed);
+    }
 
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
@@ -312,13 +314,6 @@ pub enum InitializationError {
 impl From<WifiError> for InitializationError {
     fn from(value: WifiError) -> Self {
         InitializationError::WifiError(value)
-    }
-}
-
-#[cfg(esp32)]
-impl From<Adc2Usage> for InitializationError {
-    fn from(_usage: Adc2Usage) -> Self {
-        InitializationError::Adc2IsUsed
     }
 }
 
