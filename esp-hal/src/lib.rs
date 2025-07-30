@@ -251,7 +251,6 @@ pub mod time;
 pub mod uart;
 
 mod macros;
-mod work_queue;
 
 #[cfg(feature = "rt")]
 pub use procmacros::blocking_main as main;
@@ -334,13 +333,12 @@ unstable_module! {
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
+    pub mod work_queue;
 }
 
 unstable_driver! {
     #[cfg(soc_has_aes)]
     pub mod aes;
-    #[cfg(soc_has_aes)]
-    pub mod aes_new;
     #[cfg(soc_has_assist_debug)]
     pub mod assist_debug;
     pub mod delay;

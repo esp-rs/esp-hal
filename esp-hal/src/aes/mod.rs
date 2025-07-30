@@ -53,6 +53,8 @@
 
 use crate::{pac, peripherals::AES, system::GenericPeripheralGuard};
 
+mod cipher_modes;
+
 for_each_aes_key_length! {
     ($len:literal) => {
         // Implementing From for easy conversion from array to Key enum.
@@ -263,6 +265,66 @@ impl<'d> Aes<'d> {
         let key = key.into();
         let mode = key.decrypt_mode();
         self.process(block, mode, key)
+    }
+
+    /// Encrypts/Decrypts the given buffer based on `mode` parameter
+    fn process_work_item(&mut self, work_item: &mut AesOperation) {
+        // Note that we can't just create slices out of the input and output buffers, because they
+        // may alias (when encrypting/decrypting data in place).
+
+        let slice = work_item.key.as_slice();
+        self.write_key(slice);
+        unsafe {
+            match *work_item.cipher_mode {
+                CipherModeState::Ecb(_) | CipherModeState::Cbc(_) => {
+                    self.write_mode(if work_item.mode == Operation::Encrypt {
+                        work_item.key.encrypt_mode()
+                    } else {
+                        work_item.key.decrypt_mode()
+                    })
+                }
+                CipherModeState::Ofb(_)
+                | CipherModeState::Ctr(_)
+                | CipherModeState::Cfb8(_)
+                | CipherModeState::Cfb128(_) => self.write_mode(work_item.key.encrypt_mode()),
+            }
+        }
+
+        let process_block = |input, output, len| {
+            unsafe { self.write_block(core::slice::from_raw_parts(input, len)) };
+            self.start();
+            while !self.is_idle() {}
+            unsafe { self.read_block(core::slice::from_raw_parts_mut(output, len)) };
+        };
+
+        // Safety: the reference to the algorithm state is only held for the duration of the
+        // operation.
+        match unsafe { &mut *work_item.cipher_mode } {
+            CipherModeState::Ecb(algo) => algo.encrypt_decrypt(work_item.buffers, process_block),
+            CipherModeState::Cbc(algo) => {
+                if work_item.mode == Operation::Encrypt {
+                    algo.encrypt(work_item.buffers, process_block);
+                } else {
+                    algo.decrypt(work_item.buffers, process_block);
+                }
+            }
+            CipherModeState::Ofb(algo) => algo.encrypt_decrypt(work_item.buffers, process_block),
+            CipherModeState::Ctr(algo) => algo.encrypt_decrypt(work_item.buffers, process_block),
+            CipherModeState::Cfb8(algo) => {
+                if work_item.mode == Operation::Encrypt {
+                    algo.encrypt(work_item.buffers, process_block)
+                } else {
+                    algo.decrypt(work_item.buffers, process_block)
+                }
+            }
+            CipherModeState::Cfb128(algo) => {
+                if work_item.mode == Operation::Encrypt {
+                    algo.encrypt(work_item.buffers, process_block)
+                } else {
+                    algo.decrypt(work_item.buffers, process_block)
+                }
+            }
+        }
     }
 }
 
@@ -559,6 +621,401 @@ pub mod dma {
             let _ = RX::from_view(rx_view);
             let _ = TX::from_view(tx_view);
         }
+    }
+}
+
+use crate::work_queue::{
+    Handle,
+    Poll,
+    Status,
+    VTable,
+    WorkQueue,
+    WorkQueueDriver,
+    WorkQueueFrontend,
+};
+
+/// Specifies the block cipher modes available for AES operations.
+///
+/// In DMA-driven mode, if a particular mode is not supported by the hardware, the driver will fall
+/// back to a CPU-driven method.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum CipherMode {
+    /// Electronic Codebook Mode
+    Ecb,
+    /// Cipher Block Chaining Mode
+    Cbc,
+    /// Output Feedback Mode
+    Ofb,
+    /// Counter Mode
+    Ctr,
+    /// Cipher Feedback Mode with 8-bit shifting.
+    Cfb8,
+    /// Cipher Feedback Mode with 128-bit shifting.
+    Cfb128,
+    /// Galois Counter Mode
+    Gcm,
+}
+
+#[derive(Clone, Copy)]
+struct CryptoBuffers {
+    input: *const u8,
+    output: *mut u8,
+    text_length: usize,
+}
+
+enum CipherModeState {
+    /// Electronic Codebook Mode
+    // TODO: for this, we need text_length to be a muliple of BLOCK_SIZE
+    Ecb(cipher_modes::Ecb),
+    /// Cipher Block Chaining Mode
+    // TODO: for this, we need text_length to be a muliple of BLOCK_SIZE
+    Cbc(cipher_modes::Cbc),
+    /// Output Feedback Mode
+    Ofb(cipher_modes::Ofb),
+    /// Counter Mode
+    Ctr(cipher_modes::Ctr),
+    /// Cipher Feedback Mode with 8-bit shifting.
+    Cfb8(cipher_modes::Cfb8),
+    /// Cipher Feedback Mode with 128-bit shifting.
+    Cfb128(cipher_modes::Cfb128),
+    // Galois Counter Mode
+    // Gcm(*mut Gcm), // TODO: this is more involved
+}
+
+const BLOCK_SIZE: usize = 16;
+
+struct AesOperation {
+    mode: Operation,
+    // The block cipher operating mode.
+    cipher_mode: *mut CipherModeState,
+    // The length of the key is determined by the operating mode.
+    buffers: CryptoBuffers,
+    key: Key,
+}
+
+// Safety: AesOperation is safe to share between threads, in the context of a WorkQueue. The
+// WorkQueue ensures that only a single location can access the data. All the internals, except
+// for the pointers, are Sync. The pointers are safe to share because they point at data that the
+// AES driver ensures can be accessed safely and soundly.
+unsafe impl Sync for AesOperation {}
+
+static AES_WORK_QUEUE: WorkQueue<AesOperation> = WorkQueue::new();
+const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
+    post: |driver, _item| {
+        // Since we run the operation in `poll`, there is nothing to do here, besides accepting the
+        // work item. However, DS may be using the AES peripheral. We solve that problem (later) by
+        // taking a lock in `on_work_available`
+        let driver = unsafe { AesBackend::from_raw(driver) };
+        driver.ensure_initialized()
+    },
+    poll: |driver, item| {
+        // Fully process the work item. A single CPU-driven AES operation would complete
+        // faster than we could poll the queue with all the locking around it.
+        let driver = unsafe { AesBackend::from_raw(driver) };
+        driver.process(item)
+    },
+    cancel: |_driver, _item| {
+        // To achieve a decent performance in Typical AES mode, we run the operations in a blocking
+        // manner and so they can't be cancelled.
+    },
+    on_empty: |driver| {
+        // Drop the AES driver to conserve power when the queue becomes empty.
+        let driver = unsafe { AesBackend::from_raw(driver) };
+        driver.deinitialize()
+    },
+};
+
+#[procmacros::doc_replace]
+/// CPU-driven AES processing backend.
+///
+/// Due to how this backend works, it provides no `run` method(s). Posting work to this backend will
+/// immediately be executed, in a blocking way. The backend only needs to be kept alive in order to
+/// function.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::aes::{AesBackend, AesContext, Operation};
+/// #
+/// let mut aes = AesBackend::new(peripherals.AES);
+/// // Start the backend, which pins it in place and allows processing AES operations.
+/// let _backend = aes.start();
+///
+/// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
+/// // The key length must be supported by the hardware.
+/// let mut ecb_encrypt = AesContext::ecb(
+///     Operation::Encrypt,
+///     [
+///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
+///         b'd', 0,
+///     ],
+/// );
+///
+/// // Process a block of data in this context, in place. The ECB operating mode requires that this is one block (16 bytes) long.
+/// let mut buffer: [u8; 16] = [
+///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
+/// ];
+/// ecb_encrypt
+///     .process_in_place(&mut buffer)
+///     .unwrap()
+///     .wait_blocking();
+///
+/// // buffer now contains the ciphertext!
+/// assert_eq!(
+///     buffer,
+///     [
+///         0xb3, 0xc8, 0xd2, 0x3b, 0xa7, 0x36, 0x5f, 0x18, 0x61, 0x70, 0x0, 0x3e, 0xd9, 0x3a,
+///         0x31, 0x96,
+///     ]
+/// );
+/// #
+/// # {after_snippet}
+/// ```
+pub struct AesBackend<'d> {
+    peri: AES<'d>,
+    driver: Option<Aes<'d>>,
+}
+
+impl<'d> AesBackend<'d> {
+    /// Creates a new AES backend.
+    ///
+    /// The backend needs to be [`start`][Self::start]ed before it can execute AES operations.
+    pub fn new(aes: AES<'d>) -> Self {
+        Self {
+            peri: aes,
+            driver: None,
+        }
+    }
+
+    /// Registers the AES driver.
+    pub fn start(&mut self) -> AesWorkQueueDriver<'_, 'd> {
+        AesWorkQueueDriver {
+            _inner: WorkQueueDriver::new(self, BLOCKING_AES_VTABLE, &AES_WORK_QUEUE),
+        }
+    }
+
+    // WorkQueue callbacks. They may run in any context.
+
+    unsafe fn from_raw<'any>(ptr: *const ()) -> &'any mut Self {
+        unsafe { unwrap!(ptr.cast_mut().cast::<AesBackend<'_>>().as_mut()) }
+    }
+
+    fn process(&mut self, item: &mut AesOperation) -> Option<Poll> {
+        let driver = self.driver.as_mut()?;
+
+        driver.process_work_item(item);
+
+        Some(Poll::Ready(Status::Completed))
+    }
+
+    fn ensure_initialized(&mut self) -> bool {
+        if self.driver.is_none() {
+            let peri = unsafe { self.peri.clone_unchecked() };
+            self.driver = Some(Aes::new(peri));
+        }
+        // TODO: when DS is implemented, it will need to be able to lock out AES. In that case,
+        // this function should return `false` if the AES peripheral is locked.
+        true
+    }
+
+    fn deinitialize(&mut self) {
+        self.driver = None;
+    }
+}
+
+/// An error related to an AES operation.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum Error {
+    /// The input and output buffers have different lengths.
+    BuffersNotEqual,
+
+    /// The buffer length is not appropriate for the current cipher mode.
+    IncorrectBufferLength,
+}
+
+/// An active work queue driver.
+///
+/// This object must be kept around, otherwise AES operations will never complete.
+pub struct AesWorkQueueDriver<'t, 'd> {
+    _inner: WorkQueueDriver<'t, AesBackend<'d>, AesOperation>,
+}
+
+/// An AES work queue user.
+pub struct AesContext {
+    cipher_mode: CipherModeState,
+    frontend: WorkQueueFrontend<AesOperation>,
+}
+
+impl AesContext {
+    fn new(cipher_mode: CipherModeState, operation: Operation, key: Key) -> Self {
+        Self {
+            cipher_mode,
+            frontend: WorkQueueFrontend::new(AesOperation {
+                mode: operation,
+                cipher_mode: core::ptr::null_mut(),
+                buffers: CryptoBuffers {
+                    input: core::ptr::null(),
+                    output: core::ptr::null_mut(),
+                    text_length: 0,
+                },
+                key,
+            }),
+        }
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Electronic Codebook operating
+    /// mode.
+    pub fn ecb(operation: Operation, key: impl Into<Key>) -> Self {
+        Self::new(
+            CipherModeState::Ecb(cipher_modes::Ecb {}),
+            operation,
+            key.into(),
+        )
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Cipher Block Chaining operating
+    /// mode.
+    pub fn cbc(operation: Operation, iv: [u8; BLOCK_SIZE], key: impl Into<Key>) -> Self {
+        Self::new(
+            CipherModeState::Cbc(cipher_modes::Cbc { iv }),
+            operation,
+            key.into(),
+        )
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Counter operating
+    /// mode.
+    pub fn ctr(operation: Operation, key: impl Into<Key>, nonce: [u8; BLOCK_SIZE]) -> Self {
+        Self::new(
+            CipherModeState::Ctr(cipher_modes::Ctr {
+                nonce,
+                buffer: [0; BLOCK_SIZE],
+                offset: 0,
+            }),
+            operation,
+            key.into(),
+        )
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Cipher feedback (with 8-bit
+    /// shifting) operating mode.
+    pub fn cfb8(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
+        Self::new(
+            CipherModeState::Cfb8(cipher_modes::Cfb8 { iv }),
+            operation,
+            key.into(),
+        )
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Cipher feedback (with 8-bit
+    /// shifting) operating mode.
+    pub fn cfb128(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
+        Self::new(
+            CipherModeState::Cfb128(cipher_modes::Cfb128 { iv, offset: 0 }),
+            operation,
+            key.into(),
+        )
+    }
+
+    /// Creates a new context to encrypt or decrypt data with the Output feedback operating mode.
+    pub fn ofb(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
+        Self::new(
+            CipherModeState::Ofb(cipher_modes::Ofb { iv, offset: 0 }),
+            operation,
+            key.into(),
+        )
+    }
+
+    fn post(&mut self) -> AesHandle<'_> {
+        AesHandle(self.frontend.post(&AES_WORK_QUEUE))
+    }
+
+    fn validate(&self, buffer: &[u8]) -> Result<(), Error> {
+        // TODO: check that data is appropriate for the cipher mode
+        let requires_block_aligned = matches!(
+            self.cipher_mode,
+            CipherModeState::Ecb(_) | CipherModeState::Ofb(_)
+        );
+
+        if requires_block_aligned && !buffer.len().is_multiple_of(BLOCK_SIZE) {
+            return Err(Error::IncorrectBufferLength);
+        }
+
+        Ok(())
+    }
+
+    /// Starts a configured operation.
+    ///
+    /// - For encryption the input is the plaintext, the output is the ciphertext.
+    /// - For decryption the input is the ciphertext, the output is the plaintext.
+    pub fn process<'t>(
+        &'t mut self,
+        input: &'t [u8],
+        output: &'t mut [u8],
+    ) -> Result<AesHandle<'t>, Error> {
+        if input.len() != output.len() {
+            return Err(Error::BuffersNotEqual);
+        }
+        self.validate(input)?;
+        self.validate(output)?;
+
+        let data = self.frontend.data_mut();
+        data.cipher_mode = &raw mut self.cipher_mode;
+        data.buffers.text_length = input.len();
+        data.buffers.input = input.as_ptr();
+        data.buffers.output = output.as_mut_ptr();
+
+        Ok(self.post())
+    }
+
+    /// Starts a configured operation.
+    ///
+    /// The processed data will be written back to the `buffer`.
+    pub fn process_in_place<'t>(
+        &'t mut self,
+        buffer: &'t mut [u8],
+    ) -> Result<AesHandle<'t>, Error> {
+        self.validate(buffer)?;
+
+        let data = self.frontend.data_mut();
+
+        data.cipher_mode = &raw mut self.cipher_mode;
+
+        data.buffers.text_length = buffer.len();
+        let ptr = buffer.as_mut_ptr();
+
+        data.buffers.input = ptr.cast_const();
+        data.buffers.output = ptr;
+
+        Ok(self.post())
+    }
+}
+
+/// The handle to the pending AES operation.
+///
+/// Dropping this handle will cancel the operation.
+pub struct AesHandle<'t>(Handle<'t, AesOperation>);
+
+impl AesHandle<'_> {
+    /// Returns the status of the work item.
+    #[inline]
+    pub fn poll(&mut self) -> Poll {
+        self.0.poll()
+    }
+
+    /// Waits for the work item to be processed.
+    #[inline]
+    pub fn wait_blocking(mut self) {
+        while self.poll() == Poll::Pending {}
+    }
+
+    /// Waits for the work item to be processed.
+    #[inline]
+    pub fn wait(&mut self) -> impl Future<Output = Status> {
+        self.0.wait()
     }
 }
 

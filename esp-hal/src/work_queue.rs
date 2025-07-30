@@ -10,6 +10,7 @@
 //!
 //! Posting a work item into the queue returns a handle. The handle can be used to poll whether
 //! the work item has been processed. Dropping the handle will cancel the work item.
+#![cfg_attr(esp32c2, allow(unused))]
 
 use core::{future::poll_fn, marker::PhantomData};
 
@@ -273,7 +274,7 @@ impl<T: Sync> WorkQueue<T> {
     }
 }
 
-/// The status of a [`WorkItem`].
+/// The status of a work item.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Status {
@@ -316,7 +317,7 @@ impl<T: Sync> WorkItem<T> {
     }
 }
 
-/// The status of a [`WorkItem`].
+/// The status of a work item posted to a work queue.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Poll {
@@ -404,6 +405,7 @@ where
         }
     }
 
+    #[expect(unused)] // TODO this will be used with AesDmaBackend, for example
     pub fn poll(&mut self) {
         self.queue.process();
     }
