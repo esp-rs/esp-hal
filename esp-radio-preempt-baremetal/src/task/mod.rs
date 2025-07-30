@@ -8,14 +8,16 @@ use allocator_api2::boxed::Box;
 #[cfg(riscv)]
 use arch_specific::Registers;
 pub(crate) use arch_specific::*;
-#[cfg(xtensa)]
-use esp_hal::trapframe::TrapFrame as Registers;
+use esp_hal::trapframe::TrapFrame;
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
 
 #[repr(C)]
 pub(crate) struct Context {
+    #[cfg(riscv)]
     pub trap_frame: Registers,
+    #[cfg(xtensa)]
+    pub trap_frame: TrapFrame,
     pub thread_semaphore: u32,
     pub next: *mut Context,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
@@ -46,7 +48,10 @@ pub(super) fn allocate_main_task() {
     // This context will be filled out by the first context switch.
     let context = Box::new_in(
         Context {
+            #[cfg(riscv)]
             trap_frame: Registers::default(),
+            #[cfg(xtensa)]
+            trap_frame: TrapFrame::default(),
             thread_semaphore: 0,
             next: core::ptr::null_mut(),
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
@@ -117,12 +122,6 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     }
 }
 
-#[cfg(xtensa)]
-pub(crate) fn task_switch(trap_frame: &mut Registers) {
+pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
     SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
-}
-
-#[cfg(riscv)]
-pub(crate) fn task_switch() {
-    SCHEDULER_STATE.with(|state| state.switch_task());
 }

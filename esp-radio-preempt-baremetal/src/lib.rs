@@ -28,13 +28,12 @@ mod timer;
 use core::ffi::c_void;
 
 use allocator_api2::boxed::Box;
-#[cfg(xtensa)]
-use esp_hal::trapframe::TrapFrame;
 use esp_hal::{
     Blocking,
     sync::Locked,
     time::{Duration, Instant, Rate},
     timer::{AnyTimer, PeriodicTimer},
+    trapframe::TrapFrame,
 };
 
 use crate::{task::Context, timer::TIMER};
@@ -169,7 +168,7 @@ impl SchedulerState {
     }
 
     #[cfg(riscv)]
-    fn switch_task(&mut self) {
+    fn switch_task(&mut self, _trap_frame: &mut TrapFrame) {
         if !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);
             self.delete_task(task_to_delete);
