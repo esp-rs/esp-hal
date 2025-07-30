@@ -64,10 +64,10 @@ fn main() -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = esp_radio::init().unwrap();
+    let esp_radio_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_wifi_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);
