@@ -9,7 +9,7 @@ pub(crate) fn setup_multitasking() {
     // Register the interrupt handler without nesting to satisfy the requirements of the task
     // switching code
     let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
-        unsafe { core::mem::transmute(swint2_handler as *const ()) },
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint2_handler as *const ()) },
         esp_hal::interrupt::Priority::Priority1,
     );
 
