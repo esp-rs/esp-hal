@@ -11,11 +11,11 @@ esp_bootloader_esp_idf::esp_app_desc!();
 const fn pad_to<const K: usize>(input: &[u8]) -> [u8; K] {
     let mut out = [0; K];
 
-    let bytes = input.len();
-    let bytes = if bytes < K { bytes } else { K };
+    let in_bytes = input.len();
+    assert!(in_bytes <= K);
 
     let mut i = 0;
-    while i < bytes {
+    while i < in_bytes {
         out[i] = input[i];
         i += 1;
     }
