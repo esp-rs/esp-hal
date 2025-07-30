@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - PSRAM on ESP32-S2 (#3811)
 - WDT now allows configuring longer timeouts (#3816)
+- `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 
 ### Removed
 

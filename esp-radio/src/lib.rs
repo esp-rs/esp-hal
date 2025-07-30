@@ -114,6 +114,8 @@ use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
+#[cfg(esp32)]
+use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
@@ -217,6 +219,10 @@ impl Drop for Controller<'_> {
 
         // This shuts down the task switcher and timer tick interrupt.
         preempt::disable();
+
+        #[cfg(esp32)]
+        // Allow using `ADC2` again
+        release_adc2(unsafe { esp_hal::Internal::conjure() });
     }
 }
 
@@ -224,6 +230,11 @@ impl Drop for Controller<'_> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
+    #[cfg(esp32)]
+    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+        return Err(InitializationError::Adc2IsUsed);
+    }
+
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }
@@ -294,6 +305,9 @@ pub enum InitializationError {
     InterruptsDisabled,
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
+    #[cfg(esp32)]
+    // ADC2 cannot be used with `radio` functionality on `esp32`.
+    Adc2IsUsed,
 }
 
 #[cfg(feature = "wifi")]
