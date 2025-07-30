@@ -47,13 +47,14 @@ async fn run_uart(peripherals: Peripherals) {
 
     let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
     uhci.configure();
+    uhci.read_limit(dma_rx.len()).unwrap();
 
     loop {
         println!("Waiting for message");
         uhci.read(&mut dma_rx).await;
 
         let received = dma_rx.number_of_received_bytes();
-        println!("Received dma bytes: {}", dma_rx.number_of_received_bytes());
+        println!("Received dma bytes: {}", received);
 
         let rec_slice = &dma_rx.as_slice()[0..received];
         if received > 0 {
@@ -61,7 +62,8 @@ async fn run_uart(peripherals: Peripherals) {
                 Ok(x) => {
                     println!("Received DMA message: \"{}\"", x);
                     dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
-                    uhci.write(&mut dma_tx, received).await;
+                    dma_tx.set_length(received);
+                    uhci.write(&mut dma_tx).await;
                 }
                 Err(x) => println!("Error string: {}", x),
             }

@@ -37,13 +37,14 @@ fn main() -> ! {
 
     let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
     uhci.configure();
+    uhci.read_limit(dma_rx.len()).unwrap();
 
     loop {
         println!("Waiting for message");
         uhci.read(&mut dma_rx);
 
         let received = dma_rx.number_of_received_bytes();
-        println!("Received dma bytes: {}", dma_rx.number_of_received_bytes());
+        println!("Received dma bytes: {}", received);
 
         let rec_slice = &dma_rx.as_slice()[0..received];
         if received > 0 {
@@ -51,7 +52,8 @@ fn main() -> ! {
                 Ok(x) => {
                     println!("Received DMA message: \"{}\"", x);
                     dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
-                    uhci.write(&mut dma_tx, received);
+                    dma_tx.set_length(received);
+                    uhci.write(&mut dma_tx);
                 }
                 Err(x) => println!("Error string: {}", x),
             }

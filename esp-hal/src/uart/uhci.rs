@@ -9,13 +9,25 @@ use crate::{
         DmaChannelFor,
         DmaEligible,
         DmaRxBuf,
+        DmaRxBuffer,
         DmaTxBuf,
+        DmaTxBuffer,
         PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     peripherals,
     uart::Uart,
 };
+use crate::uart::uhci::Error::*;
+
+/// todo
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum Error {
+    /// todo
+    AboveReadLimit,
+}
 
 crate::any_peripheral! {
     pub peripheral AnyUhci<'d> {
@@ -97,26 +109,28 @@ where
             }
         }
 
-        // We should do UHCI_UART_IDLE_EOF_EN too
+        // If you plan to support more UHCI features, this needs to be configurable
         reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
 
-        // Also UHCI_LEN_EOF_EN, this shouldn't be needed, in theory
+        // If you plan to support more UHCI features, this needs to be configurable
         reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
     }
 
-    fn read_limit(&mut self, mut limit: usize) {
+    /// todo
+    pub fn read_limit(&mut self, mut limit: usize) -> Result<(), Error> {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);
 
         // limit is 12 bits
+        // Above this value, it will probably split the messages, anyway, the point is below it
+        // it will not freeze itself
         if limit > 4095 {
-            // Above this value, it will probably split the messages, anyway, the point is below it
-            // it will not freeze itself
-            limit = 4095
+            return Err(AboveReadLimit);
         }
 
         reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
+        Ok(())
     }
 }
 
@@ -143,11 +157,7 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 
     /// todo
-    pub fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
-        // Do we want this to be specified as an argument? It will return when there is no
-        // communication anyway, idk when we would want to cut it into pieces
-        self.read_limit(rx_buffer.len());
-
+    pub fn read(&mut self, rx_buffer: &mut impl DmaRxBuffer) {
         unsafe {
             self.channel
                 .rx
@@ -160,7 +170,6 @@ impl<'d> UhciPer<'d, Blocking> {
         // info!("Is done: {}, ", self.channel.rx.is_done());
 
         // Based on spi slave dma, is this a good idea? infinite loop to wait for something?
-        // This never exits when a message overflows the DMA buffer
         while !self.channel.rx.is_done() {}
 
         // info!("Is done: {}, ", self.channel.rx.is_done());
@@ -169,11 +178,7 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 
     /// todo
-    pub fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
-        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
-
-        tx_buffer.set_length(length);
-
+    pub fn write(&mut self, tx_buffer: &mut impl DmaTxBuffer) {
         // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
 
         unsafe {
@@ -202,9 +207,7 @@ impl<'d> UhciPer<'d, Blocking> {
 
 impl<'d> UhciPer<'d, Async> {
     /// todo
-    pub async fn read(&mut self, rx_buffer: &mut DmaRxBuf) {
-        self.read_limit(rx_buffer.len());
-
+    pub async fn read(&mut self, rx_buffer: &mut impl DmaRxBuffer) {
         let dma_future = DmaRxFuture::new(&mut self.channel.rx);
 
         unsafe {
@@ -222,11 +225,7 @@ impl<'d> UhciPer<'d, Async> {
     }
 
     /// todo
-    pub async fn write(&mut self, tx_buffer: &mut DmaTxBuf, length: usize) {
-        // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
-
-        tx_buffer.set_length(length);
-
+    pub async fn write(&mut self, tx_buffer: &mut impl DmaTxBuffer) {
         let dma_future = DmaTxFuture::new(&mut self.channel.tx);
 
         // info!("tx_buffer.len() is: {}", tx_buffer.len()); // Nope
