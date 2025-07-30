@@ -1,14 +1,14 @@
-#[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
-#[cfg_attr(target_arch = "xtensa", path = "xtensa.rs")]
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
 pub(crate) mod arch_specific;
 
 use core::{ffi::c_void, mem::MaybeUninit};
 
 use allocator_api2::boxed::Box;
-#[cfg(target_arch = "riscv32")]
+#[cfg(riscv)]
 use arch_specific::Registers;
 pub(crate) use arch_specific::*;
-#[cfg(target_arch = "xtensa")]
+#[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame as Registers;
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
@@ -117,12 +117,12 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     }
 }
 
-#[cfg(target_arch = "xtensa")]
+#[cfg(xtensa)]
 pub(crate) fn task_switch(trap_frame: &mut Registers) {
     SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
 }
 
-#[cfg(target_arch = "riscv32")]
+#[cfg(riscv)]
 pub(crate) fn task_switch() {
     SCHEDULER_STATE.with(|state| state.switch_task());
 }

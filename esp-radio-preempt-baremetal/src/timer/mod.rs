@@ -1,5 +1,5 @@
-#[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
-#[cfg_attr(target_arch = "xtensa", path = "xtensa.rs")]
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
 mod arch_specific;
 
 pub(crate) use arch_specific::*;
@@ -24,10 +24,10 @@ pub(crate) fn setup_timebase(mut timer: TimeBase) {
 
     // Register the interrupt handler without nesting to satisfy the requirements of the task
     // switching code
-    #[cfg(target_arch = "riscv32")]
+    #[cfg(riscv)]
     let handler = InterruptHandler::new_not_nested(cb, Priority::Priority1);
 
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(xtensa)]
     let handler = InterruptHandler::new(cb, Priority::Priority1);
 
     timer.set_interrupt_handler(handler);

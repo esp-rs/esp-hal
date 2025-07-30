@@ -154,7 +154,7 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(target_arch = "xtensa")]
+    #[cfg(xtensa)]
     fn switch_task(&mut self, trap_frame: &mut TrapFrame) {
         task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
 
@@ -168,7 +168,7 @@ impl SchedulerState {
         task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
     }
 
-    #[cfg(target_arch = "riscv32")]
+    #[cfg(riscv)]
     fn switch_task(&mut self) {
         if !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);

@@ -130,12 +130,9 @@ pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
     // ending up in `sys_switch`.
     //
     // Setting MPIE to 0 _should_ prevent that from happening.
-    if !_CURRENT_CTX_PTR
+    if !_NEXT_CTX_PTR
         .load(portable_atomic::Ordering::SeqCst)
         .is_null()
-        || !_NEXT_CTX_PTR
-            .load(portable_atomic::Ordering::SeqCst)
-            .is_null()
     {
         return false;
     }
@@ -230,8 +227,6 @@ sys_switch:
     lw t0, 0(t1)
 
     # signal that the task switch is done - safe to do it already now - interrupts are disabled
-    sw x0, 0(t1)
-    la t1, {_CURRENT_CTX_PTR}
     sw x0, 0(t1)
 
     # set the next task's PC as MEPC
