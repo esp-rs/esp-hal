@@ -12,7 +12,7 @@
 //! the work item has been processed. Dropping the handle will cancel the work item.
 #![cfg_attr(esp32c2, allow(unused))]
 
-use core::{future::poll_fn, marker::PhantomData};
+use core::{future::poll_fn, marker::PhantomData, ptr::NonNull};
 
 use crate::{asynch::AtomicWaker, sync::Locked};
 
@@ -56,9 +56,9 @@ impl<T: Sync> VTable<T> {
 }
 
 struct Inner<T: Sync> {
-    head: *mut WorkItem<T>,
-    tail: *mut WorkItem<T>,
-    current: *mut WorkItem<T>,
+    head: Option<NonNull<WorkItem<T>>>,
+    tail: Option<NonNull<WorkItem<T>>>,
+    current: Option<NonNull<WorkItem<T>>>,
 
     data: *const (),
     vtable: VTable<T>,
@@ -66,46 +66,44 @@ struct Inner<T: Sync> {
 
 impl<T: Sync> Inner<T> {
     /// Places a work item at the end of the queue.
-    fn enqueue(&mut self, ptr: *mut WorkItem<T>) {
-        if self.tail.is_null() {
-            // Queue is empty, set `head`.
-            self.head = ptr;
-        } else {
+    fn enqueue(&mut self, ptr: NonNull<WorkItem<T>>) {
+        if let Some(tail) = self.tail.as_mut() {
             // Queue contains something, append to `tail`.
             unsafe {
                 // Safety: we just checked that `tail` is not null.
-                (*self.tail).next = ptr;
+                tail.as_mut().next = Some(ptr);
             }
+        } else {
+            // Queue is empty, set `head`.
+            self.head = Some(ptr);
         }
+
         // Move `tail` to the newly inserted item.
-        self.tail = ptr;
+        self.tail = Some(ptr);
     }
 
     /// Places a work item at the front of the queue.
-    fn enqueue_front(&mut self, ptr: *mut WorkItem<T>) {
-        unsafe { (*ptr).next = self.head };
-        self.head = ptr;
-        if self.tail.is_null() {
-            self.tail = ptr;
+    fn enqueue_front(&mut self, mut ptr: NonNull<WorkItem<T>>) {
+        unsafe { ptr.as_mut().next = self.head };
+        self.head = Some(ptr);
+        if self.tail.is_none() {
+            self.tail = Some(ptr);
         }
     }
 
     /// Pops and returns a work item from the start of the queue.
-    fn dequeue(&mut self) -> Option<*mut WorkItem<T>> {
-        let ptr = self.head;
-        // If the `head` is null, the queue is empty. Return None and do nothing.
-        if ptr.is_null() {
-            return None;
-        }
+    fn dequeue(&mut self) -> Option<NonNull<WorkItem<T>>> {
+        // If the `head` is None, the queue is empty. Return None and do nothing.
+        let ptr = self.head?;
 
         unsafe {
             // Safety: we just checked that `ptr` is not null.
-            self.head = (*ptr).next;
+            self.head = ptr.as_ref().next;
         }
 
         // If the new `head` is null, the queue is empty. Clear the `tail` pointer.
-        if self.head.is_null() {
-            self.tail = core::ptr::null_mut();
+        if self.head.is_none() {
+            self.tail = None;
         }
 
         Some(ptr)
@@ -115,17 +113,14 @@ impl<T: Sync> Inner<T> {
     ///
     /// Returns `true` if the work item was successfully removed, `false` if the work item was not
     /// found in the queue.
-    fn remove(&mut self, ptr: *mut WorkItem<T>) -> bool {
+    fn remove(&mut self, ptr: NonNull<WorkItem<T>>) -> bool {
         // Walk the queue to find `ptr`.
-        let mut prev = core::ptr::null_mut();
+        let mut prev = None;
         let mut current = self.head;
-        while !current.is_null() {
-            let next = unsafe {
-                // Safety: we've just verified that `current` is not null.
-                (*current).next
-            };
+        while let Some(current_item) = current {
+            let next = unsafe { current_item.as_ref().next };
 
-            if current != ptr {
+            if current_item != ptr {
                 // Not what we're looking for. Move to the next element.
                 prev = current;
                 current = next;
@@ -133,17 +128,17 @@ impl<T: Sync> Inner<T> {
             }
 
             // We've found `ptr`. Remove it from the list.
-            if ptr == self.head {
+            if Some(ptr) == self.head {
                 self.head = next;
             } else {
                 unsafe {
                     // Safety: If `ptr` is not the `head` of the queue, we must have a previous
                     // element.
-                    (*prev).next = next;
+                    unwrap!(prev).as_mut().next = next;
                 }
             }
 
-            if ptr == self.tail {
+            if Some(ptr) == self.tail {
                 self.tail = prev;
             }
 
@@ -154,10 +149,10 @@ impl<T: Sync> Inner<T> {
         false
     }
 
-    fn post_to_driver(&mut self, ptr: *mut WorkItem<T>) {
+    fn post_to_driver(&mut self, mut ptr: NonNull<WorkItem<T>>) {
         // Start processing a new work item.
-        if unsafe { (self.vtable.post)(self.data, &mut (*ptr).data) } {
-            self.current = ptr;
+        if unsafe { (self.vtable.post)(self.data, &mut ptr.as_mut().data) } {
+            self.current = Some(ptr);
         } else {
             // If the driver didn't accept the work item, place it back to the front of the queue.
             self.enqueue_front(ptr);
@@ -168,44 +163,42 @@ impl<T: Sync> Inner<T> {
     ///
     /// This function enqueues a new work item or polls the status of the currently processed one.
     fn process(&mut self) {
-        if self.current.is_null() {
-            if let Some(ptr) = self.dequeue() {
-                self.post_to_driver(ptr);
-            }
-            // The queue is empty, but the driver should already have been notified when the queue
-            // became empty, so we don't notify it here.
-        } else {
-            let result = unsafe { (self.vtable.poll)(self.data, &mut (*self.current).data) };
+        if let Some(mut current) = self.current {
+            let result = unsafe { (self.vtable.poll)(self.data, &mut current.as_mut().data) };
 
             if let Some(Poll::Ready(status)) = result {
-                unsafe { (*self.current).complete(status) };
+                unsafe { current.as_mut().complete(status) };
 
                 if let Some(ptr) = self.dequeue() {
                     self.post_to_driver(ptr);
                 } else {
                     // There are no more work items. Notify the driver.
-                    self.current = core::ptr::null_mut();
+                    self.current = None;
                     (self.vtable.on_empty)(self.data);
                 }
             }
+        } else if let Some(ptr) = self.dequeue() {
+            self.post_to_driver(ptr);
         }
+        // The queue is empty, but the driver should already have been notified when the queue
+        // became empty, so we don't notify it here.
     }
 
     /// Cancels a particular work item.
     ///
     /// If the work item is currently being processed, this function notifies the driver. Otherwise,
     /// it tries to remove the pointer from the work queue.
-    fn cancel(&mut self, work_item: *const WorkItem<T>) {
-        if core::ptr::eq(self.current.cast_const(), work_item) {
+    fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) {
+        if self.current == Some(work_item) {
             // Cancelling an in-progress item is more complicated than plucking it from the
             // queue. Forward the request to the driver to (maybe) cancel the
             // operation.
-            unsafe { (self.vtable.cancel)(self.data, &mut (*self.current).data) };
-        } else if unsafe { (*work_item).status == Poll::Pending } {
+            unsafe { (self.vtable.cancel)(self.data, &mut work_item.as_mut().data) };
+        } else if unsafe { work_item.as_ref().status == Poll::Pending } {
             // The work item is not the current one, remove it from the queue. This immediately
             // cancels the work item, if it was in fact in this work queue.
-            if self.remove(work_item.cast_mut()) {
-                unsafe { (*work_item.cast_mut()).complete(Status::Cancelled) };
+            if self.remove(work_item) {
+                unsafe { work_item.as_mut().complete(Status::Cancelled) };
             }
         }
     }
@@ -221,9 +214,9 @@ impl<T: Sync> WorkQueue<T> {
     pub const fn new() -> Self {
         Self {
             inner: Locked::new(Inner {
-                head: core::ptr::null_mut(),
-                tail: core::ptr::null_mut(),
-                current: core::ptr::null_mut(),
+                head: None,
+                tail: None,
+                current: None,
 
                 data: core::ptr::null(),
                 vtable: VTable::noop(),
@@ -257,7 +250,7 @@ impl<T: Sync> WorkQueue<T> {
 
         Handle {
             queue: self,
-            work_item: ptr.cast_const(),
+            work_item: ptr,
             _marker: PhantomData,
         }
     }
@@ -271,7 +264,7 @@ impl<T: Sync> WorkQueue<T> {
     ///
     /// The work item should not be assumed to be immediately cancelled. Polling its handle
     /// is necessary to ensure it is no longer being processed by the underlying driver.
-    pub fn cancel(&self, work_item: *const WorkItem<T>) {
+    pub fn cancel(&self, work_item: NonNull<WorkItem<T>>) {
         self.inner.with(|inner| inner.cancel(work_item));
     }
 }
@@ -289,7 +282,7 @@ pub enum Status {
 
 /// A unit of work in the work queue.
 pub(crate) struct WorkItem<T: Sync> {
-    next: *mut WorkItem<T>,
+    next: Option<NonNull<WorkItem<T>>>,
     status: Poll,
     data: T,
     waker: AtomicWaker,
@@ -310,12 +303,11 @@ impl<T: Sync> WorkItem<T> {
     ///
     /// The caller must ensure the reference is not used again while the pointer returned by this
     /// function is in use.
-    unsafe fn prepare(&mut self) -> *mut Self {
-        self.next = core::ptr::null_mut();
-
+    unsafe fn prepare(&mut self) -> NonNull<Self> {
+        self.next = None;
         self.status = Poll::Pending;
 
-        self as *mut _
+        NonNull::from(self)
     }
 }
 
@@ -339,14 +331,14 @@ pub enum Poll {
 /// already being processed.
 pub(crate) struct Handle<'t, T: Sync> {
     queue: &'t WorkQueue<T>,
-    work_item: *const WorkItem<T>,
+    work_item: NonNull<WorkItem<T>>,
     // Make sure lifetime is invariant to prevent UB.
     _marker: PhantomData<&'t mut WorkItem<T>>,
 }
 
 impl<'t, T: Sync> Handle<'t, T> {
     fn status(&self) -> Poll {
-        unsafe { (*self.work_item).status }
+        unsafe { (*self.work_item.as_ptr()).status }
     }
 
     /// Returns the status of the work item.
@@ -363,7 +355,7 @@ impl<'t, T: Sync> Handle<'t, T> {
     /// Waits for the work item to be processed.
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         poll_fn(|ctx| {
-            unsafe { (*self.work_item).waker.register(ctx.waker()) };
+            unsafe { (*self.work_item.as_ptr()).waker.register(ctx.waker()) };
             match self.poll() {
                 Poll::Pending => core::task::Poll::Pending,
                 Poll::Ready(status) => core::task::Poll::Ready(status),
@@ -435,7 +427,7 @@ impl<T: Sync> WorkQueueFrontend<T> {
     pub fn new(initial: T) -> Self {
         Self {
             work_item: WorkItem {
-                next: core::ptr::null_mut(),
+                next: None,
                 status: Poll::Pending,
                 data: initial,
                 waker: AtomicWaker::new(),

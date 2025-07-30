@@ -51,6 +51,8 @@
 //!
 //! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 
+use core::ptr::NonNull;
+
 use crate::{pac, peripherals::AES, system::GenericPeripheralGuard};
 
 mod cipher_modes;
@@ -275,7 +277,7 @@ impl<'d> Aes<'d> {
         let slice = work_item.key.as_slice();
         self.write_key(slice);
         unsafe {
-            match *work_item.cipher_mode {
+            match work_item.cipher_mode.as_ref() {
                 CipherModeState::Ecb(_) | CipherModeState::Cbc(_) => {
                     self.write_mode(if work_item.mode == Operation::Encrypt {
                         work_item.key.encrypt_mode()
@@ -290,16 +292,16 @@ impl<'d> Aes<'d> {
             }
         }
 
-        let process_block = |input, output, len| {
-            unsafe { self.write_block(core::slice::from_raw_parts(input, len)) };
+        let process_block = |input: NonNull<[u8]>, mut output: NonNull<[u8]>| {
+            unsafe { self.write_block(input.as_ref()) };
             self.start();
             while !self.is_idle() {}
-            unsafe { self.read_block(core::slice::from_raw_parts_mut(output, len)) };
+            unsafe { self.read_block(output.as_mut()) };
         };
 
         // Safety: the reference to the algorithm state is only held for the duration of the
         // operation.
-        match unsafe { &mut *work_item.cipher_mode } {
+        match unsafe { work_item.cipher_mode.as_mut() } {
             CipherModeState::Ecb(algo) => algo.encrypt_decrypt(work_item.buffers, process_block),
             CipherModeState::Cbc(algo) => {
                 if work_item.mode == Operation::Encrypt {
@@ -658,8 +660,8 @@ pub enum CipherMode {
 
 #[derive(Clone, Copy)]
 struct CryptoBuffers {
-    input: *const u8,
-    output: *mut u8,
+    input: NonNull<[u8]>,
+    output: NonNull<[u8]>,
     text_length: usize,
 }
 
@@ -687,7 +689,7 @@ const BLOCK_SIZE: usize = 16;
 struct AesOperation {
     mode: Operation,
     // The block cipher operating mode.
-    cipher_mode: *mut CipherModeState,
+    cipher_mode: NonNull<CipherModeState>,
     // The length of the key is determined by the operating mode.
     buffers: CryptoBuffers,
     key: Key,
@@ -855,10 +857,10 @@ impl AesContext {
             cipher_mode,
             frontend: WorkQueueFrontend::new(AesOperation {
                 mode: operation,
-                cipher_mode: core::ptr::null_mut(),
+                cipher_mode: NonNull::dangling(),
                 buffers: CryptoBuffers {
-                    input: core::ptr::null(),
-                    output: core::ptr::null_mut(),
+                    input: NonNull::from(&[]),
+                    output: NonNull::from(&[]),
                     text_length: 0,
                 },
                 key,
@@ -963,10 +965,10 @@ impl AesContext {
         self.validate(output)?;
 
         let data = self.frontend.data_mut();
-        data.cipher_mode = &raw mut self.cipher_mode;
+        data.cipher_mode = NonNull::from(&mut self.cipher_mode);
         data.buffers.text_length = input.len();
-        data.buffers.input = input.as_ptr();
-        data.buffers.output = output.as_mut_ptr();
+        data.buffers.input = NonNull::from(input);
+        data.buffers.output = NonNull::from(output);
 
         Ok(self.post())
     }
@@ -982,12 +984,12 @@ impl AesContext {
 
         let data = self.frontend.data_mut();
 
-        data.cipher_mode = &raw mut self.cipher_mode;
+        data.cipher_mode = NonNull::from(&self.cipher_mode);
 
         data.buffers.text_length = buffer.len();
-        let ptr = buffer.as_mut_ptr();
+        let ptr = NonNull::from(buffer);
 
-        data.buffers.input = ptr.cast_const();
+        data.buffers.input = ptr;
         data.buffers.output = ptr;
 
         Ok(self.post())
