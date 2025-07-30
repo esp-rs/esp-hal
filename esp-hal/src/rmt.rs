@@ -1822,6 +1822,12 @@ where
     ///
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
+    ///
+    /// The caller must ensure:
+    /// - that the Rmt is configured for mode `Dm`
+    /// - no other ChannelCreator or Channel for the given CH_IDX will be used
+    ///   for the lifetime of this ChannelCreator and the Channels obtained from
+    ///   it
     #[inline]
     pub unsafe fn steal() -> Option<Self> {
         if CH_IDX >= CHANNEL_INDEX_COUNT {
@@ -1830,8 +1836,12 @@ where
 
         let raw = unsafe { ConstChannelAccess::conjure() };
 
+        // FIXME: Try to verify that Dm is valid!
+
         // panic if the channel is currently running a transaction, or if another
         // channel is using its memory
+        // FIXME: This is not sufficient, we need some compare_exchange here,
+        // setting this to the expected Unconfigured, and even then, misuse is still possible!
         if !matches!(
             RmtState::load(raw, Ordering::Relaxed),
             RmtState::Unconfigured,
