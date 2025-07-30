@@ -30,7 +30,7 @@ The previous way to obtain RNG object has changed like so:
 The `esp_hal::aes::Aes` driver has been slightly reworked:
 
 - `Mode` has been replaced by `Operation`. Operation has `Encrypt` and `Decrypt` variants, but the key length is no longer part of the enum. The key length is specified by the key. AesDma now takes this `Operation`.
-- `process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
+- `Aes::process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
 - `AesDma::write_block` has been removed.
 
 ```diff
