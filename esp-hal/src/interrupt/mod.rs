@@ -146,6 +146,7 @@ impl InterruptHandler {
         Self {
             f,
             prio,
+            #[cfg(riscv)]
             nested: true,
         }
     }
