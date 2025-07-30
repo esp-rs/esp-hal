@@ -31,19 +31,19 @@
 use core::ffi::c_void;
 
 unsafe extern "Rust" {
-    fn esp_wifi_preempt_initialized() -> bool;
-    fn esp_wifi_preempt_usleep(us: u32);
-    fn esp_wifi_preempt_enable();
-    fn esp_wifi_preempt_disable();
-    fn esp_wifi_preempt_yield_task();
-    fn esp_wifi_preempt_current_task() -> *mut c_void;
-    fn esp_wifi_preempt_task_create(
+    fn esp_radio_preempt_initialized() -> bool;
+    fn esp_radio_preempt_usleep(us: u32);
+    fn esp_radio_preempt_enable();
+    fn esp_radio_preempt_disable();
+    fn esp_radio_preempt_yield_task();
+    fn esp_radio_preempt_current_task() -> *mut c_void;
+    fn esp_radio_preempt_task_create(
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
     ) -> *mut c_void;
-    fn esp_wifi_preempt_schedule_task_deletion(task_handle: *mut c_void);
-    fn esp_wifi_preempt_current_task_thread_semaphore() -> *mut c_void;
+    fn esp_radio_preempt_schedule_task_deletion(task_handle: *mut c_void);
+    fn esp_radio_preempt_current_task_thread_semaphore() -> *mut c_void;
 }
 
 /// Set the Scheduler implementation.
@@ -56,39 +56,39 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_initialized() -> bool {
+        fn esp_radio_preempt_initialized() -> bool {
             <$t as $crate::Scheduler>::initialized(&$name)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_usleep(us: u32) {
+        fn esp_radio_preempt_usleep(us: u32) {
             <$t as $crate::Scheduler>::usleep(&$name, us)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_enable() {
+        fn esp_radio_preempt_enable() {
             <$t as $crate::Scheduler>::enable(&$name)
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_disable() {
+        fn esp_radio_preempt_disable() {
             <$t as $crate::Scheduler>::disable(&$name)
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_yield_task() {
+        fn esp_radio_preempt_yield_task() {
             <$t as $crate::Scheduler>::yield_task(&$name)
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_current_task() -> *mut c_void {
+        fn esp_radio_preempt_current_task() -> *mut c_void {
             <$t as $crate::Scheduler>::current_task(&$name)
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_task_create(
+        fn esp_radio_preempt_task_create(
             task: extern "C" fn(*mut c_void),
             param: *mut c_void,
             task_stack_size: usize,
@@ -97,12 +97,12 @@ macro_rules! scheduler_impl {
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_schedule_task_deletion(task_handle: *mut c_void) {
+        fn esp_radio_preempt_schedule_task_deletion(task_handle: *mut c_void) {
             <$t as $crate::Scheduler>::schedule_task_deletion(&$name, task_handle)
         }
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_wifi_preempt_current_task_thread_semaphore() -> *mut c_void {
+        fn esp_radio_preempt_current_task_thread_semaphore() -> *mut c_void {
             <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
         }
     };
@@ -113,10 +113,10 @@ macro_rules! scheduler_impl {
 /// This trait needs to be implemented by a driver crate to integrate esp-radio with a software
 /// platform.
 pub trait Scheduler: Send + Sync + 'static {
-    /// This function is called by `esp_wifi::init` to verify that the scheduler is properly set up.
+    /// This function is called by `esp_radio::init` to verify that the scheduler is properly set up.
     fn initialized(&self) -> bool;
 
-    /// This function is called by `esp_wifi::init` to put the current task to sleep for the
+    /// This function is called by `esp_radio::init` to put the current task to sleep for the
     /// specified number of microseconds.
     fn usleep(&self, us: u32);
 
@@ -126,10 +126,10 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp-radio` to stop the task scheduler.
     fn disable(&self);
 
-    /// This function is called by `esp_wifi::init` to yield control to another task.
+    /// This function is called by `esp_radio::init` to yield control to another task.
     fn yield_task(&self);
 
-    /// This function is called by `esp_wifi::init` to retrieve a pointer to the current task.
+    /// This function is called by `esp_radio::init` to retrieve a pointer to the current task.
     fn current_task(&self) -> *mut c_void;
 
     /// This function is used to create threads.
@@ -160,37 +160,37 @@ pub trait Scheduler: Send + Sync + 'static {
 /// Returns whether the task scheduler has been initialized.
 #[inline]
 pub fn initialized() -> bool {
-    unsafe { esp_wifi_preempt_initialized() }
+    unsafe { esp_radio_preempt_initialized() }
 }
 
 /// Puts the current task to sleep for the specified number of microseconds.
 #[inline]
 pub fn usleep(us: u32) {
-    unsafe { esp_wifi_preempt_usleep(us) }
+    unsafe { esp_radio_preempt_usleep(us) }
 }
 
 /// Starts the task scheduler.
 #[inline]
 pub fn enable() {
-    unsafe { esp_wifi_preempt_enable() }
+    unsafe { esp_radio_preempt_enable() }
 }
 
 /// Stops the task scheduler.
 #[inline]
 pub fn disable() {
-    unsafe { esp_wifi_preempt_disable() }
+    unsafe { esp_radio_preempt_disable() }
 }
 
 /// Yields control to another task.
 #[inline]
 pub fn yield_task() {
-    unsafe { esp_wifi_preempt_yield_task() }
+    unsafe { esp_radio_preempt_yield_task() }
 }
 
 /// Returns a pointer to the current task.
 #[inline]
 pub fn current_task() -> *mut c_void {
-    unsafe { esp_wifi_preempt_current_task() }
+    unsafe { esp_radio_preempt_current_task() }
 }
 
 /// Creates a new task with the given initial parameter and stack size.
@@ -205,7 +205,7 @@ pub unsafe fn task_create(
     param: *mut c_void,
     task_stack_size: usize,
 ) -> *mut c_void {
-    unsafe { esp_wifi_preempt_task_create(task, param, task_stack_size) }
+    unsafe { esp_radio_preempt_task_create(task, param, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.
@@ -218,11 +218,11 @@ pub unsafe fn task_create(
 /// [`current_task`].
 #[inline]
 pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
-    unsafe { esp_wifi_preempt_schedule_task_deletion(task_handle) }
+    unsafe { esp_radio_preempt_schedule_task_deletion(task_handle) }
 }
 
 /// Returns a pointer to the current thread's semaphore.
 #[inline]
 pub fn current_task_thread_semaphore() -> *mut c_void {
-    unsafe { esp_wifi_preempt_current_task_thread_semaphore() }
+    unsafe { esp_radio_preempt_current_task_thread_semaphore() }
 }
