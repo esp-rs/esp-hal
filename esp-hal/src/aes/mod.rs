@@ -258,7 +258,7 @@ impl<'d> Aes<'d> {
         self.process(block, mode, key)
     }
 
-    /// Encrypts/Decrypts the given buffer with the given key.
+    /// Decrypts the given buffer with the given key.
     pub fn decrypt(&mut self, block: &mut [u8; 16], key: impl Into<Key>) {
         let key = key.into();
         let mode = key.decrypt_mode();
