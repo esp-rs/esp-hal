@@ -6,11 +6,8 @@ use esp_hal::{
 use crate::task::task_switch;
 
 pub(crate) fn setup_multitasking() {
-    // unwrap!(interrupt::enable(
-    //     Interrupt::FROM_CPU_INTR2,
-    //     interrupt::Priority::Priority1,
-    // ));
-
+    // Register the interrupt handler without nesting to satisfy the requirements of the task
+    // switching code
     let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
         swint2_handler,
         esp_hal::interrupt::Priority::Priority1,
@@ -37,4 +34,10 @@ pub(crate) fn yield_task() {
     // clear FROM_CPU_INTR2
     let swi = unsafe { SoftwareInterrupt::<2>::steal() };
     swi.raise();
+}
+
+#[esp_hal::ram]
+pub(crate) extern "C" fn timer_tick_handler() {
+    super::clear_timer_interrupt();
+    crate::task::task_switch();
 }

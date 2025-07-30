@@ -153,6 +153,9 @@ impl InterruptHandler {
 
     /// Creates a new [InterruptHandler] which will call the given function at
     /// the given priority with disabled interrupt nesting.
+    ///
+    /// Usually higher priority interrupts get served while handling an interrupt.
+    /// Using this the interrupt handler won't get preempted by higher priority interrupts.
     #[cfg(riscv)]
     pub const fn new_not_nested(f: extern "C" fn(), prio: Priority) -> Self {
         Self {

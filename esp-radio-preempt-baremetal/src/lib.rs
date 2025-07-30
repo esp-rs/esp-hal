@@ -28,7 +28,7 @@ mod timer;
 use core::ffi::c_void;
 
 use allocator_api2::boxed::Box;
-#[cfg_attr(riscv, expect(unused_imports))]
+#[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame;
 use esp_hal::{
     Blocking,
