@@ -112,6 +112,8 @@ instances = [
 
 [device.aes]
 support_status = "partial"
+has_split_text_registers = false
+endianness_configurable = true
 key_length = { options = [
     { bits = 128, encrypt_mode = 0, decrypt_mode = 4 },
     { bits = 192, encrypt_mode = 1, decrypt_mode = 5 },

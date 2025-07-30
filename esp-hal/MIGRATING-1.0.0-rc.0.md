@@ -24,3 +24,19 @@ The previous way to obtain RNG object has changed like so:
 +// As long as `trng_source` is alive:
 +let trng = Tnrg::try_new().unrwap();
 ```
+
+## AES changes
+
+The `esp_hal::aes::Aes` driver has been slightly reworked:
+
+- `Mode` has been replaced by `Operation`. Operation has `Encrypt` and `Decrypt` variants, but the key length is no longer part of the enum. The key length is specified by the key. AesDma now takes this `Operation`.
+- `process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
+- `AesDma::write_block` has been removed.
+
+```diff
+-aes.process(block, Mode::Encrypt128, key);
++aes.encrypt(block, key_16_bytes);
+
+-aes.process(block, Mode::Decrypt256, key);
++aes.decrypt(block, key_32_bytes);
+```
