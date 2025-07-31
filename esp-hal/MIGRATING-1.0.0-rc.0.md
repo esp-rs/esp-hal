@@ -66,6 +66,11 @@ RMT transmit and receive methods accept `impl Into<PulseCode>` and
 `impl From<PulseCode>`, respectively, and implementations for
 `PulseCode: From<u32>` and `u32: From<PulseCode>` are provided.
 
+The `PulseCode::empty()` method has been renamed to `PulseCode::end_marker()`,
+and the same value can also be obtained via `PulseCode::default()`. Either methods
+might be more desirable depending on the context to better communicate the meaning
+of this value.
+
 Nevertheless, type annotations will require some changes:
 
 ```diff
@@ -77,12 +82,10 @@ Nevertheless, type annotations will require some changes:
 +let mut tx_data: [PulseCode; 20] = [PulseCode::new(Level::High, 42, Level::Low, 24); 20];
 
 -tx_data[tx_data.len() - 1] = PulseCode::empty();
-+// `PulseCode::end_marker()` and `PulseCode::empty()` are equivalent,
-+// but the former is more explicit about its meaning.
 +tx_data[tx_data.len() - 1] = PulseCode::end_marker();
 
 -let mut rx_data: [u32; 20] = [PulseCode::empty(); 20];
-+let mut rx_data: [PulseCode; 20] = [PulseCode::empty(); 20];
++let mut rx_data: [PulseCode; 20] = [PulseCode::default(); 20];
 
 let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 
