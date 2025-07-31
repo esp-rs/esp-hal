@@ -43,13 +43,6 @@
 //! // The decryption happens in-place, so the plaintext is in `block`
 //! # {after_snippet}
 //! ```
-//!
-//! ### AES-DMA
-//!
-//! Visit the [AES-DMA] test for a more advanced example of using AES-DMA
-//! mode.
-//!
-//! [AES-DMA]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/aes_dma.rs
 
 use core::ptr::NonNull;
 
@@ -771,6 +764,7 @@ impl<'d> AesBackend<'d> {
     /// use esp_hal::aes::AesBackend;
     /// #
     /// let mut aes = AesBackend::new(peripherals.AES);
+    /// # {after_snippet}
     /// ```
     pub fn new(aes: AES<'d>) -> Self {
         Self {
@@ -793,6 +787,7 @@ impl<'d> AesBackend<'d> {
     /// let mut aes = AesBackend::new(peripherals.AES);
     /// // Start the backend, which allows processing AES operations.
     /// let _backend = aes.start();
+    /// # {after_snippet}
     /// ```
     pub fn start(&mut self) -> AesWorkQueueDriver<'_, 'd> {
         AesWorkQueueDriver {
@@ -998,7 +993,8 @@ impl AesContext {
     /// This function operates similar to [`AesContext::process`], but it overwrites the data buffer
     /// with the result of the transformation.
     ///
-    /// ```rust, ignore/// # {before_snippet}
+    /// ```rust, no_run
+    /// # {before_snippet}
     /// use esp_hal::aes::{AesBackend, AesContext, Operation};
     /// #
     /// let mut aes = AesBackend::new(peripherals.AES);
@@ -1021,9 +1017,7 @@ impl AesContext {
     ///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
     /// ];
     ///
-    /// let operation_handle = ecb_encrypt
-    ///     .process_in_place(&mut buffer)
-    ///     .unwrap();
+    /// let operation_handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
     /// operation_handle.wait_blocking();
     ///
     /// // Instead of the plaintext message, buffer now contains the ciphertext.
