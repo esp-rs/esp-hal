@@ -86,6 +86,79 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(esp32))]
+    fn test_aes_dma_ecb() {
+        use esp_hal::{
+            aes::dma::{AesDma, CipherMode},
+            dma::{DmaRxBuf, DmaTxBuf},
+            dma_buffers,
+        };
+
+        fn test_aes_ecb<const K: usize>(
+            mut aes: AesDma<'_>,
+            plaintext: [u8; 16],
+            ciphertext: [u8; 16],
+        ) -> AesDma<'_>
+        where
+            Key: From<[u8; K]>,
+        {
+            const DMA_BUFFER_SIZE: usize = 16;
+
+            let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
+            let mut output = DmaRxBuf::new(rx_descriptors, output).unwrap();
+            let mut input = DmaTxBuf::new(tx_descriptors, input).unwrap();
+
+            // Encrypt
+            input.as_mut_slice().copy_from_slice(&plaintext);
+            let transfer = aes
+                .process(
+                    1,
+                    output,
+                    input,
+                    Operation::Encrypt,
+                    CipherMode::Ecb,
+                    pad_to::<K>(KEY),
+                )
+                .map_err(|e| e.0)
+                .unwrap();
+            (aes, output, input) = transfer.wait();
+            assert_eq!(output.as_slice(), ciphertext);
+
+            // Decrypt
+            input.as_mut_slice().copy_from_slice(&ciphertext);
+            let transfer = aes
+                .process(
+                    1,
+                    output,
+                    input,
+                    Operation::Decrypt,
+                    CipherMode::Ecb,
+                    pad_to::<K>(KEY),
+                )
+                .map_err(|e| e.0)
+                .unwrap();
+            (aes, output, _) = transfer.wait();
+            assert_eq!(output.as_slice(), plaintext);
+
+            aes
+        }
+        let peripherals = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let dma_channel = peripherals.DMA_CRYPTO;
+            } else {
+                let dma_channel = peripherals.DMA_CH0;
+            }
+        }
+
+        let aes = Aes::new(peripherals.AES).with_dma(dma_channel);
+
+        let aes = test_aes_ecb::<16>(aes, PLAINTEXT_BUF, CIPHERTEXT_ECB_128);
+        let _ = test_aes_ecb::<32>(aes, PLAINTEXT_BUF, CIPHERTEXT_ECB_256);
+    }
+
+    #[test]
     fn test_aes_work_queue() {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 

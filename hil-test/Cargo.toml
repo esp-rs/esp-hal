@@ -12,10 +12,6 @@ name    = "aes"
 harness = false
 
 [[test]]
-name    = "aes_dma"
-harness = false
-
-[[test]]
 name    = "alloc_psram"
 harness = false
 required-features = ["psram"]
