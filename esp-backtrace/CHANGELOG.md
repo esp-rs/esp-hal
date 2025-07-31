@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- the `exception-handler` feature got removed (#3887)
 
 ## [v0.17.0] - 2025-07-16
 
