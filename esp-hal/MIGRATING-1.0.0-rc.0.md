@@ -40,3 +40,20 @@ The `esp_hal::aes::Aes` driver has been slightly reworked:
 -aes.process(block, Mode::Decrypt256, key);
 +aes.decrypt(block, key_32_bytes);
 ```
+## ISR Callback Changes
+
+Previously callbacks were of type `extern "C" fn()`, now they are `IsrCallback`. In most places no changes are needed but when using `bind_interrupt` directly
+you need to adapt the code.
+
+```diff
+#[esp_hal::ram]
+extern "C" fn software3_interrupt() {
+    // ...
+}
+
+esp_hal::interrupt::bind_interrupt(
+    esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
+-   software3_interrupt,
++   IsrCallback::new(software3_interrupt),
+);
+```
