@@ -121,7 +121,7 @@
 //!     .with_idle_threshold(10000);
 //! # {channel}
 //! let delay = Delay::new();
-//! let mut data: [PulseCode; 48] = [PulseCode::empty(); 48];
+//! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
 //!
 //! loop {
 //!     for x in data.iter_mut() {
@@ -250,43 +250,38 @@ pub enum Error {
     MemoryBlockNotAvailable,
 }
 
-///  Convenience newtype to work with pulse codes.
+/// Convenience newtype to work with pulse codes.
+///
+/// A [`PulseCode`] is represented as `u32`, with fields laid out as follows:
+///
+/// | Bit 31   | Bits 30-16 | Bit 15   | Bits 14-0 |
+/// |----------|------------|----------|-----------|
+/// | `level2` | `length2`  | `level1` | `length1` |
+///
+/// Here, `level1` / `length1` correspond to the signal that is send/received first,
+/// and the signal with `level2` / `length2` is send/received afterwards.
+///
+/// If `length1` or `length2` are zero, this implies an end marker and transmission will
+/// stop with the corresponding signal.
 #[derive(Clone, Copy, Default, Eq, PartialEq)]
 #[repr(transparent)]
-pub struct PulseCode(u32);
+pub struct PulseCode(pub u32);
 
-// Use these constants such that the code below is exactly the same for both halves of the
-// PulseCode and it is easier to verify that they're not mixed up.
-const LEVEL1_SHIFT: usize = 0;
-const LEVEL2_SHIFT: usize = 16;
+// Pre-compute some constants to make it obvious that the code below doesn't mix up both halves of
+// a PulseCode.
+const LENGTH1_SHIFT: usize = 0;
+const LEVEL1_SHIFT: usize = 15;
+const LENGTH2_SHIFT: usize = 16;
+const LEVEL2_SHIFT: usize = 31;
+
+const LENGTH_MASK: u32 = 0x7FFF;
+const LENGTH1_MASK: u32 = LENGTH_MASK << LENGTH1_SHIFT;
+const LENGTH2_MASK: u32 = LENGTH_MASK << LENGTH2_SHIFT;
+
+const LEVEL1_MASK: u32 = 1 << LEVEL1_SHIFT;
+const LEVEL2_MASK: u32 = 1 << LEVEL2_SHIFT;
 
 impl PulseCode {
-    /// Create a new instance.
-    ///
-    /// SAFETY:
-    /// - `length1` and `length2` must be 15-bit wide, i.e. their MSB must be cleared.
-    #[inline]
-    const unsafe fn new_unchecked(
-        level1: Level,
-        length1: u16,
-        level2: Level,
-        length2: u16,
-    ) -> Self {
-        let mut code = 0;
-
-        if matches!(level1, Level::High) {
-            code |= 1 << (LEVEL1_SHIFT + 15);
-        }
-        code |= (length1 as u32) << LEVEL1_SHIFT;
-
-        if matches!(level2, Level::High) {
-            code |= 1 << (LEVEL2_SHIFT + 15);
-        }
-        code |= (length2 as u32) << LEVEL2_SHIFT;
-
-        Self(code)
-    }
-
     /// Create a new instance.
     ///
     /// If `length1` or `length2` exceed the maximum representable range, they
@@ -317,19 +312,31 @@ impl PulseCode {
         Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
     }
 
-    /// Create a new empty instance.
+    /// Create a new instance without checking that code lengths are in range.
     ///
-    /// This corresponds to the all-zero `PulseCode`, i.e. an end marker with
-    /// level `Level::Low`.
+    /// # Safety
+    ///
+    /// `length1` and `length2` must be 15-bit wide, i.e. their MSB must be cleared.
     #[inline]
-    pub const fn empty() -> Self {
-        Self(0)
+    pub const unsafe fn new_unchecked(
+        level1: Level,
+        length1: u16,
+        level2: Level,
+        length2: u16,
+    ) -> Self {
+        Self(
+            (level1.const_into() as u32) << LEVEL1_SHIFT
+                | (level2.const_into() as u32) << LEVEL2_SHIFT
+                | (length1 as u32) << LENGTH1_SHIFT
+                | (length2 as u32) << LENGTH2_SHIFT,
+        )
     }
 
-    /// Create a new instance that is and end marker with `Level::Low`.
+    /// Create a new instance that is an end marker with `Level::Low`.
     ///
-    /// This is equivalent to `PulseCode::empty()` and provided as a more
-    /// semantic alias.
+    /// This corresponds to the all-zero [`PulseCode`], i.e. with both level and
+    /// length fields set to zero, equivalent to (but more semantic than)
+    /// `PulseCode::from(0u32)` and [`PulseCode::default()`].
     // FIXME: Consider adding a variant with `level1`, `length1` and `level2` arguments
     // which sets `length2 = 0` so that it is still guaranteed to return an end
     // marker.
@@ -340,7 +347,7 @@ impl PulseCode {
 
     /// Set all levels and lengths to 0.
     ///
-    /// In other words, assigns the value of `PulseCode::empty()` to `self`.
+    /// In other words, assigns the value of [`PulseCode::end_marker()`] to `self`.
     #[inline]
     pub fn reset(&mut self) {
         self.0 = 0
@@ -348,61 +355,47 @@ impl PulseCode {
 
     /// Logical output level in the first pulse code interval
     #[inline]
-    pub const fn level1(&self) -> Level {
-        // Can't use Level::from(bool) since it is non-const
-        if 0 != (self.0 & (1 << (LEVEL1_SHIFT + 15))) {
-            Level::High
-        } else {
-            Level::Low
-        }
+    pub const fn level1(self) -> Level {
+        let level = (self.0 >> LEVEL1_SHIFT) & 1;
+        Level::const_from(0 != level)
     }
 
     /// Logical output level in the second pulse code interval
     #[inline]
-    pub const fn level2(&self) -> Level {
-        // Can't use Level::from(bool) since it is non-const
-        if 0 != (self.0 & (1 << (LEVEL2_SHIFT + 15))) {
-            Level::High
-        } else {
-            Level::Low
-        }
+    pub const fn level2(self) -> Level {
+        let level = (self.0 >> LEVEL2_SHIFT) & 1;
+        Level::const_from(0 != level)
     }
 
     /// Length of the first pulse code interval (in clock cycles)
     #[inline]
-    pub const fn length1(&self) -> u16 {
-        ((self.0 >> LEVEL1_SHIFT) & 0x7FFF) as u16
+    pub const fn length1(self) -> u16 {
+        ((self.0 >> LENGTH1_SHIFT) & LENGTH_MASK) as u16
     }
 
     /// Length of the second pulse code interval (in clock cycles)
     #[inline]
-    pub const fn length2(&self) -> u16 {
-        ((self.0 >> LEVEL2_SHIFT) & 0x7FFF) as u16
+    pub const fn length2(self) -> u16 {
+        ((self.0 >> LENGTH2_SHIFT) & LENGTH_MASK) as u16
     }
 
-    /// Set level1
+    /// Set `level1` and return the modified [`PulseCode`].
     #[inline]
     pub const fn with_level1(mut self, level: Level) -> Self {
-        if matches!(level, Level::High) {
-            self.0 |= 1 << (LEVEL1_SHIFT + 15);
-        } else {
-            self.0 &= !(1 << (LEVEL1_SHIFT + 15));
-        }
+        self.0 &= !LEVEL1_MASK;
+        self.0 |= (level.const_into() as u32) << LEVEL1_SHIFT;
         self
     }
 
-    /// Set level2
+    /// Set `level2` and return the modified [`PulseCode`].
     #[inline]
     pub const fn with_level2(mut self, level: Level) -> Self {
-        if matches!(level, Level::High) {
-            self.0 |= 1 << (LEVEL2_SHIFT + 15);
-        } else {
-            self.0 &= !(1 << (LEVEL2_SHIFT + 15));
-        }
+        self.0 &= !LEVEL2_MASK;
+        self.0 |= (level.const_into() as u32) << LEVEL2_SHIFT;
         self
     }
 
-    /// Set length1
+    /// Set `length1` and return the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -411,12 +404,12 @@ impl PulseCode {
             return None;
         }
 
-        self.0 &= !(0x7FFF << LEVEL1_SHIFT);
-        self.0 |= (length as u32) << LEVEL1_SHIFT;
+        self.0 &= !LENGTH1_MASK;
+        self.0 |= (length as u32) << LENGTH1_SHIFT;
         Some(self)
     }
 
-    /// Set length2
+    /// Set `length2` and return the modified [`PulseCode`].
     ///
     /// Returns `None` if `length` exceeds the representable range.
     #[inline]
@@ -425,21 +418,27 @@ impl PulseCode {
             return None;
         }
 
-        self.0 &= !(0x7FFF << LEVEL2_SHIFT);
-        self.0 |= (length as u32) << LEVEL2_SHIFT;
+        self.0 &= !LENGTH2_MASK;
+        self.0 |= (length as u32) << LENGTH2_SHIFT;
         Some(self)
     }
 
-    /// Convert to u32
+    /// Return whether this pulse code contains an end marker.
+    ///
+    /// Equivalent to `self.length1() == 0 || self.length2() == 0`.
     #[inline]
-    pub const fn as_u32(&self) -> u32 {
-        self.0
+    pub const fn is_end_marker(self) -> bool {
+        self.length1() == 0 || self.length2() == 0
     }
 
-    /// Whether this pulse code contains an end marker
     #[inline]
-    pub const fn is_end_marker(&self) -> bool {
-        self.length1() == 0 || self.length2() == 0
+    fn symbol1(self) -> char {
+        if self.level1().into() { 'H' } else { 'L' }
+    }
+
+    #[inline]
+    fn symbol2(self) -> char {
+        if self.level2().into() { 'H' } else { 'L' }
     }
 }
 
@@ -448,9 +447,9 @@ impl core::fmt::Debug for PulseCode {
         write!(
             f,
             "PulseCode({} {}, {} {})",
-            if self.level1().into() { 'H' } else { 'L' },
+            self.symbol1(),
             self.length1(),
-            if self.level2().into() { 'H' } else { 'L' },
+            self.symbol2(),
             self.length2(),
         )
     }
@@ -462,23 +461,25 @@ impl defmt::Format for PulseCode {
         defmt::write!(
             fmt,
             "PulseCode({} {}, {} {})",
-            if self.level1().into() { 'H' } else { 'L' },
+            self.symbol1(),
             self.length1(),
-            if self.level2().into() { 'H' } else { 'L' },
+            self.symbol2(),
             self.length2(),
         )
     }
 }
 
 impl From<u32> for PulseCode {
+    #[inline]
     fn from(value: u32) -> Self {
         Self(value)
     }
 }
 
 impl From<PulseCode> for u32 {
+    #[inline]
     fn from(code: PulseCode) -> u32 {
-        code.as_u32()
+        code.0
     }
 }
 

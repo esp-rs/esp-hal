@@ -94,7 +94,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
-    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
@@ -132,7 +132,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
-    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     let (rx_res, tx_res) = embassy_futures::join::join(
         rx_channel.receive(&mut rcv_data),
