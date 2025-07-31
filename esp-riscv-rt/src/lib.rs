@@ -16,8 +16,7 @@
 use core::arch::global_asm;
 
 pub use riscv;
-pub use riscv_rt::entry;
-pub use riscv_rt::TrapFrame;
+pub use riscv_rt::{TrapFrame, entry};
 
 #[doc(hidden)]
 #[unsafe(no_mangle)]
