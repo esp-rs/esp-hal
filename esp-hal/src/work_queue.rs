@@ -16,6 +16,10 @@ use core::{future::poll_fn, marker::PhantomData, ptr::NonNull};
 
 use crate::{asynch::AtomicWaker, sync::Locked};
 
+/// Queue driver operations.
+///
+/// Functions in this VTable are provided by drivers that consume work items.
+/// These functions may be called both in the context of the queue frontends and drivers.
 pub(crate) struct VTable<T: Sync> {
     /// Starts processing a new work item.
     ///
@@ -60,6 +64,7 @@ struct Inner<T: Sync> {
     tail: Option<NonNull<WorkItem<T>>>,
     current: Option<NonNull<WorkItem<T>>>,
 
+    // The data pointer will be passed to VTable functions, which may be called in any context.
     data: *const (),
     vtable: VTable<T>,
 }
@@ -69,12 +74,9 @@ impl<T: Sync> Inner<T> {
     fn enqueue(&mut self, ptr: NonNull<WorkItem<T>>) {
         if let Some(tail) = self.tail.as_mut() {
             // Queue contains something, append to `tail`.
-            unsafe {
-                // Safety: we just checked that `tail` is not null.
-                tail.as_mut().next = Some(ptr);
-            }
+            unsafe { tail.as_mut().next = Some(ptr) };
         } else {
-            // Queue is empty, set `head`.
+            // Queue was empty, set `head` to the first element.
             self.head = Some(ptr);
         }
 
@@ -84,10 +86,54 @@ impl<T: Sync> Inner<T> {
 
     /// Places a work item at the front of the queue.
     fn enqueue_front(&mut self, mut ptr: NonNull<WorkItem<T>>) {
+        // Chain the node into the list.
         unsafe { ptr.as_mut().next = self.head };
+
+        // Adjust list `head` to point at the new-first element.
         self.head = Some(ptr);
         if self.tail.is_none() {
+            // The queue was empty, we need to set `tail` to the last element.
             self.tail = Some(ptr);
+        }
+    }
+
+    /// Runs one processing iteration.
+    ///
+    /// This function enqueues a new work item or polls the status of the currently processed one.
+    fn process(&mut self) {
+        if let Some(mut current) = self.current {
+            let result = unsafe { (self.vtable.poll)(self.data, &mut current.as_mut().data) };
+
+            if let Some(Poll::Ready(status)) = result {
+                unsafe { current.as_mut().complete(status) };
+                self.current = None;
+
+                self.dequeue_and_post(true);
+            }
+        } else {
+            // If the queue is empty, the driver should already have been notified when the queue
+            // became empty, so we don't notify it here.
+            self.dequeue_and_post(false);
+        }
+    }
+
+    // Note: even if the queue itself may be implemented lock-free, dequeuing and posting to the
+    // driver must be done atomically to ensure that the queue can be processed fully by any of
+    // the frontends polling it.
+    fn dequeue_and_post(&mut self, notify_on_empty: bool) {
+        if let Some(mut ptr) = self.dequeue() {
+            // Start processing a new work item.
+
+            if unsafe { (self.vtable.post)(self.data, &mut ptr.as_mut().data) } {
+                self.current = Some(ptr);
+            } else {
+                // If the driver didn't accept the work item, place it back to the front of the
+                // queue.
+                self.enqueue_front(ptr);
+            }
+        } else if notify_on_empty {
+            // There are no more work items. Notify the driver.
+            (self.vtable.on_empty)(self.data);
         }
     }
 
@@ -96,10 +142,7 @@ impl<T: Sync> Inner<T> {
         // If the `head` is None, the queue is empty. Return None and do nothing.
         let ptr = self.head?;
 
-        unsafe {
-            // Safety: we just checked that `ptr` is not null.
-            self.head = ptr.as_ref().next;
-        }
+        unsafe { self.head = ptr.as_ref().next };
 
         // If the new `head` is null, the queue is empty. Clear the `tail` pointer.
         if self.head.is_none() {
@@ -107,6 +150,25 @@ impl<T: Sync> Inner<T> {
         }
 
         Some(ptr)
+    }
+
+    /// Cancels a particular work item.
+    ///
+    /// If the work item is currently being processed, this function notifies the driver. Otherwise,
+    /// it tries to remove the pointer from the work queue.
+    fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) {
+        if self.current == Some(work_item) {
+            // Cancelling an in-progress item is more complicated than plucking it from the
+            // queue. Forward the request to the driver to (maybe) cancel the
+            // operation.
+            unsafe { (self.vtable.cancel)(self.data, &mut work_item.as_mut().data) };
+        } else if unsafe { work_item.as_ref().status == Poll::Pending } {
+            // The work item is not the current one, remove it from the queue. This immediately
+            // cancels the work item, if it was in fact in this work queue.
+            if self.remove(work_item) {
+                unsafe { work_item.as_mut().complete(Status::Cancelled) };
+            }
+        }
     }
 
     /// Removes the item from the queue.
@@ -131,11 +193,9 @@ impl<T: Sync> Inner<T> {
             if Some(ptr) == self.head {
                 self.head = next;
             } else {
-                unsafe {
-                    // Safety: If `ptr` is not the `head` of the queue, we must have a previous
-                    // element.
-                    unwrap!(prev).as_mut().next = next;
-                }
+                // Unwrapping is fine, because if the current pointer is not the `head`, the
+                // previous pointer must be Some.
+                unsafe { unwrap!(prev).as_mut().next = next };
             }
 
             if Some(ptr) == self.tail {
@@ -147,60 +207,6 @@ impl<T: Sync> Inner<T> {
 
         // Did not find `ptr`.
         false
-    }
-
-    fn post_to_driver(&mut self, mut ptr: NonNull<WorkItem<T>>) {
-        // Start processing a new work item.
-        if unsafe { (self.vtable.post)(self.data, &mut ptr.as_mut().data) } {
-            self.current = Some(ptr);
-        } else {
-            // If the driver didn't accept the work item, place it back to the front of the queue.
-            self.enqueue_front(ptr);
-        }
-    }
-
-    /// Runs one processing iteration.
-    ///
-    /// This function enqueues a new work item or polls the status of the currently processed one.
-    fn process(&mut self) {
-        if let Some(mut current) = self.current {
-            let result = unsafe { (self.vtable.poll)(self.data, &mut current.as_mut().data) };
-
-            if let Some(Poll::Ready(status)) = result {
-                unsafe { current.as_mut().complete(status) };
-
-                if let Some(ptr) = self.dequeue() {
-                    self.post_to_driver(ptr);
-                } else {
-                    // There are no more work items. Notify the driver.
-                    self.current = None;
-                    (self.vtable.on_empty)(self.data);
-                }
-            }
-        } else if let Some(ptr) = self.dequeue() {
-            self.post_to_driver(ptr);
-        }
-        // The queue is empty, but the driver should already have been notified when the queue
-        // became empty, so we don't notify it here.
-    }
-
-    /// Cancels a particular work item.
-    ///
-    /// If the work item is currently being processed, this function notifies the driver. Otherwise,
-    /// it tries to remove the pointer from the work queue.
-    fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) {
-        if self.current == Some(work_item) {
-            // Cancelling an in-progress item is more complicated than plucking it from the
-            // queue. Forward the request to the driver to (maybe) cancel the
-            // operation.
-            unsafe { (self.vtable.cancel)(self.data, &mut work_item.as_mut().data) };
-        } else if unsafe { work_item.as_ref().status == Poll::Pending } {
-            // The work item is not the current one, remove it from the queue. This immediately
-            // cancels the work item, if it was in fact in this work queue.
-            if self.remove(work_item) {
-                unsafe { work_item.as_mut().complete(Status::Cancelled) };
-            }
-        }
     }
 }
 
@@ -226,9 +232,13 @@ impl<T: Sync> WorkQueue<T> {
 
     /// Configures the queue.
     ///
+    /// The provided data pointer will be passed to the VTable functions.
+    ///
     /// # Safety
     ///
-    /// The `data` pointer must be valid as long as the `WorkQueue` is configured with it.
+    /// The `data` pointer must be valid as long as the `WorkQueue` is configured with it. The
+    /// driver must access the data pointer appropriately (i.e. it must not move !Send data out of
+    /// it).
     pub unsafe fn configure<D: Sync>(&self, data: *const D, vtable: VTable<T>) {
         self.inner.with(|inner| {
             inner.data = data.cast();
@@ -366,9 +376,11 @@ impl<'t, T: Sync> Handle<'t, T> {
 
 impl<'t, T: Sync> Drop for Handle<'t, T> {
     fn drop(&mut self) {
-        self.queue.cancel(self.work_item);
-        // We must wait for the driver to release our WorkItem.
-        while self.poll() == Poll::Pending {}
+        if self.status() == Poll::Pending {
+            self.queue.cancel(self.work_item);
+            // We must wait for the driver to release our WorkItem.
+            while self.poll() == Poll::Pending {}
+        }
     }
 }
 
