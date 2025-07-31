@@ -126,6 +126,8 @@ pub trait InterruptConfigurable: crate::private::Sealed {
 }
 
 /// Represents an ISR callback function
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct IsrCallback {
     f: usize,
 }

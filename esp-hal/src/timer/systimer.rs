@@ -438,14 +438,14 @@ impl Alarm<'_> {
             // checks if an interrupt is active before calling the associated
             // handler functions.
 
-            static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
+            static mut HANDLERS: [Option<crate::interrupt::IsrCallback>; 3] = [None, None, None];
 
             #[crate::ram]
-            unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
+            extern "C" fn _handle_interrupt<const CH: u8>() {
                 if SYSTIMER::regs().int_raw().read().target(CH).bit_is_set() {
                     let handler = unsafe { HANDLERS[CH as usize] };
                     if let Some(handler) = handler {
-                        handler();
+                        (handler.aligned_ptr())();
                     }
                 }
             }
@@ -458,7 +458,7 @@ impl Alarm<'_> {
                     2 => _handle_interrupt::<2>,
                     _ => unreachable!(),
                 };
-                interrupt::bind_interrupt(interrupt, handler);
+                interrupt::bind_interrupt(interrupt, crate::interrupt::IsrCallback::new(handler));
             }
         }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
