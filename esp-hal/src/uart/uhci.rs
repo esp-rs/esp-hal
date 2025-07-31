@@ -271,16 +271,16 @@ impl<'d> Uhci<'d, Async> {
 /// This structure holds references to the SPI instance, DMA buffers, and
 /// transfer status.
 #[instability::unstable]
-pub struct UhciDmaTxTransfer<'e, Dm, Buf>
+pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
 {
-    uhci: ManuallyDrop<Uhci<'e, Dm>>,
+    uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf>,
 }
 
-impl<'e, Buf> UhciDmaTxTransfer<'e, Async, Buf> {
-    fn new(uhci: Uhci<'e, Async>, dma_buf: Buf) -> Self {
+impl<'d, Buf> UhciDmaTxTransfer<'d, Async, Buf> {
+    fn new(uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf),
@@ -301,7 +301,7 @@ impl<'e, Buf> UhciDmaTxTransfer<'e, Async, Buf> {
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     #[instability::unstable]
-    pub async fn wait(mut self) -> (Uhci<'e, Async>, Buf) {
+    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf) {
         self.wait_for_idle().await;
 
         let retval = unsafe {
