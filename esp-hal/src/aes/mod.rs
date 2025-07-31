@@ -67,16 +67,6 @@ for_each_aes_key_length! {
                 }
             }
         }
-
-        paste::paste! {
-            #[doc = concat!("Marker type for AES-", stringify!($len))]
-            pub struct [<Aes $len>];
-
-            impl crate::private::Sealed for [<Aes $len>] {}
-            impl AesFlavour for [<Aes $len>] {
-                type KeyType<'b> = &'b [u8; $len / 8];
-            }
-        }
     };
 
     (bits $( ($len:literal) ),*) => {
@@ -328,15 +318,6 @@ impl<'d> Aes<'d> {
             }
         }
     }
-}
-
-/// Specifications for AES flavours
-pub trait AesFlavour: crate::private::Sealed {
-    /// Type of the AES key, a fixed-size array of bytes
-    ///
-    /// The size of this type depends on various factors, such as the device
-    /// being targeted and the desired key size.
-    type KeyType<'b>;
 }
 
 /// State matrix endianness
