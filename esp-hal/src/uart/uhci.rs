@@ -1,3 +1,5 @@
+use core::mem::ManuallyDrop;
+
 use crate::{
     Async,
     Blocking,
@@ -16,9 +18,8 @@ use crate::{
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     peripherals,
-    uart::Uart,
+    uart::{Uart, uhci::Error::*},
 };
-use crate::uart::uhci::Error::*;
 
 /// todo
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -56,7 +57,7 @@ impl AnyUhci<'_> {
 }
 
 /// todo
-pub struct UhciPer<'d, Dm>
+pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
@@ -65,7 +66,7 @@ where
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
 }
 
-impl<'d, Dm> UhciPer<'d, Dm>
+impl<'d, Dm> Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
@@ -134,7 +135,7 @@ where
     }
 }
 
-impl<'d> UhciPer<'d, Blocking> {
+impl<'d> Uhci<'d, Blocking> {
     /// todo
     pub fn new(
         uart: Uart<'d, Blocking>,
@@ -196,8 +197,8 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 
     /// todo
-    pub fn into_async(self) -> UhciPer<'d, Async> {
-        UhciPer {
+    pub fn into_async(self) -> Uhci<'d, Async> {
+        Uhci {
             _uart: self._uart.into_async(),
             uhci: self.uhci,
             channel: self.channel.into_async(),
@@ -205,7 +206,7 @@ impl<'d> UhciPer<'d, Blocking> {
     }
 }
 
-impl<'d> UhciPer<'d, Async> {
+impl<'d> Uhci<'d, Async> {
     /// todo
     pub async fn read(&mut self, rx_buffer: &mut impl DmaRxBuffer) {
         let dma_future = DmaRxFuture::new(&mut self.channel.rx);
@@ -242,5 +243,102 @@ impl<'d> UhciPer<'d, Async> {
         dma_future.await.unwrap();
 
         self.channel.tx.stop_transfer();
+    }
+
+    /// todo
+    pub async fn write_dma_out(
+        mut self: Uhci<'d, Async>,
+        mut tx_buffer: impl DmaTxBuffer,
+    ) -> UhciDmaTxTransfer<'d, Async, impl DmaTxBuffer> {
+        {
+            unsafe {
+                self.channel
+                    .tx
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
+                    .unwrap()
+            };
+
+            self.channel.tx.start_transfer().unwrap();
+
+            return UhciDmaTxTransfer::new(self, tx_buffer);
+        }
+    }
+}
+
+// Based on SpiDmaTransfer
+/// A structure representing a DMA transfer for UHCI/UA.
+///
+/// This structure holds references to the SPI instance, DMA buffers, and
+/// transfer status.
+#[instability::unstable]
+pub struct UhciDmaTxTransfer<'e, Dm, Buf>
+where
+    Dm: DriverMode,
+{
+    uhci: ManuallyDrop<Uhci<'e, Dm>>,
+    dma_buf: ManuallyDrop<Buf>,
+}
+
+impl<'e, Buf> UhciDmaTxTransfer<'e, Async, Buf> {
+    fn new(uhci: Uhci<'e, Async>, dma_buf: Buf) -> Self {
+        Self {
+            uhci: ManuallyDrop::new(uhci),
+            dma_buf: ManuallyDrop::new(dma_buf),
+        }
+    }
+
+    /// todo
+    pub fn is_done(&self) -> bool {
+        self.uhci.channel.tx.is_done()
+    }
+
+    async fn wait_for_idle(&mut self) {
+        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
+    }
+
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `Uhci` instance and the associated buffer.
+    #[instability::unstable]
+    pub async fn wait(mut self) -> (Uhci<'e, Async>, Buf) {
+        self.wait_for_idle().await;
+
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
+    }
+
+    /// Cancels the DMA transfer.
+    #[instability::unstable]
+    pub fn cancel(&mut self) {
+        // TODO: Shouldn't I here return like in wait?
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
+        }
+    }
+}
+
+impl<Dm, Buf> Drop for UhciDmaTxTransfer<'_, Dm, Buf>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
+            // TODO: I don't have async here, should I call the blocking (not yet existing wait_for_idle?)
+            // should a drop cause the whole program to potentially freeze?
+            // self.wait_for_idle();
+
+            unsafe {
+                ManuallyDrop::drop(&mut self.uhci);
+                ManuallyDrop::drop(&mut self.dma_buf);
+            }
+        }
     }
 }
