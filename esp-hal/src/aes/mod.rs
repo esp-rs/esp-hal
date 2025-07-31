@@ -695,8 +695,9 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
         // To achieve a decent performance in Typical AES mode, we run the operations in a blocking
         // manner and so they can't be cancelled.
     },
-    on_empty: |driver| {
-        // Drop the AES driver to conserve power when the queue becomes empty.
+    stop: |driver| {
+        // Drop the AES driver to conserve power when there is nothig to do (or when the driver was
+        // stopped).
         let driver = unsafe { AesBackend::from_raw(driver) };
         driver.deinitialize()
     },

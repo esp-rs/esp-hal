@@ -42,10 +42,10 @@ pub(crate) struct VTable<T: Sync> {
     /// This function should be as short as possible.
     pub(crate) cancel: fn(*const (), &mut T),
 
-    /// Called when the work queue becomes empty.
+    /// Called when the driver may be stopped.
     ///
     /// This function should be as short as possible.
-    pub(crate) on_empty: fn(*const ()),
+    pub(crate) stop: fn(*const ()),
 }
 
 impl<T: Sync> VTable<T> {
@@ -54,7 +54,7 @@ impl<T: Sync> VTable<T> {
             post: |_, _| false,
             poll: |_, _| None,
             cancel: |_, _| (),
-            on_empty: |_| (),
+            stop: |_| (),
         }
     }
 }
@@ -132,8 +132,8 @@ impl<T: Sync> Inner<T> {
                 self.enqueue_front(ptr);
             }
         } else if notify_on_empty {
-            // There are no more work items. Notify the driver.
-            (self.vtable.on_empty)(self.data);
+            // There are no more work items. Notify the driver that it can stop.
+            (self.vtable.stop)(self.data);
         }
     }
 
@@ -241,6 +241,8 @@ impl<T: Sync> WorkQueue<T> {
     /// it).
     pub unsafe fn configure<D: Sync>(&self, data: *const D, vtable: VTable<T>) {
         self.inner.with(|inner| {
+            (inner.vtable.stop)(inner.data);
+
             inner.data = data.cast();
             inner.vtable = vtable;
         })
