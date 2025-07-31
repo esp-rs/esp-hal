@@ -70,7 +70,7 @@
 //! }
 //! ```
 
-use core::ops::BitAnd;
+use core::{num::NonZeroUsize, ops::BitAnd};
 
 #[cfg(riscv)]
 pub use self::riscv::*;
@@ -129,43 +129,54 @@ pub trait InterruptConfigurable: crate::private::Sealed {
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct IsrCallback {
-    f: usize,
+    f: NonZeroUsize,
 }
 
 impl IsrCallback {
     /// Construct a new callback from the callback function.
     pub fn new(f: extern "C" fn()) -> Self {
-        Self { f: f as usize }
+        // a valid fn pointer is non zero
+        Self {
+            f: unwrap!(NonZeroUsize::new(f as usize)),
+        }
     }
 
     /// Construct a new callback from the callback function and the nested flag.
     pub(crate) fn new_with_nested(f: extern "C" fn(), nested: bool) -> Self {
-        let f = f as usize | !nested as usize;
+        // a valid fn pointer is non zero
+        let f = unwrap!(NonZeroUsize::new(f as usize | !nested as usize));
         Self { f }
     }
 
     /// Construct a new callback from a raw value.
+    ///
+    /// # Panics
+    ///
+    /// Passing zero is invalid and results in a panic.
     pub fn from_raw(f: usize) -> Self {
-        Self { f }
+        Self {
+            f: unwrap!(NonZeroUsize::new(f)),
+        }
     }
 
     /// Returns the raw value of the callback.
+    ///
     /// Don't just cast this to function and call it - it might be misaligned.
-    pub fn raw_value(&self) -> usize {
-        self.f
+    pub fn raw_value(self) -> usize {
+        self.f.into()
     }
 
     /// The callback function.
     ///
     /// This is aligned and can be called.
-    pub fn aligned_ptr(&self) -> extern "C" fn() {
-        unsafe { core::mem::transmute::<usize, extern "C" fn()>(self.f & !1) }
+    pub fn aligned_ptr(self) -> extern "C" fn() {
+        unsafe { core::mem::transmute::<usize, extern "C" fn()>(Into::<usize>::into(self.f) & !1) }
     }
 }
 
 impl PartialEq for IsrCallback {
     fn eq(&self, other: &Self) -> bool {
-        self.f & !1 == other.f & !1
+        core::ptr::fn_addr_eq(self.aligned_ptr(), other.aligned_ptr())
     }
 }
 
