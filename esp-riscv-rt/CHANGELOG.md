@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A new feature `defmt` which implements `defmt::Format` on `TrapFrame` (#3887)
 
 ### Changed
 

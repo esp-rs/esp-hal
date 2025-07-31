@@ -221,6 +221,8 @@ defmt = [
     "esp32s2?/defmt",
     "esp32s3?/defmt",
     "fugit/defmt",
+    "esp-riscv-rt?/defmt",
+    "xtensa-lx-rt?/defmt",
 ]
 
 #! ### PSRAM Feature Flags

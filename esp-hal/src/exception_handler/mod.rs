@@ -7,13 +7,7 @@ unsafe extern "C" fn __user_exception(
     cause: xtensa_lx_rt::exception::ExceptionCause,
     context: &TrapFrame,
 ) {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "defmt")] {
-            panic!("\n\nException occurred '{:?}'\n{:?}", defmt::Debug2Format(&cause), defmt::Debug2Format(&context));
-        } else {
-            panic!("\n\nException occurred '{:?}'\n{:?}", cause, context);
-        }
-    }
+    panic!("\n\nException occurred '{:?}'\n{:?}", cause, context);
 }
 
 #[cfg(riscv)]
@@ -49,18 +43,9 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
             _ => "UNKNOWN",
         };
 
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "defmt")] {
-                panic!(
-                    "Exception '{}' mepc={:08x}, mtval={:08x}\n{:?}",
-                    code, mepc, mtval, defmt::Debug2Format(&context)
-                );
-            } else {
-                panic!(
-                    "Exception '{}' mepc={:08x}, mtval={:08x}\n{:?}",
-                    code, mepc, mtval, context
-                );
-            }
-        }
+        panic!(
+            "Exception '{}' mepc={:08x}, mtval={:08x}\n{:?}",
+            code, mepc, mtval, context
+        );
     }
 }

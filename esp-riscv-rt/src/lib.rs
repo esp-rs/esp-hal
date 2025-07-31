@@ -70,6 +70,7 @@ pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
 
 /// Registers saved in trap handler
 #[derive(Debug, Default, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(C)]
 pub struct TrapFrame {
     /// Return address, stores the address to return to after a function call or
