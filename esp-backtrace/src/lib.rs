@@ -60,7 +60,9 @@ impl BacktraceFrame {
     }
 }
 
+#[allow(unused)]
 const RESET: &str = "\u{001B}[0m";
+#[allow(unused)]
 const RED: &str = "\u{001B}[31m";
 
 #[cfg(feature = "defmt")]
@@ -94,10 +96,12 @@ pub mod arch;
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     pre_backtrace();
 
+    set_color_code(RED);
     println!("");
     println!("====================== PANIC ======================");
 
     println!("{}", info);
+    set_color_code(RESET);
 
     println!("");
     println!("Backtrace:");
@@ -115,53 +119,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     }
 
     abort();
-}
-
-#[cfg(all(feature = "exception-handler", target_arch = "xtensa"))]
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".rwtext")]
-unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
-    panic!("\n\nException occurred '{}'\n{:?}", cause, context);
-}
-
-#[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
-#[unsafe(export_name = "ExceptionHandler")]
-fn exception_handler(context: &arch::TrapFrame) -> ! {
-    let mepc = context.pc;
-    let code = context.mcause & 0xff;
-    let mtval = context.mtval;
-
-    if code == 14 {
-        panic!(
-            "Stack overflow detected at 0x{:x} called by 0x{:x}",
-            mepc, context.ra
-        );
-    } else {
-        let code = match code {
-            0 => "Instruction address misaligned",
-            1 => "Instruction access fault",
-            2 => "Illegal instruction",
-            3 => "Breakpoint",
-            4 => "Load address misaligned",
-            5 => "Load access fault",
-            6 => "Store/AMO address misaligned",
-            7 => "Store/AMO access fault",
-            8 => "Environment call from U-mode",
-            9 => "Environment call from S-mode",
-            10 => "Reserved",
-            11 => "Environment call from M-mode",
-            12 => "Instruction page fault",
-            13 => "Load page fault",
-            14 => "Reserved",
-            15 => "Store/AMO page fault",
-            _ => "UNKNOWN",
-        };
-
-        panic!(
-            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
-            code, mepc, mtval, context
-        );
-    }
 }
 
 // Ensure that the address is in DRAM and that it is 16-byte aligned.
@@ -281,8 +238,6 @@ fn pre_backtrace() {
         }
         unsafe { custom_pre_backtrace() }
     }
-
-    set_color_code(RED);
 }
 
 #[allow(unused)]
@@ -290,8 +245,6 @@ fn abort() -> ! {
     println!("");
     println!("");
     println!("");
-
-    set_color_code(RESET);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {
