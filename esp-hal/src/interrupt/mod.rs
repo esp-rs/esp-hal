@@ -125,6 +125,48 @@ pub trait InterruptConfigurable: crate::private::Sealed {
     fn set_interrupt_handler(&mut self, handler: InterruptHandler);
 }
 
+/// Represents an ISR callback function
+pub struct IsrCallback {
+    f: usize,
+}
+
+impl IsrCallback {
+    /// Construct a new callback from the callback function.
+    pub fn new(f: extern "C" fn()) -> Self {
+        Self { f: f as usize }
+    }
+
+    /// Construct a new callback from the callback function and the nested flag.
+    pub(crate) fn new_with_nested(f: extern "C" fn(), nested: bool) -> Self {
+        let f = f as usize | !nested as usize;
+        Self { f }
+    }
+
+    /// Construct a new callback from a raw value.
+    pub fn from_raw(f: usize) -> Self {
+        Self { f }
+    }
+
+    /// Returns the raw value of the callback.
+    /// Don't just cast this to function and call it - it might be misaligned.
+    pub fn raw_value(&self) -> usize {
+        self.f
+    }
+
+    /// The callback function.
+    ///
+    /// This is aligned and can be called.
+    pub fn aligned_ptr(&self) -> extern "C" fn() {
+        unsafe { core::mem::transmute::<usize, extern "C" fn()>(self.f & !1) }
+    }
+}
+
+impl PartialEq for IsrCallback {
+    fn eq(&self, other: &Self) -> bool {
+        self.f & !1 == other.f & !1
+    }
+}
+
 /// An interrupt handler
 #[cfg_attr(
     multi_core,
@@ -165,20 +207,18 @@ impl InterruptHandler {
         }
     }
 
-    /// The function to be called.
-    #[cfg_attr(
-        riscv,
-        doc = "\n\nNote that the function pointer might be misaligned. Don't ever just call the function."
-    )]
+    /// The Isr callback.
     #[inline]
-    pub fn handler(&self) -> extern "C" fn() {
+    pub fn handler(&self) -> IsrCallback {
         cfg_if::cfg_if! {
             if #[cfg(riscv)] {
-                unsafe { core::mem::transmute::<usize, extern "C" fn()>((self.f as usize) | !self.nested as usize) }
+                let nested = self.nested;
             } else {
-                self.f
+                let nested = true;
             }
         }
+
+        IsrCallback::new_with_nested(self.f, nested)
     }
 
     /// Priority to be used when registering the interrupt

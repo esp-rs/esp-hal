@@ -312,6 +312,7 @@ pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option
 
 mod vectored {
     use super::*;
+    use crate::interrupt::IsrCallback;
 
     // Setup interrupts ready for vectoring
     #[doc(hidden)]
@@ -387,23 +388,23 @@ mod vectored {
     /// # Safety
     ///
     /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
         unsafe {
-            let ptr = &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
-                as *mut unsafe extern "C" fn();
-            ptr.write_volatile(handler);
+            let ptr =
+                &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
+            ptr.write_volatile(handler.raw_value());
         }
     }
 
     /// Returns the currently bound interrupt handler.
-    pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
+    pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
         unsafe {
-            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
-            if addr as usize == 0 {
+            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as usize;
+            if addr == 0 {
                 return None;
             }
 
-            Some(addr)
+            Some(IsrCallback::from_raw(addr))
         }
     }
 }

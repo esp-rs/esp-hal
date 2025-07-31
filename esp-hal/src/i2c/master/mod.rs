@@ -139,7 +139,7 @@ use crate::{
         interconnect::{self, PeripheralOutput},
     },
     handler,
-    interrupt::InterruptHandler,
+    interrupt::{self, InterruptHandler},
     pac::i2c0::{COMD, RegisterBlock},
     private,
     ram,
@@ -3263,7 +3263,7 @@ impl Instance for AnyI2c<'_> {
 }
 
 impl AnyI2c<'_> {
-    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+    fn bind_peri_interrupt(&self, handler: interrupt::IsrCallback) {
         any::delegate!(self, i2c => { i2c.bind_peri_interrupt(handler) })
     }
 
