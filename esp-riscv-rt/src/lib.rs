@@ -17,60 +17,13 @@ use core::arch::global_asm;
 
 pub use riscv;
 pub use riscv_rt::entry;
+pub use riscv_rt::TrapFrame;
 
 #[doc(hidden)]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn _dispatch_exception() {
     // never called but needed for riscv-rt to link
     panic!();
-}
-
-/// Registers saved in trap handler
-#[derive(Debug, Default, Clone, Copy)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[repr(C)]
-pub struct TrapFrame {
-    /// Return address, stores the address to return to after a function call or
-    /// interrupt.
-    pub ra: usize,
-    /// Temporary register t0, used for intermediate values.
-    pub t0: usize,
-    /// Temporary register t1, used for intermediate values.
-    pub t1: usize,
-    /// Temporary register t2, used for intermediate values.
-    pub t2: usize,
-    /// Temporary register t3, used for intermediate values.
-    pub t3: usize,
-    /// Temporary register t4, used for intermediate values.
-    pub t4: usize,
-    /// Temporary register t5, used for intermediate values.
-    pub t5: usize,
-    /// Temporary register t6, used for intermediate values.
-    pub t6: usize,
-    /// Argument register a0, typically used to pass the first argument to a
-    /// function.
-    pub a0: usize,
-    /// Argument register a1, typically used to pass the second argument to a
-    /// function.
-    pub a1: usize,
-    /// Argument register a2, typically used to pass the third argument to a
-    /// function.
-    pub a2: usize,
-    /// Argument register a3, typically used to pass the fourth argument to a
-    /// function.
-    pub a3: usize,
-    /// Argument register a4, typically used to pass the fifth argument to a
-    /// function.
-    pub a4: usize,
-    /// Argument register a5, typically used to pass the sixth argument to a
-    /// function.
-    pub a5: usize,
-    /// Argument register a6, typically used to pass the seventh argument to a
-    /// function.
-    pub a6: usize,
-    /// Argument register a7, typically used to pass the eighth argument to a
-    /// function.
-    pub a7: usize,
 }
 
 /// Parse cfg attributes inside a global_asm call.
