@@ -320,8 +320,8 @@ impl<'d> Aes<'d> {
     }
 }
 
-/// State matrix endianness
-#[cfg(any(esp32, esp32s2))]
+/// Data endianness
+#[cfg(aes_endianness_configurable)]
 pub enum Endianness {
     /// Big endian (most-significant byte at the smallest address)
     BigEndian    = 1,
@@ -353,8 +353,6 @@ pub mod dma {
         peripherals::AES,
         system::{Peripheral, PeripheralClockControl},
     };
-
-    const ALIGN_SIZE: usize = core::mem::size_of::<u32>();
 
     /// Specifies the block cipher modes available for AES operations.
     #[derive(Clone, Copy, PartialEq, Eq)]
@@ -388,7 +386,7 @@ pub mod dma {
         channel: Channel<Blocking, PeripheralDmaChannel<AES<'d>>>,
     }
 
-    impl<'d> crate::aes::Aes<'d> {
+    impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma(self, channel: impl DmaChannelFor<AES<'d>>) -> AesDma<'d> {
             let channel = Channel::new(channel.degrade());
@@ -404,13 +402,9 @@ pub mod dma {
     }
 
     impl<'d> AesDma<'d> {
-        /// Writes the encryption key to the AES hardware, checking that its
-        /// length matches expected constraints.
-        pub fn write_key(&mut self, key: impl Into<Key>) {
-            let key = key.into(); // Convert into Key enum
+        fn write_key(&mut self, key: impl Into<Key>) {
+            let key = key.into();
             let key = key.as_slice();
-            debug_assert!(key.len() <= 8 * ALIGN_SIZE);
-            debug_assert_eq!(key.len() % ALIGN_SIZE, 0);
             self.aes.write_key(key);
         }
 
@@ -722,7 +716,7 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 /// use esp_hal::aes::{AesBackend, AesContext, Operation};
 /// #
 /// let mut aes = AesBackend::new(peripherals.AES);
-/// // Start the backend, which pins it in place and allows processing AES operations.
+/// // Start the backend, which allows processing AES operations.
 /// let _backend = aes.start();
 ///
 /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
@@ -735,18 +729,21 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 ///     ],
 /// );
 ///
-/// // Process a block of data in this context, in place. The ECB operating mode requires that this is one block (16 bytes) long.
-/// let mut buffer: [u8; 16] = [
+/// // Process a block of data in this context. The ECB operating mode requires that
+/// // the length of the data is a multiple of the block (16 bytes) size.
+/// let input_buffer: [u8; 16] = [
 ///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
 /// ];
-/// ecb_encrypt
-///     .process_in_place(&mut buffer)
-///     .unwrap()
-///     .wait_blocking();
+/// let mut output_buffer: [u8; 16] = [0; 16];
 ///
-/// // buffer now contains the ciphertext!
+/// let operation_handle = ecb_encrypt
+///     .process(&input_buffer, &mut output_buffer)
+///     .unwrap();
+/// operation_handle.wait_blocking();
+///
+/// // output_buffer now contains the ciphertext
 /// assert_eq!(
-///     buffer,
+///     output_buffer,
 ///     [
 ///         0xb3, 0xc8, 0xd2, 0x3b, 0xa7, 0x36, 0x5f, 0x18, 0x61, 0x70, 0x0, 0x3e, 0xd9, 0x3a,
 ///         0x31, 0x96,
@@ -761,9 +758,19 @@ pub struct AesBackend<'d> {
 }
 
 impl<'d> AesBackend<'d> {
+    #[procmacros::doc_replace]
     /// Creates a new AES backend.
     ///
     /// The backend needs to be [`start`][Self::start]ed before it can execute AES operations.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::aes::AesBackend;
+    /// #
+    /// let mut aes = AesBackend::new(peripherals.AES);
+    /// ```
     pub fn new(aes: AES<'d>) -> Self {
         Self {
             peri: aes,
@@ -771,7 +778,21 @@ impl<'d> AesBackend<'d> {
         }
     }
 
-    /// Registers the AES driver.
+    #[procmacros::doc_replace]
+    /// Registers the CPU-driven AES driver to process AES operations.
+    ///
+    /// The driver stops operating when the returned object is dropped.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::aes::AesBackend;
+    /// #
+    /// let mut aes = AesBackend::new(peripherals.AES);
+    /// // Start the backend, which allows processing AES operations.
+    /// let _backend = aes.start();
+    /// ```
     pub fn start(&mut self) -> AesWorkQueueDriver<'_, 'd> {
         AesWorkQueueDriver {
             _inner: WorkQueueDriver::new(self, BLOCKING_AES_VTABLE, &AES_WORK_QUEUE),
@@ -930,10 +951,21 @@ impl AesContext {
         Ok(())
     }
 
-    /// Starts a configured operation.
+    /// Starts transforming the input buffer, and writes the result into the output buffer.
     ///
     /// - For encryption the input is the plaintext, the output is the ciphertext.
     /// - For decryption the input is the ciphertext, the output is the plaintext.
+    ///
+    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// before the operation finishes will cancel the operation.
+    ///
+    /// For an example, see the documentation of [`AesBackend`].
+    ///
+    /// ## Errors
+    ///
+    /// - If the lengths of the input and output buffers don't match, an error is returned.
+    /// - The ECB and OFB cipher modes require the data length to be a multiple of the block size
+    ///   (16), otherwise an error is returned.
     pub fn process<'t>(
         &'t mut self,
         input: &'t [u8],
@@ -954,9 +986,61 @@ impl AesContext {
         Ok(self.post())
     }
 
-    /// Starts a configured operation.
+    #[procmacros::doc_replace]
+    /// Starts transforming the buffer.
     ///
     /// The processed data will be written back to the `buffer`.
+    ///
+    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// before the operation finishes will cancel the operation.
+    ///
+    /// This function operates similar to [`AesContext::process`], but it overwrites the data buffer
+    /// with the result of the transformation.
+    ///
+    /// ```rust, ignore/// # {before_snippet}
+    /// use esp_hal::aes::{AesBackend, AesContext, Operation};
+    /// #
+    /// let mut aes = AesBackend::new(peripherals.AES);
+    /// // Start the backend, which pins it in place and allows processing AES operations.
+    /// let _backend = aes.start();
+    ///
+    /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
+    /// // The key length must be supported by the hardware.
+    /// let mut ecb_encrypt = AesContext::ecb(
+    ///     Operation::Encrypt,
+    ///     [
+    ///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
+    ///         b'd', 0,
+    ///     ],
+    /// );
+    ///
+    /// // Process a block of data in this context, in place. The ECB operating mode requires that
+    /// // the length of the data is a multiple of the block (16 bytes) size.
+    /// let mut buffer: [u8; 16] = [
+    ///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    /// ];
+    ///
+    /// let operation_handle = ecb_encrypt
+    ///     .process_in_place(&mut buffer)
+    ///     .unwrap();
+    /// operation_handle.wait_blocking();
+    ///
+    /// // Instead of the plaintext message, buffer now contains the ciphertext.
+    /// assert_eq!(
+    ///     buffer,
+    ///     [
+    ///         0xb3, 0xc8, 0xd2, 0x3b, 0xa7, 0x36, 0x5f, 0x18, 0x61, 0x70, 0x0, 0x3e, 0xd9, 0x3a,
+    ///         0x31, 0x96,
+    ///     ]
+    /// );
+    /// #
+    /// # {after_snippet}
+    /// ```
+    ///
+    /// ## Errors
+    ///
+    /// The ECB and OFB cipher modes require the data length to be a multiple of the block size
+    /// (16), otherwise an error is returned.
     pub fn process_in_place<'t>(
         &'t mut self,
         buffer: &'t mut [u8],
@@ -979,17 +1063,21 @@ impl AesContext {
 
 /// The handle to the pending AES operation.
 ///
-/// Dropping this handle will cancel the operation.
+/// This object is returned by [`AesContext::process`] and [`AesContext::process_in_place`].
+///
+/// Dropping this handle before the operation finishes will cancel the operation.
+///
+/// For an example, see the documentation of [`AesBackend`].
 pub struct AesHandle<'t>(Handle<'t, AesOperation>);
 
 impl AesHandle<'_> {
-    /// Returns the status of the work item.
+    /// Polls the status of the work item.
     #[inline]
     pub fn poll(&mut self) -> Poll {
         self.0.poll()
     }
 
-    /// Waits for the work item to be processed.
+    /// Blocks until the work item to be processed.
     #[inline]
     pub fn wait_blocking(mut self) {
         while self.poll() == Poll::Pending {}
