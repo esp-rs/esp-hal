@@ -3992,7 +3992,7 @@ impl Instance for AnySpi<'_> {
 }
 
 impl AnySpi<'_> {
-    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+    fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback) {
         any::delegate!(self, spi => { spi.bind_peri_interrupt(handler) })
     }
 

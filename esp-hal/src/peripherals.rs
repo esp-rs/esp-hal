@@ -64,7 +64,7 @@ macro_rules! create_peripheral {
             $(
                 /// Binds an interrupt handler to the corresponding interrupt for this peripheral.
                 #[instability::unstable]
-                pub fn $bind(&self, handler: unsafe extern "C" fn() -> ()) {
+                pub fn $bind(&self, handler: $crate::interrupt::IsrCallback) {
                     unsafe { $crate::interrupt::bind_interrupt($crate::peripherals::Interrupt::$interrupt, handler); }
                 }
 
