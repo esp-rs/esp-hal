@@ -16,250 +16,14 @@
 use core::arch::global_asm;
 
 pub use riscv;
-use riscv::register::{mcause, mtvec};
-pub use riscv_rt_macros::{entry, pre_init};
-
-pub use self::Interrupt as interrupt;
-
-#[unsafe(export_name = "error: esp-riscv-rt appears more than once in the dependency graph")]
-#[doc(hidden)]
-pub static __ONCE__: () = ();
-
-unsafe extern "C" {
-    // Boundaries of the .bss section
-    static mut _bss_end: u32;
-    static mut _bss_start: u32;
-
-    // Boundaries of the .data section
-    static mut _data_end: u32;
-    static mut _data_start: u32;
-
-    // Initial values of the .data section (stored in Flash)
-    static _sidata: u32;
-}
-
-/// Rust entry point (_start_rust)
-///
-/// Zeros bss section, initializes data section and calls main. This function
-/// never returns.
-///
-/// # Safety
-///
-/// This function should not be called directly by the user, and should instead
-/// be invoked by the runtime implicitly.
-#[unsafe(link_section = ".init.rust")]
-#[unsafe(export_name = "_start_rust")]
-pub unsafe extern "C" fn start_rust(a0: usize, a1: usize, a2: usize) -> ! {
-    unsafe {
-        unsafe extern "Rust" {
-            fn hal_main(a0: usize, a1: usize, a2: usize) -> !;
-
-            fn __post_init();
-
-            fn _setup_interrupts();
-
-        }
-
-        __post_init();
-
-        _setup_interrupts();
-
-        hal_main(a0, a1, a2);
-    }
-}
-
-/// Registers saved in trap handler
-#[derive(Debug, Default, Clone, Copy)]
-#[repr(C)]
-pub struct TrapFrame {
-    /// Return address, stores the address to return to after a function call or
-    /// interrupt.
-    pub ra: usize,
-    /// Temporary register t0, used for intermediate values.
-    pub t0: usize,
-    /// Temporary register t1, used for intermediate values.
-    pub t1: usize,
-    /// Temporary register t2, used for intermediate values.
-    pub t2: usize,
-    /// Temporary register t3, used for intermediate values.
-    pub t3: usize,
-    /// Temporary register t4, used for intermediate values.
-    pub t4: usize,
-    /// Temporary register t5, used for intermediate values.
-    pub t5: usize,
-    /// Temporary register t6, used for intermediate values.
-    pub t6: usize,
-    /// Argument register a0, typically used to pass the first argument to a
-    /// function.
-    pub a0: usize,
-    /// Argument register a1, typically used to pass the second argument to a
-    /// function.
-    pub a1: usize,
-    /// Argument register a2, typically used to pass the third argument to a
-    /// function.
-    pub a2: usize,
-    /// Argument register a3, typically used to pass the fourth argument to a
-    /// function.
-    pub a3: usize,
-    /// Argument register a4, typically used to pass the fifth argument to a
-    /// function.
-    pub a4: usize,
-    /// Argument register a5, typically used to pass the sixth argument to a
-    /// function.
-    pub a5: usize,
-    /// Argument register a6, typically used to pass the seventh argument to a
-    /// function.
-    pub a6: usize,
-    /// Argument register a7, typically used to pass the eighth argument to a
-    /// function.
-    pub a7: usize,
-}
-
-/// Trap entry point rust (_start_trap_rust)
-///
-/// `scause`/`mcause` is read to determine the cause of the trap. XLEN-1 bit
-/// indicates if it's an interrupt or an exception. The result is examined and
-/// ExceptionHandler or one of the core interrupt handlers is called.
-///
-/// # Safety
-///
-/// This function should not be called directly by the user, and should instead
-/// be invoked by the runtime implicitly.
-#[unsafe(link_section = ".trap.rust")]
-#[unsafe(export_name = "_start_trap_rust")]
-pub unsafe extern "C" fn start_trap_rust(trap_frame: *const TrapFrame) {
-    unsafe extern "C" {
-        fn ExceptionHandler(trap_frame: &TrapFrame);
-        fn DefaultHandler();
-    }
-
-    unsafe {
-        let cause = mcause::read();
-
-        if cause.is_exception() {
-            ExceptionHandler(&*trap_frame)
-        } else if cause.code() < __INTERRUPTS.len() {
-            let h = &__INTERRUPTS[cause.code()];
-            if h.reserved == 0 {
-                DefaultHandler();
-            } else {
-                (h.handler)();
-            }
-        } else {
-            DefaultHandler();
-        }
-    }
-}
+pub use riscv_rt::{TrapFrame, entry};
 
 #[doc(hidden)]
 #[unsafe(no_mangle)]
-#[allow(unused_variables, non_snake_case)]
-pub fn DefaultExceptionHandler(trap_frame: &TrapFrame) -> ! {
-    loop {
-        // Prevent this from turning into a UDF instruction
-        // see rust-lang/rust#28728 for details
-        continue;
-    }
+pub unsafe extern "C" fn _dispatch_exception() {
+    // never called but needed for riscv-rt to link
+    panic!();
 }
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-#[allow(unused_variables, non_snake_case)]
-pub fn DefaultInterruptHandler() {
-    loop {
-        // Prevent this from turning into a UDF instruction
-        // see rust-lang/rust#28728 for details
-        continue;
-    }
-}
-
-// Interrupts
-#[doc(hidden)]
-pub enum Interrupt {
-    UserSoft,
-    SupervisorSoft,
-    MachineSoft,
-    UserTimer,
-    SupervisorTimer,
-    MachineTimer,
-    UserExternal,
-    SupervisorExternal,
-    MachineExternal,
-}
-
-unsafe extern "C" {
-    fn UserSoft();
-    fn SupervisorSoft();
-    fn MachineSoft();
-    fn UserTimer();
-    fn SupervisorTimer();
-    fn MachineTimer();
-    fn UserExternal();
-    fn SupervisorExternal();
-    fn MachineExternal();
-}
-
-#[doc(hidden)]
-pub union Vector {
-    pub handler: unsafe extern "C" fn(),
-    pub reserved: usize,
-}
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-pub static __INTERRUPTS: [Vector; 12] = [
-    Vector { handler: UserSoft },
-    Vector {
-        handler: SupervisorSoft,
-    },
-    Vector { reserved: 0 },
-    Vector {
-        handler: MachineSoft,
-    },
-    Vector { handler: UserTimer },
-    Vector {
-        handler: SupervisorTimer,
-    },
-    Vector { reserved: 0 },
-    Vector {
-        handler: MachineTimer,
-    },
-    Vector {
-        handler: UserExternal,
-    },
-    Vector {
-        handler: SupervisorExternal,
-    },
-    Vector { reserved: 0 },
-    Vector {
-        handler: MachineExternal,
-    },
-];
-
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-#[rustfmt::skip]
-pub unsafe extern "Rust" fn default_post_init() {}
-
-/// Default implementation of `_setup_interrupts` that sets `mtvec`/`stvec` to a
-/// trap handler address.
-#[doc(hidden)]
-#[unsafe(no_mangle)]
-#[rustfmt::skip]
-pub unsafe extern "Rust" fn default_setup_interrupts() { unsafe {
-    unsafe extern "C" {
-        fn _start_trap();
-    }
-
-    mtvec::write(
-        {
-            let mut mtvec = mtvec::Mtvec::from_bits(0);
-            mtvec.set_trap_mode(mtvec::TrapMode::Vectored);
-            mtvec.set_address(_start_trap as usize);
-            mtvec
-        }
-    );
-}}
 
 /// Parse cfg attributes inside a global_asm call.
 macro_rules! cfg_global_asm {
@@ -282,43 +46,10 @@ macro_rules! cfg_global_asm {
 
 cfg_global_asm! {
     r#"
-/*
-    Entry point of all programs (_start).
-
-    It initializes DWARF call frame information, the stack pointer, the
-    frame pointer (needed for closures to work in start_rust) and the global
-    pointer. Then it calls _start_rust.
-*/
-
 .section .init, "ax"
-.global _start
-
-_start:
-    /* Jump to the absolute address defined by the linker script. */
-    lui ra, %hi(_abs_start)
-    jr %lo(_abs_start)(ra)
-
-_abs_start:
-    .option norelax
-    .cfi_startproc
-    .cfi_undefined ra
-"#,
-#[cfg(feature = "has-mie-mip")]
-    r#"
-    csrw mie, 0
-    csrw mip, 0
-"#,
-    r#"
-    la a0, _bss_start
-    la a1, _bss_end
-    bge a0, a1, 2f
-    mv a3, x0
-    1:
-    sw a3, 0(a0)
-    addi a0, a0, 4
-    blt a0, a1, 1b
-    2:
-"#,
+.weak __pre_init
+__pre_init:"#,
+    // Zero .rtc_fast.bss
 #[cfg(feature = "rtc-ram")]
     r#"
     la a0, _rtc_fast_bss_start
@@ -331,11 +62,13 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-    // Zero .rtc_fast.persistent iff the chip just powered on
-#[cfg(feature = "rtc-ram")]
+     // Zero .rtc_fast.persistent if the chip just powered on
+ #[cfg(feature = "rtc-ram")]
     r#"
     mv a0, zero
+    mv t0, ra
     call rtc_get_reset_reason
+    mv ra, t0
     addi a1, zero, 1
     bne a0, a1, 2f
     la a0, _rtc_fast_persistent_start
@@ -348,62 +81,10 @@ _abs_start:
     blt a0, a1, 1b
     2:
 "#,
-    r#"
-    li  x1, 0
-    li  x2, 0
-    li  x3, 0
-    li  x4, 0
-    li  x5, 0
-    li  x6, 0
-    li  x7, 0
-    li  x8, 0
-    li  x9, 0
-    li  x10,0
-    li  x11,0
-    li  x12,0
-    li  x13,0
-    li  x14,0
-    li  x15,0
-    li  x16,0
-    li  x17,0
-    li  x18,0
-    li  x19,0
-    li  x20,0
-    li  x21,0
-    li  x22,0
-    li  x23,0
-    li  x24,0
-    li  x25,0
-    li  x26,0
-    li  x27,0
-    li  x28,0
-    li  x29,0
-    li  x30,0
-    li  x31,0
-
-    .option push
-    .option norelax
-    la gp, __global_pointer$
-    .option pop
-
-    // Check hart ID
-    csrr t2, mhartid
-    lui t0, %hi(_max_hart_id)
-    add t0, t0, %lo(_max_hart_id)
-    bgtu t2, t0, abort
-
-    // Allocate stack
-    la sp, _stack_start
-    li t0, 4 // make sure stack start is in RAM
-    sub sp, sp, t0
-    andi sp, sp, -16 // Force 16-byte alignment
-
-    // Set frame pointer
-    add s0, sp, zero
-
-    jal zero, _start_rust
-
-    .cfi_endproc
+r#"
+    ret
+"#,
+r#"
 
 /*
     Trap entry points (_start_trap, _start_trapN for N in 1..=31)
@@ -446,7 +127,8 @@ _abs_start:
 .weak _start_trap31
 "#,
 r#"
-_start_trap: // Handle exceptions in vectored mode
+_start_trap:
+    // Handle exceptions in vectored mode
     // move SP to some save place if it's pointing below the RAM
     // otherwise we won't be able to do anything reasonable
     // (since we don't have a working stack)
@@ -473,7 +155,7 @@ _start_trap: // Handle exceptions in vectored mode
 
     addi sp, sp, -16*4
     sw ra, 0(sp)
-    la ra, _start_trap_rust_hal /* Load the HAL trap handler */
+    la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
     j _start_trap_direct
 _start_trap1:
     addi sp, sp, -16*4
@@ -629,8 +311,6 @@ _start_trap31:
     addi sp, sp, -16*4
     sw ra, 0(sp)
     la ra, interrupt31
-    j _start_trap_direct
-la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
 _start_trap_direct:
 "#,
 r#"
@@ -675,12 +355,6 @@ r#"
 
     # SP was restored from the original SP
     mret
-
-/* Make sure there is an abort when linking */
-.section .text.abort
-.globl abort
-abort:
-    j abort
 
 /*
     Interrupt vector table (_vector_table)
