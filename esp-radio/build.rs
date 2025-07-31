@@ -21,6 +21,27 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Define all necessary configuration symbols for the configured device:
     chip.define_cfgs();
 
+    // If some library required unstable make sure unstable is actually enabled.
+    if cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
+        panic!(
+            "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
+        );
+    }
+
+    if (cfg!(feature = "ble")
+        || cfg!(feature = "coex")
+        || cfg!(feature = "csi")
+        || cfg!(feature = "esp-now")
+        || cfg!(feature = "ieee802154")
+        || cfg!(feature = "smoltcp")
+        || cfg!(feature = "sniffer"))
+        && !cfg!(feature = "unstable")
+    {
+        panic!(
+            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`.\n\n"
+        )
+    }
+
     // Log and defmt are mutually exclusive features. The main technical reason is
     // that allowing both would make the exact panicking behaviour a fragile
     // implementation detail.

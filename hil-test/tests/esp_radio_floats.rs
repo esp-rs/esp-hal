@@ -1,7 +1,7 @@
 //! Cp0Disable exception regression test
 
 //% CHIPS: esp32 esp32s2 esp32s3
-//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi esp-radio/unstable
 
 #![no_std]
 #![no_main]
