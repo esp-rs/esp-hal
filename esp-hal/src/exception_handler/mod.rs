@@ -7,7 +7,7 @@ unsafe extern "C" fn __user_exception(
     cause: xtensa_lx_rt::exception::ExceptionCause,
     context: &TrapFrame,
 ) {
-    panic!("\n\nException occurred '{:?}'\n{:x?}", cause, context);
+    panic!("\n\nException occurred '{:?}'\n{:?}", cause, context);
 }
 
 #[cfg(riscv)]
@@ -44,7 +44,7 @@ unsafe extern "C" fn ExceptionHandler(context: &TrapFrame) -> ! {
         };
 
         panic!(
-            "Exception '{}' mepc={:08x}, mtval={:08x}\n{:x?}",
+            "Exception '{}' mepc={:08x}, mtval={:08x}\n{:?}",
             code, mepc, mtval, context
         );
     }
