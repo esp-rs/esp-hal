@@ -14,9 +14,9 @@ use core::{cell::RefCell, mem::MaybeUninit};
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use critical_section::Mutex;
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(btdm)]
 use self::btdm as ble;
-#[cfg(any(esp32c2, esp32c6, esp32h2))]
+#[cfg(npl)]
 use self::npl as ble;
 
 unstable_module! {

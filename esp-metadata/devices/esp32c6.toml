@@ -123,6 +123,9 @@ symbols = [
     "gpio_support_deepsleep_wakeup",
     "uart_support_wakeup_int",
     "pm_support_ext1_wakeup",
+
+    # Which bluetooth implementation
+    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]

@@ -95,6 +95,9 @@ symbols = [
     "pm_support_ext1_wakeup",
     "pm_support_touch_sensor_wakeup",
     "ulp_supported",
+
+    # Which bluetooth implementation
+    "btdm",
 ]
 
 memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
