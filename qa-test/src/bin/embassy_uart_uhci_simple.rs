@@ -9,7 +9,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, i2s::master::{DataFormat, I2s, Standard}, time::Rate, timer::{timg::TimerGroup}, uart::{uhci::UhciPer, Config, RxConfig, Uart}, Async
+    dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, timer::{timg::TimerGroup}, uart::{uhci::simple::UhciSimple, Config, RxConfig, Uart}
 };
 use esp_println::println;
 use esp_hal::peripherals::Peripherals;
@@ -44,10 +44,8 @@ async fn run_uart(peripherals: Peripherals) {
     let mut dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
-
-    let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
-    uhci.configure();
-    uhci.read_limit(dma_rx.len()).unwrap();
+    let mut uhci = UhciSimple::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
+    uhci.internal.chunk_limit(dma_rx.len()).unwrap();
 
     loop {
         println!("Waiting for message");

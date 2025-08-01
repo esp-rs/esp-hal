@@ -8,7 +8,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, uart::{uhci::UhciPer, Config, RxConfig, Uart}, Blocking
+    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, uart::{uhci::simple::{UhciSimple}, Config, RxConfig, Uart}
 };
 use esp_println::println;
 
@@ -35,9 +35,8 @@ fn main() -> ! {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
 
-    let mut uhci = UhciPer::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-    uhci.configure();
-    uhci.read_limit(dma_rx.len()).unwrap();
+    let mut uhci = UhciSimple::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
+    uhci.internal.chunk_limit(dma_rx.len()).unwrap();
 
     loop {
         println!("Waiting for message");
