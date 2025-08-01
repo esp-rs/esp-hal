@@ -333,6 +333,7 @@ unstable_module! {
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
+    pub mod work_queue;
 }
 
 unstable_driver! {
