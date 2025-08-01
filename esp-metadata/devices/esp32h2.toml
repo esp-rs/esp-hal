@@ -102,6 +102,9 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
+
+    # Which bluetooth implementation
+    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]

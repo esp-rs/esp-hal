@@ -10,6 +10,8 @@ unsafe extern "C" {
     pub fn malloc_internal(size: usize) -> *mut u8;
 
     pub fn free(ptr: *mut u8);
+
+    #[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
     pub fn calloc(number: u32, size: usize) -> *mut u8;
 
     #[cfg(feature = "wifi")]

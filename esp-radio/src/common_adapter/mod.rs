@@ -12,7 +12,7 @@ use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
-    compat::{common::*, timer_compat::*},
+    compat::common::*,
     hal::{self, clock::ModemClockController, ram},
 };
 
@@ -221,12 +221,12 @@ static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 #[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
-    compat_timer_disarm(timer.cast());
+    crate::compat::timer_compat::compat_timer_disarm(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
-    compat_timer_done(timer.cast());
+    crate::compat::timer_compat::compat_timer_done(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
@@ -236,7 +236,7 @@ pub unsafe extern "C" fn ets_timer_setfn(
     parg: *mut crate::binary::c_types::c_void,
 ) {
     unsafe {
-        compat_timer_setfn(
+        crate::compat::timer_compat::compat_timer_setfn(
             ptimer.cast(),
             core::mem::transmute::<
                 *mut crate::binary::c_types::c_void,
@@ -253,7 +253,7 @@ pub unsafe extern "C" fn ets_timer_arm(
     tmout: u32,
     repeat: bool,
 ) {
-    compat_timer_arm(timer.cast(), tmout, repeat);
+    crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
 #[cfg(feature = "wifi")]
@@ -262,7 +262,7 @@ pub unsafe extern "C" fn ets_timer_arm_us(
     tmout: u32,
     repeat: bool,
 ) {
-    compat_timer_arm_us(timer.cast(), tmout, repeat);
+    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), tmout, repeat);
 }
 
 #[unsafe(no_mangle)]
