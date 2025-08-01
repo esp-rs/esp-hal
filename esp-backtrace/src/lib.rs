@@ -1,6 +1,5 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
-#![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 //! This is a lightweight crate for obtaining backtraces during panics, exceptions, and hard faults
 //! on Espressif devices. It provides optional panic and exception handlers and supports a range of
@@ -60,26 +59,26 @@ impl BacktraceFrame {
     }
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 const RESET: &str = "\u{001B}[0m";
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 const RED: &str = "\u{001B}[31m";
 
-#[cfg(feature = "defmt")]
+#[cfg(all(feature = "panic-handler", feature = "defmt"))]
 macro_rules! println {
     ($($arg:tt)*) => {
         defmt::error!($($arg)*);
     };
 }
 
-#[cfg(all(feature = "println", not(feature = "defmt")))]
+#[cfg(all(feature = "panic-handler", feature = "println"))]
 macro_rules! println {
     ($($arg:tt)*) => {
         esp_println::println!($($arg)*);
     };
 }
 
-#[allow(unused, unused_variables)]
+#[cfg(feature = "panic-handler")]
 fn set_color_code(code: &str) {
     #[cfg(all(feature = "colors", feature = "println"))]
     {
@@ -176,7 +175,7 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn halt() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(feature = "custom-halt")] {
@@ -225,11 +224,10 @@ fn halt() -> ! {
         }
     }
 
-    #[allow(clippy::empty_loop)]
     loop {}
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn pre_backtrace() {
     #[cfg(feature = "custom-pre-backtrace")]
     {
@@ -240,7 +238,7 @@ fn pre_backtrace() {
     }
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn abort() -> ! {
     println!("");
     println!("");

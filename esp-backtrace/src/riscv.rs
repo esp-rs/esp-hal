@@ -7,7 +7,6 @@ use crate::{Backtrace, BacktraceFrame};
 // we get better results (especially if the caller was the last instruction in
 // the calling function) if we report the address of the JALR itself
 // even if it was a C.JALR we should get good results using RA - 4
-#[allow(unused)]
 pub(super) const RA_OFFSET: usize = 4;
 
 /// Get an array of backtrace addresses.
