@@ -203,9 +203,6 @@ unsafe extern "C" fn misc_nvs_restore() -> i32 {
 }
 
 #[unsafe(no_mangle)]
-static mut g_log_mod: i32 = 0;
-
-#[unsafe(no_mangle)]
 static mut g_log_level: i32 = 0;
 
 #[unsafe(no_mangle)]
