@@ -47,10 +47,10 @@ impl<'d> Uhci<'d, Blocking> {
 
 impl<'d> Uhci<'d, Async> {
     /// todo
-    pub async fn write_dma(
+    pub async fn write_dma<Buf: DmaTxBuffer>(
         mut self,
-        mut tx_buffer: impl DmaTxBuffer,
-    ) -> UhciDmaTxTransfer<'d, Async, impl DmaTxBuffer> {
+        mut tx_buffer: Buf,
+    ) -> UhciDmaTxTransfer<'d, Async, Buf> {
         {
             unsafe {
                 self.internal
@@ -67,10 +67,10 @@ impl<'d> Uhci<'d, Async> {
     }
 
     /// todo
-    pub async fn read_dma(
+    pub async fn read_dma<Buf: DmaRxBuffer>(
         mut self,
-        mut rx_buffer: impl DmaRxBuffer,
-    ) -> UhciDmaRxTransfer<'d, Async, impl DmaRxBuffer> {
+        mut rx_buffer: Buf,
+    ) -> UhciDmaRxTransfer<'d, Async, Buf> {
         {
             unsafe {
                 self.internal
