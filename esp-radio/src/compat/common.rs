@@ -175,21 +175,6 @@ pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
     }
 }
 
-#[unsafe(no_mangle)]
-unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
-    let mut len = 0;
-    loop {
-        unsafe {
-            if chars.offset(len).read_volatile() == 0 {
-                break;
-            }
-            len += 1;
-        }
-    }
-
-    len as usize
-}
-
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
     unsafe {
         let ptr = malloc(4) as *mut u32;
