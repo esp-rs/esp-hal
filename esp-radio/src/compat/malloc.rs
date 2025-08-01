@@ -5,7 +5,10 @@
 
 unsafe extern "C" {
     pub fn malloc(size: usize) -> *mut u8;
+
+    #[cfg(any(feature = "wifi", not(any(esp32c6, esp32h2))))]
     pub fn malloc_internal(size: usize) -> *mut u8;
+
     pub fn free(ptr: *mut u8);
     pub fn calloc(number: u32, size: usize) -> *mut u8;
 
