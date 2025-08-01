@@ -144,6 +144,8 @@
 
 mod allocators;
 mod macros;
+#[cfg(feature = "compat")]
+mod malloc;
 
 use core::{
     alloc::{GlobalAlloc, Layout},

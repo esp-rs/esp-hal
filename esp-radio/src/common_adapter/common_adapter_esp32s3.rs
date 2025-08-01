@@ -143,31 +143,23 @@ fn phy_digital_regs_store() {
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn abort() {
+unsafe extern "C" fn __esp_radio_misc_nvs_deinit() {
     trace!("misc_nvs_deinit")
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_deinit() {
-    trace!("misc_nvs_deinit")
-}
-
-#[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_init() -> i32 {
+unsafe extern "C" fn __esp_radio_misc_nvs_init() -> i32 {
     trace!("misc_nvs_init");
     0
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_restore() -> i32 {
+unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
 #[unsafe(no_mangle)]
-static mut g_log_mod: i32 = 0;
+static mut __ESP_RADIO_G_LOG_LEVEL: i32 = 0;
 
 #[unsafe(no_mangle)]
-static mut g_log_level: i32 = 0;
-
-#[unsafe(no_mangle)]
-pub static mut g_misc_nvs: u32 = 0;
+pub static mut __ESP_RADIO_G_MISC_NVS: u32 = 0;

@@ -14,9 +14,9 @@ use core::{cell::RefCell, mem::MaybeUninit};
 pub(crate) use ble::{ble_deinit, ble_init, send_hci};
 use critical_section::Mutex;
 
-#[cfg(any(esp32, esp32c3, esp32s3))]
+#[cfg(btdm)]
 use self::btdm as ble;
-#[cfg(any(esp32c2, esp32c6, esp32h2))]
+#[cfg(npl)]
 use self::npl as ble;
 
 unstable_module! {
@@ -29,7 +29,7 @@ pub(crate) unsafe extern "C" fn malloc(size: u32) -> *mut crate::binary::c_types
 
 #[cfg(any(esp32, esp32c3, esp32s3))]
 pub(crate) unsafe extern "C" fn malloc_internal(size: u32) -> *mut crate::binary::c_types::c_void {
-    unsafe { crate::compat::malloc::malloc(size as usize).cast() }
+    unsafe { crate::compat::malloc::malloc_internal(size as usize).cast() }
 }
 
 pub(crate) unsafe extern "C" fn free(ptr: *mut crate::binary::c_types::c_void) {

@@ -124,7 +124,7 @@ fn phy_digital_regs_store() {
 /// *************************************************************************
 #[ram]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn esp_dport_access_reg_read(reg: u32) -> u32 {
+unsafe extern "C" fn __esp_radio_esp_dport_access_reg_read(reg: u32) -> u32 {
     unsafe {
         // trace!("esp_dport_access_reg_read {:x} => {:x}", reg, res);
         (reg as *mut u32).read_volatile()
@@ -146,7 +146,7 @@ unsafe extern "C" fn esp_dport_access_reg_read(reg: u32) -> u32 {
 /// *************************************************************************
 #[ram]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn phy_enter_critical() -> u32 {
+unsafe extern "C" fn __esp_radio_phy_enter_critical() -> u32 {
     trace!("phy_enter_critical");
 
     unsafe { core::mem::transmute(critical_section::acquire()) }
@@ -167,7 +167,7 @@ unsafe extern "C" fn phy_enter_critical() -> u32 {
 /// *************************************************************************
 #[ram]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn phy_exit_critical(level: u32) {
+unsafe extern "C" fn __esp_radio_phy_exit_critical(level: u32) {
     trace!("phy_exit_critical {}", level);
 
     unsafe {
@@ -179,7 +179,7 @@ unsafe extern "C" fn phy_exit_critical(level: u32) {
 
 #[ram]
 #[unsafe(no_mangle)]
-unsafe extern "C" fn rtc_get_xtal() -> u32 {
+unsafe extern "C" fn __esp_radio_rtc_get_xtal() -> u32 {
     use esp_hal::clock::Clock;
 
     let xtal = crate::hal::rtc_cntl::RtcClock::xtal_freq();
@@ -187,26 +187,23 @@ unsafe extern "C" fn rtc_get_xtal() -> u32 {
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_deinit() {
+unsafe extern "C" fn __esp_radio_misc_nvs_deinit() {
     trace!("misc_nvs_deinit")
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_init() -> i32 {
+unsafe extern "C" fn __esp_radio_misc_nvs_init() -> i32 {
     trace!("misc_nvs_init");
     0
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn misc_nvs_restore() -> i32 {
+unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
 #[unsafe(no_mangle)]
-static mut g_log_mod: i32 = 0;
+static mut __ESP_RADIO_G_LOG_LEVEL: i32 = 0;
 
 #[unsafe(no_mangle)]
-static mut g_log_level: i32 = 0;
-
-#[unsafe(no_mangle)]
-pub static mut g_misc_nvs: u32 = 0;
+pub static mut __ESP_RADIO_G_MISC_NVS: u32 = 0;
