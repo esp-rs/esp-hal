@@ -118,7 +118,6 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 /// *************************************************************************
 #[allow(unused)]
 #[ram]
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
@@ -220,17 +219,17 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 #[unsafe(no_mangle)]
 static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
     compat_timer_disarm(timer.cast());
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
     compat_timer_done(timer.cast());
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_setfn(
     ptimer: *mut crate::binary::c_types::c_void,
     pfunction: *mut crate::binary::c_types::c_void,
@@ -248,7 +247,7 @@ pub unsafe extern "C" fn ets_timer_setfn(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
@@ -257,7 +256,7 @@ pub unsafe extern "C" fn ets_timer_arm(
     compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm_us(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
