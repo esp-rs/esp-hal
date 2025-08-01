@@ -109,7 +109,7 @@ esp32s3 = [
   "xtensa-lx-rt/float-save-restore",
 ]
 
-## Use `esp-alloc` for dynamic allocations.
+## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
 ## If you opt-out you need to provide implementations for the following functions:
 ## - `pub extern "C" fn malloc(size: usize) -> *mut u8`
