@@ -263,6 +263,9 @@ pub use procmacros::load_lp_code;
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub use procmacros::{handler, ram};
 
+#[cfg(all(feature = "rt", feature = "exception-handler"))]
+mod exception_handler;
+
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
 macro_rules! unstable_module {
@@ -330,6 +333,7 @@ unstable_module! {
     #[cfg(psram)] // DMA needs some things from here
     pub mod psram;
     pub mod efuse;
+    pub mod work_queue;
 }
 
 unstable_driver! {

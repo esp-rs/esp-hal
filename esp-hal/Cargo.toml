@@ -99,7 +99,7 @@ serde        = { version = "1.0.219", default-features = false, features = ["der
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
-default = ["rt", "esp32c6", "unstable"]
+default = ["rt", "exception-handler"]
 
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
@@ -195,6 +195,10 @@ rt = [
     "esp32s3?/rt",
 ]
 
+## Enable a simple exception handler turning exceptions into panics.
+##
+## If you are depending on `esp-hal` as a library, you should *not* enable the `exception-handler` feature under any circumstance.
+exception-handler = []
 
 #! ### Logging Feature Flags
 ## Enable logging output using version 0.4 of the `log` crate.
@@ -217,6 +221,8 @@ defmt = [
     "esp32s2?/defmt",
     "esp32s3?/defmt",
     "fugit/defmt",
+    "esp-riscv-rt?/defmt",
+    "xtensa-lx-rt?/defmt",
 ]
 
 #! ### PSRAM Feature Flags

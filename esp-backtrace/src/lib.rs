@@ -1,6 +1,5 @@
 //! ## Feature Flags
 #![doc = document_features::document_features!()]
-#![allow(rustdoc::bare_urls, unused_macros)]
 #![cfg_attr(target_arch = "xtensa", feature(asm_experimental_arch))]
 //! This is a lightweight crate for obtaining backtraces during panics, exceptions, and hard faults
 //! on Espressif devices. It provides optional panic and exception handlers and supports a range of
@@ -60,24 +59,26 @@ impl BacktraceFrame {
     }
 }
 
+#[cfg(feature = "panic-handler")]
 const RESET: &str = "\u{001B}[0m";
+#[cfg(feature = "panic-handler")]
 const RED: &str = "\u{001B}[31m";
 
-#[cfg(feature = "defmt")]
+#[cfg(all(feature = "panic-handler", feature = "defmt"))]
 macro_rules! println {
     ($($arg:tt)*) => {
         defmt::error!($($arg)*);
     };
 }
 
-#[cfg(all(feature = "println", not(feature = "defmt")))]
+#[cfg(all(feature = "panic-handler", feature = "println"))]
 macro_rules! println {
     ($($arg:tt)*) => {
         esp_println::println!($($arg)*);
     };
 }
 
-#[allow(unused, unused_variables)]
+#[cfg(feature = "panic-handler")]
 fn set_color_code(code: &str) {
     #[cfg(all(feature = "colors", feature = "println"))]
     {
@@ -94,10 +95,12 @@ pub mod arch;
 fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     pre_backtrace();
 
+    set_color_code(RED);
     println!("");
     println!("====================== PANIC ======================");
 
     println!("{}", info);
+    set_color_code(RESET);
 
     println!("");
     println!("Backtrace:");
@@ -115,53 +118,6 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     }
 
     abort();
-}
-
-#[cfg(all(feature = "exception-handler", target_arch = "xtensa"))]
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".rwtext")]
-unsafe fn __user_exception(cause: arch::ExceptionCause, context: arch::Context) {
-    panic!("\n\nException occurred '{}'\n{:?}", cause, context);
-}
-
-#[cfg(all(feature = "exception-handler", target_arch = "riscv32"))]
-#[unsafe(export_name = "ExceptionHandler")]
-fn exception_handler(context: &arch::TrapFrame) -> ! {
-    let mepc = context.pc;
-    let code = context.mcause & 0xff;
-    let mtval = context.mtval;
-
-    if code == 14 {
-        panic!(
-            "Stack overflow detected at 0x{:x} called by 0x{:x}",
-            mepc, context.ra
-        );
-    } else {
-        let code = match code {
-            0 => "Instruction address misaligned",
-            1 => "Instruction access fault",
-            2 => "Illegal instruction",
-            3 => "Breakpoint",
-            4 => "Load address misaligned",
-            5 => "Load access fault",
-            6 => "Store/AMO address misaligned",
-            7 => "Store/AMO access fault",
-            8 => "Environment call from U-mode",
-            9 => "Environment call from S-mode",
-            10 => "Reserved",
-            11 => "Environment call from M-mode",
-            12 => "Instruction page fault",
-            13 => "Load page fault",
-            14 => "Reserved",
-            15 => "Store/AMO page fault",
-            _ => "UNKNOWN",
-        };
-
-        panic!(
-            "Exception '{}' mepc=0x{:08x}, mtval=0x{:08x}\n{:?}",
-            code, mepc, mtval, context
-        );
-    }
 }
 
 // Ensure that the address is in DRAM and that it is 16-byte aligned.
@@ -219,7 +175,7 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn halt() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(feature = "custom-halt")] {
@@ -268,11 +224,10 @@ fn halt() -> ! {
         }
     }
 
-    #[allow(clippy::empty_loop)]
     loop {}
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn pre_backtrace() {
     #[cfg(feature = "custom-pre-backtrace")]
     {
@@ -281,17 +236,13 @@ fn pre_backtrace() {
         }
         unsafe { custom_pre_backtrace() }
     }
-
-    set_color_code(RED);
 }
 
-#[allow(unused)]
+#[cfg(feature = "panic-handler")]
 fn abort() -> ! {
     println!("");
     println!("");
     println!("");
-
-    set_color_code(RESET);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {

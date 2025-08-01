@@ -6,6 +6,7 @@ use super::ExceptionCause;
 #[repr(C)]
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Context {
     pub PC: u32,
     pub PS: u32,

@@ -53,13 +53,11 @@ print-float-registers = [] # TODO support esp32p4
 # additional functionality:
 ## Print messages in red
 colors               = []
-## Invoke the extern function `custom_halt()` instead of doing a loop {} in case of a panic or exception
+## Invoke the extern function `custom_halt()` instead of doing a loop {} in case of a panic
 custom-halt          = []
-## Invoke the extern function `custom_pre_backtrace()` before handling a panic or exception
+## Invoke the extern function `custom_pre_backtrace()` before handling a panic
 custom-pre-backtrace = []
-## Turn unhandled exceptions into panics
-exception-handler    = []
-## Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic or exception
+## Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic
 halt-cores           = []
 ## Include a panic handler
 panic-handler        = []

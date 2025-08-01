@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A reimplemntation of the `assign_resources!` macro (#3809)
 - `TrngSource` to manage random number generator entropy (#3829)
 - On RISC-V you can opt-out of nested interrupts for an interrupt handler by using `new_not_nested` (#3875)
+- A new default feature `exception-handler` was added (#3887)
+- `AesBackend, AesContext`: Work-queue based AES driver (#3880)
 
 ### Changed
 
@@ -31,7 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `Trng::new` (replaced by `Trng::try_new`) (#3829)
-- `AesDma::write_block` has been removed. (#3882)
+- `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
+- `AesFlavour` trait and `AesX` structs have been removed. (#3880)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
