@@ -15,3 +15,7 @@ PROVIDE(strchr = 0x40000534);
 PROVIDE(strlcpy = 0x40000544);
 PROVIDE(strstr = 0x400004cc);
 PROVIDE(strcasecmp = 0x40000524);
+
+PROVIDE ( strnlen = __strnlen );
+PROVIDE ( atoi = __atoi );
+PROVIDE ( mktime = __mktime );
