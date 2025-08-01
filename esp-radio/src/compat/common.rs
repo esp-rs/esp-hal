@@ -419,9 +419,3 @@ unsafe extern "C" fn usleep(us: u32) -> c_int {
     esp_radio_preempt_driver::usleep(us);
     0
 }
-
-#[unsafe(no_mangle)]
-unsafe extern "C" fn putchar(c: i32) -> c_int {
-    trace!("putchar {}", c as u8 as char);
-    c
-}
