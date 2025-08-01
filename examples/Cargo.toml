@@ -46,6 +46,7 @@ edge-nal            = { version = "0.5.0" }
 edge-nal-embassy    = { version = "0.5.0" }
 
 [features]
+default = ["esp32c6", "embassy"]
 esp32   = ["esp-hal/esp32",   "esp-backtrace/esp32",   "esp-hal-embassy?/esp32",   "esp-println/esp32",   "esp-storage?/esp32",   "esp-radio?/esp32",   "esp-bootloader-esp-idf/esp32", "esp-radio-preempt-baremetal?/esp32"]
 esp32c2 = ["esp-hal/esp32c2", "esp-backtrace/esp32c2", "esp-hal-embassy?/esp32c2", "esp-println/esp32c2", "esp-storage?/esp32c2", "esp-radio?/esp32c2", "esp-bootloader-esp-idf/esp32c2", "esp-radio-preempt-baremetal?/esp32c2"]
 esp32c3 = ["esp-hal/esp32c3", "esp-backtrace/esp32c3", "esp-hal-embassy?/esp32c3", "esp-println/esp32c3", "esp-storage?/esp32c3", "esp-radio?/esp32c3", "esp-bootloader-esp-idf/esp32c3", "esp-radio-preempt-baremetal?/esp32c3"]

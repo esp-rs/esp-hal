@@ -23,6 +23,7 @@ lis3dh-async       = "0.9.3"
 ssd1306            = "0.10.0"
 
 [features]
+default = ["esp32c6"]
 unstable = []
 esp32   = ["esp-backtrace/esp32",   "esp-hal/esp32",   "esp-hal-embassy/esp32",   "esp-println/esp32",   "esp-bootloader-esp-idf/esp32"]
 esp32c2 = ["esp-backtrace/esp32c2", "esp-hal/esp32c2", "esp-hal-embassy/esp32c2", "esp-println/esp32c2", "esp-bootloader-esp-idf/esp32c2"]
