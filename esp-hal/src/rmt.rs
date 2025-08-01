@@ -91,7 +91,7 @@
 //!
 //! let mut data = [PulseCode::new(Level::High, 200, Level::Low, 50); 20];
 //! data[data.len() - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-//! data[data.len() - 1] = PulseCode::empty();
+//! data[data.len() - 1] = PulseCode::end_marker();
 //!
 //! loop {
 //!     let transaction = channel.transmit(&data)?;
@@ -121,7 +121,7 @@
 //!     .with_idle_threshold(10000);
 //! # {channel}
 //! let delay = Delay::new();
-//! let mut data: [u32; 48] = [PulseCode::empty(); 48];
+//! let mut data: [PulseCode; 48] = [PulseCode::default(); 48];
 //!
 //! loop {
 //!     for x in data.iter_mut() {
@@ -250,59 +250,236 @@ pub enum Error {
     MemoryBlockNotAvailable,
 }
 
-///  Convenience trait to work with pulse codes.
-pub trait PulseCode: crate::private::Sealed {
-    /// Create a new instance
-    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self;
+/// Convenience newtype to work with pulse codes.
+///
+/// A [`PulseCode`] is represented as `u32`, with fields laid out as follows:
+///
+/// | Bit 31   | Bits 30-16 | Bit 15   | Bits 14-0 |
+/// |----------|------------|----------|-----------|
+/// | `level2` | `length2`  | `level1` | `length1` |
+///
+/// Here, `level1` / `length1` correspond to the signal that is send/received first,
+/// and the signal with `level2` / `length2` is send/received afterwards.
+///
+/// If `length1` or `length2` are zero, this implies an end marker and transmission will
+/// stop with the corresponding signal.
+#[derive(Clone, Copy, Default, Eq, PartialEq)]
+#[repr(transparent)]
+pub struct PulseCode(pub u32);
 
-    /// Create a new empty instance
-    fn empty() -> Self;
+// Pre-compute some constants to make it obvious that the code below doesn't mix up both halves of
+// a PulseCode.
+const LENGTH1_SHIFT: usize = 0;
+const LEVEL1_SHIFT: usize = 15;
+const LENGTH2_SHIFT: usize = 16;
+const LEVEL2_SHIFT: usize = 31;
 
-    /// Set all levels and lengths to 0
-    fn reset(&mut self);
+const LENGTH_MASK: u32 = 0x7FFF;
+const LENGTH1_MASK: u32 = LENGTH_MASK << LENGTH1_SHIFT;
+const LENGTH2_MASK: u32 = LENGTH_MASK << LENGTH2_SHIFT;
+
+const LEVEL1_MASK: u32 = 1 << LEVEL1_SHIFT;
+const LEVEL2_MASK: u32 = 1 << LEVEL2_SHIFT;
+
+impl PulseCode {
+    /// Create a new instance.
+    ///
+    /// If `length1` or `length2` exceed the maximum representable range, they
+    /// will be clamped to `0x7FFF`.
+    #[inline]
+    pub const fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
+        // Can't use lengthX.min(0x7FFF) since it is not const
+        let length1 = if length1 >= 0x8000 { 0x7FFF } else { length1 };
+        let length2 = if length2 >= 0x8000 { 0x7FFF } else { length2 };
+
+        // SAFETY:
+        // - We just clamped length1 and length2 to the required intervals
+        unsafe { Self::new_unchecked(level1, length1, level2, length2) }
+    }
+
+    /// Create a new instance.
+    ///
+    /// If `length1` or `length2` exceed the maximum representable range, this
+    /// will return `None`.
+    #[inline]
+    pub const fn try_new(level1: Level, length1: u16, level2: Level, length2: u16) -> Option<Self> {
+        if length1 >= 0x8000 || length2 >= 0x8000 {
+            return None;
+        }
+
+        // SAFETY:
+        // - We just checked that length1 and length2 have their MSB cleared.
+        Some(unsafe { Self::new_unchecked(level1, length1, level2, length2) })
+    }
+
+    /// Create a new instance without checking that code lengths are in range.
+    ///
+    /// # Safety
+    ///
+    /// `length1` and `length2` must be 15-bit wide, i.e. their MSB must be cleared.
+    #[inline]
+    pub const unsafe fn new_unchecked(
+        level1: Level,
+        length1: u16,
+        level2: Level,
+        length2: u16,
+    ) -> Self {
+        Self(
+            (level1.const_into() as u32) << LEVEL1_SHIFT
+                | (level2.const_into() as u32) << LEVEL2_SHIFT
+                | (length1 as u32) << LENGTH1_SHIFT
+                | (length2 as u32) << LENGTH2_SHIFT,
+        )
+    }
+
+    /// Create a new instance that is an end marker with `Level::Low`.
+    ///
+    /// This corresponds to the all-zero [`PulseCode`], i.e. with both level and
+    /// length fields set to zero, equivalent to (but more semantic than)
+    /// `PulseCode::from(0u32)` and [`PulseCode::default()`].
+    // FIXME: Consider adding a variant with `level1`, `length1` and `level2` arguments
+    // which sets `length2 = 0` so that it is still guaranteed to return an end
+    // marker.
+    #[inline]
+    pub const fn end_marker() -> Self {
+        Self(0)
+    }
+
+    /// Set all levels and lengths to 0.
+    ///
+    /// In other words, assigns the value of [`PulseCode::end_marker()`] to `self`.
+    #[inline]
+    pub fn reset(&mut self) {
+        self.0 = 0
+    }
 
     /// Logical output level in the first pulse code interval
-    fn level1(&self) -> Level;
-
-    /// Length of the first pulse code interval (in clock cycles)
-    fn length1(&self) -> u16;
+    #[inline]
+    pub const fn level1(self) -> Level {
+        let level = (self.0 >> LEVEL1_SHIFT) & 1;
+        Level::const_from(0 != level)
+    }
 
     /// Logical output level in the second pulse code interval
-    fn level2(&self) -> Level;
+    #[inline]
+    pub const fn level2(self) -> Level {
+        let level = (self.0 >> LEVEL2_SHIFT) & 1;
+        Level::const_from(0 != level)
+    }
+
+    /// Length of the first pulse code interval (in clock cycles)
+    #[inline]
+    pub const fn length1(self) -> u16 {
+        ((self.0 >> LENGTH1_SHIFT) & LENGTH_MASK) as u16
+    }
 
     /// Length of the second pulse code interval (in clock cycles)
-    fn length2(&self) -> u16;
+    #[inline]
+    pub const fn length2(self) -> u16 {
+        ((self.0 >> LENGTH2_SHIFT) & LENGTH_MASK) as u16
+    }
+
+    /// Set `level1` and return the modified [`PulseCode`].
+    #[inline]
+    pub const fn with_level1(mut self, level: Level) -> Self {
+        self.0 &= !LEVEL1_MASK;
+        self.0 |= (level.const_into() as u32) << LEVEL1_SHIFT;
+        self
+    }
+
+    /// Set `level2` and return the modified [`PulseCode`].
+    #[inline]
+    pub const fn with_level2(mut self, level: Level) -> Self {
+        self.0 &= !LEVEL2_MASK;
+        self.0 |= (level.const_into() as u32) << LEVEL2_SHIFT;
+        self
+    }
+
+    /// Set `length1` and return the modified [`PulseCode`].
+    ///
+    /// Returns `None` if `length` exceeds the representable range.
+    #[inline]
+    pub const fn with_length1(mut self, length: u16) -> Option<Self> {
+        if length >= 0x8000 {
+            return None;
+        }
+
+        self.0 &= !LENGTH1_MASK;
+        self.0 |= (length as u32) << LENGTH1_SHIFT;
+        Some(self)
+    }
+
+    /// Set `length2` and return the modified [`PulseCode`].
+    ///
+    /// Returns `None` if `length` exceeds the representable range.
+    #[inline]
+    pub const fn with_length2(mut self, length: u16) -> Option<Self> {
+        if length >= 0x8000 {
+            return None;
+        }
+
+        self.0 &= !LENGTH2_MASK;
+        self.0 |= (length as u32) << LENGTH2_SHIFT;
+        Some(self)
+    }
+
+    /// Return whether this pulse code contains an end marker.
+    ///
+    /// Equivalent to `self.length1() == 0 || self.length2() == 0`.
+    #[inline]
+    pub const fn is_end_marker(self) -> bool {
+        self.length1() == 0 || self.length2() == 0
+    }
+
+    #[inline]
+    fn symbol1(self) -> char {
+        if self.level1().into() { 'H' } else { 'L' }
+    }
+
+    #[inline]
+    fn symbol2(self) -> char {
+        if self.level2().into() { 'H' } else { 'L' }
+    }
 }
 
-impl PulseCode for u32 {
-    fn new(level1: Level, length1: u16, level2: Level, length2: u16) -> Self {
-        let level1 = ((bool::from(level1) as u32) << 15) | (length1 as u32 & 0b111_1111_1111_1111);
-        let level2 = ((bool::from(level2) as u32) << 15) | (length2 as u32 & 0b111_1111_1111_1111);
-        level1 | (level2 << 16)
+impl core::fmt::Debug for PulseCode {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "PulseCode({} {}, {} {})",
+            self.symbol1(),
+            self.length1(),
+            self.symbol2(),
+            self.length2(),
+        )
     }
+}
 
-    fn empty() -> Self {
-        0
+#[cfg(feature = "defmt")]
+impl defmt::Format for PulseCode {
+    fn format(&self, fmt: defmt::Formatter<'_>) {
+        defmt::write!(
+            fmt,
+            "PulseCode({} {}, {} {})",
+            self.symbol1(),
+            self.length1(),
+            self.symbol2(),
+            self.length2(),
+        )
     }
+}
 
-    fn reset(&mut self) {
-        *self = 0
+impl From<u32> for PulseCode {
+    #[inline]
+    fn from(value: u32) -> Self {
+        Self(value)
     }
+}
 
-    fn level1(&self) -> Level {
-        (self & (1 << 15) != 0).into()
-    }
-
-    fn length1(&self) -> u16 {
-        (self & 0b111_1111_1111_1111) as u16
-    }
-
-    fn level2(&self) -> Level {
-        (self & (1 << 31) != 0).into()
-    }
-
-    fn length2(&self) -> u16 {
-        ((self >> 16) & 0b111_1111_1111_1111) as u16
+impl From<PulseCode> for u32 {
+    #[inline]
+    fn from(code: PulseCode) -> u32 {
+        code.0
     }
 }
 
@@ -983,9 +1160,10 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
-pub struct SingleShotTxTransaction<'a, Raw>
+pub struct SingleShotTxTransaction<'a, Raw, T>
 where
     Raw: TxChannelInternal,
+    T: Into<PulseCode> + Copy,
 {
     channel: Channel<Blocking, Raw>,
 
@@ -995,12 +1173,13 @@ where
     ram_index: usize,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'a [u32],
+    remaining_data: &'a [T],
 }
 
-impl<Raw> SingleShotTxTransaction<'_, Raw>
+impl<Raw, T> SingleShotTxTransaction<'_, Raw, T>
 where
     Raw: TxChannelInternal,
+    T: Into<PulseCode> + Copy,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
@@ -1018,7 +1197,7 @@ where
                 let (chunk, remaining) = self.remaining_data.split_at(count);
                 for (idx, entry) in chunk.iter().enumerate() {
                     unsafe {
-                        ptr.add(idx).write_volatile(*entry);
+                        ptr.add(idx).write_volatile((*entry).into());
                     }
                 }
 
@@ -1110,7 +1289,7 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
         let ptr = raw.channel_ram_start();
         for idx in 0..raw.memsize().codes() {
             unsafe {
-                ptr.add(idx).write_volatile(0);
+                ptr.add(idx).write_volatile(PulseCode::end_marker());
             }
         }
 
@@ -1245,25 +1424,31 @@ pub trait TxChannel: Sized {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Self::Raw>, Error>;
+    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Self::Raw, T>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 
     /// Start transmitting the given pulse code continuously.
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously(
+    fn transmit_continuously<T>(
         self,
-        data: &[u32],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>;
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 
     /// Like [`Self::transmit_continuously`] but also sets a loop count.
     /// [`ContinuousTxTransaction`] can be used to check if the loop count is
     /// reached.
-    fn transmit_continuously_with_loopcount(
+    fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
-        data: &[u32],
-    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>;
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Self::Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy;
 }
 
 impl<Raw> TxChannel for Channel<Blocking, Raw>
@@ -1273,7 +1458,10 @@ where
     type Raw = Raw;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn transmit(self, data: &[u32]) -> Result<SingleShotTxTransaction<'_, Raw>, Error> {
+    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, Raw, T>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         let index = self.raw.start_send(data, false, 0)?;
         Ok(SingleShotTxTransaction {
             channel: self,
@@ -1284,16 +1472,22 @@ where
     }
 
     #[inline]
-    fn transmit_continuously(self, data: &[u32]) -> Result<ContinuousTxTransaction<Raw>, Error> {
+    fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction<Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         self.transmit_continuously_with_loopcount(0, data)
     }
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn transmit_continuously_with_loopcount(
+    fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
-        data: &[u32],
-    ) -> Result<ContinuousTxTransaction<Raw>, Error> {
+        data: &[T],
+    ) -> Result<ContinuousTxTransaction<Raw>, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         if data.len() > self.raw.memsize().codes() {
             return Err(Error::Overflow);
         }
@@ -1304,12 +1498,19 @@ where
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, Raw: RxChannelInternal> {
+pub struct RxTransaction<'a, Raw: RxChannelInternal, T>
+where
+    T: From<PulseCode>,
+{
     channel: Channel<Blocking, Raw>,
-    data: &'a mut [u32],
+    data: &'a mut [T],
 }
 
-impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
+impl<Raw, T> RxTransaction<'_, Raw, T>
+where
+    Raw: RxChannelInternal,
+    T: From<PulseCode>,
+{
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll_internal(&mut self) -> Option<Event> {
         let raw = self.channel.raw;
@@ -1325,7 +1526,7 @@ impl<Raw: RxChannelInternal> RxTransaction<'_, Raw> {
             // SAFETY: RxChannel.receive() verifies that the length of self.data does not
             // exceed the channel RAM size.
             for (idx, entry) in self.data.iter_mut().enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile() };
+                *entry = unsafe { ptr.add(idx).read_volatile() }.into();
             }
         }
 
@@ -1372,7 +1573,9 @@ pub trait RxChannel: Sized {
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self::Raw>, Error>;
+    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, Self::Raw, T>, Error>
+    where
+        T: From<PulseCode>;
 }
 
 impl<Raw> RxChannel for Channel<Blocking, Raw>
@@ -1382,9 +1585,10 @@ where
     type Raw = Raw;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn receive(self, data: &mut [u32]) -> Result<RxTransaction<'_, Self::Raw>, Error>
+    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, Self::Raw, T>, Error>
     where
         Self: Sized,
+        T: From<PulseCode>,
     {
         if data.len() > self.raw.memsize().codes() {
             return Err(Error::InvalidDataLength);
@@ -1431,9 +1635,10 @@ pub trait TxChannelAsync {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit(&mut self, data: &[u32]) -> Result<(), Error>
+    async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
     where
-        Self: Sized;
+        Self: Sized,
+        T: Into<PulseCode> + Copy;
 }
 
 impl<Raw> TxChannelAsync for Channel<Async, Raw>
@@ -1441,9 +1646,10 @@ where
     Raw: TxChannelInternal,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    async fn transmit(&mut self, data: &[u32]) -> Result<(), Error>
+    async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
     where
         Self: Sized,
+        T: Into<PulseCode> + Copy,
     {
         let raw = self.raw;
 
@@ -1490,9 +1696,10 @@ pub trait RxChannelAsync {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
+    async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
-        Self: Sized;
+        Self: Sized,
+        T: From<PulseCode>;
 }
 
 impl<Raw> RxChannelAsync for Channel<Async, Raw>
@@ -1500,9 +1707,10 @@ where
     Raw: RxChannelInternal,
 {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    async fn receive<T: From<u32> + Copy>(&mut self, data: &mut [T]) -> Result<(), Error>
+    async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
+        T: From<PulseCode>,
     {
         let raw = self.raw;
 
@@ -1584,9 +1792,9 @@ pub trait ChannelInternal: RawChannelAccess {
     fn set_memsize(&self, value: MemSize);
 
     #[inline]
-    fn channel_ram_start(&self) -> *mut u32 {
+    fn channel_ram_start(&self) -> *mut PulseCode {
         unsafe {
-            (property!("rmt.ram_start") as *mut u32)
+            (property!("rmt.ram_start") as *mut PulseCode)
                 .add(usize::from(self.channel()) * property!("rmt.channel_ram_size"))
         }
     }
@@ -1623,11 +1831,14 @@ pub trait TxChannelInternal: ChannelInternal {
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
     #[inline]
-    fn start_send(&self, data: &[u32], continuous: bool, repeat: u16) -> Result<usize, Error> {
+    fn start_send<T>(&self, data: &[T], continuous: bool, repeat: u16) -> Result<usize, Error>
+    where
+        T: Into<PulseCode> + Copy,
+    {
         self.clear_tx_interrupts();
 
         if let Some(last) = data.last() {
-            if !continuous && last.length2() != 0 && last.length1() != 0 {
+            if !continuous && !(*last).into().is_end_marker() {
                 return Err(Error::EndMarkerMissing);
             }
         } else {
@@ -1638,7 +1849,7 @@ pub trait TxChannelInternal: ChannelInternal {
         let memsize = self.memsize().codes();
         for (idx, entry) in data.iter().take(memsize).enumerate() {
             unsafe {
-                ptr.add(idx).write_volatile(*entry);
+                ptr.add(idx).write_volatile((*entry).into());
             }
         }
 

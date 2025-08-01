@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::Mode` has been replaced by `Operation`. The key length is now solely determined by the key. (#3882)
 - `Aes::process` has been split into `Aes::encrypt` and `Aes::decrypt` (#3882)
 - Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
+- The RMT `PulseCode` is now a newtype wrapping `u32` with `const fn` methods and implementing `defmt::Format` and `core::fmt::Debug`. (#3884)
+- RMT transmit and receive methods accept `impl Into<PulseCode>` and `impl From<PulseCode>`, respectively. (#3884)
 
 ### Fixed
 
