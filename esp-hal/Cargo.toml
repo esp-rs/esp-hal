@@ -99,7 +99,7 @@ serde        = { version = "1.0.219", default-features = false, features = ["der
 jiff = { version = "0.2.10", default-features = false, features = ["static"] }
 
 [features]
-default = ["rt", "exception-handler", "esp32c6", "unstable"]
+default = ["rt", "exception-handler"]
 
 # These features are considered private and unstable. They are not covered by
 # semver guarantees and may change or be removed without notice.
