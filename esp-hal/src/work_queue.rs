@@ -156,25 +156,45 @@ impl<T: Sync> Inner<T> {
     ///
     /// If the work item is currently being processed, this function notifies the driver. Otherwise,
     /// it tries to remove the pointer from the work queue.
-    fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) {
+    ///
+    /// The function returns true when the item was immediately cancelled.
+    ///
+    /// This function is not `unsafe` because it only dereferences `work_item` if the function has
+    /// determined that the item belongs to this queue.
+    fn cancel(&mut self, mut work_item: NonNull<WorkItem<T>>) -> bool {
         if self.current == Some(work_item) {
             // Cancelling an in-progress item is more complicated than plucking it from the
             // queue. Forward the request to the driver to (maybe) cancel the
             // operation.
-            unsafe { (self.vtable.cancel)(self.data, &mut work_item.as_mut().data) };
-        } else if unsafe { work_item.as_ref().status == Poll::Pending } {
-            // The work item is not the current one, remove it from the queue. This immediately
-            // cancels the work item, if it was in fact in this work queue.
-            if self.remove(work_item) {
-                unsafe { work_item.as_mut().complete(Status::Cancelled) };
-            }
+            (self.vtable.cancel)(self.data, unsafe {
+                // This is safe to do, because the work item is currently owned by this queue.
+                &mut work_item.as_mut().data
+            });
+            // Queue will need to be polled to query item status.
+            return false;
         }
+
+        // The work item is not the current one, remove it from the queue. This immediately
+        // cancels the work item. `remove` only uses the address of the work item without
+        // dereferencing it.
+        if self.remove(work_item) {
+            unsafe { work_item.as_mut().complete(Status::Cancelled) };
+            // Cancelled immediately, no further polling necessary for this item.
+            return true;
+        }
+
+        // In this case the item doesn't belong to this queue, it can be in any state. The item will
+        // need to be polled, but this also means something may have gone wrong.
+        false
     }
 
     /// Removes the item from the queue.
     ///
     /// Returns `true` if the work item was successfully removed, `false` if the work item was not
     /// found in the queue.
+    ///
+    /// This function is not `unsafe` because it does not dereference `ptr`, so it does not matter
+    /// that `ptr` may belong to a different work queue.
     fn remove(&mut self, ptr: NonNull<WorkItem<T>>) -> bool {
         // Walk the queue to find `ptr`.
         let mut prev = None;
@@ -272,12 +292,34 @@ impl<T: Sync> WorkQueue<T> {
         self.inner.with(|inner| inner.process());
     }
 
+    /// Polls the queue once and returns the status of the given work item.
+    ///
+    /// ## Safety
+    ///
+    /// The caller must ensure that `item` belongs to the polled queue. An item belongs to the
+    /// **last queue it was enqueued in**, even if the item is no longer in the queue's linked
+    /// list. This relationship is broken when the Handle that owns the WorkItem is dropped.
+    pub unsafe fn poll(&self, item: NonNull<WorkItem<T>>) -> Poll {
+        self.inner.with(|inner| {
+            let status = unsafe { (*item.as_ptr()).status };
+            if status == Poll::Pending {
+                inner.process();
+                unsafe { (*item.as_ptr()).status }
+            } else {
+                status
+            }
+        })
+    }
+
     /// Schedules the work item to be cancelled.
+    ///
+    /// The function returns true when the item was immediately cancelled. If the function returns
+    /// `false`, the item will need to be polled until its status becomes [`Poll::Ready`].
     ///
     /// The work item should not be assumed to be immediately cancelled. Polling its handle
     /// is necessary to ensure it is no longer being processed by the underlying driver.
-    pub fn cancel(&self, work_item: NonNull<WorkItem<T>>) {
-        self.inner.with(|inner| inner.cancel(work_item));
+    pub fn cancel(&self, work_item: NonNull<WorkItem<T>>) -> bool {
+        self.inner.with(|inner| inner.cancel(work_item))
     }
 }
 
@@ -349,19 +391,9 @@ pub(crate) struct Handle<'t, T: Sync> {
 }
 
 impl<'t, T: Sync> Handle<'t, T> {
-    fn status(&self) -> Poll {
-        unsafe { (*self.work_item.as_ptr()).status }
-    }
-
     /// Returns the status of the work item.
     pub fn poll(&mut self) -> Poll {
-        let status = self.status();
-        if status == Poll::Pending {
-            self.queue.process();
-            self.status()
-        } else {
-            status
-        }
+        unsafe { self.queue.poll(self.work_item) }
     }
 
     /// Waits for the work item to be processed.
@@ -378,8 +410,7 @@ impl<'t, T: Sync> Handle<'t, T> {
 
 impl<'t, T: Sync> Drop for Handle<'t, T> {
     fn drop(&mut self) {
-        if self.status() == Poll::Pending {
-            self.queue.cancel(self.work_item);
+        if self.queue.cancel(self.work_item) {
             // We must wait for the driver to release our WorkItem.
             while self.poll() == Poll::Pending {}
         }
