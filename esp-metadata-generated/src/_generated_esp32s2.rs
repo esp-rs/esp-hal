@@ -479,7 +479,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO40 <= virtual())); _for_each_inner!((GPIO41 <= virtual()));
         _for_each_inner!((GPIO42 <= virtual())); _for_each_inner!((GPIO43 <= virtual()));
         _for_each_inner!((GPIO44 <= virtual())); _for_each_inner!((GPIO45 <= virtual()));
-        _for_each_inner!((GPIO46 <= virtual())); _for_each_inner!((AES <= AES()
+        _for_each_inner!((GPIO46 <= virtual())); _for_each_inner!((AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner!((APB_SARADC <= APB_SARADC() (unstable)));
         _for_each_inner!((DEDICATED_GPIO <= DEDICATED_GPIO() (unstable)));
         _for_each_inner!((DS <= DS() (unstable))); _for_each_inner!((EFUSE <= EFUSE()
@@ -541,7 +542,8 @@ macro_rules! for_each_peripheral {
         (GPIO34 <= virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <=
         virtual()), (GPIO38 <= virtual()), (GPIO39 <= virtual()), (GPIO40 <= virtual()),
         (GPIO41 <= virtual()), (GPIO42 <= virtual()), (GPIO43 <= virtual()), (GPIO44 <=
-        virtual()), (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES()
+        virtual()), (GPIO45 <= virtual()), (GPIO46 <= virtual()), (AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (APB_SARADC <= APB_SARADC() (unstable)), (DEDICATED_GPIO <=
         DEDICATED_GPIO() (unstable)), (DS <= DS() (unstable)), (EFUSE <= EFUSE()
         (unstable)), (EXTMEM <= EXTMEM() (unstable)), (FE <= FE() (unstable)), (FE2 <=

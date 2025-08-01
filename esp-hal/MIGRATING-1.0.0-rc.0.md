@@ -27,11 +27,11 @@ The previous way to obtain RNG object has changed like so:
 
 ## AES changes
 
-The `esp_hal::aes::Aes` driver has been slightly reworked:
+The `esp_hal::aes::Aes` and `esp_hal::aes::AesDma` drivers has been slightly reworked:
 
 - `Mode` has been replaced by `Operation`. Operation has `Encrypt` and `Decrypt` variants, but the key length is no longer part of the enum. The key length is specified by the key. AesDma now takes this `Operation`.
 - `Aes::process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
-- `AesDma::write_block` has been removed.
+- `AesDma::write_block` and `AesDma::write_key` have been removed.
 
 ```diff
 -aes.process(block, Mode::Encrypt128, key);
@@ -40,6 +40,27 @@ The `esp_hal::aes::Aes` driver has been slightly reworked:
 -aes.process(block, Mode::Decrypt256, key);
 +aes.decrypt(block, key_32_bytes);
 ```
+
+```diff
++use esp_hal::aes::dma::DmaCipherState;
++esp_hal::aes::cipher_modes::Ecb;
+
+ let transfer = aes_dma
+     .process(
+         1,
+         output,
+         input,
+         Operation::Encrypt,
+-        CipherMode::Ecb,
++        DmaCipherState::from(Ecb),
+         key,
+     )
+     .map_err(|e| e.0)
+     .unwrap();
+-(aes_dma, output, input) = transfer.wait();
++(aes_dma, output, input, state) = transfer.wait();
+```
+
 ## ISR Callback Changes
 
 Previously callbacks were of type `extern "C" fn()`, now they are `IsrCallback`. In most places no changes are needed but when using `bind_interrupt` directly
