@@ -7,13 +7,16 @@
 #![no_main]
 
 use embassy_executor::Spawner;
+use embassy_time::{Duration, Timer};
 use esp_backtrace as _;
 use esp_hal::{
-    dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, timer::{timg::TimerGroup}, uart::{uhci::simple::UhciSimple, Config, RxConfig, Uart}
+    dma::{DmaRxBuf, DmaTxBuf},
+    dma_buffers,
+    peripherals::Peripherals,
+    timer::timg::TimerGroup,
+    uart::{Config, RxConfig, Uart, uhci::simple::UhciSimple},
 };
 use esp_println::println;
-use esp_hal::peripherals::Peripherals;
-use embassy_time::{Duration, Timer};
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -47,6 +50,12 @@ async fn run_uart(peripherals: Peripherals) {
     let mut uhci = UhciSimple::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
     uhci.internal.chunk_limit(dma_rx.len()).unwrap();
 
+    // Change uart config after uhci consumed it
+    let config = Config::default()
+        .with_rx(RxConfig::default().with_fifo_full_threshold(64))
+        .with_baudrate(9600);
+    uhci.internal.set_uart_config(&config).unwrap();
+
     loop {
         println!("Waiting for message");
         uhci.read(&mut dma_rx).await;
@@ -79,4 +88,3 @@ async fn run_logs() {
         println!("Loop is looping!");
     }
 }
-

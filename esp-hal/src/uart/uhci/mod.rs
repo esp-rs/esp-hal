@@ -3,17 +3,14 @@ pub mod simple;
 /// todo
 pub mod normal;
 
+use embassy_embedded_hal::SetConfig;
+
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
     dma::{
         Channel,
         DmaEligible,
         PeripheralDmaChannel,
-    },
-    peripherals,
-    uart::{Uart, uhci::Error::*},
+    }, peripherals, uart::{self, uhci::Error::*, Uart}, Async, Blocking, DriverMode
 };
 
 /// todo
@@ -135,11 +132,16 @@ where
         reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
         Ok(())
     }
+
+    /// todo
+    pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
+        self.uart.set_config(uart_config)
+    }
 }
 
 impl<'d> UhciInternal<'d, Blocking> {
     /// todo
-    pub fn into_async(self) -> UhciInternal<'d, Async> {
+    pub(crate) fn into_async(self) -> UhciInternal<'d, Async> {
         UhciInternal {
             uart: self.uart.into_async(),
             uhci: self.uhci,
@@ -150,7 +152,7 @@ impl<'d> UhciInternal<'d, Blocking> {
 
 impl<'d> UhciInternal<'d, Async> {
     /// todo
-    pub fn into_blocking(self) -> UhciInternal<'d, Blocking> {
+    pub(crate) fn into_blocking(self) -> UhciInternal<'d, Blocking> {
         UhciInternal {
             uart: self.uart.into_blocking(),
             uhci: self.uhci,
