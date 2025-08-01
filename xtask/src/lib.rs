@@ -211,6 +211,11 @@ impl Package {
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
+                if features.iter().any(|f| {
+                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex"
+                }) {
+                    features.push("unstable".to_owned());
+                }
             }
             Package::EspHalProcmacros => {
                 features.push("embassy".to_owned());
@@ -248,7 +253,7 @@ impl Package {
     }
 
     /// Additional feature rules to test subsets of features for a package.
-    pub fn lint_feature_rules(&self, _config: &Config) -> Vec<Vec<String>> {
+    pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
 
         match self {
@@ -265,6 +270,14 @@ impl Package {
             Package::EspRadio => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
+                // This tests if `wifi` feature works without `unstable`
+                if config.contains("wifi") {
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi".to_owned(),
+                    ]);
+                }
             }
             Package::EspMetadataGenerated => {
                 cases.push(vec!["build-script".to_owned()]);

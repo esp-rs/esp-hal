@@ -911,10 +911,10 @@ pub unsafe extern "C" fn event_post(
 /// *************************************************************************
 pub unsafe extern "C" fn get_free_heap_size() -> u32 {
     unsafe extern "C" {
-        fn esp_wifi_free_internal_heap() -> usize;
+        fn esp_radio_free_internal_heap() -> usize;
     }
 
-    unsafe { esp_wifi_free_internal_heap() as u32 }
+    unsafe { esp_radio_free_internal_heap() as u32 }
 }
 
 /// **************************************************************************

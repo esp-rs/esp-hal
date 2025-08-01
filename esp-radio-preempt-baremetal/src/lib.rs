@@ -10,7 +10,7 @@
 //! esp_radio_preempt_baremetal::init(timg0.timer0);
 //!
 //! // You can now start esp-radio:
-//! // let esp_wifi_controller = esp_radio::init().unwrap();
+//! // let esp_radio_controller = esp_radio::init().unwrap();
 //! # }
 //! ```
 
@@ -53,19 +53,19 @@ mod esp_alloc {
     unsafe impl Allocator for InternalMemory {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
             unsafe extern "C" {
-                fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8;
+                fn esp_radio_allocate_from_internal_ram(size: usize) -> *mut u8;
             }
-            let raw_ptr = unsafe { esp_wifi_allocate_from_internal_ram(layout.size()) };
+            let raw_ptr = unsafe { esp_radio_allocate_from_internal_ram(layout.size()) };
             let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
         unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
             unsafe extern "C" {
-                fn esp_wifi_deallocate_internal_ram(ptr: *mut u8);
+                fn esp_radio_deallocate_internal_ram(ptr: *mut u8);
             }
             unsafe {
-                esp_wifi_deallocate_internal_ram(ptr.as_ptr());
+                esp_radio_deallocate_internal_ram(ptr.as_ptr());
             }
         }
     }
@@ -153,6 +153,7 @@ impl SchedulerState {
         }
     }
 
+    #[cfg(xtensa)]
     fn switch_task(&mut self, trap_frame: &mut TrapFrame) {
         task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
 
@@ -164,6 +165,26 @@ impl SchedulerState {
         unsafe { self.current_task = (*self.current_task).next };
 
         task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
+    }
+
+    #[cfg(riscv)]
+    fn switch_task(&mut self, _trap_frame: &mut TrapFrame) {
+        if !self.to_delete.is_null() {
+            let task_to_delete = core::mem::take(&mut self.to_delete);
+            self.delete_task(task_to_delete);
+        }
+
+        let task = self.current_task;
+        let context = unsafe { &mut (*task).trap_frame };
+        let old_ctx = core::ptr::addr_of_mut!(*context);
+
+        let task = unsafe { (*self.current_task).next };
+        let context = unsafe { &mut (*task).trap_frame };
+        let new_ctx = core::ptr::addr_of_mut!(*context);
+
+        if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
+            unsafe { self.current_task = (*self.current_task).next };
+        }
     }
 
     fn schedule_task_deletion(&mut self, task: *mut Context) -> bool {

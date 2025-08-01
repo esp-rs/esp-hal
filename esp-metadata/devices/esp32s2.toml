@@ -114,6 +114,8 @@ instances = [
 
 [device.aes]
 support_status = "partial"
+has_split_text_registers = true
+endianness_configurable = true
 dma = true
 dma_mode = ["ECB", "CBC", "OFB", "CTR", "CFB8", "CFB128", "GCM"]
 key_length = { options = [

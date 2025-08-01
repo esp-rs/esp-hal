@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
-
+- `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
 
 ### Changed
 
@@ -20,12 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed `EspWifi` prefix from structs in the package codebase. (#3869)
 - Rename `esp-wifi` to `esp-radio`. (#3858)
 - `esp-ieee802154` package has been folded into `esp-radio`. (#3861)
+- `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
 
 ### Fixed
 
 - Fixed a BLE panic caused by unimplemented functions (#3762)
 - Fixed the BLE stack crashing in certain cases (#3854)
-
+- `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 
 ### Removed
 

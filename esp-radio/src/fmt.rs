@@ -283,7 +283,8 @@ impl<T, E> Try for Result<T, E> {
 }
 
 /// A way to `{:x?}` format a byte slice which is compatible with `defmt`
-pub struct Bytes<'a>(pub &'a [u8]);
+#[allow(unused)]
+pub(crate) struct Bytes<'a>(pub &'a [u8]);
 
 impl Debug for Bytes<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

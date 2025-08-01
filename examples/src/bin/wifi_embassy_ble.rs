@@ -5,7 +5,7 @@
 //!   read/write/notify)
 //! - pressing the boot-button on a dev-board will send a notification if it is subscribed
 
-//% FEATURES: embassy esp-radio esp-radio/ble esp-hal/unstable
+//% FEATURES: embassy esp-radio esp-radio/ble esp-radio/unstable esp-hal/unstable
 //% CHIPS: esp32 esp32s3 esp32c2 esp32c3 esp32c6 esp32h2
 
 // Embassy offers another compatible BLE crate [trouble](https://github.com/embassy-rs/trouble/tree/main/examples/esp32) with esp32 examples.
@@ -62,7 +62,7 @@ async fn main(_spawner: Spawner) -> ! {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     esp_radio_preempt_baremetal::init(timg0.timer0);
 
-    let esp_wifi_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
+    let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
     let config = InputConfig::default().with_pull(Pull::Down);
     cfg_if::cfg_if! {
@@ -86,7 +86,7 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut bluetooth = peripherals.BT;
 
-    let connector = BleConnector::new(esp_wifi_ctrl, bluetooth.reborrow());
+    let connector = BleConnector::new(esp_radio_ctrl, bluetooth.reborrow());
 
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut ble = Ble::new(connector, now);

@@ -1,17 +1,23 @@
-#[cfg_attr(target_arch = "riscv32", path = "riscv.rs")]
-#[cfg_attr(target_arch = "xtensa", path = "xtensa.rs")]
-mod arch_specific;
+#[cfg_attr(riscv, path = "riscv.rs")]
+#[cfg_attr(xtensa, path = "xtensa.rs")]
+pub(crate) mod arch_specific;
 
 use core::{ffi::c_void, mem::MaybeUninit};
 
 use allocator_api2::boxed::Box;
+#[cfg(riscv)]
+use arch_specific::Registers;
 pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
 
+#[repr(C)]
 pub(crate) struct Context {
-    trap_frame: TrapFrame,
+    #[cfg(riscv)]
+    pub trap_frame: Registers,
+    #[cfg(xtensa)]
+    pub trap_frame: TrapFrame,
     pub thread_semaphore: u32,
     pub next: *mut Context,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
@@ -42,6 +48,9 @@ pub(super) fn allocate_main_task() {
     // This context will be filled out by the first context switch.
     let context = Box::new_in(
         Context {
+            #[cfg(riscv)]
+            trap_frame: Registers::default(),
+            #[cfg(xtensa)]
             trap_frame: TrapFrame::default(),
             thread_semaphore: 0,
             next: core::ptr::null_mut(),

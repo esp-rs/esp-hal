@@ -25,8 +25,8 @@ enumset   = { version = "1.1.6", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 embedded-io-async = { version = "0.6.1" }
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
-rand_core = "0.9.3"
 heapless = "0.8.0"
+instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
@@ -112,9 +112,9 @@ esp32s3 = [
 ## Use `esp-alloc` for dynamic allocations.
 ##
 ## If you opt-out you need to provide implementations for the following functions:
-## - `pub extern "C" fn esp_wifi_free_internal_heap() -> usize`
-## - `pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) -> *mut u8`
-## - `pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8)`
+## - `pub extern "C" fn esp_radio_free_internal_heap() -> usize`
+## - `pub extern "C" fn esp_radio_allocate_from_internal_ram(size: usize) -> *mut u8`
+## - `pub extern "C" fn esp_radio_deallocate_internal_ram(ptr: *mut u8)`
 esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)
@@ -157,6 +157,17 @@ log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
+
+#! ### Unstable APIs
+#! Unstable APIs are drivers and features that are not yet ready for general use.
+#! They may be incomplete, have bugs, or be subject to change without notice.
+unstable = []
+
+## Libraries that depend on `esp-radio` should enable this feature to indicate their use of unstable APIs.
+## However, they must **not** enable the `unstable` feature themselves.
+##
+## For development you can enable the `unstable` and the chip feature by adding esp-radio as a dev-dependency.
+requires-unstable = []
 
 [package.metadata.docs.rs]
 features = [

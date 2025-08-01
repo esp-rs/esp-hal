@@ -1,5 +1,5 @@
 //% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-hal/unstable esp-radio/ieee802154
+//% FEATURES: esp-hal/unstable esp-radio/ieee802154 esp-radio/unstable
 
 #![no_std]
 #![no_main]

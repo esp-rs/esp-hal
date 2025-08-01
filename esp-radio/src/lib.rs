@@ -99,6 +99,7 @@
         ble or wifi."
     )
 )]
+#![cfg_attr(docsrs, feature(doc_cfg, custom_inner_attributes, proc_macro_hygiene))]
 
 #[macro_use]
 extern crate esp_metadata_generated;
@@ -114,6 +115,8 @@ use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
+#[cfg(esp32)]
+use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
     clock::{Clocks, init_radio_clocks},
     time::Rate,
@@ -127,6 +130,28 @@ use crate::{
     tasks::init_tasks,
 };
 
+// can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
+#[doc(hidden)]
+macro_rules! unstable_module {
+    ($(
+        $(#[$meta:meta])*
+        pub mod $module:ident;
+    )*) => {
+        $(
+            $(#[$meta])*
+            #[cfg(feature = "unstable")]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            pub mod $module;
+
+            $(#[$meta])*
+            #[cfg(not(feature = "unstable"))]
+            #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+            #[allow(unused)]
+            pub(crate) mod $module;
+        )*
+    };
+}
+
 mod binary {
     pub use esp_wifi_sys::*;
 }
@@ -135,18 +160,19 @@ mod compat;
 mod radio;
 mod time;
 
+pub(crate) use unstable_module;
+
 #[cfg(feature = "wifi")]
 pub mod wifi;
 
-#[cfg(feature = "ble")]
-pub mod ble;
-
-#[cfg(feature = "esp-now")]
-pub mod esp_now;
-
-#[cfg(feature = "ieee802154")]
-pub mod ieee802154;
-
+unstable_module! {
+    #[cfg(feature = "esp-now")]
+    pub mod esp_now;
+    #[cfg(feature = "ble")]
+    pub mod ble;
+    #[cfg(feature = "ieee802154")]
+    pub mod ieee802154;
+}
 pub mod config;
 
 pub(crate) mod common_adapter;
@@ -200,6 +226,7 @@ pub(crate) const CONFIG: config::Config = config::Config {
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Controller for the ESP Radio driver.
 pub struct Controller<'d> {
     _inner: PhantomData<&'d ()>,
 }
@@ -217,6 +244,10 @@ impl Drop for Controller<'_> {
 
         // This shuts down the task switcher and timer tick interrupt.
         preempt::disable();
+
+        #[cfg(esp32)]
+        // Allow using `ADC2` again
+        release_adc2(unsafe { esp_hal::Internal::conjure() });
     }
 }
 
@@ -224,6 +255,11 @@ impl Drop for Controller<'_> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
+    #[cfg(esp32)]
+    if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
+        return Err(InitializationError::Adc2IsUsed);
+    }
+
     if crate::is_interrupts_disabled() {
         return Err(InitializationError::InterruptsDisabled);
     }
@@ -294,6 +330,9 @@ pub enum InitializationError {
     InterruptsDisabled,
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
+    #[cfg(esp32)]
+    // ADC2 cannot be used with `radio` functionality on `esp32`.
+    Adc2IsUsed,
 }
 
 #[cfg(feature = "wifi")]
@@ -305,6 +344,7 @@ impl From<WifiError> for InitializationError {
 
 /// Enable verbose logging within the WiFi driver
 /// Does nothing unless the `sys-logs` feature is enabled.
+#[instability::unstable]
 pub fn wifi_set_log_verbose() {
     #[cfg(all(feature = "sys-logs", not(esp32h2)))]
     unsafe {

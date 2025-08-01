@@ -1,9 +1,42 @@
-use core::marker::PhantomData;
+use core::{
+    marker::PhantomData,
+    sync::atomic::{AtomicBool, Ordering},
+};
 
 use super::{AdcConfig, Attenuation};
-use crate::peripherals::{ADC1, ADC2, RTC_IO, SENS};
+use crate::{
+    peripherals::{ADC1, ADC2, RTC_IO, SENS},
+    private::{self},
+};
 
 pub(super) const NUM_ATTENS: usize = 10;
+
+// ADC2 cannot be used with `radio` functionality on `esp32`, this global helps us to track it's
+// state to prevent unexpected behaviour
+static ADC2_IN_USE: AtomicBool = AtomicBool::new(false);
+
+/// ADC Error
+#[derive(Debug)]
+pub enum Error {
+    /// `ADC2` is used together with `radio`.
+    Adc2InUse,
+}
+
+#[doc(hidden)]
+/// Tries to "claim" `ADC2` peripheral and set its status
+pub fn try_claim_adc2(_: private::Internal) -> Result<(), Error> {
+    if ADC2_IN_USE.fetch_or(true, Ordering::Relaxed) {
+        Err(Error::Adc2InUse)
+    } else {
+        Ok(())
+    }
+}
+
+#[doc(hidden)]
+/// Resets `ADC2` usage status to `Unused`
+pub fn release_adc2(_: private::Internal) {
+    ADC2_IN_USE.store(false, Ordering::Relaxed);
+}
 
 /// The sampling/readout resolution of the ADC.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,6 +77,8 @@ pub trait RegisterAccess {
     fn read_done_sar() -> bool;
 
     fn read_data_sar() -> u16;
+
+    fn instance_number() -> u8;
 }
 
 impl RegisterAccess for ADC1<'_> {
@@ -118,6 +153,10 @@ impl RegisterAccess for ADC1<'_> {
             .read()
             .meas1_data_sar()
             .bits()
+    }
+
+    fn instance_number() -> u8 {
+        1
     }
 }
 
@@ -194,6 +233,10 @@ impl RegisterAccess for ADC2<'_> {
             .meas2_data_sar()
             .bits()
     }
+
+    fn instance_number() -> u8 {
+        2
+    }
 }
 
 /// Analog-to-Digital Converter peripheral driver.
@@ -210,7 +253,18 @@ where
 {
     /// Configure a given ADC instance using the provided configuration, and
     /// initialize the ADC for use
+    ///
+    /// # Panics
+    ///
+    /// `ADC2` cannot be used simultaneously with `radio` functionalities, otherwise this function
+    /// will panic.
     pub fn new(adc_instance: ADCI, config: AdcConfig<ADCI>) -> Self {
+        if ADCI::instance_number() == 2 && try_claim_adc2(private::Internal).is_err() {
+            panic!(
+                "ADC2 is already in use by Radio. On ESP32, ADC2 cannot be used simultaneously with Wi-Fi or Bluetooth."
+            );
+        }
+
         let sensors = SENS::regs();
 
         // Set reading and sampling resolution
@@ -370,5 +424,11 @@ mod adc_implementation {
             (GPIO25<'_>, 8),
             (GPIO26<'_>, 9),
         ]
+    }
+}
+
+impl Drop for ADC2<'_> {
+    fn drop(&mut self) {
+        release_adc2(private::Internal);
     }
 }

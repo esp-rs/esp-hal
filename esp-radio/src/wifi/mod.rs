@@ -43,7 +43,8 @@ use esp_wifi_sys::include::{
     wifi_pkt_rx_ctrl_t,
     wifi_scan_channel_bitmap_t,
 };
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use esp_wifi_sys::include::{
     esp_wifi_80211_tx,
     esp_wifi_set_promiscuous,
@@ -57,7 +58,8 @@ pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "smoltcp")]
+#[cfg(all(feature = "smoltcp", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
@@ -75,8 +77,10 @@ const MTU: usize = crate::CONFIG.mtu;
 #[cfg(all(feature = "csi", esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
 #[cfg(feature = "csi")]
+#[instability::unstable]
 pub use crate::binary::include::wifi_csi_info_t;
 #[cfg(feature = "csi")]
+#[instability::unstable]
 use crate::binary::include::{
     esp_wifi_set_csi,
     esp_wifi_set_csi_config,
@@ -2060,7 +2064,8 @@ impl RxControlInfo {
     }
 }
 /// Represents a Wi-Fi packet in promiscuous mode.
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[instability::unstable]
 pub struct PromiscuousPkt<'a> {
     /// Control information related to packet reception.
     pub rx_cntl: RxControlInfo,
@@ -2071,7 +2076,8 @@ pub struct PromiscuousPkt<'a> {
     /// Data contained in the received packet.
     pub data: &'a [u8],
 }
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl PromiscuousPkt<'_> {
     /// # Safety
     /// When calling this, you have to ensure, that `buf` points to a valid
@@ -2096,10 +2102,10 @@ impl PromiscuousPkt<'_> {
     }
 }
 
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
 static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
 
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
     unsafe {
         if let Some(sniffer_callback) = SNIFFER_CB.with(|callback| *callback) {
@@ -2109,12 +2115,13 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
     }
 }
 
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
+#[instability::unstable]
 /// A wifi sniffer.
 #[non_exhaustive]
 pub struct Sniffer {}
 
-#[cfg(feature = "sniffer")]
+#[cfg(all(feature = "sniffer", feature = "unstable"))]
 impl Sniffer {
     pub(crate) fn new() -> Self {
         // This shouldn't fail, since the way this is created, means that wifi will
@@ -2125,11 +2132,13 @@ impl Sniffer {
         Self {}
     }
     /// Set promiscuous mode enabled or disabled.
+    #[instability::unstable]
     pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
         Ok(())
     }
     /// Transmit a raw frame.
+    #[instability::unstable]
     pub fn send_raw_frame(
         &mut self,
         use_sta_interface: bool,
@@ -2150,13 +2159,15 @@ impl Sniffer {
         })
     }
     /// Set the callback for receiving a packet.
+    #[instability::unstable]
     pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
     }
 }
 
 // see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-#[cfg(feature = "smoltcp")]
+#[cfg(all(feature = "smoltcp", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl Device for WifiDevice<'_> {
     type RxToken<'a>
         = WifiRxToken
@@ -2223,7 +2234,8 @@ impl WifiRxToken {
     }
 }
 
-#[cfg(feature = "smoltcp")]
+#[cfg(all(feature = "smoltcp", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl RxToken for WifiRxToken {
     fn consume<R, F>(self, f: F) -> R
     where
@@ -2263,7 +2275,8 @@ impl WifiTxToken {
     }
 }
 
-#[cfg(feature = "smoltcp")]
+#[cfg(all(feature = "smoltcp", feature = "unstable"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 impl TxToken for WifiTxToken {
     fn consume<R, F>(self, len: usize, f: F) -> R
     where
@@ -2633,13 +2646,16 @@ impl Drop for FreeApListOnDrop {
     }
 }
 
+/// Represents the Wi-Fi controller and its associated interfaces.
 #[non_exhaustive]
 pub struct Interfaces<'d> {
     pub sta: WifiDevice<'d>,
     pub ap: WifiDevice<'d>,
-    #[cfg(feature = "esp-now")]
+    #[cfg(all(feature = "esp-now", feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub esp_now: crate::esp_now::EspNow<'d>,
-    #[cfg(feature = "sniffer")]
+    #[cfg(all(feature = "sniffer", feature = "unstable"))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub sniffer: Sniffer,
 }
 
@@ -2695,9 +2711,9 @@ pub fn new<'d>(
                 _phantom: Default::default(),
                 mode: WifiDeviceMode::Ap,
             },
-            #[cfg(feature = "esp-now")]
+            #[cfg(all(feature = "esp-now", feature = "unstable"))]
             esp_now: crate::esp_now::EspNow::new_internal(),
-            #[cfg(feature = "sniffer")]
+            #[cfg(all(feature = "sniffer", feature = "unstable"))]
             sniffer: Sniffer::new(),
         },
     ))
@@ -2723,6 +2739,7 @@ impl Drop for WifiController<'_> {
 impl WifiController<'_> {
     /// Set CSI configuration and register the receiving callback.
     #[cfg(feature = "csi")]
+    #[instability::unstable]
     pub fn set_csi(
         &mut self,
         mut csi: CsiConfig,

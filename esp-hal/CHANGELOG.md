@@ -11,21 +11,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A reimplemntation of the `assign_resources!` macro (#3809)
 - `TrngSource` to manage random number generator entropy (#3829)
+- On RISC-V you can opt-out of nested interrupts for an interrupt handler by using `new_not_nested` (#3875)
 
 ### Changed
 
 - The `rng` module has been rewritten (#3829)
 - Update `embassy-usb` to v0.5.0 (#3848)
 - `aes::Key` variants have been renamed from bytes to bits (e.g. `Key16 -> Key128`) (#3845)
+- `aes::Mode` has been replaced by `Operation`. The key length is now solely determined by the key. (#3882)
+- `Aes::process` has been split into `Aes::encrypt` and `Aes::decrypt` (#3882)
+- Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
 
 ### Fixed
 
 - PSRAM on ESP32-S2 (#3811)
 - WDT now allows configuring longer timeouts (#3816)
+- `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 
 ### Removed
 
 - `Trng::new` (replaced by `Trng::try_new`) (#3829)
+- `AesDma::write_block` has been removed. (#3882)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

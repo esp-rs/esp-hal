@@ -16,17 +16,17 @@ use crate::{
     hal::{interrupt, peripherals::Interrupt},
 };
 
-pub static mut ISR_INTERRUPT_5: (
+pub(crate) static mut ISR_INTERRUPT_5: (
     *mut crate::binary::c_types::c_void,
     *mut crate::binary::c_types::c_void,
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub static mut ISR_INTERRUPT_8: (
+pub(crate) static mut ISR_INTERRUPT_8: (
     *mut crate::binary::c_types::c_void,
     *mut crate::binary::c_types::c_void,
 ) = (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub static mut ISR_INTERRUPT_7: (
+pub(crate) static mut ISR_INTERRUPT_7: (
     *mut crate::binary::c_types::c_void,
     *mut crate::binary::c_types::c_void,
 ) = (core::ptr::null_mut(), core::ptr::null_mut());

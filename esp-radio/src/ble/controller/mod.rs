@@ -4,6 +4,7 @@ use super::{read_hci, read_next, send_hci};
 use crate::Controller;
 
 /// A blocking HCI connector
+#[instability::unstable]
 pub struct BleConnector<'d> {
     _device: crate::hal::peripherals::BT<'d>,
 }
@@ -15,6 +16,8 @@ impl Drop for BleConnector<'_> {
 }
 
 impl<'d> BleConnector<'d> {
+    /// Create and init a new BLE connector.
+    #[instability::unstable]
     pub fn new(
         _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
@@ -24,12 +27,16 @@ impl<'d> BleConnector<'d> {
         Self { _device: device }
     }
 
+    /// Read the next HCI packet from the BLE controller.
+    #[instability::unstable]
     pub fn next(&mut self, buf: &mut [u8]) -> Result<usize, BleConnectorError> {
         Ok(read_next(buf))
     }
 }
 
 #[derive(Debug)]
+/// Error type for the BLE connector.
+#[instability::unstable]
 pub enum BleConnectorError {
     Unknown,
 }
