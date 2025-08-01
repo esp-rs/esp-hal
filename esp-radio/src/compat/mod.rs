@@ -4,7 +4,7 @@ pub mod misc;
 pub mod timer_compat;
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn _putchar(c: u8) {
+unsafe extern "C" fn __esp_radio_putchar(c: u8) {
     static mut BUFFER: [u8; 256] = [0u8; 256];
     static mut IDX: usize = 0;
 

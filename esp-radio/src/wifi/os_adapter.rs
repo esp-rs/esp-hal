@@ -1126,7 +1126,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 ///
 /// *************************************************************************
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn esp_timer_get_time() -> i64 {
+pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
     crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
 }
@@ -1409,7 +1409,7 @@ pub unsafe extern "C" fn nvs_erase_key(
 pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
     trace!("get_random");
     unsafe {
-        crate::common_adapter::esp_fill_random(buf, len as u32);
+        crate::common_adapter::__esp_radio_esp_fill_random(buf, len as u32);
     }
     0
 }

@@ -217,7 +217,7 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
 #[unsafe(no_mangle)]
-static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
+static mut __ESP_RADIO_WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 #[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
@@ -266,7 +266,7 @@ pub unsafe extern "C" fn ets_timer_arm_us(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
+pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
             let microseconds = esp_timer_get_time();
@@ -279,7 +279,7 @@ pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
+pub unsafe extern "C" fn __esp_radio_esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");
     unsafe {
         let dst = core::slice::from_raw_parts_mut(dst, len as usize);
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
+pub unsafe extern "C" fn __esp_radio_strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
 }
 
