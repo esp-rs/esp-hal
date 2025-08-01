@@ -91,7 +91,7 @@ pub unsafe extern "C" fn __strcasecmp(
 }
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __strnlen(chars: *const c_char, maxlen: usize) -> usize {
+unsafe extern "C" fn __strnlen(chars: *const c_char, maxlen: isize) -> usize {
     let mut len = 0;
     loop {
         unsafe {
