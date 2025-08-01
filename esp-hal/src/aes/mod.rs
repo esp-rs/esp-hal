@@ -46,9 +46,14 @@
 
 use core::ptr::NonNull;
 
-use crate::{pac, peripherals::AES, system::GenericPeripheralGuard};
+use crate::{
+    aes::cipher_modes::{CryptoBuffers, UnsafeCryptoBuffers},
+    pac,
+    peripherals::AES,
+    system::GenericPeripheralGuard,
+};
 
-mod cipher_modes;
+pub mod cipher_modes;
 
 for_each_aes_key_length! {
     ($len:literal) => {
@@ -259,21 +264,12 @@ impl<'d> Aes<'d> {
 
         let slice = work_item.key.as_slice();
         self.write_key(slice);
-        unsafe {
-            match work_item.cipher_mode.as_ref() {
-                CipherModeState::Ecb(_) | CipherModeState::Cbc(_) => {
-                    self.write_mode(if work_item.mode == Operation::Encrypt {
-                        work_item.key.encrypt_mode()
-                    } else {
-                        work_item.key.decrypt_mode()
-                    })
-                }
-                CipherModeState::Ofb(_)
-                | CipherModeState::Ctr(_)
-                | CipherModeState::Cfb8(_)
-                | CipherModeState::Cfb128(_) => self.write_mode(work_item.key.encrypt_mode()),
-            }
-        }
+        self.write_mode(unsafe {
+            work_item
+                .cipher_mode
+                .as_ref()
+                .software_operating_mode(work_item.mode, &work_item.key)
+        });
 
         let process_block = |input: NonNull<[u8]>, mut output: NonNull<[u8]>| {
             unsafe { self.write_block(input.as_ref()) };
@@ -352,21 +348,22 @@ pub mod dma {
     pub enum CipherMode {
         /// Electronic Codebook Mode
         #[cfg(aes_dma_mode_ecb)]
-        Ecb = 0,
+        Ecb    = 0,
         /// Cipher Block Chaining Mode
-        Cbc,
+        #[cfg(aes_dma_mode_cbc)]
+        Cbc    = 1,
         /// Output Feedback Mode
         #[cfg(aes_dma_mode_ofb)]
-        Ofb,
+        Ofb    = 2,
         /// Counter Mode.
         #[cfg(aes_dma_mode_ctr)]
-        Ctr,
+        Ctr    = 3,
         /// Cipher Feedback Mode with 8-bit shifting.
         #[cfg(aes_dma_mode_cfb8)]
-        Cfb8,
+        Cfb8   = 4,
         /// Cipher Feedback Mode with 128-bit shifting.
         #[cfg(aes_dma_mode_cfb128)]
-        Cfb128,
+        Cfb128 = 5,
         // TODO: GCM needs different handling, not supported yet
     }
 
@@ -491,6 +488,7 @@ pub mod dma {
                 .block_mode()
                 .modify(|_, w| unsafe { w.block_mode().bits(mode as u8) });
 
+            // FIXME
             if mode == CipherMode::Ctr {
                 self.aes
                     .regs()
@@ -515,6 +513,12 @@ pub mod dma {
                 .block_num()
                 .modify(|_, w| unsafe { w.block_num().bits(block) });
         }
+
+        fn is_done(&self) -> bool {
+            const DMA_STATUS_DONE: u8 = 2;
+            // TODO: PAC should provide the variants
+            self.aes.regs().state().read().state().bits() == DMA_STATUS_DONE
+        }
     }
 
     /// Represents an ongoing (or potentially stopped) transfer with the Aes.
@@ -528,8 +532,7 @@ pub mod dma {
     impl<'d, RX: DmaRxBuffer, TX: DmaTxBuffer> AesTransfer<'d, RX, TX> {
         /// Returns true when [Self::wait] will not block.
         pub fn is_done(&self) -> bool {
-            // DMA status DONE == 2
-            self.aes_dma.aes.regs().state().read().state().bits() == 2
+            self.aes_dma.is_done()
         }
 
         /// Waits for the transfer to finish and returns the peripheral and
@@ -604,41 +607,13 @@ use crate::work_queue::{
     WorkQueueFrontend,
 };
 
-/// Specifies the block cipher modes available for AES operations.
-///
-/// In DMA-driven mode, if a particular mode is not supported by the hardware, the driver will fall
-/// back to a CPU-driven method.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum CipherMode {
+/// The stored state of various block cipher modes.
+#[derive(Clone)]
+#[non_exhaustive]
+pub enum CipherModeState {
     /// Electronic Codebook Mode
-    Ecb,
-    /// Cipher Block Chaining Mode
-    Cbc,
-    /// Output Feedback Mode
-    Ofb,
-    /// Counter Mode
-    Ctr,
-    /// Cipher Feedback Mode with 8-bit shifting.
-    Cfb8,
-    /// Cipher Feedback Mode with 128-bit shifting.
-    Cfb128,
-    /// Galois Counter Mode
-    Gcm,
-}
-
-#[derive(Clone, Copy)]
-struct CryptoBuffers {
-    input: NonNull<[u8]>,
-    output: NonNull<[u8]>,
-    text_length: usize,
-}
-
-enum CipherModeState {
-    /// Electronic Codebook Mode
-    // TODO: for this, we need text_length to be a muliple of BLOCK_SIZE
     Ecb(cipher_modes::Ecb),
     /// Cipher Block Chaining Mode
-    // TODO: for this, we need text_length to be a muliple of BLOCK_SIZE
     Cbc(cipher_modes::Cbc),
     /// Output Feedback Mode
     Ofb(cipher_modes::Ofb),
@@ -652,6 +627,69 @@ enum CipherModeState {
     // Gcm(*mut Gcm), // TODO: this is more involved
 }
 
+impl From<cipher_modes::Ecb> for CipherModeState {
+    fn from(value: cipher_modes::Ecb) -> Self {
+        Self::Ecb(value)
+    }
+}
+
+impl From<cipher_modes::Cbc> for CipherModeState {
+    fn from(value: cipher_modes::Cbc) -> Self {
+        Self::Cbc(value)
+    }
+}
+
+impl From<cipher_modes::Ofb> for CipherModeState {
+    fn from(value: cipher_modes::Ofb) -> Self {
+        Self::Ofb(value)
+    }
+}
+
+impl From<cipher_modes::Ctr> for CipherModeState {
+    fn from(value: cipher_modes::Ctr) -> Self {
+        Self::Ctr(value)
+    }
+}
+
+impl From<cipher_modes::Cfb8> for CipherModeState {
+    fn from(value: cipher_modes::Cfb8) -> Self {
+        Self::Cfb8(value)
+    }
+}
+
+impl From<cipher_modes::Cfb128> for CipherModeState {
+    fn from(value: cipher_modes::Cfb128) -> Self {
+        Self::Cfb128(value)
+    }
+}
+
+impl CipherModeState {
+    fn software_operating_mode(&self, operation: Operation, key: &Key) -> Mode {
+        match self {
+            CipherModeState::Ecb(_) | CipherModeState::Cbc(_) => {
+                if operation == Operation::Encrypt {
+                    key.encrypt_mode()
+                } else {
+                    key.decrypt_mode()
+                }
+            }
+            // For these, decryption is handled in software using the hardware in ecryption mode to
+            // produce intermediate results.
+            CipherModeState::Ofb(_)
+            | CipherModeState::Ctr(_)
+            | CipherModeState::Cfb8(_)
+            | CipherModeState::Cfb128(_) => key.encrypt_mode(),
+        }
+    }
+
+    fn requires_blocks(&self) -> bool {
+        matches!(
+            self,
+            CipherModeState::Ecb(_) | CipherModeState::Ofb(_) | CipherModeState::Cbc(_)
+        )
+    }
+}
+
 const BLOCK_SIZE: usize = 16;
 
 struct AesOperation {
@@ -659,7 +697,7 @@ struct AesOperation {
     // The block cipher operating mode.
     cipher_mode: NonNull<CipherModeState>,
     // The length of the key is determined by the operating mode.
-    buffers: CryptoBuffers,
+    buffers: UnsafeCryptoBuffers,
     key: Key,
 }
 
@@ -707,7 +745,7 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 ///
 /// ```rust, no_run
 /// # {before_snippet}
-/// use esp_hal::aes::{AesBackend, AesContext, Operation};
+/// use esp_hal::aes::{AesBackend, AesContext, Operation, cipher_modes::Ecb};
 /// #
 /// let mut aes = AesBackend::new(peripherals.AES);
 /// // Start the backend, which allows processing AES operations.
@@ -715,7 +753,8 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 ///
 /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
 /// // The key length must be supported by the hardware.
-/// let mut ecb_encrypt = AesContext::ecb(
+/// let mut ecb_encrypt = AesContext::new(
+///     Ecb,
 ///     Operation::Encrypt,
 ///     [
 ///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
@@ -850,83 +889,22 @@ pub struct AesContext {
 }
 
 impl AesContext {
-    fn new(cipher_mode: CipherModeState, operation: Operation, key: Key) -> Self {
+    /// Creates a new context to encrypt or decrypt data with the given block cipher operating
+    /// mode.
+    pub fn new(
+        cipher_mode: impl Into<CipherModeState>,
+        operation: Operation,
+        key: impl Into<Key>,
+    ) -> Self {
         Self {
-            cipher_mode,
+            cipher_mode: cipher_mode.into(),
             frontend: WorkQueueFrontend::new(AesOperation {
                 mode: operation,
                 cipher_mode: NonNull::dangling(),
-                buffers: CryptoBuffers {
-                    input: NonNull::from(&[]),
-                    output: NonNull::from(&[]),
-                    text_length: 0,
-                },
-                key,
+                buffers: unsafe { CryptoBuffers::new_in_place(&mut []).into_inner() },
+                key: key.into(),
             }),
         }
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Electronic Codebook operating
-    /// mode.
-    pub fn ecb(operation: Operation, key: impl Into<Key>) -> Self {
-        Self::new(
-            CipherModeState::Ecb(cipher_modes::Ecb {}),
-            operation,
-            key.into(),
-        )
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Cipher Block Chaining operating
-    /// mode.
-    pub fn cbc(operation: Operation, iv: [u8; BLOCK_SIZE], key: impl Into<Key>) -> Self {
-        Self::new(
-            CipherModeState::Cbc(cipher_modes::Cbc { iv }),
-            operation,
-            key.into(),
-        )
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Counter operating
-    /// mode.
-    pub fn ctr(operation: Operation, key: impl Into<Key>, nonce: [u8; BLOCK_SIZE]) -> Self {
-        Self::new(
-            CipherModeState::Ctr(cipher_modes::Ctr {
-                nonce,
-                buffer: [0; BLOCK_SIZE],
-                offset: 0,
-            }),
-            operation,
-            key.into(),
-        )
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Cipher feedback (with 8-bit
-    /// shifting) operating mode.
-    pub fn cfb8(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
-        Self::new(
-            CipherModeState::Cfb8(cipher_modes::Cfb8 { iv }),
-            operation,
-            key.into(),
-        )
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Cipher feedback (with 8-bit
-    /// shifting) operating mode.
-    pub fn cfb128(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
-        Self::new(
-            CipherModeState::Cfb128(cipher_modes::Cfb128 { iv, offset: 0 }),
-            operation,
-            key.into(),
-        )
-    }
-
-    /// Creates a new context to encrypt or decrypt data with the Output feedback operating mode.
-    pub fn ofb(operation: Operation, key: impl Into<Key>, iv: [u8; BLOCK_SIZE]) -> Self {
-        Self::new(
-            CipherModeState::Ofb(cipher_modes::Ofb { iv, offset: 0 }),
-            operation,
-            key.into(),
-        )
     }
 
     fn post(&mut self) -> AesHandle<'_> {
@@ -934,13 +912,7 @@ impl AesContext {
     }
 
     fn validate(&self, buffer: &[u8]) -> Result<(), Error> {
-        // TODO: check that data is appropriate for the cipher mode
-        let requires_block_aligned = matches!(
-            self.cipher_mode,
-            CipherModeState::Ecb(_) | CipherModeState::Ofb(_)
-        );
-
-        if requires_block_aligned && !buffer.len().is_multiple_of(BLOCK_SIZE) {
+        if self.cipher_mode.requires_blocks() && !buffer.len().is_multiple_of(BLOCK_SIZE) {
             return Err(Error::IncorrectBufferLength);
         }
 
@@ -967,17 +939,12 @@ impl AesContext {
         input: &'t [u8],
         output: &'t mut [u8],
     ) -> Result<AesHandle<'t>, Error> {
-        if input.len() != output.len() {
-            return Err(Error::BuffersNotEqual);
-        }
         self.validate(input)?;
         self.validate(output)?;
 
         let data = self.frontend.data_mut();
         data.cipher_mode = NonNull::from(&mut self.cipher_mode);
-        data.buffers.text_length = input.len();
-        data.buffers.input = NonNull::from(input);
-        data.buffers.output = NonNull::from(output);
+        data.buffers = unsafe { CryptoBuffers::new(input, output)?.into_inner() };
 
         Ok(self.post())
     }
@@ -995,7 +962,7 @@ impl AesContext {
     ///
     /// ```rust, no_run
     /// # {before_snippet}
-    /// use esp_hal::aes::{AesBackend, AesContext, Operation};
+    /// use esp_hal::aes::{AesBackend, AesContext, Operation, cipher_modes::Ecb};
     /// #
     /// let mut aes = AesBackend::new(peripherals.AES);
     /// // Start the backend, which pins it in place and allows processing AES operations.
@@ -1003,7 +970,8 @@ impl AesContext {
     ///
     /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
     /// // The key length must be supported by the hardware.
-    /// let mut ecb_encrypt = AesContext::ecb(
+    /// let mut ecb_encrypt = AesContext::new(
+    ///     Ecb,
     ///     Operation::Encrypt,
     ///     [
     ///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
@@ -1045,12 +1013,7 @@ impl AesContext {
         let data = self.frontend.data_mut();
 
         data.cipher_mode = NonNull::from(&self.cipher_mode);
-
-        data.buffers.text_length = buffer.len();
-        let ptr = NonNull::from(buffer);
-
-        data.buffers.input = ptr;
-        data.buffers.output = ptr;
+        data.buffers = unsafe { CryptoBuffers::new_in_place(buffer).into_inner() };
 
         Ok(self.post())
     }
