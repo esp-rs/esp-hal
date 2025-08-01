@@ -161,7 +161,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _log_timestamp: Some(log_timestamp),
     _malloc_internal: Some(malloc_internal),
     _realloc_internal: Some(realloc_internal),
-    _calloc_internal: Some(calloc_internal),
+    _calloc_internal: Some(calloc_internal_wrapper),
     _zalloc_internal: Some(zalloc_internal),
     _wifi_malloc: Some(wifi_malloc),
     _wifi_realloc: Some(wifi_realloc),

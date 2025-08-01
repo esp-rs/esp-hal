@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cell::RefCell,
     fmt::Write,
@@ -7,7 +8,6 @@ use core::{
     ptr::{self, addr_of, addr_of_mut},
 };
 
-use allocator_api2::{boxed::Box, vec::Vec};
 use esp_hal::time::{Duration, Instant};
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
@@ -15,7 +15,6 @@ use super::malloc::free;
 use crate::{
     CONFIG,
     binary::c_types::{c_int, c_void},
-    compat::malloc::InternalMemory,
     hal::sync::Locked,
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
@@ -67,14 +66,17 @@ pub struct RawQueue {
     capacity: usize,
     current_read: usize,
     current_write: usize,
-    storage: Box<[u8], InternalMemory>,
+    storage: Box<[u8]>,
 }
 
 impl RawQueue {
     /// This allocates underlying storage. See [release_storage]
     pub fn new(capacity: usize, item_size: usize) -> Self {
-        let storage =
-            unsafe { Box::new_zeroed_slice_in(capacity * item_size, InternalMemory).assume_init() };
+        let storage = unsafe {
+            let mut boxed = Box::new_uninit_slice(capacity * item_size).assume_init();
+            boxed.fill(0);
+            boxed
+        };
 
         Self {
             item_size,
@@ -143,7 +145,7 @@ impl RawQueue {
             return;
         }
 
-        let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
+        let mut tmp_item = Vec::<u8>::new();
         tmp_item.reserve_exact(self.item_size);
         tmp_item.resize(self.item_size, 0);
 

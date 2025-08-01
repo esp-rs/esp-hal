@@ -144,6 +144,7 @@
 
 mod allocators;
 mod macros;
+mod malloc;
 
 use core::{
     alloc::{GlobalAlloc, Layout},
