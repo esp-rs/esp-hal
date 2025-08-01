@@ -33,6 +33,16 @@ pub struct AnyGdmaChannel<'d> {
     _lifetime: PhantomData<&'d mut ()>,
 }
 
+impl AnyGdmaChannel<'_> {
+    #[cfg_attr(esp32c2, expect(unused))]
+    pub(crate) unsafe fn clone_unchecked(&self) -> Self {
+        Self {
+            channel: self.channel,
+            _lifetime: PhantomData,
+        }
+    }
+}
+
 impl crate::private::Sealed for AnyGdmaChannel<'_> {}
 impl<'d> DmaChannel for AnyGdmaChannel<'d> {
     type Rx = AnyGdmaRxChannel<'d>;
