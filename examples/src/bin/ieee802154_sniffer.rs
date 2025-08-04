@@ -26,6 +26,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    esp_alloc::heap_allocator!(size: 24 * 1024);
+
     // Default pins for Uart communication
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32c6")] {

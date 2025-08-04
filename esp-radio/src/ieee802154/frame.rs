@@ -1,4 +1,5 @@
-use heapless::Vec;
+use alloc::vec::Vec;
+
 use ieee802154::mac::{FrameContent, Header};
 
 pub(crate) const FRAME_SIZE: usize = 129;
@@ -18,7 +19,7 @@ pub struct Frame {
     /// Content
     pub content: FrameContent,
     /// Payload
-    pub payload: Vec<u8, FRAME_SIZE>,
+    pub payload: Vec<u8>,
     /// This is a 2-byte CRC checksum
     pub footer: [u8; 2],
 }
