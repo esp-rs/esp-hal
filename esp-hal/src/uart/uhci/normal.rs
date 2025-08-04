@@ -14,7 +14,7 @@ use crate::{
         DmaTxBuffer,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
-    into_internal,
+    into_internal_uhci,
     peripherals,
     uart,
     uart::{
@@ -28,7 +28,7 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ConfigError {
-    /// chunk_limit is above 4095
+    /// chunk_limit is above 4095, this is not allowed (hardware limit)
     AboveReadLimit,
 }
 
@@ -55,7 +55,8 @@ impl Default for Config {
         Config {
             idle_eof: true,
             len_eof: true,
-            chunk_limit: 128, // This is the default in the register at boot
+            // This is the default in the register at boot, still should be changed!
+            chunk_limit: 128,
         }
     }
 }
@@ -88,17 +89,16 @@ where
     }
 }
 
-/// todo
+/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in the future with Uhci specific features
 pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// todo
     pub(crate) internal: UhciInternal<'d, Dm>,
 }
 
 impl<'d> Uhci<'d, Blocking> {
-    /// todo
+    /// Creates a new instance of Uhci
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
@@ -120,7 +120,7 @@ impl<'d> Uhci<'d, Blocking> {
         }
     }
 
-    /// todo
+    /// Create a new instance in [crate::Async] mode.
     pub fn into_async(self) -> Uhci<'d, Async> {
         let internal = self.internal.into_async();
         Uhci { internal }
@@ -128,7 +128,7 @@ impl<'d> Uhci<'d, Blocking> {
 }
 
 impl<'d> Uhci<'d, Async> {
-    /// todo
+    /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
     pub async fn write<Buf: DmaTxBuffer>(
         mut self,
         mut tx_buffer: Buf,
@@ -148,7 +148,7 @@ impl<'d> Uhci<'d, Async> {
         }
     }
 
-    /// todo
+    /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
     pub async fn read<Buf: DmaRxBuffer>(
         mut self,
         mut rx_buffer: Buf,
@@ -168,7 +168,7 @@ impl<'d> Uhci<'d, Async> {
         }
     }
 
-    /// todo
+    /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
         Uhci {
             internal: self.internal.into_blocking(),
@@ -177,9 +177,9 @@ impl<'d> Uhci<'d, Async> {
 }
 
 impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
-    into_internal!();
+    into_internal_uhci!();
 
-    /// todo
+    /// Change the UHCI peripheral configuration
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
 
@@ -220,7 +220,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
         }
     }
 
-    /// todo
+    /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.uhci.internal.channel.tx.is_done()
     }
@@ -322,7 +322,7 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
         }
     }
 
-    /// todo
+    /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
         self.uhci.internal.channel.tx.is_done()
     }

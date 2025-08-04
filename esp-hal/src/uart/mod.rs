@@ -41,7 +41,7 @@
 //! [embedded-hal-async]: embedded_hal_async
 //! [embedded-io-async]: embedded_io_async
 
-/// todo
+/// UHCI wrapper arround UART (Only esp32c6)
 pub mod uhci;
 
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};

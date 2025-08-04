@@ -12,7 +12,7 @@ use crate::{
         DmaTxBuffer,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
-    into_internal,
+    into_internal_uhci,
     peripherals,
     uart,
     uart::{
@@ -22,17 +22,20 @@ use crate::{
     },
 };
 
-/// todo
+/// "Simple" Uhci implementation with simple Api, it's purpuse is to only (and easily) replace Uart
+/// in an application and improve upon it by using DMA under the hood
+/// It's api (read, write) is designed to be easily wrapped upon by a struct which will implement
+/// embedded_io traits If you simply want better uart (speeds, performance, anything) you should
+/// probably just use this
 pub struct UhciSimple<'d, Dm>
 where
     Dm: DriverMode,
 {
-    /// todo
     pub(crate) internal: UhciInternal<'d, Dm>,
 }
 
 impl<'d> UhciSimple<'d, Blocking> {
-    /// todo
+    /// Creates a new instance of UhciSimple
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
@@ -58,15 +61,15 @@ impl<'d> UhciSimple<'d, Blocking> {
     }
 
     fn init(&self) {
+        // This should be like that and never be changed (for just using as a uart wrapper)
         let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
-        // If you plan to support more UHCI features, this needs to be configurable
+
         reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
 
-        // If you plan to support more UHCI features, this needs to be configurable
         reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
     }
 
-    /// todo
+    /// Reads from UART into the DMA buffer
     pub fn read(&mut self, rx_buffer: &mut impl DmaRxBuffer) {
         unsafe {
             self.internal
@@ -84,7 +87,7 @@ impl<'d> UhciSimple<'d, Blocking> {
         self.internal.channel.rx.stop_transfer();
     }
 
-    /// todo
+    /// Writes from DMA buffer into UART
     pub fn write(&mut self, tx_buffer: &mut impl DmaTxBuffer) {
         unsafe {
             self.internal
@@ -101,7 +104,7 @@ impl<'d> UhciSimple<'d, Blocking> {
         self.internal.channel.tx.stop_transfer();
     }
 
-    /// todo
+    /// Create a new instance in [crate::Async] mode.
     pub fn into_async(self) -> UhciSimple<'d, Async> {
         let internal = self.internal.into_async();
         UhciSimple { internal }
@@ -109,7 +112,7 @@ impl<'d> UhciSimple<'d, Blocking> {
 }
 
 impl<'d> UhciSimple<'d, Async> {
-    /// todo
+    /// Reads from UART into the DMA buffer
     pub async fn read(&mut self, rx_buffer: &mut impl DmaRxBuffer) {
         let dma_future = DmaRxFuture::new(&mut self.internal.channel.rx);
 
@@ -127,7 +130,7 @@ impl<'d> UhciSimple<'d, Async> {
         self.internal.channel.rx.stop_transfer();
     }
 
-    /// todo
+    /// Writes from DMA buffer into UART
     pub async fn write(&mut self, tx_buffer: &mut impl DmaTxBuffer) {
         let dma_future = DmaTxFuture::new(&mut self.internal.channel.tx);
 
@@ -145,7 +148,7 @@ impl<'d> UhciSimple<'d, Async> {
         self.internal.channel.tx.stop_transfer();
     }
 
-    /// todo
+    /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> UhciSimple<'d, Blocking> {
         let internal = self.internal.into_blocking();
         UhciSimple::<'d, Blocking> { internal }
@@ -153,9 +156,11 @@ impl<'d> UhciSimple<'d, Async> {
 }
 
 impl<'d, Dm: DriverMode> UhciSimple<'d, Dm> {
-    into_internal!();
+    into_internal_uhci!();
 
-    /// todo
+    /// The limit of how much to read in a single read call. It cannot be higher than the dma
+    /// buffer size, otherwise uart/dma/uhci will freeze. It cannot exceed 4095 (12 bits), above
+    /// this value it will simply also split the readings
     #[allow(dead_code)]
     pub fn set_chunk_limit(&self, limit: u16) -> Result<(), uhci::Error> {
         self.internal.set_chunk_limit(limit)
