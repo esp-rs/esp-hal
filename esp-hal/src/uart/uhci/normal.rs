@@ -17,10 +17,9 @@ use crate::{
     uart,
     uart::{
         Uart,
-        uhci::{AnyUhci, UhciInternal},
+        uhci::{AnyUhci, UhciInternal, normal::ConfigError::*},
     },
 };
-use crate::uart::uhci::normal::ConfigError::*;
 
 /// A configuration error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,9 +181,11 @@ impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let reg: &esp32c6::uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
 
-        reg.conf0().modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
+        reg.conf0()
+            .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
 
-        reg.conf0().modify(|_, w| w.len_eof_en().bit(config.len_eof));
+        reg.conf0()
+            .modify(|_, w| w.len_eof_en().bit(config.len_eof));
 
         if self.internal.set_chunk_limit(config.chunk_limit).is_err() {
             return Err(AboveReadLimit);

@@ -73,6 +73,13 @@ async fn run_uart(peripherals: Peripherals) {
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
                 let transfer = uhci.write(dma_tx).await;
+                // This works...
+                // while !transfer.is_done() {
+                //     println!("Waiting for transfer to complete");
+                //     Timer::after(Duration::from_secs(1)).await;
+                // }
+
+                // This doesn't, it just outputs FF nothing more nothing less
                 let (_uhci, dma_tx) = transfer.wait().await;
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
