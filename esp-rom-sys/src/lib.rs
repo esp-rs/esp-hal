@@ -70,7 +70,7 @@ unsafe extern "C" fn __assert_func(
 // _reent in newlib libc. This structure is allocated on the TCB of each task.
 // i.e. it assumes a FreeRTOS task calling it.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __strcasecmp(
+unsafe extern "C" fn __strcasecmp(
     s1: *const core::ffi::c_char,
     s2: *const core::ffi::c_char,
 ) -> i32 {
@@ -197,11 +197,4 @@ unsafe extern "C" fn __mktime(time: *const Tm) -> i64 {
     let seconds = days * 24 * 60 * 60 + time.tm_hour * 60 * 60 + time.tm_min * 60 + time.tm_sec;
 
     seconds as i64
-}
-
-pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
-    unsafe {
-        let c_str = core::ffi::CStr::from_ptr(s.cast());
-        core::str::from_utf8_unchecked(c_str.to_bytes())
-    }
 }
