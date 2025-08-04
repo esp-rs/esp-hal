@@ -83,8 +83,6 @@ __pre_init:"#,
 "#,
 r#"
     ret
-"#,
-r#"
 
 /*
     Trap entry points (_start_trap, _start_trapN for N in 1..=31)
@@ -125,8 +123,7 @@ r#"
 .weak _start_trap29
 .weak _start_trap30
 .weak _start_trap31
-"#,
-r#"
+
 _start_trap:
     // Handle exceptions in vectored mode
     // move SP to some save place if it's pointing below the RAM
@@ -312,8 +309,6 @@ _start_trap31:
     sw ra, 0(sp)
     la ra, interrupt31
 _start_trap_direct:
-"#,
-r#"
     sw t0, 1*4(sp)
     sw t1, 2*4(sp)
     sw t2, 3*4(sp)
@@ -403,8 +398,7 @@ _vector_table:
     j _start_trap30
     j _start_trap31
 .option pop
-"#,
-r#"
+
 #this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
 .section .trap, "ax"
 // See https://github.com/esp-rs/esp-hal/issues/1326 and https://reviews.llvm.org/D98762
