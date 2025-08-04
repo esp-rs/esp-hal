@@ -1,16 +1,17 @@
 /// todo
-pub mod simple;
-/// todo
 pub mod normal;
+/// todo
+pub mod simple;
 
 use embassy_embedded_hal::SetConfig;
 
 use crate::{
-    dma::{
-        Channel,
-        DmaEligible,
-        PeripheralDmaChannel,
-    }, peripherals, uart::{self, uhci::Error::*, Uart}, Async, Blocking, DriverMode
+    Async,
+    Blocking,
+    DriverMode,
+    dma::{Channel, DmaEligible, PeripheralDmaChannel},
+    peripherals,
+    uart::{self, Uart, uhci::Error::*},
 };
 
 /// todo
@@ -49,7 +50,7 @@ impl AnyUhci<'_> {
 }
 
 /// todo
-pub struct UhciInternal<'d, Dm>
+pub(crate) struct UhciInternal<'d, Dm>
 where
     Dm: DriverMode,
 {
@@ -117,7 +118,7 @@ where
 
     /// todo
     #[allow(dead_code)]
-    pub fn set_chunk_limit(&self, limit: usize) -> Result<(), Error> {
+    pub(crate) fn set_chunk_limit(&self, limit: usize) -> Result<(), Error> {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);
@@ -134,7 +135,11 @@ where
     }
 
     /// todo
-    pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
+    #[allow(dead_code)]
+    pub(crate) fn set_uart_config(
+        &mut self,
+        uart_config: &uart::Config,
+    ) -> Result<(), uart::ConfigError> {
         self.uart.set_config(uart_config)
     }
 }
@@ -159,4 +164,25 @@ impl<'d> UhciInternal<'d, Async> {
             channel: self.channel.into_blocking(),
         }
     }
+}
+
+#[macro_export]
+/// todo
+macro_rules! into_internal {
+    () => {
+        /// todo
+        #[allow(dead_code)]
+        pub fn set_uart_config(
+            &mut self,
+            uart_config: &uart::Config,
+        ) -> Result<(), uart::ConfigError> {
+            self.internal.set_uart_config(uart_config)
+        }
+
+        /// todo
+        #[allow(dead_code)]
+        pub fn set_chunk_limit(&self, limit: usize) -> Result<(), uhci::Error> {
+            self.internal.set_chunk_limit(limit)
+        }
+    };
 }

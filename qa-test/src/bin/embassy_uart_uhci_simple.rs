@@ -1,5 +1,5 @@
-//! This example utilises the UHCI peripheral to use UART with DMA, but with async using embassy
-//! uart_uhci
+//! This example utilises the UHCI peripheral to use UART with DMA
+//! using the UhciSimple implementation but with async using embassy
 
 //% CHIPS: esp32c6
 
@@ -48,13 +48,13 @@ async fn run_uart(peripherals: Peripherals) {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut uhci = UhciSimple::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
-    uhci.internal.chunk_limit(dma_rx.len()).unwrap();
+    uhci.set_chunk_limit(dma_rx.len()).unwrap();
 
     // Change uart config after uhci consumed it
     let config = Config::default()
         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
         .with_baudrate(9600);
-    uhci.internal.set_uart_config(&config).unwrap();
+    uhci.set_uart_config(&config).unwrap();
 
     loop {
         println!("Waiting for message");

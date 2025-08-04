@@ -1,7 +1,9 @@
 use core::mem::ManuallyDrop;
+use crate::uart;
+use crate::uart::uhci;
 
 use crate::{
-    dma::{asynch::{DmaRxFuture, DmaTxFuture}, Channel, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer}, peripherals, uart::{
+    dma::{asynch::{DmaRxFuture, DmaTxFuture}, Channel, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer}, into_internal, peripherals, uart::{
         uhci::{AnyUhci, UhciInternal}, Uart
     }, Async, Blocking, DriverMode
 };
@@ -12,7 +14,7 @@ where
     Dm: DriverMode,
 {
     /// todo
-    pub internal: UhciInternal<'d, Dm>,
+    pub(crate) internal: UhciInternal<'d, Dm>,
 }
 
 impl<'d> Uhci<'d, Blocking> {
@@ -90,6 +92,10 @@ impl<'d> Uhci<'d, Async> {
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
         Uhci { internal: self.internal.into_blocking() }
     }
+}
+
+impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
+    into_internal!();
 }
 
 // Based on SpiDmaTransfer

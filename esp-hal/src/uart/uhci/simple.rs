@@ -1,3 +1,5 @@
+use crate::uart;
+use crate::uart::uhci;
 use crate::{
     Async,
     Blocking,
@@ -10,6 +12,7 @@ use crate::{
         DmaTxBuffer,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
+    into_internal,
     peripherals,
     uart::{
         Uart,
@@ -23,7 +26,7 @@ where
     Dm: DriverMode,
 {
     /// todo
-    pub internal: UhciInternal<'d, Dm>,
+    pub(crate) internal: UhciInternal<'d, Dm>,
 }
 
 impl<'d> UhciSimple<'d, Blocking> {
@@ -133,4 +136,8 @@ impl<'d> UhciSimple<'d, Async> {
         let internal = self.internal.into_blocking();
         UhciSimple::<'d, Blocking> { internal }
     }
+}
+
+impl<'d, Dm: DriverMode> UhciSimple<'d, Dm> {
+    into_internal!();
 }
