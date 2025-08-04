@@ -73,9 +73,11 @@ impl RawQueue {
     /// This allocates underlying storage. See [release_storage]
     pub fn new(capacity: usize, item_size: usize) -> Self {
         let storage = unsafe {
-            let mut boxed = Box::new_uninit_slice(capacity * item_size).assume_init();
-            boxed.fill(0);
-            boxed
+            let mut boxed = Box::new_uninit_slice(capacity * item_size);
+            for i in 0..capacity * item_size {
+                boxed[i].write(0);
+            }
+            boxed.assume_init()
         };
 
         Self {
