@@ -57,7 +57,7 @@ fn main() -> ! {
                     auxiliary_security_header: None,
                 },
                 content: FrameContent::Data,
-                payload: heapless::Vec::from_slice(b"Hello World").unwrap(),
+                payload: b"Hello World".to_vec(),
                 footer: [0u8; 2],
             })
             .ok();
