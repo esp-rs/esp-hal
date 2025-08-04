@@ -117,7 +117,7 @@ where
 
     /// todo
     #[allow(dead_code)]
-    pub fn chunk_limit(&self, limit: usize) -> Result<(), Error> {
+    pub fn set_chunk_limit(&self, limit: usize) -> Result<(), Error> {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);

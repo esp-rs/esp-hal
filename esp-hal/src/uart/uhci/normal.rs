@@ -47,7 +47,7 @@ impl<'d> Uhci<'d, Blocking> {
 
 impl<'d> Uhci<'d, Async> {
     /// todo
-    pub async fn write_dma<Buf: DmaTxBuffer>(
+    pub async fn write<Buf: DmaTxBuffer>(
         mut self,
         mut tx_buffer: Buf,
     ) -> UhciDmaTxTransfer<'d, Async, Buf> {
@@ -67,7 +67,7 @@ impl<'d> Uhci<'d, Async> {
     }
 
     /// todo
-    pub async fn read_dma<Buf: DmaRxBuffer>(
+    pub async fn read<Buf: DmaRxBuffer>(
         mut self,
         mut rx_buffer: Buf,
     ) -> UhciDmaRxTransfer<'d, Async, Buf> {
@@ -88,8 +88,7 @@ impl<'d> Uhci<'d, Async> {
 
     /// todo
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
-        let internal = self.internal.into_blocking();
-        Uhci { internal }
+        Uhci { internal: self.internal.into_blocking() }
     }
 }
 
@@ -102,16 +101,17 @@ impl<'d> Uhci<'d, Async> {
 pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaTxBuffer
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
-    dma_buf: ManuallyDrop<Buf>,
+    dma_buf: ManuallyDrop<Buf::View>,
 }
 
-impl<'d, Buf> UhciDmaTxTransfer<'d, Async, Buf> {
+impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     fn new(uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
-            dma_buf: ManuallyDrop::new(dma_buf),
+            dma_buf: ManuallyDrop::new(dma_buf.into_view()),
         }
     }
 
@@ -131,7 +131,7 @@ impl<'d, Buf> UhciDmaTxTransfer<'d, Async, Buf> {
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     #[instability::unstable]
-    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf) {
+    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         self.wait_for_idle().await;
 
         let retval = unsafe {
@@ -146,24 +146,31 @@ impl<'d, Buf> UhciDmaTxTransfer<'d, Async, Buf> {
 
     /// Cancels the DMA transfer.
     #[instability::unstable]
-    pub fn cancel(&mut self) {
-        // TODO: Shouldn't I here return like in wait?
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
+        if !self.uhci.internal.channel.rx.is_done() {
+            self.uhci.internal.channel.rx.stop_transfer();
         }
+
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
     }
 }
 
 impl<Dm, Buf> Drop for UhciDmaTxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaTxBuffer,
 {
     fn drop(&mut self) {
         if !self.uhci.internal.channel.tx.is_done() {
             self.uhci.internal.channel.tx.stop_transfer();
-            // TODO: I don't have async here, should I call the blocking (not yet existing
-            // wait_for_idle?) should a drop cause the whole program to potentially
-            // freeze? self.wait_for_idle();
+            // TODO: Implement uhci drop
 
             unsafe {
                 ManuallyDrop::drop(&mut self.uhci);
@@ -182,16 +189,17 @@ where
 pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaRxBuffer
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
-    dma_buf: ManuallyDrop<Buf>,
+    dma_buf: ManuallyDrop<Buf::View>,
 }
 
-impl<'d, Buf> UhciDmaRxTransfer<'d, Async, Buf> {
+impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     fn new(uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
-            dma_buf: ManuallyDrop::new(dma_buf),
+            dma_buf: ManuallyDrop::new(dma_buf.into_view()),
         }
     }
 
@@ -211,7 +219,7 @@ impl<'d, Buf> UhciDmaRxTransfer<'d, Async, Buf> {
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     #[instability::unstable]
-    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf) {
+    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         self.wait_for_idle().await;
 
         let retval = unsafe {
@@ -226,24 +234,31 @@ impl<'d, Buf> UhciDmaRxTransfer<'d, Async, Buf> {
 
     /// Cancels the DMA transfer.
     #[instability::unstable]
-    pub fn cancel(&mut self) {
-        // TODO: Shouldn't I here return like in wait?
+    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
         if !self.uhci.internal.channel.tx.is_done() {
             self.uhci.internal.channel.tx.stop_transfer();
         }
+
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
     }
 }
 
 impl<Dm, Buf> Drop for UhciDmaRxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
+    Buf: DmaRxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
-            // TODO: I don't have async here, should I call the blocking (not yet existing
-            // wait_for_idle?) should a drop cause the whole program to potentially
-            // freeze? self.wait_for_idle();
+        if !self.uhci.internal.channel.rx.is_done() {
+            self.uhci.internal.channel.rx.stop_transfer();
+            // TODO: Implement uhci drop
 
             unsafe {
                 ManuallyDrop::drop(&mut self.uhci);
