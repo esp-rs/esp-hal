@@ -66,7 +66,7 @@ where
     pub(crate) fn init(&self) {
         self.clean_turn_on();
         self.reset();
-        self.configure();
+        self.conf_uart();
     }
 
     // uhci_ll_enable_bus_clock
@@ -93,8 +93,8 @@ where
         reg.conf0().modify(|_, w| w.tx_rst().clear_bit());
     }
 
-    /// todo
-    fn configure(&self) {
+
+    fn conf_uart(&self) {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
 
         // Idk if there is a better way to check it, but it works
@@ -108,17 +108,10 @@ where
                 reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
             }
         }
-
-        // If you plan to support more UHCI features, this needs to be configurable
-        reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
-
-        // If you plan to support more UHCI features, this needs to be configurable
-        reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
     }
 
-    /// todo
     #[allow(dead_code)]
-    pub(crate) fn set_chunk_limit(&self, limit: usize) -> Result<(), Error> {
+    pub(crate) fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
         let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);
@@ -134,7 +127,6 @@ where
         Ok(())
     }
 
-    /// todo
     #[allow(dead_code)]
     pub(crate) fn set_uart_config(
         &mut self,
@@ -177,12 +169,6 @@ macro_rules! into_internal {
             uart_config: &uart::Config,
         ) -> Result<(), uart::ConfigError> {
             self.internal.set_uart_config(uart_config)
-        }
-
-        /// todo
-        #[allow(dead_code)]
-        pub fn set_chunk_limit(&self, limit: usize) -> Result<(), uhci::Error> {
-            self.internal.set_chunk_limit(limit)
         }
     };
 }

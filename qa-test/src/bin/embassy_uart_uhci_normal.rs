@@ -14,7 +14,7 @@ use esp_hal::{
     dma_buffers,
     peripherals::Peripherals,
     timer::timg::TimerGroup,
-    uart::{uhci::normal::Uhci, Config, RxConfig, Uart},
+    uart::{self, RxConfig, Uart, uhci::normal::Uhci},
 };
 use esp_println::println;
 
@@ -34,7 +34,7 @@ async fn main(_spawner: Spawner) {
 
 #[embassy_executor::task()]
 async fn run_uart(peripherals: Peripherals) {
-    let config = Config::default()
+    let config = uart::Config::default()
         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
         .with_baudrate(115200);
 
@@ -48,10 +48,11 @@ async fn run_uart(peripherals: Peripherals) {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
-    uhci.set_chunk_limit(dma_rx.len()).unwrap();
+    uhci.apply_config(&uart::uhci::normal::Config::default().with_chunk_limit(dma_rx.len() as u16))
+        .unwrap();
 
     // Change uart config after uhci consumed it
-    let config = Config::default()
+    let config = uart::Config::default()
         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
         .with_baudrate(9600);
     uhci.set_uart_config(&config).unwrap();

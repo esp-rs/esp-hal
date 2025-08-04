@@ -48,7 +48,7 @@ async fn run_uart(peripherals: Peripherals) {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut uhci = UhciSimple::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
-    uhci.set_chunk_limit(dma_rx.len()).unwrap();
+    uhci.set_chunk_limit(dma_rx.len() as u16).unwrap();
 
     // Change uart config after uhci consumed it
     let config = Config::default()

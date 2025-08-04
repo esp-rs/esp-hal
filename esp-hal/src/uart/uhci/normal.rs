@@ -1,12 +1,91 @@
 use core::mem::ManuallyDrop;
-use crate::uart;
-use crate::uart::uhci;
 
 use crate::{
-    dma::{asynch::{DmaRxFuture, DmaTxFuture}, Channel, DmaChannelFor, DmaEligible, DmaRxBuffer, DmaTxBuffer}, into_internal, peripherals, uart::{
-        uhci::{AnyUhci, UhciInternal}, Uart
-    }, Async, Blocking, DriverMode
+    Async,
+    Blocking,
+    DriverMode,
+    dma::{
+        Channel,
+        DmaChannelFor,
+        DmaEligible,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        asynch::{DmaRxFuture, DmaTxFuture},
+    },
+    into_internal,
+    peripherals,
+    uart,
+    uart::{
+        Uart,
+        uhci::{AnyUhci, UhciInternal},
+    },
 };
+use crate::uart::uhci::normal::ConfigError::*;
+
+/// A configuration error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// chunk_limit is above 4095
+    AboveReadLimit,
+}
+
+/// UHCI Configuration
+#[derive(Debug, Clone, Copy, procmacros::BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+pub struct Config {
+    /// If this is set to true UHCI will end the payload receiving process when UART has been in
+    /// idle state.
+    idle_eof: bool,
+    /// If this is set to true UHCI decoder receiving payload data ends when the receiving
+    /// byte count has reached the specified value (in len_eof).
+    /// If this is set to false UHCI decoder receiving payload data is end when 0xc0 is received.
+    len_eof: bool,
+    /// The limit of how much to read in a single read call. It cannot be higher than the dma
+    /// buffer size, otherwise uart/dma/uhci will freeze. It cannot exceed 4095 (12 bits), above
+    /// this value it will simply also split the readings
+    chunk_limit: u16,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            idle_eof: true,
+            len_eof: true,
+            chunk_limit: 0,
+        }
+    }
+}
+
+impl core::error::Error for ConfigError {}
+
+impl core::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ConfigError::AboveReadLimit => {
+                write!(
+                    f,
+                    "The requested read limit is not possible. The max is 4095 (12 bits)"
+                )
+            }
+        }
+    }
+}
+
+#[instability::unstable]
+impl<Dm> embassy_embedded_hal::SetConfig for Uhci<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
 
 /// todo
 pub struct Uhci<'d, Dm>
@@ -90,12 +169,29 @@ impl<'d> Uhci<'d, Async> {
 
     /// todo
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
-        Uhci { internal: self.internal.into_blocking() }
+        Uhci {
+            internal: self.internal.into_blocking(),
+        }
     }
 }
 
 impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
     into_internal!();
+
+    /// todo
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let reg: &esp32c6::uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
+
+        reg.conf0().modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
+
+        reg.conf0().modify(|_, w| w.len_eof_en().bit(config.len_eof));
+
+        if self.internal.set_chunk_limit(config.chunk_limit).is_err() {
+            return Err(AboveReadLimit);
+        }
+
+        Ok(())
+    }
 }
 
 // Based on SpiDmaTransfer
@@ -107,7 +203,7 @@ impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
 pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
-    Buf: DmaTxBuffer
+    Buf: DmaTxBuffer,
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
@@ -195,7 +291,7 @@ where
 pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
-    Buf: DmaRxBuffer
+    Buf: DmaRxBuffer,
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,

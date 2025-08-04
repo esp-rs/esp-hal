@@ -1,5 +1,3 @@
-use crate::uart;
-use crate::uart::uhci;
 use crate::{
     Async,
     Blocking,
@@ -14,8 +12,10 @@ use crate::{
     },
     into_internal,
     peripherals,
+    uart,
     uart::{
         Uart,
+        uhci,
         uhci::{AnyUhci, UhciInternal},
     },
 };
@@ -47,9 +47,21 @@ impl<'d> UhciSimple<'d, Blocking> {
 
         self_uhci.init();
 
-        Self {
+        let simple = Self {
             internal: self_uhci,
-        }
+        };
+        simple.init();
+
+        simple
+    }
+
+    fn init(&self) {
+        let reg: &esp32c6::uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
+        // If you plan to support more UHCI features, this needs to be configurable
+        reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
+
+        // If you plan to support more UHCI features, this needs to be configurable
+        reg.conf0().modify(|_, w| w.len_eof_en().set_bit());
     }
 
     /// todo
@@ -140,4 +152,10 @@ impl<'d> UhciSimple<'d, Async> {
 
 impl<'d, Dm: DriverMode> UhciSimple<'d, Dm> {
     into_internal!();
+
+    /// todo
+    #[allow(dead_code)]
+    pub fn set_chunk_limit(&self, limit: u16) -> Result<(), uhci::Error> {
+        self.internal.set_chunk_limit(limit)
+    }
 }
