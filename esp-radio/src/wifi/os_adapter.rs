@@ -1116,22 +1116,6 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 }
 
 /// **************************************************************************
-/// Name: esp_timer_get_time
-///
-/// Description:
-///   Get time in microseconds since boot.
-///
-/// Returned Value:
-///   System time in micros
-///
-/// *************************************************************************
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
-    trace!("esp_timer_get_time");
-    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
-}
-
-/// **************************************************************************
 /// Name: esp_nvs_set_i8
 ///
 /// Description:

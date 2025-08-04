@@ -20,6 +20,10 @@ PROVIDE( strcasecmp = 0x400003d0 );
 
 PROVIDE( memchr = 0x400003c8 );
 
+EXTERN(__mktime);
+EXTERN(__strnlen);
+EXTERN(__atoi);
+
 PROVIDE ( strnlen = __strnlen );
 PROVIDE ( atoi = __atoi );
 PROVIDE ( mktime = __mktime );

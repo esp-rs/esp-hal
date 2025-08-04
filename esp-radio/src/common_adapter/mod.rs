@@ -278,6 +278,22 @@ pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()
     0
 }
 
+/// **************************************************************************
+/// Name: esp_timer_get_time
+///
+/// Description:
+///   Get time in microseconds since boot.
+///
+/// Returned Value:
+///   System time in micros
+///
+/// *************************************************************************
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
+    trace!("esp_timer_get_time");
+    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");

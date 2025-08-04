@@ -24,7 +24,7 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
         _is_in_isr: Some(is_in_isr_wrapper),
         _malloc_internal: Some(malloc),
         _free: Some(free),
-        _esp_timer_get_time: Some(esp_timer_get_time),
+        _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
         _env_is_chip: Some(env_is_chip),
         _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
         _timer_disarm: Some(ets_timer_disarm),
