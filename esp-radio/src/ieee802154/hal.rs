@@ -297,8 +297,8 @@ pub(crate) fn set_multipan_ext_addr(
 ) {
     let inf = IEEE802154::regs().inf(index as usize);
 
-    let ext_addr0 = u32::from_le_bytes(unwrap!(ext_addr[0..3].try_into()));
-    let ext_addr1 = u32::from_le_bytes(unwrap!(ext_addr[4..7].try_into()));
+    let ext_addr0 = u32::from_le_bytes(unwrap!(ext_addr[0..4].try_into()));
+    let ext_addr1 = u32::from_le_bytes(unwrap!(ext_addr[4..8].try_into()));
 
     inf.extend_addr0()
         .write(|w| unsafe { w.extend_addr0().bits(ext_addr0) });
