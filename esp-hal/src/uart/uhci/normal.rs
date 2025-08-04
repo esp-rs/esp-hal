@@ -54,7 +54,7 @@ impl Default for Config {
         Config {
             idle_eof: true,
             len_eof: true,
-            chunk_limit: 0,
+            chunk_limit: 128, // This is the default in the register at boot
         }
     }
 }
