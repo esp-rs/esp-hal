@@ -4,6 +4,7 @@ pub mod normal;
 pub mod simple;
 
 use embassy_embedded_hal::SetConfig;
+use esp32c6::uhci0;
 
 use crate::{
     Async,
@@ -71,7 +72,7 @@ where
 
     // uhci_ll_enable_bus_clock
     fn clean_turn_on(&self) {
-        let reg: &esp32c6::uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.clk_en().set_bit());
         reg.conf0().modify(|_, w| {
             unsafe { w.bits(0) };
@@ -85,7 +86,7 @@ where
 
     // Via UHCI_RX_RST
     fn reset(&self) {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.rx_rst().set_bit());
         reg.conf0().modify(|_, w| w.rx_rst().clear_bit());
         // Tx, unsure
@@ -95,7 +96,7 @@ where
 
 
     fn conf_uart(&self) {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
 
         // Idk if there is a better way to check it, but it works
         match &self.uart.tx.uart.0 {
@@ -112,7 +113,7 @@ where
 
     #[allow(dead_code)]
     pub(crate) fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);
 

@@ -1,3 +1,5 @@
+use esp32c6::uhci0;
+
 use crate::{
     Async,
     Blocking,
@@ -56,7 +58,7 @@ impl<'d> UhciSimple<'d, Blocking> {
     }
 
     fn init(&self) {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
         // If you plan to support more UHCI features, this needs to be configurable
         reg.conf0().modify(|_, w| w.uart_idle_eof_en().set_bit());
 

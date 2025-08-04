@@ -1,4 +1,6 @@
-use core::mem::ManuallyDrop;
+use core::{mem::ManuallyDrop, ops::{Deref, DerefMut}};
+
+use esp32c6::uhci0;
 
 use crate::{
     Async,
@@ -179,7 +181,7 @@ impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
 
     /// todo
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let reg: &esp32c6::uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
 
         reg.conf0()
             .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
@@ -265,6 +267,20 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     }
 }
 
+impl<Dm: DriverMode, Buf: DmaTxBuffer> Deref for UhciDmaTxTransfer<'_, Dm, Buf> {
+    type Target = Buf::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.dma_buf
+    }
+}
+
+impl<Dm: DriverMode, Buf: DmaTxBuffer> DerefMut for UhciDmaTxTransfer<'_, Dm, Buf> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dma_buf
+    }
+}
+
 impl<Dm, Buf> Drop for UhciDmaTxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
@@ -273,12 +289,12 @@ where
     fn drop(&mut self) {
         if !self.uhci.internal.channel.tx.is_done() {
             self.uhci.internal.channel.tx.stop_transfer();
-            // TODO: Implement uhci drop
+        }
+        // TODO: Implement uhci drop
 
-            unsafe {
-                ManuallyDrop::drop(&mut self.uhci);
-                ManuallyDrop::drop(&mut self.dma_buf);
-            }
+        unsafe {
+            ManuallyDrop::drop(&mut self.uhci);
+            ManuallyDrop::drop(&mut self.dma_buf);
         }
     }
 }
@@ -353,6 +369,20 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     }
 }
 
+impl<Dm: DriverMode, Buf: DmaRxBuffer> Deref for UhciDmaRxTransfer<'_, Dm, Buf> {
+    type Target = Buf::View;
+
+    fn deref(&self) -> &Self::Target {
+        &self.dma_buf
+    }
+}
+
+impl<Dm: DriverMode, Buf: DmaRxBuffer> DerefMut for UhciDmaRxTransfer<'_, Dm, Buf> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.dma_buf
+    }
+}
+
 impl<Dm, Buf> Drop for UhciDmaRxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
@@ -362,11 +392,10 @@ where
         if !self.uhci.internal.channel.rx.is_done() {
             self.uhci.internal.channel.rx.stop_transfer();
             // TODO: Implement uhci drop
-
-            unsafe {
-                ManuallyDrop::drop(&mut self.uhci);
-                ManuallyDrop::drop(&mut self.dma_buf);
-            }
+        }
+        unsafe {
+            ManuallyDrop::drop(&mut self.uhci);
+            ManuallyDrop::drop(&mut self.dma_buf);
         }
     }
 }
