@@ -183,6 +183,18 @@ macro_rules! property {
     ("rng.apb_cycle_wait_num", str) => {
         stringify!(16)
     };
+    ("rsa.size_increment") => {
+        32
+    };
+    ("rsa.size_increment", str) => {
+        stringify!(32)
+    };
+    ("rsa.memory_size_bytes") => {
+        384
+    };
+    ("rsa.memory_size_bytes", str) => {
+        stringify!(384)
+    };
     ("spi_master.has_octal") => {
         false
     };
@@ -483,7 +495,8 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((PCR <= PCR() (unstable)));
         _for_each_inner!((PLIC_MX <= PLIC_MX() (unstable))); _for_each_inner!((PMU <=
         PMU() (unstable))); _for_each_inner!((RMT <= RMT() (unstable)));
-        _for_each_inner!((RNG <= RNG() (unstable))); _for_each_inner!((RSA <= RSA()
+        _for_each_inner!((RNG <= RNG() (unstable))); _for_each_inner!((RSA <= RSA(RSA : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable))); _for_each_inner!((SHA <= SHA() (unstable)));
         _for_each_inner!((SLCHOST <= SLCHOST() (unstable))); _for_each_inner!((ETM <=
         SOC_ETM() (unstable))); _for_each_inner!((SPI0 <= SPI0() (unstable)));
@@ -548,9 +561,10 @@ macro_rules! for_each_peripheral {
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (PAU <= PAU()
         (unstable)), (PCNT <= PCNT() (unstable)), (PCR <= PCR() (unstable)), (PLIC_MX <=
         PLIC_MX() (unstable)), (PMU <= PMU() (unstable)), (RMT <= RMT() (unstable)), (RNG
-        <= RNG() (unstable)), (RSA <= RSA() (unstable)), (SHA <= SHA() (unstable)),
-        (SLCHOST <= SLCHOST() (unstable)), (ETM <= SOC_ETM() (unstable)), (SPI0 <= SPI0()
-        (unstable)), (SPI1 <= SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : {
+        <= RNG() (unstable)), (RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (SHA <= SHA()
+        (unstable)), (SLCHOST <= SLCHOST() (unstable)), (ETM <= SOC_ETM() (unstable)),
+        (SPI0 <= SPI0() (unstable)), (SPI1 <= SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (SYSTEM
         <= PCR() (unstable)), (SYSTIMER <= SYSTIMER() (unstable)), (TEE <= TEE()
         (unstable)), (TIMG0 <= TIMG0() (unstable)), (TIMG1 <= TIMG1() (unstable)),

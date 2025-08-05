@@ -177,6 +177,18 @@ macro_rules! property {
     ("rng.apb_cycle_wait_num", str) => {
         stringify!(16)
     };
+    ("rsa.size_increment") => {
+        32
+    };
+    ("rsa.size_increment", str) => {
+        stringify!(32)
+    };
+    ("rsa.memory_size_bytes") => {
+        384
+    };
+    ("rsa.memory_size_bytes", str) => {
+        stringify!(384)
+    };
     ("spi_master.has_octal") => {
         false
     };
@@ -445,7 +457,8 @@ macro_rules! for_each_peripheral {
         (unstable))); _for_each_inner!((IO_MUX <= IO_MUX() (unstable)));
         _for_each_inner!((LEDC <= LEDC() (unstable))); _for_each_inner!((NRX <= NRX()
         (unstable))); _for_each_inner!((RMT <= RMT() (unstable))); _for_each_inner!((RNG
-        <= RNG() (unstable))); _for_each_inner!((RSA <= RSA() (unstable)));
+        <= RNG() (unstable))); _for_each_inner!((RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner!((LPWR <= RTC_CNTL() (unstable))); _for_each_inner!((SENSITIVE <=
         SENSITIVE() (unstable))); _for_each_inner!((SHA <= SHA() (unstable)));
         _for_each_inner!((SPI0 <= SPI0() (unstable))); _for_each_inner!((SPI1 <= SPI1()
@@ -485,23 +498,24 @@ macro_rules! for_each_peripheral {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (INTERRUPT_CORE0 <= INTERRUPT_CORE0() (unstable)), (IO_MUX <=
         IO_MUX() (unstable)), (LEDC <= LEDC() (unstable)), (NRX <= NRX() (unstable)),
-        (RMT <= RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA() (unstable)),
-        (LPWR <= RTC_CNTL() (unstable)), (SENSITIVE <= SENSITIVE() (unstable)), (SHA <=
-        SHA() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <= SPI1() (unstable)),
-        (SPI2 <= SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (SYSTEM <= SYSTEM() (unstable)), (SYSTIMER <=
-        SYSTIMER() (unstable)), (TIMG0 <= TIMG0() (unstable)), (TIMG1 <= TIMG1()
-        (unstable)), (TWAI0 <= TWAI0() (unstable)), (UART0 <= UART0(UART0 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (UART1 <=
-        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt })), (UHCI0 <= UHCI0() (unstable)), (UHCI1 <= UHCI1()
-        (unstable)), (USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (XTS_AES <=
-        XTS_AES() (unstable)), (DMA_CH0 <= virtual() (unstable)), (DMA_CH1 <= virtual()
-        (unstable)), (DMA_CH2 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
-        (ADC2 <= virtual() (unstable)), (BT <= virtual() (unstable)), (SW_INTERRUPT <=
-        virtual() (unstable)), (TSENS <= virtual() (unstable)), (WIFI <= virtual()
-        (unstable))));
+        (RMT <= RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA(RSA : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (LPWR <= RTC_CNTL() (unstable)), (SENSITIVE <= SENSITIVE()
+        (unstable)), (SHA <= SHA() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
+        SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (SYSTEM <= SYSTEM()
+        (unstable)), (SYSTIMER <= SYSTIMER() (unstable)), (TIMG0 <= TIMG0() (unstable)),
+        (TIMG1 <= TIMG1() (unstable)), (TWAI0 <= TWAI0() (unstable)), (UART0 <=
+        UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (UART1 <= UART1(UART1 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (UHCI0 <= UHCI0() (unstable)),
+        (UHCI1 <= UHCI1() (unstable)), (USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (XTS_AES <= XTS_AES() (unstable)), (DMA_CH0 <= virtual()
+        (unstable)), (DMA_CH1 <= virtual() (unstable)), (DMA_CH2 <= virtual()
+        (unstable)), (ADC1 <= virtual() (unstable)), (ADC2 <= virtual() (unstable)), (BT
+        <= virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (TSENS <=
+        virtual() (unstable)), (WIFI <= virtual() (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

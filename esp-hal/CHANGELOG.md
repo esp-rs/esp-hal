@@ -28,6 +28,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ISR callbacks are now wrapped in `IsrCallback` (#3885)
 - The RMT `PulseCode` is now a newtype wrapping `u32` with `const fn` methods and implementing `defmt::Format` and `core::fmt::Debug`. (#3884)
 - RMT transmit and receive methods accept `impl Into<PulseCode>` and `impl From<PulseCode>`, respectively. (#3884)
+- The `Rsa::read` function has been removed. The constructor now blocks until the peripheral's memory has been cleared (#3900)
+- `Rsa::enable_constant_time_acceleration` has been renamed to `Rsa::disable_constant_time` (#3900)
+- `Rsa::enable_search_acceleration` has been renamed to `Rsa::search_acceleration` (#3900)
 
 ### Fixed
 

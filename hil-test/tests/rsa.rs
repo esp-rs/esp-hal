@@ -34,6 +34,21 @@ const BIGNUM_3: U512 = Uint::from_be_hex(
     67aeafa9ba25feb8712f188cb139b7d9b9af1c361",
 );
 
+const EXPECTED_EXPONENTIATION_OUTPUT: [u32; U512::LIMBS] = [
+    1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085, 1938128086,
+    625895085, 2087010412, 2133352910, 101578249, 3798099415, 3357588690, 2065243474, 330914193,
+];
+const EXPECTED_MODULAR_MULT_OUTPUT: [u32; U512::LIMBS] = [
+    1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870, 4209598061,
+    3830489207, 1317083344, 2666864448, 3701382766, 3232598924, 2904609522, 747558855, 479377985,
+];
+const EXPECTED_MULT_OUTPUT: [u32; U1024::LIMBS] = [
+    1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767, 2269697177,
+    1525551459, 3623276361, 3146383138, 191420847, 4252021895, 9176459, 301757643, 4220806186,
+    434407318, 3722444851, 1850128766, 928651940, 107896699, 563405838, 1834067613, 1289630401,
+    3145128058, 3300293535, 3077505758, 1926648662, 1264151247, 3626086486, 3701894076, 306518743,
+];
+
 struct Context<'a> {
     rsa: Rsa<'a, Blocking>,
 }
@@ -51,32 +66,29 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 5)]
+#[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
     #[init]
     fn init() -> Context<'static> {
         let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        #[allow(unused_mut)]
         let mut rsa = Rsa::new(peripherals.RSA);
-        nb::block!(rsa.ready()).unwrap();
+
+        #[cfg(not(esp32))]
+        {
+            // Here we don't care about security, just the values of the results.
+            rsa.disable_constant_time(true);
+            rsa.search_acceleration(true);
+        }
 
         Context { rsa }
     }
 
     #[test]
     fn test_modular_exponentiation(mut ctx: Context<'static>) {
-        const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
-            1601059419, 3994655875, 2600857657, 1530060852, 64828275, 4221878473, 2751381085,
-            1938128086, 625895085, 2087010412, 2133352910, 101578249, 3798099415, 3357588690,
-            2065243474, 330914193,
-        ];
-
-        #[cfg(not(feature = "esp32"))]
-        {
-            ctx.rsa.enable_disable_constant_time_acceleration(true);
-            ctx.rsa.enable_disable_search_acceleration(true);
-        }
         let mut outbuf = [0_u32; U512::LIMBS];
         let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
             &mut ctx.rsa,
@@ -87,17 +99,29 @@ mod tests {
         let r = compute_r(&BIGNUM_3);
         mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
         mod_exp.read_results(&mut outbuf);
-        assert_eq!(EXPECTED_OUTPUT, outbuf);
+        assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn modular_async_exponentiation(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let mut mod_exp = RsaModularExponentiation::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        let r = compute_r(&BIGNUM_3);
+        mod_exp
+            .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
+            .await;
+        assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
     }
 
     #[test]
     fn test_modular_multiplication(mut ctx: Context<'static>) {
-        const EXPECTED_OUTPUT: [u32; U512::LIMBS] = [
-            1868256644, 833470784, 4187374062, 2684021027, 191862388, 1279046003, 1929899870,
-            4209598061, 3830489207, 1317083344, 2666864448, 3701382766, 3232598924, 2904609522,
-            747558855, 479377985,
-        ];
-
         let mut outbuf = [0_u32; U512::LIMBS];
         let r = compute_r(&BIGNUM_3);
         let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
@@ -109,18 +133,30 @@ mod tests {
         );
         mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
         mod_multi.read_results(&mut outbuf);
-        assert_eq!(EXPECTED_OUTPUT, outbuf);
+        assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn test_async_modular_multiplication(ctx: Context<'static>) {
+        let mut rsa = ctx.rsa.into_async();
+
+        let mut outbuf = [0_u32; U512::LIMBS];
+        let r = compute_r(&BIGNUM_3);
+        let mut mod_multi = RsaModularMultiplication::<Op512, _>::new(
+            &mut rsa,
+            BIGNUM_1.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            compute_mprime(&BIGNUM_3),
+        );
+        mod_multi
+            .modular_multiplication(BIGNUM_2.as_words(), &mut outbuf)
+            .await;
+        assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
     }
 
     #[test]
     fn test_multiplication(mut ctx: Context<'static>) {
-        const EXPECTED_OUTPUT: [u32; U1024::LIMBS] = [
-            1264702968, 3552243420, 2602501218, 498422249, 2431753435, 2307424767, 349202767,
-            2269697177, 1525551459, 3623276361, 3146383138, 191420847, 4252021895, 9176459,
-            301757643, 4220806186, 434407318, 3722444851, 1850128766, 928651940, 107896699,
-            563405838, 1834067613, 1289630401, 3145128058, 3300293535, 3077505758, 1926648662,
-            1264151247, 3626086486, 3701894076, 306518743,
-        ];
         let mut outbuf = [0_u32; U1024::LIMBS];
 
         let operand_a = BIGNUM_1.as_words();
@@ -130,6 +166,21 @@ mod tests {
         rsamulti.start_multiplication(operand_b);
         rsamulti.read_results(&mut outbuf);
 
-        assert_eq!(EXPECTED_OUTPUT, outbuf)
+        assert_eq!(EXPECTED_MULT_OUTPUT, outbuf)
+    }
+
+    #[test]
+    async fn test_async_multiplication(ctx: Context<'static>) {
+        let mut outbuf = [0_u32; U1024::LIMBS];
+
+        let mut rsa = ctx.rsa.into_async();
+
+        let operand_a = BIGNUM_1.as_words();
+        let operand_b = BIGNUM_2.as_words();
+
+        let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut rsa, operand_a);
+        rsamulti.multiplication(operand_b, &mut outbuf).await;
+
+        assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
     }
 }

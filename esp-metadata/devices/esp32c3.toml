@@ -36,7 +36,7 @@ peripherals = [
     { name = "NRX" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
     { name = "SHA" },
@@ -307,8 +307,8 @@ channel_ram_size = 48
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 3072 }
-multiplication = { increment = 32, max = 1536 }
+size_increment = 32
+memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"

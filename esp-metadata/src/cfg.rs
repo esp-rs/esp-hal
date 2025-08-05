@@ -9,7 +9,6 @@ pub(crate) mod uart;
 pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
-pub(crate) use rsa::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
@@ -476,8 +475,8 @@ driver_configs![
         name: "RSA",
         has_computed_properties: true,
         properties: {
-            exponentiation: RsaLengths,
-            multiplication: RsaLengths,
+            size_increment: u32,
+            memory_size_bytes: u32,
         }
     },
     SdHostProperties {
