@@ -1,4 +1,7 @@
-use core::{mem::ManuallyDrop, ops::{Deref, DerefMut}};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 use esp32c6::uhci0;
 
@@ -12,12 +15,13 @@ use crate::{
         DmaEligible,
         DmaRxBuffer,
         DmaTxBuffer,
+        RegisterAccess,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     into_internal_uhci,
     peripherals,
-    uart,
     uart::{
+        self,
         Uart,
         uhci::{AnyUhci, UhciInternal, normal::ConfigError::*},
     },
@@ -89,7 +93,8 @@ where
     }
 }
 
-/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in the future with Uhci specific features
+/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in
+/// the future with Uhci specific features
 pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
@@ -134,6 +139,10 @@ impl<'d> Uhci<'d, Async> {
         mut tx_buffer: Buf,
     ) -> UhciDmaTxTransfer<'d, Async, Buf> {
         {
+            // self.internal.channel.tx.clear_interrupts();
+
+            // self.internal.channel.tx.tx_impl.restart();
+
             unsafe {
                 self.internal
                     .channel
@@ -252,8 +261,8 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.rx.is_done() {
-            self.uhci.internal.channel.rx.stop_transfer();
+        if !self.uhci.internal.channel.tx.is_done() {
+            self.uhci.internal.channel.tx.stop_transfer();
         }
 
         let retval = unsafe {
@@ -324,7 +333,7 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
 
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.uhci.internal.channel.tx.is_done()
+        self.uhci.internal.channel.rx.is_done()
     }
 
     async fn wait_for_idle(&mut self) {
@@ -354,8 +363,8 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+        if !self.uhci.internal.channel.rx.is_done() {
+            self.uhci.internal.channel.rx.stop_transfer();
         }
 
         let retval = unsafe {
