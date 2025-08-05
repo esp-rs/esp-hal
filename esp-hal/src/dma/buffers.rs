@@ -1,3 +1,5 @@
+#[cfg(psram_dma)]
+use core::ops::Range;
 use core::{
     ops::{Deref, DerefMut},
     ptr::{NonNull, null_mut},
@@ -1801,7 +1803,8 @@ fn build_descriptor_list_for_psram(
     // Align beginning
     if head_to_copy > 0 {
         let copy_buffer = unwrap!(copy_buffer_iter.next());
-        let buffer = copy_buffer.insert(ManualWritebackBuffer::new(data.cast(), head_to_copy));
+        let buffer =
+            copy_buffer.insert(ManualWritebackBuffer::new(get_range(data, 0..head_to_copy)));
 
         let Some(descriptor) = desciptor_iter.next() else {
             return consumed;
@@ -1812,10 +1815,7 @@ fn build_descriptor_list_for_psram(
     };
 
     // Chain up descriptors for the main aligned data part.
-    let mut aligned_data = NonNull::slice_from_raw_parts(
-        unsafe { data.cast::<u8>().byte_add(head_to_copy) },
-        data.len() - head_to_copy - tail_to_copy,
-    );
+    let mut aligned_data = get_range(data, head_to_copy..data.len() - tail_to_copy);
     while !aligned_data.is_empty() {
         let Some(descriptor) = desciptor_iter.next() else {
             return consumed;
@@ -1825,19 +1825,16 @@ fn build_descriptor_list_for_psram(
         descriptor.set_size(chunk);
         descriptor.buffer = aligned_data.cast::<u8>().as_ptr();
         consumed += chunk;
-        aligned_data = NonNull::slice_from_raw_parts(
-            unsafe { aligned_data.cast::<u8>().byte_add(chunk) },
-            aligned_data.len() - chunk,
-        );
+        aligned_data = get_range(aligned_data, chunk..aligned_data.len());
     }
 
     // Align end
     if tail_to_copy > 0 {
         let copy_buffer = unwrap!(copy_buffer_iter.next());
-        let buffer = copy_buffer.insert(ManualWritebackBuffer::new(
-            unsafe { data.cast().byte_add(data.len() - tail_to_copy) },
-            tail_to_copy,
-        ));
+        let buffer = copy_buffer.insert(ManualWritebackBuffer::new(get_range(
+            data,
+            data.len() - tail_to_copy..data.len(),
+        )));
 
         let Some(descriptor) = desciptor_iter.next() else {
             return consumed;
@@ -1848,6 +1845,12 @@ fn build_descriptor_list_for_psram(
     }
 
     consumed
+}
+
+#[cfg(psram_dma)]
+fn get_range(ptr: NonNull<[u8]>, range: Range<usize>) -> NonNull<[u8]> {
+    let len = range.end - range.start;
+    NonNull::slice_from_raw_parts(unsafe { ptr.cast().byte_add(range.start) }, len)
 }
 
 #[cfg(psram_dma)]
@@ -1928,12 +1931,12 @@ pub(crate) struct ManualWritebackBuffer {
 
 #[cfg(psram_dma)]
 impl ManualWritebackBuffer {
-    pub fn new(ptr: NonNull<u8>, len: usize) -> Self {
-        assert!(len <= BUF_LEN);
+    pub fn new(ptr: NonNull<[u8]>) -> Self {
+        assert!(ptr.len() <= BUF_LEN);
         Self {
-            dst_address: ptr,
+            dst_address: ptr.cast(),
             buffer: [0; BUF_LEN],
-            n_bytes: len as u8,
+            n_bytes: ptr.len() as u8,
         }
     }
 
