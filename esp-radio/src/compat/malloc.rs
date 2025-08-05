@@ -11,6 +11,9 @@ unsafe extern "C" {
 
     pub fn free(ptr: *mut u8);
 
+    #[cfg(feature = "wifi")]
+    pub fn realloc_internal(ptr: *mut u8, size: usize) -> *mut u8;
+
     #[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
     pub fn calloc(number: u32, size: usize) -> *mut u8;
 

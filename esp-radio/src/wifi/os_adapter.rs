@@ -1528,10 +1528,10 @@ pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_t
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn realloc_internal(
-    _ptr: *mut crate::binary::c_types::c_void,
-    _size: usize,
+    ptr: *mut crate::binary::c_types::c_void,
+    size: usize,
 ) -> *mut crate::binary::c_types::c_void {
-    todo!("realloc_internal")
+    unsafe { crate::compat::malloc::realloc_internal(ptr.cast(), size).cast() }
 }
 
 /// **************************************************************************
@@ -1604,10 +1604,10 @@ pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_realloc(
-    _ptr: *mut crate::binary::c_types::c_void,
-    _size: usize,
+    ptr: *mut crate::binary::c_types::c_void,
+    size: usize,
 ) -> *mut crate::binary::c_types::c_void {
-    todo!("wifi_realloc")
+    unsafe { realloc_internal(ptr, size) }
 }
 
 /// **************************************************************************
