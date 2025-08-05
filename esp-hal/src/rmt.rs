@@ -528,7 +528,12 @@ pub struct Rx;
 /// For internal use by the driver.
 pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed {
     #[doc(hidden)]
-    fn is_tx() -> bool;
+    const IS_TX: bool;
+
+    #[doc(hidden)]
+    fn is_tx() -> bool {
+        Self::IS_TX
+    }
 }
 
 impl crate::private::Sealed for Tx {}
@@ -536,17 +541,11 @@ impl crate::private::Sealed for Tx {}
 impl crate::private::Sealed for Rx {}
 
 impl Direction for Tx {
-    #[inline]
-    fn is_tx() -> bool {
-        true
-    }
+    const IS_TX: bool = true;
 }
 
 impl Direction for Rx {
-    #[inline]
-    fn is_tx() -> bool {
-        false
-    }
+    const IS_TX: bool = false;
 }
 
 /// An identifier for one channel of the RMT peripherial.
@@ -556,34 +555,37 @@ pub trait RawChannelAccess: Clone + Copy + core::fmt::Debug + crate::private::Se
     type Dir: Direction;
 
     #[doc(hidden)]
-    fn channel(&self) -> u8;
+    #[inline]
+    fn channel(&self) -> u8 {
+        chip_specific::channel_for_idx::<Self::Dir>(self.ch_idx())
+    }
+
+    #[doc(hidden)]
+    fn ch_idx(&self) -> u8;
 }
 
 /// A compile-time constant identifier for one channel of the RMT peripherial.
 ///
 /// This is a ZST.
 #[derive(Clone, Copy, Debug)]
-pub struct ConstChannelAccess<Dir: Direction, const CHANNEL: u8> {
+pub struct ConstChannelAccess<Dir: Direction, const CH_IDX: u8> {
     _direction: PhantomData<Dir>,
 }
 
 /// Type-erased equivalent of ConstChannelAccess.
 #[derive(Clone, Copy, Debug)]
 pub struct DynChannelAccess<Dir: Direction> {
-    channel: u8,
+    ch_idx: u8,
     _direction: PhantomData<Dir>,
 }
 
-impl<Dir: Direction, const CHANNEL: u8> crate::private::Sealed
-    for ConstChannelAccess<Dir, CHANNEL>
-{
-}
+impl<Dir: Direction, const CH_IDX: u8> crate::private::Sealed for ConstChannelAccess<Dir, CH_IDX> {}
 impl<Dir: Direction> crate::private::Sealed for DynChannelAccess<Dir> {}
 
-impl<Dir, const CHANNEL: u8> ConstChannelAccess<Dir, CHANNEL>
+impl<Dir, const CH_IDX: u8> ConstChannelAccess<Dir, CH_IDX>
 where
     Dir: Direction,
-    ConstChannelAccess<Dir, CHANNEL>: RawChannelAccess,
+    ConstChannelAccess<Dir, CH_IDX>: RawChannelAccess,
 {
     const unsafe fn conjure() -> Self {
         Self {
@@ -594,29 +596,20 @@ where
 
 impl<Dir: Direction> DynChannelAccess<Dir> {
     #[inline]
-    unsafe fn conjure(channel: u8) -> Self {
+    unsafe fn conjure(ch_idx: u8) -> Self {
         Self {
-            channel,
+            ch_idx,
             _direction: PhantomData,
         }
     }
 }
 
-impl<const CHANNEL: u8> RawChannelAccess for ConstChannelAccess<Tx, CHANNEL> {
-    type Dir = Tx;
+impl<const CH_IDX: u8, Dir: Direction> RawChannelAccess for ConstChannelAccess<Dir, CH_IDX> {
+    type Dir = Dir;
 
     #[inline]
-    fn channel(&self) -> u8 {
-        CHANNEL
-    }
-}
-
-impl<const CHANNEL: u8> RawChannelAccess for ConstChannelAccess<Rx, CHANNEL> {
-    type Dir = Rx;
-
-    #[inline]
-    fn channel(&self) -> u8 {
-        CHANNEL
+    fn ch_idx(&self) -> u8 {
+        CH_IDX
     }
 }
 
@@ -624,8 +617,8 @@ impl<Dir: Direction> RawChannelAccess for DynChannelAccess<Dir> {
     type Dir = Dir;
 
     #[inline]
-    fn channel(&self) -> u8 {
-        self.channel
+    fn ch_idx(&self) -> u8 {
+        self.ch_idx as u8
     }
 }
 
@@ -766,7 +759,7 @@ macro_rules! declare_tx_channels {
                 where
                     Dm: crate::DriverMode,
                 {
-                    type Raw = ConstChannelAccess<Tx, $num>;
+                    type Raw = ConstChannelAccess<Tx, $idx>;
                     const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
                 }
             )+
@@ -788,7 +781,7 @@ macro_rules! declare_rx_channels {
                 where
                     Dm: crate::DriverMode,
                 {
-                    type Raw = ConstChannelAccess<$crate::rmt::Rx, $num>;
+                    type Raw = ConstChannelAccess<$crate::rmt::Rx, $idx>;
                     const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
                 }
             )+
@@ -1146,7 +1139,7 @@ where
         let old = ManuallyDrop::new(self);
         Channel {
             raw: DynChannelAccess {
-                channel: old.raw.channel(),
+                ch_idx: old.raw.ch_idx(),
                 _direction: PhantomData,
             },
             _mode: PhantomData,
@@ -1739,36 +1732,22 @@ where
     }
 }
 
-#[cfg(not(any(esp32, esp32s2)))]
+// #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
-    let Some((channel, is_tx)) = chip_specific::pending_interrupt_for_channel() else {
-        return;
-    };
-    if is_tx {
-        unsafe { DynChannelAccess::<Tx>::conjure(channel) }
-            .unlisten_tx_interrupt(Event::End | Event::Error);
-    } else {
-        unsafe { DynChannelAccess::<Rx>::conjure(channel) }
-            .unlisten_rx_interrupt(Event::End | Event::Error);
+    fn on_tx(raw: DynChannelAccess<Tx>) {
+        raw.unlisten_tx_interrupt(Event::End | Event::Error);
+
+        WAKER[raw.channel() as usize].wake();
     }
 
-    WAKER[channel as usize].wake();
-}
+    fn on_rx(raw: DynChannelAccess<Rx>) {
+        raw.unlisten_rx_interrupt(Event::End | Event::Error);
 
-#[cfg(any(esp32, esp32s2))]
-#[handler]
-fn async_interrupt_handler() {
-    let Some(channel) = chip_specific::pending_interrupt_for_channel() else {
-        return;
-    };
+        WAKER[raw.channel() as usize].wake();
+    }
 
-    unsafe { DynChannelAccess::<Tx>::conjure(channel) }
-        .unlisten_tx_interrupt(Event::End | Event::Error);
-    unsafe { DynChannelAccess::<Rx>::conjure(channel) }
-        .unlisten_rx_interrupt(Event::End | Event::Error);
-
-    WAKER[channel as usize].wake();
+    chip_specific::handle_channel_interrupts(on_tx, on_rx);
 }
 
 #[derive(Debug, EnumSetType)]
@@ -1927,8 +1906,10 @@ mod chip_specific {
     use enumset::EnumSet;
 
     use super::{
+        CHANNEL_INDEX_COUNT,
         ChannelInternal,
         Direction,
+        DynChannelAccess,
         Error,
         Event,
         Level,
@@ -1993,33 +1974,32 @@ mod chip_specific {
 
     #[allow(unused)]
     #[inline]
-    pub(super) fn pending_interrupt_for_channel() -> Option<(u8, bool)> {
+    pub(super) fn handle_channel_interrupts(
+        on_tx: fn(DynChannelAccess<Tx>),
+        on_rx: fn(DynChannelAccess<Rx>),
+    ) {
         let st = RMT::regs().int_st().read();
 
-        for ch_idx in 0..NUM_CHANNELS as u8 / 2 {
-            if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
-                // The first half of all channels support tx...
-                let ch_num = ch_idx;
-                return Some((ch_num, true));
+        for ch_idx in 0..CHANNEL_INDEX_COUNT {
+            if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
+                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+                on_tx(raw);
+                return;
             }
-            if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
-                // ...whereas the second half of channels support rx.
-                let ch_num = NUM_CHANNELS as u8 / 2 + ch_idx;
-                return Some((ch_num, false));
+            if st.ch_rx_end(ch_idx as u8).bit() || st.ch_rx_err(ch_idx as u8).bit() {
+                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+                on_rx(raw);
+                return;
             }
         }
-
-        None
     }
 
-    // The index of this channel among all Tx/Rx channels (which may be different
-    // from the channel number).
     #[inline]
-    fn ch_idx<Dir: Direction>(raw: &impl RawChannelAccess<Dir = Dir>) -> u8 {
-        if Dir::is_tx() {
-            raw.channel()
+    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
+        if Dir::IS_TX {
+            idx
         } else {
-            raw.channel() - NUM_CHANNELS as u8 / 2
+            idx + NUM_CHANNELS as u8 / 2
         }
     }
 
@@ -2030,7 +2010,7 @@ mod chip_specific {
         #[inline]
         fn update(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             if A::Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
@@ -2043,7 +2023,7 @@ mod chip_specific {
 
         fn set_divider(&self, divider: u8) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             if A::Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
@@ -2057,7 +2037,7 @@ mod chip_specific {
         #[inline]
         fn memsize(&self) -> MemSize {
             let rmt = RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             let blocks = if A::Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx).read().mem_size().bits()
@@ -2071,7 +2051,7 @@ mod chip_specific {
         fn set_memsize(&self, value: MemSize) {
             let blocks = value.blocks();
             let rmt = RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             if A::Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
@@ -2167,6 +2147,7 @@ mod chip_specific {
             self.update();
         }
 
+        // Inlining this should allow significant optimization at the call site.
         #[inline]
         fn get_tx_status(&self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
@@ -2235,14 +2216,14 @@ mod chip_specific {
         A: RawChannelAccess<Dir = Rx>,
     {
         fn input_signal(&self) -> gpio::InputSignal {
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
             super::INPUT_SIGNALS[ch_idx]
         }
 
         #[inline]
         fn clear_rx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self);
+            let ch_idx = self.ch_idx();
 
             rmt.int_clr().write(|w| {
                 w.ch_rx_end(ch_idx).set_bit();
@@ -2254,14 +2235,14 @@ mod chip_specific {
         #[inline]
         fn set_rx_wrap_mode(&self, wrap: bool) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             rmt.ch_rx_conf1(ch_idx)
                 .modify(|_, w| w.mem_rx_wrap_en().bit(wrap));
         }
 
         fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
             let rmt = crate::peripherals::RMT::regs();
 
             rmt.ch_rx_carrier_rm(ch_idx).write(|w| unsafe {
@@ -2280,7 +2261,7 @@ mod chip_specific {
         #[inline]
         fn start_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self);
+            let ch_idx = self.ch_idx();
 
             for i in 1..self.memsize().blocks() {
                 rmt.ch_rx_conf1((ch_idx + i).into())
@@ -2294,11 +2275,12 @@ mod chip_specific {
             });
         }
 
+        // Inlining this should allow significant optimization at the call site.
         #[inline]
         fn get_rx_status(&self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
-            let ch_idx = ch_idx(self);
+            let ch_idx = self.ch_idx();
 
             if reg.ch_rx_end(ch_idx).bit() {
                 Some(Event::End)
@@ -2314,13 +2296,13 @@ mod chip_specific {
         #[inline]
         fn stop_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
             rmt.ch_rx_conf1(ch_idx).modify(|_, w| w.rx_en().clear_bit());
         }
 
         fn set_rx_filter_threshold(&self, value: u8) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             rmt.ch_rx_conf1(ch_idx).modify(|_, w| unsafe {
                 w.rx_filter_en().bit(value > 0);
@@ -2330,7 +2312,7 @@ mod chip_specific {
 
         fn set_rx_idle_threshold(&self, value: u16) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self) as usize;
+            let ch_idx = self.ch_idx() as usize;
 
             rmt.ch_rx_conf0(ch_idx)
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
@@ -2339,7 +2321,7 @@ mod chip_specific {
         #[inline]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch_idx = ch_idx(self);
+            let ch_idx = self.ch_idx();
 
             rmt.int_ena().modify(|_, w| {
                 if events.contains(Event::Error) {
@@ -2360,16 +2342,19 @@ mod chip_specific {
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
     use enumset::EnumSet;
+    use portable_atomic::Ordering;
 
     use super::{
         ChannelInternal,
         Direction,
+        DynChannelAccess,
         Error,
         Event,
         Level,
         MemSize,
         NUM_CHANNELS,
         RawChannelAccess,
+        RmtState,
         Rx,
         RxChannelInternal,
         Tx,
@@ -2399,13 +2384,42 @@ mod chip_specific {
 
     #[allow(unused)]
     #[inline]
-    pub(super) fn pending_interrupt_for_channel() -> Option<u8> {
-        let rmt = RMT::regs();
-        let st = rmt.int_st().read();
+    pub(super) fn handle_channel_interrupts(
+        on_tx: fn(DynChannelAccess<Tx>),
+        on_rx: fn(DynChannelAccess<Rx>),
+    ) {
+        let st = RMT::regs().int_st().read();
 
-        (0..NUM_CHANNELS as u8).find(|&ch_num| {
-            st.ch_rx_end(ch_num).bit() || st.ch_tx_end(ch_num).bit() || st.ch_err(ch_num).bit()
-        })
+        for ch_idx in 0..CHANNEL_INDEX_COUNT {
+            if st.ch_rx_end(ch_idx).bit() {
+                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+                on_rx(raw);
+                return;
+            }
+            if st.ch_tx_end(ch_idx).bit() {
+                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+                on_tx(raw);
+                return;
+            }
+            if st.ch_err(ch_idx).bit() {
+                if let Some(is_tx) = RmtState::load_by_idx(ch_idx, Ordering::Relaxed).is_tx() {
+                    if is_tx {
+                        let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+                        on_tx(raw);
+                    } else {
+                        let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+                        on_rx(raw);
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    #[inline]
+    #[allow(clippy::extra_unused_type_parameters)]
+    pub(super) const fn channel_for_idx<Dir: Direction>(idx: u8) -> u8 {
+        idx
     }
 
     impl<A> ChannelInternal for A
@@ -2419,24 +2433,20 @@ mod chip_specific {
 
         fn set_divider(&self, divider: u8) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf0(self.channel() as usize)
+            rmt.chconf0(self.ch_idx() as usize)
                 .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
         }
 
         #[inline]
         fn memsize(&self) -> MemSize {
             let rmt = crate::peripherals::RMT::regs();
-            let blocks = rmt
-                .chconf0(self.channel() as usize)
-                .read()
-                .mem_size()
-                .bits();
+            let blocks = rmt.chconf0(self.ch_idx() as usize).read().mem_size().bits();
             MemSize::from_blocks(blocks)
         }
 
         fn set_memsize(&self, value: MemSize) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf0(self.channel() as usize)
+            rmt.chconf0(self.ch_idx() as usize)
                 .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
         }
     }
@@ -2450,10 +2460,10 @@ mod chip_specific {
         fn set_generate_repeat_interrupt(&self, repeats: u16) {
             let rmt = crate::peripherals::RMT::regs();
             if repeats > 1 {
-                rmt.ch_tx_lim(self.channel() as usize)
+                rmt.ch_tx_lim(self.ch_idx() as usize)
                     .modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
             } else {
-                rmt.ch_tx_lim(self.channel() as usize)
+                rmt.ch_tx_lim(self.ch_idx() as usize)
                     .modify(|_, w| unsafe { w.tx_loop_num().bits(0) });
             }
         }
@@ -2467,7 +2477,7 @@ mod chip_specific {
         #[inline]
         fn clear_tx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             rmt.int_clr().write(|w| {
                 w.ch_err(ch).set_bit();
@@ -2480,7 +2490,7 @@ mod chip_specific {
         fn set_tx_continuous(&self, continuous: bool) {
             let rmt = crate::peripherals::RMT::regs();
 
-            rmt.chconf1(self.channel() as usize)
+            rmt.chconf1(self.ch_idx() as usize)
                 .modify(|_, w| w.tx_conti_mode().bit(continuous));
         }
 
@@ -2493,7 +2503,7 @@ mod chip_specific {
 
         fn set_tx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel() as usize;
+            let ch = self.ch_idx() as usize;
 
             rmt.chcarrier_duty(ch)
                 .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
@@ -2508,14 +2518,14 @@ mod chip_specific {
 
         fn set_tx_idle_output(&self, enable: bool, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf1(self.channel() as usize)
+            rmt.chconf1(self.ch_idx() as usize)
                 .modify(|_, w| w.idle_out_en().bit(enable).idle_out_lv().bit(level.into()));
         }
 
         #[inline]
         fn start_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             for i in 1..self.memsize().blocks() {
                 rmt.chconf1((ch + i).into())
@@ -2530,11 +2540,12 @@ mod chip_specific {
             });
         }
 
+        // Inlining this should allow significant optimization at the call site.
         #[inline]
         fn get_tx_status(&self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             if reg.ch_tx_end(ch).bit() {
                 Some(Event::End)
@@ -2551,13 +2562,13 @@ mod chip_specific {
         fn reset_tx_threshold_set(&self) {
             let rmt = crate::peripherals::RMT::regs();
             rmt.int_clr()
-                .write(|w| w.ch_tx_thr_event(self.channel()).set_bit());
+                .write(|w| w.ch_tx_thr_event(self.ch_idx()).set_bit());
         }
 
         #[inline]
         fn set_tx_threshold(&self, threshold: u8) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.ch_tx_lim(self.channel() as usize)
+            rmt.ch_tx_lim(self.ch_idx() as usize)
                 .modify(|_, w| unsafe { w.tx_lim().bits(threshold as u16) });
         }
 
@@ -2571,7 +2582,7 @@ mod chip_specific {
         #[inline]
         fn stop_tx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf1(self.channel() as usize)
+            rmt.chconf1(self.ch_idx() as usize)
                 .modify(|_, w| w.tx_stop().set_bit());
         }
 
@@ -2582,7 +2593,7 @@ mod chip_specific {
         #[inline]
         fn set_tx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
             rmt.int_ena().modify(|_, w| {
                 if events.contains(Event::Error) {
                     w.ch_err(ch).bit(enable);
@@ -2605,7 +2616,7 @@ mod chip_specific {
         #[inline]
         fn clear_rx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             rmt.int_clr().write(|w| {
                 w.ch_rx_end(ch).set_bit();
@@ -2621,7 +2632,7 @@ mod chip_specific {
 
         fn set_rx_carrier(&self, carrier: bool, high: u16, low: u16, level: Level) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel() as usize;
+            let ch = self.ch_idx() as usize;
 
             rmt.chcarrier_duty(ch)
                 .write(|w| unsafe { w.carrier_high().bits(high).carrier_low().bits(low) });
@@ -2637,7 +2648,7 @@ mod chip_specific {
         #[inline]
         fn start_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             for i in 1..self.memsize().blocks() {
                 rmt.chconf1((ch + i).into())
@@ -2652,11 +2663,12 @@ mod chip_specific {
             });
         }
 
+        // Inlining this should allow significant optimization at the call site.
         #[inline]
         fn get_rx_status(&self) -> Option<Event> {
             let rmt = crate::peripherals::RMT::regs();
             let reg = rmt.int_raw().read();
-            let ch = self.channel();
+            let ch = self.ch_idx();
 
             if reg.ch_rx_end(ch).bit() {
                 Some(Event::End)
@@ -2670,13 +2682,13 @@ mod chip_specific {
         #[inline]
         fn stop_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf1(self.channel() as usize)
+            rmt.chconf1(self.ch_idx() as usize)
                 .modify(|_, w| w.rx_en().clear_bit());
         }
 
         fn set_rx_filter_threshold(&self, value: u8) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf1(self.channel() as usize).modify(|_, w| unsafe {
+            rmt.chconf1(self.ch_idx() as usize).modify(|_, w| unsafe {
                 w.rx_filter_en().bit(value > 0);
                 w.rx_filter_thres().bits(value)
             });
@@ -2684,14 +2696,14 @@ mod chip_specific {
 
         fn set_rx_idle_threshold(&self, value: u16) {
             let rmt = crate::peripherals::RMT::regs();
-            rmt.chconf0(self.channel() as usize)
+            rmt.chconf0(self.ch_idx() as usize)
                 .modify(|_, w| unsafe { w.idle_thres().bits(value) });
         }
 
         #[inline]
         fn set_rx_interrupt(&self, events: EnumSet<Event>, enable: bool) {
             let rmt = crate::peripherals::RMT::regs();
-            let ch = self.channel();
+            let ch = self.ch_idx();
             rmt.int_ena().modify(|_, w| {
                 if events.contains(Event::Error) {
                     w.ch_err(ch).bit(enable);
