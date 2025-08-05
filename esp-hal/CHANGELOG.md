@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On RISC-V you can opt-out of nested interrupts for an interrupt handler by using `new_not_nested` (#3875)
 - A new default feature `exception-handler` was added (#3887)
 - `AesBackend, AesContext`: Work-queue based AES driver (#3880)
+- `aes::cipher_modes`, `aes::CipherModeState` for constructing `AesContext`s (#3895)
 
 ### Changed
 

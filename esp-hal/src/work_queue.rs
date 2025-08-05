@@ -102,10 +102,10 @@ impl<T: Sync> Inner<T> {
     /// This function enqueues a new work item or polls the status of the currently processed one.
     fn process(&mut self) {
         if let Some(mut current) = self.current {
-            let result = unsafe { (self.vtable.poll)(self.data, &mut current.as_mut().data) };
+            let result = (self.vtable.poll)(self.data, &mut unsafe { current.as_mut() }.data);
 
             if let Some(Poll::Ready(status)) = result {
-                unsafe { current.as_mut().complete(status) };
+                unsafe { current.as_mut() }.complete(status);
                 self.current = None;
 
                 self.dequeue_and_post(true);
@@ -124,7 +124,7 @@ impl<T: Sync> Inner<T> {
         if let Some(mut ptr) = self.dequeue() {
             // Start processing a new work item.
 
-            if unsafe { (self.vtable.post)(self.data, &mut ptr.as_mut().data) } {
+            if (self.vtable.post)(self.data, &mut unsafe { ptr.as_mut() }.data) {
                 self.current = Some(ptr);
             } else {
                 // If the driver didn't accept the work item, place it back to the front of the
@@ -142,7 +142,7 @@ impl<T: Sync> Inner<T> {
         // If the `head` is None, the queue is empty. Return None and do nothing.
         let ptr = self.head?;
 
-        unsafe { self.head = ptr.as_ref().next };
+        self.head = unsafe { ptr.as_ref() }.next;
 
         // If the new `head` is null, the queue is empty. Clear the `tail` pointer.
         if self.head.is_none() {
@@ -166,10 +166,11 @@ impl<T: Sync> Inner<T> {
             // Cancelling an in-progress item is more complicated than plucking it from the
             // queue. Forward the request to the driver to (maybe) cancel the
             // operation.
-            (self.vtable.cancel)(self.data, unsafe {
+            (self.vtable.cancel)(
+                self.data,
                 // This is safe to do, because the work item is currently owned by this queue.
-                &mut work_item.as_mut().data
-            });
+                &mut unsafe { work_item.as_mut() }.data,
+            );
             // Queue will need to be polled to query item status.
             return false;
         }
@@ -178,7 +179,7 @@ impl<T: Sync> Inner<T> {
         // cancels the work item. `remove` only uses the address of the work item without
         // dereferencing it.
         if self.remove(work_item) {
-            unsafe { work_item.as_mut().complete(Status::Cancelled) };
+            unsafe { work_item.as_mut() }.complete(Status::Cancelled);
             // Cancelled immediately, no further polling necessary for this item.
             return true;
         }
@@ -200,7 +201,7 @@ impl<T: Sync> Inner<T> {
         let mut prev = None;
         let mut current = self.head;
         while let Some(current_item) = current {
-            let next = unsafe { current_item.as_ref().next };
+            let next = unsafe { current_item.as_ref() }.next;
 
             if current_item != ptr {
                 // Not what we're looking for. Move to the next element.
@@ -215,7 +216,7 @@ impl<T: Sync> Inner<T> {
             } else {
                 // Unwrapping is fine, because if the current pointer is not the `head`, the
                 // previous pointer must be Some.
-                unsafe { unwrap!(prev).as_mut().next = next };
+                unsafe { unwrap!(prev).as_mut() }.next = next;
             }
 
             if Some(ptr) == self.tail {
@@ -301,10 +302,10 @@ impl<T: Sync> WorkQueue<T> {
     /// list. This relationship is broken when the Handle that owns the WorkItem is dropped.
     pub unsafe fn poll(&self, item: NonNull<WorkItem<T>>) -> Poll {
         self.inner.with(|inner| {
-            let status = unsafe { (*item.as_ptr()).status };
+            let status = unsafe { &*item.as_ptr() }.status;
             if status == Poll::Pending {
                 inner.process();
-                unsafe { (*item.as_ptr()).status }
+                unsafe { &*item.as_ptr() }.status
             } else {
                 status
             }
@@ -399,7 +400,9 @@ impl<'t, T: Sync> Handle<'t, T> {
     /// Waits for the work item to be processed.
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         poll_fn(|ctx| {
-            unsafe { (*self.work_item.as_ptr()).waker.register(ctx.waker()) };
+            unsafe { &*self.work_item.as_ptr() }
+                .waker
+                .register(ctx.waker());
             match self.poll() {
                 Poll::Pending => core::task::Poll::Pending,
                 Poll::Ready(status) => core::task::Poll::Ready(status),

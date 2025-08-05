@@ -25,6 +25,18 @@ use defmt_rtt as _;
 // Make sure esp_backtrace is not removed.
 use esp_backtrace as _;
 
+#[cfg(feature = "defmt")]
+#[macro_export]
+macro_rules! assert_eq {
+    ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert_eq {
+    ($($t:tt)*) => { ::core::assert_eq!($($t)*) }
+}
+
 #[macro_export]
 macro_rules! i2c_pins {
     ($peripherals:expr) => {{
