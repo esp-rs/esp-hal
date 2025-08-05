@@ -44,5 +44,5 @@ defmt = ["dep:defmt", "enumset/defmt"]
 ## ⚠️ Note: Enabling this feature will require extra computation every time alloc/dealloc is called.
 internal-heap-stats = []
 
-## Provide C-compatibility functions (malloc,free,...)
+## Provide C-compatibility functions (malloc, free, ...)
 compat = []
