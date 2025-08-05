@@ -213,6 +213,7 @@ use crate::{
     Blocking,
     asynch::AtomicWaker,
     gpio::{
+        self,
         InputConfig,
         Level,
         OutputConfig,
@@ -754,9 +755,9 @@ macro_rules! declare_tx_channels {
             #[allow(clippy::no_effect)]
             const CHANNEL_INDEX_COUNT: u8 = const { 0 $( + {$idx; 1} )+ };
 
-            const OUTPUT_SIGNALS: [crate::gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
+            const OUTPUT_SIGNALS: [gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
                 $(
-                    crate::gpio::OutputSignal::[< RMT_SIG_ $idx >],
+                    gpio::OutputSignal::[< RMT_SIG_ $idx >],
                 )+
             ];
 
@@ -776,9 +777,9 @@ macro_rules! declare_tx_channels {
 macro_rules! declare_rx_channels {
     ($([$num:literal, $idx:literal]),+ $(,)?) => {
         paste::paste! {
-            const INPUT_SIGNALS: [crate::gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
+            const INPUT_SIGNALS: [gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
                 $(
-                    crate::gpio::InputSignal::[< RMT_SIG_ $idx >],
+                    gpio::InputSignal::[< RMT_SIG_ $idx >],
                 )+
             ];
 
@@ -1800,7 +1801,7 @@ pub trait ChannelInternal: RawChannelAccess {
 
 #[doc(hidden)]
 pub trait TxChannelInternal: ChannelInternal {
-    fn output_signal(&self) -> crate::gpio::OutputSignal {
+    fn output_signal(&self) -> gpio::OutputSignal {
         OUTPUT_SIGNALS[self.channel() as usize]
     }
 
@@ -1879,7 +1880,7 @@ pub trait TxChannelInternal: ChannelInternal {
 
 #[doc(hidden)]
 pub trait RxChannelInternal: ChannelInternal {
-    fn input_signal(&self) -> crate::gpio::InputSignal {
+    fn input_signal(&self) -> gpio::InputSignal {
         INPUT_SIGNALS[self.channel() as usize]
     }
 
@@ -1939,7 +1940,7 @@ mod chip_specific {
         Tx,
         TxChannelInternal,
     };
-    use crate::{peripherals::RMT, time::Rate};
+    use crate::{gpio, peripherals::RMT, time::Rate};
 
     pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
@@ -2233,7 +2234,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir = Rx>,
     {
-        fn input_signal(&self) -> crate::gpio::InputSignal {
+        fn input_signal(&self) -> gpio::InputSignal {
             let ch_idx = ch_idx(self) as usize;
             super::INPUT_SIGNALS[ch_idx]
         }
