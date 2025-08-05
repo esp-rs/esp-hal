@@ -1953,10 +1953,12 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn set_tx_interrupt(&self, event: EnumSet<Event>, enable: bool);
 
+    #[inline]
     fn listen_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), true);
     }
 
+    #[inline]
     fn unlisten_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), false);
     }
@@ -1995,10 +1997,12 @@ pub trait RxChannelInternal: ChannelInternal {
 
     fn set_rx_interrupt(&self, event: EnumSet<Event>, enable: bool);
 
+    #[inline]
     fn listen_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), true);
     }
 
+    #[inline]
     fn unlisten_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), false);
     }
