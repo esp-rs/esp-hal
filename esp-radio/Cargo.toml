@@ -25,7 +25,6 @@ enumset   = { version = "1.1.6", default-features = false, optional = true }
 embedded-io = { version = "0.6.1", default-features = false }
 embedded-io-async = { version = "0.6.1" }
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
-heapless = "0.8.0"
 instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
@@ -109,12 +108,16 @@ esp32s3 = [
   "xtensa-lx-rt/float-save-restore",
 ]
 
-## Use `esp-alloc` for dynamic allocations.
+## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
 ## If you opt-out you need to provide implementations for the following functions:
-## - `pub extern "C" fn esp_radio_free_internal_heap() -> usize`
-## - `pub extern "C" fn esp_radio_allocate_from_internal_ram(size: usize) -> *mut u8`
-## - `pub extern "C" fn esp_radio_deallocate_internal_ram(ptr: *mut u8)`
+## - `pub extern "C" fn malloc(size: usize) -> *mut u8`
+## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
+## - `pub extern "C" fn free(ptr: *mut u8)`
+## - `pub extern "C" fn calloc(number: u32, size: usize) -> *mut u8`
+## - `pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8`
+## - `pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8`
+## - `pub extern "C" fn get_free_internal_heap_size() -> usize;`
 esp-alloc = ["dep:esp-alloc"]
 
 ## Logs the WiFi logs from the driver at log level info (needs a nightly-compiler)

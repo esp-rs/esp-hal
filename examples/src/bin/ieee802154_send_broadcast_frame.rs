@@ -4,6 +4,7 @@
 #![no_std]
 #![no_main]
 
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{delay::Delay, main};
 use esp_println::println;
@@ -23,6 +24,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_alloc::heap_allocator!(size: 24 * 1024);
 
     let delay = Delay::new();
 
@@ -54,7 +57,7 @@ fn main() -> ! {
                     auxiliary_security_header: None,
                 },
                 content: FrameContent::Data,
-                payload: heapless::Vec::from_slice(b"Hello World").unwrap(),
+                payload: b"Hello World".to_vec(),
                 footer: [0u8; 2],
             })
             .ok();

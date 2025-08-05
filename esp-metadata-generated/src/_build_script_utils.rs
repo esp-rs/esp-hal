@@ -215,6 +215,7 @@ impl Chip {
                     "pm_support_ext1_wakeup",
                     "pm_support_touch_sensor_wakeup",
                     "ulp_supported",
+                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -369,6 +370,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
                     "cargo:rustc-cfg=pm_support_touch_sensor_wakeup",
                     "cargo:rustc-cfg=ulp_supported",
+                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -505,6 +507,7 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
+                    "npl",
                     "soc",
                     "adc",
                     "assist_debug",
@@ -620,6 +623,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
+                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=assist_debug",
@@ -748,6 +752,7 @@ impl Chip {
                     "pm_support_bt_wakeup",
                     "uart_support_wakeup_int",
                     "gpio_support_deepsleep_wakeup",
+                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -891,6 +896,7 @@ impl Chip {
                     "cargo:rustc-cfg=pm_support_bt_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
+                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -1079,6 +1085,7 @@ impl Chip {
                     "gpio_support_deepsleep_wakeup",
                     "uart_support_wakeup_int",
                     "pm_support_ext1_wakeup",
+                    "npl",
                     "soc",
                     "adc",
                     "aes",
@@ -1278,6 +1285,7 @@ impl Chip {
                     "cargo:rustc-cfg=gpio_support_deepsleep_wakeup",
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=pm_support_ext1_wakeup",
+                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -1462,6 +1470,7 @@ impl Chip {
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
+                    "npl",
                     "soc",
                     "adc",
                     "aes",
@@ -1635,6 +1644,7 @@ impl Chip {
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
+                    "cargo:rustc-cfg=npl",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -2159,6 +2169,7 @@ impl Chip {
                     "uart_support_wakeup_int",
                     "ulp_supported",
                     "riscv_coproc_supported",
+                    "btdm",
                     "soc",
                     "adc",
                     "aes",
@@ -2344,6 +2355,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_support_wakeup_int",
                     "cargo:rustc-cfg=ulp_supported",
                     "cargo:rustc-cfg=riscv_coproc_supported",
+                    "cargo:rustc-cfg=btdm",
                     "cargo:rustc-cfg=soc",
                     "cargo:rustc-cfg=adc",
                     "cargo:rustc-cfg=aes",
@@ -2530,6 +2542,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(pm_support_ext1_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(pm_support_touch_sensor_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(ulp_supported)");
+        println!("cargo:rustc-check-cfg=cfg(btdm)");
         println!("cargo:rustc-check-cfg=cfg(soc)");
         println!("cargo:rustc-check-cfg=cfg(adc)");
         println!("cargo:rustc-check-cfg=cfg(aes)");
@@ -2616,6 +2629,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(uart_support_wakeup_int)");
         println!("cargo:rustc-check-cfg=cfg(gpio_support_deepsleep_wakeup)");
+        println!("cargo:rustc-check-cfg=cfg(npl)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug)");
         println!("cargo:rustc-check-cfg=cfg(ecc)");
         println!("cargo:rustc-check-cfg=cfg(systimer)");

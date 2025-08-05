@@ -10,6 +10,7 @@
 #![no_std]
 #![no_main]
 
+use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{
     main,
@@ -24,6 +25,8 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[main]
 fn main() -> ! {
     let peripherals = esp_hal::init(esp_hal::Config::default());
+
+    esp_alloc::heap_allocator!(size: 24 * 1024);
 
     // Default pins for Uart communication
     cfg_if::cfg_if! {

@@ -19,3 +19,11 @@ PROVIDE( strchr = 0x4000138c );
 PROVIDE( strlcpy = 0x400013bc );
 PROVIDE( strstr = 0x40001254 );
 PROVIDE( strcasecmp = 0x4000135c );
+
+EXTERN(__mktime);
+EXTERN(__strnlen);
+EXTERN(__atoi);
+
+PROVIDE ( strnlen = __strnlen );
+PROVIDE ( atoi = __atoi );
+PROVIDE ( mktime = __mktime );

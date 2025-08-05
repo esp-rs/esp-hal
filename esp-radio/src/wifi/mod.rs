@@ -1377,7 +1377,7 @@ pub fn ap_mac(mac: &mut [u8; 6]) {
 pub(crate) fn wifi_init() -> Result<(), WifiError> {
     unsafe {
         internal::G_CONFIG.wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs;
-        internal::G_CONFIG.feature_caps = internal::g_wifi_feature_caps;
+        internal::G_CONFIG.feature_caps = internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS;
 
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
@@ -1403,7 +1403,7 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
         #[cfg(any(esp32, esp32s3))]
         {
             static mut NVS_STRUCT: [u32; 12] = [0; 12];
-            chip_specific::g_misc_nvs = addr_of!(NVS_STRUCT) as u32;
+            chip_specific::__ESP_RADIO_G_MISC_NVS = addr_of!(NVS_STRUCT) as u32;
         }
 
         Ok(())

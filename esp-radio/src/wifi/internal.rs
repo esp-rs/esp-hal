@@ -24,7 +24,7 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
         _is_in_isr: Some(is_in_isr_wrapper),
         _malloc_internal: Some(malloc),
         _free: Some(free),
-        _esp_timer_get_time: Some(esp_timer_get_time),
+        _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
         _env_is_chip: Some(env_is_chip),
         _magic: crate::binary::include::COEX_ADAPTER_MAGIC as i32,
         _timer_disarm: Some(ets_timer_disarm),
@@ -67,7 +67,7 @@ unsafe extern "C" fn is_in_isr_wrapper() -> i32 {
 }
 
 #[unsafe(no_mangle)]
-static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
+static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _version: ESP_WIFI_OS_ADAPTER_VERSION as i32,
     _env_is_chip: Some(env_is_chip),
     _set_intr: Some(set_intr),
@@ -134,7 +134,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _wifi_clock_disable: Some(wifi_clock_disable),
     _wifi_rtc_enable_iso: Some(wifi_rtc_enable_iso),
     _wifi_rtc_disable_iso: Some(wifi_rtc_disable_iso),
-    _esp_timer_get_time: Some(esp_timer_get_time),
+    _esp_timer_get_time: Some(__esp_radio_esp_timer_get_time),
     _nvs_set_i8: Some(nvs_set_i8),
     _nvs_get_i8: Some(nvs_get_i8),
     _nvs_set_u8: Some(nvs_set_u8),
@@ -161,7 +161,7 @@ static g_wifi_osi_funcs: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _log_timestamp: Some(log_timestamp),
     _malloc_internal: Some(malloc_internal),
     _realloc_internal: Some(realloc_internal),
-    _calloc_internal: Some(calloc_internal),
+    _calloc_internal: Some(calloc_internal_wrapper),
     _zalloc_internal: Some(zalloc_internal),
     _wifi_malloc: Some(wifi_malloc),
     _wifi_realloc: Some(wifi_realloc),
@@ -222,10 +222,10 @@ const WIFI_ENABLE_ENTERPRISE: u64 = 1 << 7;
 const WIFI_FEATURE_CAPS: u64 = WIFI_ENABLE_WPA3_SAE | WIFI_ENABLE_ENTERPRISE;
 
 #[unsafe(no_mangle)]
-pub(super) static mut g_wifi_feature_caps: u64 = WIFI_FEATURE_CAPS;
+pub(super) static mut __ESP_RADIO_G_WIFI_FEATURE_CAPS: u64 = WIFI_FEATURE_CAPS;
 
 pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
-    osi_funcs: core::ptr::addr_of!(g_wifi_osi_funcs).cast_mut(),
+    osi_funcs: core::ptr::addr_of!(__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
 
     // dummy for now - populated in init
     wpa_crypto_funcs: wpa_crypto_funcs_t {

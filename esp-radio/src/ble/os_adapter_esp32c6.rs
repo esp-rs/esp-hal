@@ -130,17 +130,3 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     let mut bt = unsafe { BT::steal() };
     bt.reset_rpa();
 }
-
-#[allow(improper_ctypes_definitions)]
-#[unsafe(no_mangle)]
-unsafe extern "C" fn jrand48(
-    _xsubi: [crate::binary::c_types::c_ushort; 3],
-) -> crate::binary::c_types::c_long {
-    // this is not very random but good enough for now - it's apparently not used
-    // for crypto
-    unsafe {
-        static mut VALUE: u32 = 0;
-        VALUE = VALUE.wrapping_add(3);
-        VALUE as i32
-    }
-}

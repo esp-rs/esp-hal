@@ -15,13 +15,13 @@
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 
+use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_config::*;
 use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
-use heapless::Vec;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
 use self::{
@@ -188,7 +188,7 @@ impl<'a> Ieee802154<'a> {
                         frame: Frame {
                             header: decoded.header,
                             content: decoded.content,
-                            payload: Vec::from_slice(decoded.payload).unwrap(),
+                            payload: decoded.payload.to_vec(),
                             footer: decoded.footer,
                         },
                         channel: raw.channel,
