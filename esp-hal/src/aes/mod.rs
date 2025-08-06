@@ -610,6 +610,9 @@ pub mod dma {
         pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             while !self.is_done() {}
 
+            // Now wait for the DMA to finish.
+            while !self.aes_dma.channel.rx.is_done() {}
+
             // Stop the DMA as it doesn't know that the aes has stopped.
             self.aes_dma.channel.rx.stop_transfer();
             self.aes_dma.channel.tx.stop_transfer();
