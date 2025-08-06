@@ -12,7 +12,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![deny(missing_docs)]
 #![no_std]
-
+#![feature(naked_functions_rustic_abi)]
 use core::arch::global_asm;
 
 pub use riscv;
@@ -20,9 +20,14 @@ pub use riscv_rt::{TrapFrame, entry};
 
 #[doc(hidden)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn _dispatch_exception() {
-    // never called but needed for riscv-rt to link
-    panic!();
+pub unsafe extern "C" fn _dispatch_exception(trap_frame: &TrapFrame, _code: usize) {
+    unsafe extern "C" {
+        fn _start_trap_rust_hal(trap_frame: &TrapFrame);
+    }
+
+    unsafe {
+        _start_trap_rust_hal(trap_frame);
+    }
 }
 
 /// Parse cfg attributes inside a global_asm call.
@@ -85,273 +90,6 @@ r#"
     ret
 
 /*
-    Trap entry points (_start_trap, _start_trapN for N in 1..=31)
-
-    The default implementation saves all registers to the stack and calls
-    _start_trap_rust, then restores all saved registers before `mret`
-*/
-.section .trap, "ax"
-.weak _start_trap  /* Exceptions call into _start_trap in vectored mode */
-.weak _start_trap1
-.weak _start_trap2
-.weak _start_trap3
-.weak _start_trap4
-.weak _start_trap5
-.weak _start_trap6
-.weak _start_trap7
-.weak _start_trap8
-.weak _start_trap9
-.weak _start_trap10
-.weak _start_trap11
-.weak _start_trap12
-.weak _start_trap13
-.weak _start_trap14
-.weak _start_trap15
-.weak _start_trap16
-.weak _start_trap17
-.weak _start_trap18
-.weak _start_trap19
-.weak _start_trap20
-.weak _start_trap21
-.weak _start_trap22
-.weak _start_trap23
-.weak _start_trap24
-.weak _start_trap25
-.weak _start_trap26
-.weak _start_trap27
-.weak _start_trap28
-.weak _start_trap29
-.weak _start_trap30
-.weak _start_trap31
-
-_start_trap:
-    // Handle exceptions in vectored mode
-    // move SP to some save place if it's pointing below the RAM
-    // otherwise we won't be able to do anything reasonable
-    // (since we don't have a working stack)
-    //
-    // most probably we will just print something and halt in this case
-    // we actually can't do anything else
-    csrw mscratch, t0
-    la t0, _dram_origin
-    bge sp, t0, 1f
-
-    // use the reserved exception cause 14 to signal we detected a stack overflow
-    li t0, 14
-    csrw mcause, t0
-
-    // set SP to the start of the stack
-    la sp, _stack_start
-    li t0, 4 // make sure stack start is in RAM
-    sub sp, sp, t0
-    andi sp, sp, -16 // Force 16-byte alignment
-
-    1:
-    csrr t0, mscratch
-    // now SP is in RAM - continue
-
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, _start_trap_rust_hal /* this runs on exception, use regular fault handler */
-    j _start_trap_direct
-_start_trap1:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt1
-    j _start_trap_direct
-_start_trap2:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt2
-    j _start_trap_direct
-_start_trap3:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt3
-    j _start_trap_direct
-_start_trap4:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt4
-    j _start_trap_direct
-_start_trap5:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt5
-    j _start_trap_direct
-_start_trap6:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt6
-    j _start_trap_direct
-_start_trap7:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt7
-    j _start_trap_direct
-_start_trap8:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt8
-    j _start_trap_direct
-_start_trap9:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt9
-    j _start_trap_direct
-_start_trap10:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt10
-    j _start_trap_direct
-_start_trap11:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt11
-    j _start_trap_direct
-_start_trap12:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt12
-    j _start_trap_direct
-_start_trap13:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt13
-    j _start_trap_direct
-_start_trap14:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt14
-    j _start_trap_direct
-_start_trap15:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt15
-    j _start_trap_direct
-_start_trap16:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt16
-    j _start_trap_direct
-_start_trap17:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt17
-    j _start_trap_direct
-_start_trap18:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt18
-    j _start_trap_direct
-_start_trap19:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt19
-    j _start_trap_direct
-_start_trap20:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt20
-    j _start_trap_direct
-_start_trap21:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt21
-    j _start_trap_direct
-_start_trap22:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt22
-    j _start_trap_direct
-_start_trap23:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt23
-    j _start_trap_direct
-_start_trap24:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt24
-    j _start_trap_direct
-_start_trap25:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt25
-    j _start_trap_direct
-_start_trap26:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt26
-    j _start_trap_direct
-_start_trap27:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt27
-    j _start_trap_direct
-_start_trap28:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt28
-    j _start_trap_direct
-_start_trap29:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt29
-    j _start_trap_direct
-_start_trap30:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt30
-    j _start_trap_direct
-_start_trap31:
-    addi sp, sp, -16*4
-    sw ra, 0(sp)
-    la ra, interrupt31
-_start_trap_direct:
-    sw t0, 1*4(sp)
-    sw t1, 2*4(sp)
-    sw t2, 3*4(sp)
-    sw t3, 4*4(sp)
-    sw t4, 5*4(sp)
-    sw t5, 6*4(sp)
-    sw t6, 7*4(sp)
-    sw a0, 8*4(sp)
-    sw a1, 9*4(sp)
-    sw a2, 10*4(sp)
-    sw a3, 11*4(sp)
-    sw a4, 12*4(sp)
-    sw a5, 13*4(sp)
-    sw a6, 14*4(sp)
-    sw a7, 15*4(sp)
-
-    # jump to handler loaded in direct handler
-    add a0, sp, zero # load trap-frame address in a0 - we only _need_ this only for trap-0 / exceptions
-    jalr ra, ra # jump to label loaded in _start_trapX
-
-    lw ra, 0*4(sp)
-    lw t0, 1*4(sp)
-    lw t1, 2*4(sp)
-    lw t2, 3*4(sp)
-    lw t3, 4*4(sp)
-    lw t4, 5*4(sp)
-    lw t5, 6*4(sp)
-    lw t6, 7*4(sp)
-    lw a0, 8*4(sp)
-    lw a1, 9*4(sp)
-    lw a2, 10*4(sp)
-    lw a3, 11*4(sp)
-    lw a4, 12*4(sp)
-    lw a5, 13*4(sp)
-    lw a6, 14*4(sp)
-    lw a7, 15*4(sp)
-
-    addi sp, sp, 16*4
-
-    # SP was restored from the original SP
-    mret
-
-/*
     Interrupt vector table (_vector_table)
 */
 
@@ -366,74 +104,104 @@ _start_trap_direct:
 
 _vector_table:
     j _start_trap
-    j _start_trap1
-    j _start_trap2
-    j _start_trap3
-    j _start_trap4
-    j _start_trap5
-    j _start_trap6
-    j _start_trap7
-    j _start_trap8
-    j _start_trap9
-    j _start_trap10
-    j _start_trap11
-    j _start_trap12
-    j _start_trap13
-    j _start_trap14
-    j _start_trap15
-    j _start_trap16
-    j _start_trap17
-    j _start_trap18
-    j _start_trap19
-    j _start_trap20
-    j _start_trap21
-    j _start_trap22
-    j _start_trap23
-    j _start_trap24
-    j _start_trap25
-    j _start_trap26
-    j _start_trap27
-    j _start_trap28
-    j _start_trap29
-    j _start_trap30
-    j _start_trap31
+    j _start_Trap1_trap
+    j _start_Trap2_trap
+    j _start_Trap3_trap
+    j _start_Trap4_trap
+    j _start_Trap5_trap
+    j _start_Trap6_trap
+    j _start_Trap7_trap
+    j _start_Trap8_trap
+    j _start_Trap9_trap
+    j _start_Trap10_trap
+    j _start_Trap11_trap
+    j _start_Trap12_trap
+    j _start_Trap13_trap
+    j _start_Trap14_trap
+    j _start_Trap15_trap
+    j _start_Trap16_trap
+    j _start_Trap17_trap
+    j _start_Trap18_trap
+    j _start_Trap19_trap
+    j _start_Trap20_trap
+    j _start_Trap21_trap
+    j _start_Trap22_trap
+    j _start_Trap23_trap
+    j _start_Trap24_trap
+    j _start_Trap25_trap
+    j _start_Trap26_trap
+    j _start_Trap27_trap
+    j _start_Trap28_trap
+    j _start_Trap29_trap
+    j _start_Trap30_trap
+    j _start_Trap31_trap
 .option pop
-
-#this is required for the linking step, these symbols for in-use interrupts should always be overwritten by the user.
-.section .trap, "ax"
-// See https://github.com/esp-rs/esp-hal/issues/1326 and https://reviews.llvm.org/D98762
-// and yes, this all has to go on one line... *sigh*.
-.lto_discard interrupt1, interrupt2, interrupt3, interrupt4, interrupt5, interrupt6, interrupt7, interrupt8, interrupt9, interrupt10, interrupt11, interrupt12, interrupt13, interrupt14, interrupt15, interrupt16, interrupt17, interrupt18, interrupt19, interrupt20, interrupt21, interrupt22, interrupt23, interrupt24, interrupt25, interrupt26, interrupt27, interrupt28, interrupt29, interrupt30, interrupt31
-.weak interrupt1
-.weak interrupt2
-.weak interrupt3
-.weak interrupt4
-.weak interrupt5
-.weak interrupt6
-.weak interrupt7
-.weak interrupt8
-.weak interrupt9
-.weak interrupt10
-.weak interrupt11
-.weak interrupt12
-.weak interrupt13
-.weak interrupt14
-.weak interrupt15
-.weak interrupt16
-.weak interrupt17
-.weak interrupt18
-.weak interrupt19
-.weak interrupt20
-.weak interrupt21
-.weak interrupt22
-.weak interrupt23
-.weak interrupt24
-.weak interrupt25
-.weak interrupt26
-.weak interrupt27
-.weak interrupt28
-.weak interrupt29
-.weak interrupt30
-.weak interrupt31
 "#,
 }
+
+macro_rules! define_interrupt {
+    ($num:literal, $name:ident, $fname:ident) => {
+        #[derive(Copy, Clone)]
+        struct $name;
+
+        unsafe impl riscv_rt::InterruptNumber for $name {
+            const MAX_INTERRUPT_NUMBER: usize = 31;
+
+            fn number(self) -> usize {
+                $num
+            }
+
+            fn from_number(_value: usize) -> riscv_rt::result::Result<Self> {
+                Ok($name)
+            }
+        }
+
+        unsafe impl riscv_rt::CoreInterruptNumber for $name {}
+
+        #[unsafe(naked)]
+        #[unsafe(link_section = ".trap.start")]
+        #[riscv_rt::core_interrupt($name)]
+        fn $fname() {
+            core::arch::naked_asm! {
+                concat!(
+                "
+                li a0,",$num,"
+                j handle_interrupts
+                "
+                )
+            }
+        }
+    };
+}
+
+define_interrupt!(1, Trap1, trap1);
+define_interrupt!(2, Trap2, trap2);
+define_interrupt!(3, Trap3, trap3);
+define_interrupt!(4, Trap4, trap4);
+define_interrupt!(5, Trap5, trap5);
+define_interrupt!(6, Trap6, trap6);
+define_interrupt!(7, Trap7, trap7);
+define_interrupt!(8, Trap8, trap8);
+define_interrupt!(9, Trap9, trap9);
+define_interrupt!(10, Trap10, trap10);
+define_interrupt!(11, Trap11, trap11);
+define_interrupt!(12, Trap12, trap12);
+define_interrupt!(13, Trap13, trap13);
+define_interrupt!(14, Trap14, trap14);
+define_interrupt!(15, Trap15, trap15);
+define_interrupt!(16, Trap16, trap16);
+define_interrupt!(17, Trap17, trap17);
+define_interrupt!(18, Trap18, trap18);
+define_interrupt!(19, Trap19, trap19);
+define_interrupt!(20, Trap20, trap20);
+define_interrupt!(21, Trap21, trap21);
+define_interrupt!(22, Trap22, trap22);
+define_interrupt!(23, Trap23, trap23);
+define_interrupt!(24, Trap24, trap24);
+define_interrupt!(25, Trap25, trap25);
+define_interrupt!(26, Trap26, trap26);
+define_interrupt!(27, Trap27, trap27);
+define_interrupt!(28, Trap28, trap28);
+define_interrupt!(29, Trap29, trap29);
+define_interrupt!(30, Trap30, trap30);
+define_interrupt!(31, Trap31, trap31);
