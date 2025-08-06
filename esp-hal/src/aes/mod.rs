@@ -457,8 +457,8 @@ pub mod dma {
             self.aes.write_key(key);
         }
 
-        fn write_iv(&mut self, iv: [u8; BLOCK_SIZE]) {
-            for (word, reg) in read_words(&iv).zip(self.aes.regs().iv_mem_iter()) {
+        fn write_iv(&mut self, iv: &[u8; BLOCK_SIZE]) {
+            for (word, reg) in read_words(iv).zip(self.aes.regs().iv_mem_iter()) {
                 reg.write(|w| unsafe { w.bits(word) });
             }
         }
@@ -1206,11 +1206,11 @@ pub mod dma {
         fn write_state(&self, aes: &mut AesDma<'_>) {
             match self {
                 CipherState::Ecb(_ecb) => {}
-                CipherState::Cbc(cbc) => aes.write_iv(cbc.iv),
-                CipherState::Ofb(ofb) => aes.write_iv(ofb.iv),
-                CipherState::Ctr(ctr) => aes.write_iv(ctr.nonce),
-                CipherState::Cfb8(cfb8) => aes.write_iv(cfb8.iv),
-                CipherState::Cfb128(cfb128) => aes.write_iv(cfb128.iv),
+                CipherState::Cbc(cbc) => aes.write_iv(&cbc.iv),
+                CipherState::Ofb(ofb) => aes.write_iv(&ofb.iv),
+                CipherState::Ctr(ctr) => aes.write_iv(&ctr.nonce),
+                CipherState::Cfb8(cfb8) => aes.write_iv(&cfb8.iv),
+                CipherState::Cfb128(cfb128) => aes.write_iv(&cfb128.iv),
             }
         }
 
