@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::Mode` has been replaced by `Operation`. The key length is now solely determined by the key. (#3882)
 - `Aes::process` has been split into `Aes::encrypt` and `Aes::decrypt` (#3882)
 - Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
+- RISC-V: Interrupt handler don't get a TrapFrame passed in anymore (#3903)
 
 ### Fixed
 
