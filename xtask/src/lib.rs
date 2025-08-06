@@ -158,9 +158,13 @@ impl Package {
     pub fn is_published(&self, workspace: &Path) -> bool {
         // TODO: we should use some sort of cache instead of parsing the TOML every
         // time, but for now this should be good enough.
-        let toml =
-            crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
-        toml.is_published()
+        match crate::cargo::CargoToml::new(workspace, *self) {
+            Ok(toml) => toml.is_published(),
+            Err(_) => {
+                log::warn!("Could not parse manifest for package '{}', skipping", self);
+                false
+            }
+        }
     }
 
     /// Build on host
@@ -375,13 +379,18 @@ pub fn execute_app(
         .features(&features);
 
     let bin_arg = if package.starts_with("src/bin") {
-        format!("--bin={}", app.binary_name())
+        Some(format!("--bin={}", app.binary_name()))
     } else if package.starts_with("tests") {
-        format!("--test={}", app.binary_name())
+        Some(format!("--test={}", app.binary_name()))
+    } else if !package_path.ends_with("examples") {
+        Some(format!("--example={}", app.binary_name()))
     } else {
-        format!("--example={}", app.binary_name())
+        None
     };
-    builder.add_arg(bin_arg);
+
+    if let Some(arg) = bin_arg {
+        builder.add_arg(arg);
+    }
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
@@ -425,15 +434,22 @@ pub fn execute_app(
     let args = builder.build();
     log::debug!("{args:#?}");
 
+    let cwd = if package_path.ends_with("examples") {
+        package_path.join(package).to_path_buf()
+    } else {
+        package_path.to_path_buf()
+    };
+
     if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, package_path, env_vars, false)?;
+        cargo::run_with_env(&args, &cwd, env_vars, false)?;
 
         // Now that the build has succeeded and we printed the output, we can
         // rerun the build again quickly enough to capture JSON. We'll use this to
         // copy the binary to the output directory.
         builder.add_arg("--message-format=json");
         let args = builder.build();
-        let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
+
+        let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
                 let out_dir = out_dir.join(chip.to_string());
@@ -449,7 +465,7 @@ pub fn execute_app(
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
+            cargo::run_with_env(&args, &cwd, env_vars, false)?;
         }
     }
 
