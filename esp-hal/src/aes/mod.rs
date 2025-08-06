@@ -485,19 +485,15 @@ pub mod dma {
         /// Perform a DMA transfer.
         ///
         /// This will return a [AesTransfer].
-        // Maybe we could extract the parts without the error, and reuse them in .wait(), but would
-        // that really be better?
-        #[allow(clippy::type_complexity)]
-        #[allow(clippy::result_large_err)] // ¯\_(ツ)_/¯ the joys of the move-based API
         pub fn process<K, RXBUF, TXBUF>(
             mut self,
             number_of_blocks: usize,
             mut output: RXBUF,
             mut input: TXBUF,
             mode: Operation,
-            cipher_state: DmaCipherState,
+            cipher_state: &DmaCipherState,
             key: K,
-        ) -> Result<AesTransfer<'d, RXBUF, TXBUF>, (DmaError, Self, RXBUF, TXBUF, DmaCipherState)>
+        ) -> Result<AesTransfer<'d, RXBUF, TXBUF>, (DmaError, Self, RXBUF, TXBUF)>
         where
             K: Into<Key>,
             TXBUF: DmaTxBuffer,
@@ -523,14 +519,13 @@ pub mod dma {
                 cipher_mode,
                 &key,
             ) {
-                return Err((error, self, output, input, cipher_state));
+                return Err((error, self, output, input));
             }
 
             Ok(AesTransfer {
                 aes_dma: ManuallyDrop::new(self),
                 rx_view: ManuallyDrop::new(output.into_view()),
                 tx_view: ManuallyDrop::new(input.into_view()),
-                cipher_state,
             })
         }
 
@@ -602,7 +597,6 @@ pub mod dma {
         aes_dma: ManuallyDrop<AesDma<'d>>,
         rx_view: ManuallyDrop<RX::View>,
         tx_view: ManuallyDrop<TX::View>,
-        cipher_state: DmaCipherState,
     }
 
     impl<'d, RX: DmaRxBuffer, TX: DmaTxBuffer> AesTransfer<'d, RX, TX> {
@@ -613,7 +607,7 @@ pub mod dma {
 
         /// Waits for the transfer to finish and returns the peripheral and
         /// buffers.
-        pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final, DmaCipherState) {
+        pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             while !self.is_done() {}
 
             // Stop the DMA as it doesn't know that the aes has stopped.
@@ -622,11 +616,6 @@ pub mod dma {
 
             self.aes_dma.finish_transform();
 
-            let mut cipher_state = self.cipher_state.clone();
-
-            // AES is done, we can write back the IV while the DMA may still copy data.
-            cipher_state.state.read_state(&self.aes_dma);
-
             unsafe {
                 let aes_dma = ManuallyDrop::take(&mut self.aes_dma);
                 let rx_view = ManuallyDrop::take(&mut self.rx_view);
@@ -634,12 +623,7 @@ pub mod dma {
 
                 core::mem::forget(self);
 
-                (
-                    aes_dma,
-                    RX::from_view(rx_view),
-                    TX::from_view(tx_view),
-                    cipher_state,
-                )
+                (aes_dma, RX::from_view(rx_view), TX::from_view(tx_view))
             }
         }
 
@@ -1085,6 +1069,13 @@ pub mod dma {
     #[derive(Clone)]
     pub struct DmaCipherState {
         state: CipherState,
+    }
+
+    impl DmaCipherState {
+        /// Saves the block cipher state in memory so that it can be restored by a later operation.
+        pub fn save_state(&mut self, aes_dma: &AesDma<'_>) {
+            self.state.read_state(aes_dma);
+        }
     }
 
     #[cfg(aes_dma_mode_ecb)]

@@ -391,12 +391,12 @@ mod tests {
                     output,
                     input,
                     Operation::Encrypt,
-                    DmaCipherState::from(Ecb),
+                    &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, input, _) = transfer.wait();
+            (aes, output, input) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), ciphertext);
 
             // Decrypt
@@ -407,12 +407,12 @@ mod tests {
                     output,
                     input,
                     Operation::Decrypt,
-                    DmaCipherState::from(Ecb),
+                    &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
                 .unwrap();
-            (aes, output, _, _) = transfer.wait();
+            (aes, output, _) = transfer.wait();
             hil_test::assert_eq!(output.as_slice(), plaintext);
 
             aes
