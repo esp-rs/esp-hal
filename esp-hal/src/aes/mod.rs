@@ -796,8 +796,8 @@ pub mod dma {
     /// DMA-enabled AES processing backend.
     ///
     /// The backend will try its best to use hardware acceleration as much as possible. It will
-    /// fall back to CPU-based processing (equivalent to [`AesBackend`](super::AesBackend)) in some
-    /// cases, however:
+    /// fall back to CPU-driven processing (equivalent to [`AesBackend`](super::AesBackend)) in some
+    /// cases, including:
     ///
     /// - When the block cipher is not implemented in hardware.
     /// - When the data is not correctly aligned to the needs of the hardware (e.g. when using a
@@ -816,20 +816,11 @@ pub mod dma {
     ///
     /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
     /// // The key length must be supported by the hardware.
-    /// let mut ecb_encrypt = AesContext::new(
-    ///     Ecb,
-    ///     Operation::Encrypt,
-    ///     [
-    ///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
-    ///         b'd', 0,
-    ///     ],
-    /// );
+    /// let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, *b"SUp4SeCp@sSw0rd\0");
     ///
     /// // Process a block of data in this context. The ECB mode of operation requires that
     /// // the length of the data is a multiple of the block (16 bytes) size.
-    /// let input_buffer: [u8; 16] = [
-    ///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    /// ];
+    /// let input_buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
     /// let mut output_buffer: [u8; 16] = [0; 16];
     ///
     /// let operation_handle = ecb_encrypt
@@ -948,6 +939,8 @@ pub mod dma {
                     // same length. The CryptoBuffers constructor also ensures that output is
                     // mutable and therefore is in RAM. If input is not, the pointers
                     // don't overlap.
+                    // A buffer created via `CryptoBuffers::new_in_place` will not reach here
+                    // because it takes a `&mut` buffer, which is always in RAM.
                     item.buffers.output.cast::<u8>().copy_from_nonoverlapping(
                         item.buffers.input.cast::<u8>(),
                         item.buffers.input.len(),
@@ -1380,20 +1373,11 @@ const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
 ///
 /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
 /// // The key length must be supported by the hardware.
-/// let mut ecb_encrypt = AesContext::new(
-///     Ecb,
-///     Operation::Encrypt,
-///     [
-///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
-///         b'd', 0,
-///     ],
-/// );
+/// let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, *b"SUp4SeCp@sSw0rd\0");
 ///
 /// // Process a block of data in this context. The ECB mode of operation requires that
 /// // the length of the data is a multiple of the block (16 bytes) size.
-/// let input_buffer: [u8; 16] = [
-///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
-/// ];
+/// let input_buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
 /// let mut output_buffer: [u8; 16] = [0; 16];
 ///
 /// let operation_handle = ecb_encrypt
@@ -1597,20 +1581,11 @@ impl AesContext {
     ///
     /// // Create a new context with a 128-bit key. The context will use the ECB block cipher mode.
     /// // The key length must be supported by the hardware.
-    /// let mut ecb_encrypt = AesContext::new(
-    ///     Ecb,
-    ///     Operation::Encrypt,
-    ///     [
-    ///         b'S', b'U', b'p', b'4', b'S', b'e', b'C', b'p', b'@', b's', b'S', b'w', b'0', b'r',
-    ///         b'd', 0,
-    ///     ],
-    /// );
+    /// let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, *b"SUp4SeCp@sSw0rd\0");
     ///
     /// // Process a block of data in this context, in place. The ECB mode of operation requires that
     /// // the length of the data is a multiple of the block (16 bytes) size.
-    /// let mut buffer: [u8; 16] = [
-    ///     b'm', b'e', b's', b's', b'a', b'g', b'e', 0, 0, 0, 0, 0, 0, 0, 0, 0,
-    /// ];
+    /// let mut buffer: [u8; 16] = *b"message\0\0\0\0\0\0\0\0\0";
     ///
     /// let operation_handle = ecb_encrypt.process_in_place(&mut buffer).unwrap();
     /// operation_handle.wait_blocking();
