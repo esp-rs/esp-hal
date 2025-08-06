@@ -234,7 +234,12 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
         self.uhci.internal.channel.tx.is_done()
     }
 
-    async fn wait_for_idle(&mut self) {
+    /// to
+    pub async fn wait_for_idle(&mut self) {
+        DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
+            .await
+            .unwrap();
+        // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm lost at this point, this is the only thing that worked
         DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
             .await
             .unwrap();

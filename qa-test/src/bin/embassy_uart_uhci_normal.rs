@@ -43,7 +43,7 @@ async fn run_uart(peripherals: Peripherals) {
         .with_tx(peripherals.GPIO2)
         .with_rx(peripherals.GPIO3);
 
-    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(25);
+    let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
@@ -73,13 +73,6 @@ async fn run_uart(peripherals: Peripherals) {
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
                 let transfer = uhci.write(dma_tx).await;
-                // This works...
-                // while !transfer.is_done() {
-                //     println!("Waiting for transfer to complete");
-                //     Timer::after(Duration::from_secs(1)).await;
-                // }
-
-                // This doesn't, it just outputs FF nothing more nothing less
                 let (_uhci, dma_tx) = transfer.wait().await;
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
