@@ -8,6 +8,7 @@ use allocator_api2::boxed::Box;
 #[cfg(riscv)]
 use arch_specific::Registers;
 pub(crate) use arch_specific::*;
+#[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame;
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
@@ -122,6 +123,12 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     }
 }
 
+#[cfg(riscv)]
+pub(crate) fn task_switch() {
+    SCHEDULER_STATE.with(|state| state.switch_task());
+}
+
+#[cfg(xtensa)]
 pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
     SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
 }

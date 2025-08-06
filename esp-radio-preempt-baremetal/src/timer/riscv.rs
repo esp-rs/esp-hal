@@ -1,30 +1,9 @@
-use core::ptr::addr_of_mut;
-
 use esp_hal::{
     interrupt::{self, software::SoftwareInterrupt},
     peripherals::Interrupt,
 };
 
 use crate::task::task_switch;
-
-static mut FAKE_TRAP_FRAME: esp_hal::interrupt::TrapFrame = esp_hal::interrupt::TrapFrame {
-    ra: 0xdeadbeef,
-    t0: 0xdeadbeef,
-    t1: 0xdeadbeef,
-    t2: 0xdeadbeef,
-    t3: 0xdeadbeef,
-    t4: 0xdeadbeef,
-    t5: 0xdeadbeef,
-    t6: 0xdeadbeef,
-    a0: 0xdeadbeef,
-    a1: 0xdeadbeef,
-    a2: 0xdeadbeef,
-    a3: 0xdeadbeef,
-    a4: 0xdeadbeef,
-    a5: 0xdeadbeef,
-    a6: 0xdeadbeef,
-    a7: 0xdeadbeef,
-};
 
 pub(crate) fn setup_multitasking() {
     // Register the interrupt handler without nesting to satisfy the requirements of the task
@@ -47,7 +26,7 @@ extern "C" fn swint2_handler() {
     let swi = unsafe { SoftwareInterrupt::<2>::steal() };
     swi.reset();
 
-    task_switch(unsafe { &mut *addr_of_mut!(FAKE_TRAP_FRAME) });
+    task_switch();
 }
 
 #[inline]
@@ -60,5 +39,5 @@ pub(crate) fn yield_task() {
 #[esp_hal::ram]
 pub(crate) extern "C" fn timer_tick_handler() {
     super::clear_timer_interrupt();
-    crate::task::task_switch(unsafe { &mut *addr_of_mut!(FAKE_TRAP_FRAME) });
+    crate::task::task_switch();
 }

@@ -33,7 +33,6 @@ use esp_hal::{
     sync::Locked,
     time::{Duration, Instant, Rate},
     timer::{AnyTimer, PeriodicTimer},
-    trapframe::TrapFrame,
 };
 
 use crate::{task::Context, timer::TIMER};
@@ -154,7 +153,7 @@ impl SchedulerState {
     }
 
     #[cfg(xtensa)]
-    fn switch_task(&mut self, trap_frame: &mut TrapFrame) {
+    fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
         task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
 
         if !self.to_delete.is_null() {
@@ -168,7 +167,7 @@ impl SchedulerState {
     }
 
     #[cfg(riscv)]
-    fn switch_task(&mut self, _trap_frame: &mut TrapFrame) {
+    fn switch_task(&mut self) {
         if !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);
             self.delete_task(task_to_delete);
