@@ -21,6 +21,11 @@ macro_rules! assert_unique_features {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // if using '"rust-analyzer.cargo.buildScripts.useRustcWrapper": true' we can detect this
+    let suppress_panics = std::env::var("RUSTC_WRAPPER")
+        .unwrap_or_default()
+        .contains("rust-analyzer");
+
     // Load the configuration file for the configured device:
     let chip = Chip::from_cargo_feature()?;
 
@@ -28,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     chip.define_cfgs();
 
     // If some library required unstable make sure unstable is actually enabled.
-    if cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
+    if !suppress_panics && cfg!(feature = "requires-unstable") && !cfg!(feature = "unstable") {
         panic!(
             "\n\nThe `unstable` feature is required by a dependent crate but is not enabled.\n\n"
         );
@@ -42,6 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         || cfg!(feature = "smoltcp")
         || cfg!(feature = "sniffer"))
         && !cfg!(feature = "unstable")
+        && !suppress_panics
     {
         panic!(
             "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`.\n\n"
