@@ -777,7 +777,7 @@ mod rt {
                 unsafe {
                     let level =
                         change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(|| handler());
+                    riscv::interrupt::nested(handler);
                     change_current_runlevel(level);
                 }
             }
