@@ -88,7 +88,7 @@ extern "C" fn RWBLE() {
 
 #[cfg(feature = "ble")]
 #[unsafe(no_mangle)]
-extern "C" fn BT_BB(_trap_frame: &mut crate::hal::interrupt::TrapFrame) {
+extern "C" fn BT_BB() {
     unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::BT_INTERRUPT_FUNCTION5;
 

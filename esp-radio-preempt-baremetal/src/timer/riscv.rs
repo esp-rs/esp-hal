@@ -21,12 +21,12 @@ pub(crate) fn disable_multitasking() {
 }
 
 #[esp_hal::ram]
-extern "C" fn swint2_handler(trap_frame: &mut esp_hal::interrupt::TrapFrame) {
+extern "C" fn swint2_handler() {
     // clear FROM_CPU_INTR2
     let swi = unsafe { SoftwareInterrupt::<2>::steal() };
     swi.reset();
 
-    task_switch(trap_frame);
+    task_switch();
 }
 
 #[inline]
@@ -37,7 +37,7 @@ pub(crate) fn yield_task() {
 }
 
 #[esp_hal::ram]
-pub(crate) extern "C" fn timer_tick_handler(trap_frame: &mut esp_hal::interrupt::TrapFrame) {
+pub(crate) extern "C" fn timer_tick_handler() {
     super::clear_timer_interrupt();
-    crate::task::task_switch(trap_frame);
+    crate::task::task_switch();
 }

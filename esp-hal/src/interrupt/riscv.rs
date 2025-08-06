@@ -751,7 +751,7 @@ mod rt {
 
     #[unsafe(no_mangle)]
     #[ram]
-    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
+    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let core = Cpu::current();
         let status = status(core);
 
@@ -768,17 +768,16 @@ mod rt {
             let not_nested = (handler & 1) == 1;
             let handler = handler & !1;
 
-            let handler: fn(&mut TrapFrame) =
-                unsafe { core::mem::transmute::<usize, fn(&mut TrapFrame)>(handler) };
+            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
 
             if not_nested || prio == Priority::Priority15 {
-                handler(context);
+                handler();
             } else {
                 let elevated = prio as u8;
                 unsafe {
                     let level =
                         change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(|| handler(context));
+                    riscv::interrupt::nested(handler);
                     change_current_runlevel(level);
                 }
             }
@@ -820,7 +819,6 @@ mod rt {
                     .global interrupt"#,$num,r#"
 
                 interrupt"#,$num,r#":
-                    mv a1, a0
                     li a0,"#,$num,r#"
                     j handle_interrupts
                 "#
