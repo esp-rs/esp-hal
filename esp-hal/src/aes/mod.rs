@@ -98,11 +98,8 @@ for_each_aes_key_length! {
 
             impl Drop for Key {
                 fn drop(&mut self) {
-                    match self {
-                        $(
-                            Self::[<Key $len>](key) => key.fill(0),
-                        )*
-                    }
+                    use core::mem::MaybeUninit;
+                    unsafe { (self as *mut Self).cast::<MaybeUninit<Self>>().write_volatile(MaybeUninit::zeroed()) };
                 }
             }
         }
