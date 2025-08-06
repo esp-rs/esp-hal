@@ -774,8 +774,6 @@ pub mod dma {
     // The DMA descriptors prevent auto-implementing Sync, but they can be treated as Sync because
     // we only access them in a critical section (around the work queue operations), and only when
     // the DMA is not actively using them.
-    // FIXME: it's possible to stop and drop the backend while the DMA is in use, it'll need to be
-    // fixed for this to not be UB.
     unsafe impl Sync for AesDmaBackend<'_> {}
 
     impl<'d> AesDmaBackend<'d> {
