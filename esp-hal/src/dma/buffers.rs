@@ -1583,93 +1583,45 @@ impl DerefMut for DmaLoopBuf {
     }
 }
 
-/// A custom DMA TX buffer that lets us unsafely fiddle with the descriptors.
+/// A Preparation that masks itself as a DMA buffer.
 ///
-/// Beware the dragons.
-///
-/// This type is only meant to fill out descriptors once, then send them off to the DMA. This
-/// isn't meant to hold onto the descriptors or otherwise provide a reuseable API to work with
-/// them. In fact this should just be a way to produce a `Preparation` but we have no way to do
-/// that in the current API.
+/// Fow low level use, where none of the pre-made buffers really fit.
 ///
 /// This type likely never should be visible outside of esp-hal.
-pub(crate) struct UnsafeTxBuffer<'a> {
-    descriptors: DescriptorSet<'a>,
-    #[cfg(psram_dma)]
-    in_psram: bool,
-}
-
-impl<'a> UnsafeTxBuffer<'a> {
-    /// Creates a new DMA bufer.
-    ///
-    /// `block_size` is the requirement imposed by the peripheral that receives the data. It
-    /// ensures that the DMA will not try to copy a partial block, which would cause the RX DMA
-    /// to never complete.
-    ///
-    /// The function returns the DMA buffer, and the number of bytes that will be transferred.
-    ///
-    /// # Safety
-    ///
-    /// The caller must keep all its descriptors and the buffers they
-    /// point to valid while the buffer is being transferred.
-    #[cfg_attr(not(aes_dma), expect(unused))]
-    pub unsafe fn new(
-        descriptors: &'a mut [DmaDescriptor],
-        mut data: NonNull<[u8]>,
-        block_size: usize,
-    ) -> (Self, usize) {
-        let chunk_size = BurstConfig::DEFAULT
-            .max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::Out)
-            .min(4096 - block_size); // Whichever is stricter, data location or peripheral requirements
-
-        let data_len = data.len().min(chunk_size * descriptors.len());
-
-        cfg_if::cfg_if! {
-            if #[cfg(psram_dma)] {
-                let data_addr = data.addr().get();
-                let data_in_psram = crate::psram::psram_range().contains(&data_addr);
-
-                // Make sure input data is in PSRAM instead of cache
-                if data_in_psram {
-                    unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
-                }
-            }
+pub(crate) struct NoBuffer(Preparation);
+impl NoBuffer {
+    fn prep(&self) -> Preparation {
+        Preparation {
+            start: self.0.start,
+            direction: self.0.direction,
+            #[cfg(psram_dma)]
+            accesses_psram: self.0.accesses_psram,
+            burst_transfer: self.0.burst_transfer,
+            check_owner: self.0.check_owner,
+            auto_write_back: self.0.auto_write_back,
         }
-
-        let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
-        // TODO: it would be best if this function returned the amount of data that could be linked
-        // up.
-        unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
-        unwrap!(descriptors.set_tx_length(data_len, chunk_size));
-
-        for desc in descriptors.linked_iter_mut() {
-            desc.reset_for_tx(desc.next.is_null());
-        }
-
-        (
-            Self {
-                descriptors,
-                #[cfg(psram_dma)]
-                in_psram: data_in_psram,
-            },
-            data_len,
-        )
     }
 }
-
-unsafe impl DmaTxBuffer for UnsafeTxBuffer<'_> {
+unsafe impl DmaTxBuffer for NoBuffer {
     type View = Self;
 
     fn prepare(&mut self) -> Preparation {
-        Preparation {
-            start: self.descriptors.head(),
-            direction: TransferDirection::Out,
-            burst_transfer: BurstConfig::DEFAULT,
-            check_owner: None,
-            auto_write_back: true,
-            #[cfg(psram_dma)]
-            accesses_psram: self.in_psram,
-        }
+        self.prep()
+    }
+
+    fn into_view(self) -> Self::View {
+        self
+    }
+
+    fn from_view(view: Self::View) -> Self {
+        view
+    }
+}
+unsafe impl DmaRxBuffer for NoBuffer {
+    type View = Self;
+
+    fn prepare(&mut self) -> Preparation {
+        self.prep()
     }
 
     fn into_view(self) -> Self::View {
@@ -1681,98 +1633,143 @@ unsafe impl DmaTxBuffer for UnsafeTxBuffer<'_> {
     }
 }
 
-/// A custom DMA RX buffer that lets us unsafely fiddle with the descriptors.
+/// Prepares data unsafely to be transmitted via DMA.
 ///
-/// When receiving data into PSRAM, depending on the alignment requirements this may need 2 more
-/// descriptors than normal. These will be used to tie in internal memory buffers into the DMA
-/// transfer, so that they can be written back to PSRAM by the CPU. For now this implementation
-/// assumes at least 3 buffers when the chip supports PSRAM.
+/// `block_size` is the requirement imposed by the peripheral that receives the data. It
+/// ensures that the DMA will not try to copy a partial block, which would cause the RX DMA (that
+/// moves results back into RAM) to never complete.
 ///
-/// Beware the dragons.
+/// The function returns the DMA buffer, and the number of bytes that will be transferred.
 ///
-/// This type is only meant to fill out descriptors once, then send them off to the DMA. This
-/// isn't meant to hold onto the descriptors or otherwise provide a reuseable API to work with
-/// them. In fact this should just be a way to produce a `Preparation` but we have no way to do
-/// that in the current API.
+/// # Safety
 ///
-/// This type likely never should be visible outside of esp-hal.
-pub(crate) struct UnsafeRxBuffer<'a> {
-    descriptors: DescriptorSet<'a>,
-    #[cfg(psram_dma)]
-    in_psram: bool,
+/// The caller must keep all its descriptors and the buffers they
+/// point to valid while the buffer is being transferred.
+#[cfg_attr(not(aes_dma), expect(unused))]
+pub(crate) unsafe fn prepare_for_tx(
+    descriptors: &mut [DmaDescriptor],
+    mut data: NonNull<[u8]>,
+    block_size: usize,
+) -> (NoBuffer, usize) {
+    let chunk_size = BurstConfig::DEFAULT
+        .max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::Out)
+        .min(4096 - block_size); // Whichever is stricter, data location or peripheral requirements
+
+    let data_len = data.len().min(chunk_size * descriptors.len());
+
+    cfg_if::cfg_if! {
+        if #[cfg(psram_dma)] {
+            let data_addr = data.addr().get();
+            let data_in_psram = crate::psram::psram_range().contains(&data_addr);
+
+            // Make sure input data is in PSRAM instead of cache
+            if data_in_psram {
+                unsafe { crate::soc::cache_writeback_addr(data_addr as u32, data_len as u32) };
+            }
+        }
+    }
+
+    let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
+    // TODO: it would be best if this function returned the amount of data that could be linked
+    // up.
+    unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
+    unwrap!(descriptors.set_tx_length(data_len, chunk_size));
+
+    for desc in descriptors.linked_iter_mut() {
+        desc.reset_for_tx(desc.next.is_null());
+    }
+
+    (
+        NoBuffer(Preparation {
+            start: descriptors.head(),
+            direction: TransferDirection::Out,
+            burst_transfer: BurstConfig::DEFAULT,
+            check_owner: None,
+            auto_write_back: true,
+            #[cfg(psram_dma)]
+            accesses_psram: data_in_psram,
+        }),
+        data_len,
+    )
 }
 
-impl<'a> UnsafeRxBuffer<'a> {
-    /// # Safety
-    ///
-    /// The caller must keep all its descriptors and the buffers they
-    /// point to valid while the buffer is being transferred.
-    #[cfg_attr(not(aes_dma), expect(unused))]
-    pub unsafe fn new(
-        descriptors: &'a mut [DmaDescriptor],
-        #[cfg(psram_dma)] align_buffers: &'a mut [Option<ManualWritebackBuffer>; 2],
-        mut data: NonNull<[u8]>,
-    ) -> (Self, usize) {
-        let chunk_size = BurstConfig::DEFAULT
-            .max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::In);
+/// Prepare buffers to receive data from DMA.
+///
+/// The function returns the DMA buffer, and the number of bytes that will be transferred.
+///
+/// # Safety
+///
+/// The caller must keep all its descriptors and the buffers they
+/// point to valid while the buffer is being transferred.
+#[cfg_attr(not(aes_dma), expect(unused))]
+pub(crate) unsafe fn prepare_for_rx(
+    descriptors: &mut [DmaDescriptor],
+    #[cfg(psram_dma)] align_buffers: &mut [Option<ManualWritebackBuffer>; 2],
+    mut data: NonNull<[u8]>,
+) -> (NoBuffer, usize) {
+    let chunk_size =
+        BurstConfig::DEFAULT.max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::In);
 
-        // The data we have to process may not be appropriate for the DMA:
-        // - it may be improperly aligned for PSRAM
-        // - it may not have a length that is a multiple of the external memory block size
+    // The data we have to process may not be appropriate for the DMA:
+    // - it may be improperly aligned for PSRAM
+    // - it may not have a length that is a multiple of the external memory block size
 
+    cfg_if::cfg_if! {
+        if #[cfg(psram_dma)] {
+            let data_addr = data.addr().get();
+            let data_in_psram = crate::psram::psram_range().contains(&data_addr);
+        } else {
+            let data_in_psram = false;
+        }
+    }
+
+    let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
+    let data_len = if data_in_psram {
         cfg_if::cfg_if! {
             if #[cfg(psram_dma)] {
-                let data_addr = data.addr().get();
-                let data_in_psram = crate::psram::psram_range().contains(&data_addr);
-            } else {
-                let data_in_psram = false;
-            }
-        }
+                // This could use a better API, but right now we'll have to build the descriptor list by
+                // hand.
+                let consumed_bytes = build_descriptor_list_for_psram(
+                    &mut descriptors,
+                    align_buffers,
+                    data,
+                );
 
-        let mut descriptors = unwrap!(DescriptorSet::new(descriptors));
-        let data_len = if data_in_psram {
-            cfg_if::cfg_if! {
-                if #[cfg(psram_dma)] {
-                    // This could use a better API, but right now we'll have to build the descriptor list by
-                    // hand.
-                    let consumed_bytes = build_descriptor_list_for_psram(
-                        &mut descriptors,
-                        align_buffers,
-                        data,
-                    );
-
-                    // Invalidate data written by the DMA
-                    unsafe {
-                        crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
-                    }
-
-                    consumed_bytes
-                } else {
-                    unreachable!()
+                // Invalidate data written by the DMA
+                unsafe {
+                    crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
                 }
+
+                consumed_bytes
+            } else {
+                unreachable!()
             }
-        } else {
-            // Just set up descriptors as usual
-            let data_len = data.len();
-            unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
-            unwrap!(descriptors.set_tx_length(data_len, chunk_size));
-
-            data_len
-        };
-
-        for desc in descriptors.linked_iter_mut() {
-            desc.reset_for_rx();
         }
+    } else {
+        // Just set up descriptors as usual
+        let data_len = data.len();
+        unwrap!(descriptors.link_with_buffer(unsafe { data.as_mut() }, chunk_size));
+        unwrap!(descriptors.set_tx_length(data_len, chunk_size));
 
-        (
-            Self {
-                descriptors,
-                #[cfg(psram_dma)]
-                in_psram: data_in_psram,
-            },
-            data_len,
-        )
+        data_len
+    };
+
+    for desc in descriptors.linked_iter_mut() {
+        desc.reset_for_rx();
     }
+
+    (
+        NoBuffer(Preparation {
+            start: descriptors.head(),
+            direction: TransferDirection::In,
+            burst_transfer: BurstConfig::DEFAULT,
+            check_owner: None,
+            auto_write_back: true,
+            #[cfg(psram_dma)]
+            accesses_psram: data_in_psram,
+        }),
+        data_len,
+    )
 }
 
 #[cfg(psram_dma)]
@@ -1906,30 +1903,6 @@ impl<'a> DescriptorChainingIter<'a> {
         } else {
             None
         }
-    }
-}
-
-unsafe impl DmaRxBuffer for UnsafeRxBuffer<'_> {
-    type View = Self;
-
-    fn prepare(&mut self) -> Preparation {
-        Preparation {
-            start: self.descriptors.head(),
-            direction: TransferDirection::In,
-            burst_transfer: BurstConfig::DEFAULT,
-            check_owner: None,
-            auto_write_back: true,
-            #[cfg(psram_dma)]
-            accesses_psram: self.in_psram,
-        }
-    }
-
-    fn into_view(self) -> Self::View {
-        self
-    }
-
-    fn from_view(view: Self::View) -> Self {
-        view
     }
 }
 
