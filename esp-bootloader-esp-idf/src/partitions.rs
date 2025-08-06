@@ -488,6 +488,13 @@ pub struct FlashRegion<'a, F> {
     pub(crate) flash: &'a mut F,
 }
 
+impl<F> FlashRegion<'_, F> {
+    /// Returns the size of the partition in bytes.
+    pub fn partition_size(&self) -> usize {
+        self.raw.len() as _
+    }
+}
+
 impl<F> embedded_storage::Region for FlashRegion<'_, F> {
     fn contains(&self, address: u32) -> bool {
         address >= self.raw.offset() && address < self.raw.offset() + self.raw.len()
@@ -517,7 +524,7 @@ where
     }
 
     fn capacity(&self) -> usize {
-        self.raw.len() as _
+        self.partition_size()
     }
 }
 
@@ -582,7 +589,7 @@ where
     }
 
     fn capacity(&self) -> usize {
-        self.flash.capacity()
+        self.partition_size()
     }
 }
 
