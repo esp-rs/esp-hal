@@ -31,7 +31,7 @@ use esp_println::{print, println};
 use esp_radio::wifi::{
     AccessPointConfiguration,
     Configuration,
-    event::{self, EventExt},
+    event::{self, Event},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
 
@@ -53,16 +53,16 @@ fn main() -> ! {
     _ = event::ApStart::replace_handler(|_| esp_println::println!("ap start event"));
     event::ApStaconnected::update_handler(move |event| {
         connections += 1;
-        esp_println::println!("connected {}, mac: {:?}", connections, event.0.mac);
+        esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
     event::ApStaconnected::update_handler(|event| {
-        esp_println::println!("connected aid: {}", event.0.aid);
+        esp_println::println!("connected aid: {}", event.aid());
     });
     event::ApStadisconnected::update_handler(|event| {
         esp_println::println!(
             "disconnected mac: {:?}, reason: {:?}",
-            event.0.mac,
-            event.0.reason
+            event.mac(),
+            event.reason()
         );
     });
 

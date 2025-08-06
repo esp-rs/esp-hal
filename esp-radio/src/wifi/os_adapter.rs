@@ -36,8 +36,8 @@ use crate::{
     },
     memory_fence::memory_fence,
     preempt::yield_task,
+    wifi::event::internal::dispatch_event_handler,
 };
-
 static WIFI_LOCK: RawMutex = RawMutex::new();
 
 static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
@@ -872,8 +872,7 @@ pub unsafe extern "C" fn event_post(
     trace!("EVENT: {:?}", event);
 
     WIFI_EVENTS.with(|events| events.borrow_mut().insert(event));
-    let handled =
-        unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
+    let handled = unsafe { dispatch_event_handler(event, event_data) };
 
     super::state::update_state(event, handled);
 
