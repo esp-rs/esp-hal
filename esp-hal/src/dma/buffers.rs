@@ -1650,10 +1650,22 @@ pub(crate) unsafe fn prepare_for_tx(
     descriptors: &mut [DmaDescriptor],
     mut data: NonNull<[u8]>,
     block_size: usize,
-) -> (NoBuffer, usize) {
-    let chunk_size = BurstConfig::DEFAULT
-        .max_chunk_size_for(unsafe { data.as_ref() }, TransferDirection::Out)
-        .min(4096 - block_size); // Whichever is stricter, data location or peripheral requirements
+) -> Result<(NoBuffer, usize), DmaError> {
+    let alignment =
+        BurstConfig::DEFAULT.min_alignment(unsafe { data.as_ref() }, TransferDirection::Out);
+
+    if !data.addr().get().is_multiple_of(alignment) {
+        // ESP32 has word alignment requirement on the TX descriptors, too.
+        return Err(DmaError::InvalidAlignment(DmaAlignmentError::Address));
+    }
+
+    // Whichever is stricter, data location or peripheral requirements.
+    //
+    // This ensures that the RX DMA, if used, can transfer the returned number of bytes using at
+    // most N+2 descriptors. While the hardware doesn't require this on the TX DMA side, (the TX DMA
+    // can, except on the ESP32, transfer any amount of data), it makes usage MUCH simpler.
+    let alignment = alignment.max(block_size);
+    let chunk_size = 4096 - alignment;
 
     let data_len = data.len().min(chunk_size * descriptors.len());
 
@@ -1679,7 +1691,7 @@ pub(crate) unsafe fn prepare_for_tx(
         desc.reset_for_tx(desc.next.is_null());
     }
 
-    (
+    Ok((
         NoBuffer(Preparation {
             start: descriptors.head(),
             direction: TransferDirection::Out,
@@ -1690,7 +1702,7 @@ pub(crate) unsafe fn prepare_for_tx(
             accesses_psram: data_in_psram,
         }),
         data_len,
-    )
+    ))
 }
 
 /// Prepare buffers to receive data from DMA.
