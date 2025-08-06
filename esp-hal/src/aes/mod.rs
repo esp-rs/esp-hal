@@ -417,31 +417,14 @@ pub mod dma {
         pub aes: super::Aes<'d>,
 
         channel: Channel<Blocking, PeripheralDmaChannel<AES<'d>>>,
-
-        #[cfg(psram_dma)]
-        unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
-        input_descriptors: [DmaDescriptor; 1],
-        output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
     }
-
-    // The DMA descriptors prevent auto-implementing Sync, but they can be treated as Sync because
-    // we only access them in a critical section (around the work queue operations), and only when
-    // the DMA is not actively using them.
-    unsafe impl Sync for AesDma<'_> {}
 
     impl<'d> super::Aes<'d> {
         /// Enable DMA for the current instance of the AES driver
         pub fn with_dma(self, channel: impl DmaChannelFor<AES<'d>>) -> AesDma<'d> {
             let channel = Channel::new(channel.degrade());
             channel.runtime_ensure_compatible(&self.aes);
-            AesDma {
-                aes: self,
-                channel,
-                #[cfg(psram_dma)]
-                unaligned_data_buffers: [const { None }; 2],
-                input_descriptors: [DmaDescriptor::EMPTY; 1],
-                output_descriptors: [DmaDescriptor::EMPTY; OUT_DESCR_COUNT],
-            }
+            AesDma { aes: self, channel }
         }
     }
 
@@ -552,55 +535,6 @@ pub mod dma {
                 tx_view: ManuallyDrop::new(input.into_view()),
                 cipher_state,
             })
-        }
-
-        fn process_work_item(&mut self, work_item: &mut AesOperation) -> usize {
-            self.reset_aes();
-
-            let (mut input_buffer, data_len) = unsafe {
-                prepare_for_tx(
-                    &mut self.input_descriptors,
-                    work_item.buffers.input,
-                    BLOCK_SIZE,
-                )
-            };
-
-            let number_of_blocks = data_len / BLOCK_SIZE;
-            if number_of_blocks == 0 {
-                // DMA can't do anything.
-                return 0;
-            }
-
-            let (mut output_buffer, rx_data_len) = unsafe {
-                prepare_for_rx(
-                    &mut self.output_descriptors,
-                    #[cfg(psram_dma)]
-                    &mut self.unaligned_data_buffers,
-                    // Truncate data based on how much the TX buffer can read.
-                    NonNull::slice_from_raw_parts(work_item.buffers.output.cast::<u8>(), data_len),
-                )
-            };
-
-            debug_assert_eq!(rx_data_len, data_len);
-
-            let cipher_state = unsafe { work_item.cipher_mode.as_ref() };
-            cipher_state.write_state(self);
-
-            let mode = cipher_state.hardware_operating_mode(work_item.mode, &work_item.key);
-            // This unwrap is fine, this function is not called for modes of operation not supported
-            // by the hardware.
-            let cipher_mode = unwrap!(cipher_state.hardware_cipher_mode());
-
-            unwrap!(self.start_dma_transfer(
-                number_of_blocks,
-                &mut output_buffer,
-                &mut input_buffer,
-                mode,
-                cipher_mode,
-                &work_item.key
-            ));
-
-            data_len
         }
 
         fn reset_aes(&self) {
@@ -843,7 +777,19 @@ pub mod dma {
         dma: PeripheralDmaChannel<AES<'d>>,
         driver: Option<AesDma<'d>>,
         state: DmaState,
+
+        #[cfg(psram_dma)]
+        unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
+        input_descriptors: [DmaDescriptor; 1],
+        output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
     }
+
+    // The DMA descriptors prevent auto-implementing Sync, but they can be treated as Sync because
+    // we only access them in a critical section (around the work queue operations), and only when
+    // the DMA is not actively using them.
+    // FIXME: it's possible to stop and drop the backend while the DMA is in use, it'll need to be
+    // fixed for this to not be UB.
+    unsafe impl Sync for AesDmaBackend<'_> {}
 
     impl<'d> AesDmaBackend<'d> {
         #[procmacros::doc_replace(
@@ -872,6 +818,11 @@ pub mod dma {
                 dma: dma.degrade(),
                 driver: None,
                 state: DmaState::Idle,
+
+                #[cfg(psram_dma)]
+                unaligned_data_buffers: [const { None }; 2],
+                input_descriptors: [DmaDescriptor::EMPTY; 1],
+                output_descriptors: [DmaDescriptor::EMPTY; OUT_DESCR_COUNT],
             }
         }
 
@@ -909,8 +860,6 @@ pub mod dma {
         }
 
         fn start_processing(&mut self, item: &mut AesOperation) {
-            let driver = unwrap!(self.driver.as_mut());
-
             // There are some constraints that make us (partially) fall back to CPU-driven mode:
             // - The algo isn't implemented in hardware. Not much to do here, we process the whole
             //   data using the CPU.
@@ -927,7 +876,7 @@ pub mod dma {
 
             if unsafe { !item.cipher_mode.as_ref().implemented_in_hardware() } {
                 // Algo is either not implemented in hardware, or the data is not accessible by DMA.
-                driver.aes.process_work_item(item);
+                self.process_with_cpu(item);
                 return;
             }
 
@@ -966,14 +915,14 @@ pub mod dma {
             };
 
             // If there is enough data for the DMA, set it up:
-            let dma_processed = driver.process_work_item(&mut new_item);
+            let dma_processed = self.process_with_dma(&mut new_item);
             if dma_processed > 0 {
                 self.state = DmaState::WaitingForDma {
                     processed_bytes: flushed + dma_processed,
                 };
             } else {
                 // Otherwise, process the remaining data with CPU.
-                driver.aes.process_work_item(&mut new_item);
+                self.process_with_cpu(&mut new_item);
             }
         }
 
@@ -1007,7 +956,7 @@ pub mod dma {
 
             // Write out PSRAM data if needed:
             #[cfg(psram_dma)]
-            for buffer in driver.unaligned_data_buffers.iter_mut() {
+            for buffer in self.unaligned_data_buffers.iter_mut() {
                 if let Some(buffer) = buffer.take() {
                     buffer.write_back();
                 }
@@ -1033,7 +982,7 @@ pub mod dma {
                 };
 
                 // If there is enough data for the DMA, set it up again:
-                let dma_processed = driver.process_work_item(&mut temp_item);
+                let dma_processed = self.process_with_dma(&mut temp_item);
                 if dma_processed > 0 {
                     self.state = DmaState::WaitingForDma {
                         processed_bytes: processed_bytes + dma_processed,
@@ -1041,11 +990,65 @@ pub mod dma {
                     return Some(Poll::Pending);
                 } else {
                     // Otherwise, process the remaining data with CPU.
-                    driver.aes.process_work_item(&mut temp_item);
+                    self.process_with_cpu(&mut temp_item);
                 }
             }
 
             Some(Poll::Ready(Status::Completed))
+        }
+
+        fn process_with_cpu(&mut self, work_item: &mut AesOperation) {
+            let driver = unwrap!(self.driver.as_mut());
+            driver.aes.process_work_item(work_item);
+        }
+
+        fn process_with_dma(&mut self, work_item: &mut AesOperation) -> usize {
+            let (mut input_buffer, data_len) = unsafe {
+                prepare_for_tx(
+                    &mut self.input_descriptors,
+                    work_item.buffers.input,
+                    BLOCK_SIZE,
+                )
+            };
+
+            let number_of_blocks = data_len / BLOCK_SIZE;
+            if number_of_blocks == 0 {
+                // DMA can't do anything.
+                return 0;
+            }
+
+            let (mut output_buffer, rx_data_len) = unsafe {
+                prepare_for_rx(
+                    &mut self.output_descriptors,
+                    #[cfg(psram_dma)]
+                    &mut self.unaligned_data_buffers,
+                    // Truncate data based on how much the TX buffer can read.
+                    NonNull::slice_from_raw_parts(work_item.buffers.output.cast::<u8>(), data_len),
+                )
+            };
+
+            debug_assert_eq!(rx_data_len, data_len);
+
+            let driver = unwrap!(self.driver.as_mut());
+
+            let cipher_state = unsafe { work_item.cipher_mode.as_ref() };
+            cipher_state.write_state(driver);
+
+            let mode = cipher_state.hardware_operating_mode(work_item.mode, &work_item.key);
+            // This unwrap is fine, this function is not called for modes of operation not supported
+            // by the hardware.
+            let cipher_mode = unwrap!(cipher_state.hardware_cipher_mode());
+
+            unwrap!(driver.start_dma_transfer(
+                number_of_blocks,
+                &mut output_buffer,
+                &mut input_buffer,
+                mode,
+                cipher_mode,
+                &work_item.key
+            ));
+
+            data_len
         }
 
         fn ensure_initialized(&mut self) -> bool {
