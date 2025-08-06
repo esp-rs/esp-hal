@@ -373,8 +373,8 @@ pub mod dma {
             DmaRxBuffer,
             DmaTxBuffer,
             PeripheralDmaChannel,
-            UnsafeRxBuffer,
-            UnsafeTxBuffer,
+            prepare_for_rx,
+            prepare_for_tx,
         },
         interrupt::Priority,
         peripherals::AES,
@@ -470,6 +470,38 @@ pub mod dma {
             iv[12..16].copy_from_slice(&self.aes.regs().iv_mem(3).read().bits().to_le_bytes());
         }
 
+        fn start_dma_transfer(
+            &mut self,
+            number_of_blocks: usize,
+            output: &mut impl DmaRxBuffer,
+            input: &mut impl DmaTxBuffer,
+            mode: Mode,
+            cipher_mode: CipherMode,
+            key: &Key,
+        ) -> Result<(), DmaError> {
+            let peri = self.dma_peripheral();
+
+            unsafe { self.channel.tx.prepare_transfer(peri, input) }?;
+            unsafe { self.channel.rx.prepare_transfer(peri, output) }?;
+
+            // Start them together, to avoid the latter prepare discarding data from FIFOs.
+            self.channel.tx.start_transfer()?;
+            self.channel.rx.start_transfer()?;
+
+            self.enable_dma(true);
+            self.enable_interrupt();
+
+            self.aes.write_mode(mode);
+            self.write_key(key);
+
+            self.set_cipher_mode(cipher_mode);
+            self.set_num_block(number_of_blocks as u32);
+
+            self.start_transform();
+
+            Ok(())
+        }
+
         /// Perform a DMA transfer.
         ///
         /// This will return a [AesTransfer].
@@ -494,28 +526,6 @@ pub mod dma {
             // AES has to be restarted after each calculation
             self.reset_aes();
 
-            let result = unsafe {
-                self.channel
-                    .tx
-                    .prepare_transfer(self.dma_peripheral(), &mut input)
-                    .and_then(|_| self.channel.tx.start_transfer())
-            };
-            if let Err(err) = result {
-                return Err((err, self, output, input, cipher_state));
-            }
-
-            let result = unsafe {
-                self.channel
-                    .rx
-                    .prepare_transfer(self.dma_peripheral(), &mut output)
-                    .and_then(|_| self.channel.rx.start_transfer())
-            };
-            if let Err(err) = result {
-                self.channel.tx.stop_transfer();
-
-                return Err((err, self, output, input, cipher_state));
-            }
-
             // This unwrap is fine, the cipher state can only be constructed from supported
             // modes of operation.
             let cipher_mode = unwrap!(cipher_state.state.hardware_cipher_mode());
@@ -525,15 +535,16 @@ pub mod dma {
 
             let mode = cipher_state.state.hardware_operating_mode(mode, &key);
 
-            self.enable_dma(true);
-            self.enable_interrupt();
-            self.aes.write_mode(mode);
-            self.set_cipher_mode(cipher_mode);
-            self.write_key(&key);
-
-            self.set_num_block(number_of_blocks as u32);
-
-            self.start_transform();
+            if let Err(error) = self.start_dma_transfer(
+                number_of_blocks,
+                &mut output,
+                &mut input,
+                mode,
+                cipher_mode,
+                &key,
+            ) {
+                return Err((error, self, output, input, cipher_state));
+            }
 
             Ok(AesTransfer {
                 aes_dma: ManuallyDrop::new(self),
@@ -546,10 +557,8 @@ pub mod dma {
         fn process_work_item(&mut self, work_item: &mut AesOperation) -> usize {
             self.reset_aes();
 
-            let peri = self.dma_peripheral();
-
             let (mut input_buffer, data_len) = unsafe {
-                UnsafeTxBuffer::new(
+                prepare_for_tx(
                     &mut self.input_descriptors,
                     work_item.buffers.input,
                     BLOCK_SIZE,
@@ -563,7 +572,7 @@ pub mod dma {
             }
 
             let (mut output_buffer, rx_data_len) = unsafe {
-                UnsafeRxBuffer::new(
+                prepare_for_rx(
                     &mut self.output_descriptors,
                     #[cfg(psram_dma)]
                     &mut self.unaligned_data_buffers,
@@ -574,18 +583,7 @@ pub mod dma {
 
             debug_assert_eq!(rx_data_len, data_len);
 
-            unwrap!(unsafe { self.channel.tx.prepare_transfer(peri, &mut input_buffer) });
-            unwrap!(unsafe { self.channel.rx.prepare_transfer(peri, &mut output_buffer) });
-
-            // Start them together, to avoid the latter prepare discarding data from FIFOs.
-            unwrap!(self.channel.tx.start_transfer());
-            unwrap!(self.channel.rx.start_transfer());
-
-            self.enable_dma(true);
-            self.enable_interrupt();
-
             let cipher_state = unsafe { work_item.cipher_mode.as_ref() };
-
             cipher_state.write_state(self);
 
             let mode = cipher_state.hardware_operating_mode(work_item.mode, &work_item.key);
@@ -593,13 +591,14 @@ pub mod dma {
             // by the hardware.
             let cipher_mode = unwrap!(cipher_state.hardware_cipher_mode());
 
-            self.aes.write_mode(mode);
-            self.write_key(&work_item.key);
-
-            self.set_cipher_mode(cipher_mode);
-            self.set_num_block(number_of_blocks as u32);
-
-            self.start_transform();
+            unwrap!(self.start_dma_transfer(
+                number_of_blocks,
+                &mut output_buffer,
+                &mut input_buffer,
+                mode,
+                cipher_mode,
+                &work_item.key
+            ));
 
             data_len
         }
