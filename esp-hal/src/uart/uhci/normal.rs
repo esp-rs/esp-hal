@@ -235,7 +235,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     }
 
     /// to
-    pub async fn wait_for_idle(&mut self) {
+    async fn wait_for_idle(&mut self) {
         DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
             .await
             .unwrap();
