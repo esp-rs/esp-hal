@@ -985,11 +985,13 @@ pub mod dma {
 
         fn process_with_dma(&mut self, work_item: &mut AesOperation) -> usize {
             let (mut input_buffer, data_len) = unsafe {
-                prepare_for_tx(
+                // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
+                // requirements.
+                unwrap!(prepare_for_tx(
                     &mut self.input_descriptors,
                     work_item.buffers.input,
                     BLOCK_SIZE,
-                )
+                ))
             };
 
             let number_of_blocks = data_len / BLOCK_SIZE;
