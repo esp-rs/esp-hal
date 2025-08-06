@@ -589,6 +589,16 @@ pub mod dma {
             // TODO: PAC should provide the variants
             self.aes.regs().state().read().state().bits() == DMA_STATUS_DONE
         }
+
+        fn finish_dma_transfer(&mut self) {
+            while !self.channel.rx.is_done() {}
+
+            // Stop the DMA as it doesn't know that the aes has stopped.
+            self.channel.rx.stop_transfer();
+            self.channel.tx.stop_transfer();
+
+            self.finish_transform();
+        }
     }
 
     /// Represents an ongoing (or potentially stopped) transfer with the Aes.
@@ -610,14 +620,7 @@ pub mod dma {
         pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             while !self.is_done() {}
 
-            // Now wait for the DMA to finish.
-            while !self.aes_dma.channel.rx.is_done() {}
-
-            // Stop the DMA as it doesn't know that the aes has stopped.
-            self.aes_dma.channel.rx.stop_transfer();
-            self.aes_dma.channel.tx.stop_transfer();
-
-            self.aes_dma.finish_transform();
+            self.aes_dma.finish_dma_transfer();
 
             unsafe {
                 let aes_dma = ManuallyDrop::take(&mut self.aes_dma);
@@ -929,14 +932,8 @@ pub mod dma {
             // AES is done, we can write back the IV while the DMA may still copy data.
             unsafe { item.cipher_mode.as_mut() }.read_state(driver);
 
-            // Now wait for the DMA.
-            while !driver.channel.rx.is_done() {}
-
-            // Stop the DMA as it doesn't know that the aes has stopped.
-            driver.channel.rx.stop_transfer();
-            driver.channel.tx.stop_transfer();
-
-            driver.finish_transform();
+            // Now wait for the DMA and finish the transfer.
+            driver.finish_dma_transfer();
 
             // Write out PSRAM data if needed:
             #[cfg(psram_dma)]
