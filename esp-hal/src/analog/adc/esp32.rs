@@ -404,8 +404,8 @@ mod adc_implementation {
             (GPIO37<'_>, 1), // Alt. name: SENSOR_CAPP
             (GPIO38<'_>, 2), // Alt. name: SENSOR_CAPN
             (GPIO39<'_>, 3), // Alt. name: SENSOR_VN
-            (GPIO32<'_>, 4), // Alt. name: 32K_XN
-            (GPIO33<'_>, 5), // Alt. name: 32K_XP
+            (GPIO32<'_>, 4), // Alt. name: 32K_XP
+            (GPIO33<'_>, 5), // Alt. name: 32K_XN
             (GPIO34<'_>, 6), // Alt. name: VDET_1
             (GPIO35<'_>, 7), // Alt. name: VDET_2
         ]
