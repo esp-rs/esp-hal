@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Output: Include firmware-side metadata macros even if the build-script feature is set. (#3906)
 
 ### Removed
 

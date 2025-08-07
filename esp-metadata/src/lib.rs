@@ -910,7 +910,7 @@ pub fn generate_lib_rs() -> TokenStream {
         let feature = format!("{c}");
         let file = format!("_generated_{c}.rs");
         quote! {
-            #[cfg(all(not(feature = "build-script"), feature = #feature))]
+            #[cfg(feature = #feature)]
             include!(#file);
         }
     });
