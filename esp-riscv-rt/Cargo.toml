@@ -20,7 +20,7 @@ document-features = "0.2.11"
 defmt             = {version = "1.0.1", optional = true}
 riscv             = "0.14.0"
 # TODO wait for a release
-riscv-rt          = {version = "0.15.0", git = "https://github.com/rust-embedded/riscv.git", rev = "fcde9ff25ee97d0677b58ed34e8c0754ab9d42fb", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap"]}
+riscv-rt          = {version = "0.15.0", git = "https://github.com/rust-embedded/riscv.git", rev = "4bd25defd37f7f122619e21c434029bc6c10f893", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap"]}
 
 [features]
 ## Indicate that the device does NOT support `mie` and `mip` CSRs.
