@@ -68,6 +68,8 @@ const fn compute_mprime(modulus: &U512) -> u32 {
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod tests {
+    use esp_hal::rsa::{RsaBackend, RsaContext};
+
     use super::*;
 
     #[init]
@@ -99,7 +101,7 @@ mod tests {
         let r = compute_r(&BIGNUM_3);
         mod_exp.start_exponentiation(BIGNUM_1.as_words(), r.as_words());
         mod_exp.read_results(&mut outbuf);
-        assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
     }
 
     #[test]
@@ -117,7 +119,7 @@ mod tests {
         mod_exp
             .exponentiation(BIGNUM_1.as_words(), r.as_words(), &mut outbuf)
             .await;
-        assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
     }
 
     #[test]
@@ -133,7 +135,7 @@ mod tests {
         );
         mod_multi.start_modular_multiplication(BIGNUM_2.as_words());
         mod_multi.read_results(&mut outbuf);
-        assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
     }
 
     #[test]
@@ -152,7 +154,7 @@ mod tests {
         mod_multi
             .modular_multiplication(BIGNUM_2.as_words(), &mut outbuf)
             .await;
-        assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
     }
 
     #[test]
@@ -166,7 +168,7 @@ mod tests {
         rsamulti.start_multiplication(operand_b);
         rsamulti.read_results(&mut outbuf);
 
-        assert_eq!(EXPECTED_MULT_OUTPUT, outbuf)
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf)
     }
 
     #[test]
@@ -181,6 +183,62 @@ mod tests {
         let mut rsamulti = RsaMultiplication::<Op512, _>::new(&mut rsa, operand_a);
         rsamulti.multiplication(operand_b, &mut outbuf).await;
 
-        assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, outbuf);
+    }
+
+    #[test]
+    async fn test_rsa_work_queue() {
+        // FIXME
+        let mut backend = RsaBackend::new(unsafe { esp_hal::peripherals::RSA::steal() });
+        let _rsa = backend.start();
+
+        let mut rsa = RsaContext::new();
+
+        // Output buffers
+        let mut multi_outbuf = [0_u32; U1024::LIMBS];
+        let mut outbuf = [0_u32; U512::LIMBS];
+
+        // Software-derived values
+        let r = compute_r(&BIGNUM_3);
+        let mprime = compute_mprime(&BIGNUM_3);
+
+        defmt::info!("Multiply");
+
+        let mut handle =
+            rsa.multiply::<Op512>(BIGNUM_1.as_words(), BIGNUM_2.as_words(), &mut multi_outbuf);
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_MULT_OUTPUT, multi_outbuf);
+
+        defmt::info!("Modular multiply");
+
+        let mut handle = rsa.modular_multiply::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            mprime,
+            &mut outbuf,
+        );
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_MODULAR_MULT_OUTPUT, outbuf);
+
+        defmt::info!("Modular exponentiate");
+
+        let mut handle = rsa.modular_exponentiate::<Op512>(
+            BIGNUM_1.as_words(),
+            BIGNUM_2.as_words(),
+            BIGNUM_3.as_words(),
+            r.as_words(),
+            mprime,
+            &mut outbuf,
+        );
+        handle.wait().await;
+        core::mem::drop(handle);
+
+        hil_test::assert_eq!(EXPECTED_EXPONENTIATION_OUTPUT, outbuf);
     }
 }
