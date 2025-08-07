@@ -12,7 +12,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![deny(missing_docs)]
 #![no_std]
-#![feature(naked_functions_rustic_abi)]
+
 use core::arch::global_asm;
 
 pub use riscv;
@@ -161,7 +161,7 @@ macro_rules! define_interrupt {
         #[unsafe(naked)]
         #[unsafe(link_section = ".trap.start")]
         #[riscv_rt::core_interrupt($name)]
-        fn $fname() {
+        extern "C" fn $fname() {
             core::arch::naked_asm! {
                 concat!(
                 "
