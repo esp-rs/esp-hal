@@ -397,36 +397,6 @@ impl<ADC1> Adc<'_, ADC1, crate::Blocking> {
     }
 }
 
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO36<'_>, 0), // Alt. name: SENSOR_VP
-            (GPIO37<'_>, 1), // Alt. name: SENSOR_CAPP
-            (GPIO38<'_>, 2), // Alt. name: SENSOR_CAPN
-            (GPIO39<'_>, 3), // Alt. name: SENSOR_VN
-            (GPIO32<'_>, 4), // Alt. name: 32K_XP
-            (GPIO33<'_>, 5), // Alt. name: 32K_XN
-            (GPIO34<'_>, 6), // Alt. name: VDET_1
-            (GPIO35<'_>, 7), // Alt. name: VDET_2
-        ]
-    }
-
-    crate::analog::adc::impl_adc_interface! {
-        ADC2 [
-            (GPIO4<'_>,  0),
-            (GPIO0<'_>,  1),
-            (GPIO2<'_>,  2),
-            (GPIO15<'_>, 3), // Alt. name: MTDO
-            (GPIO13<'_>, 4), // Alt. name: MTCK
-            (GPIO12<'_>, 5), // Alt. name: MTDI
-            (GPIO14<'_>, 6), // Alt. name: MTMS
-            (GPIO27<'_>, 7),
-            (GPIO25<'_>, 8),
-            (GPIO26<'_>, 9),
-        ]
-    }
-}
-
 impl Drop for ADC2<'_> {
     fn drop(&mut self) {
         release_adc2(private::Internal);
