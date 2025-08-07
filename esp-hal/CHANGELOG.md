@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - WDT now allows configuring longer timeouts (#3816)
 - `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 - Switched GPIO32 and GPIO33 ADC channel numbers (#3908, #3911)
+- Switched GPIO32 and GPIO33 ADC channel numbers (#3908)
+- Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
 
 ### Removed
 

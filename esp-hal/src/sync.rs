@@ -321,8 +321,14 @@ impl<L: single_core::RawLock> GenericRawMutex<L> {
     ///
     /// Note that this function is not reentrant, calling it reentrantly will
     /// panic.
+    pub fn lock_non_reentrant<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _token = LockGuard::new_non_reentrant(self);
+        f()
+    }
+
+    /// Runs the callback with this lock locked.
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        let _token = LockGuard::new(self);
+        let _token = LockGuard::new_reentrant(self);
         f()
     }
 }
@@ -381,6 +387,11 @@ impl RawMutex {
     ///
     /// Note that this function is not reentrant, calling it reentrantly will
     /// panic.
+    pub fn lock_non_reentrant<R>(&self, f: impl FnOnce() -> R) -> R {
+        self.inner.lock_non_reentrant(f)
+    }
+
+    /// Runs the callback with this lock locked.
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock(f)
     }
@@ -391,9 +402,7 @@ unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawMutex {
     const INIT: Self = Self::new();
 
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        // embassy_sync semantics allow reentrancy.
-        let _token = LockGuard::new_reentrant(&self.inner);
-        f()
+        self.inner.lock(f)
     }
 }
 
@@ -414,9 +423,6 @@ impl RawPriorityLimitedMutex {
     }
 
     /// Runs the callback with this lock locked.
-    ///
-    /// Note that this function is not reentrant, calling it reentrantly will
-    /// panic.
     pub fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
         self.inner.lock(f)
     }
@@ -427,9 +433,7 @@ unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMu
     const INIT: Self = Self::new(Priority::max());
 
     fn lock<R>(&self, f: impl FnOnce() -> R) -> R {
-        // embassy_sync semantics allow reentrancy.
-        let _token = LockGuard::new_reentrant(&self.inner);
-        f()
+        self.inner.lock(f)
     }
 }
 
@@ -462,7 +466,8 @@ impl<T> Locked<T> {
     ///
     /// Calling this reentrantly will panic.
     pub fn with<R>(&self, f: impl FnOnce(&mut T) -> R) -> R {
-        lock(&self.lock_state, || f(unsafe { &mut *self.data.get() }))
+        self.lock_state
+            .lock_non_reentrant(|| f(unsafe { &mut *self.data.get() }))
     }
 }
 
@@ -474,7 +479,7 @@ struct LockGuard<'a, L: single_core::RawLock> {
 }
 
 impl<'a, L: single_core::RawLock> LockGuard<'a, L> {
-    fn new(lock: &'a GenericRawMutex<L>) -> Self {
+    fn new_non_reentrant(lock: &'a GenericRawMutex<L>) -> Self {
         let this = Self::new_reentrant(lock);
         assert!(!this.token.is_reentry(), "lock is not reentrant");
         this
