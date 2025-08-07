@@ -12,7 +12,6 @@ use crate::{
         DmaTxBuffer,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
-    into_internal_uhci,
     peripherals,
     uart,
     uart::{
@@ -156,7 +155,10 @@ impl<'d> UhciSimple<'d, Async> {
 }
 
 impl<'d, Dm: DriverMode> UhciSimple<'d, Dm> {
-    into_internal_uhci!();
+    /// Sets the UART config for the consumer earlier uart
+    pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
+        self.internal.set_uart_config(uart_config)
+    }
 
     /// The limit of how much to read in a single read call. It cannot be higher than the dma
     /// buffer size, otherwise uart/dma/uhci will freeze. It cannot exceed 4095 (12 bits), above

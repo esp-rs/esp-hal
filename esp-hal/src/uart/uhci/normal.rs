@@ -1,6 +1,6 @@
 use core::{
     mem::ManuallyDrop,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut}, u8,
 };
 
 use esp32c6::uhci0;
@@ -15,10 +15,8 @@ use crate::{
         DmaEligible,
         DmaRxBuffer,
         DmaTxBuffer,
-        RegisterAccess,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
-    into_internal_uhci,
     peripherals,
     uart::{
         self,
@@ -99,7 +97,7 @@ pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
-    pub(crate) internal: UhciInternal<'d, Dm>,
+    pub(crate) internal: ManuallyDrop<Option<UhciInternal<'d, Dm>>>,
 }
 
 impl<'d> Uhci<'d, Blocking> {
@@ -121,14 +119,29 @@ impl<'d> Uhci<'d, Blocking> {
         self_uhci.init();
 
         Self {
-            internal: self_uhci,
+            internal: ManuallyDrop::new(Some(self_uhci)),
         }
     }
 
     /// Create a new instance in [crate::Async] mode.
-    pub fn into_async(self) -> Uhci<'d, Async> {
-        let internal = self.internal.into_async();
-        Uhci { internal }
+    pub fn into_async(mut self) -> Uhci<'d, Async> {
+        let internal = self.internal.take().unwrap().into_async();
+        Uhci {
+            internal: ManuallyDrop::new(Some(internal)),
+        }
+    }
+}
+
+impl<Dm> Drop for Uhci<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+        if let Some(mut internal) = self.internal.take() {
+            internal.turn_off();
+            // Drop uart too to be sure?
+            drop(internal.uart);
+        }
     }
 }
 
@@ -139,19 +152,19 @@ impl<'d> Uhci<'d, Async> {
         mut tx_buffer: Buf,
     ) -> UhciDmaTxTransfer<'d, Async, Buf> {
         {
-            // self.internal.channel.tx.clear_interrupts();
-
-            // self.internal.channel.tx.tx_impl.restart();
+            let mut just_self = self.internal.take().unwrap();
 
             unsafe {
-                self.internal
+                just_self
                     .channel
                     .tx
-                    .prepare_transfer(self.internal.uhci.dma_peripheral(), &mut tx_buffer)
+                    .prepare_transfer(just_self.uhci.dma_peripheral(), &mut tx_buffer)
                     .unwrap()
             };
 
-            self.internal.channel.tx.start_transfer().unwrap();
+            just_self.channel.tx.start_transfer().unwrap();
+
+            self.internal = ManuallyDrop::new(Some(just_self));
 
             return UhciDmaTxTransfer::new(self, tx_buffer);
         }
@@ -163,34 +176,54 @@ impl<'d> Uhci<'d, Async> {
         mut rx_buffer: Buf,
     ) -> UhciDmaRxTransfer<'d, Async, Buf> {
         {
+            let mut just_self = self.internal.take().unwrap();
+
             unsafe {
-                self.internal
+                just_self
                     .channel
                     .rx
-                    .prepare_transfer(self.internal.uhci.dma_peripheral(), &mut rx_buffer)
+                    .prepare_transfer(just_self.uhci.dma_peripheral(), &mut rx_buffer)
                     .unwrap()
             };
 
-            self.internal.channel.rx.start_transfer().unwrap();
+            just_self.channel.rx.start_transfer().unwrap();
+
+            self.internal = ManuallyDrop::new(Some(just_self));
 
             return UhciDmaRxTransfer::new(self, rx_buffer);
         }
     }
 
     /// Create a new instance in [crate::Blocking] mode.
-    pub fn into_blocking(self) -> Uhci<'d, Blocking> {
+    pub fn into_blocking(mut self) -> Uhci<'d, Blocking> {
+        let internal = self.internal.take().unwrap().into_blocking();
         Uhci {
-            internal: self.internal.into_blocking(),
+            internal: ManuallyDrop::new(Some(internal)),
         }
     }
 }
 
 impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
-    into_internal_uhci!();
+    pub(crate) fn new_from_internal(uhci_internal: UhciInternal<'d, Dm>) -> Self {
+        Self {
+            internal: ManuallyDrop::new(Some(uhci_internal)),
+        }
+    }
+
+    /// Sets the UART config for the consumer earlier uart
+    pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
+        let mut just_self = self.internal.take().unwrap();
+
+        let res = just_self.set_uart_config(uart_config);
+
+        self.internal = ManuallyDrop::new(Some(just_self));
+        res
+    }
 
     /// Change the UHCI peripheral configuration
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
+        let just_self = self.internal.take().unwrap();
+        let reg: &uhci0::RegisterBlock = just_self.uhci.give_uhci().register_block();
 
         reg.conf0()
             .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
@@ -198,9 +231,11 @@ impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
         reg.conf0()
             .modify(|_, w| w.len_eof_en().bit(config.len_eof));
 
-        if self.internal.set_chunk_limit(config.chunk_limit).is_err() {
+        if just_self.set_chunk_limit(config.chunk_limit).is_err() {
             return Err(AboveReadLimit);
         }
+
+        self.internal = ManuallyDrop::new(Some(just_self));
 
         Ok(())
     }
@@ -217,32 +252,28 @@ where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
 {
-    uhci: ManuallyDrop<Uhci<'d, Dm>>,
+    uhci: ManuallyDrop<UhciInternal<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
 }
 
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    fn new(uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
+    fn new(mut uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
+        let just_self = uhci.internal.take().unwrap();
         Self {
-            uhci: ManuallyDrop::new(uhci),
+            uhci: ManuallyDrop::new(just_self),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
         }
     }
 
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.uhci.internal.channel.tx.is_done()
+        self.uhci.channel.tx.is_done()
     }
 
     /// to
     async fn wait_for_idle(&mut self) {
-        DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
-            .await
-            .unwrap();
-        // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm lost at this point, this is the only thing that worked
-        DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
-            .await
-            .unwrap();
+        self.uhci.uart.flush_async().await.unwrap();
+        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
     }
 
     /// Waits for the DMA transfer to complete.
@@ -255,7 +286,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
 
         let retval = unsafe {
             (
-                ManuallyDrop::take(&mut self.uhci),
+                Uhci::new_from_internal(ManuallyDrop::take(&mut self.uhci)),
                 ManuallyDrop::take(&mut self.dma_buf),
             )
         };
@@ -266,13 +297,13 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
         }
 
         let retval = unsafe {
             (
-                ManuallyDrop::take(&mut self.uhci),
+                Uhci::new_from_internal(ManuallyDrop::take(&mut self.uhci)),
                 ManuallyDrop::take(&mut self.dma_buf),
             )
         };
@@ -301,8 +332,8 @@ where
     Buf: DmaTxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
         }
         // TODO: Implement uhci drop
 
@@ -324,27 +355,25 @@ where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
 {
-    uhci: ManuallyDrop<Uhci<'d, Dm>>,
+    uhci: ManuallyDrop<UhciInternal<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    fn new(uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
+    fn new(mut uhci: Uhci<'d, Async>, dma_buf: Buf) -> Self {
         Self {
-            uhci: ManuallyDrop::new(uhci),
+            uhci: ManuallyDrop::new(uhci.internal.take().unwrap()),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
         }
     }
 
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.uhci.internal.channel.rx.is_done()
+        self.uhci.channel.rx.is_done()
     }
 
     async fn wait_for_idle(&mut self) {
-        DmaRxFuture::new(&mut self.uhci.internal.channel.rx)
-            .await
-            .unwrap();
+        DmaRxFuture::new(&mut self.uhci.channel.rx).await.unwrap();
     }
 
     /// Waits for the DMA transfer to complete.
@@ -357,7 +386,7 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
 
         let retval = unsafe {
             (
-                ManuallyDrop::take(&mut self.uhci),
+                Uhci::new_from_internal(ManuallyDrop::take(&mut self.uhci)),
                 ManuallyDrop::take(&mut self.dma_buf),
             )
         };
@@ -368,13 +397,13 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.rx.is_done() {
-            self.uhci.internal.channel.rx.stop_transfer();
+        if !self.uhci.channel.rx.is_done() {
+            self.uhci.channel.rx.stop_transfer();
         }
 
         let retval = unsafe {
             (
-                ManuallyDrop::take(&mut self.uhci),
+                Uhci::new_from_internal(ManuallyDrop::take(&mut self.uhci)),
                 ManuallyDrop::take(&mut self.dma_buf),
             )
         };
@@ -403,8 +432,8 @@ where
     Buf: DmaRxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.internal.channel.rx.is_done() {
-            self.uhci.internal.channel.rx.stop_transfer();
+        if !self.uhci.channel.rx.is_done() {
+            self.uhci.channel.rx.stop_transfer();
             // TODO: Implement uhci drop
         }
         unsafe {
