@@ -1600,19 +1600,12 @@ impl core::future::Future for RmtTxFuture {
 }
 
 /// TX channel in async mode
-pub trait TxChannelAsync {
+impl Channel<Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
-    where
-        Self: Sized,
-        T: Into<PulseCode> + Copy;
-}
-
-impl TxChannelAsync for Channel<Async, Tx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
+    pub async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
     where
         Self: Sized,
         T: Into<PulseCode> + Copy,
@@ -1652,19 +1645,12 @@ impl core::future::Future for RmtRxFuture {
 }
 
 /// RX channel in async mode
-pub trait RxChannelAsync {
+impl Channel<Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
-    where
-        Self: Sized,
-        T: From<PulseCode>;
-}
-
-impl RxChannelAsync for Channel<Async, Rx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
+    pub async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
         T: From<PulseCode>,
