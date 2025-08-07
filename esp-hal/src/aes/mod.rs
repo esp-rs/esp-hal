@@ -922,7 +922,7 @@ pub mod dma {
 
             if !driver.is_done() {
                 // Still working.
-                return Some(Poll::Pending);
+                return Some(Poll::Pending(false));
             }
 
             driver.clear_interrupt();
@@ -967,7 +967,7 @@ pub mod dma {
                     self.state = DmaState::WaitingForDma {
                         processed_bytes: processed_bytes + dma_processed,
                     };
-                    return Some(Poll::Pending);
+                    return Some(Poll::Pending(false));
                 } else {
                     // Otherwise, process the remaining data with CPU.
                     self.process_with_cpu(&mut temp_item);
