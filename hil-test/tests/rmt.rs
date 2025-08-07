@@ -417,7 +417,7 @@ mod tests {
     }
 
     #[test]
-    async fn rmt_async_tx_invalid_args() {
+    async fn rmt_async_tx_invalid_args_slice() {
         let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
@@ -450,6 +450,44 @@ mod tests {
         // Requires wrapping, error can only be detected after starting tx
         assert_eq!(
             ch0.transmit(&no_end_long).await,
+            Err(Error::EndMarkerMissing)
+        );
+    }
+
+    #[test]
+    async fn rmt_async_tx_invalid_args_iter() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let mut ch0 = rmt
+            .channel0
+            .configure_tx(NoPin, TxChannelConfig::default())
+            .unwrap();
+
+        let empty: [PulseCode; 0] = [];
+
+        assert_eq!(ch0.transmit_iter(&empty).await, Err(Error::InvalidArgument));
+
+        let code = PulseCode::default()
+            .with_length1(42)
+            .unwrap()
+            .with_length2(42)
+            .unwrap();
+
+        let no_end_short = [code; 3];
+
+        // No wrapping, error should already be detected before starting tx
+        assert_eq!(
+            ch0.transmit_iter(&no_end_short).await,
+            Err(Error::EndMarkerMissing)
+        );
+
+        let no_end_long = [code; 80];
+
+        // Requires wrapping, error can only be detected after starting tx
+        assert_eq!(
+            ch0.transmit_iter(&no_end_long).await,
             Err(Error::EndMarkerMissing)
         );
     }
