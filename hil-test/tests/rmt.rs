@@ -35,13 +35,13 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup<Dm: DriverMode>(
-    rmt: Rmt<'static, Dm>,
-    rx: impl InputPin,
-    tx: impl OutputPin,
+fn setup<'a, Dm: DriverMode + 'static>(
+    rmt: Rmt<'a, Dm>,
+    rx: impl InputPin + 'a,
+    tx: impl OutputPin + 'a,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
+) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
@@ -457,44 +457,52 @@ mod tests {
     #[test]
     async fn rmt_pin_reconfigure() {
         let mut peripherals = esp_hal::init(esp_hal::Config::default());
-
         let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
 
-        let mut ch0 = {
-            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+        let ch0 = {
+            let mut rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
                 .unwrap()
                 .into_async();
-            let mut ch0 = rmt
-                .channel0
-                .configure_tx(tx.reborrow(), TxChannelConfig::default())
-                .unwrap();
 
-            let tx_data: [_; 10] = generate_tx_data(true);
+            let ch0 = {
+                let mut ch0 = rmt
+                    .channel0
+                    .reborrow()
+                    .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                    .unwrap();
 
-            ch0.transmit(&tx_data).await.unwrap();
+                let tx_data: [_; 10] = generate_tx_data(true);
 
-            ch0
+                ch0.transmit(&tx_data).await.unwrap();
+
+                ch0
+            };
+
+            // Removing the drop should break compilation!
+            core::mem::drop(ch0);
+            let _input = Input::new(tx.reborrow(), Default::default());
+
+            {
+                // This time take the ChannelCreator by value
+                let mut ch0 = rmt
+                    .channel0
+                    .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                    .unwrap();
+
+                let tx_data: [_; 10] = generate_tx_data(true);
+
+                ch0.transmit(&tx_data).await.unwrap();
+
+                ch0
+            }
+
+            // let tx_data: [_; 10] = generate_tx_data(1, true);
+            // ch0.transmit(&tx_data).await.unwrap();
         };
 
-        let _input = Input::new(tx.reborrow(), Default::default());
-
-        {
-            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
-                .unwrap()
-                .into_async();
-
-            // FIXME: Allow reborrow of ChannelCreator!
-            let mut ch0 = rmt
-                .channel0
-                .configure_tx(tx.reborrow(), TxChannelConfig::default())
-                .unwrap();
-
-            let tx_data: [_; 10] = generate_tx_data(true);
-
-            ch0.transmit(&tx_data).await.unwrap();
-        }
-
-        let tx_data: [_; 10] = generate_tx_data(true);
-        ch0.transmit(&tx_data).await.unwrap();
+        // Note that we can keep around the channel longer than the Rmt! This is
+        // intended and useful when e.g. creating the Rmt in the main task and
+        // then sending several channels to different places.
+        let _ = ch0;
     }
 }

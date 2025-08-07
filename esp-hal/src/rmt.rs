@@ -1217,7 +1217,7 @@ macro_rules! declare_channels {
                 pub(super) peripheral: RMT<'d>,
                 $(
                     #[doc = concat!("RMT Channel ", $num)]
-                    pub [<channel $num>]: ChannelCreator<Dm, ConstChannelAccess<$cap, $idx>>,
+                    pub [<channel $num>]: ChannelCreator<'d, Dm, ConstChannelAccess<$cap, $idx>>,
                 )+
                 _mode: PhantomData<Dm>,
             }
@@ -1359,17 +1359,17 @@ cfg_if::cfg_if! {
 
 /// RMT Channel Creator
 #[derive(Debug)]
-pub struct ChannelCreator<Dm, Raw>
+pub struct ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: RawChannelAccess<Dir: Capability>,
 {
     raw: Raw,
-    _mode: PhantomData<Dm>,
+    _rmt: PhantomData<Rmt<'rmt, Dm>>,
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, Raw> ChannelCreator<Dm, Raw>
+impl<'rmt, Dm, Raw> ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: RawChannelAccess<Dir: Capability>,
@@ -1377,23 +1377,33 @@ where
     fn new(raw: Raw) -> Self {
         Self {
             raw,
-            _mode: PhantomData,
+            _rmt: PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
 
     /// FIXME: Docs
-    pub fn degrade(self) -> ChannelCreator<Dm, DynChannelAccess<Raw::Dir>> {
+    pub fn degrade(self) -> ChannelCreator<'rmt, Dm, DynChannelAccess<Raw::Dir>> {
         // FIXME: Share code with Channel::degrade?
         ChannelCreator {
             raw: self.raw.degrade(),
-            _mode: self._mode,
+            _rmt: self._rmt,
             _guard: self._guard,
+        }
+    }
+
+    /// FIXME: Docs
+    pub fn reborrow(&mut self) -> ChannelCreator<'_, Dm, Raw> {
+        ChannelCreator {
+            raw: self.raw,
+            _rmt: PhantomData,
+            _guard: self._guard.clone(),
         }
     }
 }
 
-impl<Dm, Dir, const CH_IDX: u8> ChannelCreator<Dm, ConstChannelAccess<Dir, CH_IDX>>
+impl<'rmt, Dm, Dir, const CH_IDX: u8>
+    ChannelCreator<'rmt, Dm, ConstChannelAccess<Dir, CH_IDX>>
 where
     Dir: Capability,
     Dm: crate::DriverMode,
@@ -1432,7 +1442,7 @@ where
 // - RxTx devices: always allow reconfigure + unconfigure
 // - Rx/Tx devices: allow Unconfigure and reconfigure with the same direction
 
-impl<Dm, Raw> ChannelCreator<Dm, Raw>
+impl<'rmt, Dm, Raw> ChannelCreator<'rmt, Dm, Raw>
 where
     Dm: crate::DriverMode,
     Raw: RawChannelAccess,
@@ -1442,8 +1452,9 @@ where
         self,
         pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Tx>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Tx>, (Error, Self)>
     where
+        Self: 'pin,
         Raw::Dir: Supports<Tx>,
     {
         let raw = self.raw.configure().degrade();
@@ -1458,8 +1469,9 @@ where
         self,
         pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Rx>, (Error, Self)>
+    ) -> Result<Channel<'pin, Dm, Rx>, (Error, Self)>
     where
+        Self: 'pin,
         Raw::Dir: Supports<Rx>,
     {
         let raw = self.raw.configure().degrade();
@@ -1732,17 +1744,17 @@ use state::RmtState;
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Channel<Dm, Dir>
+pub struct Channel<'ch, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
 {
     raw: DynChannelAccess<Dir>,
-    _mode: PhantomData<Dm>,
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, Dir> Channel<Dm, Dir>
+impl<Dm, Dir> Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction
@@ -1750,13 +1762,13 @@ where
     fn new(raw: DynChannelAccess<Dir>) -> Self {
         Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
 
     // FIXME: Implement, regain full Capabilitis of Raw!
-    // fn unconfigure(self) -> ChannelCreator<Dm, Raw> {
+    // fn unconfigure(self) -> ChannelCreator<'rmt, Dm, Raw> {
     //     // requires ChannelCreator to take a RawChannelAccess such that
     // type-erased channels can     // also be unconfigured
     //     todo!("implement, then do the same on drop")
@@ -1768,7 +1780,7 @@ where
     }
 }
 
-impl<Dm, Dir> Drop for Channel<Dm, Dir>
+impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
@@ -2031,7 +2043,7 @@ impl defmt::Format for BenchmarkResult {
     }
 }
 
-impl<Dm> Channel<Dm, Tx>
+impl<Dm> Channel<'_, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
@@ -2126,7 +2138,7 @@ where
 }
 
 /// Channel in TX mode
-impl Channel<Blocking, Tx> {
+impl Channel<'_, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
@@ -2387,7 +2399,7 @@ where
 }
 
 /// Channel is RX mode
-impl Channel<Blocking, Rx> {
+impl Channel<'_, Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
@@ -2538,7 +2550,7 @@ where
 }
 
 /// TX channel in async mode
-impl Channel<Async, Tx> {
+impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
@@ -2754,7 +2766,7 @@ where
 }
 
 /// RX channel in async mode
-impl Channel<Async, Rx> {
+impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
