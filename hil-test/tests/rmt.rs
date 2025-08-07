@@ -450,29 +450,21 @@ mod tests {
             .configure_tx(NoPin, TxChannelConfig::default())
             .unwrap();
 
-        let empty: [PulseCode; 0] = [];
+        let code = PulseCode::new(Level::High, 42, Level::Low, 42);
 
-        assert_eq!(ch0.transmit(&empty).await, Err(Error::InvalidArgument));
+        let no_end = [code; 80];
 
-        let code = PulseCode::default()
-            .with_length1(42)
-            .unwrap()
-            .with_length2(42)
-            .unwrap();
-
-        let no_end_short = [code; 3];
+        assert_eq!(ch0.transmit(&no_end[..0]).await, Err(Error::InvalidArgument));
 
         // No wrapping, error should already be detected before starting tx
         assert_eq!(
-            ch0.transmit(&no_end_short).await,
+            ch0.transmit(&no_end[..3]).await,
             Err(Error::EndMarkerMissing)
         );
 
-        let no_end_long = [code; 80];
-
         // Requires wrapping, error can only be detected after starting tx
         assert_eq!(
-            ch0.transmit(&no_end_long).await,
+            ch0.transmit(&no_end[..80]).await,
             Err(Error::EndMarkerMissing)
         );
     }
@@ -488,29 +480,22 @@ mod tests {
             .configure_tx(NoPin, TxChannelConfig::default())
             .unwrap();
 
-        let empty: [PulseCode; 0] = [];
+        let code = PulseCode::new(Level::High, 42, Level::Low, 42);
 
-        assert_eq!(ch0.transmit_iter(&empty).await, Err(Error::InvalidArgument));
-
-        let code = PulseCode::default()
-            .with_length1(42)
-            .unwrap()
-            .with_length2(42)
-            .unwrap();
-
-        let no_end_short = [code; 3];
+        assert_eq!(
+            ch0.transmit_iter(core::iter::repeat(code).take(0)).await,
+            Err(Error::InvalidArgument)
+        );
 
         // No wrapping, error should already be detected before starting tx
         assert_eq!(
-            ch0.transmit_iter(&no_end_short).await,
+            ch0.transmit_iter(core::iter::repeat(code).take(3)).await,
             Err(Error::EndMarkerMissing)
         );
 
-        let no_end_long = [code; 80];
-
         // Requires wrapping, error can only be detected after starting tx
         assert_eq!(
-            ch0.transmit_iter(&no_end_long).await,
+            ch0.transmit_iter(core::iter::repeat(code).take(80)).await,
             Err(Error::EndMarkerMissing)
         );
     }

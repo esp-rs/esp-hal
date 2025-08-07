@@ -193,10 +193,10 @@
 //! > Note: on ESP32 and ESP32-S2 you cannot specify a base frequency other than 80 MHz
 
 use core::{
-    borrow::{Borrow, BorrowMut},
     default::Default,
     marker::PhantomData,
     mem::ManuallyDrop,
+    num::NonZeroU16,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -598,19 +598,29 @@ pub trait Encoder {
     fn encode(&mut self, writer: &mut RmtWriterInner) -> bool;
 }
 
-/// FIXME: Docs
+#[derive(Debug)]
 #[derive(Clone)]
-pub struct SliceEncoder<'a> {
-    data: &'a [PulseCode],
+#[doc(hidden)]
+pub struct SliceEncoder<'a, T>
+where
+    T: Into<PulseCode> + Copy,
+{
+    data: &'a [T],
 }
 
-impl<'a> SliceEncoder<'a> {
-    fn new(data: &'a [PulseCode]) -> Self {
+impl<'a, T> SliceEncoder<'a, T>
+where
+    T: Into<PulseCode> + Copy,
+{
+    fn new(data: &'a [T]) -> Self {
         Self { data }
     }
 }
 
-impl<'a> Encoder for SliceEncoder<'a> {
+impl<'a, T> Encoder for SliceEncoder<'a, T>
+where
+    T: Into<PulseCode> + Copy,
+{
     #[inline(always)]
     fn encode(&mut self, writer: &mut RmtWriterInner) -> bool {
         let count = self
@@ -620,15 +630,17 @@ impl<'a> Encoder for SliceEncoder<'a> {
         if count > 0 {
             let mut ptr = writer.ptr;
 
+            let mut last_code = PulseCode::end_marker();
             for code in &self.data[..count] {
-                unsafe { ptr.write_volatile(*code) }
+                last_code = (*code).into();
+                unsafe { ptr.write_volatile(last_code) }
                 ptr = unsafe { ptr.add(1) };
             }
 
             debug_assert!(writer.ptr <= writer.end);
 
             writer.ptr = ptr;
-            writer.last_code = self.data[count - 1];
+            writer.last_code = last_code;
             self.data = &self.data[count..];
         }
 
@@ -636,19 +648,18 @@ impl<'a> Encoder for SliceEncoder<'a> {
     }
 }
 
-/// FIXME: Docs
+#[derive(Debug)]
+#[doc(hidden)]
 pub struct IterEncoder<D>
 where
-    D: Iterator,
-    D::Item: Borrow<PulseCode>,
+    D: Iterator<Item = PulseCode>,
 {
     data: D,
 }
 
 impl<D> Clone for IterEncoder<D>
 where
-    D: Iterator + Clone,
-    D::Item: Borrow<PulseCode>,
+    D: Iterator<Item = PulseCode> + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -659,8 +670,7 @@ where
 
 impl<D> IterEncoder<D>
 where
-    D: Iterator,
-    D::Item: Borrow<PulseCode>,
+    D: Iterator<Item = PulseCode>,
 {
     fn new(data: impl IntoIterator<IntoIter = D>) -> Self {
         Self {
@@ -671,14 +681,13 @@ where
 
 impl<D> Encoder for IterEncoder<D>
 where
-    D: Iterator,
-    D::Item: Borrow<PulseCode>,
+    D: Iterator<Item = PulseCode>,
 {
     #[inline(always)]
     fn encode(&mut self, writer: &mut RmtWriterInner) -> bool {
         while let Some(slot) = writer.next() {
             if let Some(code) = self.data.next() {
-                slot.write(*code.borrow());
+                slot.write(code);
             } else {
                 return true;
             }
@@ -2066,16 +2075,18 @@ where
 {
     /// FIXME: docs
     /// FIXME: Add an example of how to use these
-    pub fn bench(&mut self, data: &[PulseCode]) -> BenchmarkResult {
+    pub fn bench<T>(&mut self, data: &[T]) -> BenchmarkResult
+    where
+        T: Into<PulseCode> + Copy,
+    {
         self.bench_enc(SliceEncoder::new(data))
     }
 
     /// FIXME: docs
-    pub fn bench_iter<D>(&mut self, data: D) -> BenchmarkResult
+    pub fn bench_iter<I>(&mut self, data: I) -> BenchmarkResult
     where
-        D: IntoIterator,
-        D::IntoIter: Clone,
-        D::Item: Borrow<PulseCode>,
+        I: IntoIterator<Item=PulseCode>,
+        I::IntoIter: Clone,
     {
         self.bench_enc(IterEncoder::new(data))
     }
@@ -2160,78 +2171,35 @@ impl Channel<'_, Blocking, Tx> {
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<'d>(
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn transmit<'a, T>(
         &mut self,
-        data: &'d [PulseCode],
-    ) -> Result<SingleShotTxTransaction<'_, SliceEncoder<'d>>, Error> {
-        let raw = self.raw;
-
-        // FIXME: For slices, verify more things beforehand (non-empty, has end marker)
-
-        let mut data = SliceEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        match writer.state {
-            WriterState::Empty => return Err(Error::InvalidArgument),
-            WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
-            // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
-            _ => (),
-        };
-
-        RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
-
-        raw.clear_tx_interrupts();
-        raw.start_send(false, 0);
-
-        Ok(SingleShotTxTransaction {
-            raw,
-            _phantom: PhantomData,
-            writer,
-            data,
-        })
-    }
-
-    /// FIXME: docs
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_iter<D>(
-        &mut self,
-        data: D,
-    ) -> Result<SingleShotTxTransaction<'_, IterEncoder<<D as IntoIterator>::IntoIter>>, Error>
+        data: &'a [T],
+    ) -> Result<SingleShotTxTransaction<'_, SliceEncoder<'a, T>>, Error>
     where
-        D: IntoIterator,
-        D::Item: Borrow<PulseCode>,
+        T: Into<PulseCode> + Copy,
     {
-        let raw = self.raw;
+        self.transmit_enc(SliceEncoder::new(data))
+    }
 
-        let mut data = IterEncoder::new(data);
-        let mut writer = RmtWriterOuter::new();
-        writer.write(&mut data, raw, true);
-
-        match writer.state {
-            WriterState::Empty => return Err(Error::InvalidArgument),
-            WriterState::DoneNoEnd => return Err(Error::EndMarkerMissing),
-            // WriterState::DoneEarly => return Err(Error::UnexpectedEndMarker),
-            _ => (),
-        };
-
-        RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
-
-        raw.clear_tx_interrupts();
-        raw.start_send(false, 0);
-
-        Ok(SingleShotTxTransaction {
-            raw,
-            _phantom: PhantomData,
-            writer,
-            data,
-        })
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn transmit_iter<I>(
+        &mut self,
+        data: I,
+    ) -> Result<SingleShotTxTransaction<'_, IterEncoder<I::IntoIter>>, Error>
+    where
+        I: IntoIterator<Item = PulseCode>,
+    {
+        self.transmit_enc(IterEncoder::new(data))
     }
 
     /// FIXME: docs
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_enc<E>(&mut self, mut data: E) -> Result<SingleShotTxTransaction<'_, E>, Error>
+    pub fn transmit_enc<E>(
+        &mut self,
+        mut data: E,
+    ) -> Result<SingleShotTxTransaction<'_, E>, Error>
     where
         E: Encoder,
     {
@@ -2250,10 +2218,10 @@ impl Channel<'_, Blocking, Tx> {
         RmtState::store(RmtState::TxBlocking, raw, Ordering::Relaxed);
 
         raw.clear_tx_interrupts();
-        raw.start_send(false, 0);
+        raw.start_send(false, None);
 
         Ok(SingleShotTxTransaction {
-            raw: self.raw,
+            raw,
             _phantom: PhantomData,
             writer,
             data,
@@ -2264,31 +2232,43 @@ impl Channel<'_, Blocking, Tx> {
     /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
     /// ongoing transmission and get back the channel for further use.
     /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    #[inline]
-    pub fn transmit_continuously<D>(&mut self, data: D) -> Result<ContinuousTxTransaction<'_>, Error>
-    where
-        D: IntoIterator,
-        D::Item: Borrow<PulseCode>,
-    {
-        self.transmit_continuously_with_loopcount(0, data)
-    }
-
-    /// Like [`Self::transmit_continuously`] but also sets a loop count.
-    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
-    /// reached.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_continuously_with_loopcount<D>(
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn transmit_continuously<T>(
         &mut self,
-        loopcount: u16,
-        data: D,
+        loopcount: Option<NonZeroU16>,
+        data: &'_ [T]
     ) -> Result<ContinuousTxTransaction<'_>, Error>
     where
-        D: IntoIterator,
-        D::Item: Borrow<PulseCode>,
+        T: Into<PulseCode> + Copy,
+    {
+        self.transmit_continuously_enc(loopcount, SliceEncoder::new(data))
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub fn transmit_continuously_iter<I>(
+        &mut self,
+        loopcount: Option<NonZeroU16>,
+        data: I,
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
+    where
+        I: IntoIterator<Item = PulseCode>,
+    {
+        self.transmit_continuously_enc(loopcount, IterEncoder::new(data))
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    pub fn transmit_continuously_enc<E>(
+        &mut self,
+        loopcount: Option<NonZeroU16>,
+        mut data: E,
+    ) -> Result<ContinuousTxTransaction<'_>, Error>
+    where
+        E: Encoder,
     {
         let raw = self.raw;
 
-        let mut data = IterEncoder::new(data);
         let mut writer = RmtWriterOuter::new();
         writer.write(&mut data, raw, true);
 
@@ -2457,9 +2437,8 @@ static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_C
 // FIXME: This is essentially the same as SingleShotTxTransaction. Is it
 // possible to share most of the code?
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a, D, E>
+struct RmtTxFuture<'a, E>
 where
-    D: BorrowMut<E>,
     E: Encoder,
 {
     raw: DynChannelAccess<Tx>,
@@ -2468,12 +2447,11 @@ where
     writer: RmtWriterOuter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    data: D,
+    data: E,
 }
 
-impl<D, E> Future for RmtTxFuture<'_, D, E>
+impl<E> Future for RmtTxFuture<'_, E>
 where
-    D: BorrowMut<E> + Unpin,
     E: Encoder + Unpin,
 {
     type Output = Result<(), Error>;
@@ -2518,7 +2496,7 @@ where
 
                 if this.writer.state == WriterState::Active {
                     // re-fill TX RAM
-                    this.writer.write(this.data.borrow_mut(), raw, false);
+                    this.writer.write(&mut this.data, raw, false);
                     // FIXME: Return if writer.state indicates an error (ensure
                     // to stop transmission first)
                 }
@@ -2551,9 +2529,8 @@ where
     }
 }
 
-impl<D, E> Drop for RmtTxFuture<'_, D, E>
+impl<E> Drop for RmtTxFuture<'_, E>
 where
-    D: BorrowMut<E>,
     E: Encoder,
 {
     fn drop(&mut self) {
@@ -2581,108 +2558,55 @@ impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<'a>(&'a mut self, data: &'a [PulseCode]) -> impl Future<Output = Result<(), Error>>
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
     where
         Self: Sized,
+        T: Into<PulseCode> + Copy,
     {
-        let raw = self.raw;
-
-        // FIXME: copy over the modified validation code from the blocking code
-
-        let mut fut = RmtTxFuture {
-            raw,
-            _phantom: PhantomData,
-            writer: RmtWriterOuter::new(),
-            data: SliceEncoder::new(data),
-        };
-
-        fut.writer.write(fut.data.borrow_mut(), raw, true);
-
-        let wrap = match fut.writer.state {
-            WriterState::Empty | WriterState::DoneNoEnd => {
-                // Error cases; the future will return the error on the first call to poll()
-                return fut;
-            }
-            WriterState::Active => true,
-            WriterState::Done => false,
-        };
-
-        RmtState::store(RmtState::TxAsync, fut.raw, Ordering::Relaxed);
-
-        fut.raw.clear_tx_interrupts();
-        let mut events = Event::End | Event::Error;
-        if wrap {
-            events |= Event::Threshold;
-        }
-        fut.raw.listen_tx_interrupt(events);
-        fut.raw.start_send(false, 0);
-
-        fut
+        self.transmit_inner(SliceEncoder::new(data)).await
     }
 
-    /// FIXME: Docs
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_iter<'a, D>(&'a mut self, data: D) -> impl Future<Output = Result<(), Error>>
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn transmit_iter<I>(&mut self, data: I) -> Result<(), Error>
     where
         Self: Sized,
-        D: IntoIterator,
+        I: IntoIterator<Item=PulseCode>,
+        I::IntoIter: Unpin,
+    {
+        self.transmit_inner(IterEncoder::new(data)).await
+    }
+
+    /// FIXME: docs
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    pub async fn transmit_enc<'a, E>(&'a mut self, data: E) -> Result<(), Error>
+    where
+        Self: Sized,
+        E: Encoder + Unpin + 'a
+    {
+        self.transmit_inner(data).await
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn transmit_inner<'a, E>(&'a mut self, data: E) -> impl Future<Output = Result<(), Error>>
+    where
+        Self: Sized,
+        E: Encoder + Unpin + 'a,
         // FIXME: Is being Unpin a significant restriction for the iterator?
         // If so, we could use it in a pinned way by using pin-projection (e.g. via
         // pin-project-lite) for the RmtTxFuture.
-        D::IntoIter: Unpin + 'a,
-        D::Item: Borrow<PulseCode>,
     {
         let raw = self.raw;
 
         let mut fut = RmtTxFuture {
-            raw,
-            _phantom: PhantomData,
-            writer: RmtWriterOuter::new(),
-            data: IterEncoder::new(data),
-        };
-
-        fut.writer.write(fut.data.borrow_mut(), raw, true);
-
-        let wrap = match fut.writer.state {
-            WriterState::Empty | WriterState::DoneNoEnd => {
-                // Error cases; the future will return the error on the first call to poll()
-                return fut;
-            }
-            WriterState::Active => true,
-            WriterState::Done => false,
-        };
-
-        RmtState::store(RmtState::TxAsync, fut.raw, Ordering::Relaxed);
-
-        fut.raw.clear_tx_interrupts();
-        let mut events = Event::End | Event::Error;
-        if wrap {
-            events |= Event::Threshold;
-        }
-        fut.raw.listen_tx_interrupt(events);
-        fut.raw.start_send(false, 0);
-
-        fut
-    }
-
-    /// FIXME: Docs
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit_enc<'a, E>(&'a mut self, data: &'a mut E) -> impl Future<Output = Result<(), Error>>
-    where
-        Self: Sized,
-        E: Encoder + Unpin,
-    {
-        let raw = self.raw;
-
-        let mut fut = RmtTxFuture::<'_, &mut E, E> {
             raw,
             _phantom: PhantomData,
             writer: RmtWriterOuter::new(),
             data,
         };
 
-        fut.writer.write(fut.data.borrow_mut(), raw, true);
+        fut.writer.write(&mut fut.data, raw, true);
 
         let wrap = match fut.writer.state {
             WriterState::Empty | WriterState::DoneNoEnd => {
@@ -2701,7 +2625,7 @@ impl Channel<'_, Async, Tx> {
             events |= Event::Threshold;
         }
         fut.raw.listen_tx_interrupt(events);
-        fut.raw.start_send(false, 0);
+        fut.raw.start_send(false, None);
 
         fut
     }
@@ -2916,12 +2840,12 @@ pub trait TxChannelInternal: ChannelInternal + RawChannelAccess<Dir = Tx> {
     fn is_tx_loopcount_interrupt_set(&self) -> bool;
 
     #[inline]
-    fn start_send(&self, continuous: bool, repeat: u16) {
+    fn start_send(&self, continuous: bool, repeat: Option<NonZeroU16>) {
         self.clear_tx_interrupts();
 
         self.set_tx_threshold((self.memsize().codes() / 2) as u8);
         self.set_tx_continuous(continuous);
-        self.set_generate_repeat_interrupt(repeat);
+        self.set_generate_repeat_interrupt(repeat.map_or(0, |r| r.get()));
         self.set_tx_wrap_mode(true);
         self.update();
         self.start_tx();
