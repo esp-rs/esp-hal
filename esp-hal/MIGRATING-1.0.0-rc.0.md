@@ -32,6 +32,7 @@ The `esp_hal::aes::Aes` and `esp_hal::aes::AesDma` drivers has been slightly rew
 - `Mode` has been replaced by `Operation`. Operation has `Encrypt` and `Decrypt` variants, but the key length is no longer part of the enum. The key length is specified by the key. AesDma now takes this `Operation`.
 - `Aes::process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
 - `AesDma::write_block` and `AesDma::write_key` have been removed.
+- `AesDma::process` now takes `DmaCipherState` which includes information to initialize the block cipher mode of operation.
 
 ```diff
 -aes.process(block, Mode::Encrypt128, key);
@@ -52,13 +53,12 @@ The `esp_hal::aes::Aes` and `esp_hal::aes::AesDma` drivers has been slightly rew
          input,
          Operation::Encrypt,
 -        CipherMode::Ecb,
-+        DmaCipherState::from(Ecb),
++        &DmaCipherState::from(Ecb),
          key,
      )
      .map_err(|e| e.0)
      .unwrap();
--(aes_dma, output, input) = transfer.wait();
-+(aes_dma, output, input, state) = transfer.wait();
+ (aes_dma, output, input) = transfer.wait();
 ```
 
 ## ISR Callback Changes
