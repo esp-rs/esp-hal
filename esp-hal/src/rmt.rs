@@ -225,6 +225,9 @@ use crate::{
     time::Rate,
 };
 
+mod writer;
+use writer::RmtWriter;
+
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -1187,10 +1190,7 @@ where
 {
     channel: Channel<Blocking, Tx>,
 
-    // The position in channel RAM to continue writing at; must be either
-    // 0 or half the available RAM size if there's further data.
-    // The position may be invalid if there's no data left.
-    ram_index: usize,
+    writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
     remaining_data: &'a [T],
@@ -1208,31 +1208,7 @@ where
         if status == Some(Event::Threshold) {
             raw.reset_tx_threshold_set();
 
-            if !self.remaining_data.is_empty() {
-                // re-fill TX RAM
-                let memsize = raw.memsize().codes();
-                let ptr = unsafe { raw.channel_ram_start().add(self.ram_index) };
-                let count = self.remaining_data.len().min(memsize / 2);
-                let (chunk, remaining) = self.remaining_data.split_at(count);
-                for (idx, entry) in chunk.iter().enumerate() {
-                    unsafe {
-                        ptr.add(idx).write_volatile((*entry).into());
-                    }
-                }
-
-                // If count == memsize / 2 codes were written, update ram_index as
-                // - 0 -> memsize / 2
-                // - memsize / 2 -> 0
-                // Otherwise, for count < memsize / 2, the new position is invalid but the new
-                // slice is empty and we won't use ram_index again.
-                self.ram_index = memsize / 2 - self.ram_index;
-                self.remaining_data = remaining;
-                debug_assert!(
-                    self.ram_index == 0
-                        || self.ram_index == memsize / 2
-                        || self.remaining_data.is_empty()
-                );
-            }
+            self.writer.write(&mut self.remaining_data, raw, false);
         }
 
         status
@@ -1366,16 +1342,28 @@ impl Channel<Blocking, Tx> {
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
+    pub fn transmit<T>(self, mut data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
-        let index = self.raw.start_send(data, false, 0)?;
+        let raw = self.raw;
+        let memsize = raw.memsize();
+
+        match data.last() {
+            None => return Err(Error::InvalidArgument),
+            Some(&code) if code.into().is_end_marker() => (),
+            Some(_) => return Err(Error::EndMarkerMissing),
+        }
+
+        let mut writer = RmtWriter::new(memsize);
+        writer.write(&mut data, raw, true);
+
+        raw.start_send(false, 0, memsize);
+
         Ok(SingleShotTxTransaction {
             channel: self,
-            // Either, remaining_data is empty, or we filled the entire buffer.
-            ram_index: 0,
-            remaining_data: &data[index..],
+            writer,
+            remaining_data: data,
         })
     }
 
@@ -1398,16 +1386,25 @@ impl Channel<Blocking, Tx> {
     pub fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
-        data: &[T],
+        mut data: &[T],
     ) -> Result<ContinuousTxTransaction, Error>
     where
         T: Into<PulseCode> + Copy,
     {
-        if data.len() > self.raw.memsize().codes() {
+        let raw = self.raw;
+        let memsize = raw.memsize();
+
+        if data.is_empty() {
+            return Err(Error::InvalidArgument);
+        } else if data.len() > memsize.codes() {
             return Err(Error::Overflow);
         }
 
-        let _index = self.raw.start_send(data, true, loopcount)?;
+        let mut writer = RmtWriter::new(memsize);
+        writer.write(&mut data, raw, true);
+
+        self.raw.start_send(true, loopcount, memsize);
+
         Ok(ContinuousTxTransaction { channel: self })
     }
 }
@@ -1530,20 +1527,30 @@ impl Channel<Async, Tx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn transmit<T>(&mut self, data: &[T]) -> Result<(), Error>
+    pub async fn transmit<T>(&mut self, mut data: &[T]) -> Result<(), Error>
     where
         Self: Sized,
         T: Into<PulseCode> + Copy,
     {
         let raw = self.raw;
+        let memsize = raw.memsize();
 
-        if data.len() > raw.memsize().codes() {
+        match data.last() {
+            None => return Err(Error::InvalidArgument),
+            Some(&code) if code.into().is_end_marker() => (),
+            Some(_) => return Err(Error::EndMarkerMissing),
+        }
+
+        if data.len() > memsize.codes() {
             return Err(Error::InvalidDataLength);
         }
 
+        let mut writer = RmtWriter::new(memsize);
+        writer.write(&mut data, raw, true);
+
         raw.clear_tx_interrupts();
         raw.listen_tx_interrupt(Event::End | Event::Error);
-        raw.start_send(data, false, 0)?;
+        raw.start_send(false, 0, memsize);
 
         (RmtTxFuture { raw }).await
     }
@@ -1649,37 +1656,15 @@ impl DynChannelAccess<Tx> {
     }
 
     #[inline]
-    fn start_send<T>(&self, data: &[T], continuous: bool, repeat: u16) -> Result<usize, Error>
-    where
-        T: Into<PulseCode> + Copy,
-    {
+    fn start_send(&self, continuous: bool, repeat: u16, memsize: MemSize) {
         self.clear_tx_interrupts();
-
-        if let Some(last) = data.last() {
-            if !continuous && !(*last).into().is_end_marker() {
-                return Err(Error::EndMarkerMissing);
-            }
-        } else {
-            return Err(Error::InvalidArgument);
-        }
-
-        let ptr = self.channel_ram_start();
-        let memsize = self.memsize().codes();
-        for (idx, entry) in data.iter().take(memsize).enumerate() {
-            unsafe {
-                ptr.add(idx).write_volatile((*entry).into());
-            }
-        }
-
-        self.set_tx_threshold((memsize / 2) as u8);
+        self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(continuous);
         self.set_generate_repeat_interrupt(repeat);
         self.set_tx_wrap_mode(true);
         self.update();
         self.start_tx();
         self.update();
-
-        Ok(data.len().min(memsize))
     }
 
     #[inline]
