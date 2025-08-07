@@ -709,18 +709,15 @@ unsafe impl Sync for AesOperation {}
 
 static AES_WORK_QUEUE: WorkQueue<AesOperation> = WorkQueue::new();
 const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
-    post: |driver, _item| {
-        // Since we run the operation in `poll`, there is nothing to do here, besides accepting the
-        // work item. However, DS may be using the AES peripheral. We solve that problem (later) by
-        // taking a lock in `on_work_available`
-        let driver = unsafe { AesBackend::from_raw(driver) };
-        driver.ensure_initialized()
-    },
-    poll: |driver, item| {
+    post: |driver, item| {
         // Fully process the work item. A single CPU-driven AES operation would complete
         // faster than we could poll the queue with all the locking around it.
         let driver = unsafe { AesBackend::from_raw(driver) };
-        driver.process(item)
+        Some(driver.process(item))
+    },
+    poll: |_driver, _item| {
+        // We've processed the item completely when we received it in `post`.
+        unreachable!()
     },
     cancel: |_driver, _item| {
         // To achieve a decent performance in Typical AES mode, we run the operations in a blocking
@@ -840,22 +837,15 @@ impl<'d> AesBackend<'d> {
         unsafe { unwrap!(ptr.cast_mut().cast::<AesBackend<'_>>().as_mut()) }
     }
 
-    fn process(&mut self, item: &mut AesOperation) -> Option<Poll> {
-        let driver = self.driver.as_mut()?;
+    fn process(&mut self, item: &mut AesOperation) -> Poll {
+        let driver = self.driver.get_or_insert_with(|| {
+            let peri = unsafe { self.peri.clone_unchecked() };
+            Aes::new(peri)
+        });
 
         driver.process_work_item(item);
 
-        Some(Poll::Ready(Status::Completed))
-    }
-
-    fn ensure_initialized(&mut self) -> bool {
-        if self.driver.is_none() {
-            let peri = unsafe { self.peri.clone_unchecked() };
-            self.driver = Some(Aes::new(peri));
-        }
-        // TODO: when DS is implemented, it will need to be able to lock out AES. In that case,
-        // this function should return `false` if the AES peripheral is locked.
-        true
+        Poll::Ready(Status::Completed)
     }
 
     fn deinitialize(&mut self) {
@@ -1038,7 +1028,7 @@ impl AesHandle<'_> {
     /// Blocks until the work item to be processed.
     #[inline]
     pub fn wait_blocking(mut self) {
-        while self.poll() == Poll::Pending {}
+        while self.poll().is_pending() {}
     }
 
     /// Waits for the work item to be processed.
