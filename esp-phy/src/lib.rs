@@ -1,12 +1,15 @@
 #![no_std]
-use core::{cell::RefCell, sync::atomic::Ordering};
+use core::cell::RefCell;
 
 use esp_hal::clock::{ModemClockController, PhyClockGuard};
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
-use portable_atomic::AtomicUsize;
+use esp_wifi_sys::include::*;
 
+mod ffi;
 mod phy_init_data;
+
+use esp_metadata_generated::property;
 
 pub(crate) mod private {
     pub trait Sealed {}
@@ -23,6 +26,9 @@ enum PhyCalibrationMode {
     Partial = 1,
     Full    = 2,
 }
+
+#[cfg(phy_backed_up_digital_register_count_is_set)]
+type PhyDigRegsBackup = [u32; property!("phy.backed_up_digital_register_count")];
 
 #[cfg(esp32)]
 /// Callback to update the MAC time.
@@ -41,8 +47,14 @@ struct PhyState {
     /// If this is [None], when `PhyController::enable_phy` is called, it will be initialized to
     /// zero and a full calibration is performed.
     calibration_data: Option<PhyCalibrationData>,
-    /// Calibration mode used for PHY initialization.
-    calibration_mode: PhyCalibrationMode,
+    /// Has the PHY been calibrated since the chip was powered up.
+    calibrated: bool,
+
+    #[cfg(phy_backed_up_digital_register_count_is_set)]
+    /// Backup of the digital PHY registers.
+    phy_digital_register_backup: Option<PhyDigRegsBackup>,
+
+    // Chip specific.
     #[cfg(esp32)]
     /// Timestamp at which the modem clock domain state transitioned.
     phy_clock_state_transition_timestamp: Instant,
@@ -58,28 +70,109 @@ impl PhyState {
         Self {
             ref_count: 0,
             calibration_data: None,
-            calibration_mode: PhyCalibrationMode::Full,
+            calibrated: true,
+
+            #[cfg(phy_backed_up_digital_register_count_is_set)]
+            phy_digital_register_backup: None,
+
             #[cfg(esp32)]
             phy_clock_state_transition_timestamp: Instant::EPOCH,
             #[cfg(esp32)]
             mac_clock_delta_since_last_call: Duration::ZERO,
             #[cfg(esp32)]
-            mac_time_update_cb: None
+            mac_time_update_cb: None,
         }
     }
-    pub fn calibration_data(&mut self) -> &PhyCalibrationData {
+    /// Get a reference to the calibration data.
+    ///
+    /// If no calibration data is available, it will be initialized to zero.
+    pub fn calibration_data(&mut self) -> &mut PhyCalibrationData {
         self.calibration_data
             .get_or_insert_with(|| [0u8; PHY_CALIBRATION_DATA_LENGTH])
     }
+    fn calibrate(&mut self) {
+        #[cfg(esp32)]
+        {
+            let now = Instant::now();
+            let delta = now - self.phy_clock_state_transition_timestamp;
+            self.phy_clock_state_transition_timestamp = now;
+            self.mac_clock_delta_since_last_call += delta;
+        }
+        #[cfg(phy_combo_module)]
+        unsafe {
+            use esp_wifi_sys::include::phy_init_param_set;
+            phy_init_param_set(1);
+        };
+
+        let calibration_data_available = self.calibration_data.is_some();
+        let calibration_mode = if calibration_data_available {
+            // If the SOC just woke up from deep sleep and
+            // `phy_skip_calibration_after_deep_sleep` is enabled.
+            cfg_if::cfg_if! {
+                if #[cfg(phy_skip_calibration_after_deep_sleep)] {
+                    use esp_hal::{rtc_cntl::SocResetReason, system::reset_reason};
+                    if reset_reason() == Some(SocResetReason::CoreDeepSleep) {
+                        esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+                    } else {
+                        esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
+                    }
+                } else {
+                    esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL
+                }
+            }
+        } else {
+            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL
+        };
+        let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
+        unsafe {
+            register_chipv7_phy(
+                init_data,
+                self.calibration_data() as *mut PhyCalibrationData as *mut _,
+                calibration_mode,
+            );
+        }
+        self.calibrated = true;
+    }
+    #[cfg(phy_backed_up_digital_register_count_is_set)]
+    /// Backup the digital PHY register into memory.
+    fn backup_digital_regs(&mut self) {
+        unsafe {
+            phy_dig_reg_backup(
+                true,
+                self.phy_digital_register_backup.get_or_insert_default() as *mut u32,
+            );
+        }
+    }
+    #[cfg(phy_backed_up_digital_register_count_is_set)]
+    /// Restore the digital PHY registers from memory.
+    ///
+    /// This panics if the registers weren't previously backed up.
+    fn restore_digital_regs(&mut self) {
+        unsafe {
+            phy_dig_reg_backup(
+                false,
+                self.phy_digital_register_backup
+                    .as_mut()
+                    .expect("Can't restore digital PHY registers from backup, without a backup.")
+                    as *mut u32,
+            );
+            self.phy_digital_register_backup = None;
+        }
+    }
+    /// Increase the number of references to the PHY.
+    ///
+    /// If the ref count was zero, the PHY will be initialized.
     pub fn increase_ref_count(&mut self) {
         self.ref_count += 1;
         if self.ref_count == 0 {
-            #[cfg(esp32)]
-            {
-                let now = Instant::now();
-                let delta = now - self.phy_clock_state_transition_timestamp;
-                self.phy_clock_state_transition_timestamp = now;
-                self.mac_clock_delta_since_last_call += delta;
+            if self.calibrated {
+                unsafe {
+                    phy_wakeup_init();
+                }
+                self.restore_digital_regs();
+            } else {
+                self.calibrate();
+                self.calibrated = true;
             }
         }
         #[cfg(esp32)]
@@ -89,10 +182,16 @@ impl PhyState {
         }
     }
     pub fn decrease_ref_count(&mut self) {
-        self.ref_count = self.ref_count.checked_sub(1).expect("PHY init ref count dropped below zero.");
+        self.ref_count = self
+            .ref_count
+            .checked_sub(1)
+            .expect("PHY init ref count dropped below zero.");
         if self.ref_count == 0 {
             #[cfg(esp32)]
-            self.phy_clock_state_transition_timestamp = Instant::now();            
+            {
+                self.phy_clock_state_transition_timestamp = Instant::now();
+            }
+            self.backup_digital_regs();
         }
     }
 }
@@ -103,26 +202,37 @@ static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }
+impl Drop for PhyInitGuard<'_> {
+    fn drop(&mut self) {
+        critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
+    }
+}
 
 pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     fn enable_phy(&self) -> PhyInitGuard<'d> {
+        // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
+        // much of a difference.
         let _phy_clock_guard = self.enable_phy_clock();
 
         critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).increase_ref_count());
 
-        PhyInitGuard {
-            _phy_clock_guard
-        }
+        PhyInitGuard { _phy_clock_guard }
     }
 }
-#[cfg(wifi)]
-impl esp_hal::peripherals::WIFI {
-    pub const fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
+#[cfg(esp32)]
+/// Trait providing MAC time functionality for the Wi-Fi peripheral.
+pub trait MacTimeExt {
+    /// Set the MAC time update callback.
+    ///
+    /// See [MacTimeUpdateCb] for details.
+    fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
         critical_section::with(|cs| {
-            
+            PHY_STATE.borrow_ref_mut(cs).mac_time_update_cb = Some(mac_time_update_cb);
         })
     }
 }
+#[cfg(esp32)]
+impl MacTimeExt for esp_hal::peripherals::WIFI<'_> {}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -140,18 +250,12 @@ pub struct NoCalibrationDataError;
 /// for further details.
 pub fn set_phy_calibration_data(
     calibration_data: &PhyCalibrationData,
-    no_calibration: bool,
 ) -> Result<(), CalibrationDataAlreadySetError> {
     critical_section::with(|cs| {
         let mut phy_state = PHY_STATE.borrow_ref_mut(cs);
         if phy_state.calibration_data.is_some() {
             Err(CalibrationDataAlreadySetError)
         } else {
-            phy_state.calibration_mode = if no_calibration {
-                PhyCalibrationMode::None
-            } else {
-                PhyCalibrationMode::Partial
-            };
             phy_state.calibration_data.insert(*calibration_data);
             Ok(())
         }
@@ -167,7 +271,6 @@ pub fn backup_phy_calibration_data(
             .calibration_data
             .as_mut()
             .ok_or(NoCalibrationDataError)
-            .inspect(|calibration_data| buffer.copy_from_slice(calibration_data.as_slice()))
+            .map(|calibration_data| buffer.copy_from_slice(calibration_data.as_slice()))
     })
 }
-

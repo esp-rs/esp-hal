@@ -7,6 +7,7 @@ description = "PHY initialization"
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["unstable", "requires-unstable"] }
 esp-wifi-sys = "0.7.1"
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 
 cfg-if = "1.0.1"
 instability = "0.3.9"
@@ -17,9 +18,11 @@ critical-section = "1.2.0"
 portable-atomic = { version = "1.11.1", default-features = false }
 
 [build-dependencies]
+esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
+default =  ["esp32s3"]
 defmt = ["dep:defmt"]
 log-04 = ["dep:log-04"]
 
