@@ -225,6 +225,8 @@ use crate::{
     time::Rate,
 };
 
+mod reader;
+use reader::RmtReader;
 mod writer;
 use writer::RmtWriter;
 
@@ -1415,6 +1417,9 @@ where
     T: From<PulseCode>,
 {
     channel: Channel<Blocking, Rx>,
+
+    reader: RmtReader,
+
     data: &'a mut [T],
 }
 
@@ -1433,12 +1438,7 @@ where
             raw.stop_rx();
             raw.update();
 
-            let ptr = raw.channel_ram_start();
-            // SAFETY: RxChannel.receive() verifies that the length of self.data does not
-            // exceed the channel RAM size.
-            for (idx, entry) in self.data.iter_mut().enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile() }.into();
-            }
+            self.reader.read(&mut self.data, raw, true);
         }
 
         status
@@ -1487,14 +1487,20 @@ impl Channel<Blocking, Rx> {
         Self: Sized,
         T: From<PulseCode>,
     {
-        if data.len() > self.raw.memsize().codes() {
+        let raw = self.raw;
+        let memsize = raw.memsize();
+
+        if data.len() > memsize.codes() {
             return Err(Error::InvalidDataLength);
         }
 
-        self.raw.start_receive();
+        let reader = RmtReader::new(memsize);
+
+        raw.start_receive();
 
         Ok(RxTransaction {
             channel: self,
+            reader,
             data,
         })
     }
@@ -1582,16 +1588,19 @@ impl Channel<Async, Rx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
+    pub async fn receive<T>(&mut self, mut data: &mut [T]) -> Result<(), Error>
     where
         Self: Sized,
         T: From<PulseCode>,
     {
         let raw = self.raw;
+        let memsize = raw.memsize();
 
-        if data.len() > raw.memsize().codes() {
+        if data.len() > memsize.codes() {
             return Err(Error::InvalidDataLength);
         }
+
+        let mut reader = RmtReader::new(memsize);
 
         raw.clear_rx_interrupts();
         raw.listen_rx_interrupt(Event::End | Event::Error);
@@ -1604,11 +1613,7 @@ impl Channel<Async, Rx> {
             raw.clear_rx_interrupts();
             raw.update();
 
-            let ptr = raw.channel_ram_start();
-            let len = data.len();
-            for (idx, entry) in data.iter_mut().take(len).enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile().into() };
-            }
+            reader.read(&mut data, raw, true);
         }
 
         result
