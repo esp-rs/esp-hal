@@ -219,7 +219,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
 
     let (rx_res, tx_res) = embassy_futures::join::join(
         rx_channel.receive(&mut rcv_data),
-        tx_channel.transmit(&tx_data).unwrap(),
+        tx_channel.transmit(&tx_data),
     )
     .await;
 
@@ -274,7 +274,7 @@ async fn do_rmt_single_shot_iter_async(
         i: 0,
         write_end_marker,
     };
-    tx_channel.transmit(&mut tx_data)?.await
+    tx_channel.transmit(&mut tx_data).await
 }
 
 #[cfg(test)]
@@ -414,5 +414,43 @@ mod tests {
         let ch1 = ch1
             .configure_tx(NoPin, TxChannelConfig::default())
             .unwrap();
+    }
+
+    #[test]
+    async fn rmt_async_tx_invalid_args() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let mut ch0 = rmt
+            .channel0
+            .configure_tx(NoPin, TxChannelConfig::default())
+            .unwrap();
+
+        let empty: [PulseCode; 0] = [];
+
+        assert_eq!(ch0.transmit(&empty).await, Err(Error::InvalidArgument));
+
+        let code = PulseCode::default()
+            .with_length1(42)
+            .unwrap()
+            .with_length2(42)
+            .unwrap();
+
+        let no_end_short = [code; 3];
+
+        // No wrapping, error should already be detected before starting tx
+        assert_eq!(
+            ch0.transmit(&no_end_short).await,
+            Err(Error::EndMarkerMissing)
+        );
+
+        let no_end_long = [code; 80];
+
+        // Requires wrapping, error can only be detected after starting tx
+        assert_eq!(
+            ch0.transmit(&no_end_long).await,
+            Err(Error::EndMarkerMissing)
+        );
     }
 }
