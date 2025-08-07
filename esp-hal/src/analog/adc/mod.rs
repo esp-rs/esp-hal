@@ -242,16 +242,10 @@ trait AdcCalEfuse {
     fn cal_code(atten: Attenuation) -> Option<u16>;
 }
 
-macro_rules! impl_adc_interface {
-    ($adc:ident [
-        $( ($pin:ident<'_>, $channel:expr) ,)+
-    ]) => {
-        $(
-            impl $crate::analog::adc::AdcChannel for $crate::peripherals::$pin<'_> {
-                const CHANNEL: u8 = $channel;
-            }
-        )+
-    }
+for_each_analog_function! {
+    (($ch_name:ident, ADCn_CHm, $adc:literal, $ch:literal), $gpio:ident) => {
+        impl $crate::analog::adc::AdcChannel for $crate::peripherals::$gpio<'_> {
+            const CHANNEL: u8 = $ch;
+        }
+    };
 }
-
-pub(crate) use impl_adc_interface;

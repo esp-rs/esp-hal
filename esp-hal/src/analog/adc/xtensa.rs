@@ -518,35 +518,3 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
         Efuse::rtc_calib_cal_code(2, atten)
     }
 }
-
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO1<'_>,  0),
-            (GPIO2<'_>,  1),
-            (GPIO3<'_>,  2),
-            (GPIO4<'_>,  3),
-            (GPIO5<'_>,  4),
-            (GPIO6<'_>,  5),
-            (GPIO7<'_>,  6),
-            (GPIO8<'_>,  7),
-            (GPIO9<'_>,  8),
-            (GPIO10<'_>, 9),
-        ]
-    }
-
-    crate::analog::adc::impl_adc_interface! {
-        ADC2 [
-            (GPIO11<'_>, 0),
-            (GPIO12<'_>, 1),
-            (GPIO13<'_>, 2),
-            (GPIO14<'_>, 3),
-            (GPIO15<'_>, 4),
-            (GPIO16<'_>, 5),
-            (GPIO17<'_>, 6),
-            (GPIO18<'_>, 7),
-            (GPIO19<'_>, 8),
-            (GPIO20<'_>, 9),
-        ]
-    }
-}
