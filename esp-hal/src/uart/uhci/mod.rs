@@ -1,4 +1,5 @@
-/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in the future with Uhci specific features
+/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in
+/// the future with Uhci specific features
 pub mod normal;
 /// "Simple" Uhci implementation with simple Api, it's purpuse is to only (and easily) replace Uart
 /// in an application and improve upon it by using DMA under the hood
@@ -136,6 +137,16 @@ where
     ) -> Result<(), uart::ConfigError> {
         self.uart.set_config(uart_config)
     }
+
+    pub(crate) fn turn_off(&mut self) {
+        info!("Running uhci internal drop!");
+        self.clean_turn_on();
+        self.reset();
+
+        // Turning off the clock should be enough?
+        let reg: &uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
+        reg.conf0().modify(|_, w| w.clk_en().clear_bit());
+    }
 }
 
 impl<'d> UhciInternal<'d, Blocking> {
@@ -158,20 +169,4 @@ impl<'d> UhciInternal<'d, Async> {
             channel: self.channel.into_blocking(),
         }
     }
-}
-
-#[macro_export]
-/// Macro to re-expose some functions from UhciInternal to both implementations
-macro_rules! into_internal_uhci {
-    () => {
-        /// Sets the config for the consumed (and used) UART. Generally this works, but more testing is advised
-        /// (As the technical reference manual says nothing if this is allowed)
-        #[allow(dead_code)]
-        pub fn set_uart_config(
-            &mut self,
-            uart_config: &uart::Config,
-        ) -> Result<(), uart::ConfigError> {
-            self.internal.set_uart_config(uart_config)
-        }
-    };
 }
