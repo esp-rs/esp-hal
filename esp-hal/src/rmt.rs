@@ -77,7 +77,7 @@
 //! # {before_snippet}
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::Level;
-//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannel, TxChannelConfig, TxChannelCreator};
+//! # use esp_hal::rmt::{PulseCode, Rmt, TxChannelConfig, TxChannelCreator};
 //!
 //! // Configure frequency based on chip type
 //! # {freq}
@@ -104,7 +104,7 @@
 //! ### RX operation
 //! ```rust, no_run
 //! # {before_snippet}
-//! # use esp_hal::rmt::{PulseCode, Rmt, RxChannel, RxChannelConfig, RxChannelCreator};
+//! # use esp_hal::rmt::{PulseCode, Rmt, RxChannelConfig, RxChannelCreator};
 //! # use esp_hal::delay::Delay;
 //! # use esp_hal::gpio::{Level, Output, OutputConfig};
 //!
@@ -1441,38 +1441,13 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
 }
 
 /// Channel in TX mode
-pub trait TxChannel: Sized {
+impl Channel<Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
-    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
-    where
-        T: Into<PulseCode> + Copy;
-
-    /// Start transmitting the given pulse code continuously.
-    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
-    /// ongoing transmission and get back the channel for further use.
-    /// The length of sequence cannot exceed the size of the allocated RMT RAM.
-    fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction, Error>
-    where
-        T: Into<PulseCode> + Copy;
-
-    /// Like [`Self::transmit_continuously`] but also sets a loop count.
-    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
-    /// reached.
-    fn transmit_continuously_with_loopcount<T>(
-        self,
-        loopcount: u16,
-        data: &[T],
-    ) -> Result<ContinuousTxTransaction, Error>
-    where
-        T: Into<PulseCode> + Copy;
-}
-
-impl TxChannel for Channel<Blocking, Tx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
+    pub fn transmit<T>(self, data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1485,16 +1460,23 @@ impl TxChannel for Channel<Blocking, Tx> {
         })
     }
 
+    /// Start transmitting the given pulse code continuously.
+    /// This returns a [`ContinuousTxTransaction`] which can be used to stop the
+    /// ongoing transmission and get back the channel for further use.
+    /// The length of sequence cannot exceed the size of the allocated RMT RAM.
     #[inline]
-    fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction, Error>
+    pub fn transmit_continuously<T>(self, data: &[T]) -> Result<ContinuousTxTransaction, Error>
     where
         T: Into<PulseCode> + Copy,
     {
         self.transmit_continuously_with_loopcount(0, data)
     }
 
+    /// Like [`Self::transmit_continuously`] but also sets a loop count.
+    /// [`ContinuousTxTransaction`] can be used to check if the loop count is
+    /// reached.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn transmit_continuously_with_loopcount<T>(
+    pub fn transmit_continuously_with_loopcount<T>(
         self,
         loopcount: u16,
         data: &[T],
@@ -1578,19 +1560,13 @@ where
 }
 
 /// Channel is RX mode
-pub trait RxChannel: Sized {
+impl Channel<Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
-    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
-    where
-        T: From<PulseCode>;
-}
-
-impl RxChannel for Channel<Blocking, Rx> {
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
+    pub fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
     where
         Self: Sized,
         T: From<PulseCode>,

@@ -79,8 +79,6 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
 ) {
-    use esp_hal::rmt::{RxChannel, TxChannel};
-
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
@@ -159,8 +157,6 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
-    use esp_hal::rmt::TxChannel;
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
