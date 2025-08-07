@@ -1696,7 +1696,7 @@ mod private {
                 #[cfg(soc_has_i2s1)]
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
-                fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ());
+                fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback);
                 fn disable_peri_interrupt(&self);
                 fn enable_peri_interrupt(&self, priority: crate::interrupt::Priority);
             }

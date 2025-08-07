@@ -659,8 +659,13 @@ impl<'d> Io<'d> {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
         self.set_interrupt_priority(handler.priority());
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                Interrupt::GPIO,
+                crate::interrupt::IsrCallback::new(user_gpio_interrupt_handler),
+            )
+        };
+        USER_INTERRUPT_HANDLER.store(handler.handler().aligned_ptr());
     }
 }
 
