@@ -79,8 +79,6 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannel, TxChannel};
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
@@ -153,8 +151,6 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
-    use esp_hal::rmt::TxChannel;
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
