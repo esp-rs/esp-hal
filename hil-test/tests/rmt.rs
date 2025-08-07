@@ -115,8 +115,6 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
 async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
