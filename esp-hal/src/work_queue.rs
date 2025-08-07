@@ -296,6 +296,7 @@ impl<T: Sync> WorkQueue<T> {
     }
 
     /// Polls the queue once.
+    #[cfg_attr(esp32, expect(unused))]
     pub fn process(&self) {
         self.inner.with(|inner| inner.process(true));
     }
@@ -452,11 +453,6 @@ where
             queue,
             _marker: PhantomData,
         }
-    }
-
-    #[expect(unused)] // TODO this will be used with AesDmaBackend, for example
-    pub fn poll(&mut self) {
-        self.queue.process();
     }
 }
 
