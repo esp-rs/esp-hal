@@ -2158,16 +2158,16 @@ impl Channel<Async, Rx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn receive<T>(&mut self, data: &mut [T]) -> Result<(), Error>
+    pub async fn receive<'a, D, T>(&mut self, data: D) -> Result<(), Error>
     where
         Self: Sized,
-        T: From<PulseCode>,
+        D: IntoIterator<Item = &'a mut T>,
+        T: From<PulseCode> + 'static,
     {
         let raw = self.raw;
 
-        if data.len() > raw.memsize().codes() {
-            return Err(Error::InvalidDataLength);
-        }
+        let mut data = data.into_iter();
+        let mut reader = RmtReader::new();
 
         RmtState::store(RmtState::RxAsync, raw, Ordering::Relaxed);
 
@@ -2186,11 +2186,8 @@ impl Channel<Async, Rx> {
             raw.clear_rx_interrupts();
             raw.update();
 
-            let ptr = raw.channel_ram_start();
-            let len = data.len();
-            for (idx, entry) in data.iter_mut().take(len).enumerate() {
-                *entry = unsafe { ptr.add(idx).read_volatile().into() };
-            }
+            let memsize = raw.memsize().codes();
+            reader.read(&mut data, raw, memsize);
         }
 
         result
