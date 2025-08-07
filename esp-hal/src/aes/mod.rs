@@ -343,7 +343,7 @@ pub enum Endianness {
 pub mod dma {
     use core::{mem::ManuallyDrop, ptr::NonNull};
 
-    use procmacros::ram;
+    use procmacros::{handler, ram};
 
     #[cfg(psram_dma)]
     use crate::dma::ManualWritebackBuffer;
@@ -373,7 +373,6 @@ pub mod dma {
             prepare_for_rx,
             prepare_for_tx,
         },
-        interrupt::Priority,
         peripherals::AES,
         system::{Peripheral, PeripheralClockControl},
         work_queue::{Poll, Status, VTable, WorkQueueDriver},
@@ -1040,8 +1039,14 @@ pub mod dma {
                 let dma = unsafe { self.dma.clone_unchecked() };
                 let driver = super::Aes::new(peri).with_dma(dma);
 
-                driver.aes.aes.bind_peri_interrupt(interrupt_handler);
-                driver.aes.aes.enable_peri_interrupt(Priority::min());
+                driver
+                    .aes
+                    .aes
+                    .bind_peri_interrupt(interrupt_handler.handler());
+                driver
+                    .aes
+                    .aes
+                    .enable_peri_interrupt(interrupt_handler.priority());
 
                 self.driver = Some(driver);
             }
@@ -1055,8 +1060,9 @@ pub mod dma {
         }
     }
 
+    #[handler]
     #[ram]
-    extern "C" fn interrupt_handler() {
+    fn interrupt_handler() {
         AES_WORK_QUEUE.process();
     }
 
