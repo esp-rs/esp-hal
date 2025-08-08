@@ -4,9 +4,6 @@
 //! Besides the runtime changeable channel and the output format it's almost
 //! identical to ieee802154_receive_all_frames
 
-//% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-hal/unstable esp-radio/ieee802154 esp-radio/unstable
-
 #![no_std]
 #![no_main]
 
@@ -24,6 +21,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
