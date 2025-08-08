@@ -315,9 +315,9 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Enables/disables constant time acceleration.
     ///
-    /// When enabled it would increases the performance of modular
+    /// When enabled it would increase the performance of modular
     /// exponentiation by simplifying the calculation concerning the 0 bits
-    /// of the exponent. I.e. lesser the hamming weight, greater the
+    /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
     ///
     /// Note: this compromises security by enabling timing-based side-channel attacks.
@@ -333,7 +333,7 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 
     /// Enables/disables search acceleration.
     ///
-    /// When enabled it would increases the performance of modular
+    /// When enabled it would increase the performance of modular
     /// exponentiation by discarding the exponent's bits before the most
     /// significant set bit.
     ///
