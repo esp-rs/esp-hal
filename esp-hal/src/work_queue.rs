@@ -142,13 +142,14 @@ impl<T: Sync + Send> Inner<T> {
 
         if let Some(poll_status) = (self.vtable.post)(self.data, &mut unsafe { ptr.as_mut() }.data)
         {
-            unsafe { ptr.as_mut().status = poll_status };
             match poll_status {
                 Poll::Pending(recall) => {
+                    unsafe { ptr.as_mut().status = Poll::Pending(recall) };
                     self.current = Some(ptr);
                     recall
                 }
-                Poll::Ready(_) => {
+                Poll::Ready(status) => {
+                    unsafe { ptr.as_mut() }.complete(status);
                     // The driver immediately processed the work item.
                     // Polling again needs to dequeue the next item.
                     true
