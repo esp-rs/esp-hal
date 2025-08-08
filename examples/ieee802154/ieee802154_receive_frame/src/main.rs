@@ -1,6 +1,3 @@
-//% CHIPS: esp32c6 esp32h2
-//% FEATURES: esp-hal/unstable esp-radio/ieee802154 esp-radio/unstable
-
 #![no_std]
 #![no_main]
 
@@ -14,6 +11,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     esp_alloc::heap_allocator!(size: 24 * 1024);
@@ -22,10 +20,12 @@ fn main() -> ! {
 
     ieee802154.set_config(Config {
         channel: 15,
-        promiscuous: true,
+        promiscuous: false,
         rx_when_idle: true,
-        auto_ack_rx: false,
-        auto_ack_tx: false,
+        auto_ack_rx: true,
+        auto_ack_tx: true,
+        pan_id: Some(0x4242),
+        short_addr: Some(0x2323),
         ..Default::default()
     });
 
