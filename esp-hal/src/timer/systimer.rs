@@ -24,7 +24,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    sync::{RawMutex, lock},
+    sync::RawMutex,
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
@@ -168,7 +168,7 @@ impl Unit {
 
     #[cfg(not(esp32s2))]
     fn configure(&self, config: UnitConfig) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             SYSTIMER::regs().conf().modify(|_, w| match config {
                 UnitConfig::Disabled => match self.channel() {
                     0 => w.timer_unit0_work_en().clear_bit(),
@@ -313,7 +313,7 @@ impl Alarm<'_> {
     /// Enables/disables the comparator. If enabled, this means
     /// it will generate interrupt based on its configuration.
     fn set_enable(&self, enable: bool) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             #[cfg(not(esp32s2))]
             SYSTIMER::regs().conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
@@ -566,7 +566,7 @@ impl super::Timer for Alarm<'_> {
     }
 
     fn enable_interrupt(&self, state: bool) {
-        lock(&INT_ENA_LOCK, || {
+        INT_ENA_LOCK.lock(|| {
             SYSTIMER::regs()
                 .int_ena()
                 .modify(|_, w| w.target(self.channel()).bit(state));

@@ -437,13 +437,6 @@ unsafe impl embassy_sync::blocking_mutex::raw::RawMutex for RawPriorityLimitedMu
     }
 }
 
-// Prefer this over a critical-section as this allows you to have multiple
-// locks active at the same time rather than using the global mutex that is
-// critical-section.
-pub(crate) fn lock<T>(lock: &RawMutex, f: impl FnOnce() -> T) -> T {
-    lock.lock(f)
-}
-
 /// Data protected by a [RawMutex].
 ///
 /// This is largely equivalent to a `Mutex<RefCell<T>>`, but accessing the inner
