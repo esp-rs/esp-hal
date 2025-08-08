@@ -1,0 +1,52 @@
+[package]
+name    = "embassy-usb-serial-jtag"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-sync = "0.7.0"
+embedded-io-async = "0.6.1"
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-hal-embassy = { path = "../../../esp-hal-embassy" }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+heapless = "0.8.0"
+static_cell = "2.1.1"
+
+[features]
+esp32c3 = [
+    "esp-backtrace/esp32c3",
+    "esp-bootloader-esp-idf/esp32c3",
+    "esp-hal-embassy/esp32c3",
+    "esp-hal/esp32c3",
+]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal-embassy/esp32c6",
+    "esp-hal/esp32c6",
+]
+esp32h2 = [
+    "esp-backtrace/esp32h2",
+    "esp-bootloader-esp-idf/esp32h2",
+    "esp-hal-embassy/esp32h2",
+    "esp-hal/esp32h2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal-embassy/esp32s3",
+    "esp-hal/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1

@@ -1,12 +1,14 @@
 # Examples
 
-This package contains a number of binary applications demonstrating the use of various hardware peripherals found within ESP32 the family of devices.
+This directory contains a number of binary applications demonstrating the use of various hardware peripherals found within the ESP32 family of devices from Espressif.
 
 Each device has its own unique set of peripherals, and as such not every example will run on every device. We recommend building and flashing the examples using the `xtask` method documented below, which will greatly simplify the process.
 
-To check if a device is compatible with a given example, check the metadata comments above the imports, which will list all supported devices following the `//% CHIPS:` designator. If this metadata is not present, then the example will work on any device supported by `esp-hal`.
+To check if a device is compatible with a given example, check the features in the `Cargo.toml` file for the example application, which will include a feature for each supported device.
 
 As previously stated, we use the [cargo-xtask] pattern for automation. Commands invoking this tool must be run from the root of the repository.
+
+For more information regarding the examples, refer to the `README.md` file in any of the subdirectories within the `examples/` directory.
 
 [cargo-xtask]: https://github.com/matklad/cargo-xtask
 
@@ -18,7 +20,7 @@ You can build all examples for a given device using the `build examples` subcomm
 cargo xtask build examples esp-hal esp32
 ```
 
-Note that we must specify which package to build the examples for, since this repository contains multiple packages (specifying esp-hal will build the examples in the examples package instead).
+Note that we must specify which package to build the examples for, since this repository contains multiple packages. Specifying `esp-hal` will build the examples in the `examples/` directory instead.
 
 ## Running Examples
 
@@ -32,16 +34,7 @@ Again, note that we must specify which package to build the example from, plus w
 
 ## Adding Examples
 
-If you are contributing to `esp-hal` and would like to add an example, the process is generally the same as any other project.
-
-One major difference in our case is the metadata comments which state the compatible devices and required features for an example. Both of these designators are optional; if `//% CHIPS:` is omitted then all devices considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
-
-To demonstrated, in `src/bin/embassy_hello_world.rs` you will see the following:
-
-```rust
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal-embassy/integrated-timers
-```
+If you are contributing to `esp-hal` and would like to add an example, the process is generally the same as any other project. The `Cargo.toml` file should include a feature for each supported chip, which itself should enable any dependency's features required for the given chip.
 
 Another thing to be aware of is the GPIO pins being used. We have tried to use pins available the DevKit-C boards from Espressif, however this is being done on a best-effort basis.
 
