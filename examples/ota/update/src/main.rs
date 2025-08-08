@@ -30,9 +30,6 @@
 //!
 //! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html
 
-//% FEATURES: esp-storage esp-hal/unstable
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-
 #![no_std]
 #![no_main]
 
@@ -50,10 +47,11 @@ use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
-static OTA_IMAGE: &[u8] = include_bytes!("../../target/ota_image");
+static OTA_IMAGE: &[u8] = include_bytes!("../../../target/ota_image");
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut storage = esp_storage::FlashStorage::new();
