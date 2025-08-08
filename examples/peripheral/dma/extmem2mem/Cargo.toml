@@ -1,0 +1,34 @@
+[package]
+name    = "dma-extmem2mem"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+aligned = "0.4.2"
+esp-alloc = { path = "../../../../esp-alloc" }
+esp-backtrace = { path = "../../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../../esp-hal", features = [
+    "log-04",
+    "psram",
+    "unstable",
+] }
+esp-println = { path = "../../../../esp-println", features = ["log-04"] }
+log = "0.4.27"
+
+[features]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
