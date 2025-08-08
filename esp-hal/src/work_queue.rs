@@ -12,7 +12,7 @@
 //! the work item has been processed. Dropping the handle will cancel the work item.
 #![cfg_attr(esp32c2, allow(unused))]
 
-use core::{future::poll_fn, marker::PhantomData, ptr::NonNull};
+use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 
 use embassy_sync::waitqueue::WakerRegistration;
 
@@ -70,6 +70,14 @@ struct Inner<T: Sync + Send> {
     // The data pointer will be passed to VTable functions, which may be called in any context.
     data: NonNull<()>,
     vtable: VTable<T>,
+
+    // Counts suspend requests. When this reaches 0 again, the all wakers in the queue need to be
+    // waken to continue processing.
+    suspend_count: usize,
+    // The task waiting for the queue to be suspended. There can be multiple tasks, but that's
+    // practically rare (in this setup, it needs both HMAC and DSA to want to work at the same
+    // time).
+    suspend_waker: WakerRegistration,
 }
 
 impl<T: Sync + Send> Inner<T> {
@@ -112,7 +120,14 @@ impl<T: Sync + Send> Inner<T> {
                 Poll::Ready(status) => {
                     unsafe { current.as_mut() }.complete(status);
                     self.current = None;
-                    self.dequeue_and_post(true)
+                    if self.suspend_count > 0 {
+                        // Queue suspended, stop the driver.
+                        (self.vtable.stop)(self.data);
+                        self.suspend_waker.wake();
+                        false
+                    } else {
+                        self.dequeue_and_post(true)
+                    }
                 }
                 Poll::Pending(recall) => recall,
             }
@@ -260,6 +275,64 @@ impl<T: Sync + Send> Inner<T> {
         // Did not find `ptr`.
         false
     }
+
+    /// Increases the suspend counter, preventing new work items from starting to be processed.
+    ///
+    /// If the current work item finishes processing, the driver is shut down. Call `is_active` to
+    /// determine when the queue enters suspended state.
+    fn suspend(&mut self, ctx: Option<&Context<'_>>) {
+        self.suspend_count += 1;
+        if let Some(ctx) = ctx {
+            if self.current.is_some() {
+                self.suspend_waker.register(ctx.waker());
+            } else {
+                ctx.waker().wake_by_ref();
+            }
+        }
+    }
+
+    /// Decreases the suspend counter.
+    ///
+    /// When it reaches 0, this function wakes async tasks that poll the queue. They need to be
+    /// waken to ensure that their items don't end up stuck. Blocking pollers will eventually end up
+    /// looping when their turn comes.
+    fn resume(&mut self) {
+        self.suspend_count -= 1;
+        if self.suspend_count == 0 {
+            self.wake_polling_tasks();
+        }
+    }
+
+    fn wake_polling_tasks(&mut self) {
+        if self.data == NonNull::dangling() {
+            // No VTable means no driver, no need to continue processing.
+            return;
+        }
+        // Walk through the list and wake polling tasks.
+        let mut current = self.head;
+        while let Some(mut current_item) = current {
+            let item = unsafe { current_item.as_mut() };
+
+            item.waker.wake();
+
+            current = item.next;
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        self.current.is_some()
+    }
+
+    unsafe fn configure(&mut self, data: NonNull<()>, vtable: VTable<T>) {
+        (self.vtable.stop)(self.data);
+
+        self.data = data;
+        self.vtable = vtable;
+
+        if self.suspend_count == 0 {
+            self.wake_polling_tasks();
+        }
+    }
 }
 
 /// A generic work queue.
@@ -278,6 +351,9 @@ impl<T: Sync + Send> WorkQueue<T> {
 
                 data: NonNull::dangling(),
                 vtable: VTable::noop(),
+
+                suspend_count: 0,
+                suspend_waker: WakerRegistration::new(),
             }),
         }
     }
@@ -292,12 +368,8 @@ impl<T: Sync + Send> WorkQueue<T> {
     /// driver must access the data pointer appropriately (i.e. it must not move !Send data out of
     /// it).
     pub unsafe fn configure<D: Sync + Send>(&self, data: NonNull<D>, vtable: VTable<T>) {
-        self.inner.with(|inner| {
-            (inner.vtable.stop)(inner.data);
-
-            inner.data = data.cast();
-            inner.vtable = vtable;
-        })
+        self.inner
+            .with(|inner| unsafe { inner.configure(data.cast(), vtable) })
     }
 
     /// Enqueues a work item.
@@ -522,6 +594,40 @@ where
             _marker: PhantomData,
         }
     }
+
+    /// Shuts down the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        let mut suspended = false;
+        poll_fn(move |ctx| {
+            self.queue.inner.with(|inner| {
+                if !inner.is_active() {
+                    unsafe {
+                        // Safety: the noop VTable functions don't use the pointer at all.
+                        self.queue
+                            .configure(NonNull::<D>::dangling(), VTable::noop())
+                    };
+                    // Make sure the queue doesn't remain suspended when the driver is re-started.
+                    if suspended {
+                        inner.resume();
+                    }
+                    return core::task::Poll::Ready(());
+                }
+                // This may kick out other suspend() callers, but that should be okay. They will
+                // only be able to do work if the queue is !active, for them it doesn't matter if
+                // the queue is suspended or stopped completely - just that it isn't running. As for
+                // the possible waker churn, we can use MultiWakerRegistration with a capacity
+                // suitable for the number of possible suspenders (2-3 unless the work queue ends up
+                // being used more widely), if this turns out to be a problem.
+                inner.suspend_waker.register(ctx.waker());
+                if !suspended {
+                    inner.suspend(Some(ctx));
+                    suspended = true;
+                }
+
+                core::task::Poll::Pending
+            })
+        })
+    }
 }
 
 impl<D, T> Drop for WorkQueueDriver<'_, D, T>
@@ -530,11 +636,40 @@ where
     T: Sync + Send,
 {
     fn drop(&mut self) {
-        unsafe {
-            // Safety: the noop VTable functions don't use the pointer at all.
-            self.queue
-                .configure(NonNull::<D>::dangling(), VTable::noop())
-        };
+        let suspended = self.queue.inner.with(|inner| {
+            if inner.is_active() {
+                inner.suspend(None);
+                true
+            } else {
+                false
+            }
+        });
+
+        if suspended {
+            loop {
+                let done = self.queue.inner.with(|inner| {
+                    if inner.is_active() {
+                        return false;
+                    }
+
+                    unsafe {
+                        inner.configure(NonNull::dangling(), VTable::noop());
+                    }
+
+                    inner.resume();
+
+                    true
+                });
+                if done {
+                    break;
+                }
+            }
+        } else {
+            unsafe {
+                self.queue
+                    .configure(NonNull::<D>::dangling(), VTable::noop());
+            }
+        }
     }
 }
 
