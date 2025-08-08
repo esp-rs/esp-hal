@@ -394,7 +394,7 @@ impl<T: Sync> WorkItem<T> {
 /// The status of a work item posted to a work queue.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Poll {
+pub(crate) enum Poll {
     /// The work item has not yet been fully processed. Contains whether the caller should poll the
     /// queue again. This only has effect on async pollers, which will need to wake their tasks
     /// immediately.
@@ -408,6 +408,11 @@ impl Poll {
     /// Returns whether the current result is still pending.
     pub fn is_pending(self) -> bool {
         matches!(self, Self::Pending(_))
+    }
+
+    /// Returns whether the current result is ready.
+    pub fn is_ready(self) -> bool {
+        !self.is_pending()
     }
 }
 
@@ -426,18 +431,34 @@ pub(crate) struct Handle<'t, T: Sync> {
 }
 
 impl<'t, T: Sync> Handle<'t, T> {
-    /// Returns the status of the work item.
-    pub fn poll(&mut self) -> Poll {
+    fn poll_inner(&mut self) -> Poll {
         unsafe { self.queue.poll(self.work_item) }
     }
 
-    /// Waits for the work item to be processed.
+    /// Returns the status of the work item.
+    pub fn poll(&mut self) -> bool {
+        self.poll_inner().is_ready()
+    }
+
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
+    #[inline]
+    pub fn wait_blocking(mut self) -> Status {
+        loop {
+            if let Poll::Ready(status) = self.poll_inner() {
+                return status;
+            }
+        }
+    }
+
+    /// Waits until the work item is completed.
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         poll_fn(|ctx| {
             unsafe { &*self.work_item.as_ptr() }
                 .waker
                 .register(ctx.waker());
-            match self.poll() {
+            match self.poll_inner() {
                 Poll::Pending(recall) => {
                     if recall {
                         ctx.waker().wake_by_ref();
@@ -454,7 +475,7 @@ impl<'t, T: Sync> Drop for Handle<'t, T> {
     fn drop(&mut self) {
         if self.queue.cancel(self.work_item) {
             // We must wait for the driver to release our WorkItem.
-            while self.poll().is_pending() {}
+            while self.poll_inner().is_pending() {}
         }
     }
 }

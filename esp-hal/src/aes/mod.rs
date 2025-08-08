@@ -914,7 +914,7 @@ impl AesContext {
     /// - For encryption the input is the plaintext, the output is the ciphertext.
     /// - For decryption the input is the ciphertext, the output is the plaintext.
     ///
-    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
     /// For an example, see the documentation of [`AesBackend`].
@@ -944,7 +944,7 @@ impl AesContext {
     ///
     /// The processed data will be written back to the `buffer`.
     ///
-    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
     /// This function operates similar to [`AesContext::process`], but it overwrites the data buffer
@@ -1020,18 +1020,22 @@ pub struct AesHandle<'t>(Handle<'t, AesOperation>);
 
 impl AesHandle<'_> {
     /// Polls the status of the work item.
+    ///
+    /// This function returns `true` if the item has been processed.
     #[inline]
-    pub fn poll(&mut self) -> Poll {
+    pub fn poll(&mut self) -> bool {
         self.0.poll()
     }
 
-    /// Blocks until the work item to be processed.
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
     #[inline]
-    pub fn wait_blocking(mut self) {
-        while self.poll().is_pending() {}
+    pub fn wait_blocking(self) -> Status {
+        self.0.wait_blocking()
     }
 
-    /// Waits for the work item to be processed.
+    /// Waits until the work item is completed.
     #[inline]
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         self.0.wait()
