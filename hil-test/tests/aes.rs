@@ -305,8 +305,12 @@ fn run_cipher_tests(buffer: &mut [u8]) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use embassy_executor::Spawner;
+    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+    use hil_test::mk_static;
+
     use super::*;
 
     #[test]
@@ -450,6 +454,45 @@ mod tests {
         handle.wait_blocking();
 
         hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+    }
+
+    #[test]
+    async fn test_aes_work_queue_work_posted_before_queue_started_async() {
+        #[embassy_executor::task]
+        async fn aes_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
+            let mut output = [0; PLAINTEXT_BUF_SIZE];
+            let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut plaintext);
+
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let mut handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
+
+            // Backend can start now
+            signal.signal(());
+
+            handle.wait().await;
+            core::mem::drop(handle);
+
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+
+            // Test can end now
+            signal.signal(());
+        }
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+
+        // Start task before we'd start the AES operation
+        let spawner = Spawner::for_current_executor().await;
+        spawner.must_spawn(aes_task(signal));
+
+        signal.wait().await;
+
+        let mut aes = AesBackend::new(p.AES);
+        let _backend = aes.start();
+
+        signal.wait().await;
     }
 
     #[test]
