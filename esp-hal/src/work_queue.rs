@@ -473,7 +473,7 @@ impl<'t, T: Sync> Handle<'t, T> {
 
 impl<'t, T: Sync> Drop for Handle<'t, T> {
     fn drop(&mut self) {
-        if self.queue.cancel(self.work_item) {
+        if !self.queue.cancel(self.work_item) {
             // We must wait for the driver to release our WorkItem.
             while self.poll_inner().is_pending() {}
         }
