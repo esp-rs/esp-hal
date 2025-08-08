@@ -28,7 +28,7 @@ pub(crate) struct VTable<T: Sync> {
     /// return None to prevent removing the work item from the queue.
     ///
     /// This function should be as short as possible.
-    pub(crate) post: fn(*const (), &mut T) -> Option<Poll>,
+    pub(crate) post: fn(NonNull<()>, &mut T) -> Option<Poll>,
 
     /// Polls the status of the current work item.
     ///
@@ -36,17 +36,17 @@ pub(crate) struct VTable<T: Sync> {
     /// `post`.
     ///
     /// This function should be as short as possible.
-    pub(crate) poll: fn(*const (), &mut T) -> Poll,
+    pub(crate) poll: fn(NonNull<()>, &mut T) -> Poll,
 
     /// Attempts to abort processing a work item.
     ///
     /// This function should be as short as possible.
-    pub(crate) cancel: fn(*const (), &mut T),
+    pub(crate) cancel: fn(NonNull<()>, &mut T),
 
     /// Called when the driver may be stopped.
     ///
     /// This function should be as short as possible.
-    pub(crate) stop: fn(*const ()),
+    pub(crate) stop: fn(NonNull<()>),
 }
 
 impl<T: Sync> VTable<T> {
@@ -66,7 +66,7 @@ struct Inner<T: Sync> {
     current: Option<NonNull<WorkItem<T>>>,
 
     // The data pointer will be passed to VTable functions, which may be called in any context.
-    data: *const (),
+    data: NonNull<()>,
     vtable: VTable<T>,
 }
 
@@ -268,7 +268,7 @@ impl<T: Sync> WorkQueue<T> {
                 tail: None,
                 current: None,
 
-                data: core::ptr::null(),
+                data: NonNull::dangling(),
                 vtable: VTable::noop(),
             }),
         }
@@ -283,7 +283,7 @@ impl<T: Sync> WorkQueue<T> {
     /// The `data` pointer must be valid as long as the `WorkQueue` is configured with it. The
     /// driver must access the data pointer appropriately (i.e. it must not move !Send data out of
     /// it).
-    pub unsafe fn configure<D: Sync>(&self, data: *const D, vtable: VTable<T>) {
+    pub unsafe fn configure<D: Sync>(&self, data: NonNull<D>, vtable: VTable<T>) {
         self.inner.with(|inner| {
             (inner.vtable.stop)(inner.data);
 
@@ -499,7 +499,7 @@ where
             // Safety: the lifetime 't ensures the pointer remains valid for the lifetime of the
             // WorkQueueDriver. The Drop implementation (and the general "Don't forget" clause)
             // ensure the pointer is not used after the WQD has been dropped.
-            queue.configure((driver as *mut D).cast_const(), vtable);
+            queue.configure(NonNull::from(driver), vtable);
         }
         Self {
             queue,
@@ -521,7 +521,8 @@ where
     fn drop(&mut self) {
         unsafe {
             // Safety: the noop VTable functions don't use the pointer at all.
-            self.queue.configure(core::ptr::null::<D>(), VTable::noop())
+            self.queue
+                .configure(NonNull::<D>::dangling(), VTable::noop())
         };
     }
 }

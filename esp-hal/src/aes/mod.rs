@@ -833,8 +833,8 @@ impl<'d> AesBackend<'d> {
 
     // WorkQueue callbacks. They may run in any context.
 
-    unsafe fn from_raw<'any>(ptr: *const ()) -> &'any mut Self {
-        unsafe { unwrap!(ptr.cast_mut().cast::<AesBackend<'_>>().as_mut()) }
+    unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+        unsafe { ptr.cast::<AesBackend<'_>>().as_mut() }
     }
 
     fn process(&mut self, item: &mut AesOperation) -> Poll {
