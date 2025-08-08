@@ -198,6 +198,11 @@ impl<T: Sync> Inner<T> {
             return false;
         }
 
+        if unsafe { work_item.as_ref() }.status.is_ready() {
+            // Nothing to do.
+            return true;
+        }
+
         // The work item is not the current one, remove it from the queue. This immediately
         // cancels the work item. `remove` only uses the address of the work item without
         // dereferencing it.
@@ -468,6 +473,13 @@ impl<'t, T: Sync> Handle<'t, T> {
                 Poll::Ready(status) => core::task::Poll::Ready(status),
             }
         })
+    }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    pub async fn cancel(&mut self) {
+        if !self.queue.cancel(self.work_item) {
+            self.wait().await;
+        }
     }
 }
 

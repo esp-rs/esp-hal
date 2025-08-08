@@ -1040,6 +1040,12 @@ impl AesHandle<'_> {
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         self.0.wait()
     }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    #[inline]
+    pub fn cancel(&mut self) -> impl Future<Output = ()> {
+        self.0.cancel()
+    }
 }
 
 // Utilities
