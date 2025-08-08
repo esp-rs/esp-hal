@@ -14,7 +14,9 @@
 
 use core::{future::poll_fn, marker::PhantomData, ptr::NonNull};
 
-use crate::{asynch::AtomicWaker, sync::Locked};
+use embassy_sync::waitqueue::WakerRegistration;
+
+use crate::sync::Locked;
 
 /// Queue driver operations.
 ///
@@ -371,7 +373,7 @@ pub(crate) struct WorkItem<T: Sync> {
     next: Option<NonNull<WorkItem<T>>>,
     status: Poll,
     data: T,
-    waker: AtomicWaker,
+    waker: WakerRegistration,
 }
 
 impl<T: Sync> WorkItem<T> {
@@ -461,7 +463,7 @@ impl<'t, T: Sync> Handle<'t, T> {
     /// Waits until the work item is completed.
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         poll_fn(|ctx| {
-            unsafe { &*self.work_item.as_ptr() }
+            unsafe { self.work_item.as_mut() }
                 .waker
                 .register(ctx.waker());
             match self.poll_inner() {
@@ -547,7 +549,7 @@ impl<T: Sync> WorkQueueFrontend<T> {
                 next: None,
                 status: Poll::Pending(false),
                 data: initial,
-                waker: AtomicWaker::new(),
+                waker: WakerRegistration::new(),
             },
         }
     }
