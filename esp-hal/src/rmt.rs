@@ -490,10 +490,8 @@ impl From<PulseCode> for u32 {
 /// extra space. However, it is useful to abstract memory sizes into their own
 /// type to make explicit whether they refer to a number of RAM blocks or a
 /// number of pulse codes and to centralize conversion between both.
-// This currently needs to be `pub` because it is accessible via the *ChannelInternal traits.
-#[doc(hidden)]
 #[derive(Copy, Clone)]
-pub struct MemSize(u8);
+struct MemSize(u8);
 
 impl MemSize {
     /// Create from the given number of RMT RAM blocks.
@@ -1586,7 +1584,7 @@ impl Channel<Blocking, Rx> {
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct RmtTxFuture {
+struct RmtTxFuture {
     raw: DynChannelAccess<Tx>,
 }
 
@@ -1631,7 +1629,7 @@ impl Channel<Async, Tx> {
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-pub(crate) struct RmtRxFuture {
+struct RmtRxFuture {
     raw: DynChannelAccess<Rx>,
 }
 
@@ -1709,15 +1707,13 @@ fn async_interrupt_handler() {
 
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[doc(hidden)]
-pub enum Event {
+enum Event {
     Error,
     Threshold,
     End,
 }
 
-#[doc(hidden)]
-pub trait ChannelInternal: RawChannelAccess {
+trait ChannelInternal: RawChannelAccess {
     fn update(&self);
 
     fn set_divider(&self, divider: u8);
@@ -1735,8 +1731,7 @@ pub trait ChannelInternal: RawChannelAccess {
     }
 }
 
-#[doc(hidden)]
-pub trait TxChannelInternal: ChannelInternal {
+trait TxChannelInternal: ChannelInternal {
     fn output_signal(&self) -> gpio::OutputSignal {
         OUTPUT_SIGNALS[self.channel() as usize]
     }
@@ -1799,6 +1794,7 @@ pub trait TxChannelInternal: ChannelInternal {
         Ok(data.len().min(memsize))
     }
 
+    #[allow(unused)]
     fn stop_tx(&self);
 
     fn set_tx_interrupt(&self, event: EnumSet<Event>, enable: bool);
@@ -1814,8 +1810,7 @@ pub trait TxChannelInternal: ChannelInternal {
     }
 }
 
-#[doc(hidden)]
-pub trait RxChannelInternal: ChannelInternal {
+trait RxChannelInternal: ChannelInternal {
     fn input_signal(&self) -> gpio::InputSignal {
         INPUT_SIGNALS[self.channel() as usize]
     }
