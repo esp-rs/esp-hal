@@ -100,7 +100,7 @@ impl<T: Sync> Inner<T> {
     /// Runs one processing iteration.
     ///
     /// This function enqueues a new work item or polls the status of the currently processed one.
-    fn process(&mut self) {
+    fn process(&mut self, start_new: bool) {
         if let Some(mut current) = self.current {
             let result = (self.vtable.poll)(self.data, &mut unsafe { current.as_mut() }.data);
 
@@ -108,9 +108,11 @@ impl<T: Sync> Inner<T> {
                 unsafe { current.as_mut() }.complete(status);
                 self.current = None;
 
-                self.dequeue_and_post(true);
+                if start_new {
+                    self.dequeue_and_post(true);
+                }
             }
-        } else {
+        } else if start_new {
             // If the queue is empty, the driver should already have been notified when the queue
             // became empty, so we don't notify it here.
             self.dequeue_and_post(false);
@@ -262,6 +264,11 @@ impl<T: Sync> WorkQueue<T> {
     /// it).
     pub unsafe fn configure<D: Sync>(&self, data: *const D, vtable: VTable<T>) {
         self.inner.with(|inner| {
+            // The current item needs to finish processing before we can stop the driver.
+            while inner.current.is_some() {
+                inner.process(false);
+            }
+
             (inner.vtable.stop)(inner.data);
 
             inner.data = data.cast();
@@ -289,8 +296,9 @@ impl<T: Sync> WorkQueue<T> {
     }
 
     /// Polls the queue once.
+    #[cfg_attr(esp32, expect(unused))]
     pub fn process(&self) {
-        self.inner.with(|inner| inner.process());
+        self.inner.with(|inner| inner.process(true));
     }
 
     /// Polls the queue once and returns the status of the given work item.
@@ -304,7 +312,7 @@ impl<T: Sync> WorkQueue<T> {
         self.inner.with(|inner| {
             let status = unsafe { &*item.as_ptr() }.status;
             if status == Poll::Pending {
-                inner.process();
+                inner.process(true);
                 unsafe { &*item.as_ptr() }.status
             } else {
                 status
@@ -445,11 +453,6 @@ where
             queue,
             _marker: PhantomData,
         }
-    }
-
-    #[expect(unused)] // TODO this will be used with AesDmaBackend, for example
-    pub fn poll(&mut self) {
-        self.queue.process();
     }
 }
 
