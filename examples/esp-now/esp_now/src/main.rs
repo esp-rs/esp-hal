@@ -2,9 +2,6 @@
 //!
 //! Broadcasts, receives and sends messages via esp-now
 
-//% FEATURES: esp-radio esp-radio/wifi esp-radio/esp-now esp-radio/unstable esp-hal/unstable
-//% CHIPS: esp32 esp32s2 esp32s3 esp32c2 esp32c3 esp32c6
-
 #![no_std]
 #![no_main]
 
