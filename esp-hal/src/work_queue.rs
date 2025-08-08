@@ -319,6 +319,7 @@ impl<T: Sync> WorkQueue<T> {
     /// Polls the queue once.
     ///
     /// Returns true if the queue needs to be polled again.
+    #[allow(unused)]
     pub fn process(&self) -> bool {
         self.inner.with(|inner| inner.process())
     }
@@ -517,11 +518,6 @@ where
             queue,
             _marker: PhantomData,
         }
-    }
-
-    #[expect(unused)] // TODO this will be used with AesDmaBackend, for example
-    pub fn poll(&mut self) {
-        self.queue.process();
     }
 }
 
