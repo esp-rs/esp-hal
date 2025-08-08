@@ -2,9 +2,6 @@
 //! You need to connect via the Serial/JTAG interface to see any output.
 //! Most dev-kits use a USB-UART-bridge - in that case you won't see any output.
 
-//% CHIPS: esp32c3 esp32c6 esp32h2 esp32s3
-//% FEATURES: embassy esp-hal/unstable
-
 #![no_std]
 #![no_main]
 
@@ -65,6 +62,8 @@ async fn reader(
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
+
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

@@ -3,9 +3,6 @@
 //! The following wiring is assumed:
 //! - Connect GPIO4 and GPIO5
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal/unstable
-
 #![no_std]
 #![no_main]
 
@@ -41,6 +38,8 @@ async fn signal_task(mut pin: Output<'static>) {
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     println!("Init!");
+
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);

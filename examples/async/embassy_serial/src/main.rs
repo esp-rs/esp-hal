@@ -3,9 +3,6 @@
 //! This is an example of running the embassy executor and asynchronously
 //! writing to and reading from UART.
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal/unstable
-
 #![no_std]
 #![no_main]
 
@@ -67,6 +64,8 @@ async fn reader(mut rx: UartRx<'static, Async>, signal: &'static Signal<NoopRawM
 #[esp_hal_embassy::main]
 async fn main(spawner: Spawner) {
     esp_println::println!("Init!");
+
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
