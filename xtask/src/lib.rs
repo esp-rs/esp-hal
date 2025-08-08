@@ -156,14 +156,17 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self, workspace: &Path) -> bool {
-        // TODO: we should use some sort of cache instead of parsing the TOML every
-        // time, but for now this should be good enough.
-        match crate::cargo::CargoToml::new(workspace, *self) {
-            Ok(toml) => toml.is_published(),
-            Err(_) => {
-                log::warn!("Could not parse manifest for package '{}', skipping", self);
-                false
-            }
+        if *self == Package::Examples {
+            // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
+            // did nothing in this directory will be published.
+            false
+        } else {
+            // TODO: we should use some sort of cache instead of parsing the TOML every
+            // time, but for now this should be good enough.
+            let toml =
+                crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
+
+            toml.is_published()
         }
     }
 
