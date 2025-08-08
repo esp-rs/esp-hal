@@ -706,21 +706,20 @@ struct AesOperation {
 // for the pointers, are Sync. The pointers are safe to share because they point at data that the
 // AES driver ensures can be accessed safely and soundly.
 unsafe impl Sync for AesOperation {}
+// Safety: we will not hold on to the pointers when the work item leaves the queue.
+unsafe impl Send for AesOperation {}
 
 static AES_WORK_QUEUE: WorkQueue<AesOperation> = WorkQueue::new();
 const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
-    post: |driver, _item| {
-        // Since we run the operation in `poll`, there is nothing to do here, besides accepting the
-        // work item. However, DS may be using the AES peripheral. We solve that problem (later) by
-        // taking a lock in `on_work_available`
-        let driver = unsafe { AesBackend::from_raw(driver) };
-        driver.ensure_initialized()
-    },
-    poll: |driver, item| {
+    post: |driver, item| {
         // Fully process the work item. A single CPU-driven AES operation would complete
         // faster than we could poll the queue with all the locking around it.
         let driver = unsafe { AesBackend::from_raw(driver) };
-        driver.process(item)
+        Some(driver.process(item))
+    },
+    poll: |_driver, _item| {
+        // We've processed the item completely when we received it in `post`.
+        unreachable!()
     },
     cancel: |_driver, _item| {
         // To achieve a decent performance in Typical AES mode, we run the operations in a blocking
@@ -836,26 +835,19 @@ impl<'d> AesBackend<'d> {
 
     // WorkQueue callbacks. They may run in any context.
 
-    unsafe fn from_raw<'any>(ptr: *const ()) -> &'any mut Self {
-        unsafe { unwrap!(ptr.cast_mut().cast::<AesBackend<'_>>().as_mut()) }
+    unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+        unsafe { ptr.cast::<AesBackend<'_>>().as_mut() }
     }
 
-    fn process(&mut self, item: &mut AesOperation) -> Option<Poll> {
-        let driver = self.driver.as_mut()?;
+    fn process(&mut self, item: &mut AesOperation) -> Poll {
+        let driver = self.driver.get_or_insert_with(|| {
+            let peri = unsafe { self.peri.clone_unchecked() };
+            Aes::new(peri)
+        });
 
         driver.process_work_item(item);
 
-        Some(Poll::Ready(Status::Completed))
-    }
-
-    fn ensure_initialized(&mut self) -> bool {
-        if self.driver.is_none() {
-            let peri = unsafe { self.peri.clone_unchecked() };
-            self.driver = Some(Aes::new(peri));
-        }
-        // TODO: when DS is implemented, it will need to be able to lock out AES. In that case,
-        // this function should return `false` if the AES peripheral is locked.
-        true
+        Poll::Ready(Status::Completed)
     }
 
     fn deinitialize(&mut self) {
@@ -924,7 +916,7 @@ impl AesContext {
     /// - For encryption the input is the plaintext, the output is the ciphertext.
     /// - For decryption the input is the ciphertext, the output is the plaintext.
     ///
-    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
     /// For an example, see the documentation of [`AesBackend`].
@@ -954,7 +946,7 @@ impl AesContext {
     ///
     /// The processed data will be written back to the `buffer`.
     ///
-    /// The returned Handle must be polled until it returns [`Poll::Ready`]. Dropping the handle
+    /// The returned Handle must be polled until it returns `true`. Dropping the handle
     /// before the operation finishes will cancel the operation.
     ///
     /// This function operates similar to [`AesContext::process`], but it overwrites the data buffer
@@ -1030,21 +1022,31 @@ pub struct AesHandle<'t>(Handle<'t, AesOperation>);
 
 impl AesHandle<'_> {
     /// Polls the status of the work item.
+    ///
+    /// This function returns `true` if the item has been processed.
     #[inline]
-    pub fn poll(&mut self) -> Poll {
+    pub fn poll(&mut self) -> bool {
         self.0.poll()
     }
 
-    /// Blocks until the work item to be processed.
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
     #[inline]
-    pub fn wait_blocking(mut self) {
-        while self.poll() == Poll::Pending {}
+    pub fn wait_blocking(self) -> Status {
+        self.0.wait_blocking()
     }
 
-    /// Waits for the work item to be processed.
+    /// Waits until the work item is completed.
     #[inline]
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         self.0.wait()
+    }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    #[inline]
+    pub fn cancel(&mut self) -> impl Future<Output = ()> {
+        self.0.cancel()
     }
 }
 
