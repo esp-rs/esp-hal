@@ -7,9 +7,6 @@
 //! - LED => GPIO2
 //! - BUTTON => GPIO0 (ESP32, ESP32-S2, ESP32-S3) / GPIO9
 
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: esp-hal/unstable
-
 #![no_std]
 #![no_main]
 
@@ -31,6 +28,7 @@ static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 
 #[main]
 fn main() -> ! {
+    esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
     // Set GPIO2 as an output, and set its state high initially.
