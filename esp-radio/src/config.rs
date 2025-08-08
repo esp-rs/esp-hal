@@ -26,6 +26,7 @@ pub(crate) struct Config {
 
 #[non_exhaustive]
 #[derive(Default)]
+/// Power save mode for the WiFi driver
 pub enum PowerSaveMode {
     #[default]
     None,
