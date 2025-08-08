@@ -22,7 +22,7 @@ use crate::sync::Locked;
 ///
 /// Functions in this VTable are provided by drivers that consume work items.
 /// These functions may be called both in the context of the queue frontends and drivers.
-pub(crate) struct VTable<T: Sync> {
+pub(crate) struct VTable<T: Sync + Send> {
     /// Starts processing a new work item.
     ///
     /// The function returns whether the work item was accepted, and its poll status if it was
@@ -51,7 +51,7 @@ pub(crate) struct VTable<T: Sync> {
     pub(crate) stop: fn(NonNull<()>),
 }
 
-impl<T: Sync> VTable<T> {
+impl<T: Sync + Send> VTable<T> {
     pub(crate) const fn noop() -> Self {
         Self {
             post: |_, _| None,
@@ -62,7 +62,7 @@ impl<T: Sync> VTable<T> {
     }
 }
 
-struct Inner<T: Sync> {
+struct Inner<T: Sync + Send> {
     head: Option<NonNull<WorkItem<T>>>,
     tail: Option<NonNull<WorkItem<T>>>,
     current: Option<NonNull<WorkItem<T>>>,
@@ -72,7 +72,7 @@ struct Inner<T: Sync> {
     vtable: VTable<T>,
 }
 
-impl<T: Sync> Inner<T> {
+impl<T: Sync + Send> Inner<T> {
     /// Places a work item at the end of the queue.
     fn enqueue(&mut self, ptr: NonNull<WorkItem<T>>) {
         if let Some(tail) = self.tail.as_mut() {
@@ -262,11 +262,11 @@ impl<T: Sync> Inner<T> {
 }
 
 /// A generic work queue.
-pub(crate) struct WorkQueue<T: Sync> {
+pub(crate) struct WorkQueue<T: Sync + Send> {
     inner: Locked<Inner<T>>,
 }
 
-impl<T: Sync> WorkQueue<T> {
+impl<T: Sync + Send> WorkQueue<T> {
     /// Creates a new `WorkQueue`.
     pub const fn new() -> Self {
         Self {
@@ -290,7 +290,7 @@ impl<T: Sync> WorkQueue<T> {
     /// The `data` pointer must be valid as long as the `WorkQueue` is configured with it. The
     /// driver must access the data pointer appropriately (i.e. it must not move !Send data out of
     /// it).
-    pub unsafe fn configure<D: Sync>(&self, data: NonNull<D>, vtable: VTable<T>) {
+    pub unsafe fn configure<D: Sync + Send>(&self, data: NonNull<D>, vtable: VTable<T>) {
         self.inner.with(|inner| {
             (inner.vtable.stop)(inner.data);
 
@@ -369,14 +369,14 @@ pub enum Status {
 }
 
 /// A unit of work in the work queue.
-pub(crate) struct WorkItem<T: Sync> {
+pub(crate) struct WorkItem<T: Sync + Send> {
     next: Option<NonNull<WorkItem<T>>>,
     status: Poll,
     data: T,
     waker: WakerRegistration,
 }
 
-impl<T: Sync> WorkItem<T> {
+impl<T: Sync + Send> WorkItem<T> {
     /// Completes the work item.
     ///
     /// This function is intended to be called from the underlying drivers.
@@ -431,14 +431,14 @@ impl Poll {
 ///
 /// Dropping the handle cancels the work item, but may block for some time if the work item is
 /// already being processed.
-pub(crate) struct Handle<'t, T: Sync> {
+pub(crate) struct Handle<'t, T: Sync + Send> {
     queue: &'t WorkQueue<T>,
     work_item: NonNull<WorkItem<T>>,
     // Make sure lifetime is invariant to prevent UB.
     _marker: PhantomData<&'t mut WorkItem<T>>,
 }
 
-impl<'t, T: Sync> Handle<'t, T> {
+impl<'t, T: Sync + Send> Handle<'t, T> {
     fn poll_inner(&mut self) -> Poll {
         unsafe { self.queue.poll(self.work_item) }
     }
@@ -486,7 +486,7 @@ impl<'t, T: Sync> Handle<'t, T> {
     }
 }
 
-impl<'t, T: Sync> Drop for Handle<'t, T> {
+impl<'t, T: Sync + Send> Drop for Handle<'t, T> {
     fn drop(&mut self) {
         if !self.queue.cancel(self.work_item) {
             // We must wait for the driver to release our WorkItem.
@@ -497,8 +497,8 @@ impl<'t, T: Sync> Drop for Handle<'t, T> {
 
 pub(crate) struct WorkQueueDriver<'t, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     queue: &'t WorkQueue<T>,
     _marker: PhantomData<&'t mut D>,
@@ -506,8 +506,8 @@ where
 
 impl<'t, D, T> WorkQueueDriver<'t, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     pub fn new(driver: &'t mut D, vtable: VTable<T>, queue: &'t WorkQueue<T>) -> Self {
         unsafe {
@@ -525,8 +525,8 @@ where
 
 impl<D, T> Drop for WorkQueueDriver<'_, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     fn drop(&mut self) {
         unsafe {
@@ -538,11 +538,11 @@ where
 }
 
 /// Used by work queue clients, allows hiding WorkItem.
-pub(crate) struct WorkQueueFrontend<T: Sync> {
+pub(crate) struct WorkQueueFrontend<T: Sync + Send> {
     work_item: WorkItem<T>,
 }
 
-impl<T: Sync> WorkQueueFrontend<T> {
+impl<T: Sync + Send> WorkQueueFrontend<T> {
     pub fn new(initial: T) -> Self {
         Self {
             work_item: WorkItem {

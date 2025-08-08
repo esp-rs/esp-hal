@@ -706,6 +706,8 @@ struct AesOperation {
 // for the pointers, are Sync. The pointers are safe to share because they point at data that the
 // AES driver ensures can be accessed safely and soundly.
 unsafe impl Sync for AesOperation {}
+// Safety: we will not hold on to the pointers when the work item leaves the queue.
+unsafe impl Send for AesOperation {}
 
 static AES_WORK_QUEUE: WorkQueue<AesOperation> = WorkQueue::new();
 const BLOCKING_AES_VTABLE: VTable<AesOperation> = VTable {
