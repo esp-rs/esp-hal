@@ -204,7 +204,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use portable_atomic::{AtomicU8, Ordering};
+use portable_atomic::Ordering;
 #[cfg(place_rmt_driver_in_ram)]
 use procmacros::ram;
 
@@ -213,6 +213,7 @@ use crate::{
     Blocking,
     asynch::AtomicWaker,
     gpio::{
+        self,
         InputConfig,
         Level,
         OutputConfig,
@@ -706,177 +707,165 @@ impl Default for RxChannelConfig {
     }
 }
 
-// Declare input/output signals in a const array.
-macro_rules! declare_signals {
-    ($name:ident, $type:ident, [$($entry:ident $(,)?)*; $count:expr]) => {
-        pub(crate) const $name: [crate::gpio::$type; $count] = [
-            $(crate::gpio::$type::$entry,)*
-        ];
-    };
-}
+// Channel specification
 
+// Looping all channels: Build up the Rmt struct and compute NUM_CHANNELS
 macro_rules! declare_channels {
-    // Final step of the macro, when all input has been iterated over: Declares the Rmt struct and
-    // its constructor.
-    (@define_rmt {
-        () -> (
-            [$($field_decl:tt)*],
-            [$($field_init:tt)*]
-        )
-    }) => {
-        /// RMT Instance
-        pub struct Rmt<'d, Dm>
-        where
-            Dm: $crate::DriverMode,
-        {
-            pub(super) peripheral: $crate::peripherals::RMT<'d>,
-            $($field_decl)+
-            _mode: ::core::marker::PhantomData<Dm>,
-        }
+    ($($num:literal),+ $(,)?) => {
+        paste::paste! {
+            /// RMT Instance
+            pub struct Rmt<'d, Dm>
+            where
+                Dm: crate::DriverMode,
+            {
+                pub(super) peripheral: RMT<'d>,
+                $(
+                    #[doc = concat!("RMT Channel ", $num)]
+                    pub [<channel $num>]: ChannelCreator<Dm, $num>,
+                )+
+                _mode: PhantomData<Dm>,
+            }
 
-        impl<'d, Dm> Rmt<'d, Dm>
-        where
-            Dm: crate::DriverMode,
-        {
-            fn create(peripheral: crate::peripherals::RMT<'d>) -> Self {
-                Self {
-                    peripheral,
-                    $($field_init)+
-                    _mode: ::core::marker::PhantomData,
+            impl<'d, Dm> Rmt<'d, Dm>
+            where
+                Dm: crate::DriverMode,
+            {
+                fn create(peripheral: RMT<'d>) -> Self {
+                    Self {
+                        peripheral,
+                        $(
+                            [<channel $num>]: ChannelCreator::conjure(),
+                        )+
+                        _mode: PhantomData,
+                    }
                 }
             }
+
+            #[allow(clippy::no_effect)]
+            const NUM_CHANNELS: usize = const { 0 $( + {$num; 1} )+ };
         }
-    };
-
-    // Iteration step of the macro when going through channels: Takes one entry from the channel
-    // declaration and builds up field definitions for the Rmt struct as well as corresponding
-    // initializers.
-    (@define_rmt {
-        ([$name:ident, $num:literal] $(, $($ch:tt),+)?)
-        -> (
-            [$($field_decl:tt)*],
-            [$($field_init:tt)*]
-        )
-    }) => {
-        declare_channels! (@define_rmt {
-            ($($($ch),+)?) -> ([
-                $($field_decl)*
-                #[doc = concat!("RMT Channel ", $num)]
-                pub $name: ChannelCreator<Dm, $num>,
-            ], [
-                $($field_init)*
-                $name: $crate::rmt::ChannelCreator {
-                    _mode: ::core::marker::PhantomData,
-                    _guard: $crate::system::GenericPeripheralGuard::new(),
-                },
-            ])
-        });
-    };
-
-    // The main entry-point of the macro: takes a comma-separated list of channels,
-    // allowing for a trailing comma.
-    ($($ch:tt),+ $(,)?) => {
-        declare_channels! (@define_rmt { ($($ch),+) -> ([], []) });
     };
 }
 
-const NUM_CHANNELS: usize = if cfg!(any(esp32, esp32s3)) { 8 } else { 4 };
+// Looping channel indices: Declare input/output signals and ChannelIndex
+// The number of Rx and Tx channels is identical for all chips.
+macro_rules! declare_tx_channels {
+    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+        paste::paste! {
+            #[allow(clippy::no_effect)]
+            const CHANNEL_INDEX_COUNT: u8 = const { 0 $( + {$idx; 1} )+ };
+
+            const OUTPUT_SIGNALS: [gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
+                $(
+                    gpio::OutputSignal::[< RMT_SIG_ $idx >],
+                )+
+            ];
+
+            $(
+                impl<'d, Dm> TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                where
+                    Dm: crate::DriverMode,
+                {
+                    type Raw = ConstChannelAccess<Tx, $num>;
+                    const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
+                }
+            )+
+        }
+    };
+}
+
+macro_rules! declare_rx_channels {
+    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+        paste::paste! {
+            const INPUT_SIGNALS: [gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
+                $(
+                    gpio::InputSignal::[< RMT_SIG_ $idx >],
+                )+
+            ];
+
+            $(
+                impl<'d, Dm> RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                where
+                    Dm: crate::DriverMode,
+                {
+                    type Raw = ConstChannelAccess<$crate::rmt::Rx, $num>;
+                    const RAW: Self::Raw = unsafe { ConstChannelAccess::conjure() };
+                }
+            )+
+        }
+    };
+}
 
 cfg_if::cfg_if! {
     if #[cfg(esp32)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [4, 4],
+            [5, 5],
+            [6, 6],
+            [7, 7],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3, RMT_SIG_4, RMT_SIG_5, RMT_SIG_6, RMT_SIG_7; NUM_CHANNELS]
+        declare_rx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
+            [4, 4],
+            [5, 5],
+            [6, 6],
+            [7, 7],
         );
     } else if #[cfg(esp32s2)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+        declare_channels!(0, 1, 2, 3);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; NUM_CHANNELS]
+        declare_rx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
     } else if #[cfg(esp32s3)] {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
-            [channel4, 4],
-            [channel5, 5],
-            [channel6, 6],
-            [channel7, 7],
+        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
+            [2, 2],
+            [3, 3],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
-        );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1, RMT_SIG_2, RMT_SIG_3; const { NUM_CHANNELS / 2 }]
+        declare_rx_channels!(
+            [4, 0],
+            [5, 1],
+            [6, 2],
+            [7, 3],
         );
     } else {
-        declare_channels!(
-            [channel0, 0],
-            [channel1, 1],
-            [channel2, 2],
-            [channel3, 3],
+        declare_channels!(0, 1, 2, 3);
+        declare_tx_channels!(
+            [0, 0],
+            [1, 1],
         );
-        declare_signals!(
-            OUTPUT_SIGNALS,
-            OutputSignal,
-            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
+        declare_rx_channels!(
+            [2, 0],
+            [3, 1],
         );
-        declare_signals!(
-            INPUT_SIGNALS,
-            InputSignal,
-            [RMT_SIG_0, RMT_SIG_1; const { NUM_CHANNELS / 2 }]
-        );
-    }
-}
-
-impl<'d, Dm> Rmt<'d, Dm>
-where
-    Dm: crate::DriverMode,
-{
-    pub(crate) fn new_internal(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
-        let me = Rmt::create(peripheral);
-        self::chip_specific::configure_clock(frequency)?;
-        Ok(me)
     }
 }
 
 impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
     pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
-        Self::new_internal(peripheral, frequency)
+        let this = Rmt::create(peripheral);
+        self::chip_specific::configure_clock(frequency)?;
+        Ok(this)
     }
 
     /// Reconfigures the driver for asynchronous operation.
@@ -920,18 +909,21 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
 
     let mut next_state = state;
     for cur_channel in channel..channel + memsize.blocks() {
-        if STATE[cur_channel as usize]
-            .compare_exchange(
-                RmtState::Unconfigured as u8,
-                next_state as u8,
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
-            .is_err()
+        if RmtState::compare_exchange(
+            cur_channel,
+            RmtState::Unconfigured,
+            next_state,
+            Ordering::Acquire,
+            Ordering::Relaxed,
+        )
+        .is_err()
         {
-            for i in (channel..cur_channel).rev() {
-                STATE[i as usize].store(RmtState::Unconfigured as u8, Ordering::Release);
-            }
+            RmtState::store_range_rev(
+                RmtState::Unconfigured,
+                channel,
+                cur_channel,
+                Ordering::Relaxed,
+            );
 
             return Err(Error::MemoryBlockNotAvailable);
         }
@@ -1010,25 +1002,107 @@ fn configure_tx_channel<'d>(
 
     Ok(())
 }
-#[repr(u8)]
-enum RmtState {
-    // The channel is not configured for either rx or tx, and its memory is available
-    Unconfigured,
 
-    // The channels is not in use, but one of the preceding channels is using its memory
-    Reserved,
+// We store values of type `RmtState` in the global `STATE`. However, we also need atomic access,
+// thus the enum needs to be represented as AtomicU8. Thus, we end up with unsafe conversions
+// between `RmtState` and `u8` to avoid constant range checks.
+// This submodule wraps all accesses in a safe API which ensures that only valid enum values can
+// be stored to `STATE` such that other code in this driver does not need to be concerned with
+// these details.
+mod state {
+    use portable_atomic::{AtomicU8, Ordering};
 
-    // The channel is configured for rx
-    Rx,
+    use super::{Direction, NUM_CHANNELS, RawChannelAccess};
 
-    // The channel is configured for tx
-    Tx,
+    static STATE: [AtomicU8; NUM_CHANNELS] =
+        [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[repr(u8)]
+    pub(super) enum RmtState {
+        // The channel is not configured for either rx or tx, and its memory is available
+        Unconfigured,
+
+        // The channels is not in use, but one of the preceding channels is using its memory
+        Reserved,
+
+        // The channel is configured for rx
+        Rx,
+
+        // The channel is configured for tx
+        Tx,
+    }
+
+    impl RmtState {
+        /// Check whether this state corresponds to a rx, tx, or other configuration.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn is_tx(&self) -> Option<bool> {
+            match self {
+                Self::Rx => Some(false),
+                Self::Tx => Some(true),
+                _ => None,
+            }
+        }
+
+        /// Convert a `u8` to `Self` without checking that it has a valid value for the enum.
+        ///
+        /// # Safety
+        ///
+        /// - Must only be called with valid values of the RmtState discrimiant
+        #[allow(unused)]
+        #[inline]
+        unsafe fn from_u8_unchecked(value: u8) -> Self {
+            unsafe { core::mem::transmute::<_, Self>(value) }
+        }
+
+        /// Load channel state from the global `STATE` by channel index.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn load_by_idx(channel: u8, ordering: Ordering) -> Self {
+            unsafe { Self::from_u8_unchecked(STATE[channel as usize].load(ordering)) }
+        }
+
+        /// Store the given state to all channel states for an index range in reverse order.
+        #[inline]
+        pub(super) fn store_range_rev(self, start: u8, end: u8, ordering: Ordering) {
+            for ch_num in (start as usize..end as usize).rev() {
+                STATE[ch_num].store(self as u8, ordering);
+            }
+        }
+
+        /// Store channel state to the global `STATE` given a `RawChannelAccess`.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn store(self, raw: impl RawChannelAccess<Dir: Direction>, ordering: Ordering) {
+            STATE[raw.channel() as usize].store(self as u8, ordering);
+        }
+
+        /// Load channel state from the global `STATE` given a `RawChannelAccess`.
+        #[allow(unused)]
+        #[inline]
+        pub(super) fn load(raw: impl RawChannelAccess<Dir: Direction>, ordering: Ordering) -> Self {
+            Self::load_by_idx(raw.channel(), ordering)
+        }
+
+        /// Perform a compare_exchange for the channel state for a `RawChannelAccess`.
+        #[inline]
+        pub(super) fn compare_exchange(
+            ch_num: u8,
+            current: Self,
+            new: Self,
+            success: Ordering,
+            failure: Ordering,
+        ) -> Result<Self, Self> {
+            STATE[ch_num as usize]
+                .compare_exchange(current as u8, new as u8, success, failure)
+                .map(|prev| unsafe { Self::from_u8_unchecked(prev) })
+                .map_err(|prev| unsafe { Self::from_u8_unchecked(prev) })
+        }
+    }
 }
 
-// This must only holds value of RmtState. However, we need atomic access, thus
-// represent as AtomicU8.
-static STATE: [AtomicU8; NUM_CHANNELS] =
-    [const { AtomicU8::new(RmtState::Unconfigured as u8) }; NUM_CHANNELS];
+use state::RmtState;
 
 /// RMT Channel
 #[derive(Debug)]
@@ -1094,14 +1168,14 @@ where
         // interfere with others.
         self.raw.set_memsize(MemSize::from_blocks(0));
 
-        for s in STATE[usize::from(self.raw.channel())..][..usize::from(memsize.blocks())]
-            .iter()
-            .rev()
-        {
-            // Existence of this `Channel` struct implies exclusive access to these hardware
-            // channels, thus simply store the new state.
-            s.store(RmtState::Unconfigured as u8, Ordering::Release);
-        }
+        // Existence of this `Channel` struct implies exclusive access to these hardware
+        // channels, thus simply store the new state.
+        RmtState::store_range_rev(
+            RmtState::Unconfigured,
+            self.raw.channel(),
+            self.raw.channel() + memsize.blocks(),
+            Ordering::Release,
+        );
     }
 }
 
@@ -1308,32 +1382,6 @@ impl<Raw: TxChannelInternal> ContinuousTxTransaction<Raw> {
     }
 }
 
-macro_rules! impl_tx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::TxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Tx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
-macro_rules! impl_rx_channel_creator {
-    ($channel:literal) => {
-        impl<'d, Dm> $crate::rmt::RxChannelCreator<'d, Dm>
-            for $crate::rmt::ChannelCreator<Dm, $channel>
-        where
-            Dm: $crate::DriverMode,
-        {
-            type Raw = $crate::rmt::ConstChannelAccess<$crate::rmt::Rx, $channel>;
-            const RAW: Self::Raw = unsafe { $crate::rmt::ConstChannelAccess::conjure() };
-        }
-    };
-}
-
 /// RMT Channel Creator
 pub struct ChannelCreator<Dm, const CHANNEL: u8>
 where
@@ -1344,6 +1392,13 @@ where
 }
 
 impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
+    fn conjure() -> ChannelCreator<Dm, CHANNEL> {
+        ChannelCreator {
+            _mode: PhantomData,
+            _guard: GenericPeripheralGuard::new(),
+        }
+    }
+
     /// Unsafely steal a channel creator instance.
     ///
     /// # Safety
@@ -1357,62 +1412,6 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
             _guard: GenericPeripheralGuard::new(),
         }
     }
-}
-
-#[cfg(not(any(esp32, esp32s2, esp32s3)))]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-    impl_tx_channel_creator!(4);
-    impl_tx_channel_creator!(5);
-    impl_tx_channel_creator!(6);
-    impl_tx_channel_creator!(7);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
-}
-
-#[cfg(esp32s2)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(0);
-    impl_rx_channel_creator!(1);
-    impl_rx_channel_creator!(2);
-    impl_rx_channel_creator!(3);
-}
-
-#[cfg(esp32s3)]
-mod impl_for_chip {
-    impl_tx_channel_creator!(0);
-    impl_tx_channel_creator!(1);
-    impl_tx_channel_creator!(2);
-    impl_tx_channel_creator!(3);
-
-    impl_rx_channel_creator!(4);
-    impl_rx_channel_creator!(5);
-    impl_rx_channel_creator!(6);
-    impl_rx_channel_creator!(7);
 }
 
 /// Channel in TX mode
@@ -1802,7 +1801,7 @@ pub trait ChannelInternal: RawChannelAccess {
 
 #[doc(hidden)]
 pub trait TxChannelInternal: ChannelInternal {
-    fn output_signal(&self) -> crate::gpio::OutputSignal {
+    fn output_signal(&self) -> gpio::OutputSignal {
         OUTPUT_SIGNALS[self.channel() as usize]
     }
 
@@ -1868,10 +1867,12 @@ pub trait TxChannelInternal: ChannelInternal {
 
     fn set_tx_interrupt(&self, event: EnumSet<Event>, enable: bool);
 
+    #[inline]
     fn listen_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), true);
     }
 
+    #[inline]
     fn unlisten_tx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_tx_interrupt(event.into(), false);
     }
@@ -1879,7 +1880,7 @@ pub trait TxChannelInternal: ChannelInternal {
 
 #[doc(hidden)]
 pub trait RxChannelInternal: ChannelInternal {
-    fn input_signal(&self) -> crate::gpio::InputSignal {
+    fn input_signal(&self) -> gpio::InputSignal {
         INPUT_SIGNALS[self.channel() as usize]
     }
 
@@ -1910,10 +1911,12 @@ pub trait RxChannelInternal: ChannelInternal {
 
     fn set_rx_interrupt(&self, event: EnumSet<Event>, enable: bool);
 
+    #[inline]
     fn listen_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), true);
     }
 
+    #[inline]
     fn unlisten_rx_interrupt(&self, event: impl Into<EnumSet<Event>>) {
         self.set_rx_interrupt(event.into(), false);
     }
@@ -1937,7 +1940,7 @@ mod chip_specific {
         Tx,
         TxChannelInternal,
     };
-    use crate::{peripherals::RMT, time::Rate};
+    use crate::{gpio, peripherals::RMT, time::Rate};
 
     pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
         let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
@@ -2231,7 +2234,7 @@ mod chip_specific {
     where
         A: RawChannelAccess<Dir = Rx>,
     {
-        fn input_signal(&self) -> crate::gpio::InputSignal {
+        fn input_signal(&self) -> gpio::InputSignal {
             let ch_idx = ch_idx(self) as usize;
             super::INPUT_SIGNALS[ch_idx]
         }
