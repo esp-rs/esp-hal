@@ -58,6 +58,18 @@ pub fn interrupt_handler() {
     });
 }
 
+#[cfg_attr(feature = "unstable", handler)]
+#[cfg(feature = "unstable")]
+pub fn interrupt_handler_unlisten() {
+    critical_section::with(|cs| {
+        INPUT_PIN
+            .borrow_ref_mut(cs)
+            .as_mut()
+            .map(|pin| pin.unlisten());
+        *COUNTER.borrow_ref_mut(cs) += 1;
+    });
+}
+
 // Compile-time test to check that GPIOs can be passed by reference.
 fn _gpios_can_be_reused() {
     let p = esp_hal::init(esp_hal::Config::default());
@@ -326,6 +338,25 @@ mod tests {
         let mut test_gpio1 =
             critical_section::with(|cs| INPUT_PIN.borrow_ref_mut(cs).take().unwrap());
         test_gpio1.unlisten();
+    }
+
+    #[test]
+    #[cfg(feature = "unstable")] // Interrupts are unstable
+    async fn unlisten_in_interrupt_handler_does_not_panic(mut ctx: Context) {
+        ctx.io.set_interrupt_handler(interrupt_handler_unlisten);
+
+        let mut test_gpio1 =
+            Input::new(ctx.test_gpio1, InputConfig::default().with_pull(Pull::Down));
+        let mut test_gpio2 = Output::new(ctx.test_gpio2, Level::Low, OutputConfig::default());
+
+        critical_section::with(|cs| {
+            *COUNTER.borrow_ref_mut(cs) = 0;
+            test_gpio1.listen(Event::AnyEdge);
+            INPUT_PIN.borrow_ref_mut(cs).replace(test_gpio1);
+        });
+        test_gpio2.set_high();
+
+        while critical_section::with(|cs| *COUNTER.borrow_ref(cs)) == 0 {}
     }
 
     #[test]
