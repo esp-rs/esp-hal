@@ -1960,16 +1960,13 @@ mod chip_specific {
         }
     }
 
-    impl<A> ChannelInternal for A
-    where
-        A: RawChannelAccess<Dir: Direction>,
-    {
+    impl<Dir: Direction> ChannelInternal for DynChannelAccess<Dir> {
         #[inline]
         fn update(&self) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx() as usize;
 
-            if A::Dir::is_tx() {
+            if Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| w.conf_update().set_bit());
             } else {
@@ -1982,7 +1979,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx() as usize;
 
-            if A::Dir::is_tx() {
+            if Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
             } else {
@@ -1996,7 +1993,7 @@ mod chip_specific {
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx() as usize;
 
-            let blocks = if A::Dir::is_tx() {
+            let blocks = if Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx).read().mem_size().bits()
             } else {
                 rmt.ch_rx_conf0(ch_idx).read().mem_size().bits()
@@ -2010,7 +2007,7 @@ mod chip_specific {
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx() as usize;
 
-            if A::Dir::is_tx() {
+            if Dir::is_tx() {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             } else {
@@ -2020,10 +2017,7 @@ mod chip_specific {
         }
     }
 
-    impl<A> TxChannelInternal for A
-    where
-        A: RawChannelAccess<Dir = Tx>,
-    {
+    impl TxChannelInternal for DynChannelAccess<Tx> {
         #[inline]
         fn set_generate_repeat_interrupt(&self, repeats: u16) {
             let rmt = crate::peripherals::RMT::regs();
@@ -2167,10 +2161,7 @@ mod chip_specific {
         }
     }
 
-    impl<A> RxChannelInternal for A
-    where
-        A: RawChannelAccess<Dir = Rx>,
-    {
+    impl RxChannelInternal for DynChannelAccess<Rx> {
         fn input_signal(&self) -> gpio::InputSignal {
             let ch_idx = self.ch_idx() as usize;
             super::INPUT_SIGNALS[ch_idx]
@@ -2382,10 +2373,7 @@ mod chip_specific {
         idx as u8
     }
 
-    impl<A> ChannelInternal for A
-    where
-        A: RawChannelAccess<Dir: Direction>,
-    {
+    impl<Dir: Direction> ChannelInternal for DynChannelAccess<Dir> {
         #[inline]
         fn update(&self) {
             // no-op
@@ -2411,10 +2399,7 @@ mod chip_specific {
         }
     }
 
-    impl<A> TxChannelInternal for A
-    where
-        A: RawChannelAccess<Dir = Tx>,
-    {
+    impl TxChannelInternal for DynChannelAccess<Tx> {
         #[cfg(not(esp32))]
         #[inline]
         fn set_generate_repeat_interrupt(&self, repeats: u16) {
@@ -2568,10 +2553,7 @@ mod chip_specific {
         }
     }
 
-    impl<A> RxChannelInternal for A
-    where
-        A: RawChannelAccess<Dir = Rx>,
-    {
+    impl RxChannelInternal for DynChannelAccess<Rx> {
         #[inline]
         fn clear_rx_interrupts(&self) {
             let rmt = crate::peripherals::RMT::regs();
