@@ -313,9 +313,9 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
         self.read_out(outbuf);
     }
 
-    /// Enables/disables constant time acceleration.
+    /// Enables/disables constant time operation.
     ///
-    /// When enabled it would increase the performance of modular
+    /// Disabling constant time operation increases the performance of modular
     /// exponentiation by simplifying the calculation concerning the 0 bits
     /// of the exponent. I.e. the less the Hamming weight, the greater the
     /// performance.
@@ -325,10 +325,10 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
     /// For more information refer to the
     #[doc = trm_markdown_link!("rsa")]
     #[cfg(not(esp32))]
-    pub fn disable_constant_time(&mut self, accelerate: bool) {
+    pub fn disable_constant_time(&mut self, disable: bool) {
         self.regs()
             .constant_time()
-            .write(|w| w.constant_time().bit(accelerate));
+            .write(|w| w.constant_time().bit(disable));
     }
 
     /// Enables/disables search acceleration.
@@ -464,7 +464,8 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function. `start_exponentiation` must be
+    /// This is a blocking function: it waits for the RSA operation to complete,
+    /// then reads the results into the provided buffer. `start_exponentiation` must be
     /// called before calling this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
@@ -543,7 +544,8 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function. `start_modular_multiplication` must be
+    /// This is a blocking function: it waits for the RSA operation to complete,
+    /// then reads the results into the provided buffer. `start_modular_multiplication` must be
     /// called before calling this function.
     pub fn read_results(&mut self, outbuf: &mut T::InputType) {
         self.rsa.read_results(outbuf);
@@ -600,7 +602,8 @@ where
 
     /// Reads the result to the given buffer.
     ///
-    /// This is a blocking function. `start_multiplication` must be
+    /// This is a blocking function: it waits for the RSA operation to complete,
+    /// then reads the results into the provided buffer. `start_multiplication` must be
     /// called before calling this function.
     pub fn read_results<const O: usize>(&mut self, outbuf: &mut T::OutputType)
     where
