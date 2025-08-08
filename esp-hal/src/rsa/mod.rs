@@ -404,9 +404,6 @@ pub mod operand_sizes {
     );
 }
 
-// TODO: these types aren't needed. A work queue driver should receive and execute operations. The
-// operations should point at slices of data.
-
 /// Support for RSA peripheral's modular exponentiation feature that could be
 /// used to find the `(base ^ exponent) mod modulus`.
 ///
