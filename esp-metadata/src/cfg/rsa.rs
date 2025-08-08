@@ -1,33 +1,28 @@
-use crate::cfg::{GenericProperty, Value};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct RsaLengths {
-    increment: u32,
-    max: u32,
-}
-
-impl RsaLengths {
-    fn generate(&self) -> Vec<u32> {
-        (self.increment..=self.max)
-            .step_by(self.increment as usize)
-            .collect()
-    }
-}
-
-impl GenericProperty for RsaLengths {}
+use crate::cfg::Value;
 
 impl super::RsaProperties {
     pub(super) fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)> {
+        let increment = self.size_increment;
+        let memory_bits = self.memory_size_bytes * 8;
+
         [
             (
                 "rsa.exponentiation",
                 false,
-                Value::NumberList(self.exponentiation.generate()),
+                Value::NumberList(
+                    (increment..=memory_bits)
+                        .step_by(increment as usize)
+                        .collect(),
+                ),
             ),
             (
                 "rsa.multiplication",
                 false,
-                Value::NumberList(self.multiplication.generate()),
+                Value::NumberList(
+                    (increment..=memory_bits / 2)
+                        .step_by(increment as usize)
+                        .collect(),
+                ),
             ),
         ]
         .into_iter()
