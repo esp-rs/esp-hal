@@ -205,21 +205,37 @@ impl core::ops::Not for Level {
     }
 }
 
-impl From<bool> for Level {
-    fn from(val: bool) -> Self {
+impl Level {
+    /// Create a [`Level`] from [`bool`].
+    ///
+    /// Like `<Level as From<bool>>::from(val)`, but `const`.
+    pub(crate) const fn const_from(val: bool) -> Self {
         match val {
             true => Self::High,
             false => Self::Low,
         }
     }
+
+    /// Convert a [`Level`] to [`bool`].
+    ///
+    /// Like `<bool as From<Level>>::from(self)`, but `const`.
+    pub(crate) const fn const_into(self) -> bool {
+        match self {
+            Level::Low => false,
+            Level::High => true,
+        }
+    }
+}
+
+impl From<bool> for Level {
+    fn from(val: bool) -> Self {
+        Self::const_from(val)
+    }
 }
 
 impl From<Level> for bool {
     fn from(level: Level) -> bool {
-        match level {
-            Level::Low => false,
-            Level::High => true,
-        }
+        level.const_into()
     }
 }
 

@@ -77,7 +77,7 @@ async fn main(spawner: Spawner) {
         )))
         .unwrap();
 
-    let mut data: [u32; 48] = [PulseCode::empty(); 48];
+    let mut data = [PulseCode::default(); 48];
 
     loop {
         println!("receive");

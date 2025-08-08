@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
 - RISC-V: Interrupt handler don't get a TrapFrame passed in anymore (#3903)
 - ISR callbacks are now wrapped in `IsrCallback` (#3885)
+- The RMT `PulseCode` is now a newtype wrapping `u32` with `const fn` methods and implementing `defmt::Format` and `core::fmt::Debug`. (#3884)
+- RMT transmit and receive methods accept `impl Into<PulseCode>` and `impl From<PulseCode>`, respectively. (#3884)
 
 ### Fixed
 
