@@ -22,7 +22,6 @@ esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"]
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
-default =  ["esp32s3"]
 defmt = ["dep:defmt"]
 log-04 = ["dep:log-04"]
 
