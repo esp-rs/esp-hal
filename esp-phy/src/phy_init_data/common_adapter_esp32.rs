@@ -13,7 +13,6 @@ static mut G_PHY_DIGITAL_REGS_MEM: *mut u32 = core::ptr::null_mut();
 static mut S_IS_PHY_REG_STORED: bool = false;
 static PHY_ACCESS_REF: AtomicU32 = AtomicU32::new(0);
 
-
 pub(crate) fn enable_wifi_power_domain() {
     LPWR::regs()
         .dig_pwc()

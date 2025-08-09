@@ -1,4 +1,3 @@
-
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
 #[cfg_attr(esp32c2, path = "common_adapter_esp32c2.rs")]
 #[cfg_attr(esp32c6, path = "common_adapter_esp32c6.rs")]

@@ -1,2 +1,1 @@
-unsafe extern "C" {
-}
+unsafe extern "C" {}

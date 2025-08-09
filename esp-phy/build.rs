@@ -2,7 +2,6 @@ use std::error::Error as StdError;
 
 use esp_config::generate_config_from_yaml_definition;
 
-
 fn main() -> Result<(), Box<dyn StdError>> {
     // Load the configuration for the configured device:
     let chip = esp_metadata_generated::Chip::from_cargo_feature()?;

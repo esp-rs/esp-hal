@@ -91,18 +91,23 @@ impl PhyState {
             .get_or_insert_with(|| [0u8; PHY_CALIBRATION_DATA_LENGTH])
     }
     fn calibrate(&mut self) {
-        #[cfg(esp32)]
-        {
-            let now = Instant::now();
-            let delta = now - self.phy_clock_state_transition_timestamp;
-            self.phy_clock_state_transition_timestamp = now;
-            self.mac_clock_delta_since_last_call += delta;
+        #[cfg(esp32s2)]
+        unsafe {
+            use esp_hal::efuse::Efuse;
+            use esp_wifi_sys::include::phy_eco_version_sel;
+            phy_eco_version_sel(Efuse::major_chip_version());
         }
         #[cfg(phy_combo_module)]
         unsafe {
             use esp_wifi_sys::include::phy_init_param_set;
             phy_init_param_set(1);
-        };
+        }
+
+        #[cfg(all(phy_enable_usb, any(soc_has_usb0, soc_has_usb_device), not(esp32s2)))]
+        unsafe {
+            use esp_wifi_sys::include::phy_bbpll_en_usb;
+            phy_bbpll_en_usb(true);
+        }
 
         let calibration_data_available = self.calibration_data.is_some();
         let calibration_mode = if calibration_data_available {
@@ -165,10 +170,18 @@ impl PhyState {
     pub fn increase_ref_count(&mut self) {
         self.ref_count += 1;
         if self.ref_count == 0 {
+            #[cfg(esp32)]
+            {
+                let now = Instant::now();
+                let delta = now - self.phy_clock_state_transition_timestamp;
+                self.phy_clock_state_transition_timestamp = now;
+                self.mac_clock_delta_since_last_call += delta;
+            }
             if self.calibrated {
                 unsafe {
                     phy_wakeup_init();
                 }
+                #[cfg(phy_backed_up_digital_register_count_is_set)]
                 self.restore_digital_regs();
             } else {
                 self.calibrate();
@@ -187,11 +200,23 @@ impl PhyState {
             .checked_sub(1)
             .expect("PHY init ref count dropped below zero.");
         if self.ref_count == 0 {
+            #[cfg(phy_backed_up_digital_register_count_is_set)]
+            self.backup_digital_regs();
+            unsafe {
+                // Disable PHY and RF.
+                phy_close_rf();
+
+                // Power down PHY temperature sensor.
+                #[cfg(not(esp32))]
+                phy_xpd_tsens();
+            }
             #[cfg(esp32)]
             {
                 self.phy_clock_state_transition_timestamp = Instant::now();
             }
-            self.backup_digital_regs();
+            // The PHY clock guard will get released in the drop code of the PHYInitGuard. Note
+            // that this accepts a slight skewing of the delta, since the clock will be disabled
+            // after we record the value. This shouldn't be too bad though.
         }
     }
 }
