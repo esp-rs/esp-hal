@@ -204,6 +204,9 @@ macro_rules! property {
     ("uart.ram_size", str) => {
         stringify!(128)
     };
+    ("phy.combo_module") => {
+        false
+    };
 }
 /// Macro to get the address range of the given memory region.
 #[macro_export]

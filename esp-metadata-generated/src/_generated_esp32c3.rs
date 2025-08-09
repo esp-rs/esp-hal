@@ -207,6 +207,15 @@ macro_rules! property {
     ("wifi.has_wifi6") => {
         false
     };
+    ("phy.combo_module") => {
+        true
+    };
+    ("phy.backed_up_digital_register_count") => {
+        21
+    };
+    ("phy.backed_up_digital_register_count", str) => {
+        stringify!(21)
+    };
 }
 /// Macro to get the address range of the given memory region.
 #[macro_export]

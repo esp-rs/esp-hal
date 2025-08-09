@@ -509,3 +509,5 @@ apb_cycle_wait_num = 16 # TODO
 
 ## Radio
 [device.wifi]
+[device.phy]
+combo_module = true

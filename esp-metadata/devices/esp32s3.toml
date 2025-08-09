@@ -686,3 +686,6 @@ apb_cycle_wait_num = 16 # TODO
 ## Radio
 [device.wifi]
 [device.bt]
+[device.phy]
+combo_module = true
+backed_up_digital_register_count = 21

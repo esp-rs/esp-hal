@@ -53,6 +53,7 @@ pub enum Package {
     EspLpHal,
     EspMetadata,
     EspMetadataGenerated,
+    EspPhy,
     EspPrintln,
     EspRiscvRt,
     EspStorage,
@@ -81,6 +82,7 @@ impl Package {
                 | EspMetadataGenerated
                 | EspRomSys
                 | EspLpHal
+                | EspPhy
                 | EspPrintln
                 | EspRadioPreemptBaremetal
                 | EspStorage
@@ -145,6 +147,7 @@ impl Package {
             EspHal
                 | EspLpHal
                 | EspRadio
+                | EspPhy
                 | EspHalEmbassy
                 | EspRomSys
                 | EspBootloaderEspIdf
@@ -246,6 +249,7 @@ impl Package {
             }
             Package::EspMetadataGenerated => {}
             Package::EspRadioPreemptBaremetal => features.push("esp-hal/unstable".to_owned()),
+            Package::EspPhy => features.push("esp-hal/unstable".to_owned()),
             _ => {}
         }
 
