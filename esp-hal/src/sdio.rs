@@ -20,7 +20,9 @@ use embedded_hal_sdmmc::{
 
 use crate::pac;
 
+pub mod command;
 mod config;
+mod direction;
 pub mod dma;
 mod hinf;
 mod interrupt;
@@ -31,6 +33,7 @@ mod state;
 mod timing;
 
 pub use config::Config;
+pub use direction::Direction;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::{DeviceInterrupt, HostInterrupt};
 pub use pins::Pins;
