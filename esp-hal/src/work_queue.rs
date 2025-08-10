@@ -636,7 +636,7 @@ where
     T: Sync + Send,
 {
     fn drop(&mut self) {
-        let suspended = self.queue.inner.with(|inner| {
+        let suspend_started = self.queue.inner.with(|inner| {
             if inner.is_active() {
                 inner.suspend(None);
                 true
@@ -645,7 +645,7 @@ where
             }
         });
 
-        if suspended {
+        if suspend_started {
             loop {
                 let done = self.queue.inner.with(|inner| {
                     if inner.is_active() {
