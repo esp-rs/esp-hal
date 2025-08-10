@@ -636,38 +636,34 @@ where
     T: Sync + Send,
 {
     fn drop(&mut self) {
-        let suspend_started = self.queue.inner.with(|inner| {
+        let wait_for_suspended = self.queue.inner.with(|inner| {
             if inner.is_active() {
                 inner.suspend(None);
                 true
             } else {
+                unsafe { inner.configure(NonNull::dangling(), VTable::noop()) };
                 false
             }
         });
 
-        if suspend_started {
-            loop {
-                let done = self.queue.inner.with(|inner| {
-                    if inner.is_active() {
-                        return false;
-                    }
+        if !wait_for_suspended {
+            return;
+        }
 
-                    unsafe {
-                        inner.configure(NonNull::dangling(), VTable::noop());
-                    }
-
-                    inner.resume();
-
-                    true
-                });
-                if done {
-                    break;
+        loop {
+            let done = self.queue.inner.with(|inner| {
+                if inner.is_active() {
+                    return false;
                 }
-            }
-        } else {
-            unsafe {
-                self.queue
-                    .configure(NonNull::<D>::dangling(), VTable::noop());
+
+                unsafe { inner.configure(NonNull::dangling(), VTable::noop()) };
+
+                inner.resume();
+
+                true
+            });
+            if done {
+                break;
             }
         }
     }
