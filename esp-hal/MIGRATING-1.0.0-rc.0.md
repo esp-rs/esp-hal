@@ -44,7 +44,7 @@ The `esp_hal::aes::Aes` and `esp_hal::aes::AesDma` drivers has been slightly rew
 
 ```diff
 +use esp_hal::aes::dma::DmaCipherState;
-+esp_hal::aes::cipher_modes::Ecb;
++use esp_hal::aes::cipher_modes::Ecb;
 
  let transfer = aes_dma
      .process(
