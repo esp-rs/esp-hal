@@ -829,7 +829,7 @@ impl<'d> AesBackend<'d> {
     /// ```
     pub fn start(&mut self) -> AesWorkQueueDriver<'_, 'd> {
         AesWorkQueueDriver {
-            _inner: WorkQueueDriver::new(self, BLOCKING_AES_VTABLE, &AES_WORK_QUEUE),
+            inner: WorkQueueDriver::new(self, BLOCKING_AES_VTABLE, &AES_WORK_QUEUE),
         }
     }
 
@@ -871,7 +871,14 @@ pub enum Error {
 ///
 /// This object must be kept around, otherwise AES operations will never complete.
 pub struct AesWorkQueueDriver<'t, 'd> {
-    _inner: WorkQueueDriver<'t, AesBackend<'d>, AesOperation>,
+    inner: WorkQueueDriver<'t, AesBackend<'d>, AesOperation>,
+}
+
+impl<'t, 'd> AesWorkQueueDriver<'t, 'd> {
+    /// Finishes processing the current work queue item, then stops the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        self.inner.stop()
+    }
 }
 
 /// An AES work queue user.
