@@ -39,7 +39,7 @@ peripherals = [
     { name = "PCNT" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
@@ -602,8 +602,8 @@ channel_ram_size = 64
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 512, max = 4096 }
-multiplication = { increment = 512, max = 2048 }
+size_increment = 512
+memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
