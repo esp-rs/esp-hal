@@ -6,6 +6,8 @@
 #![no_std]
 #![no_main]
 
+use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use esp_hal::{
     Config,
     aes::{
@@ -19,7 +21,7 @@ use esp_hal::{
     },
     clock::CpuClock,
 };
-use hil_test as _;
+use hil_test::mk_static;
 
 const KEY: &[u8] = b"SUp4SeCp@sSw0rd";
 const KEY_128: [u8; 16] = pad_to::<16>(KEY);
@@ -307,10 +309,6 @@ fn run_cipher_tests(buffer: &mut [u8]) {
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
-    use embassy_executor::Spawner;
-    use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
-    use hil_test::mk_static;
-
     use super::*;
 
     #[test]
