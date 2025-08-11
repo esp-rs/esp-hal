@@ -91,3 +91,19 @@ let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
 ```
+
+## DMA changes
+
+DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
+so there is no code change necessary in user codebases. Library writes will need to add the type to their
+DMA buffer implementations.
+
+```diff
+ unsafe impl DmaTxBuffer for MyTxBuf {
+     type View = BufView<Self>;
++    type Final = Self;
+     // ...
+ }
+```
+
+If the `Final` type is not `Self`, `fn from_view()` will need to be updated to return `Self::Final`.

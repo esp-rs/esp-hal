@@ -558,7 +558,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Dpi<'d, Dm>, BUF) {
+    pub fn stop(mut self) -> (Dpi<'d, Dm>, BUF::Final) {
         self.stop_peripherals();
         let (dpi, view) = self.release();
         (dpi, BUF::from_view(view))
@@ -568,7 +568,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> DpiTransfer<'d, BUF, Dm> {
     ///
     /// Note: If you specified `next_frame_en` as true in [Dpi::send], you're
     /// just waiting for a DMA error when you call this.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Dpi<'d, Dm>, BUF::Final) {
         while !self.is_done() {
             core::hint::spin_loop();
         }
