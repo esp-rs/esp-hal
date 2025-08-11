@@ -1,0 +1,38 @@
+[package]
+name    = "embassy-usb-serial"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-futures = "0.1.1"
+embassy-usb = { version = "0.5.0", default-features = false }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-hal-embassy = { path = "../../../esp-hal-embassy" }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+
+[features]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-hal-embassy/esp32s2",
+    "esp-hal/esp32s2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal-embassy/esp32s3",
+    "esp-hal/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1

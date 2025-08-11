@@ -156,11 +156,18 @@ impl Package {
     /// Should documentation be built for the package, and should the package be
     /// published?
     pub fn is_published(&self, workspace: &Path) -> bool {
-        // TODO: we should use some sort of cache instead of parsing the TOML every
-        // time, but for now this should be good enough.
-        let toml =
-            crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
-        toml.is_published()
+        if *self == Package::Examples {
+            // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
+            // did nothing in this directory will be published.
+            false
+        } else {
+            // TODO: we should use some sort of cache instead of parsing the TOML every
+            // time, but for now this should be good enough.
+            let toml =
+                crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
+
+            toml.is_published()
+        }
     }
 
     /// Build on host
@@ -375,13 +382,18 @@ pub fn execute_app(
         .features(&features);
 
     let bin_arg = if package.starts_with("src/bin") {
-        format!("--bin={}", app.binary_name())
+        Some(format!("--bin={}", app.binary_name()))
     } else if package.starts_with("tests") {
-        format!("--test={}", app.binary_name())
+        Some(format!("--test={}", app.binary_name()))
+    } else if !package_path.ends_with("examples") {
+        Some(format!("--example={}", app.binary_name()))
     } else {
-        format!("--example={}", app.binary_name())
+        None
     };
-    builder.add_arg(bin_arg);
+
+    if let Some(arg) = bin_arg {
+        builder.add_arg(arg);
+    }
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
@@ -425,15 +437,22 @@ pub fn execute_app(
     let args = builder.build();
     log::debug!("{args:#?}");
 
+    let cwd = if package_path.ends_with("examples") {
+        package_path.join(package).to_path_buf()
+    } else {
+        package_path.to_path_buf()
+    };
+
     if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, package_path, env_vars, false)?;
+        cargo::run_with_env(&args, &cwd, env_vars, false)?;
 
         // Now that the build has succeeded and we printed the output, we can
         // rerun the build again quickly enough to capture JSON. We'll use this to
         // copy the binary to the output directory.
         builder.add_arg("--message-format=json");
         let args = builder.build();
-        let output = cargo::run_with_env(&args, package_path, env_vars, true)?;
+
+        let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
         for line in output.lines() {
             if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
                 let out_dir = out_dir.join(chip.to_string());
@@ -449,7 +468,7 @@ pub fn execute_app(
             if repeat != 1 {
                 log::info!("Run {}/{}", i + 1, repeat);
             }
-            cargo::run_with_env(&args, package_path, env_vars.clone(), false)?;
+            cargo::run_with_env(&args, &cwd, env_vars, false)?;
         }
     }
 
@@ -506,11 +525,25 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
 
 pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
     log::info!("Formatting package: {}", package);
-    let path = workspace.join(package.as_ref());
+    let package_path = workspace.join(package.as_ref());
 
-    // we need to list all source files since modules in `unstable_module!` macros
+    let paths = if package == Package::Examples {
+        crate::find_packages(&package_path)?
+    } else {
+        vec![package_path]
+    };
+
+    for path in &paths {
+        format_package_path(workspace, path, check)?;
+    }
+
+    Ok(())
+}
+
+fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
+    // We need to list all source files since modules in `unstable_module!` macros
     // won't get picked up otherwise
-    let source_files = walkdir::WalkDir::new(path.join("src"))
+    let source_files = walkdir::WalkDir::new(package_path.join("src"))
         .into_iter()
         .filter_map(|entry| {
             let path = entry.unwrap().into_path();
@@ -538,9 +571,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     ));
     cargo_args.extend(source_files);
 
-    cargo::run(&cargo_args, &path)?;
-
-    Ok(())
+    cargo::run(&cargo_args, &package_path)
 }
 
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
@@ -634,4 +665,24 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
     std::fs::write(workspace.join("esp-hal").join("README.md"), output)?;
 
     Ok(())
+}
+
+pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
+    let mut packages = Vec::new();
+
+    for result in fs::read_dir(path)? {
+        let entry = result?;
+        if entry.path().is_file() {
+            continue;
+        }
+
+        // Path is a directory:
+        if entry.path().join("Cargo.toml").exists() {
+            packages.push(entry.path());
+        } else {
+            packages.extend(find_packages(&entry.path())?);
+        }
+    }
+
+    Ok(packages)
 }

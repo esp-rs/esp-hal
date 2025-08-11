@@ -23,7 +23,7 @@ serde        = { version = "1.0.215", default-features = false, features = ["der
 serde_json   = "1.0.70"
 strum        = { version = "0.27.1", features = ["derive"] }
 syn          = { version = "2", default-features = false, features = ["full", "parsing"] }
-toml_edit    = "0.22.22"
+toml_edit    = { version = "0.22.22", features = ["serde"] }
 walkdir      = "2.5.0"
 
 # Only required when building documentation for deployment:

@@ -83,14 +83,24 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // Absolute path of the package's root:
     let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
 
-    let example_path = match args.package {
-        Package::Examples | Package::QaTest => package_path.join("src").join("bin"),
-        Package::HilTest => package_path.join("tests"),
-        _ => package_path.join("examples"),
+    // Load all examples which support the specified chip and parse their metadata.
+    //
+    // The `examples` directory contains a number of individual projects, and does not rely on
+    // metadata comments in the source files. As such, it needs to load its metadata differently
+    // than other packages.
+    let examples = if args.package == Package::Examples {
+        crate::firmware::load_cargo_toml(&package_path)?
+    } else {
+        let example_path = match args.package {
+            Package::QaTest => package_path.join("src").join("bin"),
+            Package::HilTest => package_path.join("tests"),
+            _ => package_path.join("examples"),
+        };
+
+        crate::firmware::load(&example_path)?
     };
 
-    // Load all examples which support the specified chip and parse their metadata:
-    let mut examples = crate::firmware::load(&example_path)?
+    let mut examples = examples
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
