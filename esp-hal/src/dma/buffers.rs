@@ -1604,6 +1604,7 @@ impl NoBuffer {
 }
 unsafe impl DmaTxBuffer for NoBuffer {
     type View = Self;
+    type Final = ();
 
     fn prepare(&mut self) -> Preparation {
         self.prep()
@@ -1613,12 +1614,11 @@ unsafe impl DmaTxBuffer for NoBuffer {
         self
     }
 
-    fn from_view(view: Self::View) -> Self {
-        view
-    }
+    fn from_view(_view: Self::View) {}
 }
 unsafe impl DmaRxBuffer for NoBuffer {
     type View = Self;
+    type Final = ();
 
     fn prepare(&mut self) -> Preparation {
         self.prep()
@@ -1628,9 +1628,7 @@ unsafe impl DmaRxBuffer for NoBuffer {
         self
     }
 
-    fn from_view(view: Self::View) -> Self {
-        view
-    }
+    fn from_view(_view: Self::View) {}
 }
 
 /// Prepares data unsafely to be transmitted via DMA.
