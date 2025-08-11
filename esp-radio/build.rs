@@ -68,7 +68,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "#
     );
     assert!(
-        !cfg!(feature = "wifi") || chip.contains("wifi"),
+        !(cfg!(feature = "wifi-ap") || cfg!(feature = "wifi-sta") || cfg!(feature = "wifi-eap"))
+            || chip.contains("wifi"),
         r#"
 
         WiFi is not supported on this target.
@@ -108,10 +109,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             "#
         );
 
-        #[cfg(all(feature = "wifi", feature = "ble"))]
+        #[cfg(all(
+            any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"),
+            feature = "ble"
+        ))]
         println!("cargo:rustc-cfg=coex");
 
-        #[cfg(not(feature = "wifi"))]
+        #[cfg(not(any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap")))]
         println!("cargo:warning=coex is enabled but wifi is not");
 
         #[cfg(not(feature = "ble"))]
@@ -131,7 +135,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
     println!("cargo:rerun-if-changed=./ld/");
     let config = [
-        #[cfg(feature = "wifi")]
+        #[cfg(any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"))]
         "wifi",
         #[cfg(feature = "ble")]
         "ble",

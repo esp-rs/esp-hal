@@ -1,4 +1,4 @@
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"))]
 #[allow(unused_imports)]
 use crate::hal::{interrupt, peripherals};
 
@@ -11,7 +11,7 @@ pub(crate) fn shutdown_radio_isr() {
     // ble not supported
 }
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"))]
 #[unsafe(no_mangle)]
 extern "C" fn WIFI_MAC() {
     unsafe {
@@ -25,7 +25,7 @@ extern "C" fn WIFI_MAC() {
     }
 }
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"))]
 #[unsafe(no_mangle)]
 extern "C" fn WIFI_PWR() {
     unsafe {

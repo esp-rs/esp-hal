@@ -1,4 +1,9 @@
-#[cfg(any(feature = "wifi", feature = "ble"))]
+#[cfg(any(
+    feature = "wifi-ap",
+    feature = "wifi-sta",
+    feature = "wifi-eap",
+    feature = "ble"
+))]
 #[allow(unused_imports)]
 use crate::hal::{interrupt, peripherals};
 
@@ -47,7 +52,7 @@ fn Software0() {
     }
 }
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-ap", feature = "wifi-sta", feature = "wifi-eap"))]
 #[unsafe(no_mangle)]
 extern "C" fn WIFI_MAC() {
     unsafe {

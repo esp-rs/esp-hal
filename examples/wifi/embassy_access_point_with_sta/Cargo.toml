@@ -31,7 +31,8 @@ esp-radio-preempt-baremetal = { path = "../../../esp-radio-preempt-baremetal", f
 esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
     "unstable",
-    "wifi",
+    "wifi-ap",
+    "wifi-sta"
 ] }
 static_cell = "2.1.0"
 
