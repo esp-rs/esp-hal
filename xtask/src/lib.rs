@@ -525,11 +525,25 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
 
 pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
     log::info!("Formatting package: {}", package);
-    let path = workspace.join(package.as_ref());
+    let package_path = workspace.join(package.as_ref());
 
-    // we need to list all source files since modules in `unstable_module!` macros
+    let paths = if package == Package::Examples {
+        crate::find_packages(&package_path)?
+    } else {
+        vec![package_path]
+    };
+
+    for path in &paths {
+        format_package_path(workspace, path, check)?;
+    }
+
+    Ok(())
+}
+
+fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
+    // We need to list all source files since modules in `unstable_module!` macros
     // won't get picked up otherwise
-    let source_files = walkdir::WalkDir::new(path.join("src"))
+    let source_files = walkdir::WalkDir::new(package_path.join("src"))
         .into_iter()
         .filter_map(|entry| {
             let path = entry.unwrap().into_path();
@@ -557,9 +571,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     ));
     cargo_args.extend(source_files);
 
-    cargo::run(&cargo_args, &path)?;
-
-    Ok(())
+    cargo::run(&cargo_args, &package_path)
 }
 
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
@@ -653,4 +665,24 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
     std::fs::write(workspace.join("esp-hal").join("README.md"), output)?;
 
     Ok(())
+}
+
+pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
+    let mut packages = Vec::new();
+
+    for result in fs::read_dir(path)? {
+        let entry = result?;
+        if entry.path().is_file() {
+            continue;
+        }
+
+        // Path is a directory:
+        if entry.path().join("Cargo.toml").exists() {
+            packages.push(entry.path());
+        } else {
+            packages.extend(find_packages(&entry.path())?);
+        }
+    }
+
+    Ok(packages)
 }

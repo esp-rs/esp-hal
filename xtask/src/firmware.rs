@@ -329,7 +329,7 @@ struct CargoToml {
 pub fn load_cargo_toml(examples_path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
-    let mut packages = find_packages(examples_path)?;
+    let mut packages = crate::find_packages(examples_path)?;
     packages.sort();
 
     for package_path in packages {
@@ -381,24 +381,4 @@ fn parse_description(text: &str) -> Option<String> {
     }
 
     description
-}
-
-fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
-    let mut packages = Vec::new();
-
-    for result in fs::read_dir(path)? {
-        let entry = result?;
-        if entry.path().is_file() {
-            continue;
-        }
-
-        // Path is a directory:
-        if entry.path().join("Cargo.toml").exists() {
-            packages.push(entry.path());
-        } else {
-            packages.extend(find_packages(&entry.path())?);
-        }
-    }
-
-    Ok(packages)
 }
