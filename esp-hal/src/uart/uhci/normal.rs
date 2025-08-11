@@ -206,6 +206,15 @@ impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
     }
 }
 
+impl<Dm> Drop for Uhci<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+
+    }
+}
+
 // Based on SpiDmaTransfer
 /// A structure representing a DMA transfer for UHCI/UART.
 ///

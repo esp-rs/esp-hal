@@ -166,3 +166,12 @@ impl<'d, Dm: DriverMode> UhciSimple<'d, Dm> {
         self.internal.set_chunk_limit(limit)
     }
 }
+
+impl<Dm> Drop for UhciSimple<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+
+    }
+}

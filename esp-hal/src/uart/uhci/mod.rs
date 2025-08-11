@@ -160,6 +160,15 @@ impl<'d> UhciInternal<'d, Async> {
     }
 }
 
+impl<Dm> Drop for UhciInternal<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    fn drop(&mut self) {
+
+    }
+}
+
 #[macro_export]
 /// Macro to re-expose some functions from UhciInternal to both implementations
 macro_rules! into_internal_uhci {
