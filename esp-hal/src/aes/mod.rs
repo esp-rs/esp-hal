@@ -677,11 +677,9 @@ pub mod dma {
             // the work item. However, DS may be using the AES peripheral. We solve that
             // problem (later) by taking a lock in `on_work_available`
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
-            if !driver.ensure_initialized() {
-                return false;
-            }
+            driver.ensure_initialized();
             driver.start_processing(item);
-            true
+            Some(Poll::Pending(false))
         },
         poll: |driver, item| {
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
@@ -770,12 +768,13 @@ pub mod dma {
         output_descriptors: [DmaDescriptor; OUT_DESCR_COUNT],
     }
 
-    // The DMA descriptors prevent auto-implementing Sync, but they can be treated as Sync because
-    // we only access them in a critical section (around the work queue operations), and only when
-    // the DMA is not actively using them.
-    // FIXME: it's possible to stop and drop the backend while the DMA is in use, it'll need to be
-    // fixed for this to not be UB.
+    // The DMA descriptors prevent auto-implementing Sync and Send, but they can be treated as Send
+    // and Sync because we only access them in a critical section (around the work queue
+    // operations), and only when the DMA is not actively using them. `unaligned_data_buffers`
+    // contain pointers to AesContext data, and are only accessed when the associated data is
+    // handled by the work queue. Other parts of the backend are Send and Sync automatically.
     unsafe impl Sync for AesDmaBackend<'_> {}
+    unsafe impl Send for AesDmaBackend<'_> {}
 
     impl<'d> AesDmaBackend<'d> {
         #[procmacros::doc_replace(
@@ -841,8 +840,8 @@ pub mod dma {
 
         // WorkQueue callbacks. They may run in any context.
 
-        unsafe fn from_raw<'any>(ptr: *const ()) -> &'any mut Self {
-            unsafe { unwrap!(ptr.cast_mut().cast::<AesDmaBackend<'_>>().as_mut()) }
+        unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+            unsafe { ptr.cast::<AesDmaBackend<'_>>().as_mut() }
         }
 
         fn start_processing(&mut self, item: &mut AesOperation) {
@@ -912,17 +911,17 @@ pub mod dma {
             }
         }
 
-        fn poll_status(&mut self, item: &mut AesOperation) -> Option<Poll> {
-            let driver = self.driver.as_mut()?;
+        fn poll_status(&mut self, item: &mut AesOperation) -> Poll {
+            let driver = unwrap!(self.driver.as_mut());
 
             let DmaState::WaitingForDma { processed_bytes } = self.state else {
                 // Data was processed by the CPU for any reason.
-                return Some(Poll::Ready(Status::Completed));
+                return Poll::Ready(Status::Completed);
             };
 
             if !driver.is_done() {
                 // Still working.
-                return Some(Poll::Pending(false));
+                return Poll::Pending(false);
             }
 
             driver.clear_interrupt();
@@ -967,14 +966,14 @@ pub mod dma {
                     self.state = DmaState::WaitingForDma {
                         processed_bytes: processed_bytes + dma_processed,
                     };
-                    return Some(Poll::Pending(false));
+                    return Poll::Pending(false);
                 } else {
                     // Otherwise, process the remaining data with CPU.
                     self.process_with_cpu(&mut temp_item);
                 }
             }
 
-            Some(Poll::Ready(Status::Completed))
+            Poll::Ready(Status::Completed)
         }
 
         fn process_with_cpu(&mut self, work_item: &mut AesOperation) {
@@ -1033,7 +1032,7 @@ pub mod dma {
             data_len
         }
 
-        fn ensure_initialized(&mut self) -> bool {
+        fn ensure_initialized(&mut self) {
             if self.driver.is_none() {
                 let peri = unsafe { self.peri.clone_unchecked() };
                 let dma = unsafe { self.dma.clone_unchecked() };
@@ -1050,9 +1049,6 @@ pub mod dma {
 
                 self.driver = Some(driver);
             }
-            // TODO: when DS is implemented, it will need to be able to lock out AES. In that case,
-            // this function should return `false` if the AES peripheral is locked.
-            true
         }
 
         fn deinitialize(&mut self) {
