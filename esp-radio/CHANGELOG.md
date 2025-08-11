@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename `esp-wifi` to `esp-radio`. (#3858)
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
-- Update bt-hci version to add additional HCI commands
+- Update bt-hci version to add additional HCI commands (#3920)
 
 ### Fixed
 
