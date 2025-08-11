@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AesBackend, AesContext`: Work-queue based AES driver (#3880)
 - `aes::cipher_modes`, `aes::CipherModeState` for constructing `AesContext`s (#3895)
 - `DmaTxBuffer` and `DmaRxBuffer` now have a `Final` associated type. (#3923)
+- `RsaBackend, RsaContext`: Work-queue based RSA driver (#3910)
 
 ### Changed
 

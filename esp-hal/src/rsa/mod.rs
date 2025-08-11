@@ -20,10 +20,10 @@
 //!
 //! [RSA test suite]: https://github.com/esp-rs/esp-hal/blob/main/hil-test/tests/rsa.rs
 
-use core::{marker::PhantomData, task::Poll};
+use core::{marker::PhantomData, ptr::NonNull, task::Poll};
 
 use portable_atomic::{AtomicBool, Ordering};
-use procmacros::handler;
+use procmacros::{handler, ram};
 
 use crate::{
     Async,
@@ -35,6 +35,7 @@ use crate::{
     peripherals::{Interrupt, RSA},
     system::{Cpu, GenericPeripheralGuard, Peripheral as PeripheralEnable},
     trm_markdown_link,
+    work_queue::{self, Status, VTable, WorkQueue, WorkQueueDriver, WorkQueueFrontend},
 };
 
 /// RSA peripheral driver.
@@ -370,13 +371,13 @@ impl<'d, Dm: DriverMode> Rsa<'d, Dm> {
 /// Defines the input size of an RSA operation.
 pub trait RsaMode: crate::private::Sealed {
     /// The input data type used for the operation.
-    type InputType;
+    type InputType: AsRef<[u32]> + AsMut<[u32]>;
 }
 
 /// Defines the output type of RSA multiplications.
 pub trait Multi: RsaMode {
     /// The type of the output produced by the operation.
-    type OutputType;
+    type OutputType: AsRef<[u32]> + AsMut<[u32]>;
 }
 
 /// Defines the exponentiation and multiplication lengths for RSA operations.
@@ -743,4 +744,621 @@ pub(super) fn rsa_interrupt_handler() {
     }
 
     WAKER.wake();
+}
+
+static RSA_WORK_QUEUE: WorkQueue<RsaWorkItem> = WorkQueue::new();
+const RSA_VTABLE: VTable<RsaWorkItem> = VTable {
+    post: |driver, item| {
+        // Start processing immediately.
+        let driver = unsafe { RsaBackend::from_raw(driver) };
+        Some(driver.process_item(item))
+    },
+    poll: |driver, item| {
+        let driver = unsafe { RsaBackend::from_raw(driver) };
+        driver.process_item(item)
+    },
+    cancel: |driver, item| {
+        let driver = unsafe { RsaBackend::from_raw(driver) };
+        driver.cancel(item)
+    },
+    stop: |driver| {
+        let driver = unsafe { RsaBackend::from_raw(driver) };
+        driver.deinitialize()
+    },
+};
+
+#[derive(Default)]
+enum RsaBackendState<'d> {
+    #[default]
+    Idle,
+    Initializing(Rsa<'d, Blocking>),
+    Ready(Rsa<'d, Blocking>),
+    #[cfg(esp32)]
+    ModularMultiplicationRoundOne(Rsa<'d, Blocking>),
+    Processing(Rsa<'d, Blocking>),
+}
+
+#[procmacros::doc_replace]
+/// RSA processing backend.
+///
+/// The backend processes work items placed in the RSA work queue. The backend needs to be created
+/// and started for operations to be processed. This allows you to perform operations on the RSA
+/// accelerator without carrying around the peripheral singleton, or the driver.
+///
+/// The [`RsaContext`] struct can enqueue work items that this backend will process.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::rsa::{RsaBackend, RsaContext, operand_sizes::Op512};
+/// #
+/// let mut rsa_backend = RsaBackend::new(peripherals.RSA);
+/// let _driver = rsa_backend.start();
+///
+/// async fn perform_512bit_big_number_multiplication(
+///     operand_a: &[u32; 16],
+///     operand_b: &[u32; 16],
+///     result: &mut [u32; 32],
+/// ) {
+///     let mut rsa = RsaContext::new();
+///
+///     let mut handle = rsa.multiply::<Op512>(operand_a, operand_b, result);
+///     handle.wait().await;
+/// }
+/// # {after_snippet}
+/// ```
+pub struct RsaBackend<'d> {
+    peri: RSA<'d>,
+    state: RsaBackendState<'d>,
+}
+
+impl<'d> RsaBackend<'d> {
+    #[procmacros::doc_replace]
+    /// Creates a new RSA backend.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::rsa::RsaBackend;
+    /// #
+    /// let mut rsa = RsaBackend::new(peripherals.RSA);
+    /// # {after_snippet}
+    /// ```
+    pub fn new(rsa: RSA<'d>) -> Self {
+        Self {
+            peri: rsa,
+            state: RsaBackendState::Idle,
+        }
+    }
+
+    #[procmacros::doc_replace]
+    /// Registers the RSA driver to process RSA operations.
+    ///
+    /// The driver stops operating when the returned object is dropped.
+    ///
+    /// ## Example
+    ///
+    /// ```rust, no_run
+    /// # {before_snippet}
+    /// use esp_hal::rsa::RsaBackend;
+    /// #
+    /// let mut rsa = RsaBackend::new(peripherals.RSA);
+    /// // Start the backend, which allows processing RSA operations.
+    /// let _backend = rsa.start();
+    /// # {after_snippet}
+    /// ```
+    pub fn start(&mut self) -> RsaWorkQueueDriver<'_, 'd> {
+        RsaWorkQueueDriver {
+            inner: WorkQueueDriver::new(self, RSA_VTABLE, &RSA_WORK_QUEUE),
+        }
+    }
+
+    // WorkQueue callbacks. They may run in any context.
+
+    unsafe fn from_raw<'any>(ptr: NonNull<()>) -> &'any mut Self {
+        unsafe { ptr.cast::<RsaBackend<'_>>().as_mut() }
+    }
+
+    fn process_item(&mut self, item: &mut RsaWorkItem) -> work_queue::Poll {
+        match core::mem::take(&mut self.state) {
+            RsaBackendState::Idle => {
+                let driver = Rsa {
+                    rsa: unsafe { self.peri.clone_unchecked() },
+                    phantom: PhantomData,
+                    _guard: GenericPeripheralGuard::new(),
+                };
+                self.state = RsaBackendState::Initializing(driver);
+                work_queue::Poll::Pending(true)
+            }
+            RsaBackendState::Initializing(mut rsa) => {
+                // Wait for the peripheral to finish initializing. Ideally we need a way to
+                // instruct the work queue to wake the polling task immediately.
+                self.state = if rsa.ready() {
+                    rsa.set_interrupt_handler(rsa_work_queue_handler);
+                    rsa.enable_disable_interrupt(true);
+                    RsaBackendState::Ready(rsa)
+                } else {
+                    RsaBackendState::Initializing(rsa)
+                };
+                work_queue::Poll::Pending(true)
+            }
+            RsaBackendState::Ready(mut rsa) => {
+                #[cfg(not(esp32))]
+                {
+                    rsa.disable_constant_time(!item.constant_time);
+                    rsa.search_acceleration(item.search_acceleration);
+                }
+
+                match item.operation {
+                    RsaOperation::Multiplication { x, y } => {
+                        let n = x.len() as u32;
+                        rsa.write_operand_a(unsafe { x.as_ref() });
+
+                        // Non-modular multiplication result is twice as wide as its operands.
+                        rsa.write_multi_mode(2 * n / WORDS_PER_INCREMENT - 1, false);
+                        rsa.write_multi_operand_b(unsafe { y.as_ref() });
+                        rsa.start_multi();
+                    }
+
+                    RsaOperation::ModularMultiplication {
+                        x,
+                        #[cfg(not(esp32))]
+                        y,
+                        m,
+                        m_prime,
+                        r: r_inv,
+                        ..
+                    } => {
+                        let n = x.len() as u32;
+                        rsa.write_operand_a(unsafe { x.as_ref() });
+
+                        rsa.write_multi_mode(n / WORDS_PER_INCREMENT - 1, true);
+
+                        #[cfg(not(esp32))]
+                        rsa.write_operand_b(unsafe { y.as_ref() });
+
+                        rsa.write_modulus(unsafe { m.as_ref() });
+                        rsa.write_mprime(m_prime);
+                        rsa.write_r(unsafe { r_inv.as_ref() });
+
+                        rsa.start_modmulti();
+
+                        #[cfg(esp32)]
+                        {
+                            // ESP32 requires a two-step process where Y needs to be written to the
+                            // X memory.
+                            self.state = RsaBackendState::ModularMultiplicationRoundOne(rsa);
+
+                            return work_queue::Poll::Pending(false);
+                        }
+                    }
+                    RsaOperation::ModularExponentiation {
+                        x,
+                        y,
+                        m,
+                        m_prime,
+                        r_inv,
+                    } => {
+                        let n = x.len() as u32;
+                        rsa.write_operand_a(unsafe { x.as_ref() });
+
+                        rsa.write_modexp_mode(n / WORDS_PER_INCREMENT - 1);
+                        rsa.write_operand_b(unsafe { y.as_ref() });
+                        rsa.write_modulus(unsafe { m.as_ref() });
+                        rsa.write_mprime(m_prime);
+                        rsa.write_r(unsafe { r_inv.as_ref() });
+
+                        #[cfg(not(esp32))]
+                        if item.search_acceleration {
+                            fn find_search_pos(exponent: &[u32]) -> u32 {
+                                for (i, byte) in exponent.iter().rev().enumerate() {
+                                    if *byte == 0 {
+                                        continue;
+                                    }
+                                    return (exponent.len() * 32) as u32
+                                        - (byte.leading_zeros() + i as u32 * 32)
+                                        - 1;
+                                }
+                                0
+                            }
+                            rsa.write_search_position(find_search_pos(unsafe { y.as_ref() }));
+                        }
+
+                        rsa.start_modexp();
+                    }
+                }
+
+                self.state = RsaBackendState::Processing(rsa);
+
+                work_queue::Poll::Pending(false)
+            }
+
+            #[cfg(esp32)]
+            RsaBackendState::ModularMultiplicationRoundOne(mut rsa) => {
+                if rsa.is_idle() {
+                    let RsaOperation::ModularMultiplication { y, .. } = item.operation else {
+                        unreachable!();
+                    };
+
+                    // Y needs to be written to the X memory.
+                    rsa.write_operand_a(unsafe { y.as_ref() });
+                    rsa.start_modmulti();
+
+                    self.state = RsaBackendState::Processing(rsa);
+                } else {
+                    // Wait for the operation to complete
+                    self.state = RsaBackendState::ModularMultiplicationRoundOne(rsa);
+                }
+                work_queue::Poll::Pending(false)
+            }
+
+            RsaBackendState::Processing(rsa) => {
+                if rsa.is_idle() {
+                    rsa.read_out(unsafe { item.result.as_mut() });
+
+                    self.state = RsaBackendState::Ready(rsa);
+                    work_queue::Poll::Ready(Status::Completed)
+                } else {
+                    self.state = RsaBackendState::Processing(rsa);
+                    work_queue::Poll::Pending(false)
+                }
+            }
+        }
+    }
+
+    fn cancel(&mut self, _item: &mut RsaWorkItem) {
+        // Drop the driver to reset it. We don't read the result, so the work item remains
+        // unchanged, effectively cancelling it.
+        self.state = RsaBackendState::Idle;
+    }
+
+    fn deinitialize(&mut self) {
+        self.state = RsaBackendState::Idle;
+    }
+}
+
+/// An active work queue driver.
+///
+/// This object must be kept around, otherwise RSA operations will never complete.
+///
+/// For a usage example, see [`RsaBackend`].
+pub struct RsaWorkQueueDriver<'t, 'd> {
+    inner: WorkQueueDriver<'t, RsaBackend<'d>, RsaWorkItem>,
+}
+
+impl<'t, 'd> RsaWorkQueueDriver<'t, 'd> {
+    /// Finishes processing the current work queue item, then stops the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        self.inner.stop()
+    }
+}
+
+struct RsaWorkItem {
+    // Acceleration options
+    #[cfg(not(esp32))]
+    search_acceleration: bool,
+    #[cfg(not(esp32))]
+    constant_time: bool,
+
+    // The operation to execute.
+    operation: RsaOperation,
+    result: NonNull<[u32]>,
+}
+
+unsafe impl Sync for RsaWorkItem {}
+unsafe impl Send for RsaWorkItem {}
+
+enum RsaOperation {
+    // Z = X * Y
+    // len(Z) = len(X) + len(Y)
+    Multiplication {
+        x: NonNull<[u32]>,
+        y: NonNull<[u32]>,
+    },
+    // Z = X * Y mod M
+    ModularMultiplication {
+        x: NonNull<[u32]>,
+        y: NonNull<[u32]>,
+        m: NonNull<[u32]>,
+        r: NonNull<[u32]>,
+        m_prime: u32,
+    },
+    // Z = X ^ Y mod M
+    ModularExponentiation {
+        x: NonNull<[u32]>,
+        y: NonNull<[u32]>,
+        m: NonNull<[u32]>,
+        r_inv: NonNull<[u32]>,
+        m_prime: u32,
+    },
+}
+
+#[handler]
+#[ram]
+fn rsa_work_queue_handler() {
+    if !RSA_WORK_QUEUE.process() {
+        // The queue may indicate that it needs to be polled again. In this case, we do not clear
+        // the interrupt bit, which causes the interrupt to be re-handled.
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                RSA::regs().interrupt().write(|w| w.interrupt().set_bit());
+            } else {
+                RSA::regs().int_clr().write(|w| w.int_clr().set_bit());
+            }
+        }
+    }
+}
+
+/// An RSA work queue user.
+///
+/// This object allows performing [big number multiplication][Self::multiply], [big number modular
+/// multiplication][Self::modular_multiply] and [big number modular
+/// exponentiation][Self::modular_exponentiate] with hardware acceleration. To perform these
+/// operations, the [`RsaBackend`] must be started, otherwise these operations will never complete.
+#[cfg_attr(
+    not(esp32),
+    doc = " \nThe context is created with a secure configuration by default. You can enable hardware acceleration
+    options using [enable_search_acceleration][Self::enable_search_acceleration] and
+    [enable_acceleration][Self::enable_acceleration] when appropriate."
+)]
+pub struct RsaContext {
+    frontend: WorkQueueFrontend<RsaWorkItem>,
+}
+
+impl Default for RsaContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RsaContext {
+    /// Creates a new context.
+    pub fn new() -> Self {
+        Self {
+            frontend: WorkQueueFrontend::new(RsaWorkItem {
+                #[cfg(not(esp32))]
+                search_acceleration: false,
+                #[cfg(not(esp32))]
+                constant_time: true,
+                operation: RsaOperation::Multiplication {
+                    x: NonNull::from(&[]),
+                    y: NonNull::from(&[]),
+                },
+                result: NonNull::from(&mut []),
+            }),
+        }
+    }
+
+    #[cfg(not(esp32))]
+    /// Enables search acceleration.
+    ///
+    /// When enabled it would increase the performance of modular
+    /// exponentiation by discarding the exponent's bits before the most
+    /// significant set bit.
+    ///
+    /// > ⚠️ Note: this compromises security by effectively decreasing the key length.
+    ///
+    /// For more information refer to the
+    #[doc = trm_markdown_link!("rsa")]
+    pub fn enable_search_acceleration(&mut self) {
+        self.frontend.data_mut().search_acceleration = true;
+    }
+
+    #[cfg(not(esp32))]
+    /// Enables acceleration by disabling constant time operation.
+    ///
+    /// Disabling constant time operation increases the performance of modular
+    /// exponentiation by simplifying the calculation concerning the 0 bits
+    /// of the exponent. I.e. the less the Hamming weight, the greater the
+    /// performance.
+    ///
+    /// > ⚠️ Note: this compromises security by enabling timing-based side-channel attacks.
+    ///
+    /// For more information refer to the
+    #[doc = trm_markdown_link!("rsa")]
+    pub fn enable_acceleration(&mut self) {
+        self.frontend.data_mut().constant_time = false;
+    }
+
+    fn post(&mut self) -> RsaHandle<'_> {
+        RsaHandle(self.frontend.post(&RSA_WORK_QUEUE))
+    }
+
+    #[procmacros::doc_replace]
+    /// Starts a modular exponentiation operation, performing `Z = X ^ Y mod M`.
+    ///
+    /// Software needs to pre-calculate the following values:
+    ///
+    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
+    ///
+    /// It is relatively easy to calculate these values using the `crypto-bigint` crate:
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// use crypto_bigint::{U512, Uint};
+    /// const fn compute_r(modulus: &U512) -> U512 {
+    ///     let mut d = [0_u32; U512::LIMBS * 2 + 1];
+    ///     d[d.len() - 1] = 1;
+    ///     let d = Uint::from_words(d);
+    ///     d.const_rem(&modulus.resize()).0.resize()
+    /// }
+    ///
+    /// const fn compute_mprime(modulus: &U512) -> u32 {
+    ///     let m_inv = modulus.inv_mod2k(32).to_words()[0];
+    ///     (-1 * m_inv as i64 & (u32::MAX as i64)) as u32
+    /// }
+    ///
+    /// // Inputs
+    /// const X: U512 = Uint::from_be_hex(
+    ///     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
+    ///    7dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",
+    /// );
+    /// const Y: U512 = Uint::from_be_hex(
+    ///     "1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759afac15a01f3c4c83ec2d2f66\
+    ///    6bd22f71c3c1f075ec0e2cb0cb29994d091b73f51",
+    /// );
+    /// const M: U512 = Uint::from_be_hex(
+    ///     "6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38df7118cf5dd45b9b63d293b\
+    ///    67aeafa9ba25feb8712f188cb139b7d9b9af1c361",
+    /// );
+    ///
+    /// // Values derived using the functions we defined above:
+    /// let r = compute_r(&M);
+    /// let mprime = compute_mprime(&M);
+    ///
+    /// use esp_hal::rsa::{RsaContext, operand_sizes::Op512};
+    ///
+    /// // Now perform the actual computation:
+    /// let mut rsa = RsaContext::new();
+    /// let mut outbuf = [0; 16];
+    /// let mut handle = rsa.modular_multiply::<Op512>(
+    ///     X.as_words(),
+    ///     Y.as_words(),
+    ///     M.as_words(),
+    ///     r.as_words(),
+    ///     mprime,
+    ///     &mut outbuf,
+    /// );
+    /// handle.wait_blocking();
+    /// # {after_snippet}
+    /// ```
+    ///
+    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
+    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// operation (by dropping the handle).
+    ///
+    /// When the operation is completed, the result will be stored in `result`.
+    pub fn modular_exponentiate<'t, OP>(
+        &'t mut self,
+        x: &'t OP::InputType,
+        y: &'t OP::InputType,
+        m: &'t OP::InputType,
+        r: &'t OP::InputType,
+        m_prime: u32,
+        result: &'t mut OP::InputType,
+    ) -> RsaHandle<'t>
+    where
+        OP: RsaMode,
+    {
+        self.frontend.data_mut().operation = RsaOperation::ModularExponentiation {
+            x: NonNull::from(x.as_ref()),
+            y: NonNull::from(y.as_ref()),
+            m: NonNull::from(m.as_ref()),
+            r_inv: NonNull::from(r.as_ref()),
+            m_prime,
+        };
+        self.frontend.data_mut().result = NonNull::from(result.as_mut());
+        self.post()
+    }
+
+    /// Starts a modular multiplication operation, performing `Z = X * Y mod M`.
+    ///
+    /// Software needs to pre-calculate the following values:
+    ///
+    /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
+    /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
+    ///
+    /// For an example how these values can be calculated and used, see
+    /// [Self::modular_exponentiate].
+    ///
+    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
+    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// operation (by dropping the handle).
+    ///
+    /// When the operation is completed, the result will be stored in `result`.
+    pub fn modular_multiply<'t, OP>(
+        &'t mut self,
+        x: &'t OP::InputType,
+        y: &'t OP::InputType,
+        m: &'t OP::InputType,
+        r: &'t OP::InputType,
+        m_prime: u32,
+        result: &'t mut OP::InputType,
+    ) -> RsaHandle<'t>
+    where
+        OP: RsaMode,
+    {
+        self.frontend.data_mut().operation = RsaOperation::ModularMultiplication {
+            x: NonNull::from(x.as_ref()),
+            y: NonNull::from(y.as_ref()),
+            m: NonNull::from(m.as_ref()),
+            r: NonNull::from(r.as_ref()),
+            m_prime,
+        };
+        self.frontend.data_mut().result = NonNull::from(result.as_mut());
+        self.post()
+    }
+
+    #[procmacros::doc_replace]
+    /// Starts a multiplication operation, performing `Z = X * Y`.
+    ///
+    /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
+    /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
+    /// operation (by dropping the handle).
+    ///
+    /// When the operation is completed, the result will be stored in `result`. The `result` is
+    /// twice as wide as the inputs.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    ///
+    /// // Inputs
+    /// # let x: [u32; 16] = [0; 16];
+    /// # let y: [u32; 16] = [0; 16];
+    /// // let x: [u32; 16] = [...];
+    /// // let y: [u32; 16] = [...];
+    /// let mut outbuf = [0; 32];
+    ///
+    /// use esp_hal::rsa::{RsaContext, operand_sizes::Op512};
+    ///
+    /// // Now perform the actual computation:
+    /// let mut rsa = RsaContext::new();
+    /// let mut handle = rsa.multiply::<Op512>(&x, &y, &mut outbuf);
+    /// handle.wait_blocking();
+    /// # {after_snippet}
+    /// ```
+    pub fn multiply<'t, OP>(
+        &'t mut self,
+        x: &'t OP::InputType,
+        y: &'t OP::InputType,
+        result: &'t mut OP::OutputType,
+    ) -> RsaHandle<'t>
+    where
+        OP: Multi,
+    {
+        self.frontend.data_mut().operation = RsaOperation::Multiplication {
+            x: NonNull::from(x.as_ref()),
+            y: NonNull::from(y.as_ref()),
+        };
+        self.frontend.data_mut().result = NonNull::from(result.as_mut());
+        self.post()
+    }
+}
+
+/// The handle to the pending RSA operation.
+pub struct RsaHandle<'t>(work_queue::Handle<'t, RsaWorkItem>);
+
+impl RsaHandle<'_> {
+    /// Polls the status of the work item.
+    #[inline]
+    pub fn poll(&mut self) -> bool {
+        self.0.poll()
+    }
+
+    /// Blocks until the work item to be processed.
+    #[inline]
+    pub fn wait_blocking(mut self) {
+        while !self.poll() {}
+    }
+
+    /// Waits for the work item to be processed.
+    #[inline]
+    pub fn wait(&mut self) -> impl Future<Output = Status> {
+        self.0.wait()
+    }
 }
