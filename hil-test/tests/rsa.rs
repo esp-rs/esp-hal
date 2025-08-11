@@ -62,7 +62,7 @@ const fn compute_r(modulus: &U512) -> U512 {
 
 const fn compute_mprime(modulus: &U512) -> u32 {
     let m_inv = modulus.inv_mod2k(32).to_words()[0];
-    (-1 * m_inv as i64 % 4294967296) as u32
+    (-1 * m_inv as i64 & (u32::MAX as i64)) as u32
 }
 
 #[cfg(test)]

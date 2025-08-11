@@ -786,6 +786,28 @@ enum RsaBackendState<'d> {
 /// accelerator without carrying around the peripheral singleton, or the driver.
 ///
 /// The [`RsaContext`] struct can enqueue work items that this backend will process.
+///
+/// ## Example
+///
+/// ```rust, no_run
+/// # {before_snippet}
+/// use esp_hal::rsa::{RsaBackend, RsaContext, operand_sizes::Op512};
+/// #
+/// let mut rsa_backend = RsaBackend::new(peripherals.RSA);
+/// let _driver = rsa_backend.start();
+///
+/// async fn perform_512bit_big_number_multiplication(
+///     operand_a: &[u32; 16],
+///     operand_b: &[u32; 16],
+///     result: &mut [u32; 32],
+/// ) {
+///     let mut rsa = RsaContext::new();
+///
+///     let mut handle = rsa.multiply::<Op512>(operand_a, operand_b, result);
+///     handle.wait().await;
+/// }
+/// # {after_snippet}
+/// ```
 pub struct RsaBackend<'d> {
     peri: RSA<'d>,
     state: RsaBackendState<'d>,
@@ -829,7 +851,7 @@ impl<'d> RsaBackend<'d> {
     /// ```
     pub fn start(&mut self) -> RsaWorkQueueDriver<'_, 'd> {
         RsaWorkQueueDriver {
-            _inner: WorkQueueDriver::new(self, RSA_VTABLE, &RSA_WORK_QUEUE),
+            inner: WorkQueueDriver::new(self, RSA_VTABLE, &RSA_WORK_QUEUE),
         }
     }
 
@@ -1000,8 +1022,17 @@ impl<'d> RsaBackend<'d> {
 /// An active work queue driver.
 ///
 /// This object must be kept around, otherwise RSA operations will never complete.
+///
+/// For a usage example, see [`RsaBackend`].
 pub struct RsaWorkQueueDriver<'t, 'd> {
-    _inner: WorkQueueDriver<'t, RsaBackend<'d>, RsaWorkItem>,
+    inner: WorkQueueDriver<'t, RsaBackend<'d>, RsaWorkItem>,
+}
+
+impl<'t, 'd> RsaWorkQueueDriver<'t, 'd> {
+    /// Finishes processing the current work queue item, then stops the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        self.inner.stop()
+    }
 }
 
 struct RsaWorkItem {
@@ -1061,6 +1092,17 @@ fn rsa_work_queue_handler() {
 }
 
 /// An RSA work queue user.
+///
+/// This object allows performing [big number multiplication][Self::multiply], [big number modular
+/// multiplication][Self::modular_multiply] and [big number modular
+/// exponentiation][Self::modular_exponentiate] with hardware acceleration. To perform these
+/// operations, the [`RsaBackend`] must be started, otherwise these operations will never complete.
+#[cfg_attr(
+    not(esp32),
+    doc = " \nThe context is created with a secure configuration by default. You can enable hardware acceleration
+    options using [enable_search_acceleration][Self::enable_search_acceleration] and
+    [enable_acceleration][Self::enable_acceleration] when appropriate."
+)]
 pub struct RsaContext {
     frontend: WorkQueueFrontend<RsaWorkItem>,
 }
@@ -1089,16 +1131,100 @@ impl RsaContext {
         }
     }
 
+    #[cfg(not(esp32))]
+    /// Enables search acceleration.
+    ///
+    /// When enabled it would increase the performance of modular
+    /// exponentiation by discarding the exponent's bits before the most
+    /// significant set bit.
+    ///
+    /// > ⚠️ Note: this compromises security by effectively decreasing the key length.
+    ///
+    /// For more information refer to the
+    #[doc = trm_markdown_link!("rsa")]
+    pub fn enable_search_acceleration(&mut self) {
+        self.frontend.data_mut().search_acceleration = true;
+    }
+
+    #[cfg(not(esp32))]
+    /// Enables acceleration by disabling constant time operation.
+    ///
+    /// Disabling constant time operation increases the performance of modular
+    /// exponentiation by simplifying the calculation concerning the 0 bits
+    /// of the exponent. I.e. the less the Hamming weight, the greater the
+    /// performance.
+    ///
+    /// > ⚠️ Note: this compromises security by enabling timing-based side-channel attacks.
+    ///
+    /// For more information refer to the
+    #[doc = trm_markdown_link!("rsa")]
+    pub fn enable_acceleration(&mut self) {
+        self.frontend.data_mut().constant_time = false;
+    }
+
     fn post(&mut self) -> RsaHandle<'_> {
         RsaHandle(self.frontend.post(&RSA_WORK_QUEUE))
     }
 
+    #[procmacros::doc_replace]
     /// Starts a modular exponentiation operation, performing `Z = X ^ Y mod M`.
     ///
     /// Software needs to pre-calculate the following values:
     ///
     /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
     /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
+    ///
+    /// It is relatively easy to calculate these values using the `crypto-bigint` crate:
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    /// use crypto_bigint::{U512, Uint};
+    /// const fn compute_r(modulus: &U512) -> U512 {
+    ///     let mut d = [0_u32; U512::LIMBS * 2 + 1];
+    ///     d[d.len() - 1] = 1;
+    ///     let d = Uint::from_words(d);
+    ///     d.const_rem(&modulus.resize()).0.resize()
+    /// }
+    ///
+    /// const fn compute_mprime(modulus: &U512) -> u32 {
+    ///     let m_inv = modulus.inv_mod2k(32).to_words()[0];
+    ///     (-1 * m_inv as i64 & (u32::MAX as i64)) as u32
+    /// }
+    ///
+    /// // Inputs
+    /// const X: U512 = Uint::from_be_hex(
+    ///     "c7f61058f96db3bd87dbab08ab03b4f7f2f864eac249144adea6a65f97803b719d8ca980b7b3c0389c1c7c6\
+    ///    7dc353c5e0ec11f5fc8ce7f6073796cc8f73fa878",
+    /// );
+    /// const Y: U512 = Uint::from_be_hex(
+    ///     "1763db3344e97be15d04de4868badb12a38046bb793f7630d87cf100aa1c759afac15a01f3c4c83ec2d2f66\
+    ///    6bd22f71c3c1f075ec0e2cb0cb29994d091b73f51",
+    /// );
+    /// const M: U512 = Uint::from_be_hex(
+    ///     "6b6bb3d2b6cbeb45a769eaa0384e611e1b89b0c9b45a045aca1c5fd6e8785b38df7118cf5dd45b9b63d293b\
+    ///    67aeafa9ba25feb8712f188cb139b7d9b9af1c361",
+    /// );
+    ///
+    /// // Values derived using the functions we defined above:
+    /// let r = compute_r(&M);
+    /// let mprime = compute_mprime(&M);
+    ///
+    /// use esp_hal::rsa::{RsaContext, operand_sizes::Op512};
+    ///
+    /// // Now perform the actual computation:
+    /// let mut rsa = RsaContext::new();
+    /// let mut outbuf = [0; 16];
+    /// let mut handle = rsa.modular_multiply::<Op512>(
+    ///     X.as_words(),
+    ///     Y.as_words(),
+    ///     M.as_words(),
+    ///     r.as_words(),
+    ///     mprime,
+    ///     &mut outbuf,
+    /// );
+    /// handle.wait_blocking();
+    /// # {after_snippet}
+    /// ```
     ///
     /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
     /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
@@ -1135,6 +1261,9 @@ impl RsaContext {
     /// - `r`: `2 ^ ( bitlength * 2 ) mod M`.
     /// - `m_prime` can be calculated using `-(modular multiplicative inverse of M) mod 2^32`.
     ///
+    /// For an example how these values can be calculated and used, see
+    /// [Self::modular_exponentiate].
+    ///
     /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
     /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
     /// operation (by dropping the handle).
@@ -1163,13 +1292,36 @@ impl RsaContext {
         self.post()
     }
 
+    #[procmacros::doc_replace]
     /// Starts a multiplication operation, performing `Z = X * Y`.
     ///
     /// The calculation is done asynchronously. This function returns an [`RsaHandle`] that can be
     /// used to poll the status of the calculation, to wait for it to finish, or to cancel the
     /// operation (by dropping the handle).
     ///
-    /// When the operation is completed, the result will be stored in `result`.
+    /// When the operation is completed, the result will be stored in `result`. The `result` is
+    /// twice as wide as the inputs.
+    ///
+    /// ## Example
+    ///
+    /// ```rust,no_run
+    /// # {before_snippet}
+    ///
+    /// // Inputs
+    /// # let x: [u32; 16] = [0; 16];
+    /// # let y: [u32; 16] = [0; 16];
+    /// // let x: [u32; 16] = [...];
+    /// // let y: [u32; 16] = [...];
+    /// let mut outbuf = [0; 32];
+    ///
+    /// use esp_hal::rsa::{RsaContext, operand_sizes::Op512};
+    ///
+    /// // Now perform the actual computation:
+    /// let mut rsa = RsaContext::new();
+    /// let mut handle = rsa.multiply::<Op512>(&x, &y, &mut outbuf);
+    /// handle.wait_blocking();
+    /// # {after_snippet}
+    /// ```
     pub fn multiply<'t, OP>(
         &'t mut self,
         x: &'t OP::InputType,
