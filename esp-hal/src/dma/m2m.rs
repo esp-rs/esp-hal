@@ -196,7 +196,7 @@ impl<'d, M: DriverMode, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, M, BUF> {
     }
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
-    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, M>, BUF) {
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemRx<'d, M>, BUF::Final) {
         while !self.is_done() {}
 
         let (m2m, view) = self.release();
@@ -211,7 +211,7 @@ impl<'d, M: DriverMode, BUF: DmaRxBuffer> Mem2MemRxTransfer<'d, M, BUF> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(self) -> (Mem2MemRx<'d, M>, BUF) {
+    pub fn stop(self) -> (Mem2MemRx<'d, M>, BUF::Final) {
         let (mut m2m, view) = self.release();
 
         m2m.channel.stop_transfer();
@@ -324,7 +324,7 @@ impl<'d, Dm: DriverMode, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Dm, BUF> {
     }
 
     /// Waits for the transfer to stop and returns the peripheral and buffer.
-    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Dm>, BUF) {
+    pub fn wait(self) -> (Result<(), DmaError>, Mem2MemTx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         let (m2m, view) = self.release();
@@ -339,7 +339,7 @@ impl<'d, Dm: DriverMode, BUF: DmaTxBuffer> Mem2MemTxTransfer<'d, Dm, BUF> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(self) -> (Mem2MemTx<'d, Dm>, BUF) {
+    pub fn stop(self) -> (Mem2MemTx<'d, Dm>, BUF::Final) {
         let (mut m2m, view) = self.release();
 
         m2m.channel.stop_transfer();

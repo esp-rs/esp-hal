@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A new default feature `exception-handler` was added (#3887)
 - `AesBackend, AesContext`: Work-queue based AES driver (#3880)
 - `aes::cipher_modes`, `aes::CipherModeState` for constructing `AesContext`s (#3895)
+- `DmaTxBuffer` and `DmaRxBuffer` now have a `Final` associated type. (#3923)
 
 ### Changed
 
@@ -31,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Rsa::read` function has been removed. The constructor now blocks until the peripheral's memory has been cleared (#3900)
 - `Rsa::enable_constant_time_acceleration` has been renamed to `Rsa::disable_constant_time` (#3900)
 - `Rsa::enable_search_acceleration` has been renamed to `Rsa::search_acceleration` (#3900)
+- `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
 
 ### Fixed
 

@@ -425,6 +425,11 @@ pub unsafe trait DmaTxBuffer {
     /// whilst the DMA is actively using it.
     type View;
 
+    /// The type returned to the user when a transfer finishes.
+    ///
+    /// Some buffers don't need to be reconstructed.
+    type Final;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
@@ -435,7 +440,7 @@ pub unsafe trait DmaTxBuffer {
     fn into_view(self) -> Self::View;
 
     /// This is called after the DMA is done using the buffer.
-    fn from_view(view: Self::View) -> Self;
+    fn from_view(view: Self::View) -> Self::Final;
 }
 
 /// [DmaRxBuffer] is a DMA descriptor + memory combo that can be used for
@@ -454,6 +459,11 @@ pub unsafe trait DmaRxBuffer {
     /// whilst the DMA is actively using it.
     type View;
 
+    /// The type returned to the user when a transfer finishes.
+    ///
+    /// Some buffers don't need to be reconstructed.
+    type Final;
+
     /// Prepares the buffer for an imminent transfer and returns
     /// information required to use this buffer.
     ///
@@ -464,7 +474,7 @@ pub unsafe trait DmaRxBuffer {
     fn into_view(self) -> Self::View;
 
     /// This is called after the DMA is done using the buffer.
-    fn from_view(view: Self::View) -> Self;
+    fn from_view(view: Self::View) -> Self::Final;
 }
 
 /// An in-progress view into [DmaRxBuf]/[DmaTxBuf].
@@ -623,6 +633,7 @@ impl DmaTxBuf {
 
 unsafe impl DmaTxBuffer for DmaTxBuf {
     type View = BufView<DmaTxBuf>;
+    type Final = DmaTxBuf;
 
     fn prepare(&mut self) -> Preparation {
         cfg_if::cfg_if! {
@@ -829,6 +840,7 @@ impl DmaRxBuf {
 
 unsafe impl DmaRxBuffer for DmaRxBuf {
     type View = BufView<DmaRxBuf>;
+    type Final = DmaRxBuf;
 
     fn prepare(&mut self) -> Preparation {
         for desc in self.descriptors.linked_iter_mut() {
@@ -1009,6 +1021,7 @@ impl DmaRxTxBuf {
 
 unsafe impl DmaTxBuffer for DmaRxTxBuf {
     type View = BufView<DmaRxTxBuf>;
+    type Final = DmaRxTxBuf;
 
     fn prepare(&mut self) -> Preparation {
         for desc in self.tx_descriptors.linked_iter_mut() {
@@ -1054,6 +1067,7 @@ unsafe impl DmaTxBuffer for DmaRxTxBuf {
 
 unsafe impl DmaRxBuffer for DmaRxTxBuf {
     type View = BufView<DmaRxTxBuf>;
+    type Final = DmaRxTxBuf;
 
     fn prepare(&mut self) -> Preparation {
         for desc in self.rx_descriptors.linked_iter_mut() {
@@ -1202,6 +1216,7 @@ impl DmaRxStreamBuf {
 
 unsafe impl DmaRxBuffer for DmaRxStreamBuf {
     type View = DmaRxStreamBufView;
+    type Final = DmaRxStreamBuf;
 
     fn prepare(&mut self) -> Preparation {
         // Link up all the descriptors (but not in a circle).
@@ -1419,6 +1434,7 @@ pub struct EmptyBuf;
 
 unsafe impl DmaTxBuffer for EmptyBuf {
     type View = EmptyBuf;
+    type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
         Preparation {
@@ -1448,6 +1464,7 @@ unsafe impl DmaTxBuffer for EmptyBuf {
 
 unsafe impl DmaRxBuffer for EmptyBuf {
     type View = EmptyBuf;
+    type Final = EmptyBuf;
 
     fn prepare(&mut self) -> Preparation {
         Preparation {
@@ -1523,7 +1540,8 @@ impl DmaLoopBuf {
 }
 
 unsafe impl DmaTxBuffer for DmaLoopBuf {
-    type View = Self;
+    type View = DmaLoopBuf;
+    type Final = DmaLoopBuf;
 
     fn prepare(&mut self) -> Preparation {
         Preparation {

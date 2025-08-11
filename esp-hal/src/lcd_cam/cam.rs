@@ -461,7 +461,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn stop(mut self) -> (Camera<'d>, BUF) {
+    pub fn stop(mut self) -> (Camera<'d>, BUF::Final) {
         self.stop_peripherals();
         let (camera, view) = self.release();
         (camera, BUF::from_view(view))
@@ -472,7 +472,7 @@ impl<'d, BUF: DmaRxBuffer> CameraTransfer<'d, BUF> {
     /// Note: The camera doesn't really "finish" its transfer, so what you're
     /// really waiting for here is a DMA Error. You typically just want to
     /// call [Self::stop] once you have the data you need.
-    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, Camera<'d>, BUF::Final) {
         while !self.is_done() {}
 
         // Stop the DMA as it doesn't know that the camera has stopped.

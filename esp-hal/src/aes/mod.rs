@@ -537,7 +537,7 @@ pub mod dma {
 
         /// Waits for the transfer to finish and returns the peripheral and
         /// buffers.
-        pub fn wait(mut self) -> (AesDma<'d>, RX, TX) {
+        pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             while !self.is_done() {}
 
             // Stop the DMA as it doesn't know that the aes has stopped.

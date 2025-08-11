@@ -1278,7 +1278,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> ParlIoTxTransfer<'d, BUF, Dm> {
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoTx<'d, Dm>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoTx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         Instance::set_tx_start(false);
@@ -1446,7 +1446,7 @@ impl<'d, BUF: DmaRxBuffer, Dm: DriverMode> ParlIoRxTransfer<'d, BUF, Dm> {
     }
 
     /// Waits for the transfer to finish and returns the peripheral and buffer.
-    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoRx<'d, Dm>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, ParlIoRx<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         Instance::set_rx_start(false);
