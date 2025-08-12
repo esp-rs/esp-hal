@@ -369,6 +369,7 @@ pub mod dma {
             DmaPeripheral,
             DmaRxBuffer,
             DmaTxBuffer,
+            NoBuffer,
             PeripheralDmaChannel,
             prepare_for_rx,
             prepare_for_tx,
@@ -449,23 +450,29 @@ pub mod dma {
             iv[12..16].copy_from_slice(&self.aes.regs().iv_mem(3).read().bits().to_le_bytes());
         }
 
-        fn start_dma_transfer(
-            &mut self,
+        fn start_dma_transfer<RXBUF, TXBUF>(
+            mut self,
             number_of_blocks: usize,
-            output: &mut impl DmaRxBuffer,
-            input: &mut impl DmaTxBuffer,
+            mut output: RXBUF,
+            mut input: TXBUF,
             mode: Mode,
             cipher_mode: CipherMode,
             key: &Key,
-        ) -> Result<(), DmaError> {
+        ) -> Result<AesTransfer<'d, RXBUF, TXBUF>, (DmaError, Self, RXBUF, TXBUF)>
+        where
+            TXBUF: DmaTxBuffer,
+            RXBUF: DmaRxBuffer,
+        {
             let peri = self.dma_peripheral();
 
-            unsafe { self.channel.tx.prepare_transfer(peri, input) }?;
-            unsafe { self.channel.rx.prepare_transfer(peri, output) }?;
-
-            // Start them together, to avoid the latter prepare discarding data from FIFOs.
-            self.channel.tx.start_transfer()?;
-            self.channel.rx.start_transfer()?;
+            if let Err(error) = unsafe { self.channel.tx.prepare_transfer(peri, &mut input) }
+                .and_then(|_| unsafe { self.channel.rx.prepare_transfer(peri, &mut output) })
+                // Start them together, to avoid the latter prepare discarding data from FIFOs.
+                .and_then(|_| self.channel.tx.start_transfer())
+                .and_then(|_| self.channel.rx.start_transfer())
+            {
+                return Err((error, self, output, input));
+            }
 
             self.enable_dma(true);
             self.enable_interrupt();
@@ -478,7 +485,11 @@ pub mod dma {
 
             self.start_transform();
 
-            Ok(())
+            Ok(AesTransfer {
+                aes_dma: ManuallyDrop::new(self),
+                rx_view: ManuallyDrop::new(output.into_view()),
+                tx_view: ManuallyDrop::new(input.into_view()),
+            })
         }
 
         /// Perform a DMA transfer.
@@ -487,8 +498,8 @@ pub mod dma {
         pub fn process<K, RXBUF, TXBUF>(
             mut self,
             number_of_blocks: usize,
-            mut output: RXBUF,
-            mut input: TXBUF,
+            output: RXBUF,
+            input: TXBUF,
             mode: Operation,
             cipher_state: &DmaCipherState,
             key: K,
@@ -510,22 +521,7 @@ pub mod dma {
 
             let mode = cipher_state.state.hardware_operating_mode(mode, &key);
 
-            if let Err(error) = self.start_dma_transfer(
-                number_of_blocks,
-                &mut output,
-                &mut input,
-                mode,
-                cipher_mode,
-                &key,
-            ) {
-                return Err((error, self, output, input));
-            }
-
-            Ok(AesTransfer {
-                aes_dma: ManuallyDrop::new(self),
-                rx_view: ManuallyDrop::new(output.into_view()),
-                tx_view: ManuallyDrop::new(input.into_view()),
-            })
+            self.start_dma_transfer(number_of_blocks, output, input, mode, cipher_mode, &key)
         }
 
         fn reset_aes(&self) {
@@ -673,11 +669,7 @@ pub mod dma {
 
     const AES_DMA_VTABLE: VTable<super::AesOperation> = VTable {
         post: |driver, item| {
-            // Since we run the operation in `poll`, there is nothing to do here, besides accepting
-            // the work item. However, DS may be using the AES peripheral. We solve that
-            // problem (later) by taking a lock in `on_work_available`
             let driver = unsafe { AesDmaBackend::from_raw(driver) };
-            driver.ensure_initialized();
             driver.start_processing(item);
             Some(Poll::Pending(false))
         },
@@ -686,8 +678,8 @@ pub mod dma {
             driver.poll_status(item)
         },
         cancel: |_driver, _item| {
-            // We can't abort an in-progress computation, or we may corrupt the block cipher's
-            // state.
+            // We can't (shouldn't) abort an in-progress computation, or we may corrupt the block
+            // cipher's state.
         },
         stop: |driver| {
             // Drop the AES driver to conserve power when there is nothig to do (or when the driver
@@ -697,11 +689,13 @@ pub mod dma {
         },
     };
 
-    #[derive(Clone, Copy, PartialEq, Debug)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    enum DmaState {
-        Idle,
-        WaitingForDma { processed_bytes: usize },
+    enum DriverState<'d> {
+        None,
+        Idle(AesDma<'d>),
+        WaitingForDma {
+            transfer: AesTransfer<'d, NoBuffer, NoBuffer>,
+            remaining_bytes: usize,
+        },
     }
 
     #[procmacros::doc_replace(
@@ -759,8 +753,7 @@ pub mod dma {
     pub struct AesDmaBackend<'d> {
         peri: AES<'d>,
         dma: PeripheralDmaChannel<AES<'d>>,
-        driver: Option<AesDma<'d>>,
-        state: DmaState,
+        state: DriverState<'d>,
 
         #[cfg(psram_dma)]
         unaligned_data_buffers: [Option<ManualWritebackBuffer>; 2],
@@ -801,8 +794,7 @@ pub mod dma {
             Self {
                 peri: aes,
                 dma: dma.degrade(),
-                driver: None,
-                state: DmaState::Idle,
+                state: DriverState::None,
 
                 #[cfg(psram_dma)]
                 unaligned_data_buffers: [const { None }; 2],
@@ -844,7 +836,28 @@ pub mod dma {
             unsafe { ptr.cast::<AesDmaBackend<'_>>().as_mut() }
         }
 
-        fn start_processing(&mut self, item: &mut AesOperation) {
+        fn start_processing(&mut self, item: &mut AesOperation) -> Poll {
+            let driver = match core::mem::replace(&mut self.state, DriverState::None) {
+                DriverState::None => {
+                    let peri = unsafe { self.peri.clone_unchecked() };
+                    let dma = unsafe { self.dma.clone_unchecked() };
+                    let driver = super::Aes::new(peri).with_dma(dma);
+
+                    driver
+                        .aes
+                        .aes
+                        .bind_peri_interrupt(interrupt_handler.handler());
+                    driver
+                        .aes
+                        .aes
+                        .enable_peri_interrupt(interrupt_handler.priority());
+
+                    driver
+                }
+                DriverState::Idle(aes_dma) => aes_dma,
+                _ => unreachable!(),
+            };
+
             // There are some constraints that make us (partially) fall back to CPU-driven mode:
             // - The algo isn't implemented in hardware. Not much to do here, we process the whole
             //   data using the CPU.
@@ -861,8 +874,8 @@ pub mod dma {
 
             if unsafe { !item.cipher_mode.as_ref().implemented_in_hardware() } {
                 // Algo is either not implemented in hardware, or the data is not accessible by DMA.
-                self.process_with_cpu(item);
-                return;
+                self.process_with_cpu(driver, item);
+                return Poll::Ready(Status::Completed);
             }
 
             if !crate::soc::is_valid_memory_address(item.buffers.input.addr().get()) {
@@ -888,7 +901,8 @@ pub mod dma {
             let flushed = unsafe { item.cipher_mode.as_mut().flush(item.buffers, item.mode) };
             if flushed == item.buffers.input.len() {
                 // No more data to process
-                return;
+                self.state = DriverState::Idle(driver);
+                return Poll::Ready(Status::Completed);
             }
 
             // Process the remaining data with DMA:
@@ -900,89 +914,91 @@ pub mod dma {
             };
 
             // If there is enough data for the DMA, set it up:
-            let dma_processed = self.process_with_dma(&mut new_item);
-            if dma_processed > 0 {
-                self.state = DmaState::WaitingForDma {
-                    processed_bytes: flushed + dma_processed,
-                };
-            } else {
+            if let Err(driver) = self.process_with_dma(driver, &mut new_item) {
                 // Otherwise, process the remaining data with CPU.
-                self.process_with_cpu(&mut new_item);
+                self.process_with_cpu(driver, &mut new_item);
+                return Poll::Ready(Status::Completed);
             }
+
+            Poll::Pending(false)
         }
 
         fn poll_status(&mut self, item: &mut AesOperation) -> Poll {
-            let driver = unwrap!(self.driver.as_mut());
-
-            let DmaState::WaitingForDma { processed_bytes } = self.state else {
-                // Data was processed by the CPU for any reason.
-                return Poll::Ready(Status::Completed);
-            };
-
-            if !driver.is_done() {
-                // Still working.
-                return Poll::Pending(false);
-            }
-
-            driver.clear_interrupt();
-            self.state = DmaState::Idle;
-
-            // AES is done, we can write back the IV while the DMA may still copy data.
-            unsafe { item.cipher_mode.as_mut() }.read_state(driver);
-
-            // Now wait for the DMA and finish the transfer.
-            driver.finish_dma_transfer();
-
-            // Write out PSRAM data if needed:
-            #[cfg(psram_dma)]
-            for buffer in self.unaligned_data_buffers.iter_mut() {
-                if let Some(buffer) = buffer.take() {
-                    buffer.write_back();
+            match &self.state {
+                DriverState::WaitingForDma { transfer, .. } if !transfer.is_done() => {
+                    Poll::Pending(false)
                 }
-            }
 
-            #[cfg(psram_dma)]
-            if crate::psram::psram_range().contains(&item.buffers.output.addr().get()) {
-                unsafe {
-                    crate::soc::cache_writeback_addr(
-                        item.buffers.output.addr().get() as u32,
-                        item.buffers.output.len() as u32,
-                    );
-                }
-            }
-
-            // Now process the remainder:
-            if processed_bytes < item.buffers.input.len() {
-                let mut temp_item = AesOperation {
-                    mode: item.mode,
-                    cipher_mode: item.cipher_mode,
-                    buffers: unsafe { item.buffers.byte_add(processed_bytes) },
-                    key: item.key.copy(),
-                };
-
-                // If there is enough data for the DMA, set it up again:
-                let dma_processed = self.process_with_dma(&mut temp_item);
-                if dma_processed > 0 {
-                    self.state = DmaState::WaitingForDma {
-                        processed_bytes: processed_bytes + dma_processed,
+                DriverState::WaitingForDma { .. } => {
+                    let DriverState::WaitingForDma {
+                        transfer,
+                        remaining_bytes,
+                    } = core::mem::replace(&mut self.state, DriverState::None)
+                    else {
+                        unreachable!()
                     };
-                    return Poll::Pending(false);
-                } else {
-                    // Otherwise, process the remaining data with CPU.
-                    self.process_with_cpu(&mut temp_item);
+
+                    let (driver, _, _) = transfer.wait();
+                    unsafe { item.cipher_mode.as_mut() }.read_state(&driver);
+
+                    driver.clear_interrupt();
+
+                    // Write out PSRAM data if needed:
+                    #[cfg(psram_dma)]
+                    for buffer in self.unaligned_data_buffers.iter_mut() {
+                        if let Some(buffer) = buffer.take() {
+                            buffer.write_back();
+                        }
+                    }
+                    #[cfg(psram_dma)]
+                    if crate::psram::psram_range().contains(&item.buffers.output.addr().get()) {
+                        unsafe {
+                            crate::soc::cache_writeback_addr(
+                                item.buffers.output.addr().get() as u32,
+                                item.buffers.output.len() as u32,
+                            );
+                        }
+                    }
+
+                    // Now process the remainder:
+                    if remaining_bytes > 0 {
+                        let mut temp_item = AesOperation {
+                            mode: item.mode,
+                            cipher_mode: item.cipher_mode,
+                            buffers: unsafe {
+                                item.buffers
+                                    .byte_add(item.buffers.input.len() - remaining_bytes)
+                            },
+                            key: item.key.copy(),
+                        };
+
+                        // If there is enough data for the DMA, set it up again:
+                        if let Err(driver) = self.process_with_dma(driver, &mut temp_item) {
+                            // Otherwise, process the remaining data with CPU.
+                            self.process_with_cpu(driver, &mut temp_item);
+                        } else {
+                            return Poll::Pending(false);
+                        }
+                    }
+
+                    Poll::Ready(Status::Completed)
                 }
+                _ => unreachable!(),
             }
-
-            Poll::Ready(Status::Completed)
         }
 
-        fn process_with_cpu(&mut self, work_item: &mut AesOperation) {
-            let driver = unwrap!(self.driver.as_mut());
+        fn process_with_cpu(&mut self, mut driver: AesDma<'d>, work_item: &mut AesOperation) {
             driver.aes.process_work_item(work_item);
+            self.state = DriverState::Idle(driver);
         }
 
-        fn process_with_dma(&mut self, work_item: &mut AesOperation) -> usize {
-            let (mut input_buffer, data_len) = unsafe {
+        fn process_with_dma(
+            &mut self,
+            mut driver: AesDma<'d>,
+            work_item: &mut AesOperation,
+        ) -> Result<(), AesDma<'d>> {
+            let input_len = work_item.buffers.input.len();
+            let (input_buffer, data_len) = unsafe {
                 // This unwrap is infallible as AES-DMA devices don't have TX DMA alignment
                 // requirements.
                 unwrap!(prepare_for_tx(
@@ -995,10 +1011,10 @@ pub mod dma {
             let number_of_blocks = data_len / BLOCK_SIZE;
             if number_of_blocks == 0 {
                 // DMA can't do anything.
-                return 0;
+                return Err(driver);
             }
 
-            let (mut output_buffer, rx_data_len) = unsafe {
+            let (output_buffer, rx_data_len) = unsafe {
                 prepare_for_rx(
                     &mut self.output_descriptors,
                     #[cfg(psram_dma)]
@@ -1010,49 +1026,35 @@ pub mod dma {
 
             debug_assert_eq!(rx_data_len, data_len);
 
-            let driver = unwrap!(self.driver.as_mut());
-
             let cipher_state = unsafe { work_item.cipher_mode.as_ref() };
-            cipher_state.write_state(driver);
+            cipher_state.write_state(&mut driver);
 
             let mode = cipher_state.hardware_operating_mode(work_item.mode, &work_item.key);
             // This unwrap is fine, this function is not called for modes of operation not supported
             // by the hardware.
             let cipher_mode = unwrap!(cipher_state.hardware_cipher_mode());
 
-            unwrap!(driver.start_dma_transfer(
+            let Ok(transfer) = driver.start_dma_transfer(
                 number_of_blocks,
-                &mut output_buffer,
-                &mut input_buffer,
+                output_buffer,
+                input_buffer,
                 mode,
                 cipher_mode,
-                &work_item.key
-            ));
+                &work_item.key,
+            ) else {
+                panic!()
+            };
 
-            data_len
-        }
+            self.state = DriverState::WaitingForDma {
+                transfer,
+                remaining_bytes: input_len - data_len,
+            };
 
-        fn ensure_initialized(&mut self) {
-            if self.driver.is_none() {
-                let peri = unsafe { self.peri.clone_unchecked() };
-                let dma = unsafe { self.dma.clone_unchecked() };
-                let driver = super::Aes::new(peri).with_dma(dma);
-
-                driver
-                    .aes
-                    .aes
-                    .bind_peri_interrupt(interrupt_handler.handler());
-                driver
-                    .aes
-                    .aes
-                    .enable_peri_interrupt(interrupt_handler.priority());
-
-                self.driver = Some(driver);
-            }
+            Ok(())
         }
 
         fn deinitialize(&mut self) {
-            self.driver = None;
+            self.state = DriverState::None;
         }
     }
 
