@@ -6,7 +6,8 @@ use esp_metadata::Chip;
 
 pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{Package, cargo::CargoAction};
-
+use inquire::Select;
+use strum::IntoEnumIterator;
 mod build;
 mod check_changelog;
 mod release;
@@ -17,19 +18,17 @@ mod run;
 
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
-    /// Package whose examples we which to act on.
-    #[arg(value_enum)]
-    pub package: Package,
+    /// Example to act on ("all" will execute every example).
+    pub example: String,
     /// Chip to target.
-    #[arg(value_enum)]
-    pub chip: Chip,
-
+    #[arg(value_enum, long)]
+    pub chip: Option<Chip>,
+    /// Package whose examples we which to act on.
+    #[arg(value_enum, long)]
+    pub package: Option<Package>,
     /// Build examples in debug mode only
     #[arg(long)]
     pub debug: bool,
-    /// Optional example to act on (all examples used if omitted)
-    #[arg(long)]
-    pub example: Option<String>,
 
     /// The toolchain used to build the examples
     #[arg(long)]
@@ -38,6 +37,16 @@ pub struct ExamplesArgs {
     /// Emit crate build timings
     #[arg(long)]
     pub timings: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DocTestArgs {
+    /// Package where we wish to run doc tests.
+    #[arg(value_enum)]
+    pub package: Package,
+    /// Chip to target.
+    #[arg(value_enum)]
+    pub chip: Chip,
 }
 
 #[derive(Debug, Args)]
@@ -66,32 +75,48 @@ pub struct TestsArgs {
 // Subcommand Actions
 
 pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
+    if args.chip.is_none() {
+        let chip_variants = Chip::iter().collect::<Vec<_>>();
+
+        let chip = Select::new("Select your target chip:", chip_variants).prompt()?;
+
+        args.chip = Some(chip);
+    }
+
+    let chip = args.chip.unwrap();
+
+    // If no package was provided, default to `examples`
+    if args.package.is_none() {
+        args.package = Some(Package::Examples);
+    }
     // Ensure that the package/chip combination provided are valid:
-    args.package.validate_package_chip(&args.chip)?;
+    args.package.unwrap().validate_package_chip(&chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
-    if args.package == Package::EspHal {
+    if let Some(Package::EspHal) = args.package {
         log::warn!(
             "Package '{}' specified, using '{}' instead",
             Package::EspHal,
             Package::Examples
         );
-        args.package = Package::Examples;
+        args.package = Some(Package::Examples);
     }
 
+    let package = args.package.unwrap();
+
     // Absolute path of the package's root:
-    let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
 
     // Load all examples which support the specified chip and parse their metadata.
     //
     // The `examples` directory contains a number of individual projects, and does not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if args.package == Package::Examples {
+    let examples = if package == Package::Examples {
         crate::firmware::load_cargo_toml(&package_path)?
     } else {
-        let example_path = match args.package {
+        let example_path = match package {
             Package::QaTest => package_path.join("src").join("bin"),
             Package::HilTest => package_path.join("tests"),
             _ => package_path.join("examples"),
@@ -102,7 +127,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     let mut examples = examples
         .into_iter()
-        .filter(|example| example.supports_chip(args.chip))
+        .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
     // Sort all examples by name:

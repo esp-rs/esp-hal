@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result, bail, ensure};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
-use super::{ExamplesArgs, TestsArgs};
+use super::{ExamplesArgs, TestsArgs, DocTestArgs};
 use crate::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Subcommand)]
 pub enum Run {
     /// Run doctests for specified chip and package.
-    DocTests(ExamplesArgs),
+    DocTests(DocTestArgs),
     /// Run all ELFs in a folder.
     Elfs(RunElfsArgs),
     /// Run the given example for the specified chip.
@@ -44,7 +44,7 @@ pub struct RunElfsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
-pub fn run_doc_tests(workspace: &Path, args: ExamplesArgs) -> Result<()> {
+pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     let chip = args.chip;
 
     let package_name = args.package.to_string();
@@ -132,23 +132,25 @@ pub fn run_examples(
 ) -> Result<()> {
     let mut examples = examples;
 
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&args.chip)?;
+    // At this point, package can never be `None`, so we can safely unwrap it.
+    let package = args.package.unwrap();
+    // At this point, chip can never be `None`, so we can safely unwrap it.
+    let chip = args.chip.unwrap();
 
-    let single_example = args.example.is_some();
+    // Determine the appropriate build target for the given package and chip:
+    let target = package.target_triple(&chip)?;
 
     // Filter the examples down to only the binaries supported by the given chip
-    examples.retain(|ex| ex.supports_chip(args.chip));
+    examples.retain(|ex| ex.supports_chip(chip));
 
-    // User requested to run exactly one example
-    if single_example {
-        // Filter the examples down to only the binary we're interested in
-        examples.retain(|ex| ex.matches(&args.example));
-
+    // Handle "all" examples and specific example
+    if args.example.to_lowercase() != "all" {
+        examples.retain(|ex| ex.matches(&Some(args.example.to_lowercase().clone())));
         ensure!(
             examples.len() == 1,
-            "Example not found or unsupported for {}",
-            args.chip
+            "Example '{}' not found or unsupported for {}",
+            args.example,
+            chip
         );
     }
 
@@ -186,7 +188,7 @@ pub fn run_examples(
             while !skip
                 && crate::execute_app(
                     package_path,
-                    args.chip,
+                    chip,
                     &target,
                     &example,
                     CargoAction::Run,

@@ -126,15 +126,29 @@ pub fn build_examples(
     package_path: &Path,
     out_path: &Path,
 ) -> Result<()> {
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&args.chip)?;
+    let chip = args.chip.unwrap();
 
-    if examples.iter().any(|ex| ex.matches(&args.example)) {
+    // Determine the appropriate build target for the given package and chip:
+    let target = args.package.unwrap().target_triple(&chip)?;
+
+    if args.example.to_lowercase() != "all" {
         // Attempt to build only the specified example:
-        for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
+        let filtered = examples
+            .iter()
+            .filter(|ex| ex.matches(&Some(args.example.to_lowercase().clone())))
+            .collect::<Vec<_>>();
+
+        if filtered.is_empty() {
+            bail!(
+                "Example '{}' not found or unsupported for the given chip",
+                args.example
+            );
+        }
+
+        for example in filtered {
             crate::execute_app(
                 package_path,
-                args.chip,
+                chip,
                 &target,
                 example,
                 CargoAction::Build(out_path.to_path_buf()),
@@ -144,16 +158,14 @@ pub fn build_examples(
                 args.timings,
             )?;
         }
+
         Ok(())
-    } else if args.example.is_some() {
-        // An invalid argument was provided:
-        bail!("Example not found or unsupported for the given chip")
     } else {
         // Attempt to build each supported example, with all required features enabled:
         examples.iter().try_for_each(|example| {
             crate::execute_app(
                 package_path,
-                args.chip,
+                chip,
                 &target,
                 example,
                 CargoAction::Build(out_path.to_path_buf()),

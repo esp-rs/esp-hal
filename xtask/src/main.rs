@@ -341,13 +341,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     println!("::group::Doc Test");
     run_doc_tests(
         workspace,
-        ExamplesArgs {
+        DocTestArgs {
             package: Package::EspHal,
             chip: args.chip,
-            example: None,
-            debug: true,
-            toolchain: args.toolchain.clone(),
-            timings: false,
         },
     )
     .inspect_err(|_| failed.push("Doc Test"))
@@ -379,9 +375,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Package::EspLpHal,
-                chip: args.chip,
-                example: None,
+                package: Some(Package::EspLpHal),
+                chip: Some(args.chip),
+                example: "all".to_string(),
                 debug: false,
                 toolchain: args.toolchain.clone(),
                 timings: false,
@@ -455,9 +451,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     examples(
         workspace,
         ExamplesArgs {
-            package: Package::Examples,
-            chip: args.chip,
-            example: None,
+            package: Some(Package::Examples),
+            chip: Some(args.chip),
+            example: "all".to_string(),
             debug: true,
             toolchain: args.toolchain.clone(),
             timings: false,
@@ -473,9 +469,9 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     examples(
         workspace,
         ExamplesArgs {
-            package: Package::QaTest,
-            chip: args.chip,
-            example: None,
+            package: Some(Package::QaTest),
+            chip: Some(args.chip),
+            example: "all".to_string(),
             debug: true,
             toolchain: args.toolchain.clone(),
             timings: false,
