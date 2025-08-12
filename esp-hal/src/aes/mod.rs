@@ -584,16 +584,6 @@ pub mod dma {
             // TODO: PAC should provide the variants
             self.aes.regs().state().read().state().bits() == DMA_STATUS_DONE
         }
-
-        fn finish_dma_transfer(&mut self) {
-            while !self.channel.rx.is_done() {}
-
-            // Stop the DMA as it doesn't know that the aes has stopped.
-            self.channel.rx.stop_transfer();
-            self.channel.tx.stop_transfer();
-
-            self.finish_transform();
-        }
     }
 
     /// Represents an ongoing (or potentially stopped) transfer with the Aes.
@@ -614,8 +604,13 @@ pub mod dma {
         /// buffers.
         pub fn wait(mut self) -> (AesDma<'d>, RX::Final, TX::Final) {
             while !self.is_done() {}
+            while !self.aes_dma.channel.rx.is_done() {}
 
-            self.aes_dma.finish_dma_transfer();
+            // Stop the DMA as it doesn't know that the aes has stopped.
+            self.aes_dma.channel.rx.stop_transfer();
+            self.aes_dma.channel.tx.stop_transfer();
+
+            self.aes_dma.finish_transform();
 
             unsafe {
                 let aes_dma = ManuallyDrop::take(&mut self.aes_dma);

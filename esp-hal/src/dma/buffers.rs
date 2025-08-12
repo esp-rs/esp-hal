@@ -1603,31 +1603,25 @@ impl NoBuffer {
     }
 }
 unsafe impl DmaTxBuffer for NoBuffer {
-    type View = Self;
+    type View = ();
     type Final = ();
 
     fn prepare(&mut self) -> Preparation {
         self.prep()
     }
 
-    fn into_view(self) -> Self::View {
-        self
-    }
-
+    fn into_view(self) -> Self::View {}
     fn from_view(_view: Self::View) {}
 }
 unsafe impl DmaRxBuffer for NoBuffer {
-    type View = Self;
+    type View = ();
     type Final = ();
 
     fn prepare(&mut self) -> Preparation {
         self.prep()
     }
 
-    fn into_view(self) -> Self::View {
-        self
-    }
-
+    fn into_view(self) -> Self::View {}
     fn from_view(_view: Self::View) {}
 }
 
