@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 - `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
+- Added `wifi-ap`, `wifi-sta`, and `wifi-eap` features (#3924)
 
 ### Changed
 
@@ -22,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
 - Update bt-hci version to add additional HCI commands (#3920)
+- `wifi` feature enables `wifi-ap`, `wifi-sta`, and `wifi-eap` (#3924)
 
 ### Fixed
 
