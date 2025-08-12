@@ -11,11 +11,20 @@ use embassy_time::{Duration, Ticker};
 use esp_hal::{
     Async,
     Blocking,
-    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, I2cAddress, Operation},
+    i2c::master::{
+        AcknowledgeCheckFailedReason,
+        Config,
+        Error,
+        I2c,
+        I2cAddress,
+        Operation,
+        SoftwareTimeout,
+    },
     interrupt::{
         Priority,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
+    time,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
@@ -241,6 +250,31 @@ mod tests {
     async fn test_timeout_when_scl_kept_low(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
 
+        i2c.apply_config(
+            &Config::default()
+                .with_software_timeout(SoftwareTimeout::PerByte(time::Duration::from_millis(10))),
+        )
+        .unwrap();
+
+        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+
+        let mut read_data = [0u8; 22];
+        // will run into an error but it should return at least
+        i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .expect_err("Expected timeout error");
+    }
+
+    #[test]
+    #[cfg(i2c_master_has_fsm_timeouts)]
+    async fn test_timeout_when_scl_kept_low_with_fsm_timeout(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+
+        i2c.apply_config(
+            &Config::default()
+                .with_scl_st_timeout(esp_hal::i2c::master::FsmTimeout::new_const::<16>()),
+        )
+        .unwrap();
+
         esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
 
         let mut read_data = [0u8; 22];
@@ -252,6 +286,12 @@ mod tests {
     #[test]
     async fn async_test_timeout_when_scl_kept_low(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
+
+        i2c.apply_config(
+            &Config::default()
+                .with_software_timeout(SoftwareTimeout::PerByte(time::Duration::from_millis(10))),
+        )
+        .unwrap();
 
         esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
 

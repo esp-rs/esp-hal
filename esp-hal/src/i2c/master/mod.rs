@@ -206,8 +206,7 @@ impl From<u8> for I2cAddress {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-// TODO: when supporting interrupts, document that SCL = high also triggers an
-// interrupt.
+#[instability::unstable]
 pub enum BusTimeout {
     /// Use the maximum timeout value.
     Maximum,
@@ -265,7 +264,6 @@ impl BusTimeout {
 /// efficiency.
 ///
 /// [`embassy_time::with_timeout`]: https://docs.rs/embassy-time/0.4.0/embassy_time/fn.with_timeout.html
-#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SoftwareTimeout {
@@ -286,7 +284,7 @@ pub enum SoftwareTimeout {
 /// When the FSM remains unchanged for more than the 2^ the given amount of bus
 /// clock cycles a timeout will be triggered.
 ///
-/// The default value is 0x10
+/// The default value is 23 (2^23 clock cycles).
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -298,8 +296,6 @@ pub struct FsmTimeout {
 #[cfg(i2c_master_has_fsm_timeouts)]
 impl FsmTimeout {
     const FSM_TIMEOUT_MAX: u8 = 23;
-
-    const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
 
     /// Creates a new timeout.
     ///
@@ -334,7 +330,7 @@ impl FsmTimeout {
 #[cfg(i2c_master_has_fsm_timeouts)]
 impl Default for FsmTimeout {
     fn default() -> Self {
-        Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
+        Self::new_const::<{ Self::FSM_TIMEOUT_MAX }>()
     }
 }
 
@@ -582,13 +578,15 @@ pub struct Config {
 
     /// I2C SCL timeout period.
     ///
-    /// Default value: 10 bus clock cycles.
+    /// Default value:
+    #[cfg_attr(i2c_master_has_bus_timeout_enable, doc = "disabled")]
+    #[cfg_attr(not(i2c_master_has_bus_timeout_enable), doc = concat!(property!("i2c_master.max_bus_timeout", str), " bus cycles"))]
+    #[builder_lite(unstable)]
     timeout: BusTimeout,
 
     /// Software timeout.
     ///
-    /// Default value: 1 ms per byte.
-    #[builder_lite(unstable)]
+    /// Default value: disabled.
     software_timeout: SoftwareTimeout,
 
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
@@ -610,8 +608,14 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             frequency: Rate::from_khz(100),
-            timeout: BusTimeout::BusCycles(10),
-            software_timeout: SoftwareTimeout::PerByte(Duration::from_millis(1)),
+
+            #[cfg(i2c_master_has_bus_timeout_enable)]
+            timeout: BusTimeout::Disabled,
+            #[cfg(not(i2c_master_has_bus_timeout_enable))]
+            timeout: BusTimeout::Maximum,
+
+            software_timeout: SoftwareTimeout::None,
+
             #[cfg(i2c_master_has_fsm_timeouts)]
             scl_st_timeout: Default::default(),
             #[cfg(i2c_master_has_fsm_timeouts)]
