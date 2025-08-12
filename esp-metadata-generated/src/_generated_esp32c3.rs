@@ -440,9 +440,10 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((GPIO16 <= virtual())); _for_each_inner!((GPIO17 <= virtual()));
         _for_each_inner!((GPIO18 <= virtual())); _for_each_inner!((GPIO19 <= virtual()));
         _for_each_inner!((GPIO20 <= virtual())); _for_each_inner!((GPIO21 <= virtual()));
-        _for_each_inner!((AES <= AES() (unstable))); _for_each_inner!((APB_CTRL <=
-        APB_CTRL() (unstable))); _for_each_inner!((APB_SARADC <= APB_SARADC()
-        (unstable))); _for_each_inner!((ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
+        _for_each_inner!((AES <= AES(AES : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((APB_CTRL <= APB_CTRL()
+        (unstable))); _for_each_inner!((APB_SARADC <= APB_SARADC() (unstable)));
+        _for_each_inner!((ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)));
         _for_each_inner!((BB <= BB() (unstable))); _for_each_inner!((DMA <= DMA()
         (unstable))); _for_each_inner!((DS <= DS() (unstable))); _for_each_inner!((EFUSE
         <= EFUSE() (unstable))); _for_each_inner!((EXTMEM <= EXTMEM() (unstable)));
@@ -487,9 +488,10 @@ macro_rules! for_each_peripheral {
         (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <=
         virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()),
         (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <=
-        AES() (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (APB_SARADC <=
-        APB_SARADC() (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (BB <=
-        BB() (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)), (EFUSE <=
+        AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (APB_SARADC <= APB_SARADC()
+        (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (BB <= BB()
+        (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)), (EFUSE <=
         EFUSE() (unstable)), (EXTMEM <= EXTMEM() (unstable)), (FE <= FE() (unstable)),
         (FE2 <= FE2() (unstable)), (GPIO <= GPIO() (unstable)), (GPIO_SD <= GPIO_SD()
         (unstable)), (HMAC <= HMAC() (unstable)), (I2C_ANA_MST <= I2C_ANA_MST()
