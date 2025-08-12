@@ -14,9 +14,11 @@ use esp_hal::{
     dma_buffers,
     peripherals::Peripherals,
     timer::timg::TimerGroup,
-    uart::{self, RxConfig, Uart, uhci::normal::Uhci},
+    uart::{self, RxConfig, Uart},
 };
 use esp_println::println;
+use crate::uart::uhci::Config;
+use esp_hal::uart::uhci::Uhci;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -48,7 +50,7 @@ async fn run_uart(peripherals: Peripherals) {
     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0).into_async();
-    uhci.apply_config(&uart::uhci::normal::Config::default().with_chunk_limit(dma_rx.len() as u16))
+    uhci.apply_config(&Config::default().with_chunk_limit(dma_rx.len() as u16))
         .unwrap();
 
     // Change uart config after uhci consumed it

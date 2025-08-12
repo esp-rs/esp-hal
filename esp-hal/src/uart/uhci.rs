@@ -3,6 +3,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
@@ -15,17 +16,48 @@ use crate::{
         DmaEligible,
         DmaRxBuffer,
         DmaTxBuffer,
-        RegisterAccess,
+        PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
-    into_internal_uhci,
     peripherals,
-    uart::{
-        self,
-        Uart,
-        uhci::{AnyUhci, UhciInternal, normal::ConfigError::*},
-    },
+    uart::{self, Uart, uhci::Error::AboveReadLimit},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+/// Uhci specific errors
+pub enum Error {
+    /// set_chunk_limit() argument is above what's possible by the hardware. It cannot exceed 4095
+    /// (12 bits), above this value it will simply also split the readings
+    AboveReadLimit,
+}
+
+crate::any_peripheral! {
+    pub peripheral AnyUhci<'d> {
+        Uhci0(crate::peripherals::UHCI0<'d>),
+    }
+}
+
+impl<'d> DmaEligible for AnyUhci<'d> {
+    #[cfg(gdma)]
+    type Dma = crate::dma::AnyGdmaChannel<'d>;
+
+    fn dma_peripheral(&self) -> crate::dma::DmaPeripheral {
+        match &self.0 {
+            any::Inner::Uhci0(_) => crate::dma::DmaPeripheral::Uhci0,
+        }
+    }
+}
+
+impl AnyUhci<'_> {
+    /// Unwraps the enum into the peripheral below
+    pub fn give_uhci(&self) -> &peripherals::UHCI0<'_> {
+        match &self.0 {
+            any::Inner::Uhci0(x) => x,
+        }
+    }
+}
 
 /// A configuration error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,17 +125,107 @@ where
     }
 }
 
-/// "Normal" Uhci implementation, which implements regular dma transfers, can be expanded upon in
-/// the future with Uhci specific features
+/// todo
 pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
-    pub(crate) internal: UhciInternal<'d, Dm>,
+    uart: Uart<'d, Dm>,
+    uhci: AnyUhci<'static>,
+    channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
+}
+
+impl<'d, Dm> Uhci<'d, Dm>
+where
+    Dm: DriverMode,
+{
+    fn init(&self) {
+        self.clean_turn_on();
+        self.reset();
+        self.conf_uart();
+    }
+
+    fn clean_turn_on(&self) {
+        // General conf registers
+        let reg: &uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
+        reg.conf0().modify(|_, w| w.clk_en().set_bit());
+        reg.conf0().modify(|_, w| {
+            unsafe { w.bits(0) };
+            w.clk_en().set_bit()
+        });
+        reg.conf1().modify(|_, w| unsafe { w.bits(0) });
+
+        // For TX
+        reg.escape_conf().modify(|_, w| unsafe { w.bits(0) });
+    }
+
+    fn reset(&self) {
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        reg.conf0().modify(|_, w| w.rx_rst().set_bit());
+        reg.conf0().modify(|_, w| w.rx_rst().clear_bit());
+
+        reg.conf0().modify(|_, w| w.tx_rst().set_bit());
+        reg.conf0().modify(|_, w| w.tx_rst().clear_bit());
+    }
+
+    fn conf_uart(&self) {
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+
+        // Idk if there is a better way to check it, but it works
+        match &self.uart.tx.uart.0 {
+            super::any::Inner::Uart0(_) => {
+                info!("Uhci will use uart0");
+                reg.conf0().modify(|_, w| w.uart0_ce().set_bit());
+            }
+            super::any::Inner::Uart1(_) => {
+                info!("Uhci will use uart1");
+                reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        // let val = reg.pkt_thres().read().pkt_thrs().bits();
+        // info!("Read limit value: {} to set: {}", val, limit);
+
+        // limit is 12 bits
+        // Above this value, it will probably split the messages, anyway, the point is below (the
+        // dma buffer length) it it will not freeze itself
+        if limit > 4095 {
+            return Err(AboveReadLimit);
+        }
+
+        reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
+        Ok(())
+    }
+
+    /// todo
+    pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
+        self.uart.set_config(uart_config)
+    }
+
+    /// todo
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+
+        reg.conf0()
+            .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
+
+        reg.conf0()
+            .modify(|_, w| w.len_eof_en().bit(config.len_eof));
+
+        if self.set_chunk_limit(config.chunk_limit).is_err() {
+            return Err(ConfigError::AboveReadLimit);
+        }
+
+        Ok(())
+    }
 }
 
 impl<'d> Uhci<'d, Blocking> {
-    /// Creates a new instance of Uhci
+    /// todo
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
@@ -112,23 +234,28 @@ impl<'d> Uhci<'d, Blocking> {
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&uhci);
 
-        let self_uhci = UhciInternal {
+        let uhci = Uhci {
             uart,
             uhci: uhci.into(),
             channel,
         };
 
-        self_uhci.init();
-
-        Self {
-            internal: self_uhci,
-        }
+        uhci.init();
+        uhci
     }
 
     /// Create a new instance in [crate::Async] mode.
     pub fn into_async(self) -> Uhci<'d, Async> {
-        let internal = self.internal.into_async();
-        Uhci { internal }
+        let this = ManuallyDrop::new(self);
+        let uart = unsafe { core::ptr::read(&this.uart) }.into_async();
+        let uhci = unsafe { core::ptr::read(&this.uhci) };
+        let channel = unsafe { core::ptr::read(&this.channel) }.into_async();
+
+        Uhci {
+            uart,
+            uhci,
+            channel,
+        }
     }
 }
 
@@ -139,19 +266,18 @@ impl<'d> Uhci<'d, Async> {
         mut tx_buffer: Buf,
     ) -> UhciDmaTxTransfer<'d, Async, Buf> {
         {
-            // self.internal.channel.tx.clear_interrupts();
+            // self.channel.tx.clear_interrupts();
 
-            // self.internal.channel.tx.tx_impl.restart();
+            // self.channel.tx.tx_impl.restart();
 
             unsafe {
-                self.internal
-                    .channel
+                self.channel
                     .tx
-                    .prepare_transfer(self.internal.uhci.dma_peripheral(), &mut tx_buffer)
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
                     .unwrap()
             };
 
-            self.internal.channel.tx.start_transfer().unwrap();
+            self.channel.tx.start_transfer().unwrap();
 
             return UhciDmaTxTransfer::new(self, tx_buffer);
         }
@@ -164,14 +290,13 @@ impl<'d> Uhci<'d, Async> {
     ) -> UhciDmaRxTransfer<'d, Async, Buf> {
         {
             unsafe {
-                self.internal
-                    .channel
+                self.channel
                     .rx
-                    .prepare_transfer(self.internal.uhci.dma_peripheral(), &mut rx_buffer)
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)
                     .unwrap()
             };
 
-            self.internal.channel.rx.start_transfer().unwrap();
+            self.channel.rx.start_transfer().unwrap();
 
             return UhciDmaRxTransfer::new(self, rx_buffer);
         }
@@ -179,30 +304,12 @@ impl<'d> Uhci<'d, Async> {
 
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
-        Uhci {
-            internal: self.internal.into_blocking(),
-        }
-    }
-}
-
-impl<'d, Dm: DriverMode> Uhci<'d, Dm> {
-    into_internal_uhci!();
-
-    /// Change the UHCI peripheral configuration
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let reg: &uhci0::RegisterBlock = self.internal.uhci.give_uhci().register_block();
-
-        reg.conf0()
-            .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
-
-        reg.conf0()
-            .modify(|_, w| w.len_eof_en().bit(config.len_eof));
-
-        if self.internal.set_chunk_limit(config.chunk_limit).is_err() {
-            return Err(AboveReadLimit);
-        }
-
-        Ok(())
+        todo!()
+        // Uhci {
+        // uart: self.uart.into_blocking(),
+        // uhci: self.uhci,
+        // channel: self.channel.into_blocking(),
+        // }
     }
 }
 
@@ -210,9 +317,7 @@ impl<Dm> Drop for Uhci<'_, Dm>
 where
     Dm: DriverMode,
 {
-    fn drop(&mut self) {
-
-    }
+    fn drop(&mut self) {}
 }
 
 // Based on SpiDmaTransfer
@@ -240,18 +345,15 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
 
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.uhci.internal.channel.tx.is_done()
+        self.uhci.channel.tx.is_done()
     }
 
     /// to
     async fn wait_for_idle(&mut self) {
-        DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
-            .await
-            .unwrap();
-        // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm lost at this point, this is the only thing that worked
-        DmaTxFuture::new(&mut self.uhci.internal.channel.tx)
-            .await
-            .unwrap();
+        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
+        // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
+        // lost at this point, this is the only thing that worked
+        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
     }
 
     /// Waits for the DMA transfer to complete.
@@ -275,8 +377,8 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
         }
 
         let retval = unsafe {
@@ -310,8 +412,8 @@ where
     Buf: DmaTxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.internal.channel.tx.is_done() {
-            self.uhci.internal.channel.tx.stop_transfer();
+        if !self.uhci.channel.tx.is_done() {
+            self.uhci.channel.tx.stop_transfer();
         }
         // TODO: Implement uhci drop
 
@@ -347,13 +449,11 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
 
     /// Returns true when [Self::wait] will not block.
     pub fn is_done(&self) -> bool {
-        self.uhci.internal.channel.rx.is_done()
+        self.uhci.channel.rx.is_done()
     }
 
     async fn wait_for_idle(&mut self) {
-        DmaRxFuture::new(&mut self.uhci.internal.channel.rx)
-            .await
-            .unwrap();
+        DmaRxFuture::new(&mut self.uhci.channel.rx).await.unwrap();
     }
 
     /// Waits for the DMA transfer to complete.
@@ -377,8 +477,8 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     /// Cancels the DMA transfer.
     #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.internal.channel.rx.is_done() {
-            self.uhci.internal.channel.rx.stop_transfer();
+        if !self.uhci.channel.rx.is_done() {
+            self.uhci.channel.rx.stop_transfer();
         }
 
         let retval = unsafe {
@@ -412,8 +512,8 @@ where
     Buf: DmaRxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.internal.channel.rx.is_done() {
-            self.uhci.internal.channel.rx.stop_transfer();
+        if !self.uhci.channel.rx.is_done() {
+            self.uhci.channel.rx.stop_transfer();
             // TODO: Implement uhci drop
         }
         unsafe {
