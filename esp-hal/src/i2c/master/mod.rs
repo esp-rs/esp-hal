@@ -2973,7 +2973,7 @@ mod bus_clear {
     }
 
     impl<'a> ClearBusFuture<'a> {
-        // Number of SCL pulses to clear the bus
+        // Number of SCL pulses to clear the bus (max 8 data bits sent by the device, + NACK)
         const BUS_CLEAR_BITS: u8 = 9;
         // use standard 100kHz data rate
         const SCL_DELAY: Duration = Duration::from_micros(5);
@@ -3009,12 +3009,17 @@ mod bus_clear {
             driver.info.scl_output.disconnect_from(&scl);
             driver.info.sda_output.disconnect_from(&sda);
 
-            // Starting from (9, false), becase:
-            // - we start with SCL low
-            // - a complete SCL cycle consists of a high period and a low period
-            // - we decrement the remaining counter at the beginning of a cycle, which gives us 9
-            //   complete SCL cycles.
-            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
+            let state = if sda.is_input_high() {
+                // SDA is high, the device is not holding it, we don't need to do anything.
+                State::Idle
+            } else {
+                // Starting from (9, false), becase:
+                // - we start with SCL low
+                // - a complete SCL cycle consists of a high period and a low period
+                // - we decrement the remaining counter at the beginning of a cycle, which gives us
+                //   9 complete SCL cycles.
+                State::SendClock(Self::BUS_CLEAR_BITS, false)
+            };
 
             Self {
                 driver,
@@ -3031,8 +3036,11 @@ mod bus_clear {
 
             match self.state {
                 State::Idle => {
-                    if self.driver.regs().sr().read().bus_busy().bit_is_set() {
-                        return Poll::Pending;
+                    if let Some((sda, _scl)) = self.pins.as_ref() {
+                        // Pins are disconnected from the peripheral, we can't use `bus_busy`.
+                        if !sda.is_input_high() {
+                            return Poll::Pending;
+                        }
                     }
                     return Poll::Ready(());
                 }
@@ -3062,8 +3070,13 @@ mod bus_clear {
                     self.state = State::SendClock(n - 1, true);
                 }
                 State::SendClock(n, true) => {
-                    if let Some((_sda, scl)) = self.pins.as_ref() {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(false);
+                        if sda.is_input_high() {
+                            // The device has released SDA, we can move on to generating a NACK
+                            self.state = State::SendClock(0, false);
+                            return Poll::Pending;
+                        }
                     }
                     self.state = State::SendClock(n, false);
                 }
