@@ -3005,11 +3005,11 @@ mod bus_clear {
                 };
             };
 
-            driver.info.scl_output.disconnect_from(&scl);
-            driver.info.sda_output.disconnect_from(&sda);
-
             sda.set_output_high(true);
             scl.set_output_high(false);
+
+            driver.info.scl_output.disconnect_from(&scl);
+            driver.info.sda_output.disconnect_from(&sda);
 
             // Starting from (9, false), becase:
             // - we start with SCL low
