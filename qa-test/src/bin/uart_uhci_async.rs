@@ -14,11 +14,11 @@ use esp_hal::{
     dma_buffers,
     peripherals::Peripherals,
     timer::timg::TimerGroup,
-    uart::{self, RxConfig, Uart},
+    uart::{self, RxConfig, Uart, uhci::Uhci},
 };
 use esp_println::println;
+
 use crate::uart::uhci::Config;
-use esp_hal::uart::uhci::Uhci;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -60,8 +60,9 @@ async fn run_uart(peripherals: Peripherals) {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let transfer = uhci.read(dma_rx).await;
-    let (uhci, dma_rx) = transfer.wait().await;
+    let mut transfer = uhci.read(dma_rx);
+    transfer.wait_for_idle().await;
+    let (uhci, dma_rx) = transfer.wait();
     let dma_rx: DmaRxBuf = DmaRxBuffer::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
@@ -74,8 +75,9 @@ async fn run_uart(peripherals: Peripherals) {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let transfer = uhci.write(dma_tx).await;
-                let (_uhci, dma_tx) = transfer.wait().await;
+                let mut transfer = uhci.write(dma_tx);
+                transfer.wait_for_idle().await;
+                let (_uhci, dma_tx) = transfer.wait();
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
             }
