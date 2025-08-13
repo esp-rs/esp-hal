@@ -27,8 +27,20 @@ use esp_backtrace as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
+macro_rules! assert {
+    ($($t:tt)*) => { defmt::assert!($($t)*) }
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
 macro_rules! assert_eq {
     ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert {
+    ($($t:tt)*) => { ::core::assert!($($t)*) }
 }
 
 #[cfg(not(feature = "defmt"))]

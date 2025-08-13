@@ -1,7 +1,7 @@
 //! I2C test
 
 //% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable embassy
+//% FEATURES: unstable embassy defmt
 
 #![no_std]
 #![no_main]
@@ -44,9 +44,15 @@ fn _async_driver_is_compatible_with_blocking_ehal() {
     fn _with_ehal(_: impl embedded_hal::i2c::I2c) {}
 }
 
+// Daniel's test device:
+// const DUT_ADDRESS: u8 = 0x29;
+// const READ_DATA_COMMAND: &[u8] = &[0, 0];
+
+// HIL test device:
 const DUT_ADDRESS: u8 = 0x77;
-const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 const READ_DATA_COMMAND: &[u8] = &[0xaa];
+
+const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 
 #[embassy_executor::task]
 async fn waiting_blocking_task() {
@@ -209,7 +215,11 @@ mod tests {
     #[test]
     async fn async_cancellation(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
-        let mut read_data = [0u8; 22];
+
+        // Read a lot of data to ensure that the transaction is cancelled mid-transfer.
+        let mut read_data = [0u8; 220];
+
+        defmt::info!("Running transaction to be cancelled");
 
         // Start a transaction that will be cancelled.
         let select_result = select(
@@ -230,8 +240,15 @@ mod tests {
         .await;
 
         // Assert that the I2C transaction was cancelled.
-        assert!(matches!(select_result, Either::Second(_)));
+        hil_test::assert!(
+            matches!(select_result, Either::Second(_)),
+            "Transaction completed with {:?}",
+            select_result
+        );
 
+        defmt::info!("Transaction cancelled");
+
+        let mut read_data = [0u8; 22];
         // do the real read which should succeed
         i2c.transaction_async(
             DUT_ADDRESS,
