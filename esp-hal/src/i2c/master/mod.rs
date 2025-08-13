@@ -2969,8 +2969,7 @@ mod bus_clear {
         driver: Driver<'a>,
         wait: Instant,
         state: State,
-        sda: Option<AnyPin<'static>>,
-        scl: Option<AnyPin<'static>>,
+        pins: Option<(AnyPin<'static>, AnyPin<'static>)>,
     }
 
     impl<'a> ClearBusFuture<'a> {
@@ -3000,8 +2999,7 @@ mod bus_clear {
                     driver,
                     wait: Instant::now(),
                     state: State::Idle,
-                    sda: None,
-                    scl: None,
+                    pins: None,
                 };
             };
 
@@ -3022,8 +3020,7 @@ mod bus_clear {
                 driver,
                 wait: Instant::now() + Self::SCL_DELAY,
                 state,
-                sda: Some(sda),
-                scl: Some(scl),
+                pins: Some((sda, scl)),
             }
         }
     }
@@ -3044,14 +3041,14 @@ mod bus_clear {
                     return Poll::Pending;
                 }
                 State::SendStop => {
-                    if let Some(sda) = self.sda.as_ref() {
+                    if let Some((sda, _scl)) = self.pins.as_ref() {
                         sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
                     }
                     self.state = State::Idle;
                     return Poll::Pending;
                 }
                 State::SendClock(0, false) => {
-                    if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         // Set up for STOP condition
                         sda.set_output_high(false);
                         scl.set_output_high(true);
@@ -3059,13 +3056,13 @@ mod bus_clear {
                     self.state = State::SendStop;
                 }
                 State::SendClock(n, false) => {
-                    if let Some(scl) = self.scl.as_ref() {
+                    if let Some((_sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(true);
                     }
                     self.state = State::SendClock(n - 1, true);
                 }
                 State::SendClock(n, true) => {
-                    if let Some(scl) = self.scl.as_ref() {
+                    if let Some((_sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(false);
                     }
                     self.state = State::SendClock(n, false);
@@ -3079,7 +3076,7 @@ mod bus_clear {
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
-            if let (Some(sda), Some(scl)) = (self.sda.take(), self.scl.take()) {
+            if let Some((sda, scl)) = self.pins.take() {
                 // Make sure _we_ release the bus.
                 scl.set_output_high(true);
                 sda.set_output_high(true);
