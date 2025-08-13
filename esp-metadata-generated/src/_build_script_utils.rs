@@ -562,6 +562,7 @@ impl Chip {
                     "i2c_master_fifo_size=\"16\"",
                     "interrupts_status_registers=\"2\"",
                     "rng_apb_cycle_wait_num=\"16\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -678,6 +679,7 @@ impl Chip {
                     "cargo:rustc-cfg=i2c_master_fifo_size=\"16\"",
                     "cargo:rustc-cfg=interrupts_status_registers=\"2\"",
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -828,6 +830,7 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -974,6 +977,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -1178,6 +1182,7 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -1380,6 +1385,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -1562,6 +1568,7 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"384\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -1738,6 +1745,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"384\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -1910,6 +1918,7 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -2082,6 +2091,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -2274,6 +2284,7 @@ impl Chip {
                     "rng_apb_cycle_wait_num=\"16\"",
                     "rsa_size_increment=\"32\"",
                     "rsa_memory_size_bytes=\"512\"",
+                    "sha_dma",
                     "sha_algo_sha_1",
                     "sha_algo_sha_224",
                     "sha_algo_sha_256",
@@ -2462,6 +2473,7 @@ impl Chip {
                     "cargo:rustc-cfg=rng_apb_cycle_wait_num=\"16\"",
                     "cargo:rustc-cfg=rsa_size_increment=\"32\"",
                     "cargo:rustc-cfg=rsa_memory_size_bytes=\"512\"",
+                    "cargo:rustc-cfg=sha_dma",
                     "cargo:rustc-cfg=sha_algo_sha_1",
                     "cargo:rustc-cfg=sha_algo_sha_224",
                     "cargo:rustc-cfg=sha_algo_sha_256",
@@ -2666,6 +2678,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(i2c_master_has_arbitration_en)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_has_tx_fifo_watermark)");
         println!("cargo:rustc-check-cfg=cfg(i2c_master_bus_timeout_is_exponential)");
+        println!("cargo:rustc-check-cfg=cfg(sha_dma)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_224)");
         println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_divcnt_rst)");
         println!("cargo:rustc-check-cfg=cfg(timergroup_default_clock_source_is_set)");

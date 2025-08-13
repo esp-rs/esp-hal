@@ -499,6 +499,8 @@ driver_configs![
         name: "SHA",
         properties: {
             #[serde(default)]
+            dma: bool,
+            #[serde(default)]
             algo: Vec<String>,
         }
     },

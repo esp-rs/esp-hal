@@ -156,6 +156,9 @@ macro_rules! property {
     ("rng.apb_cycle_wait_num", str) => {
         stringify!(16)
     };
+    ("sha.dma") => {
+        true
+    };
     ("spi_master.has_octal") => {
         false
     };

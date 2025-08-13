@@ -195,6 +195,9 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(512)
     };
+    ("sha.dma") => {
+        true
+    };
     ("spi_master.has_octal") => {
         true
     };
