@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
@@ -129,20 +129,29 @@ pub fn build_examples(
     let chip = args.chip.unwrap();
 
     // Determine the appropriate build target for the given package and chip:
-    let target = args.package.unwrap().target_triple(&chip)?;
+    let target = args.package.target_triple(&chip)?;
 
     if !args.example.eq_ignore_ascii_case("all") {
         // Attempt to build only the specified example:
-        let filtered = examples
+        let mut filtered = examples
             .iter()
             .filter(|ex| ex.matches_name(&args.example))
             .collect::<Vec<_>>();
 
         if filtered.is_empty() {
-            bail!(
-                "Example '{}' not found or unsupported for the given chip",
+            log::warn!(
+                "Example '{}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package.",
                 args.example
             );
+
+            let example_idx = inquire::Select::new(
+                "Select the example:",
+                examples.iter().map(|ex| ex.binary_name()).collect(),
+            ).prompt()?;
+
+            if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_idx) {
+                filtered.push(selected);
+            }
         }
 
         for example in filtered {

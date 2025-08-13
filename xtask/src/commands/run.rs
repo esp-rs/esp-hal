@@ -4,7 +4,7 @@ use std::{
     process::Command,
 };
 
-use anyhow::{Context as _, Result, bail, ensure};
+use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
@@ -132,27 +132,44 @@ pub fn run_examples(
 ) -> Result<()> {
     let mut examples = examples;
 
-    // At this point, package can never be `None`, so we can safely unwrap it.
-    let package = args.package.unwrap();
     // At this point, chip can never be `None`, so we can safely unwrap it.
     let chip = args.chip.unwrap();
 
     // Determine the appropriate build target for the given package and chip:
-    let target = package.target_triple(&chip)?;
+    let target = args.package.target_triple(&chip)?;
 
     // Filter the examples down to only the binaries supported by the given chip
     examples.retain(|ex| ex.supports_chip(chip));
 
     // Handle "all" examples and specific example
     if !args.example.eq_ignore_ascii_case("all") {
-        examples.retain(|ex| ex.matches_name(&args.example));
-        ensure!(
-            examples.len() == 1,
-            "Example '{}' not found or unsupported for {}",
-            args.example,
-            chip
-        );
+        let mut filtered = examples
+            .iter()
+            .filter(|ex| ex.matches_name(&args.example))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        if filtered.is_empty() {
+            log::warn!(
+                "Example '{}' not found or unsupported for {}. Please select one of the existing examples in the desired package.",
+                args.example,
+                chip
+            );
+
+            let example_idx = inquire::Select::new(
+                "Select the example:",
+                examples.iter().map(|ex| ex.binary_name()).collect(),
+            )
+            .prompt()?;
+
+            if let Some(selected) = examples.into_iter().find(|ex| ex.binary_name() == example_idx) {
+                filtered.push(selected);
+            }
+        }
+
+        examples = filtered;
     }
+
 
     examples.sort_by_key(|ex| ex.tag());
 

@@ -375,7 +375,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         examples(
             workspace,
             ExamplesArgs {
-                package: Some(Package::EspLpHal),
+                package: Package::EspLpHal,
                 chip: Some(args.chip),
                 example: "all".to_string(),
                 debug: false,
@@ -451,7 +451,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     examples(
         workspace,
         ExamplesArgs {
-            package: Some(Package::Examples),
+            package: Package::Examples,
             chip: Some(args.chip),
             example: "all".to_string(),
             debug: true,
@@ -469,7 +469,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     examples(
         workspace,
         ExamplesArgs {
-            package: Some(Package::QaTest),
+            package: Package::QaTest,
             chip: Some(args.chip),
             example: "all".to_string(),
             debug: true,

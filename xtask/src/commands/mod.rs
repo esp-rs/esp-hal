@@ -24,8 +24,8 @@ pub struct ExamplesArgs {
     #[arg(value_enum, long)]
     pub chip: Option<Chip>,
     /// Package whose examples we wish to act on.
-    #[arg(value_enum, long)]
-    pub package: Option<Package>,
+    #[arg(value_enum, long, default_value_t = Package::Examples)]
+    pub package: Package,
     /// Build examples in debug mode only
     #[arg(long)]
     pub debug: bool,
@@ -85,38 +85,32 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     let chip = args.chip.unwrap();
 
-    // If no package was provided, default to `examples`
-    if args.package.is_none() {
-        args.package = Some(Package::Examples);
-    }
     // Ensure that the package/chip combination provided are valid:
-    args.package.unwrap().validate_package_chip(&chip)?;
+    args.package.validate_package_chip(&chip)?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
-    if let Some(Package::EspHal) = args.package {
+    if args.package == Package::EspHal {
         log::warn!(
             "Package '{}' specified, using '{}' instead",
             Package::EspHal,
             Package::Examples
         );
-        args.package = Some(Package::Examples);
+        args.package = Package::Examples;
     }
 
-    let package = args.package.unwrap();
-
     // Absolute path of the package's root:
-    let package_path = crate::windows_safe_path(&workspace.join(package.to_string()));
+    let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
 
     // Load all examples which support the specified chip and parse their metadata.
     //
     // The `examples` directory contains a number of individual projects, and does not rely on
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
-    let examples = if package == Package::Examples {
+    let examples = if args.package == Package::Examples {
         crate::firmware::load_cargo_toml(&package_path)?
     } else {
-        let example_path = match package {
+        let example_path = match args.package {
             Package::QaTest => package_path.join("src").join("bin"),
             Package::HilTest => package_path.join("tests"),
             _ => package_path.join("examples"),
