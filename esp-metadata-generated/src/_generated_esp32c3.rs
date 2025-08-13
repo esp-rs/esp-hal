@@ -189,6 +189,9 @@ macro_rules! property {
     ("rsa.memory_size_bytes", str) => {
         stringify!(384)
     };
+    ("sha.dma") => {
+        true
+    };
     ("spi_master.has_octal") => {
         false
     };
@@ -461,34 +464,36 @@ macro_rules! for_each_peripheral {
         <= RNG() (unstable))); _for_each_inner!((RSA <= RSA(RSA : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
         _for_each_inner!((LPWR <= RTC_CNTL() (unstable))); _for_each_inner!((SENSITIVE <=
-        SENSITIVE() (unstable))); _for_each_inner!((SHA <= SHA() (unstable)));
-        _for_each_inner!((SPI0 <= SPI0() (unstable))); _for_each_inner!((SPI1 <= SPI1()
-        (unstable))); _for_each_inner!((SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((SYSTEM <=
-        SYSTEM() (unstable))); _for_each_inner!((SYSTIMER <= SYSTIMER() (unstable)));
-        _for_each_inner!((TIMG0 <= TIMG0() (unstable))); _for_each_inner!((TIMG1 <=
-        TIMG1() (unstable))); _for_each_inner!((TWAI0 <= TWAI0() (unstable)));
-        _for_each_inner!((UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((UART1 <=
-        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner!((UHCI0 <= UHCI0() (unstable)));
-        _for_each_inner!((UHCI1 <= UHCI1() (unstable))); _for_each_inner!((USB_DEVICE <=
-        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }) (unstable))); _for_each_inner!((XTS_AES <= XTS_AES()
-        (unstable))); _for_each_inner!((DMA_CH0 <= virtual() (unstable)));
-        _for_each_inner!((DMA_CH1 <= virtual() (unstable))); _for_each_inner!((DMA_CH2 <=
-        virtual() (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
-        _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((BT <=
-        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((TSENS <= virtual() (unstable))); _for_each_inner!((WIFI <=
-        virtual() (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <=
-        virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()),
-        (GPIO5 <= virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <=
-        virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()),
-        (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <=
-        virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()),
-        (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <=
-        AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        SENSITIVE() (unstable))); _for_each_inner!((SHA <= SHA(SHA : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner!((SPI0 <= SPI0() (unstable)));
+        _for_each_inner!((SPI1 <= SPI1() (unstable))); _for_each_inner!((SPI2 <=
+        SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }))); _for_each_inner!((SYSTEM <= SYSTEM() (unstable)));
+        _for_each_inner!((SYSTIMER <= SYSTIMER() (unstable))); _for_each_inner!((TIMG0 <=
+        TIMG0() (unstable))); _for_each_inner!((TIMG1 <= TIMG1() (unstable)));
+        _for_each_inner!((TWAI0 <= TWAI0() (unstable))); _for_each_inner!((UART0 <=
+        UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner!((UART1 <= UART1(UART1 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })));
+        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((UHCI1 <=
+        UHCI1() (unstable))); _for_each_inner!((USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable))); _for_each_inner!((XTS_AES <= XTS_AES() (unstable)));
+        _for_each_inner!((DMA_CH0 <= virtual() (unstable))); _for_each_inner!((DMA_CH1 <=
+        virtual() (unstable))); _for_each_inner!((DMA_CH2 <= virtual() (unstable)));
+        _for_each_inner!((ADC1 <= virtual() (unstable))); _for_each_inner!((ADC2 <=
+        virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
+        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable))); _for_each_inner!((TSENS
+        <= virtual() (unstable))); _for_each_inner!((WIFI <= virtual() (unstable)));
+        _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
+        virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
+        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
+        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
+        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()), (GPIO16 <=
+        virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <= virtual()),
+        (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <= AES(AES : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (APB_SARADC <= APB_SARADC()
         (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (BB <= BB()
         (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)), (EFUSE <=
@@ -503,7 +508,8 @@ macro_rules! for_each_peripheral {
         (RMT <= RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA(RSA : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (LPWR <= RTC_CNTL() (unstable)), (SENSITIVE <= SENSITIVE()
-        (unstable)), (SHA <= SHA() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
+        (unstable)), (SHA <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
         SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (SYSTEM <= SYSTEM()
         (unstable)), (SYSTIMER <= SYSTIMER() (unstable)), (TIMG0 <= TIMG0() (unstable)),

@@ -57,7 +57,7 @@ peripherals = [
     { name = "RMT" },
     { name = "RNG" },
     { name = "RSA", interrupts = { peri = "RSA" } },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
     { name = "SPI1" },
@@ -384,6 +384,7 @@ memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
+dma = true
 algo = ["SHA-1", "SHA-224", "SHA-256"]
 
 [device.spi_master]
