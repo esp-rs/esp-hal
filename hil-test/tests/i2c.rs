@@ -6,7 +6,7 @@
 #![no_std]
 #![no_main]
 
-use embassy_futures::select::select;
+use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 use esp_hal::{
     Async,
@@ -203,7 +203,7 @@ mod tests {
         let mut read_data = [0u8; 22];
 
         // Start a transaction that will be cancelled.
-        select(
+        let select_result = select(
             i2c.transaction_async(
                 DUT_ADDRESS,
                 &mut [
@@ -219,6 +219,9 @@ mod tests {
             },
         )
         .await;
+
+        // Assert that the I2C transaction was cancelled.
+        assert!(matches!(select_result, Either::Second(_)));
 
         // do the real read which should succeed
         i2c.transaction_async(
