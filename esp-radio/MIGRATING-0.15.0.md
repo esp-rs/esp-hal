@@ -49,10 +49,3 @@ Provide these symbols:
 + pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 ...
 + pub extern "C" fn get_free_internal_heap_size() -> usize; ...
 ```
-
-## Timer interrupts
-```diff
-- pub fn enable_interrupt(&mut self, enable: bool) { ... }
-+ pub fn listen(&mut self) { ... }
-+ pub fn unlisten(&mut self) { ... }
-```
