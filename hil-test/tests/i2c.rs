@@ -11,11 +11,20 @@ use embassy_time::{Duration, Ticker};
 use esp_hal::{
     Async,
     Blocking,
-    i2c::master::{AcknowledgeCheckFailedReason, Config, Error, I2c, I2cAddress, Operation},
+    i2c::master::{
+        AcknowledgeCheckFailedReason,
+        Config,
+        Error,
+        I2c,
+        I2cAddress,
+        Operation,
+        SoftwareTimeout,
+    },
     interrupt::{
         Priority,
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
+    time,
 };
 use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
@@ -35,9 +44,15 @@ fn _async_driver_is_compatible_with_blocking_ehal() {
     fn _with_ehal(_: impl embedded_hal::i2c::I2c) {}
 }
 
+// Daniel's test device:
+// const DUT_ADDRESS: u8 = 0x29;
+// const READ_DATA_COMMAND: &[u8] = &[0, 0];
+
+// HIL test device:
 const DUT_ADDRESS: u8 = 0x77;
-const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 const READ_DATA_COMMAND: &[u8] = &[0xaa];
+
+const NON_EXISTENT_ADDRESS: u8 = 0x6b;
 
 #[embassy_executor::task]
 async fn waiting_blocking_task() {
@@ -200,7 +215,11 @@ mod tests {
     #[test]
     async fn async_cancellation(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
-        let mut read_data = [0u8; 22];
+
+        // Read a lot of data to ensure that the transaction is cancelled mid-transfer.
+        let mut read_data = [0u8; 220];
+
+        defmt::info!("Running transaction to be cancelled");
 
         // Start a transaction that will be cancelled.
         let select_result = select(
@@ -221,8 +240,15 @@ mod tests {
         .await;
 
         // Assert that the I2C transaction was cancelled.
-        assert!(matches!(select_result, Either::Second(_)));
+        hil_test::assert!(
+            matches!(select_result, Either::Second(_)),
+            "Transaction completed with {:?}",
+            select_result
+        );
 
+        defmt::info!("Transaction cancelled");
+
+        let mut read_data = [0u8; 22];
         // do the real read which should succeed
         i2c.transaction_async(
             DUT_ADDRESS,
@@ -241,6 +267,31 @@ mod tests {
     async fn test_timeout_when_scl_kept_low(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
 
+        i2c.apply_config(
+            &Config::default()
+                .with_software_timeout(SoftwareTimeout::PerByte(time::Duration::from_millis(10))),
+        )
+        .unwrap();
+
+        esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
+
+        let mut read_data = [0u8; 22];
+        // will run into an error but it should return at least
+        i2c.write_read(DUT_ADDRESS, READ_DATA_COMMAND, &mut read_data)
+            .expect_err("Expected timeout error");
+    }
+
+    #[test]
+    #[cfg(i2c_master_has_fsm_timeouts)]
+    async fn test_timeout_when_scl_kept_low_with_fsm_timeout(ctx: Context) {
+        let mut i2c = ctx.i2c.into_async();
+
+        i2c.apply_config(
+            &Config::default()
+                .with_scl_st_timeout(esp_hal::i2c::master::FsmTimeout::new_const::<16>()),
+        )
+        .unwrap();
+
         esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
 
         let mut read_data = [0u8; 22];
@@ -252,6 +303,12 @@ mod tests {
     #[test]
     async fn async_test_timeout_when_scl_kept_low(ctx: Context) {
         let mut i2c = ctx.i2c.into_async();
+
+        i2c.apply_config(
+            &Config::default()
+                .with_software_timeout(SoftwareTimeout::PerByte(time::Duration::from_millis(10))),
+        )
+        .unwrap();
 
         esp_hal::gpio::InputSignal::I2CEXT0_SCL.connect_to(&esp_hal::gpio::Level::Low);
 

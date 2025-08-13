@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rsa::enable_constant_time_acceleration` has been renamed to `Rsa::disable_constant_time` (#3900)
 - `Rsa::enable_search_acceleration` has been renamed to `Rsa::search_acceleration` (#3900)
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
+- `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
+- The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
 
 ### Fixed
 
@@ -46,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 - Switched GPIO32 and GPIO33 ADC channel numbers (#3908, #3911)
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
+- ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
 
 ### Removed
 

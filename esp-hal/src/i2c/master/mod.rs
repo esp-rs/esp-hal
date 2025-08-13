@@ -206,8 +206,7 @@ impl From<u8> for I2cAddress {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
-// TODO: when supporting interrupts, document that SCL = high also triggers an
-// interrupt.
+#[instability::unstable]
 pub enum BusTimeout {
     /// Use the maximum timeout value.
     Maximum,
@@ -265,7 +264,6 @@ impl BusTimeout {
 /// efficiency.
 ///
 /// [`embassy_time::with_timeout`]: https://docs.rs/embassy-time/0.4.0/embassy_time/fn.with_timeout.html
-#[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SoftwareTimeout {
@@ -286,7 +284,7 @@ pub enum SoftwareTimeout {
 /// When the FSM remains unchanged for more than the 2^ the given amount of bus
 /// clock cycles a timeout will be triggered.
 ///
-/// The default value is 0x10
+/// The default value is 23 (2^23 clock cycles).
 #[instability::unstable]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -298,8 +296,6 @@ pub struct FsmTimeout {
 #[cfg(i2c_master_has_fsm_timeouts)]
 impl FsmTimeout {
     const FSM_TIMEOUT_MAX: u8 = 23;
-
-    const FSM_TIMEOUT_DEFAULT: u8 = 0x10;
 
     /// Creates a new timeout.
     ///
@@ -334,7 +330,7 @@ impl FsmTimeout {
 #[cfg(i2c_master_has_fsm_timeouts)]
 impl Default for FsmTimeout {
     fn default() -> Self {
-        Self::new_const::<{ Self::FSM_TIMEOUT_DEFAULT }>()
+        Self::new_const::<{ Self::FSM_TIMEOUT_MAX }>()
     }
 }
 
@@ -582,13 +578,15 @@ pub struct Config {
 
     /// I2C SCL timeout period.
     ///
-    /// Default value: 10 bus clock cycles.
+    /// Default value:
+    #[cfg_attr(i2c_master_has_bus_timeout_enable, doc = "disabled")]
+    #[cfg_attr(not(i2c_master_has_bus_timeout_enable), doc = concat!(property!("i2c_master.max_bus_timeout", str), " bus cycles"))]
+    #[builder_lite(unstable)]
     timeout: BusTimeout,
 
     /// Software timeout.
     ///
-    /// Default value: 1 ms per byte.
-    #[builder_lite(unstable)]
+    /// Default value: disabled.
     software_timeout: SoftwareTimeout,
 
     /// Sets the threshold value for the unchanged period of the SCL_FSM.
@@ -610,8 +608,14 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             frequency: Rate::from_khz(100),
-            timeout: BusTimeout::BusCycles(10),
-            software_timeout: SoftwareTimeout::PerByte(Duration::from_millis(1)),
+
+            #[cfg(i2c_master_has_bus_timeout_enable)]
+            timeout: BusTimeout::Disabled,
+            #[cfg(not(i2c_master_has_bus_timeout_enable))]
+            timeout: BusTimeout::Maximum,
+
+            software_timeout: SoftwareTimeout::None,
+
             #[cfg(i2c_master_has_fsm_timeouts)]
             scl_st_timeout: Default::default(),
             #[cfg(i2c_master_has_fsm_timeouts)]
@@ -2965,12 +2969,11 @@ mod bus_clear {
         driver: Driver<'a>,
         wait: Instant,
         state: State,
-        sda: Option<AnyPin<'static>>,
-        scl: Option<AnyPin<'static>>,
+        pins: Option<(AnyPin<'static>, AnyPin<'static>)>,
     }
 
     impl<'a> ClearBusFuture<'a> {
-        // Number of SCL pulses to clear the bus
+        // Number of SCL pulses to clear the bus (max 8 data bits sent by the device, + NACK)
         const BUS_CLEAR_BITS: u8 = 9;
         // use standard 100kHz data rate
         const SCL_DELAY: Duration = Duration::from_micros(5);
@@ -2996,30 +2999,33 @@ mod bus_clear {
                     driver,
                     wait: Instant::now(),
                     state: State::Idle,
-                    sda: None,
-                    scl: None,
+                    pins: None,
                 };
             };
-
-            driver.info.scl_output.disconnect_from(&scl);
-            driver.info.sda_output.disconnect_from(&sda);
 
             sda.set_output_high(true);
             scl.set_output_high(false);
 
-            // Starting from (9, false), becase:
-            // - we start with SCL low
-            // - a complete SCL cycle consists of a high period and a low period
-            // - we decrement the remaining counter at the beginning of a cycle, which gives us 9
-            //   complete SCL cycles.
-            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
+            driver.info.scl_output.disconnect_from(&scl);
+            driver.info.sda_output.disconnect_from(&sda);
+
+            let state = if sda.is_input_high() {
+                // SDA is high, the device is not holding it, we don't need to do anything.
+                State::Idle
+            } else {
+                // Starting from (9, false), becase:
+                // - we start with SCL low
+                // - a complete SCL cycle consists of a high period and a low period
+                // - we decrement the remaining counter at the beginning of a cycle, which gives us
+                //   9 complete SCL cycles.
+                State::SendClock(Self::BUS_CLEAR_BITS, false)
+            };
 
             Self {
                 driver,
                 wait: Instant::now() + Self::SCL_DELAY,
                 state,
-                sda: Some(sda),
-                scl: Some(scl),
+                pins: Some((sda, scl)),
             }
         }
     }
@@ -3030,8 +3036,11 @@ mod bus_clear {
 
             match self.state {
                 State::Idle => {
-                    if self.driver.regs().sr().read().bus_busy().bit_is_set() {
-                        return Poll::Pending;
+                    if let Some((sda, _scl)) = self.pins.as_ref() {
+                        // Pins are disconnected from the peripheral, we can't use `bus_busy`.
+                        if !sda.is_input_high() {
+                            return Poll::Pending;
+                        }
                     }
                     return Poll::Ready(());
                 }
@@ -3040,14 +3049,14 @@ mod bus_clear {
                     return Poll::Pending;
                 }
                 State::SendStop => {
-                    if let Some(sda) = self.sda.as_ref() {
+                    if let Some((sda, _scl)) = self.pins.as_ref() {
                         sda.set_output_high(true); // STOP, SDA low -> high while SCL is HIGH
                     }
                     self.state = State::Idle;
                     return Poll::Pending;
                 }
                 State::SendClock(0, false) => {
-                    if let (Some(scl), Some(sda)) = (self.scl.as_ref(), self.sda.as_ref()) {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         // Set up for STOP condition
                         sda.set_output_high(false);
                         scl.set_output_high(true);
@@ -3055,14 +3064,19 @@ mod bus_clear {
                     self.state = State::SendStop;
                 }
                 State::SendClock(n, false) => {
-                    if let Some(scl) = self.scl.as_ref() {
+                    if let Some((_sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(true);
                     }
                     self.state = State::SendClock(n - 1, true);
                 }
                 State::SendClock(n, true) => {
-                    if let Some(scl) = self.scl.as_ref() {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(false);
+                        if sda.is_input_high() {
+                            // The device has released SDA, we can move on to generating a NACK
+                            self.state = State::SendClock(0, false);
+                            return Poll::Pending;
+                        }
                     }
                     self.state = State::SendClock(n, false);
                 }
@@ -3075,7 +3089,7 @@ mod bus_clear {
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
-            if let (Some(sda), Some(scl)) = (self.sda.take(), self.scl.take()) {
+            if let Some((sda, scl)) = self.pins.take() {
                 // Make sure _we_ release the bus.
                 scl.set_output_high(true);
                 sda.set_output_high(true);
