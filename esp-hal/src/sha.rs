@@ -68,6 +68,12 @@ use crate::{
     system::GenericPeripheralGuard,
 };
 
+// ESP32 quirks:
+// - Big endian text register (what about hash?)
+// - Text and hash is in the same register -> needs an additional load operation to place the hash
+//   in the text registers
+// - Each algorithm has its own register cluster
+
 /// The SHA Accelerator driver instance
 pub struct Sha<'d> {
     sha: SHA<'d>,
@@ -115,11 +121,8 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 
 // A few notes on this implementation with regards to 'memcpy',
 // - The registers are *not* cleared after processing, so padding needs to be written out
-// - This component uses core::intrinsics::volatile_* which is unstable, but is the only way to
-// efficiently copy memory with volatile
-// - For this particular registers (and probably others), a full u32 needs to be written partial
-// register writes (i.e. in u8 mode) does not work
-//   - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
+// - Registers need to be written one u32 at a time, no u8 access
+// - This means that we need to buffer bytes coming in up to 4 u8's in order to create a full u32
 
 /// An active digest
 ///
@@ -217,6 +220,8 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         let length = (self.cursor as u64 * 8).to_be_bytes();
         nb::block!(self.update(&[0x80]))?; // Append "1" bit
 
+        let chunk_len = A::CHUNK_LENGTH;
+
         // Flush partial data, ensures aligned cursor
         {
             while self.is_busy() {}
@@ -228,22 +233,22 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
             let flushed = self.alignment_helper.flush_to(
                 m_mem(&self.sha.borrow().sha, 0),
-                (self.cursor % A::CHUNK_LENGTH) / self.alignment_helper.align_size(),
+                (self.cursor % chunk_len) / self.alignment_helper.align_size(),
             );
             self.cursor = self.cursor.wrapping_add(flushed);
 
-            if flushed > 0 && self.cursor.is_multiple_of(A::CHUNK_LENGTH) {
+            if flushed > 0 && self.cursor.is_multiple_of(chunk_len) {
                 self.process_buffer();
                 while self.is_busy() {}
             }
         }
         debug_assert!(self.cursor.is_multiple_of(4));
 
-        let mod_cursor = self.cursor % A::CHUNK_LENGTH;
-        if (A::CHUNK_LENGTH - mod_cursor) < A::CHUNK_LENGTH / 8 {
+        let mut mod_cursor = self.cursor % chunk_len;
+        if (chunk_len - mod_cursor) < chunk_len / 8 {
             // Zero out remaining data if buffer is almost full (>=448/896), and process
             // buffer
-            let pad_len = A::CHUNK_LENGTH - mod_cursor;
+            let pad_len = chunk_len - mod_cursor;
             self.alignment_helper.volatile_write(
                 m_mem(&self.sha.borrow().sha, 0),
                 0_u8,
@@ -253,14 +258,14 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             self.process_buffer();
             self.cursor = self.cursor.wrapping_add(pad_len);
 
-            debug_assert_eq!(self.cursor % A::CHUNK_LENGTH, 0);
+            debug_assert_eq!(self.cursor % chunk_len, 0);
+            mod_cursor = 0;
 
             // Spin-wait for finish
             while self.is_busy() {}
         }
 
-        let mod_cursor = self.cursor % A::CHUNK_LENGTH; // Should be zero if branched above
-        let pad_len = A::CHUNK_LENGTH - mod_cursor - size_of::<u64>();
+        let pad_len = chunk_len - mod_cursor - size_of::<u64>();
 
         self.alignment_helper.volatile_write(
             m_mem(&self.sha.borrow().sha, 0),
@@ -272,8 +277,8 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         self.alignment_helper.aligned_volatile_copy(
             m_mem(&self.sha.borrow().sha, 0),
             &length,
-            A::CHUNK_LENGTH / self.alignment_helper.align_size(),
-            (A::CHUNK_LENGTH - size_of::<u64>()) / self.alignment_helper.align_size(),
+            chunk_len / self.alignment_helper.align_size(),
+            (chunk_len - size_of::<u64>()) / self.alignment_helper.align_size(),
         );
 
         self.process_buffer();
@@ -383,8 +388,8 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             }
         }
 
-        let mod_cursor = self.cursor % A::CHUNK_LENGTH;
         let chunk_len = A::CHUNK_LENGTH;
+        let mod_cursor = self.cursor % chunk_len;
 
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             m_mem(&self.sha.borrow().sha, 0),
@@ -536,7 +541,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<
 /// This macro implements the Sha<'a, Dm> trait for a specified Sha algorithm
 /// and a set of parameters
 macro_rules! impl_sha {
-    ($name: ident, $mode_bits: tt, $digest_length: tt, $chunk_length: tt) => {
+    ($name: ident, $mode_bits: literal, $digest_length: literal, $chunk_length: literal) => {
         /// A SHA implementation struct.
         ///
         /// This struct is generated by the macro and represents a specific SHA hashing
