@@ -246,15 +246,10 @@ impl<'d> Uhci<'d, Blocking> {
 
     /// Create a new instance in [crate::Async] mode.
     pub fn into_async(self) -> Uhci<'d, Async> {
-        let this = ManuallyDrop::new(self);
-        let uart = unsafe { core::ptr::read(&this.uart) }.into_async();
-        let uhci = unsafe { core::ptr::read(&this.uhci) };
-        let channel = unsafe { core::ptr::read(&this.channel) }.into_async();
-
         Uhci {
-            uart,
-            uhci,
-            channel,
+            uart: self.uart.into_async(),
+            uhci: self.uhci,
+            channel: self.channel.into_async(),
         }
     }
 }
@@ -266,10 +261,6 @@ impl<'d> Uhci<'d, Async> {
         mut tx_buffer: Buf,
     ) -> UhciDmaTxTransfer<'d, Async, Buf> {
         {
-            // self.channel.tx.clear_interrupts();
-
-            // self.channel.tx.tx_impl.restart();
-
             unsafe {
                 self.channel
                     .tx
@@ -304,20 +295,12 @@ impl<'d> Uhci<'d, Async> {
 
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
-        todo!()
-        // Uhci {
-        // uart: self.uart.into_blocking(),
-        // uhci: self.uhci,
-        // channel: self.channel.into_blocking(),
-        // }
+        Uhci {
+            uart: self.uart.into_blocking(),
+            uhci: self.uhci,
+            channel: self.channel.into_blocking(),
+        }
     }
-}
-
-impl<Dm> Drop for Uhci<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    fn drop(&mut self) {}
 }
 
 // Based on SpiDmaTransfer
@@ -348,11 +331,11 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
         self.uhci.channel.tx.is_done()
     }
 
-    /// to
-    async fn wait_for_idle(&mut self) {
-        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
+    /// todo
+    pub async fn wait_for_idle(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
+        self.uhci.uart.tx.flush_async().await.unwrap();
         DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
     }
 
@@ -363,7 +346,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     #[instability::unstable]
     pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         self.wait_for_idle().await;
-
+        self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
             (
                 ManuallyDrop::take(&mut self.uhci),
@@ -376,15 +359,13 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
 
     /// Cancels the DMA transfer.
     #[instability::unstable]
-    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.channel.tx.is_done() {
-            self.uhci.channel.tx.stop_transfer();
-        }
+    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf) {
+        self.uhci.channel.tx.stop_transfer();
 
         let retval = unsafe {
             (
                 ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
+                DmaTxBuffer::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
@@ -412,10 +393,7 @@ where
     Buf: DmaTxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.channel.tx.is_done() {
-            self.uhci.channel.tx.stop_transfer();
-        }
-        // TODO: Implement uhci drop
+        self.uhci.channel.tx.stop_transfer();
 
         unsafe {
             ManuallyDrop::drop(&mut self.uhci);
@@ -452,7 +430,8 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
         self.uhci.channel.rx.is_done()
     }
 
-    async fn wait_for_idle(&mut self) {
+    /// todo
+    pub async fn wait_for_idle(&mut self) {
         DmaRxFuture::new(&mut self.uhci.channel.rx).await.unwrap();
     }
 
@@ -463,6 +442,7 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     #[instability::unstable]
     pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         self.wait_for_idle().await;
+        self.uhci.channel.rx.stop_transfer();
 
         let retval = unsafe {
             (
@@ -476,15 +456,13 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
 
     /// Cancels the DMA transfer.
     #[instability::unstable]
-    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        if !self.uhci.channel.rx.is_done() {
-            self.uhci.channel.rx.stop_transfer();
-        }
+    pub fn cancel(mut self) -> (Uhci<'d, Async>, Buf) {
+        self.uhci.channel.rx.stop_transfer();
 
         let retval = unsafe {
             (
                 ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
+                DmaRxBuffer::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
@@ -512,10 +490,8 @@ where
     Buf: DmaRxBuffer,
 {
     fn drop(&mut self) {
-        if !self.uhci.channel.rx.is_done() {
-            self.uhci.channel.rx.stop_transfer();
-            // TODO: Implement uhci drop
-        }
+        self.uhci.channel.rx.stop_transfer();
+
         unsafe {
             ManuallyDrop::drop(&mut self.uhci);
             ManuallyDrop::drop(&mut self.dma_buf);

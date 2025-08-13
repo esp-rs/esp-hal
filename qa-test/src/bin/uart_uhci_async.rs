@@ -83,8 +83,6 @@ async fn run_uart(peripherals: Peripherals) {
         }
     }
 
-    // let delay_start = Instant::now();
-    // while delay_start.elapsed() < Duration::from_secs(3) {}
     println!("Waiting");
     Timer::after(Duration::from_secs(10)).await;
     println!("bye");
