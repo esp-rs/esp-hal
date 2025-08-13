@@ -23,7 +23,7 @@ pub struct ExamplesArgs {
     /// Chip to target.
     #[arg(value_enum, long)]
     pub chip: Option<Chip>,
-    /// Package whose examples we which to act on.
+    /// Package whose examples we wish to act on.
     #[arg(value_enum, long)]
     pub package: Option<Package>,
     /// Build examples in debug mode only

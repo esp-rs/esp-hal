@@ -144,8 +144,8 @@ pub fn run_examples(
     examples.retain(|ex| ex.supports_chip(chip));
 
     // Handle "all" examples and specific example
-    if args.example.to_lowercase() != "all" {
-        examples.retain(|ex| ex.matches(&Some(args.example.to_lowercase().clone())));
+    if !args.example.eq_ignore_ascii_case("all") {
+        examples.retain(|ex| ex.matches_name(&args.example));
         ensure!(
             examples.len() == 1,
             "Example '{}' not found or unsupported for {}",

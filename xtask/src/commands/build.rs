@@ -131,11 +131,11 @@ pub fn build_examples(
     // Determine the appropriate build target for the given package and chip:
     let target = args.package.unwrap().target_triple(&chip)?;
 
-    if args.example.to_lowercase() != "all" {
+    if !args.example.eq_ignore_ascii_case("all") {
         // Attempt to build only the specified example:
         let filtered = examples
             .iter()
-            .filter(|ex| ex.matches(&Some(args.example.to_lowercase().clone())))
+            .filter(|ex| ex.matches_name(&args.example))
             .collect::<Vec<_>>();
 
         if filtered.is_empty() {
