@@ -336,9 +336,10 @@ macro_rules! for_each_peripheral {
         LEDC() (unstable))); _for_each_inner!((RNG <= RNG() (unstable)));
         _for_each_inner!((LPWR <= RTC_CNTL() (unstable))); _for_each_inner!((MODEM_CLKRST
         <= MODEM_CLKRST() (unstable))); _for_each_inner!((SENSITIVE <= SENSITIVE()
-        (unstable))); _for_each_inner!((SHA <= SHA() (unstable))); _for_each_inner!((SPI0
-        <= SPI0() (unstable))); _for_each_inner!((SPI1 <= SPI1() (unstable)));
-        _for_each_inner!((SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
+        (unstable))); _for_each_inner!((SHA <= SHA(SHA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner!((SPI0 <= SPI0() (unstable))); _for_each_inner!((SPI1 <= SPI1()
+        (unstable))); _for_each_inner!((SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((SYSTEM <=
         SYSTEM() (unstable))); _for_each_inner!((SYSTIMER <= SYSTIMER() (unstable)));
         _for_each_inner!((TIMG0 <= TIMG0() (unstable))); _for_each_inner!((UART0 <=
@@ -370,7 +371,8 @@ macro_rules! for_each_peripheral {
         INTERRUPT_CORE0() (unstable)), (IO_MUX <= IO_MUX() (unstable)), (LEDC <= LEDC()
         (unstable)), (RNG <= RNG() (unstable)), (LPWR <= RTC_CNTL() (unstable)),
         (MODEM_CLKRST <= MODEM_CLKRST() (unstable)), (SENSITIVE <= SENSITIVE()
-        (unstable)), (SHA <= SHA() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
+        (unstable)), (SHA <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
         SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (SYSTEM <= SYSTEM()
         (unstable)), (SYSTIMER <= SYSTIMER() (unstable)), (TIMG0 <= TIMG0() (unstable)),

@@ -62,8 +62,6 @@ use core::{borrow::Borrow, convert::Infallible, marker::PhantomData, mem::size_o
 /// Re-export digest for convenience
 pub use digest::Digest;
 
-#[cfg(not(esp32))]
-use crate::peripherals::Interrupt;
 use crate::{
     peripherals::SHA,
     reg_access::{AlignmentHelper, SocDependentEndianess},
@@ -104,15 +102,14 @@ impl<'d> Sha<'d> {
 
 impl crate::private::Sealed for Sha<'_> {}
 
-#[cfg(not(esp32))]
+#[cfg(sha_dma)]
 #[instability::unstable]
 impl crate::interrupt::InterruptConfigurable for Sha<'_> {
     fn set_interrupt_handler(&mut self, handler: crate::interrupt::InterruptHandler) {
-        for core in crate::system::Cpu::other() {
-            crate::interrupt::disable(core, Interrupt::SHA);
-        }
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::SHA, handler.handler()) };
-        unwrap!(crate::interrupt::enable(Interrupt::SHA, handler.priority()));
+        self.sha.disable_peri_interrupt();
+
+        self.sha.bind_peri_interrupt(handler.handler());
+        self.sha.enable_peri_interrupt(handler.priority());
     }
 }
 

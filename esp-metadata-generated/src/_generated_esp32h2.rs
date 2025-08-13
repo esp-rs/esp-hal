@@ -480,7 +480,8 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((RMT <= RMT() (unstable))); _for_each_inner!((RNG <= RNG()
         (unstable))); _for_each_inner!((RSA <= RSA(RSA : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
-        _for_each_inner!((SHA <= SHA() (unstable))); _for_each_inner!((ETM <= SOC_ETM()
+        _for_each_inner!((SHA <= SHA(SHA : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((ETM <= SOC_ETM()
         (unstable))); _for_each_inner!((SPI0 <= SPI0() (unstable)));
         _for_each_inner!((SPI1 <= SPI1() (unstable))); _for_each_inner!((SPI2 <=
         SPI2(SPI2 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
@@ -539,7 +540,8 @@ macro_rules! for_each_peripheral {
         <= PAU() (unstable)), (PCNT <= PCNT() (unstable)), (PCR <= PCR() (unstable)),
         (PLIC_MX <= PLIC_MX() (unstable)), (PMU <= PMU() (unstable)), (RMT <= RMT()
         (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA(RSA : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (SHA <= SHA()
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (SHA <= SHA(SHA : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (ETM <= SOC_ETM() (unstable)), (SPI0 <= SPI0() (unstable)), (SPI1 <=
         SPI1() (unstable)), (SPI2 <= SPI2(SPI2 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (SYSTEM <= PCR() (unstable)),

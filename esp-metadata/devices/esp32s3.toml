@@ -47,7 +47,7 @@ peripherals = [
     { name = "SDHOST" },
     { name = "SENS" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },

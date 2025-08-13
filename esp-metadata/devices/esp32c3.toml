@@ -39,7 +39,7 @@ peripherals = [
     { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },

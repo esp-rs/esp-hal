@@ -41,7 +41,7 @@ peripherals = [
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
