@@ -109,7 +109,7 @@ pub trait Timer: crate::private::Sealed {
 
     /// Enable or disable the timer's interrupt.
     #[doc(hidden)]
-    fn enable_interrupt(&self, state: bool);
+    fn enable_listen(&self, state: bool);
 
     /// Clear the timer's interrupt.
     fn clear_interrupt(&self);
@@ -206,7 +206,7 @@ impl<'d> WaitFuture<'d> {
         // For some reason, on the S2 we need to enable the interrupt before we
         // read its status. Doing so in the other order causes the interrupt
         // request to never be fired.
-        timer.enable_interrupt(true);
+        timer.enable_listen(true);
         Self { timer }
     }
 
@@ -233,7 +233,7 @@ impl core::future::Future for WaitFuture<'_> {
 
 impl Drop for WaitFuture<'_> {
     fn drop(&mut self) {
-        self.timer.enable_interrupt(false);
+        self.timer.enable_listen(false);
     }
 }
 
@@ -298,12 +298,12 @@ where
 
     /// Listen for interrupt
     pub fn listen(&mut self) {
-        self.inner.enable_interrupt(true);
+        self.inner.enable_listen(true);
     }
 
     /// Unlisten for interrupt
     pub fn unlisten(&mut self) {
-        self.inner.enable_interrupt(false);
+        self.inner.enable_listen(false);
     }
 
     /// Clear the interrupt flag
@@ -398,12 +398,12 @@ where
 
     /// Listen for interrupt
     pub fn listen(&mut self) {
-        self.inner.enable_interrupt(true);
+        self.inner.enable_listen(true);
     }
 
     /// Unlisten for interrupt
     pub fn unlisten(&mut self) {
-        self.inner.enable_interrupt(false);
+        self.inner.enable_listen(false);
     }
 
     /// Clear the interrupt flag
@@ -447,7 +447,7 @@ impl Timer for AnyTimer<'_> {
             fn now(&self) -> Instant;
             fn load_value(&self, value: Duration) -> Result<(), Error>;
             fn enable_auto_reload(&self, auto_reload: bool);
-            fn enable_interrupt(&self, state: bool);
+            fn enable_listen(&self, state: bool);
             fn clear_interrupt(&self);
             fn is_interrupt_set(&self) -> bool;
             fn async_interrupt_handler(&self) -> InterruptHandler;

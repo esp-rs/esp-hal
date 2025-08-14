@@ -565,7 +565,7 @@ impl super::Timer for Alarm<'_> {
         self.set_mode(mode)
     }
 
-    fn enable_interrupt(&self, state: bool) {
+    fn enable_listen(&self, state: bool) {
         INT_ENA_LOCK.lock(|| {
             SYSTIMER::regs()
                 .int_ena()
@@ -642,7 +642,7 @@ mod asynch {
             unit: Unit::Unit0,
             _lifetime: PhantomData,
         }
-        .enable_interrupt(false);
+        .enable_listen(false);
 
         WAKERS[alarm as usize].wake();
     }

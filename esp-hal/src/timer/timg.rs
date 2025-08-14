@@ -327,7 +327,7 @@ impl super::Timer for Timer<'_> {
         self.set_auto_reload(auto_reload)
     }
 
-    fn enable_interrupt(&self, state: bool) {
+    fn enable_listen(&self, state: bool) {
         self.set_interrupt_enabled(state);
     }
 
