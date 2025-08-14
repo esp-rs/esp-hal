@@ -13,6 +13,7 @@ exclude  = [
     "esp-lp-hal",
     "esp-metadata",
     "esp-metadata-generated",
+    "esp-phy",
     "esp-println",
     "esp-radio-preempt-baremetal",
     "esp-radio-preempt-driver",

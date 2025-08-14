@@ -248,6 +248,7 @@ impl Chip {
                     "ulp_fsm",
                     "wifi",
                     "bt",
+                    "phy",
                     "adc_adc1",
                     "adc_adc2",
                     "dac_dac1",
@@ -294,6 +295,7 @@ impl Chip {
                     "sha_algo_sha_512",
                     "timergroup_timg_has_timer1",
                     "uart_ram_size=\"128\"",
+                    "phy_combo_module",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -405,6 +407,7 @@ impl Chip {
                     "cargo:rustc-cfg=ulp_fsm",
                     "cargo:rustc-cfg=wifi",
                     "cargo:rustc-cfg=bt",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
                     "cargo:rustc-cfg=dac_dac1",
@@ -451,6 +454,7 @@ impl Chip {
                     "cargo:rustc-cfg=sha_algo_sha_512",
                     "cargo:rustc-cfg=timergroup_timg_has_timer1",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -533,6 +537,7 @@ impl Chip {
                     "uart",
                     "wifi",
                     "bt",
+                    "phy",
                     "adc_adc1",
                     "i2c_master_i2c0",
                     "spi_master_spi2",
@@ -572,6 +577,7 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"0\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "phy_combo_module",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -650,6 +656,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart",
                     "cargo:rustc-cfg=wifi",
                     "cargo:rustc-cfg=bt",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=spi_master_spi2",
@@ -689,6 +696,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -786,6 +794,7 @@ impl Chip {
                     "usb_serial_jtag",
                     "wifi",
                     "bt",
+                    "phy",
                     "adc_adc1",
                     "adc_adc2",
                     "i2c_master_i2c0",
@@ -840,6 +849,9 @@ impl Chip {
                     "timergroup_default_wdt_clock_source=\"0\"",
                     "timergroup_default_wdt_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "phy_combo_module",
+                    "phy_backed_up_digital_register_count=\"21\"",
+                    "phy_backed_up_digital_register_count_is_set",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -933,6 +945,7 @@ impl Chip {
                     "cargo:rustc-cfg=usb_serial_jtag",
                     "cargo:rustc-cfg=wifi",
                     "cargo:rustc-cfg=bt",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
                     "cargo:rustc-cfg=i2c_master_i2c0",
@@ -987,6 +1000,9 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_wdt_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
+                    "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -1135,6 +1151,7 @@ impl Chip {
                     "wifi",
                     "bt",
                     "ieee802154",
+                    "phy",
                     "adc_adc1",
                     "i2c_master_i2c0",
                     "spi_master_spi2",
@@ -1193,6 +1210,7 @@ impl Chip {
                     "uart_ram_size=\"128\"",
                     "lp_uart_ram_size=\"32\"",
                     "wifi_has_wifi6",
+                    "phy_combo_module",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -1337,6 +1355,7 @@ impl Chip {
                     "cargo:rustc-cfg=wifi",
                     "cargo:rustc-cfg=bt",
                     "cargo:rustc-cfg=ieee802154",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=spi_master_spi2",
@@ -1395,6 +1414,7 @@ impl Chip {
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
                     "cargo:rustc-cfg=lp_uart_ram_size=\"32\"",
                     "cargo:rustc-cfg=wifi_has_wifi6",
+                    "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -1519,6 +1539,7 @@ impl Chip {
                     "usb_serial_jtag",
                     "bt",
                     "ieee802154",
+                    "phy",
                     "adc_adc1",
                     "i2c_master_i2c0",
                     "i2c_master_i2c1",
@@ -1696,6 +1717,7 @@ impl Chip {
                     "cargo:rustc-cfg=usb_serial_jtag",
                     "cargo:rustc-cfg=bt",
                     "cargo:rustc-cfg=ieee802154",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=i2c_master_i2c0",
                     "cargo:rustc-cfg=i2c_master_i2c1",
@@ -1867,6 +1889,7 @@ impl Chip {
                     "ulp_riscv",
                     "usb_otg",
                     "wifi",
+                    "phy",
                     "adc_adc1",
                     "adc_adc2",
                     "dac_dac1",
@@ -1930,6 +1953,7 @@ impl Chip {
                     "timergroup_default_clock_source=\"0\"",
                     "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "phy_combo_module",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -2040,6 +2064,7 @@ impl Chip {
                     "cargo:rustc-cfg=ulp_riscv",
                     "cargo:rustc-cfg=usb_otg",
                     "cargo:rustc-cfg=wifi",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
                     "cargo:rustc-cfg=dac_dac1",
@@ -2103,6 +2128,7 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -2234,6 +2260,7 @@ impl Chip {
                     "usb_serial_jtag",
                     "wifi",
                     "bt",
+                    "phy",
                     "adc_adc1",
                     "adc_adc2",
                     "i2c_master_i2c0",
@@ -2296,6 +2323,9 @@ impl Chip {
                     "timergroup_default_clock_source=\"0\"",
                     "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
+                    "phy_combo_module",
+                    "phy_backed_up_digital_register_count=\"21\"",
+                    "phy_backed_up_digital_register_count_is_set",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -2423,6 +2453,7 @@ impl Chip {
                     "cargo:rustc-cfg=usb_serial_jtag",
                     "cargo:rustc-cfg=wifi",
                     "cargo:rustc-cfg=bt",
+                    "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=adc_adc1",
                     "cargo:rustc-cfg=adc_adc2",
                     "cargo:rustc-cfg=i2c_master_i2c0",
@@ -2485,6 +2516,9 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
+                    "cargo:rustc-cfg=phy_combo_module",
+                    "cargo:rustc-cfg=phy_backed_up_digital_register_count=\"21\"",
+                    "cargo:rustc-cfg=phy_backed_up_digital_register_count_is_set",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -2634,6 +2668,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_384)");
         println!("cargo:rustc-check-cfg=cfg(sha_algo_sha_512)");
         println!("cargo:rustc-check-cfg=cfg(timergroup_timg_has_timer1)");
+        println!("cargo:rustc-check-cfg=cfg(phy_combo_module)");
         println!("cargo:rustc-check-cfg=cfg(esp32c2)");
         println!("cargo:rustc-check-cfg=cfg(riscv)");
         println!("cargo:rustc-check-cfg=cfg(single_core)");
@@ -2701,6 +2736,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(aes_dma_mode_cfb128)");
         println!("cargo:rustc-check-cfg=cfg(aes_has_split_text_registers)");
         println!("cargo:rustc-check-cfg=cfg(assist_debug_has_region_monitor)");
+        println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count_is_set)");
         println!("cargo:rustc-check-cfg=cfg(esp32c6)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_atomic)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_hp_apm)");
@@ -2823,6 +2859,7 @@ impl Config {
         println!(
             "cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source, values(\"0\",\"1\",\"2\"))"
         );
+        println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");
         for cfg in self.cfgs {
