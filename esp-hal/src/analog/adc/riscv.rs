@@ -557,7 +557,7 @@ fn handle_async<ADCI: Instance>(_instance: ADCI) {
 /// Enable asynchronous access.
 pub trait Instance: crate::private::Sealed {
     /// Enable the ADC interrupt
-    fn enable_interrupt();
+    fn enable_listen();
 
     /// Disable the ADC interrupt
     fn disable_interrupt();
@@ -571,7 +571,7 @@ pub trait Instance: crate::private::Sealed {
 
 #[cfg(adc_adc1)]
 impl Instance for crate::peripherals::ADC1<'_> {
-    fn enable_interrupt() {
+    fn enable_listen() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc1_done().set_bit());
@@ -598,7 +598,7 @@ impl Instance for crate::peripherals::ADC1<'_> {
 
 #[cfg(adc_adc2)]
 impl Instance for crate::peripherals::ADC2<'_> {
-    fn enable_interrupt() {
+    fn enable_listen() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc2_done().set_bit());
@@ -645,7 +645,7 @@ impl<ADCI: Instance + super::RegisterAccess> core::future::Future for AdcFuture<
             Poll::Ready(())
         } else {
             ADCI::waker().register(cx.waker());
-            ADCI::enable_interrupt();
+            ADCI::enable_listen();
             Poll::Pending
         }
     }

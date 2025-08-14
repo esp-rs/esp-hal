@@ -41,7 +41,7 @@ fn interrupt_handler() {
             touch1.clear_interrupt();
             // We disable the interrupt until the next loop iteration to avoid massive
             // retriggering.
-            touch1.disable_interrupt();
+            touch1.unlisten();
         }
     });
 }
@@ -72,7 +72,7 @@ fn main() -> ! {
 
     critical_section::with(|cs| {
         // A good threshold is 2/3 of the reading when the pad is not touched.
-        touch1.enable_interrupt(touch1_baseline * 2 / 3);
+        touch1.listen(touch1_baseline * 2 / 3);
         TOUCH1.borrow_ref_mut(cs).replace(touch1)
     });
 
@@ -86,7 +86,7 @@ fn main() -> ! {
                 .borrow_ref_mut(cs)
                 .as_mut()
                 .unwrap()
-                .enable_interrupt(touch1_baseline * 2 / 3);
+                .listen(touch1_baseline * 2 / 3);
         });
     }
 }
