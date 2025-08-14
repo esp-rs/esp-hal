@@ -7,7 +7,7 @@ use crate::{generate_for_each_macro, number};
 struct ShaAlgo {
     name: &'static str,
     ident: Ident,
-    digest_words: u32,
+    digest_len: u32,
     block_size: u32,
     message_len_bytes: u32,
     // These bits come from <https://en.wikipedia.org/wiki/Secure_Hash_Algorithms#Comparison_of_SHA_functions>
@@ -63,7 +63,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-1",
                 ident: format_ident!("Sha1"),
-                digest_words: 20,
+                digest_len: 20,
                 block_size: 64,
                 message_len_bytes: 8,
                 insecure_against_collision: true,
@@ -72,7 +72,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-224",
                 ident: format_ident!("Sha224"),
-                digest_words: 28,
+                digest_len: 28,
                 block_size: 64,
                 message_len_bytes: 8,
                 insecure_against_collision: false,
@@ -81,7 +81,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-256",
                 ident: format_ident!("Sha256"),
-                digest_words: 32,
+                digest_len: 32,
                 block_size: 64,
                 message_len_bytes: 8,
                 insecure_against_collision: false,
@@ -90,7 +90,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-384",
                 ident: format_ident!("Sha384"),
-                digest_words: 48,
+                digest_len: 48,
                 block_size: 128,
                 message_len_bytes: 16,
                 insecure_against_collision: false,
@@ -99,7 +99,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-512",
                 ident: format_ident!("Sha512"),
-                digest_words: 64,
+                digest_len: 64,
                 block_size: 128,
                 message_len_bytes: 16,
                 insecure_against_collision: false,
@@ -108,7 +108,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-512/224",
                 ident: format_ident!("Sha512_224"),
-                digest_words: 28,
+                digest_len: 28,
                 block_size: 128,
                 message_len_bytes: 16,
                 insecure_against_collision: false,
@@ -117,7 +117,7 @@ impl ShaAlgo {
             Self {
                 name: "SHA-512/256",
                 ident: format_ident!("Sha512_256"),
-                digest_words: 32,
+                digest_len: 32,
                 block_size: 128,
                 message_len_bytes: 16,
                 insecure_against_collision: false,
@@ -145,7 +145,7 @@ impl ToTokens for ShaAlgo {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let ident = &self.ident;
         let name = &self.name;
-        let digest_words = number(self.digest_words);
+        let digest_len = number(self.digest_len);
         let block_size = number(self.block_size);
         let message_len_bytes = number(self.message_len_bytes);
 
@@ -159,7 +159,7 @@ impl ToTokens for ShaAlgo {
         }
 
         tokens.extend(
-            quote! { #ident, #name (sizes: #block_size, #digest_words, #message_len_bytes) (insecure_against: #(#insecure),*) },
+            quote! { #ident, #name (sizes: #block_size, #digest_len, #message_len_bytes) (insecure_against: #(#insecure),*) },
         );
     }
 }
