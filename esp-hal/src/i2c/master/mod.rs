@@ -2908,7 +2908,7 @@ mod bus_clear {
 
     impl<'a> ClearBusFuture<'a> {
         // Number of SCL pulses to clear the bus
-        const BUS_CLEAR_BITS: u8 = 10;
+        const BUS_CLEAR_BITS: u8 = 9;
 
         pub fn new(driver: Driver<'a>) -> Self {
             let mut this = Self { driver };
@@ -2924,21 +2924,29 @@ mod bus_clear {
             self.driver.update_registers();
         }
 
+        fn is_done(&self) -> bool {
+            self.driver
+                .regs()
+                .scl_sp_conf()
+                .read()
+                .scl_rst_slv_en()
+                .bit_is_clear()
+        }
+
         pub fn poll_completion(&mut self) -> Poll<()> {
-            let regs = self.driver.regs();
-            if regs.scl_sp_conf().read().scl_rst_slv_en().bit_is_set()
-                || regs.sr().read().bus_busy().bit_is_set()
-            {
-                Poll::Pending
-            } else {
+            if self.is_done() {
                 Poll::Ready(())
+            } else {
+                Poll::Pending
             }
         }
     }
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
-            self.configure(0);
+            if !self.is_done() {
+                self.configure(0);
+            }
             // We don't care about errors during bus clearing
             self.driver.clear_all_interrupts();
         }
