@@ -73,6 +73,7 @@ use crate::{
 // - Text and hash is in the same register -> needs an additional load operation to place the hash
 //   in the text registers
 // - Each algorithm has its own register cluster
+// - No support for interleaved operation
 
 /// The SHA Accelerator driver instance
 pub struct Sha<'d> {
@@ -98,11 +99,6 @@ impl<'d> Sha<'d> {
     /// struct.
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
-    }
-
-    #[cfg(not(esp32))]
-    fn regs(&self) -> &crate::pac::sha::RegisterBlock {
-        self.sha.register_block()
     }
 }
 
@@ -145,9 +141,10 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         #[cfg(not(esp32))]
         // Setup SHA Mode.
         sha.borrow()
-            .regs()
+            .sha
+            .register_block()
             .mode()
-            .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
+            .write(|w| unsafe { w.mode().bits(A::ALGORITHM_KIND.mode_bits()) });
 
         Self {
             sha,
@@ -165,9 +162,10 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     pub fn restore(sha: S, ctx: &mut Context<A>) -> Self {
         // Setup SHA Mode.
         sha.borrow()
-            .regs()
+            .sha
+            .register_block()
             .mode()
-            .write(|w| unsafe { w.mode().bits(A::MODE_AS_BITS) });
+            .write(|w| unsafe { w.mode().bits(A::ALGORITHM_KIND.mode_bits()) });
 
         // Restore the message buffer
         unsafe {
@@ -192,13 +190,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Returns true if the hardware is processing the next message.
     pub fn is_busy(&self) -> bool {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                A::is_busy(&self.sha.borrow().sha)
-            } else {
-                self.sha.borrow().regs().busy().read().state().bit_is_set()
-            }
-        }
+        A::ALGORITHM_KIND.is_busy(&self.sha.borrow().sha)
     }
 
     /// Updates the SHA digest with the provided data buffer.
@@ -285,11 +277,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         // Spin-wait for final buffer to be processed
         while self.is_busy() {}
 
-        // ESP32 requires additional load to retrieve output
-        #[cfg(esp32)]
-        {
-            A::load(&self.sha.borrow().sha);
-
+        if A::ALGORITHM_KIND.load(&self.sha.borrow().sha) {
             // Spin wait for result, 8-20 clock cycles according to manual
             while self.is_busy() {}
         }
@@ -351,26 +339,11 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     fn process_buffer(&mut self) {
         let sha = self.sha.borrow();
 
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                if self.first_run {
-                    A::start(&sha.sha);
-                    self.first_run = false;
-                } else {
-                    A::r#continue(&sha.sha);
-                }
-            } else {
-                if self.first_run {
-                    // Set SHA_START_REG
-                    // FIXME: raw register access
-                    sha.regs().start().write(|w| unsafe { w.bits(1) });
-                    self.first_run = false;
-                } else {
-                    // SET SHA_CONTINUE_REG
-                    // FIXME: raw register access
-                    sha.regs().continue_().write(|w| unsafe { w.bits(1) });
-                }
-            }
+        if self.first_run {
+            A::ALGORITHM_KIND.start(&sha.sha);
+            self.first_run = false;
+        } else {
+            A::ALGORITHM_KIND.r#continue(&sha.sha);
         }
     }
 
@@ -477,6 +450,9 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     /// Constant containing the name of the algorithm as a string.
     const ALGORITHM: &'static str;
 
+    /// Constant containing the kind of the algorithm.
+    const ALGORITHM_KIND: ShaAlgorithmKind;
+
     /// The length of the chunk that the algorithm processes at a time.
     ///
     /// For example, in SHA-256, this would typically be 64 bytes.
@@ -489,30 +465,6 @@ pub trait ShaAlgorithm: crate::private::Sealed {
 
     #[doc(hidden)]
     type DigestOutputSize: digest::generic_array::ArrayLength<u8> + 'static;
-
-    #[cfg(not(esp32))]
-    #[doc(hidden)]
-    const MODE_AS_BITS: u8;
-
-    #[cfg(esp32)]
-    #[doc(hidden)]
-    // Initiate the operation
-    fn start(sha: &crate::peripherals::SHA<'_>);
-
-    #[cfg(esp32)]
-    #[doc(hidden)]
-    // Continue the operation
-    fn r#continue(sha: &crate::peripherals::SHA<'_>);
-
-    #[cfg(esp32)]
-    #[doc(hidden)]
-    // Calculate the final hash
-    fn load(sha: &crate::peripherals::SHA<'_>);
-
-    #[cfg(esp32)]
-    #[doc(hidden)]
-    // Check if peripheral is busy
-    fn is_busy(sha: &crate::peripherals::SHA<'_>) -> bool;
 }
 
 /// implement digest traits if digest feature is present.
@@ -541,7 +493,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<
 /// This macro implements the Sha<'a, Dm> trait for a specified Sha algorithm
 /// and a set of parameters
 macro_rules! impl_sha {
-    ($name: ident, $mode_bits: literal, $digest_length: literal, $chunk_length: literal) => {
+    ($name: ident, $digest_length: literal, $chunk_length: literal) => {
         /// A SHA implementation struct.
         ///
         /// This struct is generated by the macro and represents a specific SHA hashing
@@ -558,47 +510,157 @@ macro_rules! impl_sha {
 
         impl $crate::sha::ShaAlgorithm for $name {
             const ALGORITHM: &'static str = stringify!($name);
+            const ALGORITHM_KIND: ShaAlgorithmKind = ShaAlgorithmKind::$name;
 
             const CHUNK_LENGTH: usize = $chunk_length;
 
             const DIGEST_LENGTH: usize = $digest_length;
 
-            #[cfg(not(esp32))]
-            const MODE_AS_BITS: u8 = $mode_bits;
-
             // We use paste to append `U` to the digest size to match a const defined in
             // digest
             type DigestOutputSize = paste::paste!(digest::consts::[< U $digest_length >]);
-
-            #[cfg(esp32)]
-            fn start(sha: &crate::peripherals::SHA<'_>) {
-                paste::paste! {
-                    sha.register_block().[< $name:lower _start >]().write(|w| w.[< $name:lower _start >]().set_bit());
-                }
-            }
-
-            #[cfg(esp32)]
-            fn r#continue(sha: &crate::peripherals::SHA<'_>) {
-                paste::paste! {
-                    sha.register_block().[< $name:lower _continue >]().write(|w| w.[< $name:lower _continue >]().set_bit());
-                }
-            }
-
-            #[cfg(esp32)]
-            fn load(sha: &crate::peripherals::SHA<'_>) {
-                paste::paste! {
-                    sha.register_block().[< $name:lower _load >]().write(|w| w.[< $name:lower _load >]().set_bit());
-                }
-            }
-
-            #[cfg(esp32)]
-            fn is_busy(sha: &crate::peripherals::SHA<'_>) -> bool {
-                paste::paste! {
-                    sha.register_block().[< $name:lower _busy >]().read().[< $name:lower _busy >]().bit_is_set()
-                }
-            }
         }
     };
+}
+
+/// Specifies particular SHA algorithm.
+#[derive(Clone, Copy)]
+#[non_exhaustive]
+pub enum ShaAlgorithmKind {
+    /// The SHA-1 algorithm.
+    ///
+    /// Note that this algorithm is known to be insecure against collision attacks and length
+    /// extension attacks.
+    #[cfg(sha_algo_sha_1)]
+    Sha1,
+
+    /// The SHA-224 algorithm.
+    ///
+    /// Note that this algorithm is known to be insecure against length extension attacks.
+    #[cfg(sha_algo_sha_224)]
+    Sha224,
+
+    /// The SHA-256 algorithm.
+    ///
+    /// Note that this algorithm is known to be insecure against length extension attacks.
+    #[cfg(sha_algo_sha_256)]
+    Sha256,
+
+    /// The SHA-384 algorithm.
+    #[cfg(sha_algo_sha_384)]
+    Sha384,
+
+    /// The SHA-512 algorithm.
+    ///
+    /// Note that this algorithm is known to be insecure against length extension attacks.
+    #[cfg(sha_algo_sha_512)]
+    Sha512,
+
+    /// The SHA-512/224 algorithm.
+    #[cfg(sha_algo_sha_512_224)]
+    Sha512_224,
+
+    /// The SHA-512/256 algorithm.
+    #[cfg(sha_algo_sha_512_256)]
+    Sha512_256,
+    // TODO
+    // #[allow(non_camel_case_types)]
+    // #[cfg(sha_algo_sha_512_t)]
+    // Sha512_t(u16),
+}
+
+impl ShaAlgorithmKind {
+    #[cfg(not(esp32))]
+    fn mode_bits(self) -> u8 {
+        match self {
+            #[cfg(sha_algo_sha_1)]
+            ShaAlgorithmKind::Sha1 => 0,
+            #[cfg(sha_algo_sha_224)]
+            ShaAlgorithmKind::Sha224 => 1,
+            #[cfg(sha_algo_sha_256)]
+            ShaAlgorithmKind::Sha256 => 2,
+            #[cfg(sha_algo_sha_384)]
+            ShaAlgorithmKind::Sha384 => 3,
+            #[cfg(sha_algo_sha_512)]
+            ShaAlgorithmKind::Sha512 => 4,
+            #[cfg(sha_algo_sha_512_224)]
+            ShaAlgorithmKind::Sha512_224 => 5,
+            #[cfg(sha_algo_sha_512_256)]
+            ShaAlgorithmKind::Sha512_256 => 6,
+        }
+    }
+
+    fn start(self, sha: &crate::peripherals::SHA<'_>) {
+        let regs = sha.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                match self {
+                    ShaAlgorithmKind::Sha1 => regs.sha1_start().write(|w| w.sha1_start().set_bit()),
+                    ShaAlgorithmKind::Sha256 => regs.sha256_start().write(|w| w.sha256_start().set_bit()),
+                    ShaAlgorithmKind::Sha384 => regs.sha384_start().write(|w| w.sha384_start().set_bit()),
+                    ShaAlgorithmKind::Sha512 => regs.sha512_start().write(|w| w.sha512_start().set_bit()),
+                };
+            } else {
+                regs.start().write(|w| w.start().set_bit());
+            }
+        }
+    }
+
+    fn r#continue(self, sha: &crate::peripherals::SHA<'_>) {
+        let regs = sha.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                match self {
+                    ShaAlgorithmKind::Sha1 => regs.sha1_continue().write(|w| w.sha1_continue().set_bit()),
+                    ShaAlgorithmKind::Sha256 => regs.sha256_continue().write(|w| w.sha256_continue().set_bit()),
+                    ShaAlgorithmKind::Sha384 => regs.sha384_continue().write(|w| w.sha384_continue().set_bit()),
+                    ShaAlgorithmKind::Sha512 => regs.sha512_continue().write(|w| w.sha512_continue().set_bit()),
+                };
+            } else {
+                regs.continue_().write(|w| w.continue_().set_bit());
+            }
+        }
+    }
+
+    /// Starts loading the hash into the output registers.
+    ///
+    /// Returns whether the caller needs to wait for the hash to be loaded.
+    fn load(self, _sha: &crate::peripherals::SHA<'_>) -> bool {
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let regs = _sha.register_block();
+                match self {
+                    ShaAlgorithmKind::Sha1 => regs.sha1_load().write(|w| w.sha1_load().set_bit()),
+                    ShaAlgorithmKind::Sha256 => regs.sha256_load().write(|w| w.sha256_load().set_bit()),
+                    ShaAlgorithmKind::Sha384 => regs.sha384_load().write(|w| w.sha384_load().set_bit()),
+                    ShaAlgorithmKind::Sha512 => regs.sha512_load().write(|w| w.sha512_load().set_bit()),
+                };
+
+                true
+            } else {
+                // Return that no waiting is necessary
+                false
+            }
+        }
+    }
+
+    fn is_busy(self, sha: &crate::peripherals::SHA<'_>) -> bool {
+        let regs = sha.register_block();
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                let bit = match self {
+                    ShaAlgorithmKind::Sha1 => regs.sha1_busy().read().sha1_busy(),
+                    ShaAlgorithmKind::Sha256 => regs.sha256_busy().read().sha256_busy(),
+                    ShaAlgorithmKind::Sha384 => regs.sha384_busy().read().sha384_busy(),
+                    ShaAlgorithmKind::Sha512 => regs.sha512_busy().read().sha512_busy(),
+                };
+            } else {
+                let bit = regs.busy().read().state();
+            }
+        }
+
+        bit.bit_is_set()
+    }
 }
 
 // All the hash algorithms introduced in FIPS PUB 180-4 Spec.
@@ -614,19 +676,19 @@ macro_rules! impl_sha {
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 #[cfg(sha_algo_sha_1)]
-impl_sha!(Sha1, 0, 20, 64);
+impl_sha!(Sha1, 20, 64);
 #[cfg(sha_algo_sha_224)]
-impl_sha!(Sha224, 1, 28, 64);
+impl_sha!(Sha224, 28, 64);
 #[cfg(sha_algo_sha_256)]
-impl_sha!(Sha256, 2, 32, 64);
+impl_sha!(Sha256, 32, 64);
 #[cfg(sha_algo_sha_384)]
-impl_sha!(Sha384, 3, 48, 128);
+impl_sha!(Sha384, 48, 128);
 #[cfg(sha_algo_sha_512)]
-impl_sha!(Sha512, 4, 64, 128);
+impl_sha!(Sha512, 64, 128);
 #[cfg(sha_algo_sha_512_224)]
-impl_sha!(Sha512_224, 5, 28, 128);
+impl_sha!(Sha512_224, 28, 128);
 #[cfg(sha_algo_sha_512_256)]
-impl_sha!(Sha512_256, 6, 32, 128);
+impl_sha!(Sha512_256, 32, 128);
 // TODO: Allow/Implement SHA512_(u16)
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
