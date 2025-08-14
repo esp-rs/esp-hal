@@ -254,8 +254,7 @@ pub fn init(timer: impl TimerSource) {
     timer::setup_timebase(timer.timer());
 }
 
-const TICK_RATE: u32 =
-    esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
+const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
 const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(TICK_RATE);
 
 impl esp_preempt_driver::Scheduler for Scheduler {
