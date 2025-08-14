@@ -8,7 +8,7 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, rom::software_reset, uart::{Config, RxConfig, Uart}
+    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, rom::software_reset, uart::{RxConfig, Uart}
 };
 use esp_println::println;
 use esp_hal::dma::DmaRxBuffer;
@@ -50,7 +50,7 @@ fn main() -> ! {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let mut transfer = uhci.read(dma_rx);
+    let transfer = uhci.read(dma_rx);
     let (uhci, dma_rx) = transfer.wait();
     let dma_rx: DmaRxBuf = DmaRxBuffer::from_view(dma_rx);
 
@@ -64,7 +64,7 @@ fn main() -> ! {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let mut transfer = uhci.write(dma_tx);
+                let transfer = uhci.write(dma_tx);
                 let (_uhci, dma_tx) = transfer.wait();
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
