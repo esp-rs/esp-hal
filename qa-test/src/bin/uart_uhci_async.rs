@@ -30,6 +30,8 @@ async fn main(_spawner: Spawner) {
     let timg0 = TimerGroup::new(unsafe { esp_hal::peripherals::TIMG0::steal() });
     esp_hal_embassy::init(timg0.timer0);
 
+    esp_println::logger::init_logger(log::LevelFilter::Info);
+
     _spawner.spawn(run_uart(peripherals)).unwrap();
     _spawner.spawn(run_logs()).unwrap();
 }
@@ -61,8 +63,7 @@ async fn run_uart(peripherals: Peripherals) {
 
     println!("Waiting for message");
     let mut transfer = uhci.read(dma_rx);
-    transfer.wait_for_idle().await;
-    let (uhci, dma_rx) = transfer.wait();
+    let (uhci, dma_rx) = transfer.wait().await;
     let dma_rx: DmaRxBuf = DmaRxBuffer::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
@@ -76,8 +77,7 @@ async fn run_uart(peripherals: Peripherals) {
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
                 let mut transfer = uhci.write(dma_tx);
-                transfer.wait_for_idle().await;
-                let (_uhci, dma_tx) = transfer.wait();
+                let (_uhci, dma_tx) = transfer.wait().await;
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
             }
@@ -94,6 +94,6 @@ async fn run_uart(peripherals: Peripherals) {
 async fn run_logs() {
     loop {
         Timer::after(Duration::from_secs(1)).await;
-        println!("Loop is looping!");
+        log::info!("Loop is looping!");
     }
 }

@@ -112,7 +112,6 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-#[instability::unstable]
 impl<Dm> embassy_embedded_hal::SetConfig for Uhci<'_, Dm>
 where
     Dm: DriverMode,
@@ -224,10 +223,7 @@ where
     }
 
     /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
-    pub fn write<Buf: DmaTxBuffer>(
-        mut self,
-        mut tx_buffer: Buf,
-    ) -> UhciDmaTxTransfer<'d, Dm, Buf> {
+    pub fn write<Buf: DmaTxBuffer>(mut self, mut tx_buffer: Buf) -> UhciDmaTxTransfer<'d, Dm, Buf> {
         {
             unsafe {
                 self.channel
@@ -243,10 +239,7 @@ where
     }
 
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
-    pub fn read<Buf: DmaRxBuffer>(
-        mut self,
-        mut rx_buffer: Buf,
-    ) -> UhciDmaRxTransfer<'d, Dm, Buf> {
+    pub fn read<Buf: DmaRxBuffer>(mut self, mut rx_buffer: Buf) -> UhciDmaRxTransfer<'d, Dm, Buf> {
         {
             unsafe {
                 self.channel
@@ -308,7 +301,6 @@ impl<'d> Uhci<'d, Async> {
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-#[instability::unstable]
 pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -331,27 +323,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         self.uhci.channel.tx.is_done()
     }
 
-    /// Waits for the DMA transfer to complete.
-    ///
-    /// This method blocks until the transfer is finished and returns the
-    /// `Uhci` instance and the associated buffer.
-    #[instability::unstable]
-    pub fn wait(mut self) -> (Uhci<'d, Dm>, Buf::View) {
-        // How do I block here without async? This doesn't finish
-        // while !self.is_done() {}
-        self.uhci.channel.tx.stop_transfer();
-        let retval = unsafe {
-            (
-                ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
-            )
-        };
-        core::mem::forget(self);
-        retval
-    }
-
     /// Cancels the DMA transfer.
-    #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf) {
         self.uhci.channel.tx.stop_transfer();
 
@@ -366,13 +338,46 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     }
 }
 
+impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `Uhci` instance and the associated buffer.
+    pub fn wait(mut self) -> (Uhci<'d, Blocking>, Buf::View) {
+        self.uhci.uart.tx.flush().unwrap();
+        while !self.is_done() {}
+        self.uhci.channel.tx.stop_transfer();
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
+    }
+}
+
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    /// todo
-    pub async fn wait_for_idle(&mut self) {
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `Uhci` instance and the associated buffer.
+    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
         self.uhci.uart.tx.flush_async().await.unwrap();
         DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
+
+        self.uhci.channel.tx.stop_transfer();
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
     }
 }
 
@@ -410,7 +415,6 @@ where
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-#[instability::unstable]
 pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
@@ -433,28 +437,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
         self.uhci.channel.rx.is_done()
     }
 
-    /// Waits for the DMA transfer to complete.
-    ///
-    /// This method blocks until the transfer is finished and returns the
-    /// `Uhci` instance and the associated buffer.
-    #[instability::unstable]
-    pub fn wait(mut self) -> (Uhci<'d, Dm>, Buf::View) {
-        // How do I block here without async? This doesn't finish
-        // while !self.is_done() {}
-        self.uhci.channel.rx.stop_transfer();
-
-        let retval = unsafe {
-            (
-                ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
-            )
-        };
-        core::mem::forget(self);
-        retval
-    }
-
     /// Cancels the DMA transfer.
-    #[instability::unstable]
     pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf) {
         self.uhci.channel.rx.stop_transfer();
 
@@ -469,10 +452,43 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     }
 }
 
+impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Blocking, Buf> {
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `Uhci` instance and the associated buffer.
+    pub fn wait(mut self) -> (Uhci<'d, Blocking>, Buf::View) {
+        while !self.is_done() {}
+        self.uhci.channel.rx.stop_transfer();
+
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
+    }
+}
+
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    /// todo
-    pub async fn wait_for_idle(&mut self) {
+    /// Waits for the DMA transfer to complete.
+    ///
+    /// This method blocks until the transfer is finished and returns the
+    /// `Uhci` instance and the associated buffer.
+    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
         DmaRxFuture::new(&mut self.uhci.channel.rx).await.unwrap();
+        self.uhci.channel.rx.stop_transfer();
+
+        let retval = unsafe {
+            (
+                ManuallyDrop::take(&mut self.uhci),
+                ManuallyDrop::take(&mut self.dma_buf),
+            )
+        };
+        core::mem::forget(self);
+        retval
     }
 }
 
