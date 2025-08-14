@@ -7,7 +7,7 @@
 //! use esp_hal::timer::timg::TimerGroup;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! esp_radio_preempt_baremetal::init(timg0.timer0);
+//! esp_preempt::init(timg0.timer0);
 //!
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
@@ -72,7 +72,7 @@ mod esp_alloc {
 
 pub(crate) use esp_alloc::InternalMemory;
 
-/// A trait to allow better UX for initializing esp-radio-preempt-baremetal.
+/// A trait to allow better UX for initializing esp-preempt.
 ///
 /// This trait is meant to be used only for the `init` function.
 pub trait TimerSource: private::Sealed + 'static {
@@ -236,7 +236,7 @@ static SCHEDULER_STATE: Locked<SchedulerState> = Locked::new(SchedulerState::new
 
 struct Scheduler {}
 
-esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {});
+esp_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {});
 
 /// Initializes the scheduler.
 ///
@@ -255,10 +255,10 @@ pub fn init(timer: impl TimerSource) {
 }
 
 const TICK_RATE: u32 =
-    esp_config::esp_config_int!(u32, "ESP_RADIO_PREEMPT_BAREMETAL_CONFIG_TICK_RATE_HZ");
+    esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
 const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(TICK_RATE);
 
-impl esp_radio_preempt_driver::Scheduler for Scheduler {
+impl esp_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
         timer::initialized()
     }

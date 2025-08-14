@@ -2665,10 +2665,14 @@ pub struct Interfaces<'d> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
-pub fn new<'d>(
-    _inited: &'d Controller<'d>,
+pub fn new<'d, 'r, 'c>(
+    _inited: &'r Controller<'c>,
     _device: crate::hal::peripherals::WIFI<'d>,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError>
+where
+    'c: 'r, // the controller must live as long as the reference
+    'r: 'd, // this device driver must live as long as the reference to the controller
+{
     if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
     }

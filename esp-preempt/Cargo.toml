@@ -1,10 +1,10 @@
 [package]
-name          = "esp-radio-preempt-baremetal"
+name          = "esp-preempt"
 version       = "0.0.1"
 edition       = "2024"
 rust-version  = "1.86.0"
-description   = "Bare-metal task scheduler for esp-radio"
-documentation = "https://docs.espressif.com/projects/rust/esp-radio-preempt-baremetal/latest/"
+description   = "A task scheduler Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-preempt/latest/"
 keywords      = ["esp32", "espressif", "no-std"]
 categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"

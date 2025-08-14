@@ -418,6 +418,6 @@ pub(crate) unsafe extern "C" fn sleep(
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
 unsafe extern "C" fn usleep(us: u32) -> c_int {
-    esp_radio_preempt_driver::usleep(us);
+    esp_preempt_driver::usleep(us);
     0
 }

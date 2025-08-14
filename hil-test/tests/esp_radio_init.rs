@@ -27,7 +27,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
-    esp_radio_preempt_baremetal::init(timer);
+    esp_preempt::init(timer);
 }
 
 #[embassy_executor::task]
@@ -36,7 +36,7 @@ async fn try_init(
     timer: TIMG0<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
-    esp_radio_preempt_baremetal::init(timg0.timer0);
+    esp_preempt::init(timg0.timer0);
 
     match esp_radio::init() {
         Ok(_) => signal.signal(None),
@@ -59,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_init_fails_without_scheduler(_peripherals: Peripherals) {
-        // esp-radio-preempt-baremetal must be initialized before esp-radio.
+        // esp-preempt must be initialized before esp-radio.
         let init = esp_radio::init();
 
         assert!(matches!(
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_radio_preempt_baremetal::init(timg0.timer0);
+        esp_preempt::init(timg0.timer0);
 
         let init = critical_section::with(|_| esp_radio::init());
 
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_radio_preempt_baremetal::init(timg0.timer0);
+        esp_preempt::init(timg0.timer0);
 
         let init = interrupt_free(|| esp_radio::init());
 

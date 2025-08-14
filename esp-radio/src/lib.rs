@@ -114,7 +114,7 @@ use core::marker::PhantomData;
 use common_adapter::chip_specific::phy_mem_init;
 use esp_config::*;
 use esp_hal::{self as hal};
-use esp_radio_preempt_driver as preempt;
+use esp_preempt_driver as preempt;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
