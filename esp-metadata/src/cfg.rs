@@ -2,6 +2,7 @@ pub(crate) mod aes;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
 pub(crate) mod rsa;
+pub(crate) mod sha;
 pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
@@ -10,6 +11,7 @@ pub(crate) mod uart;
 pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use sha::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
@@ -510,7 +512,7 @@ driver_configs![
             #[serde(default)]
             dma: bool,
             #[serde(default)]
-            algo: Vec<String>,
+            algo: ShaAlgoMap,
         }
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {

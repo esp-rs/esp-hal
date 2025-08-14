@@ -252,7 +252,7 @@ status_registers = 2
 [device.sha]
 support_status = "partial"
 dma = true
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"
