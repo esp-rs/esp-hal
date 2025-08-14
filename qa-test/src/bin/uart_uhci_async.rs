@@ -62,8 +62,8 @@ async fn run_uart(peripherals: Peripherals) {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let transfer = uhci.read(dma_rx);
-    let (uhci, dma_rx) = transfer.wait().await;
+    let transfer = uhci.read(dma_rx).unwrap();
+    let (uhci, dma_rx) = transfer.wait().await.unwrap();
     let dma_rx: DmaRxBuf = DmaRxBuffer::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
@@ -76,8 +76,8 @@ async fn run_uart(peripherals: Peripherals) {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let transfer = uhci.write(dma_tx);
-                let (_uhci, dma_tx) = transfer.wait().await;
+                let transfer = uhci.write(dma_tx).unwrap();
+                let (_uhci, dma_tx) = transfer.wait().await.unwrap();
                 let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
                 // Do what you want...
             }

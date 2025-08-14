@@ -7,23 +7,12 @@ use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
     dma::{
-        Channel,
-        DmaChannelFor,
-        DmaEligible,
-        DmaRxBuffer,
-        DmaTxBuffer,
-        PeripheralDmaChannel,
-        asynch::{DmaRxFuture, DmaTxFuture},
-    },
-    peripherals,
-    uart::{self, Uart, uhci::Error::AboveReadLimit},
+        asynch::{DmaRxFuture, DmaTxFuture}, Channel, DmaChannelFor, DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel
+    }, peripherals, uart::{self, uhci::Error::AboveReadLimit, TxError, Uart}, Async, Blocking, DriverMode
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 /// Uhci specific errors
@@ -31,6 +20,22 @@ pub enum Error {
     /// set_chunk_limit() argument is above what's possible by the hardware. It cannot exceed 4095
     /// (12 bits), above this value it will simply also split the readings
     AboveReadLimit,
+    /// DMA originating error
+    Dma(DmaError),
+    /// UART Tx originating error
+    Tx(TxError),
+}
+
+impl From<DmaError> for Error {
+    fn from(value: DmaError) -> Self {
+        Error::Dma(value)
+    }
+}
+
+impl From<TxError> for Error {
+    fn from(value: TxError) -> Self {
+        Error::Tx(value)
+    }
 }
 
 crate::any_peripheral! {
@@ -51,7 +56,7 @@ impl<'d> DmaEligible for AnyUhci<'d> {
 }
 
 impl AnyUhci<'_> {
-    /// Unwraps the enum into the peripheral below
+    /// Opens the enum into the peripheral below
     pub fn give_uhci(&self) -> &peripherals::UHCI0<'_> {
         match &self.0 {
             any::Inner::Uhci0(x) => x,
@@ -223,34 +228,32 @@ where
     }
 
     /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
-    pub fn write<Buf: DmaTxBuffer>(mut self, mut tx_buffer: Buf) -> UhciDmaTxTransfer<'d, Dm, Buf> {
+    pub fn write<Buf: DmaTxBuffer>(mut self, mut tx_buffer: Buf) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, Error> {
         {
             unsafe {
                 self.channel
                     .tx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
-                    .unwrap()
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)?
             };
 
-            self.channel.tx.start_transfer().unwrap();
+            self.channel.tx.start_transfer()?;
 
-            return UhciDmaTxTransfer::new(self, tx_buffer);
+            Ok(UhciDmaTxTransfer::new(self, tx_buffer))
         }
     }
 
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
-    pub fn read<Buf: DmaRxBuffer>(mut self, mut rx_buffer: Buf) -> UhciDmaRxTransfer<'d, Dm, Buf> {
+    pub fn read<Buf: DmaRxBuffer>(mut self, mut rx_buffer: Buf) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, Error> {
         {
             unsafe {
                 self.channel
                     .rx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)
-                    .unwrap()
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)?
             };
 
-            self.channel.rx.start_transfer().unwrap();
+            self.channel.rx.start_transfer()?;
 
-            return UhciDmaRxTransfer::new(self, rx_buffer);
+            Ok(UhciDmaRxTransfer::new(self, rx_buffer))
         }
     }
 }
@@ -343,8 +346,8 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Uhci<'d, Blocking>, Buf::View) {
-        self.uhci.uart.tx.flush().unwrap();
+    pub fn wait(mut self) -> Result<(Uhci<'d, Blocking>, Buf::View), Error> {
+        self.uhci.uart.tx.flush()?;
         while !self.is_done() {}
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
@@ -354,7 +357,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
             )
         };
         core::mem::forget(self);
-        retval
+        Ok(retval)
     }
 }
 
@@ -363,11 +366,11 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
+    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), Error> {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
-        self.uhci.uart.tx.flush_async().await.unwrap();
-        DmaTxFuture::new(&mut self.uhci.channel.tx).await.unwrap();
+        self.uhci.uart.tx.flush_async().await?;
+        DmaTxFuture::new(&mut self.uhci.channel.tx).await?;
 
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
@@ -377,7 +380,7 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
             )
         };
         core::mem::forget(self);
-        retval
+        Ok(retval)
     }
 }
 
@@ -477,8 +480,8 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub async fn wait(mut self) -> (Uhci<'d, Async>, Buf::View) {
-        DmaRxFuture::new(&mut self.uhci.channel.rx).await.unwrap();
+    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), Error> {
+        DmaRxFuture::new(&mut self.uhci.channel.rx).await?;
         self.uhci.channel.rx.stop_transfer();
 
         let retval = unsafe {
@@ -488,7 +491,7 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
             )
         };
         core::mem::forget(self);
-        retval
+        Ok(retval)
     }
 }
 
