@@ -8,14 +8,13 @@
 
 use digest::{Digest, Update};
 #[cfg(not(feature = "esp32"))]
-use esp_hal::clock::CpuClock;
-#[cfg(not(feature = "esp32"))]
 use esp_hal::sha::Sha224;
 #[cfg(any(feature = "esp32", feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha384, Sha512};
 #[cfg(any(feature = "esp32s2", feature = "esp32s3"))]
 use esp_hal::sha::{Sha512_224, Sha512_256};
 use esp_hal::{
+    clock::CpuClock,
     rng::{Rng, TrngSource},
     sha::{Sha, Sha1, Sha256, ShaAlgorithm, ShaDigest},
 };
@@ -169,16 +168,9 @@ mod tests {
 
     #[init]
     fn init() -> Context {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "esp32")] {
-                // FIXME: max speed fails...?
-                let config = esp_hal::Config::default();
-            } else {
-                let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-            }
-        }
-
+        let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
         let peripherals = esp_hal::init(config);
+
         Context {
             _rng_source: TrngSource::new(peripherals.RNG, peripherals.ADC1),
             sha: Sha::new(peripherals.SHA),
@@ -278,7 +270,6 @@ mod tests {
                     block!(digest.save(&mut sha1));
                     all_done = false;
                 }
-                #[cfg(not(feature = "esp32"))]
                 if !sha224_remaining.is_empty() {
                     let mut digest = ShaDigest::restore(&mut ctx.sha, &mut sha224);
                     sha224_remaining = block!(digest.update(sha224_remaining)).unwrap();
