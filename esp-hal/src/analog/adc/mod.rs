@@ -131,7 +131,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[pin.AdcChannel() as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -156,7 +156,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[pin.AdcChannel() as usize] = Some(attenuation);
+        self.attenuations[pin.adc_channel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -194,7 +194,7 @@ pub trait CalibrationAccess: RegisterAccess {
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
 pub trait AdcChannel {
     /// Channel number used by the ADC
-    fn AdcChannel(&self) -> u8;
+    fn adc_channel(&self) -> u8;
 }
 
 /// A trait abstracting over calibration methods.
@@ -245,7 +245,7 @@ trait AdcCalEfuse {
 for_each_analog_function! {
     (($ch_name:ident, ADCn_CHm, $adc:literal, $ch:literal), $gpio:ident) => {
         impl $crate::analog::adc::AdcChannel for $crate::peripherals::$gpio<'_> {
-            fn AdcChannel(&self) -> u8 {
+            fn adc_channel(&self) -> u8 {
                 $ch
             }
         }
