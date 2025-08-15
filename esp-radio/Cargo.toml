@@ -126,8 +126,11 @@ sys-logs = ["esp-wifi-sys/sys-logs"]
 #! ### Wireless Feature Flags
 
 ## Enable WiFi support
-wifi = ["dep:enumset", "dep:embassy-net-driver"]
+wifi = ["wifi-sta", "wifi-ap", "wifi-eap"]
 
+wifi-sta = ["dep:enumset", "dep:embassy-net-driver"]
+wifi-ap  = ["dep:enumset", "dep:embassy-net-driver"]
+wifi-eap = ["dep:enumset", "dep:embassy-net-driver"]
 ## Enable esp-now support
 esp-now = ["wifi"]
 

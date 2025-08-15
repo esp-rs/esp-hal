@@ -90,7 +90,10 @@
 #![allow(unknown_lints)]
 #![allow(non_local_definitions)]
 #![cfg_attr(
-    not(any(feature = "wifi", feature = "ble")),
+    not(any(
+        any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap"),
+        feature = "ble"
+    )),
     allow(
         unused,
         reason = "There are a number of places where code is needed for either wifi or ble,
@@ -122,7 +125,7 @@ use hal::{
     time::Rate,
 };
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap"))]
 use crate::wifi::WifiError;
 use crate::{
     preempt::yield_task,
@@ -162,7 +165,7 @@ mod time;
 
 pub(crate) use unstable_module;
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap"))]
 pub mod wifi;
 
 unstable_module! {
@@ -321,7 +324,7 @@ pub enum InitializationError {
     /// The internal error code is reported.
     General(i32),
     /// An error from the WiFi driver.
-    #[cfg(feature = "wifi")]
+    #[cfg(any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap"))]
     WifiError(WifiError),
     /// The current CPU clock frequency is too low.
     WrongClockConfig,
@@ -335,7 +338,7 @@ pub enum InitializationError {
     Adc2IsUsed,
 }
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", feature = "wifi-eap"))]
 impl From<WifiError> for InitializationError {
     fn from(value: WifiError) -> Self {
         InitializationError::WifiError(value)

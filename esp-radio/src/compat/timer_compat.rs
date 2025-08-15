@@ -42,7 +42,7 @@ pub(crate) struct Timer {
     next: Option<Box<Timer>>,
 }
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 impl Timer {
     pub(crate) fn id(&self) -> usize {
         self.ets_timer as usize
@@ -76,7 +76,7 @@ impl TimerQueue {
     }
 }
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 impl TimerQueue {
     fn find(&mut self, ets_timer: *mut ets_timer) -> Option<&mut Box<Timer>> {
         let mut current = self.head.as_mut();
@@ -90,7 +90,7 @@ impl TimerQueue {
         None
     }
 
-    #[cfg(feature = "wifi")]
+    #[cfg(any(feature = "wifi-sta", feature = "wifi-ap"))]
     fn remove(&mut self, ets_timer: *mut ets_timer) {
         if let Some(head) = self.head.as_mut()
             && core::ptr::eq(head.ets_timer, ets_timer)
@@ -149,12 +149,12 @@ unsafe impl Send for TimerQueue {}
 
 pub(crate) static TIMERS: Locked<TimerQueue> = Locked::new(TimerQueue::new());
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
     compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
 }
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
     let systick = crate::time::systimer_count();
     let ticks = crate::time::micros_to_ticks(us as u64);
@@ -176,7 +176,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
     })
 }
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     trace!("timer disarm");
     TIMERS.with(|timers| {
@@ -189,7 +189,7 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     })
 }
 
-#[cfg(feature = "wifi")]
+#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
 pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     trace!("timer done");
     TIMERS.with(|timers| {
@@ -209,7 +209,7 @@ pub fn compat_timer_done(ets_timer: *mut ets_timer) {
     })
 }
 
-#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
+#[cfg(any(feature = "wifi-sta", feature = "wifi-ap", all(feature = "ble", npl)))]
 pub(crate) fn compat_timer_setfn(
     ets_timer: *mut ets_timer,
     pfunction: unsafe extern "C" fn(*mut c_types::c_void),
