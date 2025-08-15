@@ -52,7 +52,7 @@ impl AlarmState {
         // timer. This ensures that alarms allocated after init are correctly
         // bound to the core that created the executor.
         timer.set_interrupt_handler(interrupt_handler);
-        timer.enable_interrupt(true);
+        timer.listen();
         AlarmState::Initialized(timer)
     }
 }
@@ -152,7 +152,7 @@ impl EmbassyTimer {
 
         // Reset timers
         timers.iter_mut().for_each(|timer| {
-            timer.enable_interrupt(false);
+            timer.unlisten();
             timer.stop();
         });
 

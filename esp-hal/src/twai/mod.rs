@@ -1319,8 +1319,8 @@ pub trait PrivateInstance: crate::private::Sealed {
     /// Returns a reference to the register block for TWAI instance.
     fn register_block(&self) -> &RegisterBlock;
 
-    /// Enables interrupts for the TWAI peripheral.
-    fn enable_interrupts(&self) {
+    /// Listens for interrupts.
+    fn enable_listen(&self) {
         cfg_if::cfg_if! {
             if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
                 self.register_block().int_ena().modify(|_, w| {
@@ -1727,7 +1727,7 @@ mod asynch {
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
-            self.twai.enable_interrupts();
+            self.twai.enable_listen();
             TransmitFuture::new(self.twai.reborrow(), frame).await
         }
     }
@@ -1735,7 +1735,7 @@ mod asynch {
     impl TwaiRx<'_, Async> {
         /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
-            self.twai.enable_interrupts();
+            self.twai.enable_listen();
             poll_fn(|cx| {
                 self.twai.async_state().err_waker.register(cx.waker());
 

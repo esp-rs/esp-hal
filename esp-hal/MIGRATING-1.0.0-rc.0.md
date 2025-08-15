@@ -128,3 +128,10 @@ DMA buffer implementations.
 ```
 
 If the `Final` type is not `Self`, `fn from_view()` will need to be updated to return `Self::Final`.
+
+## Timer interrupts
+```diff
+- pub fn enable_interrupt(&mut self, enable: bool) { ... }
++ pub fn listen(&mut self) { ... }
++ pub fn unlisten(&mut self) { ... }
+```
