@@ -13,12 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The MSRV is bumped to 1.88 (#3887)
 
 ### Fixed
 
 
 ### Removed
 
+- the `pre_init` macro got removed - it's usage was always discouraged (#3857)
 
 ## [v0.12.0] - 2025-07-16
 

@@ -2,7 +2,7 @@
 name          = "esp-riscv-rt"
 version       = "0.12.0"
 edition       = "2024"
-rust-version  = "1.86.0"
+rust-version  = "1.88.0"
 description   = "Minimal runtime / startup for RISC-V CPUs from Espressif"
 documentation = "https://docs.espressif.com/projects/rust/esp-riscv-rt/latest/"
 keywords      = ["esp32", "espressif", "riscv", "runtime", "startup"]
@@ -19,17 +19,17 @@ test  = false
 document-features = "0.2.11"
 defmt             = {version = "1.0.1", optional = true}
 riscv             = "0.14.0"
-riscv-rt-macros   = "0.5.0"
+# TODO wait for a release
+riscv-rt          = {version = "0.15.0", git = "https://github.com/rust-embedded/riscv.git", rev = "4bd25defd37f7f122619e21c434029bc6c10f893", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap"]}
 
 [features]
-## Indicate that the device supports `mie` and `mip` CSRs.
-has-mie-mip = []
-
+## Indicate that the device does NOT support `mie` and `mip` CSRs.
+no-mie-mip = ["riscv-rt/no-xie-xip"]
 ## Indicate that the device has RTC RAM.
 rtc-ram = []
 
 ## Implement `defmt::Format`
-defmt = ["dep:defmt"]
+defmt = ["dep:defmt", "riscv-rt/defmt"]
 
 # This feature is intended for testing; you probably don't want to enable it:
-ci = ["has-mie-mip", "rtc-ram"]
+ci = ["rtc-ram"]
