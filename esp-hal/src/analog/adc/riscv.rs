@@ -342,20 +342,20 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        if self.attenuations[PIN::CHANNEL as usize].is_none() {
-            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
+        if self.attenuations[pin.AdcChannel() as usize].is_none() {
+            panic!("Channel {} is not configured reading!", pin.AdcChannel());
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.AdcChannel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.AdcChannel());
 
             // Set ADC unit calibration according used scheme for pin
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
@@ -481,7 +481,7 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        let channel = PIN::CHANNEL;
+        let channel = pin.AdcChannel();
         if self.attenuations[channel as usize].is_none() {
             panic!("Channel {} is not configured reading!", channel);
         }

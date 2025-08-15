@@ -131,7 +131,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.AdcChannel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -156,7 +156,7 @@ impl<ADCI> AdcConfig<ADCI> {
     {
         // TODO revert this on drop
         pin.set_analog(crate::private::Internal);
-        self.attenuations[PIN::CHANNEL as usize] = Some(attenuation);
+        self.attenuations[pin.AdcChannel() as usize] = Some(attenuation);
 
         AdcPin {
             pin,
@@ -245,7 +245,9 @@ trait AdcCalEfuse {
 for_each_analog_function! {
     (($ch_name:ident, ADCn_CHm, $adc:literal, $ch:literal), $gpio:ident) => {
         impl $crate::analog::adc::AdcChannel for $crate::peripherals::$gpio<'_> {
-            const CHANNEL: u8 = $ch;
+            fn AdcChannel(&self) -> u8 {
+                $ch
+            }
         }
     };
 }

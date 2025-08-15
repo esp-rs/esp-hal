@@ -340,26 +340,26 @@ where
     /// This method takes an [AdcPin](super::AdcPin) reference, as it is
     /// expected that the ADC will be able to sample whatever channel
     /// underlies the pin.
-    pub fn read_oneshot<PIN>(&mut self, _pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
+    pub fn read_oneshot<PIN>(&mut self, pin: &mut super::AdcPin<PIN, ADCI>) -> nb::Result<u16, ()>
     where
         PIN: super::AdcChannel,
     {
-        if self.attenuations[PIN::CHANNEL as usize].is_none() {
-            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
+        if self.attenuations[pin.channel() as usize].is_none() {
+            panic!("Channel {} is not configured reading!", pin.AdcChannel());
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.AdcChannel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.AdcChannel());
 
-            ADCI::set_en_pad(PIN::CHANNEL);
+            ADCI::set_en_pad(pin.AdcChannel());
 
             ADCI::clear_start_sar();
             ADCI::set_start_sar();
