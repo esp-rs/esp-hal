@@ -345,7 +345,10 @@ where
         PIN: super::AdcChannel,
     {
         if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
-            panic!("Channel {} is not configured reading!", pin.pin.adc_channel());
+            panic!(
+                "Channel {} is not configured reading!",
+                pin.pin.adc_channel()
+            );
         }
 
         if let Some(active_channel) = self.active_channel {
