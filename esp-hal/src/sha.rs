@@ -223,10 +223,9 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
                 while self.is_busy() {}
             }
 
-            let flushed = self.alignment_helper.flush_to(
-                m_mem(&self.sha.borrow().sha, 0),
-                (self.cursor % chunk_len) / self.alignment_helper.align_size(),
-            );
+            let flushed = self
+                .alignment_helper
+                .flush_to(m_mem(&self.sha.borrow().sha, 0), self.cursor % chunk_len);
             self.cursor = self.cursor.wrapping_add(flushed);
 
             if flushed > 0 && self.cursor.is_multiple_of(chunk_len) {
@@ -244,8 +243,8 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             self.alignment_helper.volatile_write(
                 m_mem(&self.sha.borrow().sha, 0),
                 0_u8,
-                pad_len / self.alignment_helper.align_size(),
-                mod_cursor / self.alignment_helper.align_size(),
+                pad_len,
+                mod_cursor,
             );
             self.process_buffer();
             self.cursor = self.cursor.wrapping_add(pad_len);
@@ -262,15 +261,15 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         self.alignment_helper.volatile_write(
             m_mem(&self.sha.borrow().sha, 0),
             0,
-            pad_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            pad_len,
+            mod_cursor,
         );
 
         self.alignment_helper.aligned_volatile_copy(
             m_mem(&self.sha.borrow().sha, 0),
             &length,
-            chunk_len / self.alignment_helper.align_size(),
-            (chunk_len - size_of::<u64>()) / self.alignment_helper.align_size(),
+            chunk_len,
+            chunk_len - size_of::<u64>(),
         );
 
         self.process_buffer();
@@ -285,7 +284,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         self.alignment_helper.volatile_read_regset(
             h_mem(&self.sha.borrow().sha, 0),
             output,
-            core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
+            core::cmp::min(output.len(), 32),
         );
 
         self.first_run = true;
@@ -312,7 +311,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         self.alignment_helper.volatile_read_regset(
             h_mem(&self.sha.borrow().sha, 0),
             &mut context.saved_digest,
-            64 / self.alignment_helper.align_size(),
+            64,
         );
 
         // Save the content of the current (probably partially written) message.
@@ -367,8 +366,8 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             m_mem(&self.sha.borrow().sha, 0),
             incoming,
-            chunk_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            chunk_len,
+            mod_cursor,
         );
 
         self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
