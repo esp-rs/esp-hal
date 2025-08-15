@@ -100,6 +100,158 @@ impl<'d> Sha<'d> {
     pub fn start_owned<A: ShaAlgorithm>(self) -> ShaDigest<'d, A, Self> {
         ShaDigest::new(self)
     }
+
+    /// Returns true if the hardware is processing the next message.
+    fn is_busy(&self, algo: ShaAlgorithmKind) -> bool {
+        algo.is_busy(&self.sha)
+    }
+
+    fn process_buffer(&self, state: &mut DigestState) {
+        if state.first_run {
+            state.algorithm.start(&self.sha);
+            state.first_run = false;
+        } else {
+            state.algorithm.r#continue(&self.sha);
+        }
+    }
+
+    fn write_data<'a>(
+        &self,
+        state: &mut DigestState,
+        incoming: &'a [u8],
+    ) -> nb::Result<&'a [u8], Infallible> {
+        if state.message_buffer_is_full {
+            if self.is_busy(state.algorithm) {
+                // The message buffer is full and the hardware is still processing the previous
+                // message. There's nothing to be done besides wait for the hardware.
+                return Err(nb::Error::WouldBlock);
+            } else {
+                // Submit the full buffer.
+                self.process_buffer(state);
+                // The buffer is now free for filling.
+                state.message_buffer_is_full = false;
+            }
+        }
+
+        let chunk_len = state.algorithm.chunk_length();
+        let mod_cursor = state.cursor % chunk_len;
+
+        let (remaining, bound_reached) = state.alignment_helper.aligned_volatile_copy(
+            m_mem(&self.sha, 0),
+            incoming,
+            chunk_len,
+            mod_cursor,
+        );
+
+        state.cursor = state.cursor.wrapping_add(incoming.len() - remaining.len());
+
+        if bound_reached {
+            // Message is full now.
+
+            if self.is_busy(state.algorithm) {
+                // The message buffer is full and the hardware is still processing the previous
+                // message. There's nothing to be done besides wait for the hardware.
+                state.message_buffer_is_full = true;
+            } else {
+                // Send the full buffer.
+                self.process_buffer(state);
+            }
+        }
+
+        Ok(remaining)
+    }
+
+    fn finish(&self, state: &mut DigestState, output: &mut [u8]) -> nb::Result<(), Infallible> {
+        // Store message length for padding
+        let length = (state.cursor as u64 * 8).to_be_bytes();
+        nb::block!(self.update(state, &[0x80]))?; // Append "1" bit
+
+        let chunk_len = state.algorithm.chunk_length();
+
+        // Flush partial data, ensures aligned cursor
+        {
+            while self.is_busy(state.algorithm) {}
+            if state.message_buffer_is_full {
+                self.process_buffer(state);
+
+                state.message_buffer_is_full = false;
+                while self.is_busy(state.algorithm) {}
+            }
+
+            let flushed = state
+                .alignment_helper
+                .flush_to(m_mem(&self.sha, 0), state.cursor % chunk_len);
+            state.cursor = state.cursor.wrapping_add(flushed);
+
+            if flushed > 0 && state.cursor.is_multiple_of(chunk_len) {
+                self.process_buffer(state);
+                while self.is_busy(state.algorithm) {}
+            }
+        }
+        debug_assert!(state.cursor.is_multiple_of(4));
+
+        let mut mod_cursor = state.cursor % chunk_len;
+        if (chunk_len - mod_cursor) < chunk_len / 8 {
+            // Zero out remaining data if buffer is almost full (>=448/896), and process
+            // buffer
+            let pad_len = chunk_len - mod_cursor;
+            state
+                .alignment_helper
+                .volatile_write(m_mem(&self.sha, 0), 0_u8, pad_len, mod_cursor);
+            self.process_buffer(state);
+            state.cursor = state.cursor.wrapping_add(pad_len);
+
+            debug_assert_eq!(state.cursor % chunk_len, 0);
+            mod_cursor = 0;
+
+            // Spin-wait for finish
+            while self.is_busy(state.algorithm) {}
+        }
+
+        let pad_len = chunk_len - mod_cursor - size_of::<u64>();
+
+        state
+            .alignment_helper
+            .volatile_write(m_mem(&self.sha, 0), 0, pad_len, mod_cursor);
+
+        state.alignment_helper.aligned_volatile_copy(
+            m_mem(&self.sha, 0),
+            &length,
+            chunk_len,
+            chunk_len - size_of::<u64>(),
+        );
+
+        self.process_buffer(state);
+        // Spin-wait for final buffer to be processed
+        while self.is_busy(state.algorithm) {}
+
+        if state.algorithm.load(&self.sha) {
+            // Spin wait for result, 8-20 clock cycles according to manual
+            while self.is_busy(state.algorithm) {}
+        }
+
+        state.alignment_helper.volatile_read_regset(
+            h_mem(&self.sha, 0),
+            output,
+            core::cmp::min(output.len(), 32),
+        );
+
+        state.first_run = true;
+        state.cursor = 0;
+        state.alignment_helper.reset();
+
+        Ok(())
+    }
+
+    fn update<'a>(
+        &self,
+        state: &mut DigestState,
+        incoming: &'a [u8],
+    ) -> nb::Result<&'a [u8], Infallible> {
+        state.finished = false;
+
+        self.write_data(state, incoming)
+    }
 }
 
 impl crate::private::Sealed for Sha<'_> {}
@@ -126,12 +278,31 @@ impl crate::interrupt::InterruptConfigurable for Sha<'_> {
 /// see ::finish() length/self.cursor usage
 pub struct ShaDigest<'d, A, S: Borrow<Sha<'d>>> {
     sha: S,
+    state: DigestState,
+    phantom: PhantomData<(&'d (), A)>,
+}
+
+#[derive(Clone, Debug)]
+struct DigestState {
+    algorithm: ShaAlgorithmKind,
     alignment_helper: AlignmentHelper<SocDependentEndianess>,
     cursor: usize,
     first_run: bool,
     finished: bool,
     message_buffer_is_full: bool,
-    phantom: PhantomData<(&'d (), A)>,
+}
+
+impl DigestState {
+    fn new(algorithm: ShaAlgorithmKind) -> Self {
+        Self {
+            algorithm,
+            alignment_helper: AlignmentHelper::default(),
+            cursor: 0,
+            first_run: true,
+            finished: false,
+            message_buffer_is_full: false,
+        }
+    }
 }
 
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
@@ -148,11 +319,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
         Self {
             sha,
-            alignment_helper: AlignmentHelper::default(),
-            cursor: 0,
-            first_run: true,
-            finished: false,
-            message_buffer_is_full: false,
+            state: DigestState::new(A::ALGORITHM_KIND),
             phantom: PhantomData,
         }
     }
@@ -172,18 +339,16 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             core::ptr::copy_nonoverlapping(ctx.buffer.as_ptr(), m_mem(&sha.borrow().sha, 0), 32);
         }
 
-        let mut ah = ctx.alignment_helper.clone();
-
         // Restore previously saved hash
-        ah.volatile_write_regset(h_mem(&sha.borrow().sha, 0), &ctx.saved_digest, 64);
+        ctx.state.alignment_helper.volatile_write_regset(
+            h_mem(&sha.borrow().sha, 0),
+            &ctx.saved_digest,
+            64,
+        );
 
         Self {
             sha,
-            alignment_helper: ah,
-            cursor: ctx.cursor,
-            first_run: ctx.first_run,
-            finished: ctx.finished,
-            message_buffer_is_full: ctx.message_buffer_is_full,
+            state: ctx.state.clone(),
             phantom: PhantomData,
         }
     }
@@ -195,9 +360,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
 
     /// Updates the SHA digest with the provided data buffer.
     pub fn update<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        self.finished = false;
-
-        self.write_data(incoming)
+        self.sha.borrow().update(&mut self.state, incoming)
     }
 
     /// Finish of the calculation (if not already) and copy result to output
@@ -208,90 +371,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     /// [ShaAlgorithm::DIGEST_LENGTH], but smaller inputs can be given to
     /// get a "short hash"
     pub fn finish(&mut self, output: &mut [u8]) -> nb::Result<(), Infallible> {
-        // Store message length for padding
-        let length = (self.cursor as u64 * 8).to_be_bytes();
-        nb::block!(self.update(&[0x80]))?; // Append "1" bit
-
-        let chunk_len = A::CHUNK_LENGTH;
-
-        // Flush partial data, ensures aligned cursor
-        {
-            while self.is_busy() {}
-            if self.message_buffer_is_full {
-                self.process_buffer();
-                self.message_buffer_is_full = false;
-                while self.is_busy() {}
-            }
-
-            let flushed = self
-                .alignment_helper
-                .flush_to(m_mem(&self.sha.borrow().sha, 0), self.cursor % chunk_len);
-            self.cursor = self.cursor.wrapping_add(flushed);
-
-            if flushed > 0 && self.cursor.is_multiple_of(chunk_len) {
-                self.process_buffer();
-                while self.is_busy() {}
-            }
-        }
-        debug_assert!(self.cursor.is_multiple_of(4));
-
-        let mut mod_cursor = self.cursor % chunk_len;
-        if (chunk_len - mod_cursor) < chunk_len / 8 {
-            // Zero out remaining data if buffer is almost full (>=448/896), and process
-            // buffer
-            let pad_len = chunk_len - mod_cursor;
-            self.alignment_helper.volatile_write(
-                m_mem(&self.sha.borrow().sha, 0),
-                0_u8,
-                pad_len,
-                mod_cursor,
-            );
-            self.process_buffer();
-            self.cursor = self.cursor.wrapping_add(pad_len);
-
-            debug_assert_eq!(self.cursor % chunk_len, 0);
-            mod_cursor = 0;
-
-            // Spin-wait for finish
-            while self.is_busy() {}
-        }
-
-        let pad_len = chunk_len - mod_cursor - size_of::<u64>();
-
-        self.alignment_helper.volatile_write(
-            m_mem(&self.sha.borrow().sha, 0),
-            0,
-            pad_len,
-            mod_cursor,
-        );
-
-        self.alignment_helper.aligned_volatile_copy(
-            m_mem(&self.sha.borrow().sha, 0),
-            &length,
-            chunk_len,
-            chunk_len - size_of::<u64>(),
-        );
-
-        self.process_buffer();
-        // Spin-wait for final buffer to be processed
-        while self.is_busy() {}
-
-        if A::ALGORITHM_KIND.load(&self.sha.borrow().sha) {
-            // Spin wait for result, 8-20 clock cycles according to manual
-            while self.is_busy() {}
-        }
-
-        self.alignment_helper.volatile_read_regset(
-            h_mem(&self.sha.borrow().sha, 0),
-            output,
-            core::cmp::min(output.len(), 32),
-        );
-
-        self.first_run = true;
-        self.cursor = 0;
-        self.alignment_helper.reset();
-
-        Ok(())
+        self.sha.borrow().finish(&mut self.state, output)
     }
 
     /// Save the current state of the digest for later continuation.
@@ -301,14 +381,10 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
             return Err(nb::Error::WouldBlock);
         }
 
-        context.alignment_helper = self.alignment_helper.clone();
-        context.cursor = self.cursor;
-        context.first_run = self.first_run;
-        context.finished = self.finished;
-        context.message_buffer_is_full = self.message_buffer_is_full;
+        context.state = self.state.clone();
 
         // Save the content of the current hash.
-        self.alignment_helper.volatile_read_regset(
+        self.state.alignment_helper.volatile_read_regset(
             h_mem(&self.sha.borrow().sha, 0),
             &mut context.saved_digest,
             64,
@@ -330,74 +406,13 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> ShaDigest<'d, A, S> {
     pub fn cancel(self) -> S {
         self.sha
     }
-
-    /// Processes the data buffer and updates the hash state.
-    ///
-    /// This method is platform-specific and differs for ESP32 and non-ESP32
-    /// platforms.
-    fn process_buffer(&mut self) {
-        let sha = self.sha.borrow();
-
-        if self.first_run {
-            A::ALGORITHM_KIND.start(&sha.sha);
-            self.first_run = false;
-        } else {
-            A::ALGORITHM_KIND.r#continue(&sha.sha);
-        }
-    }
-
-    fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        if self.message_buffer_is_full {
-            if self.is_busy() {
-                // The message buffer is full and the hardware is still processing the previous
-                // message. There's nothing to be done besides wait for the hardware.
-                return Err(nb::Error::WouldBlock);
-            } else {
-                // Submit the full buffer.
-                self.process_buffer();
-                // The buffer is now free for filling.
-                self.message_buffer_is_full = false;
-            }
-        }
-
-        let chunk_len = A::CHUNK_LENGTH;
-        let mod_cursor = self.cursor % chunk_len;
-
-        let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
-            m_mem(&self.sha.borrow().sha, 0),
-            incoming,
-            chunk_len,
-            mod_cursor,
-        );
-
-        self.cursor = self.cursor.wrapping_add(incoming.len() - remaining.len());
-
-        if bound_reached {
-            // Message is full now.
-
-            if self.is_busy() {
-                // The message buffer is full and the hardware is still processing the previous
-                // message. There's nothing to be done besides wait for the hardware.
-                self.message_buffer_is_full = true;
-            } else {
-                // Send the full buffer.
-                self.process_buffer();
-            }
-        }
-
-        Ok(remaining)
-    }
 }
 
 #[cfg(not(esp32))]
 /// Context for a SHA Accelerator driver instance
 #[derive(Debug, Clone)]
 pub struct Context<A: ShaAlgorithm> {
-    alignment_helper: AlignmentHelper<SocDependentEndianess>,
-    cursor: usize,
-    first_run: bool,
-    finished: bool,
-    message_buffer_is_full: bool,
+    state: DigestState,
     /// Buffered bytes (SHA_M_n_REG) to be processed.
     buffer: [u32; 32],
     /// Saved digest (SHA_H_n_REG) for interleaving operation
@@ -410,11 +425,7 @@ impl<A: ShaAlgorithm> Context<A> {
     /// Create a new empty context
     pub fn new() -> Self {
         Self {
-            cursor: 0,
-            first_run: true,
-            finished: false,
-            message_buffer_is_full: false,
-            alignment_helper: AlignmentHelper::default(),
+            state: DigestState::new(A::ALGORITHM_KIND),
             buffer: [0; 32],
             saved_digest: [0; 64],
             phantom: PhantomData,
@@ -426,14 +437,14 @@ impl<A: ShaAlgorithm> Context<A> {
     /// Returns `true` if this is the first time processing data with the SHA
     /// instance, otherwise returns `false`.
     pub fn first_run(&self) -> bool {
-        self.first_run
+        self.state.first_run
     }
 
     /// Indicates if the SHA context has finished processing the data.
     ///
     /// Returns `true` if the SHA calculation is complete, otherwise returns.
     pub fn finished(&self) -> bool {
-        self.finished
+        self.state.finished
     }
 }
 
@@ -466,7 +477,6 @@ pub trait ShaAlgorithm: crate::private::Sealed {
     type DigestOutputSize: digest::generic_array::ArrayLength<u8> + 'static;
 }
 
-/// implement digest traits if digest feature is present.
 /// Note: digest has a blanket trait implementation for [digest::Digest] for any
 /// element that implements FixedOutput + Default + Update + HashMarker
 impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::HashMarker for ShaDigest<'d, A, S> {}
@@ -492,7 +502,7 @@ impl<'d, A: ShaAlgorithm, S: Borrow<Sha<'d>>> digest::FixedOutput for ShaDigest<
 /// This macro implements the Sha<'a, Dm> trait for a specified Sha algorithm
 /// and a set of parameters
 macro_rules! impl_sha {
-    ($name: ident, $digest_length: literal, $chunk_length: literal) => {
+    ($name: ident, $digest_length: literal) => {
         /// A SHA implementation struct.
         ///
         /// This struct is generated by the macro and represents a specific SHA hashing
@@ -511,7 +521,7 @@ macro_rules! impl_sha {
             const ALGORITHM: &'static str = stringify!($name);
             const ALGORITHM_KIND: ShaAlgorithmKind = ShaAlgorithmKind::$name;
 
-            const CHUNK_LENGTH: usize = $chunk_length;
+            const CHUNK_LENGTH: usize = Self::ALGORITHM_KIND.chunk_length();
 
             const DIGEST_LENGTH: usize = $digest_length;
 
@@ -523,7 +533,8 @@ macro_rules! impl_sha {
 }
 
 /// Specifies particular SHA algorithm.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[non_exhaustive]
 pub enum ShaAlgorithmKind {
     /// The SHA-1 algorithm.
@@ -570,7 +581,7 @@ pub enum ShaAlgorithmKind {
 
 impl ShaAlgorithmKind {
     #[cfg(not(esp32))]
-    fn mode_bits(self) -> u8 {
+    const fn mode_bits(self) -> u8 {
         match self {
             #[cfg(sha_algo_sha_1)]
             ShaAlgorithmKind::Sha1 => 0,
@@ -586,6 +597,25 @@ impl ShaAlgorithmKind {
             ShaAlgorithmKind::Sha512_224 => 5,
             #[cfg(sha_algo_sha_512_256)]
             ShaAlgorithmKind::Sha512_256 => 6,
+        }
+    }
+
+    const fn chunk_length(self) -> usize {
+        match self {
+            #[cfg(sha_algo_sha_1)]
+            ShaAlgorithmKind::Sha1 => 64,
+            #[cfg(sha_algo_sha_224)]
+            ShaAlgorithmKind::Sha224 => 64,
+            #[cfg(sha_algo_sha_256)]
+            ShaAlgorithmKind::Sha256 => 64,
+            #[cfg(sha_algo_sha_384)]
+            ShaAlgorithmKind::Sha384 => 128,
+            #[cfg(sha_algo_sha_512)]
+            ShaAlgorithmKind::Sha512 => 128,
+            #[cfg(sha_algo_sha_512_224)]
+            ShaAlgorithmKind::Sha512_224 => 128,
+            #[cfg(sha_algo_sha_512_256)]
+            ShaAlgorithmKind::Sha512_256 => 128,
         }
     }
 
@@ -675,19 +705,19 @@ impl ShaAlgorithmKind {
 // – Typical SHA
 // – DMA-SHA (not implemented yet)
 #[cfg(sha_algo_sha_1)]
-impl_sha!(Sha1, 20, 64);
+impl_sha!(Sha1, 20);
 #[cfg(sha_algo_sha_224)]
-impl_sha!(Sha224, 28, 64);
+impl_sha!(Sha224, 28);
 #[cfg(sha_algo_sha_256)]
-impl_sha!(Sha256, 32, 64);
+impl_sha!(Sha256, 32);
 #[cfg(sha_algo_sha_384)]
-impl_sha!(Sha384, 48, 128);
+impl_sha!(Sha384, 48);
 #[cfg(sha_algo_sha_512)]
-impl_sha!(Sha512, 64, 128);
+impl_sha!(Sha512, 64);
 #[cfg(sha_algo_sha_512_224)]
-impl_sha!(Sha512_224, 28, 128);
+impl_sha!(Sha512_224, 28);
 #[cfg(sha_algo_sha_512_256)]
-impl_sha!(Sha512_256, 32, 128);
+impl_sha!(Sha512_256, 32);
 // TODO: Allow/Implement SHA512_(u16)
 
 fn h_mem(sha: &crate::peripherals::SHA<'_>, index: usize) -> *mut u32 {
