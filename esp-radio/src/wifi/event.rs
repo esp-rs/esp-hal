@@ -89,10 +89,11 @@ macro_rules! impl_wifi_event {
     };
     // data
     ($newtype:ident, $data:ident) => {
-        pub use esp_wifi_sys::include::$data;
+        use esp_wifi_sys::include::$data;
         /// See [`WifiEvent`].
         #[derive(Copy, Clone)]
-        pub struct $newtype(pub $data);
+        #[allow(dead_code)]
+        pub struct $newtype($data);
         impl sealed::Event for $newtype {
             unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self {
                 Self(unsafe { *ptr.cast() })
@@ -162,6 +163,32 @@ impl_wifi_event!(NdpConfirm, wifi_event_ndp_confirm_t);
 impl_wifi_event!(NdpTerminated, wifi_event_ndp_terminated_t);
 impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
+
+impl ApStaconnected {
+    /// Get the MAC address of the connected station.
+    pub fn mac(&self) -> [u8; 6] {
+        self.0.mac
+    }
+}
+
+impl ApStaconnected {
+    /// Get the AID (Association Identifier) of the connected station.
+    pub fn aid(&self) -> u8 {
+        self.0.aid
+    }
+}
+
+impl ApStadisconnected {
+    /// Get the MAC address of the disconnected station.
+    pub fn mac(&self) -> [u8; 6] {
+        self.0.mac
+    }
+
+    /// Get the reason for the disconnection.
+    pub fn reason(&self) -> u16 {
+        self.0.reason
+    }
+}
 
 /// Handle the given event using the registered event handlers.
 #[instability::unstable]

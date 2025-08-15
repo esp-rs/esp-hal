@@ -50,15 +50,16 @@ fn main() -> ! {
     _ = event::ApStart::replace_handler(|_| println!("ap start event"));
     event::ApStaconnected::update_handler(move |event| {
         connections += 1;
-        println!("connected {}, mac: {:?}", connections, event.0.mac);
+        esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
     event::ApStaconnected::update_handler(|event| {
-        println!("connected aid: {}", event.0.aid);
+        esp_println::println!("connected aid: {}", event.aid());
     });
     event::ApStadisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
-            event.0.mac, event.0.reason
+            event.mac(),
+            event.reason()
         );
     });
 
