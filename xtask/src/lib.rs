@@ -58,7 +58,7 @@ pub enum Package {
     EspStorage,
     EspRadio,
     EspRadioPreemptDriver,
-    EspRadioPreemptBaremetal,
+    EspPreempt,
     Examples,
     HilTest,
     QaTest,
@@ -82,7 +82,7 @@ impl Package {
                 | EspRomSys
                 | EspLpHal
                 | EspPrintln
-                | EspRadioPreemptBaremetal
+                | EspPreempt
                 | EspStorage
                 | EspRadio
         )
@@ -149,7 +149,7 @@ impl Package {
                 | EspRomSys
                 | EspBootloaderEspIdf
                 | EspMetadataGenerated
-                | EspRadioPreemptBaremetal
+                | EspPreempt
         )
     }
 
@@ -252,7 +252,7 @@ impl Package {
                 features.push("defmt".to_owned());
             }
             Package::EspMetadataGenerated => {}
-            Package::EspRadioPreemptBaremetal => features.push("esp-hal/unstable".to_owned()),
+            Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
             _ => {}
         }
 
@@ -289,7 +289,7 @@ impl Package {
             Package::EspMetadataGenerated => {
                 cases.push(vec!["build-script".to_owned()]);
             }
-            Package::EspRadioPreemptBaremetal => {
+            Package::EspPreempt => {
                 cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
             }
             _ => {}

@@ -59,7 +59,7 @@ fn main() -> ! {
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_radio_preempt_baremetal::init(timg0.timer0);
+    esp_preempt::init(timg0.timer0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
