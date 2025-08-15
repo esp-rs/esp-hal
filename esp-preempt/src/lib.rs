@@ -236,7 +236,7 @@ static SCHEDULER_STATE: Locked<SchedulerState> = Locked::new(SchedulerState::new
 
 struct Scheduler {}
 
-esp_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {});
+esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {});
 
 /// Initializes the scheduler.
 ///
@@ -257,7 +257,7 @@ pub fn init(timer: impl TimerSource) {
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");
 const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(TICK_RATE);
 
-impl esp_preempt_driver::Scheduler for Scheduler {
+impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
         timer::initialized()
     }
