@@ -237,6 +237,7 @@ impl<'d> Sha<'d> {
         );
 
         state.first_run = true;
+        state.finished = true;
         state.cursor = 0;
         state.alignment_helper.reset();
 
