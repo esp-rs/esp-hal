@@ -441,12 +441,12 @@ where
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.AdcChannel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.AdcChannel());
 
             self.start_sample(pin);
         }
@@ -482,7 +482,7 @@ where
             self.last_init_code = init_code;
         }
 
-        ADCI::set_en_pad(PIN::CHANNEL);
+        ADCI::set_en_pad(pin.AdcChannel());
 
         ADCI::clear_start_sample();
         ADCI::start_sample();
