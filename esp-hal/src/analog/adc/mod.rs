@@ -194,7 +194,7 @@ pub trait CalibrationAccess: RegisterAccess {
 /// A helper trait to get the ADC channel of a compatible GPIO pin.
 pub trait AdcChannel {
     /// Channel number used by the ADC
-    const CHANNEL: u8;
+    fn AdcChannel(&self) -> u8;
 }
 
 /// A trait abstracting over calibration methods.
