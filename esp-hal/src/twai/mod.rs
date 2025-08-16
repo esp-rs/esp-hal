@@ -916,13 +916,7 @@ where
             .write(|w| unsafe { w.rx_err_cnt().bits(rec) });
 
         // Clear any interrupts by reading the status register
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                let _ = self.regs().int_raw().read();
-            } else {
-                let _ = self.regs().interrupt().read();
-            }
-        }
+        let _ = self.regs().int_raw().read();
 
         // Put the peripheral into operation mode by clearing the reset mode bit.
         self.regs().mode().modify(|_, w| w.reset_mode().clear_bit());
@@ -1321,25 +1315,13 @@ pub trait PrivateInstance: crate::private::Sealed {
 
     /// Enables interrupts for the TWAI peripheral.
     fn enable_interrupts(&self) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                self.register_block().int_ena().modify(|_, w| {
-                    w.rx_int_ena().set_bit();
-                    w.tx_int_ena().set_bit();
-                    w.bus_err_int_ena().set_bit();
-                    w.arb_lost_int_ena().set_bit();
-                    w.err_passive_int_ena().set_bit()
-                });
-            } else {
-                self.register_block().interrupt_enable().modify(|_, w| {
-                    w.ext_receive_int_ena().set_bit();
-                    w.ext_transmit_int_ena().set_bit();
-                    w.bus_err_int_ena().set_bit();
-                    w.arbitration_lost_int_ena().set_bit();
-                    w.err_passive_int_ena().set_bit()
-                });
-            }
-        }
+        self.register_block().int_ena().modify(|_, w| {
+            w.rx_int_ena().set_bit();
+            w.tx_int_ena().set_bit();
+            w.bus_err_int_ena().set_bit();
+            w.arb_lost_int_ena().set_bit();
+            w.err_passive_int_ena().set_bit()
+        });
     }
 
     /// Returns a reference to the asynchronous state for this TWAI instance.
@@ -1762,21 +1744,12 @@ mod asynch {
     }
 
     pub(super) fn handle_interrupt(register_block: &RegisterBlock, async_state: &TwaiAsyncState) {
-        cfg_if::cfg_if! {
-            if #[cfg(any(esp32, esp32c3, esp32s2, esp32s3))] {
-                let intr_status = register_block.int_raw().read();
+        let intr_status = register_block.int_raw().read();
 
-                let int_ena_reg = register_block.int_ena();
-                let tx_int_status = intr_status.tx_int_st();
-                let rx_int_status = intr_status.rx_int_st();
-            } else {
-                let intr_status = register_block.interrupt().read();
+        let int_ena_reg = register_block.int_ena();
+        let tx_int_status = intr_status.tx_int_st();
+        let rx_int_status = intr_status.rx_int_st();
 
-                let int_ena_reg = register_block.interrupt_enable();
-                let tx_int_status = intr_status.transmit_int_st();
-                let rx_int_status = intr_status.receive_int_st();
-            }
-        }
         let intr_enable = int_ena_reg.read();
 
         if tx_int_status.bit_is_set() {
