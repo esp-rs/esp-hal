@@ -60,39 +60,39 @@ pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
-    #[cfg(instruction_cache_size_32kb)]
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000;
-    #[cfg(instruction_cache_size_16kb)]
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = match () {
+        _ if cfg!(instruction_cache_size_32kb) => 0x8000,
+        _ if cfg!(instruction_cache_size_16kb) => 0x4000,
+        _ => unreachable!(),
+    };
+    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = match () {
+        _ if cfg!(icache_associated_ways_8) => 8,
+        _ if cfg!(icache_associated_ways_4) => 4,
+        _ => unreachable!(),
+    };
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = match () {
+        _ if cfg!(instruction_cache_line_size_32b) => 32,
+        _ if cfg!(instruction_cache_line_size_16b) => 16,
+        _ => unreachable!(),
+    };
 
-    #[cfg(icache_associated_ways_8)]
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
-    #[cfg(icache_associated_ways_4)]
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 4;
-
-    #[cfg(instruction_cache_line_size_32b)]
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32;
-    #[cfg(instruction_cache_line_size_16b)]
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 16;
-
-    #[cfg(data_cache_size_64kb)]
-    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x10000;
-    #[cfg(data_cache_size_32kb)]
-    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x8000;
-    #[cfg(data_cache_size_16kb)]
-    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x4000;
-
-    #[cfg(dcache_associated_ways_8)]
-    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 8;
-    #[cfg(dcache_associated_ways_4)]
-    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 4;
-
-    #[cfg(data_cache_line_size_64b)]
-    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 64;
-    #[cfg(data_cache_line_size_32b)]
-    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 32;
-    #[cfg(data_cache_line_size_16b)]
-    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 16;
+    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = match () {
+        _ if cfg!(data_cache_size_64kb) => 0x10000,
+        _ if cfg!(data_cache_size_32kb) => 0x8000,
+        _ if cfg!(data_cache_size_16kb) => 0x4000,
+        _ => unreachable!(),
+    };
+    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = match () {
+        _ if cfg!(dcache_associated_ways_8) => 8,
+        _ if cfg!(dcache_associated_ways_4) => 4,
+        _ => unreachable!(),
+    };
+    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = match () {
+        _ if cfg!(data_cache_line_size_64b) => 64,
+        _ if cfg!(data_cache_line_size_32b) => 32,
+        _ if cfg!(data_cache_line_size_16b) => 16,
+        _ => unreachable!(),
+    };
 
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
