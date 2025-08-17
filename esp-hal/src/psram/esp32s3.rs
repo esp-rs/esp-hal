@@ -60,12 +60,40 @@ pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
     utils::psram_init(&mut config);
 
+    #[cfg(instruction_cache_size_32kb)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000;
+    #[cfg(instruction_cache_size_16kb)]
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
+
+    #[cfg(icache_associated_ways_8)]
     const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
+    #[cfg(icache_associated_ways_4)]
+    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 4;
+
+    #[cfg(instruction_cache_line_size_32b)]
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32;
+    #[cfg(instruction_cache_line_size_16b)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 16;
+
+    #[cfg(data_cache_size_64kb)]
+    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x10000;
+    #[cfg(data_cache_size_32kb)]
     const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x8000;
+    #[cfg(data_cache_size_16kb)]
+    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x4000;
+
+    #[cfg(dcache_associated_ways_8)]
     const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 8;
+    #[cfg(dcache_associated_ways_4)]
+    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 4;
+
+    #[cfg(data_cache_line_size_64b)]
+    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 64;
+    #[cfg(data_cache_line_size_32b)]
     const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 32;
+    #[cfg(data_cache_line_size_16b)]
+    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 16;
+
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 

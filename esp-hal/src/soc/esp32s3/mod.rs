@@ -48,10 +48,20 @@ pub(crate) unsafe fn configure_cpu_caches() {
         );
     }
 
-    // ideally these should be configurable
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000; // ESP32S3_INSTRUCTION_CACHE_32KB
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8; // ESP32S3_INSTRUCTION_CACHE_8WAYS
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32; // ESP32S3_INSTRUCTION_CACHE_LINE_32B
+    #[cfg(instruction_cache_size_32kb)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x8000;
+    #[cfg(instruction_cache_size_16kb)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
+
+    #[cfg(icache_associated_ways_8)]
+    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
+    #[cfg(icache_associated_ways_4)]
+    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 4;
+
+    #[cfg(instruction_cache_line_size_32b)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32;
+    #[cfg(instruction_cache_line_size_16b)]
+    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 16;
 
     // Configure the mode of instruction cache: cache size, cache line size.
     unsafe {
