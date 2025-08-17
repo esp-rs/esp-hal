@@ -63,17 +63,17 @@ pub(crate) fn init_psram(config: PsramConfig) {
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = match () {
         _ if cfg!(instruction_cache_size_32kb) => 0x8000,
         _ if cfg!(instruction_cache_size_16kb) => 0x4000,
-        _ => unreachable!(),
+        _ => core::unreachable!(),
     };
     const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = match () {
         _ if cfg!(icache_associated_ways_8) => 8,
         _ if cfg!(icache_associated_ways_4) => 4,
-        _ => unreachable!(),
+        _ => core::unreachable!(),
     };
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = match () {
         _ if cfg!(instruction_cache_line_size_32b) => 32,
         _ if cfg!(instruction_cache_line_size_16b) => 16,
-        _ => unreachable!(),
+        _ => core::unreachable!(),
     };
 
     const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = match () {
