@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
 - `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
+- `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 
 ### Fixed
 
