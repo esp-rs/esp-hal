@@ -64,14 +64,14 @@ fn setup<Dm: DriverMode>(
     (tx_channel, rx_channel)
 }
 
-fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [u32; TX_LEN] {
+fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
         PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
     });
 
     if write_end_marker {
         tx_data[TX_LEN - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-        tx_data[TX_LEN - 1] = PulseCode::empty();
+        tx_data[TX_LEN - 1] = PulseCode::end_marker();
     }
 
     tx_data
@@ -94,7 +94,7 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
-    let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
+    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
@@ -132,7 +132,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
 
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
-    let mut rcv_data: [u32; TX_LEN] = [PulseCode::empty(); TX_LEN];
+    let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     let (rx_res, tx_res) = embassy_futures::join::join(
         rx_channel.receive(&mut rcv_data),
@@ -254,11 +254,33 @@ mod tests {
 
         let ch0 = rmt
             .channel0
-            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2));
+            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2))
+            .unwrap();
 
+        // Configuring channel 1 should fail, since channel 0 already uses its memory.
         let ch1 = rmt.channel1.configure_tx(NoPin, TxChannelConfig::default());
 
-        assert!(ch0.is_ok());
         assert!(matches!(ch1, Err(Error::MemoryBlockNotAvailable)));
+    }
+
+    #[test]
+    fn rmt_overlapping_ram_release() {
+        use esp_hal::rmt::TxChannelCreator;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
+        let ch0 = rmt
+            .channel0
+            .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2))
+            .unwrap();
+
+        // After dropping channel 0, the memory that it reserved should become available
+        // again such that channel 1 configuration succeeds.
+        core::mem::drop(ch0);
+        rmt.channel1
+            .configure_tx(NoPin, TxChannelConfig::default())
+            .unwrap();
     }
 }

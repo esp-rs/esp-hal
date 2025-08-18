@@ -93,7 +93,7 @@ pub(crate) fn bind_default_interrupt_handler() {
     if let Some(handler) = interrupt::bound_handler(Interrupt::GPIO) {
         // We only allow binding the default handler if nothing else is bound.
         // This prevents silently overwriting RTIC's interrupt handler, if using GPIO.
-        if !core::ptr::fn_addr_eq(handler, DEFAULT_INTERRUPT_HANDLER.handler()) {
+        if handler != DEFAULT_INTERRUPT_HANDLER.handler() {
             // The user has configured an interrupt handler they wish to use.
             info!("Not using default GPIO interrupt handler: already bound in vector table");
             return;
@@ -109,7 +109,12 @@ pub(crate) fn bind_default_interrupt_handler() {
         }
     }
 
-    unsafe { interrupt::bind_interrupt(Interrupt::GPIO, default_gpio_interrupt_handler) };
+    unsafe {
+        interrupt::bind_interrupt(
+            Interrupt::GPIO,
+            interrupt::IsrCallback::new(default_gpio_interrupt_handler),
+        )
+    };
 
     // By default, we use lowest priority
     set_interrupt_priority(Interrupt::GPIO, Priority::min());

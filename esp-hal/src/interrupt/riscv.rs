@@ -312,6 +312,7 @@ pub(crate) fn bound_cpu_interrupt_for(_cpu: Cpu, interrupt: Interrupt) -> Option
 
 mod vectored {
     use super::*;
+    use crate::interrupt::IsrCallback;
 
     // Setup interrupts ready for vectoring
     #[doc(hidden)]
@@ -387,23 +388,23 @@ mod vectored {
     /// # Safety
     ///
     /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
         unsafe {
-            let ptr = &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _
-                as *mut unsafe extern "C" fn();
-            ptr.write_volatile(handler);
+            let ptr =
+                &pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize;
+            ptr.write_volatile(handler.raw_value());
         }
     }
 
     /// Returns the currently bound interrupt handler.
-    pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
+    pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
         unsafe {
-            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler;
-            if addr as usize == 0 {
+            let addr = pac::__EXTERNAL_INTERRUPTS[interrupt as usize]._handler as usize;
+            if addr == 0 {
                 return None;
             }
 
-            Some(addr)
+            Some(IsrCallback::from_raw(addr))
         }
     }
 }
@@ -751,7 +752,7 @@ mod rt {
 
     #[unsafe(no_mangle)]
     #[ram]
-    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt, context: &mut TrapFrame) {
+    unsafe fn handle_interrupts(cpu_intr: CpuInterrupt) {
         let core = Cpu::current();
         let status = status(core);
 
@@ -768,17 +769,16 @@ mod rt {
             let not_nested = (handler & 1) == 1;
             let handler = handler & !1;
 
-            let handler: fn(&mut TrapFrame) =
-                unsafe { core::mem::transmute::<usize, fn(&mut TrapFrame)>(handler) };
+            let handler: fn() = unsafe { core::mem::transmute::<usize, fn()>(handler) };
 
             if not_nested || prio == Priority::Priority15 {
-                handler(context);
+                handler();
             } else {
                 let elevated = prio as u8;
                 unsafe {
                     let level =
                         change_current_runlevel(unwrap!(Priority::try_from(elevated as u32)));
-                    riscv::interrupt::nested(|| handler(context));
+                    riscv::interrupt::nested(handler);
                     change_current_runlevel(level);
                 }
             }
@@ -820,7 +820,6 @@ mod rt {
                     .global interrupt"#,$num,r#"
 
                 interrupt"#,$num,r#":
-                    mv a1, a0
                     li a0,"#,$num,r#"
                     j handle_interrupts
                 "#

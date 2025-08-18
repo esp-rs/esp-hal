@@ -311,7 +311,7 @@ const fn str_to_cstr_array<const C: usize>(s: &str) -> [::core::ffi::c_char; C] 
     loop {
         ret[i] = bytes[i] as _;
         i += 1;
-        if i >= bytes.len() {
+        if i >= bytes.len() || i >= C {
             break;
         }
     }

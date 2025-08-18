@@ -13,7 +13,7 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-h2_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
     { name = "DMA" },
@@ -56,8 +56,8 @@ peripherals = [
     { name = "PMU" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
-    { name = "SHA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "ETM", pac = "SOC_ETM" },
     { name = "SPI0" },
     { name = "SPI1" },
@@ -102,6 +102,9 @@ symbols = [
     "rom_crc_le",
     "rom_crc_be",
     "rom_md5_bsd",
+
+    # Which bluetooth implementation
+    "npl",
 ]
 
 memory = [{ name = "dram", start = 0x4080_0000, end = 0x4085_0000 }]
@@ -376,11 +379,12 @@ channel_ram_size = 48
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 3072 }
-multiplication = { increment = 32, max = 1536 }
+size_increment = 32
+memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
+dma = true
 algo = ["SHA-1", "SHA-224", "SHA-256"]
 
 [device.spi_master]

@@ -1,5 +1,6 @@
 #![allow(unused)]
 
+use alloc::{boxed::Box, vec::Vec};
 use core::{
     cell::RefCell,
     fmt::Write,
@@ -7,7 +8,6 @@ use core::{
     ptr::{self, addr_of, addr_of_mut},
 };
 
-use allocator_api2::{boxed::Box, vec::Vec};
 use esp_hal::time::{Duration, Instant};
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
@@ -15,7 +15,6 @@ use super::malloc::free;
 use crate::{
     CONFIG,
     binary::c_types::{c_int, c_void},
-    compat::malloc::InternalMemory,
     hal::sync::Locked,
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
@@ -67,14 +66,19 @@ pub struct RawQueue {
     capacity: usize,
     current_read: usize,
     current_write: usize,
-    storage: Box<[u8], InternalMemory>,
+    storage: Box<[u8]>,
 }
 
 impl RawQueue {
     /// This allocates underlying storage. See [release_storage]
     pub fn new(capacity: usize, item_size: usize) -> Self {
-        let storage =
-            unsafe { Box::new_zeroed_slice_in(capacity * item_size, InternalMemory).assume_init() };
+        let storage = unsafe {
+            let mut boxed = Box::new_uninit_slice(capacity * item_size);
+            for i in 0..capacity * item_size {
+                boxed[i].write(0);
+            }
+            boxed.assume_init()
+        };
 
         Self {
             item_size,
@@ -143,7 +147,7 @@ impl RawQueue {
             return;
         }
 
-        let mut tmp_item = Vec::<u8, _>::new_in(InternalMemory);
+        let mut tmp_item = Vec::<u8>::new();
         tmp_item.reserve_exact(self.item_size);
         tmp_item.resize(self.item_size, 0);
 
@@ -171,21 +175,6 @@ pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
         let c_str = core::ffi::CStr::from_ptr(s.cast());
         core::str::from_utf8_unchecked(c_str.to_bytes())
     }
-}
-
-#[unsafe(no_mangle)]
-unsafe extern "C" fn strnlen(chars: *const c_char, maxlen: usize) -> usize {
-    let mut len = 0;
-    loop {
-        unsafe {
-            if chars.offset(len).read_volatile() == 0 {
-                break;
-            }
-            len += 1;
-        }
-    }
-
-    len as usize
 }
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
@@ -431,10 +420,4 @@ pub(crate) unsafe extern "C" fn sleep(
 unsafe extern "C" fn usleep(us: u32) -> c_int {
     esp_radio_preempt_driver::usleep(us);
     0
-}
-
-#[unsafe(no_mangle)]
-unsafe extern "C" fn putchar(c: i32) -> c_int {
-    trace!("putchar {}", c as u8 as char);
-    c
 }

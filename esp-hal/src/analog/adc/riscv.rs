@@ -449,66 +449,6 @@ impl super::AdcCalEfuse for crate::peripherals::ADC2<'_> {
     }
 }
 
-#[cfg(esp32c2)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO0<'_>, 0),
-            (GPIO1<'_>, 1),
-            (GPIO2<'_>, 2),
-            (GPIO3<'_>, 3),
-            (GPIO4<'_>, 4),
-        ]
-    }
-}
-
-#[cfg(esp32c3)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO0<'_>, 0),
-            (GPIO1<'_>, 1),
-            (GPIO2<'_>, 2),
-            (GPIO3<'_>, 3),
-            (GPIO4<'_>, 4),
-        ]
-    }
-
-    crate::analog::adc::impl_adc_interface! {
-        ADC2 [
-            (GPIO5<'_>, 0),
-        ]
-    }
-}
-
-#[cfg(esp32c6)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO0<'_>, 0),
-            (GPIO1<'_>, 1),
-            (GPIO2<'_>, 2),
-            (GPIO3<'_>, 3),
-            (GPIO4<'_>, 4),
-            (GPIO5<'_>, 5),
-            (GPIO6<'_>, 6),
-        ]
-    }
-}
-
-#[cfg(esp32h2)]
-mod adc_implementation {
-    crate::analog::adc::impl_adc_interface! {
-        ADC1 [
-            (GPIO1<'_>, 0),
-            (GPIO2<'_>, 1),
-            (GPIO3<'_>, 2),
-            (GPIO4<'_>, 3),
-            (GPIO5<'_>, 4),
-        ]
-    }
-}
-
 impl<'d, ADCI> Adc<'d, ADCI, Async>
 where
     ADCI: RegisterAccess + 'd,

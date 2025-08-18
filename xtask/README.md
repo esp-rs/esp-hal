@@ -33,7 +33,7 @@ cargo xtask build examples --help
 
 Build all examples for the specified chip
 
-Usage: xtask build examples [OPTIONS] <CHIP> <PACKAGE>
+Usage: xtask build examples [OPTIONS] <EXAMPLE>
 
 [...]
 ```

@@ -9,7 +9,7 @@ use xtensa_lx_rt::exception::Context;
 
 pub use self::vectored::*;
 use super::InterruptStatus;
-use crate::{pac, peripherals::Interrupt, system::Cpu};
+use crate::{interrupt::IsrCallback, pac, peripherals::Interrupt, system::Cpu};
 
 /// Interrupt Error
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -525,24 +525,22 @@ mod vectored {
     /// # Safety
     ///
     /// This will replace any previously bound interrupt handler
-    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: unsafe extern "C" fn()) {
-        let ptr = unsafe {
-            &pac::__INTERRUPTS[interrupt as usize]._handler as *const _
-                as *mut unsafe extern "C" fn()
-        };
+    pub unsafe fn bind_interrupt(interrupt: Interrupt, handler: IsrCallback) {
+        let ptr =
+            unsafe { &pac::__INTERRUPTS[interrupt as usize]._handler as *const _ as *mut usize };
         unsafe {
-            ptr.write_volatile(handler);
+            ptr.write_volatile(handler.raw_value());
         }
     }
 
     /// Returns the currently bound interrupt handler.
-    pub fn bound_handler(interrupt: Interrupt) -> Option<unsafe extern "C" fn()> {
+    pub fn bound_handler(interrupt: Interrupt) -> Option<IsrCallback> {
         unsafe {
-            let addr = pac::__INTERRUPTS[interrupt as usize]._handler;
-            if addr as usize == 0 {
+            let addr = pac::__INTERRUPTS[interrupt as usize]._handler as usize;
+            if addr == 0 {
                 return None;
             }
-            Some(addr)
+            Some(IsrCallback::from_raw(addr))
         }
     }
 

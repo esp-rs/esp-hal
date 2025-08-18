@@ -3403,7 +3403,7 @@ impl Instance for AnyUart<'_> {
 }
 
 impl AnyUart<'_> {
-    fn bind_peri_interrupt(&self, handler: unsafe extern "C" fn() -> ()) {
+    fn bind_peri_interrupt(&self, handler: crate::interrupt::IsrCallback) {
         any::delegate!(self, uart => { uart.bind_peri_interrupt(handler) })
     }
 

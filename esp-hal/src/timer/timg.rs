@@ -93,7 +93,7 @@ cfg_if::cfg_if! {
     // and S2 where the effective interrupt enable register (config) is not shared between
     // the timers.
     if #[cfg(all(timergroup_timg_has_timer1, not(any(esp32, esp32s2))))] {
-        use crate::sync::{lock, RawMutex};
+        use crate::sync::RawMutex;
         static INT_ENA_LOCK: [RawMutex; NUM_TIMG] = [const { RawMutex::new() }; NUM_TIMG];
     }
 }
@@ -582,7 +582,7 @@ impl Timer<'_> {
                     .config()
                     .modify(|_, w| w.level_int_en().bit(state));
             } else if #[cfg(timergroup_timg_has_timer1)] {
-                lock(&INT_ENA_LOCK[self.timer_group() as usize], || {
+                INT_ENA_LOCK[self.timer_group() as usize].lock(|| {
                     self.register_block()
                         .int_ena()
                         .modify(|_, w| w.t(self.timer_number()).bit(state));

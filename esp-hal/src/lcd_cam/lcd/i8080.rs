@@ -424,7 +424,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
     }
 
     /// Stops this transfer on the spot and returns the peripheral and buffer.
-    pub fn cancel(mut self) -> (I8080<'d, Dm>, BUF) {
+    pub fn cancel(mut self) -> (I8080<'d, Dm>, BUF::Final) {
         self.stop_peripherals();
         let (_, i8080, buf) = self.wait();
         (i8080, buf)
@@ -434,7 +434,7 @@ impl<'d, BUF: DmaTxBuffer, Dm: DriverMode> I8080Transfer<'d, BUF, Dm> {
     ///
     /// Note: This also clears the transfer interrupt so it can be used in
     /// interrupt handlers to "handle" the interrupt.
-    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF) {
+    pub fn wait(mut self) -> (Result<(), DmaError>, I8080<'d, Dm>, BUF::Final) {
         while !self.is_done() {}
 
         // Clear "done" interrupt.

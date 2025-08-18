@@ -12,64 +12,75 @@
 //! the work item has been processed. Dropping the handle will cancel the work item.
 #![cfg_attr(esp32c2, allow(unused))]
 
-use core::{future::poll_fn, marker::PhantomData, ptr::NonNull};
+use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 
-use crate::{asynch::AtomicWaker, sync::Locked};
+use embassy_sync::waitqueue::WakerRegistration;
+
+use crate::sync::Locked;
 
 /// Queue driver operations.
 ///
 /// Functions in this VTable are provided by drivers that consume work items.
 /// These functions may be called both in the context of the queue frontends and drivers.
-pub(crate) struct VTable<T: Sync> {
+pub(crate) struct VTable<T: Sync + Send> {
     /// Starts processing a new work item.
     ///
-    /// The function returns whether the work item was accepted. If there is no driver currently
-    /// processing the queue, this function will return false to prevent removing the work item
-    /// from the queue.
+    /// The function returns whether the work item was accepted, and its poll status if it was
+    /// accepted. If there is no driver currently processing the queue, this function will
+    /// return None to prevent removing the work item from the queue.
     ///
     /// This function should be as short as possible.
-    pub(crate) post: fn(*const (), &mut T) -> bool,
+    pub(crate) post: fn(NonNull<()>, &mut T) -> Option<Poll>,
 
-    /// Polls the status of a particular work item.
+    /// Polls the status of the current work item.
     ///
-    /// Return `None` if the work item is not currently being processed.
+    /// The work queue ensures that the item passed here has been first passed to the driver by
+    /// `post`.
     ///
     /// This function should be as short as possible.
-    pub(crate) poll: fn(*const (), &mut T) -> Option<Poll>,
+    pub(crate) poll: fn(NonNull<()>, &mut T) -> Poll,
 
     /// Attempts to abort processing a work item.
     ///
     /// This function should be as short as possible.
-    pub(crate) cancel: fn(*const (), &mut T),
+    pub(crate) cancel: fn(NonNull<()>, &mut T),
 
     /// Called when the driver may be stopped.
     ///
     /// This function should be as short as possible.
-    pub(crate) stop: fn(*const ()),
+    pub(crate) stop: fn(NonNull<()>),
 }
 
-impl<T: Sync> VTable<T> {
+impl<T: Sync + Send> VTable<T> {
     pub(crate) const fn noop() -> Self {
         Self {
-            post: |_, _| false,
-            poll: |_, _| None,
+            post: |_, _| None,
+            poll: |_, _| unreachable!(),
             cancel: |_, _| (),
             stop: |_| (),
         }
     }
 }
 
-struct Inner<T: Sync> {
+struct Inner<T: Sync + Send> {
     head: Option<NonNull<WorkItem<T>>>,
     tail: Option<NonNull<WorkItem<T>>>,
     current: Option<NonNull<WorkItem<T>>>,
 
     // The data pointer will be passed to VTable functions, which may be called in any context.
-    data: *const (),
+    data: NonNull<()>,
     vtable: VTable<T>,
+
+    // Counts suspend requests. When this reaches 0 again, the all wakers in the queue need to be
+    // waken to continue processing.
+    suspend_count: usize,
+    // The task waiting for the queue to be suspended. There can be multiple tasks, but that's
+    // practically rare (in this setup, it needs both HMAC and DSA to want to work at the same
+    // time).
+    suspend_waker: WakerRegistration,
 }
 
-impl<T: Sync> Inner<T> {
+impl<T: Sync + Send> Inner<T> {
     /// Places a work item at the end of the queue.
     fn enqueue(&mut self, ptr: NonNull<WorkItem<T>>) {
         if let Some(tail) = self.tail.as_mut() {
@@ -100,40 +111,70 @@ impl<T: Sync> Inner<T> {
     /// Runs one processing iteration.
     ///
     /// This function enqueues a new work item or polls the status of the currently processed one.
-    fn process(&mut self) {
+    /// Returns whether the function should be re-called by the caller.
+    fn process(&mut self) -> bool {
         if let Some(mut current) = self.current {
-            let result = unsafe { (self.vtable.poll)(self.data, &mut current.as_mut().data) };
+            let poll_result = (self.vtable.poll)(self.data, &mut unsafe { current.as_mut() }.data);
 
-            if let Some(Poll::Ready(status)) = result {
-                unsafe { current.as_mut().complete(status) };
-                self.current = None;
-
-                self.dequeue_and_post(true);
+            match poll_result {
+                Poll::Ready(status) => {
+                    unsafe { current.as_mut() }.complete(status);
+                    self.current = None;
+                    if self.suspend_count > 0 {
+                        // Queue suspended, stop the driver.
+                        (self.vtable.stop)(self.data);
+                        self.suspend_waker.wake();
+                        false
+                    } else {
+                        self.dequeue_and_post(true)
+                    }
+                }
+                Poll::Pending(recall) => recall,
             }
         } else {
             // If the queue is empty, the driver should already have been notified when the queue
             // became empty, so we don't notify it here.
-            self.dequeue_and_post(false);
+            self.dequeue_and_post(false)
         }
     }
 
+    /// Retrieves the next work queue item and sends it to the driver.
+    ///
+    /// Returns true if the queue needs to be polled again.
     // Note: even if the queue itself may be implemented lock-free, dequeuing and posting to the
     // driver must be done atomically to ensure that the queue can be processed fully by any of
     // the frontends polling it.
-    fn dequeue_and_post(&mut self, notify_on_empty: bool) {
-        if let Some(mut ptr) = self.dequeue() {
-            // Start processing a new work item.
-
-            if unsafe { (self.vtable.post)(self.data, &mut ptr.as_mut().data) } {
-                self.current = Some(ptr);
-            } else {
-                // If the driver didn't accept the work item, place it back to the front of the
-                // queue.
-                self.enqueue_front(ptr);
+    fn dequeue_and_post(&mut self, notify_on_empty: bool) -> bool {
+        let Some(mut ptr) = self.dequeue() else {
+            if notify_on_empty {
+                // There are no more work items. Notify the driver that it can stop.
+                (self.vtable.stop)(self.data);
             }
-        } else if notify_on_empty {
-            // There are no more work items. Notify the driver that it can stop.
-            (self.vtable.stop)(self.data);
+            return false;
+        };
+
+        // Start processing a new work item.
+
+        if let Some(poll_status) = (self.vtable.post)(self.data, &mut unsafe { ptr.as_mut() }.data)
+        {
+            match poll_status {
+                Poll::Pending(recall) => {
+                    unsafe { ptr.as_mut().status = Poll::Pending(recall) };
+                    self.current = Some(ptr);
+                    recall
+                }
+                Poll::Ready(status) => {
+                    unsafe { ptr.as_mut() }.complete(status);
+                    // The driver immediately processed the work item.
+                    // Polling again needs to dequeue the next item.
+                    true
+                }
+            }
+        } else {
+            // If the driver didn't accept the work item, place it back to the front of the
+            // queue.
+            self.enqueue_front(ptr);
+            false
         }
     }
 
@@ -142,7 +183,7 @@ impl<T: Sync> Inner<T> {
         // If the `head` is None, the queue is empty. Return None and do nothing.
         let ptr = self.head?;
 
-        unsafe { self.head = ptr.as_ref().next };
+        self.head = unsafe { ptr.as_ref() }.next;
 
         // If the new `head` is null, the queue is empty. Clear the `tail` pointer.
         if self.head.is_none() {
@@ -166,19 +207,25 @@ impl<T: Sync> Inner<T> {
             // Cancelling an in-progress item is more complicated than plucking it from the
             // queue. Forward the request to the driver to (maybe) cancel the
             // operation.
-            (self.vtable.cancel)(self.data, unsafe {
+            (self.vtable.cancel)(
+                self.data,
                 // This is safe to do, because the work item is currently owned by this queue.
-                &mut work_item.as_mut().data
-            });
+                &mut unsafe { work_item.as_mut() }.data,
+            );
             // Queue will need to be polled to query item status.
             return false;
+        }
+
+        if unsafe { work_item.as_ref() }.status.is_ready() {
+            // Nothing to do.
+            return true;
         }
 
         // The work item is not the current one, remove it from the queue. This immediately
         // cancels the work item. `remove` only uses the address of the work item without
         // dereferencing it.
         if self.remove(work_item) {
-            unsafe { work_item.as_mut().complete(Status::Cancelled) };
+            unsafe { work_item.as_mut() }.complete(Status::Cancelled);
             // Cancelled immediately, no further polling necessary for this item.
             return true;
         }
@@ -200,7 +247,7 @@ impl<T: Sync> Inner<T> {
         let mut prev = None;
         let mut current = self.head;
         while let Some(current_item) = current {
-            let next = unsafe { current_item.as_ref().next };
+            let next = unsafe { current_item.as_ref() }.next;
 
             if current_item != ptr {
                 // Not what we're looking for. Move to the next element.
@@ -215,7 +262,7 @@ impl<T: Sync> Inner<T> {
             } else {
                 // Unwrapping is fine, because if the current pointer is not the `head`, the
                 // previous pointer must be Some.
-                unsafe { unwrap!(prev).as_mut().next = next };
+                unsafe { unwrap!(prev).as_mut() }.next = next;
             }
 
             if Some(ptr) == self.tail {
@@ -228,14 +275,72 @@ impl<T: Sync> Inner<T> {
         // Did not find `ptr`.
         false
     }
+
+    /// Increases the suspend counter, preventing new work items from starting to be processed.
+    ///
+    /// If the current work item finishes processing, the driver is shut down. Call `is_active` to
+    /// determine when the queue enters suspended state.
+    fn suspend(&mut self, ctx: Option<&Context<'_>>) {
+        self.suspend_count += 1;
+        if let Some(ctx) = ctx {
+            if self.current.is_some() {
+                self.suspend_waker.register(ctx.waker());
+            } else {
+                ctx.waker().wake_by_ref();
+            }
+        }
+    }
+
+    /// Decreases the suspend counter.
+    ///
+    /// When it reaches 0, this function wakes async tasks that poll the queue. They need to be
+    /// waken to ensure that their items don't end up stuck. Blocking pollers will eventually end up
+    /// looping when their turn comes.
+    fn resume(&mut self) {
+        self.suspend_count -= 1;
+        if self.suspend_count == 0 {
+            self.wake_polling_tasks();
+        }
+    }
+
+    fn wake_polling_tasks(&mut self) {
+        if self.data == NonNull::dangling() {
+            // No VTable means no driver, no need to continue processing.
+            return;
+        }
+        // Walk through the list and wake polling tasks.
+        let mut current = self.head;
+        while let Some(mut current_item) = current {
+            let item = unsafe { current_item.as_mut() };
+
+            item.waker.wake();
+
+            current = item.next;
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        self.current.is_some()
+    }
+
+    unsafe fn configure(&mut self, data: NonNull<()>, vtable: VTable<T>) {
+        (self.vtable.stop)(self.data);
+
+        self.data = data;
+        self.vtable = vtable;
+
+        if self.suspend_count == 0 {
+            self.wake_polling_tasks();
+        }
+    }
 }
 
 /// A generic work queue.
-pub(crate) struct WorkQueue<T: Sync> {
+pub(crate) struct WorkQueue<T: Sync + Send> {
     inner: Locked<Inner<T>>,
 }
 
-impl<T: Sync> WorkQueue<T> {
+impl<T: Sync + Send> WorkQueue<T> {
     /// Creates a new `WorkQueue`.
     pub const fn new() -> Self {
         Self {
@@ -244,8 +349,11 @@ impl<T: Sync> WorkQueue<T> {
                 tail: None,
                 current: None,
 
-                data: core::ptr::null(),
+                data: NonNull::dangling(),
                 vtable: VTable::noop(),
+
+                suspend_count: 0,
+                suspend_waker: WakerRegistration::new(),
             }),
         }
     }
@@ -259,13 +367,9 @@ impl<T: Sync> WorkQueue<T> {
     /// The `data` pointer must be valid as long as the `WorkQueue` is configured with it. The
     /// driver must access the data pointer appropriately (i.e. it must not move !Send data out of
     /// it).
-    pub unsafe fn configure<D: Sync>(&self, data: *const D, vtable: VTable<T>) {
-        self.inner.with(|inner| {
-            (inner.vtable.stop)(inner.data);
-
-            inner.data = data.cast();
-            inner.vtable = vtable;
-        })
+    pub unsafe fn configure<D: Sync + Send>(&self, data: NonNull<D>, vtable: VTable<T>) {
+        self.inner
+            .with(|inner| unsafe { inner.configure(data.cast(), vtable) })
     }
 
     /// Enqueues a work item.
@@ -288,8 +392,11 @@ impl<T: Sync> WorkQueue<T> {
     }
 
     /// Polls the queue once.
-    pub fn process(&self) {
-        self.inner.with(|inner| inner.process());
+    ///
+    /// Returns true if the queue needs to be polled again.
+    #[allow(unused)]
+    pub fn process(&self) -> bool {
+        self.inner.with(|inner| inner.process())
     }
 
     /// Polls the queue once and returns the status of the given work item.
@@ -301,10 +408,10 @@ impl<T: Sync> WorkQueue<T> {
     /// list. This relationship is broken when the Handle that owns the WorkItem is dropped.
     pub unsafe fn poll(&self, item: NonNull<WorkItem<T>>) -> Poll {
         self.inner.with(|inner| {
-            let status = unsafe { (*item.as_ptr()).status };
-            if status == Poll::Pending {
+            let status = unsafe { &*item.as_ptr() }.status;
+            if status.is_pending() {
                 inner.process();
-                unsafe { (*item.as_ptr()).status }
+                unsafe { &*item.as_ptr() }.status
             } else {
                 status
             }
@@ -335,14 +442,14 @@ pub enum Status {
 }
 
 /// A unit of work in the work queue.
-pub(crate) struct WorkItem<T: Sync> {
+pub(crate) struct WorkItem<T: Sync + Send> {
     next: Option<NonNull<WorkItem<T>>>,
     status: Poll,
     data: T,
-    waker: AtomicWaker,
+    waker: WakerRegistration,
 }
 
-impl<T: Sync> WorkItem<T> {
+impl<T: Sync + Send> WorkItem<T> {
     /// Completes the work item.
     ///
     /// This function is intended to be called from the underlying drivers.
@@ -359,7 +466,7 @@ impl<T: Sync> WorkItem<T> {
     /// function is in use.
     unsafe fn prepare(&mut self) -> NonNull<Self> {
         self.next = None;
-        self.status = Poll::Pending;
+        self.status = Poll::Pending(false);
 
         NonNull::from(self)
     }
@@ -368,12 +475,26 @@ impl<T: Sync> WorkItem<T> {
 /// The status of a work item posted to a work queue.
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Poll {
-    /// The work item has not yet been fully processed.
-    Pending,
+pub(crate) enum Poll {
+    /// The work item has not yet been fully processed. Contains whether the caller should poll the
+    /// queue again. This only has effect on async pollers, which will need to wake their tasks
+    /// immediately.
+    Pending(bool),
 
     /// The work item has been processed.
     Ready(Status),
+}
+
+impl Poll {
+    /// Returns whether the current result is still pending.
+    pub fn is_pending(self) -> bool {
+        matches!(self, Self::Pending(_))
+    }
+
+    /// Returns whether the current result is ready.
+    pub fn is_ready(self) -> bool {
+        !self.is_pending()
+    }
 }
 
 /// A reference to a posted [`WorkItem`].
@@ -383,44 +504,74 @@ pub enum Poll {
 ///
 /// Dropping the handle cancels the work item, but may block for some time if the work item is
 /// already being processed.
-pub(crate) struct Handle<'t, T: Sync> {
+pub(crate) struct Handle<'t, T: Sync + Send> {
     queue: &'t WorkQueue<T>,
     work_item: NonNull<WorkItem<T>>,
     // Make sure lifetime is invariant to prevent UB.
     _marker: PhantomData<&'t mut WorkItem<T>>,
 }
 
-impl<'t, T: Sync> Handle<'t, T> {
-    /// Returns the status of the work item.
-    pub fn poll(&mut self) -> Poll {
+impl<'t, T: Sync + Send> Handle<'t, T> {
+    fn poll_inner(&mut self) -> Poll {
         unsafe { self.queue.poll(self.work_item) }
     }
 
-    /// Waits for the work item to be processed.
+    /// Returns the status of the work item.
+    pub fn poll(&mut self) -> bool {
+        self.poll_inner().is_ready()
+    }
+
+    /// Polls the work item to completion, by busy-looping.
+    ///
+    /// This function returns immediately if `poll` returns `true`.
+    #[inline]
+    pub fn wait_blocking(mut self) -> Status {
+        loop {
+            if let Poll::Ready(status) = self.poll_inner() {
+                return status;
+            }
+        }
+    }
+
+    /// Waits until the work item is completed.
     pub fn wait(&mut self) -> impl Future<Output = Status> {
         poll_fn(|ctx| {
-            unsafe { (*self.work_item.as_ptr()).waker.register(ctx.waker()) };
-            match self.poll() {
-                Poll::Pending => core::task::Poll::Pending,
+            unsafe { self.work_item.as_mut() }
+                .waker
+                .register(ctx.waker());
+            match self.poll_inner() {
+                Poll::Pending(recall) => {
+                    if recall {
+                        ctx.waker().wake_by_ref();
+                    }
+                    core::task::Poll::Pending
+                }
                 Poll::Ready(status) => core::task::Poll::Ready(status),
             }
         })
     }
+
+    /// Cancels the work item and asynchronously waits until it is removed from the work queue.
+    pub async fn cancel(&mut self) {
+        if !self.queue.cancel(self.work_item) {
+            self.wait().await;
+        }
+    }
 }
 
-impl<'t, T: Sync> Drop for Handle<'t, T> {
+impl<'t, T: Sync + Send> Drop for Handle<'t, T> {
     fn drop(&mut self) {
-        if self.queue.cancel(self.work_item) {
+        if !self.queue.cancel(self.work_item) {
             // We must wait for the driver to release our WorkItem.
-            while self.poll() == Poll::Pending {}
+            while self.poll_inner().is_pending() {}
         }
     }
 }
 
 pub(crate) struct WorkQueueDriver<'t, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     queue: &'t WorkQueue<T>,
     _marker: PhantomData<&'t mut D>,
@@ -428,15 +579,15 @@ where
 
 impl<'t, D, T> WorkQueueDriver<'t, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     pub fn new(driver: &'t mut D, vtable: VTable<T>, queue: &'t WorkQueue<T>) -> Self {
         unsafe {
             // Safety: the lifetime 't ensures the pointer remains valid for the lifetime of the
             // WorkQueueDriver. The Drop implementation (and the general "Don't forget" clause)
             // ensure the pointer is not used after the WQD has been dropped.
-            queue.configure((driver as *mut D).cast_const(), vtable);
+            queue.configure(NonNull::from(driver), vtable);
         }
         Self {
             queue,
@@ -444,38 +595,93 @@ where
         }
     }
 
-    #[expect(unused)] // TODO this will be used with AesDmaBackend, for example
-    pub fn poll(&mut self) {
-        self.queue.process();
+    /// Shuts down the driver.
+    pub fn stop(self) -> impl Future<Output = ()> {
+        let mut suspended = false;
+        poll_fn(move |ctx| {
+            self.queue.inner.with(|inner| {
+                if !inner.is_active() {
+                    unsafe {
+                        // Safety: the noop VTable functions don't use the pointer at all.
+                        self.queue
+                            .configure(NonNull::<D>::dangling(), VTable::noop())
+                    };
+                    // Make sure the queue doesn't remain suspended when the driver is re-started.
+                    if suspended {
+                        inner.resume();
+                    }
+                    return core::task::Poll::Ready(());
+                }
+                // This may kick out other suspend() callers, but that should be okay. They will
+                // only be able to do work if the queue is !active, for them it doesn't matter if
+                // the queue is suspended or stopped completely - just that it isn't running. As for
+                // the possible waker churn, we can use MultiWakerRegistration with a capacity
+                // suitable for the number of possible suspenders (2-3 unless the work queue ends up
+                // being used more widely), if this turns out to be a problem.
+                inner.suspend_waker.register(ctx.waker());
+                if !suspended {
+                    inner.suspend(Some(ctx));
+                    suspended = true;
+                }
+
+                core::task::Poll::Pending
+            })
+        })
     }
 }
 
 impl<D, T> Drop for WorkQueueDriver<'_, D, T>
 where
-    D: Sync,
-    T: Sync,
+    D: Sync + Send,
+    T: Sync + Send,
 {
     fn drop(&mut self) {
-        unsafe {
-            // Safety: the noop VTable functions don't use the pointer at all.
-            self.queue.configure(core::ptr::null::<D>(), VTable::noop())
-        };
+        let wait_for_suspended = self.queue.inner.with(|inner| {
+            if inner.is_active() {
+                inner.suspend(None);
+                true
+            } else {
+                unsafe { inner.configure(NonNull::dangling(), VTable::noop()) };
+                false
+            }
+        });
+
+        if !wait_for_suspended {
+            return;
+        }
+
+        loop {
+            let done = self.queue.inner.with(|inner| {
+                if inner.is_active() {
+                    return false;
+                }
+
+                unsafe { inner.configure(NonNull::dangling(), VTable::noop()) };
+
+                inner.resume();
+
+                true
+            });
+            if done {
+                break;
+            }
+        }
     }
 }
 
 /// Used by work queue clients, allows hiding WorkItem.
-pub(crate) struct WorkQueueFrontend<T: Sync> {
+pub(crate) struct WorkQueueFrontend<T: Sync + Send> {
     work_item: WorkItem<T>,
 }
 
-impl<T: Sync> WorkQueueFrontend<T> {
+impl<T: Sync + Send> WorkQueueFrontend<T> {
     pub fn new(initial: T) -> Self {
         Self {
             work_item: WorkItem {
                 next: None,
-                status: Poll::Pending,
+                status: Poll::Pending(false),
                 data: initial,
-                waker: AtomicWaker::new(),
+                waker: WakerRegistration::new(),
             },
         }
     }

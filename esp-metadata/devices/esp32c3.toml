@@ -13,7 +13,7 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
@@ -36,10 +36,10 @@ peripherals = [
     { name = "NRX" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },
@@ -82,6 +82,9 @@ symbols = [
     "pm_support_bt_wakeup",
     "uart_support_wakeup_int",
     "gpio_support_deepsleep_wakeup",
+
+    # Which bluetooth implementation
+    "btdm",
 ]
 
 memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
@@ -304,11 +307,12 @@ channel_ram_size = 48
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 3072 }
-multiplication = { increment = 32, max = 1536 }
+size_increment = 32
+memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
+dma = true
 algo = ["SHA-1", "SHA-224", "SHA-256"]
 
 [device.spi_master]

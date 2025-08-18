@@ -157,10 +157,6 @@ name    = "rsa"
 harness = false
 
 [[test]]
-name    = "rsa_async"
-harness = false
-
-[[test]]
 name    = "sha"
 harness = false
 
@@ -249,7 +245,7 @@ esp-backtrace      = { path = "../esp-backtrace", default-features = false, feat
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-radio-preempt-baremetal = { path = "../esp-radio-preempt-baremetal", optional = true }
+esp-preempt = { path = "../esp-preempt", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
 esp-radio           = { path = "../esp-radio", optional = true }
 portable-atomic    = "1.11.0"
@@ -279,7 +275,7 @@ default = []
 unstable = ["esp-hal/unstable"]
 
 defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-radio?/defmt", "esp-hal-embassy?/defmt"]
-esp-radio = ["dep:esp-radio", "dep:esp-radio-preempt-baremetal"]
+esp-radio = ["dep:esp-radio", "dep:esp-preempt"]
 
 # Device support (required!):
 esp32 = [
@@ -291,7 +287,7 @@ esp32 = [
     "esp-storage?/esp32",
     "esp-bootloader-esp-idf/esp32",
     "esp-metadata-generated/esp32",
-    "esp-radio-preempt-baremetal?/esp32",
+    "esp-preempt?/esp32",
 ]
 esp32c2 = [
     "esp-backtrace/esp32c2",
@@ -301,7 +297,7 @@ esp32c2 = [
     "esp-storage?/esp32c2",
     "esp-bootloader-esp-idf/esp32c2",
     "esp-metadata-generated/esp32c2",
-    "esp-radio-preempt-baremetal?/esp32c2"
+    "esp-preempt?/esp32c2"
 ]
 esp32c3 = [
     "esp-backtrace/esp32c3",
@@ -311,7 +307,7 @@ esp32c3 = [
     "esp-storage?/esp32c3",
     "esp-bootloader-esp-idf/esp32c3",
     "esp-metadata-generated/esp32c3",
-    "esp-radio-preempt-baremetal?/esp32c3",
+    "esp-preempt?/esp32c3",
 ]
 esp32c6 = [
     "esp-backtrace/esp32c6",
@@ -321,7 +317,7 @@ esp32c6 = [
     "esp-storage?/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-metadata-generated/esp32c6",
-    "esp-radio-preempt-baremetal?/esp32c6",
+    "esp-preempt?/esp32c6",
 ]
 esp32h2 = [
     "esp-backtrace/esp32h2",
@@ -331,7 +327,7 @@ esp32h2 = [
     "esp-storage?/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-metadata-generated/esp32h2",
-    "esp-radio-preempt-baremetal?/esp32h2",
+    "esp-preempt?/esp32h2",
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
@@ -342,7 +338,7 @@ esp32s2 = [
     "esp-storage?/esp32s2",
     "esp-bootloader-esp-idf/esp32s2",
     "esp-metadata-generated/esp32s2",
-    "esp-radio-preempt-baremetal?/esp32s2"
+    "esp-preempt?/esp32s2"
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
@@ -353,7 +349,7 @@ esp32s3 = [
     "esp-storage?/esp32s3",
     "esp-bootloader-esp-idf/esp32s3",
     "esp-metadata-generated/esp32s3",
-    "esp-radio-preempt-baremetal?/esp32s3",
+    "esp-preempt?/esp32s3",
 ]
 # Async & Embassy:
 embassy = [

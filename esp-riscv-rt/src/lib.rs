@@ -652,7 +652,7 @@ r#"
     sw a7, 15*4(sp)
 
     # jump to handler loaded in direct handler
-    add a0, sp, zero # load trap-frame address in a0
+    add a0, sp, zero # load trap-frame address in a0 - we only _need_ this only for trap-0 / exceptions
     jalr ra, ra # jump to label loaded in _start_trapX
 
     lw ra, 0*4(sp)

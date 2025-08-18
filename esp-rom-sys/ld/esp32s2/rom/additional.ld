@@ -16,4 +16,13 @@ PROVIDE ( strcmp = 0x40007be4 );
 PROVIDE ( strchr = 0x4001adb0 );
 PROVIDE ( strlcpy = 0x4001adf8 );
 PROVIDE ( strstr = 0x4001aee8 );
-PROVIDE ( strcasecmp = 0x40007b38 );
+
+EXTERN(__strcasecmp);
+EXTERN(__mktime);
+EXTERN(__strnlen);
+EXTERN(__atoi);
+
+PROVIDE ( strcasecmp = __strcasecmp );
+PROVIDE ( strnlen = __strnlen );
+PROVIDE ( atoi = __atoi );
+PROVIDE ( mktime = __mktime );

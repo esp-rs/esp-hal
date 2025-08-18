@@ -204,7 +204,7 @@ pub fn init(time_driver: impl TimeBase) {
 
         esp_hal::interrupt::bind_interrupt(
             esp_hal::peripherals::Interrupt::FROM_CPU_INTR3,
-            software3_interrupt,
+            esp_hal::interrupt::IsrCallback::new(software3_interrupt),
         );
     }
 

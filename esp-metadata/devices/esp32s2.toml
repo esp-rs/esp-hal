@@ -13,7 +13,7 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
     { name = "DEDICATED_GPIO" },
     { name = "DS" },
@@ -36,12 +36,12 @@ peripherals = [
     { name = "PMS" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
@@ -423,11 +423,12 @@ channel_ram_size = 64
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 4096 }
-multiplication = { increment = 32, max = 2048 }
+size_increment = 32
+memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
+dma = true
 algo = [
     "SHA-1",
     "SHA-224",

@@ -12,7 +12,7 @@ use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
-    compat::{common::*, timer_compat::*},
+    compat::common::*,
     hal::{self, clock::ModemClockController, ram},
 };
 
@@ -118,7 +118,6 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 /// *************************************************************************
 #[allow(unused)]
 #[ram]
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
     trace!("random");
 
@@ -218,26 +217,26 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 
 // #define ESP_EVENT_DEFINE_BASE(id) esp_event_base_t id = #id
 #[unsafe(no_mangle)]
-static mut WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
+static mut __ESP_RADIO_WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
-    compat_timer_disarm(timer.cast());
+    crate::compat::timer_compat::compat_timer_disarm(timer.cast());
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
-    compat_timer_done(timer.cast());
+    crate::compat::timer_compat::compat_timer_done(timer.cast());
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_setfn(
     ptimer: *mut crate::binary::c_types::c_void,
     pfunction: *mut crate::binary::c_types::c_void,
     parg: *mut crate::binary::c_types::c_void,
 ) {
     unsafe {
-        compat_timer_setfn(
+        crate::compat::timer_compat::compat_timer_setfn(
             ptimer.cast(),
             core::mem::transmute::<
                 *mut crate::binary::c_types::c_void,
@@ -248,26 +247,26 @@ pub unsafe extern "C" fn ets_timer_setfn(
     }
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
     repeat: bool,
 ) {
-    compat_timer_arm(timer.cast(), tmout, repeat);
+    crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
-#[unsafe(no_mangle)]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm_us(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
     repeat: bool,
 ) {
-    compat_timer_arm_us(timer.cast(), tmout, repeat);
+    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), tmout, repeat);
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
+pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
             let microseconds = esp_timer_get_time();
@@ -279,8 +278,24 @@ pub unsafe extern "C" fn gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     0
 }
 
+/// **************************************************************************
+/// Name: esp_timer_get_time
+///
+/// Description:
+///   Get time in microseconds since boot.
+///
+/// Returned Value:
+///   System time in micros
+///
+/// *************************************************************************
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
+pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
+    trace!("esp_timer_get_time");
+    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __esp_radio_esp_fill_random(dst: *mut u8, len: u32) {
     trace!("esp_fill_random");
     unsafe {
         let dst = core::slice::from_raw_parts_mut(dst, len as usize);
@@ -294,7 +309,7 @@ pub unsafe extern "C" fn esp_fill_random(dst: *mut u8, len: u32) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn strrchr(_s: *const (), _c: u32) -> *const u8 {
+pub unsafe extern "C" fn __esp_radio_strrchr(_s: *const (), _c: u32) -> *const u8 {
     todo!("strrchr");
 }
 

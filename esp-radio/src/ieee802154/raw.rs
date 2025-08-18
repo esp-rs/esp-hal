@@ -1,3 +1,4 @@
+use alloc::collections::VecDeque as Queue;
 use core::cell::RefCell;
 
 use critical_section::Mutex;
@@ -16,7 +17,6 @@ use esp_wifi_sys::include::{
     ieee802154_coex_event_t_IEEE802154_MIDDLE,
     register_chipv7_phy,
 };
-use heapless::spsc::Queue;
 
 use super::{
     frame::{
@@ -33,8 +33,7 @@ use super::{
 const PHY_ENABLE_VERSION_PRINT: u32 = 1;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
-static RX_QUEUE: Mutex<RefCell<Queue<RawReceived, { crate::CONFIG.rx_queue_size }>>> =
-    Mutex::new(RefCell::new(Queue::new()));
+static RX_QUEUE: Mutex<RefCell<Queue<RawReceived>>> = Mutex::new(RefCell::new(Queue::new()));
 static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
 
 unsafe extern "C" {
@@ -234,7 +233,7 @@ pub fn ieee802154_receive() -> i32 {
 pub fn ieee802154_poll() -> Option<RawReceived> {
     critical_section::with(|cs| {
         let mut queue = RX_QUEUE.borrow_ref_mut(cs);
-        queue.dequeue()
+        queue.pop_front()
     })
 }
 
@@ -391,12 +390,12 @@ fn ZB_MAC() {
             );
             critical_section::with(|cs| {
                 let mut queue = RX_QUEUE.borrow_ref_mut(cs);
-                if !queue.is_full() {
+                if queue.len() <= crate::CONFIG.rx_queue_size {
                     let item = RawReceived {
                         data: RX_BUFFER,
                         channel: freq_to_channel(freq()),
                     };
-                    queue.enqueue(item).ok();
+                    queue.push_back(item);
                 } else {
                     warn!("Receive queue full");
                 }

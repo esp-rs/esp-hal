@@ -2,16 +2,16 @@
 
 ## Initialization
 
-The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_radio_preempt_baremetal`.
-`esp_radio_preempt_baremetal` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
+The `builtin-scheduler` feature has been removed. The functionality has been moved to `esp_preempt_baremetal`.
+`esp_preempt_baremetal` needs to be initialized before calling `esp_radio::init`. Failure to do so will result in an error.
 
-Depending on your chosen OS, you may need to use other `esp_radio_preempt_driver` implementations.
+Depending on your chosen OS, you may need to use other `esp_preempt` implementations.
 
 Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 ```diff
 -let esp_wifi_ctrl = esp_wifi::init(timg0.timer0, Rng::new()).unwrap();
-+esp_radio_preempt_baremetal::init(timg0.timer0);
++esp_preempt::init(timg0.timer0);
 +let esp_wifi_ctrl = esp_radio::init().unwrap();
 ```
 
@@ -33,13 +33,19 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 ## Memory allocation functions
 
-The names of functions for which the user must provide an implementation in order to use their own allocator have been changed to match `esp-radio` crate name.
+The way to provide your own implementation of heap memory allocations (if not using `esp-alloc`) has changed.
+
+Provide these symbols:
 
 ```diff
 - pub extern "C" fn esp_wifi_free_internal_heap() ...
 - pub extern "C" fn esp_wifi_allocate_from_internal_ram(size: usize) ...
 - pub extern "C" fn esp_wifi_deallocate_internal_ram(ptr: *mut u8) ...
-+ pub extern "C" fn esp_radio_free_internal_heap() ...
-+ pub extern "C" fn esp_radio_allocate_from_internal_ram(size: usize) ...
-+ pub extern "C" fn esp_radio_deallocate_internal_ram(ptr: *mut u8) ...
++ pub extern "C" fn malloc(size: usize) -> *mut u8 ...
++ pub extern "C" fn malloc_internal(size: usize) -> *mut u8 ...
++ pub extern "C" fn free(ptr: *mut u8) ...
++ pub extern "C" fn calloc(number: u32, size: usize) -> *mut u8 ...
++ pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8 ...
++ pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 ...
++ pub extern "C" fn get_free_internal_heap_size() -> usize; ...
 ```

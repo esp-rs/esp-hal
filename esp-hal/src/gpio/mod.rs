@@ -119,7 +119,7 @@ impl PinGuard {
         }
     }
 
-    #[cfg(any(esp32, esp32s2))]
+    #[allow(unused)]
     pub(crate) fn pin_number(&self) -> Option<u8> {
         if self.pin == u8::MAX {
             None
@@ -205,21 +205,37 @@ impl core::ops::Not for Level {
     }
 }
 
-impl From<bool> for Level {
-    fn from(val: bool) -> Self {
+impl Level {
+    /// Create a [`Level`] from [`bool`].
+    ///
+    /// Like `<Level as From<bool>>::from(val)`, but `const`.
+    pub(crate) const fn const_from(val: bool) -> Self {
         match val {
             true => Self::High,
             false => Self::Low,
         }
     }
+
+    /// Convert a [`Level`] to [`bool`].
+    ///
+    /// Like `<bool as From<Level>>::from(self)`, but `const`.
+    pub(crate) const fn const_into(self) -> bool {
+        match self {
+            Level::Low => false,
+            Level::High => true,
+        }
+    }
+}
+
+impl From<bool> for Level {
+    fn from(val: bool) -> Self {
+        Self::const_from(val)
+    }
 }
 
 impl From<Level> for bool {
     fn from(level: Level) -> bool {
-        match level {
-            Level::Low => false,
-            Level::High => true,
-        }
+        level.const_into()
     }
 }
 
@@ -659,8 +675,13 @@ impl<'d> Io<'d> {
             crate::interrupt::disable(core, Interrupt::GPIO);
         }
         self.set_interrupt_priority(handler.priority());
-        unsafe { crate::interrupt::bind_interrupt(Interrupt::GPIO, user_gpio_interrupt_handler) };
-        USER_INTERRUPT_HANDLER.store(handler.handler());
+        unsafe {
+            crate::interrupt::bind_interrupt(
+                Interrupt::GPIO,
+                crate::interrupt::IsrCallback::new(user_gpio_interrupt_handler),
+            )
+        };
+        USER_INTERRUPT_HANDLER.store(handler.handler().aligned_ptr());
     }
 }
 

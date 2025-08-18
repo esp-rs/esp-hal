@@ -24,7 +24,7 @@ use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    sync::{RawMutex, lock},
+    sync::RawMutex,
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };
@@ -168,7 +168,7 @@ impl Unit {
 
     #[cfg(not(esp32s2))]
     fn configure(&self, config: UnitConfig) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             SYSTIMER::regs().conf().modify(|_, w| match config {
                 UnitConfig::Disabled => match self.channel() {
                     0 => w.timer_unit0_work_en().clear_bit(),
@@ -313,7 +313,7 @@ impl Alarm<'_> {
     /// Enables/disables the comparator. If enabled, this means
     /// it will generate interrupt based on its configuration.
     fn set_enable(&self, enable: bool) {
-        lock(&CONF_LOCK, || {
+        CONF_LOCK.lock(|| {
             #[cfg(not(esp32s2))]
             SYSTIMER::regs().conf().modify(|_, w| match self.channel() {
                 0 => w.target0_work_en().bit(enable),
@@ -438,14 +438,14 @@ impl Alarm<'_> {
             // checks if an interrupt is active before calling the associated
             // handler functions.
 
-            static mut HANDLERS: [Option<extern "C" fn()>; 3] = [None, None, None];
+            static mut HANDLERS: [Option<crate::interrupt::IsrCallback>; 3] = [None, None, None];
 
             #[crate::ram]
-            unsafe extern "C" fn _handle_interrupt<const CH: u8>() {
+            extern "C" fn _handle_interrupt<const CH: u8>() {
                 if SYSTIMER::regs().int_raw().read().target(CH).bit_is_set() {
                     let handler = unsafe { HANDLERS[CH as usize] };
                     if let Some(handler) = handler {
-                        handler();
+                        (handler.aligned_ptr())();
                     }
                 }
             }
@@ -458,7 +458,7 @@ impl Alarm<'_> {
                     2 => _handle_interrupt::<2>,
                     _ => unreachable!(),
                 };
-                interrupt::bind_interrupt(interrupt, handler);
+                interrupt::bind_interrupt(interrupt, crate::interrupt::IsrCallback::new(handler));
             }
         }
         unwrap!(interrupt::enable(interrupt, handler.priority()));
@@ -566,7 +566,7 @@ impl super::Timer for Alarm<'_> {
     }
 
     fn enable_interrupt(&self, state: bool) {
-        lock(&INT_ENA_LOCK, || {
+        INT_ENA_LOCK.lock(|| {
             SYSTIMER::regs()
                 .int_ena()
                 .modify(|_, w| w.target(self.channel()).bit(state));
