@@ -143,6 +143,7 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 
 mod allocators;
+mod heap;
 mod macros;
 #[cfg(feature = "compat")]
 mod malloc;
@@ -156,7 +157,8 @@ use core::{
 pub use allocators::*;
 use enumset::{EnumSet, EnumSetType};
 use esp_sync::NonReentrantMutex;
-use linked_list_allocator::Heap;
+
+use crate::heap::Heap;
 
 /// The global allocator instance
 #[global_allocator]
@@ -275,22 +277,40 @@ impl HeapRegion {
         size: usize,
         capabilities: EnumSet<MemoryCapability>,
     ) -> Self {
-        unsafe {
-            let mut heap = Heap::empty();
-            heap.init(heap_bottom, size);
-
-            Self { heap, capabilities }
+        Self {
+            heap: unsafe { Heap::new(heap_bottom, size) },
+            capabilities,
         }
     }
 
     /// Return stats for the current memory region
     pub fn stats(&self) -> RegionStats {
         RegionStats {
-            size: self.heap.size(),
-            used: self.heap.used(),
-            free: self.heap.free(),
+            size: self.size(),
+            used: self.used(),
+            free: self.free(),
             capabilities: self.capabilities,
         }
+    }
+
+    fn size(&self) -> usize {
+        self.heap.size()
+    }
+
+    fn used(&self) -> usize {
+        self.heap.used()
+    }
+
+    fn free(&self) -> usize {
+        self.heap.free()
+    }
+
+    fn allocate(&mut self, layout: Layout) -> Option<NonNull<u8>> {
+        self.heap.allocate(layout)
+    }
+
+    unsafe fn try_deallocate(&mut self, ptr: NonNull<u8>, layout: Layout) -> bool {
+        unsafe { self.heap.try_deallocate(ptr, layout) }
     }
 }
 
@@ -503,44 +523,34 @@ impl EspHeapInner {
     ) -> *mut u8 {
         #[cfg(feature = "internal-heap-stats")]
         let before = self.used();
+        let mut iter = self
+            .heap
+            .iter_mut()
+            .filter_map(|region| region.as_mut())
+            .filter(|region| region.capabilities.is_superset(capabilities));
 
-        let mut iter = self.heap.iter_mut().filter(|region| {
-            if region.is_some() {
-                region
-                    .as_ref()
-                    .unwrap()
-                    .capabilities
-                    .is_superset(capabilities)
-            } else {
-                false
-            }
-        });
+        let allocation = loop {
+            let Some(region) = iter.next() else {
+                return ptr::null_mut();
+            };
 
-        let res = loop {
-            if let Some(Some(region)) = iter.next() {
-                let res = region.heap.allocate_first_fit(layout);
-                if let Ok(res) = res {
-                    break Some(res);
-                }
-            } else {
-                break None;
+            if let Some(res) = region.allocate(layout) {
+                break res;
             }
         };
 
-        res.map_or(ptr::null_mut(), |allocation| {
-            #[cfg(feature = "internal-heap-stats")]
-            {
-                // We need to call used because [linked_list_allocator::Heap] does internal size
-                // alignment so we cannot use the size provided by the layout.
-                let used = self.used();
+        #[cfg(feature = "internal-heap-stats")]
+        {
+            // We need to call used because the heap impls have some internal overhead
+            // so we cannot use the size provided by the layout.
+            let used = self.used();
 
-                self.internal_heap_stats.total_allocated += used - before;
-                self.internal_heap_stats.max_usage =
-                    core::cmp::max(self.internal_heap_stats.max_usage, used);
-            }
+            self.internal_heap_stats.total_allocated += used - before;
+            self.internal_heap_stats.max_usage =
+                core::cmp::max(self.internal_heap_stats.max_usage, used);
+        }
 
-            allocation.as_ptr()
-        })
+        allocation.as_ptr()
     }
 }
 
@@ -613,6 +623,27 @@ impl EspHeap {
         self.inner.with(|heap| heap.free_caps(capabilities))
     }
 
+    /// Returns the largest size that can be allocated at once.
+    pub fn max_new_allocation(&self) -> usize {
+        self.max_new_allocation_caps(EnumSet::empty())
+    }
+
+    /// Returns the largest size that can be allocated at once with the given requirements.
+    pub fn max_new_allocation_caps(&self, capabilities: EnumSet<MemoryCapability>) -> usize {
+        self.inner.with(|heap| {
+            let mut max_new = 0;
+            for region in heap
+                .heap
+                .iter()
+                .filter_map(|region| region.as_ref())
+                .filter(|region| region.capabilities.is_superset(capabilities))
+            {
+                max_new = max_new.max(region.heap.max_new_allocation());
+            }
+            max_new
+        })
+    }
+
     /// Allocate memory in a region satisfying the given requirements.
     ///
     /// # Safety
@@ -637,9 +668,9 @@ unsafe impl GlobalAlloc for EspHeap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        if ptr.is_null() {
+        let Some(ptr) = NonNull::new(ptr) else {
             return;
-        }
+        };
 
         self.inner.with(|this| {
             #[cfg(feature = "internal-heap-stats")]
@@ -647,8 +678,8 @@ unsafe impl GlobalAlloc for EspHeap {
             let mut iter = this.heap.iter_mut();
 
             while let Some(Some(region)) = iter.next() {
-                if region.heap.bottom() <= ptr && region.heap.top() >= ptr {
-                    unsafe { region.heap.deallocate(NonNull::new_unchecked(ptr), layout) };
+                if unsafe { region.try_deallocate(ptr, layout) } {
+                    break;
                 }
             }
 

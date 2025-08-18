@@ -50,16 +50,24 @@ mod tests {
 
     #[test]
     fn all_psram_is_usable() {
-        let free = esp_alloc::HEAP.free();
-        defmt::info!("Free: {}", free);
-        let mut vec = AllocVec::with_capacity(free);
+        loop {
+            let available = esp_alloc::HEAP.max_new_allocation();
+            if available == 0 {
+                break;
+            }
+            defmt::info!("Available: {}", available);
+            let mut vec = AllocVec::with_capacity(available);
 
-        for i in 0..free {
-            vec.push((i % 256) as u8);
-        }
+            for i in 0..available {
+                vec.push((i % 256) as u8);
+            }
 
-        for i in 0..free {
-            assert_eq!(vec[i], (i % 256) as u8);
+            for i in 0..available {
+                assert_eq!(vec[i], (i % 256) as u8);
+            }
+
+            // Do not deallocate vec, so that the next iteration will use some other memory.
+            core::mem::forget(vec);
         }
     }
 
@@ -124,16 +132,24 @@ mod tests {
 
     #[test]
     fn all_psram_is_usable_with_any_mem_allocator() {
-        let free = esp_alloc::HEAP.free();
-        defmt::info!("Free: {}", free);
-        let mut vec = Vec::with_capacity_in(free, AnyMemory);
+        loop {
+            let available = esp_alloc::HEAP.max_new_allocation();
+            if available == 0 {
+                break;
+            }
+            defmt::info!("Available: {}", available);
+            let mut vec = Vec::with_capacity_in(available, AnyMemory);
 
-        for i in 0..free {
-            vec.push((i % 256) as u8);
-        }
+            for i in 0..available {
+                vec.push((i % 256) as u8);
+            }
 
-        for i in 0..free {
-            assert_eq!(vec[i], (i % 256) as u8);
+            for i in 0..available {
+                assert_eq!(vec[i], (i % 256) as u8);
+            }
+
+            // Do not deallocate vec, so that the next iteration will use some other memory.
+            core::mem::forget(vec);
         }
     }
 
