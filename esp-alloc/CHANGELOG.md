@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fix problem of not de-allocating memory in some situations (#3949)
 
 ### Removed
 
