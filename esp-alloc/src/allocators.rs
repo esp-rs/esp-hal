@@ -30,7 +30,7 @@ unsafe impl Allocator for EspHeap {
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         unsafe {
-            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+            self.dealloc(ptr.as_ptr(), layout);
         }
     }
 }
@@ -45,7 +45,7 @@ unsafe impl CoreAllocator for EspHeap {
 
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
         unsafe {
-            crate::HEAP.dealloc(ptr.as_ptr(), layout);
+            self.dealloc(ptr.as_ptr(), layout);
         }
     }
 }
