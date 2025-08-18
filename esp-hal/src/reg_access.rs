@@ -101,6 +101,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
                     .write_volatile(E::u32_from_bytes(self.buf));
             }
 
+            // We return the **extra** bytes appended besides those already written into the buffer.
             let ret = U32_ALIGN_SIZE - self.buf_fill;
             self.buf_fill = 0;
 
@@ -113,7 +114,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
     // This function is similar to `volatile_set_memory` but will prepend data that
     // was previously ingested and ensure aligned (u32) writes.
     pub fn volatile_write(&mut self, dst_ptr: *mut u32, val: u8, count: usize, offset: usize) {
-        let count = count / U32_ALIGN_SIZE;
+        let count = count.div_ceil(U32_ALIGN_SIZE);
         let offset = offset / U32_ALIGN_SIZE;
 
         let dst_ptr = unsafe { dst_ptr.add(offset) };

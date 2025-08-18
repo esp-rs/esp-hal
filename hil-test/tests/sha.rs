@@ -32,7 +32,7 @@ fn assert_sw_hash<D: Digest>(input: &[u8], expected_output: &[u8]) {
     hasher.update(input);
     let soft_result = hasher.finalize();
 
-    defmt::assert_eq!(expected_output, &soft_result[..]);
+    hil_test::assert_eq!(expected_output, &soft_result[..]);
 }
 
 fn hash_sha<S: ShaAlgorithm>(sha: &mut Sha<'static>, mut input: &[u8], output: &mut [u8]) {
