@@ -60,9 +60,13 @@ async fn run_uart(peripherals: Peripherals) {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let mut transfer = uhci.read(dma_rx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-    transfer.wait_for_done().await.unwrap_or_else(|x: (uart::uhci::Error, Uhci<'_, esp_hal::Async>, DmaRxBuf)| panic!("Something went horribly wrong: {:?}", x.0));
-    let (uhci, dma_rx) = transfer.wait();
+    let mut transfer = uhci
+        .read(dma_rx)
+        .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+    transfer.wait_for_done().await;
+    let (uhci, dma_rx) = transfer
+        .wait()
+        .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
     let dma_rx: DmaRxBuf = <DmaRxBuf as DmaRxBuffer>::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
@@ -75,9 +79,13 @@ async fn run_uart(peripherals: Peripherals) {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let mut transfer = uhci.write(dma_tx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-                transfer.wait_for_done().await.unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-                let (_uhci, dma_tx) = transfer.wait().unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+                let mut transfer = uhci
+                    .write(dma_tx)
+                    .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+                transfer.wait_for_done().await;
+                let (_uhci, dma_tx) = transfer
+                    .wait()
+                    .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
                 let _dma_tx: DmaTxBuf = <DmaTxBuf as DmaTxBuffer>::from_view(dma_tx);
                 // Do what you want...
             }

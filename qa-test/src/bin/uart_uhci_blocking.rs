@@ -8,14 +8,15 @@
 
 use esp_backtrace as _;
 use esp_hal::{
-    clock::CpuClock, dma::{DmaRxBuf, DmaTxBuf}, dma_buffers, main, rom::software_reset, uart::{RxConfig, Uart}
+    clock::CpuClock,
+    dma::{DmaRxBuf, DmaRxBuffer, DmaTxBuf, DmaTxBuffer},
+    dma_buffers,
+    main,
+    rom::software_reset,
+    uart,
+    uart::{RxConfig, Uart, uhci, uhci::Uhci},
 };
 use esp_println::println;
-use esp_hal::dma::DmaRxBuffer;
-use esp_hal::dma::DmaTxBuffer;
-use esp_hal::uart;
-use esp_hal::uart::uhci;
-use esp_hal::uart::uhci::Uhci;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -50,8 +51,12 @@ fn main() -> ! {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let transfer = uhci.read(dma_rx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-    let (uhci, dma_rx) = transfer.wait();
+    let transfer = uhci
+        .read(dma_rx)
+        .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+    let (uhci, dma_rx) = transfer
+        .wait()
+        .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
     let dma_rx: DmaRxBuf = <DmaRxBuf as DmaRxBuffer>::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
@@ -64,8 +69,12 @@ fn main() -> ! {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let transfer = uhci.write(dma_tx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-                let (_uhci, dma_tx) = transfer.wait().unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+                let transfer = uhci
+                    .write(dma_tx)
+                    .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+                let (_uhci, dma_tx) = transfer
+                    .wait()
+                    .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
                 let _dma_tx: DmaTxBuf = <DmaTxBuf as DmaTxBuffer>::from_view(dma_tx);
                 // Do what you want...
             }

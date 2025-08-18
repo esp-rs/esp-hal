@@ -342,6 +342,7 @@ where
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
+    saved_err: Result<(), Error>,
 }
 
 impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
@@ -350,6 +351,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
             done: false,
+            saved_err: Ok(()),
         }
     }
 
@@ -377,6 +379,14 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
     pub fn wait(mut self) -> Result<(Uhci<'d, Dm>, Buf::View), (Error, Uhci<'d, Dm>, Buf::Final)> {
+        if let Err(err) = self.saved_err {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
+
         if !self.done {
             let res = self.uhci.uart.tx.flush();
             if let Err(err) = res {
@@ -402,35 +412,24 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     }
 }
 
-impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {}
-
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     /// todo
-    pub async fn wait_for_done(
-        &mut self,
-    ) -> Result<(), (Error, Uhci<'d, Async>, <Buf as DmaTxBuffer>::Final)> {
+    pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
         let res = self.uhci.uart.tx.flush_async().await;
         if let Err(err) = res {
-            return Err((
-                err.into(),
-                unsafe { ManuallyDrop::take(&mut self.uhci) },
-                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+            self.saved_err = Err(err.into());
+            return;
         }
 
         let res = DmaTxFuture::new(&mut self.uhci.channel.tx).await;
         if let Err(err) = res {
-            return Err((
-                err.into(),
-                unsafe { ManuallyDrop::take(&mut self.uhci) },
-                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+            self.saved_err = Err(err.into());
+            return;
         }
 
         self.done = true;
-        Ok(())
     }
 }
 
@@ -476,6 +475,7 @@ where
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
+    saved_err: Result<(), Error>,
 }
 
 impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
@@ -484,6 +484,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
             done: false,
+            saved_err: Ok(()),
         }
     }
 
@@ -510,7 +511,15 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Uhci<'d, Dm>, Buf::View) {
+    pub fn wait(mut self) -> Result<(Uhci<'d, Dm>, Buf::View), (Error, Uhci<'d, Dm>, Buf::Final)> {
+        if let Err(err) = self.saved_err {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
+
         if !self.done {
             while !self.is_done() {}
         }
@@ -523,26 +532,20 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
             )
         };
         core::mem::forget(self);
-        retval
+        Ok(retval)
     }
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     /// todo
-    pub async fn wait_for_done(
-        &mut self,
-    ) -> Result<(), (Error, Uhci<'d, Async>, <Buf as DmaRxBuffer>::Final)> {
+    pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel.rx).await;
         if let Err(err) = res {
-            return Err((
-                err.into(),
-                unsafe { ManuallyDrop::take(&mut self.uhci) },
-                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+            self.saved_err = Err(err.into());
+            return;
         }
 
         self.done = true;
-        Ok(())
     }
 }
 
