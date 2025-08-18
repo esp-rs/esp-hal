@@ -111,14 +111,12 @@
 //! ```
 
 pub use self::rtc::SocResetReason;
-#[cfg(not(any(esp32c6, esp32h2)))]
-use crate::clock::XtalClock;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
 #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
-    clock::Clock,
+    clock::{Clock, XtalClock},
     interrupt::{self, InterruptHandler},
     peripherals::Interrupt,
     system::{Cpu, SleepSource},
@@ -306,7 +304,7 @@ impl<'d> Rtc<'d> {
 
     /// Return estimated XTAL frequency in MHz.
     pub fn estimate_xtal_frequency(&mut self) -> u32 {
-        RtcClock::estimate_xtal_frequency()
+        RtcClock::xtal_freq_mhz()
     }
 
     /// Get the time since boot in the raw register units.
@@ -491,6 +489,7 @@ impl<'d> Rtc<'d> {
         config.finish_sleep();
     }
 
+    #[cfg(any(esp32s3, esp32h2))]
     const RTC_DISABLE_ROM_LOG: u32 = 1;
 
     /// Temporarily disable log messages of the ROM bootloader.
@@ -545,72 +544,27 @@ pub struct RtcClock;
 impl RtcClock {
     const CAL_FRACT: u32 = 19;
 
-    /// Enable or disable 8 MHz internal oscillator.
-    ///
-    /// Output from 8 MHz internal oscillator is passed into a configurable
-    /// divider, which by default divides the input clock frequency by 256.
-    /// Output of the divider may be used as RTC_SLOW_CLK source.
-    /// Output of the divider is referred to in register descriptions and code
-    /// as 8md256 or simply d256. Divider values other than 256 may be
-    /// configured, but this facility is not currently needed, so is not
-    /// exposed in the code.
-    ///
-    /// When 8MHz/256 divided output is not needed, the divider should be
-    /// disabled to reduce power consumption.
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    fn enable_8m(clk_8m_en: bool, d256_en: bool) {
-        let rtc_cntl = LPWR::regs();
-
-        if clk_8m_en {
-            // clk_ll_rc_fast_enable
-            rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
-
-            rtc_cntl
-                .timer1()
-                .modify(|_, w| unsafe { w.ck8m_wait().bits(5) });
-
-            crate::rom::ets_delay_us(50);
-        } else {
-            // clk_ll_rc_fast_disable
-            rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().set_bit());
-            rtc_cntl
-                .timer1()
-                .modify(|_, w| unsafe { w.ck8m_wait().bits(20) });
+    pub(crate) fn xtal_freq_mhz() -> u32 {
+        // Load crystal frequency from wherever the bootloader has stored it.
+        unsafe extern "C" {
+            fn rtc_clk_xtal_freq_get() -> i32;
         }
 
-        rtc_cntl
-            .clk_conf()
-            .modify(|_, w| w.enb_ck8m_div().bit(!d256_en));
-    }
-
-    pub(crate) fn read_xtal_freq_mhz() -> Option<u32> {
-        let xtal_freq_reg = LP_AON::regs().store4().read().bits();
-
-        // RTC_XTAL_FREQ is stored as two copies in lower and upper 16-bit halves
-        // need to mask out the RTC_DISABLE_ROM_LOG bit which is also stored in the same
-        // register
-        let xtal_freq = (xtal_freq_reg & !Rtc::RTC_DISABLE_ROM_LOG) as u16;
-        let xtal_freq_copy = (xtal_freq_reg >> 16) as u16;
-
-        if xtal_freq == xtal_freq_copy && xtal_freq != 0 && xtal_freq != u16::MAX {
-            Some(xtal_freq as u32)
-        } else {
-            None
-        }
+        unsafe { rtc_clk_xtal_freq_get() as u32 }
     }
 
     /// Get main XTAL frequency.
     /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
     /// bootloader, as passed to rtc_clk_init function.
-    #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn xtal_freq() -> XtalClock {
-        match Self::read_xtal_freq_mhz() {
-            None | Some(40) => XtalClock::_40M,
-            #[cfg(any(esp32c3, esp32s3))]
-            Some(32) => XtalClock::_32M,
+        match Self::xtal_freq_mhz() {
+            #[cfg(not(esp32h2))]
+            40 => XtalClock::_40M,
+            #[cfg(any(esp32c3, esp32h2, esp32s3))]
+            32 => XtalClock::_32M,
             #[cfg(any(esp32, esp32c2))]
-            Some(26) => XtalClock::_26M,
-            Some(other) => XtalClock::Other(other),
+            26 => XtalClock::_26M,
+            other => XtalClock::Other(other),
         }
     }
 
@@ -805,15 +759,6 @@ impl RtcClock {
         cal_val
     }
 
-    /// Measure ratio between XTAL frequency and RTC slow clock frequency.
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    fn calibration_ratio(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
-        let ratio = (xtal_cycles << RtcClock::CAL_FRACT) / slowclk_cycles as u64;
-
-        (ratio & (u32::MAX as u64)) as u32
-    }
-
     /// Measure RTC slow clock's period, based on main XTAL frequency.
     ///
     /// This function will time out and return 0 if the time for the given
@@ -848,30 +793,6 @@ impl RtcClock {
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
         (100_000_000 * 1000 / period) as u16
-    }
-
-    /// Return estimated XTAL frequency in MHz.
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    pub(crate) fn estimate_xtal_frequency() -> u32 {
-        // Number of 8M/256 clock cycles to use for XTAL frequency estimation.
-        const XTAL_FREQ_EST_CYCLES: u32 = 10;
-
-        let rtc_cntl = LPWR::regs();
-        let clk_8m_enabled = rtc_cntl.clk_conf().read().enb_ck8m().bit_is_clear();
-        let clk_8md256_enabled = rtc_cntl.clk_conf().read().enb_ck8m_div().bit_is_clear();
-
-        if !clk_8md256_enabled {
-            RtcClock::enable_8m(true, true);
-        }
-
-        let ratio = RtcClock::calibration_ratio(RtcCalSel::RtcCal8mD256, XTAL_FREQ_EST_CYCLES);
-        let freq_mhz =
-            ((ratio as u64 * RtcFastClock::RtcFastClock8m.hz() as u64 / 1_000_000u64 / 256u64)
-                >> RtcClock::CAL_FRACT) as u32;
-
-        RtcClock::enable_8m(clk_8m_enabled, clk_8md256_enabled);
-
-        freq_mhz
     }
 }
 

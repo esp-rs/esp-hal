@@ -353,11 +353,7 @@ impl Clocks {
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
         if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
-            } else {
-                XtalClock::_26M
-            }
+            RtcClock::xtal_freq()
         } else {
             const {
                 let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
@@ -405,11 +401,7 @@ impl Clocks {
 impl Clocks {
     fn measure_xtal_frequency() -> XtalClock {
         if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
-            } else {
-                XtalClock::_26M
-            }
+            RtcClock::xtal_freq()
         } else {
             const {
                 let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");

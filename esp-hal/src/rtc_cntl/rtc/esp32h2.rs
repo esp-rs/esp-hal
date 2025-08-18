@@ -263,16 +263,6 @@ pub(crate) enum RtcCaliClkSel {
 
 /// RTC Watchdog Timer driver
 impl RtcClock {
-    /// Get main XTAL frequency.
-    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
-    /// bootloader, as passed to rtc_clk_init function.
-    pub fn xtal_freq() -> XtalClock {
-        match Self::read_xtal_freq_mhz() {
-            None | Some(32) => XtalClock::_32M,
-            Some(other) => XtalClock::Other(other),
-        }
-    }
-
     fn set_fast_freq(fast_freq: RtcFastClock) {
         // components/hal/esp32s2/include/hal/clk_tree_ll.h
         unsafe {
@@ -596,24 +586,5 @@ impl RtcClock {
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
 
         (100_000_000 * 1000 / period) as u16
-    }
-
-    pub(crate) fn estimate_xtal_frequency() -> u32 {
-        let timg0 = TIMG0::regs();
-        while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
-
-        timg0.rtccalicfg().modify(|_, w| unsafe {
-            // RTC_SLOW_CLK
-            w.rtc_cali_clk_sel().bits(0);
-            w.rtc_cali_max().bits(100);
-            w.rtc_cali_start_cycling().clear_bit();
-            w.rtc_cali_start().set_bit()
-        });
-
-        while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
-
-        (timg0.rtccalicfg1().read().rtc_cali_value().bits()
-            * (RtcSlowClock::RtcSlowClockRcSlow.frequency().as_hz() / 100))
-            / 1_000_000
     }
 }
