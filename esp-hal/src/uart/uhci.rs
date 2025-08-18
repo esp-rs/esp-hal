@@ -341,6 +341,7 @@ where
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
+    done: bool,
 }
 
 impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
@@ -348,6 +349,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
+            done: false,
         }
     }
 
@@ -369,24 +371,25 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         core::mem::forget(self);
         retval
     }
-}
 
-impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
     /// Waits for the DMA transfer to complete.
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> Result<(Uhci<'d, Blocking>, Buf::View), (Error, Uhci<'d, Blocking>, Buf::Final)> {
-        let res = self.uhci.uart.tx.flush();
-        if let Err(err) = res {
-            return Err((
-                err.into(),
-                unsafe { ManuallyDrop::take(&mut self.uhci) },
-                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+    pub fn wait(mut self) -> Result<(Uhci<'d, Dm>, Buf::View), (Error, Uhci<'d, Dm>, Buf::Final)> {
+        if !self.done {
+            let res = self.uhci.uart.tx.flush();
+            if let Err(err) = res {
+                return Err((
+                    err.into(),
+                    unsafe { ManuallyDrop::take(&mut self.uhci) },
+                    unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+                ));
+            }
+
+            while !self.is_done() {}
         }
-        
-        while !self.is_done() {}
+
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
             (
@@ -399,12 +402,13 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
     }
 }
 
+impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {}
+
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete.
-    ///
-    /// This method blocks until the transfer is finished and returns the
-    /// `Uhci` instance and the associated buffer.
-    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), (Error, Uhci<'d, Async>, Buf::Final)> {
+    /// todo
+    pub async fn wait_for_done(
+        &mut self,
+    ) -> Result<(), (Error, Uhci<'d, Async>, <Buf as DmaTxBuffer>::Final)> {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
         let res = self.uhci.uart.tx.flush_async().await;
@@ -425,15 +429,8 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
             ));
         }
 
-        self.uhci.channel.tx.stop_transfer();
-        let retval = unsafe {
-            (
-                ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
-            )
-        };
-        core::mem::forget(self);
-        Ok(retval)
+        self.done = true;
+        Ok(())
     }
 }
 
@@ -478,6 +475,7 @@ where
 {
     uhci: ManuallyDrop<Uhci<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
+    done: bool,
 }
 
 impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
@@ -485,6 +483,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
+            done: false,
         }
     }
 
@@ -506,15 +505,15 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
         core::mem::forget(self);
         retval
     }
-}
 
-impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Blocking, Buf> {
     /// Waits for the DMA transfer to complete.
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Uhci<'d, Blocking>, Buf::View) {
-        while !self.is_done() {}
+    pub fn wait(mut self) -> (Uhci<'d, Dm>, Buf::View) {
+        if !self.done {
+            while !self.is_done() {}
+        }
         self.uhci.channel.rx.stop_transfer();
 
         let retval = unsafe {
@@ -529,22 +528,21 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Blocking, Buf> {
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    /// Waits for the DMA transfer to complete.
-    ///
-    /// This method blocks until the transfer is finished and returns the
-    /// `Uhci` instance and the associated buffer.
-    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), Error> {
-        DmaRxFuture::new(&mut self.uhci.channel.rx).await?;
-        self.uhci.channel.rx.stop_transfer();
+    /// todo
+    pub async fn wait_for_done(
+        &mut self,
+    ) -> Result<(), (Error, Uhci<'d, Async>, <Buf as DmaRxBuffer>::Final)> {
+        let res = DmaRxFuture::new(&mut self.uhci.channel.rx).await;
+        if let Err(err) = res {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
 
-        let retval = unsafe {
-            (
-                ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
-            )
-        };
-        core::mem::forget(self);
-        Ok(retval)
+        self.done = true;
+        Ok(())
     }
 }
 
