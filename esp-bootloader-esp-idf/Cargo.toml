@@ -68,3 +68,6 @@ esp32     = ["esp-rom-sys/esp32"]
 esp32s2   = ["esp-rom-sys/esp32s2"]
 ## 
 esp32s3   = ["esp-rom-sys/esp32s3"]
+
+[package.metadata.cargo-machete]
+ignored = ["md-5"]

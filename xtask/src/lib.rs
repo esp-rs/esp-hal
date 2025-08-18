@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    process::Command,
 };
 
 use anyhow::{Result, anyhow};
@@ -41,6 +42,7 @@ pub mod semver_check;
 )]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
+/// Represents the packages in the `esp-hal` workspace.
 pub enum Package {
     EspAlloc,
     EspBacktrace,
@@ -110,6 +112,7 @@ impl Package {
             .any(|line| line.contains("asm_experimental_arch"))
     }
 
+    /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
         let package_path = workspace.join(self.to_string());
 
@@ -130,6 +133,7 @@ impl Package {
         false
     }
 
+    /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
 
@@ -337,6 +341,7 @@ impl Package {
         }
     }
 
+    /// Creates a tag string for this [`Package`] combined with a semantic version.
     pub fn tag(&self, version: &semver::Version) -> String {
         format!("{self}-v{version}")
     }
@@ -349,6 +354,7 @@ impl Package {
 
 #[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
+/// Represents the versioning scheme for a package.
 pub enum Version {
     Major,
     Minor,
@@ -531,6 +537,7 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
+/// Format the specified package in the workspace using `cargo fmt`.
 pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
@@ -546,6 +553,27 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     }
 
     Ok(())
+}
+
+/// Check for unused dependencies across the entire `esp-hal` workspace using `cargo machete`.
+pub fn check_unused_deps() -> Result<()> {
+    log::info!("Checking unused dependencies across `esp-hal` workspace");
+
+    let status = Command::new("cargo-machete")
+        .arg(".")
+        .status()
+        .expect("Failed to execute cargo machete");
+
+    match status.code() {
+        Some(0) => {
+            log::info!("No unused dependencies found!");
+            Ok(())
+        }
+        Some(1) => Err(anyhow!("Unused dependencies detected!")),
+        Some(2) => Err(anyhow!("cargo machete failed to run!")),
+        Some(code) => Err(anyhow!("Unexpected exit code from cargo machete: {}", code)),
+        None => Err(anyhow!("cargo machete terminated by signal")),
+    }
 }
 
 fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
@@ -582,6 +610,7 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     cargo::run(&cargo_args, &package_path)
 }
 
+/// Update the metadata and chip support table in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
@@ -675,6 +704,7 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursively find all packages in the given path that contain a `Cargo.toml` file.
 pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 

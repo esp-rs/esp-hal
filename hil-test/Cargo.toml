@@ -239,7 +239,6 @@ embedded-io        = "0.6.1"
 embedded-io-async  = "0.6.1"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
-embedded-hal-nb    = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["defmt", "semihosting"] }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
@@ -251,7 +250,6 @@ esp-radio           = { path = "../esp-radio", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
-xtensa-lx-rt       = { path = "../xtensa-lx-rt", optional = true }
 
 [dev-dependencies]
 crypto-bigint       = { version = "0.5.5", default-features = false }
@@ -375,3 +373,6 @@ incremental      = false
 opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
+
+[package.metadata.cargo-machete]
+ignored = ["semihosting"]

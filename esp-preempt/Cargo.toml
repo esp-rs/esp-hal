@@ -27,7 +27,6 @@ cfg-if = "1"
 
 # Unstable dependencies that are not (strictly) part of the public API
 allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
-document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }

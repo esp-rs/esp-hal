@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 //! ## Feature Flags
-#![doc = document_features::document_features!()]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![allow(rustdoc::bare_urls)]
 #![no_std]
