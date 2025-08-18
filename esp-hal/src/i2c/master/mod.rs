@@ -2953,6 +2953,12 @@ mod bus_clear {
     }
 }
 
+// If a SLAVE device was in a read operation when the bus was interrupted, the SLAVE device is
+// controlling SDA. The only bit during the 9 clock cycles of a READ byte the MASTER(ESP32) is
+// guaranteed control over is during the ACK bit period. If the slave is sending a stream of ZERO
+// bytes, it will only release SDA during the ACK bit period. So, this reset code needs to
+// synchronous the bit stream with, Either, the ACK bit, Or a 1 bit to correctly generate
+// a STOP condition.
 #[cfg(not(i2c_master_has_hw_bus_clear))]
 mod bus_clear {
     use super::*;
@@ -3047,6 +3053,7 @@ mod bus_clear {
                     if let Some((sda, _scl)) = self.pins.as_ref() {
                         // Pins are disconnected from the peripheral, we can't use `bus_busy`.
                         if !sda.is_input_high() {
+                            panic!("do we hit this?");
                             return Poll::Pending;
                         }
                     }
@@ -3082,6 +3089,7 @@ mod bus_clear {
                         scl.set_output_high(false);
                         if sda.is_input_high() {
                             // The device has released SDA, we can move on to generating a NACK
+                            self.wait = Instant::now() + Self::SCL_DELAY;
                             self.state = State::SendClock(0, false);
                             return Poll::Pending;
                         }
