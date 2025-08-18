@@ -90,6 +90,39 @@ r#"
     ret
 
 /*
+    Move SP to a valid memory region if needed.
+*/
+
+.section .trap.start, "ax"
+.extern _pre_default_start_trap_ret
+.global _pre_default_start_trap
+_pre_default_start_trap:
+    // move SP to some save place if it's pointing below the RAM
+    // otherwise we won't be able to do anything reasonable
+    // (since we don't have a working stack)
+    //
+    // most probably we will just print something and halt in this case
+    // we actually can't do anything else
+    csrw mscratch, t0
+    la t0, _dram_origin
+    bge sp, t0, 1f
+
+    // use the reserved exception cause 14 to signal we detected a stack overflow
+    li t0, 14
+    csrw mcause, t0
+
+    // set SP to the start of the stack
+    la sp, _stack_start
+    li t0, 4 // make sure stack start is in RAM
+    sub sp, sp, t0
+    andi sp, sp, -16 // Force 16-byte alignment
+
+    1:
+    csrr t0, mscratch
+
+    j _pre_default_start_trap_ret
+
+/*
     Interrupt vector table (_vector_table)
 */
 
