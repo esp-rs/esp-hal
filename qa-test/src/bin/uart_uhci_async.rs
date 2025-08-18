@@ -60,7 +60,7 @@ async fn run_uart(peripherals: Peripherals) {
     uhci.set_uart_config(&config).unwrap();
 
     println!("Waiting for message");
-    let transfer = uhci.read(dma_rx).unwrap();
+    let transfer = uhci.read(dma_rx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
     let (uhci, dma_rx) = transfer.wait().await.unwrap();
     let dma_rx: DmaRxBuf = <DmaRxBuf as DmaRxBuffer>::from_view(dma_rx);
 
@@ -74,8 +74,8 @@ async fn run_uart(peripherals: Peripherals) {
                 println!("Received DMA message: \"{}\"", x);
                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
                 dma_tx.set_length(received);
-                let transfer = uhci.write(dma_tx).unwrap();
-                let (_uhci, dma_tx) = transfer.wait().await.unwrap();
+                let transfer = uhci.write(dma_tx).unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+                let (_uhci, dma_tx) = transfer.wait().await.unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
                 let _dma_tx: DmaTxBuf = <DmaTxBuf as DmaTxBuffer>::from_view(dma_tx);
                 // Do what you want...
             }

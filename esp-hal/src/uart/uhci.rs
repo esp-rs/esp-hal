@@ -7,9 +7,21 @@ use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        asynch::{DmaRxFuture, DmaTxFuture}, Channel, DmaChannelFor, DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel
-    }, peripherals, uart::{self, uhci::Error::AboveReadLimit, TxError, Uart}, Async, Blocking, DriverMode
+        Channel,
+        DmaChannelFor,
+        DmaEligible,
+        DmaError,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        PeripheralDmaChannel,
+        asynch::{DmaRxFuture, DmaTxFuture},
+    },
+    peripherals,
+    uart::{self, TxError, Uart, uhci::Error::AboveReadLimit},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -228,30 +240,48 @@ where
     }
 
     /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
-    pub fn write<Buf: DmaTxBuffer>(mut self, mut tx_buffer: Buf) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, Error> {
+    pub fn write<Buf: DmaTxBuffer>(
+        mut self,
+        mut tx_buffer: Buf,
+    ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         {
-            unsafe {
+            let res = unsafe {
                 self.channel
                     .tx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)?
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
             };
+            if let Err(err) = res {
+                return Err((err.into(), self, tx_buffer));
+            }
 
-            self.channel.tx.start_transfer()?;
+            let res = self.channel.tx.start_transfer();
+            if let Err(err) = res {
+                return Err((err.into(), self, tx_buffer));
+            }
 
             Ok(UhciDmaTxTransfer::new(self, tx_buffer))
         }
     }
 
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
-    pub fn read<Buf: DmaRxBuffer>(mut self, mut rx_buffer: Buf) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, Error> {
+    pub fn read<Buf: DmaRxBuffer>(
+        mut self,
+        mut rx_buffer: Buf,
+    ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         {
-            unsafe {
+            let res = unsafe {
                 self.channel
                     .rx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)?
+                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)
             };
+            if let Err(err) = res {
+                return Err((err.into(), self, rx_buffer));
+            }
 
-            self.channel.rx.start_transfer()?;
+            let res = self.channel.rx.start_transfer();
+            if let Err(err) = res {
+                return Err((err.into(), self, rx_buffer));
+            }
 
             Ok(UhciDmaRxTransfer::new(self, rx_buffer))
         }
@@ -346,8 +376,16 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Blocking, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> Result<(Uhci<'d, Blocking>, Buf::View), Error> {
-        self.uhci.uart.tx.flush()?;
+    pub fn wait(mut self) -> Result<(Uhci<'d, Blocking>, Buf::View), (Error, Uhci<'d, Blocking>, Buf::Final)> {
+        let res = self.uhci.uart.tx.flush();
+        if let Err(err) = res {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
+        
         while !self.is_done() {}
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
@@ -366,11 +404,26 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), Error> {
+    pub async fn wait(mut self) -> Result<(Uhci<'d, Async>, Buf::View), (Error, Uhci<'d, Async>, Buf::Final)> {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
-        self.uhci.uart.tx.flush_async().await?;
-        DmaTxFuture::new(&mut self.uhci.channel.tx).await?;
+        let res = self.uhci.uart.tx.flush_async().await;
+        if let Err(err) = res {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
+
+        let res = DmaTxFuture::new(&mut self.uhci.channel.tx).await;
+        if let Err(err) = res {
+            return Err((
+                err.into(),
+                unsafe { ManuallyDrop::take(&mut self.uhci) },
+                unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
+            ));
+        }
 
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
