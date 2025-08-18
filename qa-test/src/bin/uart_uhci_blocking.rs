@@ -52,7 +52,7 @@ fn main() -> ! {
     println!("Waiting for message");
     let transfer = uhci.read(dma_rx).unwrap();
     let (uhci, dma_rx) = transfer.wait();
-    let dma_rx: DmaRxBuf = DmaRxBuffer::from_view(dma_rx);
+    let dma_rx: DmaRxBuf = <DmaRxBuf as DmaRxBuffer>::from_view(dma_rx);
 
     let received = dma_rx.number_of_received_bytes();
     println!("Received dma bytes: {}", received);
@@ -66,7 +66,7 @@ fn main() -> ! {
                 dma_tx.set_length(received);
                 let transfer = uhci.write(dma_tx).unwrap();
                 let (_uhci, dma_tx) = transfer.wait().unwrap();
-                let _dma_tx: DmaTxBuf = DmaTxBuffer::from_view(dma_tx);
+                let _dma_tx: DmaTxBuf = <DmaTxBuf as DmaTxBuffer>::from_view(dma_tx);
                 // Do what you want...
             }
             Err(x) => println!("Error string: {}", x),

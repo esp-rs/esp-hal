@@ -327,13 +327,13 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf) {
+    pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf::Final) {
         self.uhci.channel.tx.stop_transfer();
 
         let retval = unsafe {
             (
                 ManuallyDrop::take(&mut self.uhci),
-                DmaTxBuffer::from_view(ManuallyDrop::take(&mut self.dma_buf)),
+                Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
@@ -441,13 +441,13 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf) {
+    pub fn cancel(mut self) -> (Uhci<'d, Dm>, Buf::Final) {
         self.uhci.channel.rx.stop_transfer();
 
         let retval = unsafe {
             (
                 ManuallyDrop::take(&mut self.uhci),
-                DmaRxBuffer::from_view(ManuallyDrop::take(&mut self.dma_buf)),
+                Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
