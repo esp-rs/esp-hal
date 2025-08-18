@@ -1715,18 +1715,11 @@ impl RtcClock {
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel()
-                .bits(0) // RTC_SLOW_CLK
-                .rtc_cali_max()
-                .bits(100)
-                .rtc_cali_start_cycling()
-                .clear_bit()
-                .rtc_cali_start()
-                .set_bit()
+            w.rtc_cali_clk_sel().bits(0); // RTC_SLOW_CLK
+            w.rtc_cali_max().bits(100);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_start().set_bit()
         });
-        timg0
-            .rtccalicfg()
-            .modify(|_, w| w.rtc_cali_start().set_bit());
 
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
