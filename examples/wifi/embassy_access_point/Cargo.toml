@@ -9,7 +9,7 @@ cfg-if = "1.0.0"
 edge-dhcp = "0.5.0"
 edge-nal = "0.5.0"
 edge-nal-embassy = "0.5.0"
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-8192"] }
 embassy-net = { version = "0.6.0", features = [
     "dhcpv4",
     "medium-ethernet",
