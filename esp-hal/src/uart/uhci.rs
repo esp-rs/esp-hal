@@ -141,7 +141,7 @@ where
     }
 }
 
-/// todo
+/// UHCI (To use with UART over DMA)
 pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
@@ -217,12 +217,12 @@ where
         Ok(())
     }
 
-    /// todo
+    /// Sets the config the the consumed UART
     pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
         self.uart.set_config(uart_config)
     }
 
-    /// todo
+    /// Sets the config to the UHCI peripheral
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
 
@@ -287,7 +287,7 @@ where
 }
 
 impl<'d> Uhci<'d, Blocking> {
-    /// todo
+    /// Creates a new instance of UHCI
     pub fn new(
         uart: Uart<'d, Blocking>,
         uhci: peripherals::UHCI0<'static>,
@@ -411,7 +411,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
-    /// todo
+    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
         // lost at this point, this is the only thing that worked
@@ -535,7 +535,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 }
 
 impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
-    /// todo
+    /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel.rx).await;
         if let Err(err) = res {
