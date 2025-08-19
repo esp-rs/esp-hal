@@ -219,17 +219,17 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 #[unsafe(no_mangle)]
 static mut __ESP_RADIO_WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
-#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
     crate::compat::timer_compat::compat_timer_disarm(timer.cast());
 }
 
-#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
     crate::compat::timer_compat::compat_timer_done(timer.cast());
 }
 
-#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_setfn(
     ptimer: *mut crate::binary::c_types::c_void,
     pfunction: *mut crate::binary::c_types::c_void,
@@ -247,7 +247,7 @@ pub unsafe extern "C" fn ets_timer_setfn(
     }
 }
 
-#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,
@@ -256,7 +256,7 @@ pub unsafe extern "C" fn ets_timer_arm(
     crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
-#[cfg(any(feature = "wifi-ap", feature = "wifi-sta"))]
+#[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_arm_us(
     timer: *mut crate::binary::c_types::c_void,
     tmout: u32,

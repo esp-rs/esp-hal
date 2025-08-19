@@ -5,11 +5,10 @@ mod internal;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 use alloc::{collections::vec_deque::VecDeque, string::String};
-#[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
-use core::mem;
 use core::{
     fmt::Debug,
     marker::PhantomData,
+    mem,
     mem::MaybeUninit,
     ptr::addr_of,
     task::Poll,
@@ -92,8 +91,6 @@ use crate::binary::include::{
     esp_wifi_set_csi_rx_cb,
     wifi_csi_config_t,
 };
-#[cfg(any(feature = "wifi-ap", feature = "wifi-eap"))]
-use crate::binary::include::{wifi_ap_config_t, wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP};
 use crate::binary::{
     c_types,
     include::{
@@ -123,7 +120,9 @@ use crate::binary::{
         esp_wifi_stop,
         g_wifi_default_wpa_crypto_funcs,
         wifi_active_scan_time_t,
+        wifi_ap_config_t,
         wifi_auth_mode_t,
+        wifi_cipher_type_t_WIFI_CIPHER_TYPE_CCMP,
         wifi_config_t,
         wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
         wifi_country_t,
@@ -300,7 +299,6 @@ pub struct AccessPointInfo {
 /// Configuration for a Wi-Fi access point.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg(feature = "wifi-ap")]
 pub struct AccessPointConfiguration {
     /// The SSID of the access point.
     pub ssid: String,
@@ -327,7 +325,6 @@ pub struct AccessPointConfiguration {
     pub max_connections: u16,
 }
 
-#[cfg(feature = "wifi-ap")]
 impl AccessPointConfiguration {
     fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
@@ -342,7 +339,6 @@ impl AccessPointConfiguration {
     }
 }
 
-#[cfg(feature = "wifi-ap")]
 impl Default for AccessPointConfiguration {
     fn default() -> Self {
         Self {
@@ -358,7 +354,6 @@ impl Default for AccessPointConfiguration {
     }
 }
 
-#[cfg(feature = "wifi-ap")]
 impl core::fmt::Debug for AccessPointConfiguration {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AccessPointConfiguration")
@@ -375,7 +370,6 @@ impl core::fmt::Debug for AccessPointConfiguration {
 }
 
 #[cfg(feature = "defmt")]
-#[cfg(feature = "wifi-ap")]
 impl defmt::Format for AccessPointConfiguration {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
@@ -422,7 +416,6 @@ impl defmt::Format for AccessPointConfiguration {
 /// Client configuration for a Wi-Fi connection.
 #[derive(Clone, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[cfg(feature = "wifi-sta")]
 pub struct ClientConfiguration {
     /// The SSID of the Wi-Fi network.
     pub ssid: String,
@@ -441,7 +434,6 @@ pub struct ClientConfiguration {
     pub channel: Option<u8>,
 }
 
-#[cfg(feature = "wifi-sta")]
 impl ClientConfiguration {
     fn validate(&self) -> Result<(), WifiError> {
         if self.ssid.len() > 32 {
@@ -456,7 +448,6 @@ impl ClientConfiguration {
     }
 }
 
-#[cfg(feature = "wifi-sta")]
 impl core::fmt::Debug for ClientConfiguration {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ClientConfiguration")
@@ -470,7 +461,6 @@ impl core::fmt::Debug for ClientConfiguration {
 }
 
 #[cfg(feature = "defmt")]
-#[cfg(feature = "wifi-sta")]
 impl defmt::Format for ClientConfiguration {
     fn format(&self, fmt: defmt::Formatter<'_>) {
         defmt::write!(
@@ -719,17 +709,14 @@ impl Default for EapClientConfiguration {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub enum Capability {
     /// The device operates as a client, connecting to an existing network.
-    #[cfg(feature = "wifi-sta")]
     Client,
 
     /// The device operates as an access point, allowing other devices to
     /// connect to it.
-    #[cfg(feature = "wifi-ap")]
     AccessPoint,
 
     /// The device can operate in both client and access point modes
     /// simultaneously.
-    #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
     Mixed,
 }
 
@@ -744,15 +731,12 @@ pub enum Configuration {
     None,
 
     /// Client-only configuration.
-    #[cfg(feature = "wifi-sta")]
     Client(ClientConfiguration),
 
     /// Access point-only configuration.
-    #[cfg(feature = "wifi-ap")]
     AccessPoint(AccessPointConfiguration),
 
     /// Simultaneous client and access point configuration.
-    #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
     Mixed(ClientConfiguration, AccessPointConfiguration),
 
     /// EAP client configuration for enterprise Wi-Fi.
@@ -765,13 +749,10 @@ impl Configuration {
     fn validate(&self) -> Result<(), WifiError> {
         match self {
             Configuration::None => Ok(()),
-            #[cfg(feature = "wifi-sta")]
             Configuration::Client(client_configuration) => client_configuration.validate(),
-            #[cfg(feature = "wifi-ap")]
             Configuration::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Configuration::Mixed(client_configuration, access_point_configuration) => {
                 client_configuration.validate()?;
                 access_point_configuration.validate()
@@ -784,24 +765,18 @@ impl Configuration {
     }
 
     /// Returns a reference to the client configuration if available.
-    #[cfg(feature = "wifi-sta")]
     pub fn as_client_conf_ref(&self) -> Option<&ClientConfiguration> {
         match self {
-            #[cfg(feature = "wifi-sta")]
             Self::Client(client_conf) => Some(client_conf),
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Self::Mixed(client_conf, _) => Some(client_conf),
             _ => None,
         }
     }
 
     /// Returns a reference to the access point configuration if available.
-    #[cfg(feature = "wifi-ap")]
     pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfiguration> {
         match self {
-            #[cfg(feature = "wifi-ap")]
             Self::AccessPoint(ap_conf) => Some(ap_conf),
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Self::Mixed(_, ap_conf) => Some(ap_conf),
             _ => None,
         }
@@ -809,11 +784,9 @@ impl Configuration {
 
     /// Returns a mutable reference to the client configuration, creating it if
     /// necessary.
-    #[cfg(feature = "wifi-sta")]
     pub fn as_client_conf_mut(&mut self) -> &mut ClientConfiguration {
         match self {
             Self::Client(client_conf) => client_conf,
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Self::Mixed(_, _) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
@@ -833,11 +806,9 @@ impl Configuration {
 
     /// Returns a mutable reference to the access point configuration, creating
     /// it if necessary.
-    #[cfg(feature = "wifi-ap")]
     pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfiguration {
         match self {
             Self::AccessPoint(ap_conf) => ap_conf,
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Self::Mixed(_, _) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
@@ -857,7 +828,6 @@ impl Configuration {
 
     /// Retrieves mutable references to both the `ClientConfiguration`
     /// and `AccessPointConfiguration`.
-    #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
     pub fn as_mixed_conf_mut(
         &mut self,
     ) -> (&mut ClientConfiguration, &mut AccessPointConfiguration) {
@@ -972,11 +942,8 @@ impl TryFrom<&Configuration> for WifiMode {
     fn try_from(config: &Configuration) -> Result<Self, Self::Error> {
         let mode = match config {
             Configuration::None => return Err(WifiError::UnknownWifiMode),
-            #[cfg(feature = "wifi-ap")]
             Configuration::AccessPoint(_) => Self::Ap,
-            #[cfg(feature = "wifi-sta")]
             Configuration::Client(_) => Self::Sta,
-            #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
             Configuration::Mixed(_, _) => Self::ApSta,
             #[cfg(feature = "wifi-eap")]
             Configuration::EapClient(_) => Self::Sta,
@@ -2357,7 +2324,6 @@ pub(crate) fn esp_wifi_send_data(interface: wifi_interface_t, data: &mut [u8]) {
     }
 }
 
-#[cfg(feature = "wifi-ap")]
 fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
     let mut cfg = wifi_config_t {
         ap: wifi_ap_config_t {
@@ -2394,7 +2360,6 @@ fn apply_ap_config(config: &AccessPointConfiguration) -> Result<(), WifiError> {
     }
 }
 
-#[cfg(feature = "wifi-sta")]
 fn apply_sta_config(config: &ClientConfiguration) -> Result<(), WifiError> {
     let mut cfg = wifi_config_t {
         sta: wifi_sta_config_t {
@@ -2953,16 +2918,8 @@ impl WifiController<'_> {
 
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
-        let mut caps = EnumSet::new();
-
-        #[cfg(feature = "wifi-sta")]
-        caps.insert(Capability::Client);
-
-        #[cfg(feature = "wifi-ap")]
-        caps.insert(Capability::AccessPoint);
-
-        #[cfg(all(feature = "wifi-sta", feature = "wifi-ap"))]
-        caps.insert(Capability::Mixed);
+        let caps =
+            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::Mixed };
 
         Ok(caps)
     }
@@ -2981,11 +2938,8 @@ impl WifiController<'_> {
 
         let mode = match conf {
             Configuration::None => wifi_mode_t_WIFI_MODE_NULL,
-            #[cfg(feature = "wifi-sta")]
             Configuration::Client(_) => wifi_mode_t_WIFI_MODE_STA,
-            #[cfg(feature = "wifi-ap")]
             Configuration::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            #[cfg(all(feature = "wifi-ap", feature = "wifi-sta"))]
             Configuration::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
             Configuration::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
@@ -2995,11 +2949,8 @@ impl WifiController<'_> {
 
         match conf {
             Configuration::None => Ok::<(), WifiError>(()),
-            #[cfg(feature = "wifi-sta")]
             Configuration::Client(config) => apply_sta_config(config),
-            #[cfg(feature = "wifi-ap")]
             Configuration::AccessPoint(config) => apply_ap_config(config),
-            #[cfg(all(feature = "wifi-ap", feature = "wifi-sta"))]
             Configuration::Mixed(sta_config, ap_config) => {
                 apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
             }

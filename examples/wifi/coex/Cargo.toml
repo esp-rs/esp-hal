@@ -28,7 +28,7 @@ esp-radio = { path = "../../../esp-radio", features = [
     "log-04",
     "smoltcp",
     "unstable",
-    "wifi-sta",
+    "wifi",
 ] }
 smoltcp = { version = "0.12.0", default-features = false, features = [
     "medium-ethernet",
