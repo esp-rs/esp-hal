@@ -163,7 +163,7 @@ where
 
     fn clean_turn_on(&self) {
         // General conf registers
-        let reg: &uhci0::RegisterBlock = &self.uhci.give_uhci().register_block();
+        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.clk_en().set_bit());
         reg.conf0().modify(|_, w| {
             unsafe { w.bits(0) };
@@ -378,7 +378,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     pub fn wait(mut self) -> (Result<(), Error>, Uhci<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
-                Err(err.into()),
+                Err(err),
                 unsafe { ManuallyDrop::take(&mut self.uhci) },
                 unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
             );
@@ -511,7 +511,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     pub fn wait(mut self) -> (Result<(), Error>, Uhci<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
-                Err(err.into()),
+                Err(err),
                 unsafe { ManuallyDrop::take(&mut self.uhci) },
                 unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
             );
