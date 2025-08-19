@@ -244,23 +244,21 @@ where
         mut self,
         mut tx_buffer: Buf,
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
-        {
-            let res = unsafe {
-                self.channel
-                    .tx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
-            };
-            if let Err(err) = res {
-                return Err((err.into(), self, tx_buffer));
-            }
-
-            let res = self.channel.tx.start_transfer();
-            if let Err(err) = res {
-                return Err((err.into(), self, tx_buffer));
-            }
-
-            Ok(UhciDmaTxTransfer::new(self, tx_buffer))
+        let res = unsafe {
+            self.channel
+                .tx
+                .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
+        };
+        if let Err(err) = res {
+            return Err((err.into(), self, tx_buffer));
         }
+
+        let res = self.channel.tx.start_transfer();
+        if let Err(err) = res {
+            return Err((err.into(), self, tx_buffer));
+        }
+
+        Ok(UhciDmaTxTransfer::new(self, tx_buffer))
     }
 
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
@@ -329,7 +327,6 @@ impl<'d> Uhci<'d, Async> {
     }
 }
 
-// Based on SpiDmaTransfer
 /// A structure representing a DMA transfer for UHCI/UART.
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
@@ -378,23 +375,23 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> Result<(Uhci<'d, Dm>, Buf::View), (Error, Uhci<'d, Dm>, Buf::Final)> {
+    pub fn wait(mut self) -> (Result<(), Error>, Uhci<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
-            return Err((
-                err.into(),
+            return (
+                Err(err.into()),
                 unsafe { ManuallyDrop::take(&mut self.uhci) },
                 unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+            );
         }
 
         if !self.done {
             let res = self.uhci.uart.tx.flush();
             if let Err(err) = res {
-                return Err((
-                    err.into(),
+                return (
+                    Err(err.into()),
                     unsafe { ManuallyDrop::take(&mut self.uhci) },
                     unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-                ));
+                );
             }
 
             while !self.is_done() {}
@@ -403,12 +400,13 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
         self.uhci.channel.tx.stop_transfer();
         let retval = unsafe {
             (
+                Result::<(), Error>::Ok(()),
                 ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
+                Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
-        Ok(retval)
+        retval
     }
 }
 
@@ -457,12 +455,11 @@ where
 
         unsafe {
             ManuallyDrop::drop(&mut self.uhci);
-            ManuallyDrop::drop(&mut self.dma_buf);
+            drop(Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)));
         }
     }
 }
 
-// Based on SpiDmaTransfer
 /// A structure representing a DMA transfer for UHCI/UART.
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
@@ -511,13 +508,13 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> Result<(Uhci<'d, Dm>, Buf::View), (Error, Uhci<'d, Dm>, Buf::Final)> {
+    pub fn wait(mut self) -> (Result<(), Error>, Uhci<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
-            return Err((
-                err.into(),
+            return (
+                Err(err.into()),
                 unsafe { ManuallyDrop::take(&mut self.uhci) },
                 unsafe { Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)) },
-            ));
+            );
         }
 
         if !self.done {
@@ -527,12 +524,13 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
 
         let retval = unsafe {
             (
+                Result::<(), Error>::Ok(()),
                 ManuallyDrop::take(&mut self.uhci),
-                ManuallyDrop::take(&mut self.dma_buf),
+                Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)),
             )
         };
         core::mem::forget(self);
-        Ok(retval)
+        retval
     }
 }
 
@@ -573,7 +571,7 @@ where
 
         unsafe {
             ManuallyDrop::drop(&mut self.uhci);
-            ManuallyDrop::drop(&mut self.dma_buf);
+            drop(Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)));
         }
     }
 }

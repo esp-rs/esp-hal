@@ -9,7 +9,7 @@
 use esp_backtrace as _;
 use esp_hal::{
     clock::CpuClock,
-    dma::{DmaRxBuf, DmaRxBuffer, DmaTxBuf, DmaTxBuffer},
+    dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
     main,
     rom::software_reset,
@@ -54,10 +54,8 @@ fn main() -> ! {
     let transfer = uhci
         .read(dma_rx)
         .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-    let (uhci, dma_rx) = transfer
-        .wait()
-        .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-    let dma_rx: DmaRxBuf = <DmaRxBuf as DmaRxBuffer>::from_view(dma_rx);
+    let (err, uhci, dma_rx) = transfer.wait();
+    err.unwrap();
 
     let received = dma_rx.number_of_received_bytes();
     println!("Received dma bytes: {}", received);
@@ -72,11 +70,8 @@ fn main() -> ! {
                 let transfer = uhci
                     .write(dma_tx)
                     .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-                let (_uhci, dma_tx) = transfer
-                    .wait()
-                    .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-                let _dma_tx: DmaTxBuf = <DmaTxBuf as DmaTxBuffer>::from_view(dma_tx);
-                // Do what you want...
+                let (err, _uhci, _dma_tx) = transfer.wait();
+                err.unwrap();
             }
             Err(x) => println!("Error string: {}", x),
         }
