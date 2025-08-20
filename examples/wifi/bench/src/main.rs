@@ -28,7 +28,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfiguration, Configuration};
+use esp_radio::wifi::{ClientConfiguration, Configuration, ScanConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -99,7 +99,11 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let res = controller.scan_n(10).unwrap();
+    let scan_config = ScanConfig {
+        max: Some(10),
+        ..Default::default()
+    };
+    let res = controller.scan_with_config_sync(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }

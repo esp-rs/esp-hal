@@ -13,7 +13,7 @@ use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, main, rng::Rng, time, timer::timg::TimerGroup};
 use esp_println::println;
-use esp_radio::wifi::{ClientConfiguration, Configuration, CsiConfig};
+use esp_radio::wifi::{ClientConfiguration, Configuration, CsiConfig, ScanConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::DhcpOption,
@@ -84,7 +84,11 @@ fn main() -> ! {
 
     println!("Waiting for CSI data...");
     println!("Start Wifi Scan");
-    let res = controller.scan_n(10).unwrap();
+    let scan_config = ScanConfig {
+        max: Some(10),
+        ..Default::default()
+    };
+    let res = controller.scan_with_config_sync(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }

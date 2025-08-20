@@ -1638,6 +1638,10 @@ pub struct ScanConfig<'a> {
     pub show_hidden: bool,
     /// Scan type, active or passive.
     pub scan_type: ScanTypeConfig,
+    /// The maximum number of networks to return when scanning.
+    /// If [`None`] is passed, all networks will be returned.
+    /// If [`Some`] is passed, the specified number of networks will be returned.
+    pub max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(
@@ -1648,6 +1652,7 @@ pub(crate) fn wifi_start_scan(
         channel,
         show_hidden,
         scan_type,
+        ..
     }: ScanConfig<'_>,
 ) -> i32 {
     scan_type.validate();
@@ -2808,17 +2813,8 @@ impl WifiController<'_> {
         &mut self,
         config: ScanConfig<'_>,
     ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        self.scan_with_config_sync_max(config, usize::MAX)
-    }
-
-    pub fn scan_with_config_sync_max(
-        &mut self,
-        config: ScanConfig<'_>,
-        max: usize,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         esp_wifi_result!(crate::wifi::wifi_start_scan(true, config))?;
-        let result = self.scan_results(max)?;
-        Ok(result)
+        self.scan_results(config.max.unwrap_or(usize::MAX))
     }
 
     fn scan_results(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
@@ -2843,11 +2839,6 @@ impl WifiController<'_> {
         unsafe { esp_wifi_result!(include::esp_wifi_clear_ap_list())? };
 
         Ok(scanned)
-    }
-
-    /// A blocking wifi network scan with default scanning options.
-    pub fn scan_n(&mut self, max: usize) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        self.scan_with_config_sync_max(Default::default(), max)
     }
 
     /// Starts the WiFi controller.
@@ -3000,27 +2991,10 @@ impl WifiController<'_> {
         WifiMode::current()
     }
 
-    /// Async version of [`crate::wifi::WifiController`]'s `scan_n` method
-    pub async fn scan_n_async(
-        &mut self,
-        max: usize,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        self.scan_with_config_async_max(Default::default(), max)
-            .await
-    }
-
     /// An async wifi network scan with caller-provided scanning options.
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,
-    ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
-        self.scan_with_config_async_max(config, usize::MAX).await
-    }
-
-    async fn scan_with_config_async_max(
-        &mut self,
-        config: ScanConfig<'_>,
-        max: usize,
     ) -> Result<alloc::vec::Vec<AccessPointInfo>, WifiError> {
         Self::clear_events(WifiEvent::ScanDone);
         esp_wifi_result!(wifi_start_scan(false, config))?;
@@ -3031,7 +3005,7 @@ impl WifiController<'_> {
 
         guard.defuse();
 
-        let result = self.scan_results(max)?;
+        let result = self.scan_results(config.max.unwrap_or(usize::MAX))?;
 
         Ok(result)
     }
