@@ -88,9 +88,6 @@ impl FlashStorage {
         Ok(())
     }
 
-    #[allow(clippy::all)]
-    #[inline(never)]
-    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_read(
         &mut self,
         offset: u32,
@@ -114,16 +111,12 @@ impl FlashStorage {
         Ok(())
     }
 
-    #[inline(never)]
-    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
         check_rc(chip_specific::spiflash_erase_sector(sector))
     }
 
-    #[inline(never)]
-    #[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
     pub(crate) fn internal_write(
         &mut self,
         offset: u32,
