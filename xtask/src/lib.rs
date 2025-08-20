@@ -207,6 +207,7 @@ impl Package {
                 features.push("defmt".to_owned());
                 if config.contains("wifi") {
                     features.push("wifi".to_owned());
+                    features.push("wifi-eap".to_owned());
                     features.push("esp-now".to_owned());
                     features.push("sniffer".to_owned());
                     features.push("smoltcp/proto-ipv4".to_owned());
@@ -277,12 +278,19 @@ impl Package {
             Package::EspRadio => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                // This tests if `wifi` feature works without `unstable`
                 if config.contains("wifi") {
+                    // This tests if `wifi` feature works without `esp-radio/unstable`
                     cases.push(vec![
                         "esp-hal/rt".to_owned(),
                         "esp-hal/unstable".to_owned(),
                         "wifi".to_owned(),
+                    ]);
+                    // This tests `wifi-eap` feature
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi-eap".to_owned(),
+                        "unstable".to_owned(),
                     ]);
                 }
             }

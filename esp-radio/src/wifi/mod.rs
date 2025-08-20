@@ -485,6 +485,7 @@ impl defmt::Format for ClientConfiguration {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg(feature = "wifi-eap")]
+#[instability::unstable]
 pub struct EapFastConfig {
     /// Specifies the provisioning mode for EAP-FAST.
     pub fast_provisioning: u8,
@@ -499,6 +500,7 @@ pub struct EapFastConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg(feature = "wifi-eap")]
+#[instability::unstable]
 pub enum TtlsPhase2Method {
     /// EAP (Extensible Authentication Protocol).
     Eap,
@@ -544,6 +546,7 @@ impl TtlsPhase2Method {
 #[derive(Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg(feature = "wifi-eap")]
+#[instability::unstable]
 pub struct EapClientConfiguration {
     /// The SSID of the network the client is connecting to.
     pub ssid: String,
