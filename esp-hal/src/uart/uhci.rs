@@ -69,7 +69,7 @@ impl<'d> DmaEligible for AnyUhci<'d> {
 
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
-    pub fn give_uhci(&self) -> &peripherals::UHCI0<'_> {
+    fn give_uhci(&self) -> &peripherals::UHCI0<'_> {
         match &self.0 {
             any::Inner::Uhci0(x) => x,
         }
