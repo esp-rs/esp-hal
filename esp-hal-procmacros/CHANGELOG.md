@@ -9,15 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added support for lifetimes and generics to `BuilderLite` derive macro (#3963)
 
 ### Changed
 
-
 ### Fixed
 
-
 ### Removed
-
 
 ## [v0.19.0] - 2025-07-16
 

@@ -19,10 +19,10 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 `esp_wifi` crate has been renamed to `esp_radio`
 
-```diff 
+```diff
 - esp-wifi = "0.15.0"
 + esp-radio = "{{currentVersion}}"
-``` 
+```
 
 ## `EspWifi` prefix has been removed
 
@@ -49,3 +49,7 @@ Provide these symbols:
 + pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 ...
 + pub extern "C" fn get_free_internal_heap_size() -> usize; ...
 ```
+
+## Scanning Functions
+
+The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config_sync` funtions while specifying a `max` value in `ScanConfig`.
