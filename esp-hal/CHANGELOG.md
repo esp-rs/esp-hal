@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Switched GPIO32 and GPIO33 ADC channel numbers (#3908, #3911)
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
 - ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
+- Check serial instead of jtag fifo status in UsbSerialJtag's async flush function
 
 ### Removed
 
