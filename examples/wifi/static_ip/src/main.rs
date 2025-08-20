@@ -73,10 +73,7 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let scan_config = ScanConfig {
-        max: Some(10),
-        ..Default::default()
-    };
+    let scan_config = ScanConfig::default().with_max(10);
     let res = controller.scan_with_config_sync(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);

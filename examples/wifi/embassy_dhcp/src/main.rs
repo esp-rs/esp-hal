@@ -178,10 +178,7 @@ async fn connection(mut controller: WifiController<'static>) {
             println!("Wifi started!");
 
             println!("Scan");
-            let scan_config = ScanConfig {
-                max: Some(10),
-                ..Default::default()
-            };
+            let scan_config = ScanConfig::default().with_max(10);
             let result = controller
                 .scan_with_config_async(scan_config)
                 .await

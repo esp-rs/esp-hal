@@ -56,6 +56,7 @@ use num_derive::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
 use portable_atomic::{AtomicUsize, Ordering};
+use procmacros::BuilderLite;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "smoltcp", feature = "unstable"))]
@@ -1617,7 +1618,7 @@ impl ScanTypeConfig {
 }
 
 /// Scan configuration
-#[derive(Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
 pub struct ScanConfig<'a> {
     /// SSID to filter for.
     /// If [`None`] is passed, all SSIDs will be returned.
