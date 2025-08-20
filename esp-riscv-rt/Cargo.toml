@@ -19,6 +19,7 @@ test  = false
 document-features = "0.2.11"
 defmt             = {version = "1.0.1", optional = true}
 riscv             = "0.14.0"
+# We use the `single-hart` feature since starting up harts != 0 is handled by the HAL, not the runtime.
 # TODO wait for a release
 riscv-rt          = {version = "0.15.0", git = "https://github.com/rust-embedded/riscv.git", rev = "00a818cfc700bf95abbc8005a1958b502669923d", features = ["pre-init", "no-exceptions", "no-interrupts", "single-hart", "v-trap", "pre-default-start-trap"]}
 
