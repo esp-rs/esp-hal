@@ -79,7 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 config_symbols.push(key.clone());
             }
             Value::String(v) => {
-                config_symbols.push(format!("{}_{}", key, v));
+                config_symbols.push(format!("{key}_{v}"));
             }
             _ => {}
         }
