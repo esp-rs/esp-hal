@@ -114,13 +114,6 @@ pub(crate) fn init_psram(config: PsramConfig) {
         let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
-        // Configure the mode of instruction cache : cache size, cache line size.
-        rom_config_instruction_cache_mode(
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
-            CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
-        );
-
         // If we need use SPIRAM, we should use data cache.
         Cache_Suspend_DCache();
 

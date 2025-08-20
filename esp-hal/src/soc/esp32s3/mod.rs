@@ -41,6 +41,10 @@ pub(crate) unsafe fn configure_cpu_caches() {
     // see https://github.com/apache/incubator-nuttx/blob/master/arch/xtensa/src/esp32s3/esp32s3_start.c
 
     unsafe extern "C" {
+        fn Cache_Suspend_DCache();
+
+        fn Cache_Resume_DCache(param: u32);
+
         fn rom_config_instruction_cache_mode(
             cfg_cache_size: u32,
             cfg_cache_ways: u8,
@@ -99,11 +103,13 @@ pub(crate) unsafe fn configure_cpu_caches() {
 
     // Configure the mode of data : cache size, cache line size.
     unsafe {
+        Cache_Suspend_DCache();
         rom_config_data_cache_mode(
             CONFIG_ESP32S3_DATA_CACHE_SIZE,
             CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS,
             CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE,
         );
+        Cache_Resume_DCache(0);
     }
 }
 
