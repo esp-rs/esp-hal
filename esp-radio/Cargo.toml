@@ -37,6 +37,7 @@ esp-wifi-sys = "0.7.1"
 num-derive = { version = "0.4.2" }
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
+procmacros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 xtensa-lx-rt = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
