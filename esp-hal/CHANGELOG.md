@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
+- Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
 
 ### Fixed
 
@@ -90,7 +91,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjusted ESP32-S2 deep-sleep to hibernate for the Ext1WakeupSource (#3785)
 - Libraries depending on esp-hal should now disable default features, so that only the final binary crate enables the `rt` feature (#3706)
 - Changed `interrupt::RESERVED_INTERRUPTS` from `&[usize]` to `&[u32]` (#3798)
-- Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` #(3933)
 
 ### Fixed
 
