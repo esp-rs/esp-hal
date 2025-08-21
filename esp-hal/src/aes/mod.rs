@@ -475,7 +475,7 @@ pub mod dma {
             }
 
             self.enable_dma(true);
-            self.enable_listen();
+            self.listen();
 
             self.aes.write_mode(mode);
             self.write_key(key);
@@ -539,7 +539,7 @@ pub mod dma {
                 .write(|w| w.dma_enable().bit(enable));
         }
 
-        fn enable_listen(&self) {
+        fn listen(&self) {
             self.aes.regs().int_ena().write(|w| w.int_ena().set_bit());
         }
 

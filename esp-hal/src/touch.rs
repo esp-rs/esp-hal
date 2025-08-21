@@ -419,7 +419,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// ## Example
     pub fn listen(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
-        enable_listen(self.pin.touch_nr(Internal))
+        listen(self.pin.touch_nr(Internal))
     }
 
     /// Unlisten for the touch pad's interrupt.
@@ -427,7 +427,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
     pub fn unlisten(&mut self) {
-        disable_listen(self.pin.touch_nr(Internal))
+        unlisten(self.pin.touch_nr(Internal))
     }
 
     /// Clears a pending touch interrupt.
@@ -448,7 +448,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     }
 }
 
-fn enable_listen(touch_nr: u8) {
+fn listen(touch_nr: u8) {
     // enable touch interrupts
     LPWR::regs().int_ena().write(|w| w.touch().set_bit());
 
@@ -458,7 +458,7 @@ fn enable_listen(touch_nr: u8) {
     });
 }
 
-fn disable_listen(touch_nr: u8) {
+fn unlisten(touch_nr: u8) {
     SENS::regs().sar_touch_enable().modify(|r, w| unsafe {
         w.touch_pad_outen1()
             .bits(r.touch_pad_outen1().bits() & !(1 << touch_nr))
@@ -474,7 +474,7 @@ fn disable_listen(touch_nr: u8) {
     }
 }
 
-fn internal_disable_interrupts() {
+fn internal_unlisten() {
     SENS::regs()
         .sar_touch_enable()
         .write(|w| unsafe { w.touch_pad_outen1().bits(0) });
@@ -565,7 +565,7 @@ mod asynch {
         }
         TOUCHED_PINS.store(touch_pads, Ordering::Relaxed);
         internal_clear_interrupt();
-        internal_disable_interrupts();
+        internal_unlisten();
     }
 
     impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Async> {
@@ -573,7 +573,7 @@ mod asynch {
         pub async fn wait_for_touch(&mut self, threshold: u16) {
             self.pin.set_threshold(threshold, Internal);
             let touch_nr = self.pin.touch_nr(Internal);
-            enable_listen(touch_nr);
+            listen(touch_nr);
             TouchFuture::new(touch_nr).await;
         }
     }
