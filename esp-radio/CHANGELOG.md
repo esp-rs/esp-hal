@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 - `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
+- Added unstable `wifi-eap` feature (#3924)
 - Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
 
 ### Changed
