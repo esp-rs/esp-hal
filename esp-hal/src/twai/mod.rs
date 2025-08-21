@@ -122,6 +122,7 @@
 
 use core::marker::PhantomData;
 
+use enumset::{EnumSet, EnumSetType};
 use procmacros::handler;
 
 use self::filter::{Filter, FilterType};
@@ -143,7 +144,6 @@ use crate::{
     system::{Cpu, PeripheralGuard},
     twai::filter::SingleStandardFilter,
 };
-
 pub mod filter;
 
 /// TWAI error kind
@@ -1209,6 +1209,24 @@ where
     }
 }
 
+/// List of TWAI events.
+#[derive(Debug, EnumSetType)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
+#[instability::unstable]
+pub enum TwaiInterrupt {
+    /// A frame has been received.
+    Receive,
+    /// A frame has been transmitted.
+    Transmit,
+    /// An error has occurred on the bus.
+    BusError,
+    /// An arbitration lost event has occurred.
+    ArbitrationLost,
+    /// The controller has entered an error passive state.
+    ErrorPassive,
+}
+
 /// Represents errors that can occur in the TWAI driver.
 /// This enum defines the possible errors that can be encountered when
 /// interacting with the TWAI peripheral.
@@ -1313,17 +1331,31 @@ pub trait PrivateInstance: crate::private::Sealed {
     /// Returns a reference to the register block for TWAI instance.
     fn register_block(&self) -> &RegisterBlock;
 
-    /// Enables interrupts for the TWAI peripheral.
-    fn enable_interrupts(&self) {
+    /// Enables/disables interrupts for the TWAI peripheral based on the `enable` flag.
+    fn enable_interrupts(&self, interrupts: EnumSet<TwaiInterrupt>, enable: bool) {
         self.register_block().int_ena().modify(|_, w| {
-            w.rx_int_ena().set_bit();
-            w.tx_int_ena().set_bit();
-            w.bus_err_int_ena().set_bit();
-            w.arb_lost_int_ena().set_bit();
-            w.err_passive_int_ena().set_bit()
+            for interrupt in interrupts {
+                match interrupt {
+                    TwaiInterrupt::Receive => w.rx_int_ena().bit(enable),
+                    TwaiInterrupt::Transmit => w.tx_int_ena().bit(enable),
+                    TwaiInterrupt::BusError => w.bus_err_int_ena().bit(enable),
+                    TwaiInterrupt::ArbitrationLost => w.arb_lost_int_ena().bit(enable),
+                    TwaiInterrupt::ErrorPassive => w.err_passive_int_ena().bit(enable),
+                };
+            }
+            w
         });
     }
 
+    /// Listen for given interrupts.
+    fn listen(&mut self, interrupts: impl Into<EnumSet<TwaiInterrupt>>) {
+        self.enable_interrupts(interrupts.into(), true);
+    }
+
+    /// Unlisten the given interrupts.
+    fn unlisten(&mut self, interrupts: impl Into<EnumSet<TwaiInterrupt>>) {
+        self.enable_interrupts(interrupts.into(), false);
+    }
     /// Returns a reference to the asynchronous state for this TWAI instance.
     fn async_state(&self) -> &asynch::TwaiAsyncState;
 }
@@ -1705,11 +1737,11 @@ mod asynch {
         ///
         /// The transmission is aborted if the future is dropped. The technical
         /// reference manual does not specifiy if aborting the transmission also
-        /// stops it, in case it is activly transmitting. Therefor it could be
+        /// stops it, in case it is actively transmitting. Therefor it could be
         /// the case that even though the future is dropped, the frame was sent
         /// anyways.
         pub async fn transmit_async(&mut self, frame: &EspTwaiFrame) -> Result<(), EspTwaiError> {
-            self.twai.enable_interrupts();
+            self.twai.listen(EnumSet::all());
             TransmitFuture::new(self.twai.reborrow(), frame).await
         }
     }
@@ -1717,7 +1749,7 @@ mod asynch {
     impl TwaiRx<'_, Async> {
         /// Receives an `EspTwaiFrame` asynchronously over the TWAI bus.
         pub async fn receive_async(&mut self) -> Result<EspTwaiFrame, EspTwaiError> {
-            self.twai.enable_interrupts();
+            self.twai.listen(EnumSet::all());
             poll_fn(|cx| {
                 self.twai.async_state().err_waker.register(cx.waker());
 

@@ -32,7 +32,7 @@ pub(crate) fn setup_timebase(mut timer: TimeBase) {
 
     timer.set_interrupt_handler(handler);
     TIMER.with(|t| {
-        timer.enable_interrupt(true);
+        timer.listen();
         t.replace(timer);
     });
 }
@@ -46,7 +46,7 @@ pub(crate) fn clear_timer_interrupt() {
 pub(crate) fn disable_timebase() {
     TIMER.with(|timer| {
         let mut timer = unwrap!(timer.take());
-        timer.enable_interrupt(false);
+        timer.unlisten();
         unwrap!(timer.cancel());
     });
 }
