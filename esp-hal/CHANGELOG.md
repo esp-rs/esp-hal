@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::cipher_modes`, `aes::CipherModeState` for constructing `AesContext`s (#3895)
 - `DmaTxBuffer` and `DmaRxBuffer` now have a `Final` associated type. (#3923)
 - `RsaBackend, RsaContext`: Work-queue based RSA driver (#3910)
+- `aes::{AesBackend, AesContext, dma::AesDmaBackend}`: Work-queue based AES driver (#3880, #3897)
+- `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
+- `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
 
 ### Changed
 
@@ -24,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `embassy-usb` to v0.5.0 (#3848)
 - `aes::Key` variants have been renamed from bytes to bits (e.g. `Key16 -> Key128`) (#3845)
 - `aes::Mode` has been replaced by `Operation`. The key length is now solely determined by the key. (#3882)
+- `AesDma::process` now takes `DmaCipherState` instead of `CipherMode`. (#3897)
 - `Aes::process` has been split into `Aes::encrypt` and `Aes::decrypt` (#3882)
 - Blocking RMT transactions can now be `poll`ed without blocking, returning whether they have completed. (#3716)
 - RISC-V: Interrupt handler don't get a TrapFrame passed in anymore (#3903)
@@ -34,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Rsa::enable_constant_time_acceleration` has been renamed to `Rsa::disable_constant_time` (#3900)
 - `Rsa::enable_search_acceleration` has been renamed to `Rsa::search_acceleration` (#3900)
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
+- `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
+- The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
+- `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 
 ### Fixed
 
@@ -42,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ADC2` now cannot be used simultaneously with `radio` on ESP32 (#3876)
 - Switched GPIO32 and GPIO33 ADC channel numbers (#3908, #3911)
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
+- ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
 
 ### Removed
 

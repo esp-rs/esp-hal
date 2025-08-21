@@ -1,4 +1,4 @@
-crate: esp-radio-preempt-baremetal
+crate: esp-preempt
 
 options:
   - name: tick_rate_hz

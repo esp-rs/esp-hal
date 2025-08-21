@@ -52,6 +52,14 @@ impl UnsafeCryptoBuffers {
     pub fn in_place(&self) -> bool {
         self.input.addr() == self.output.addr()
     }
+
+    #[cfg(aes_dma)]
+    pub(crate) unsafe fn byte_add(self, bytes: usize) -> Self {
+        UnsafeCryptoBuffers {
+            input: unsafe { self.input.byte_add(bytes) },
+            output: unsafe { self.output.byte_add(bytes) },
+        }
+    }
 }
 
 /// Electronic codebook mode.
@@ -173,6 +181,20 @@ impl Ofb {
         });
         self.offset = offset;
     }
+
+    #[cfg(aes_dma)]
+    pub(super) fn flush(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
+        let mut offset = self.offset;
+        buffer
+            .first_n((BLOCK_SIZE - offset) % BLOCK_SIZE)
+            .for_data_chunks(1, |input, output, _| {
+                unsafe { output.write(input.read() ^ self.iv[offset]) };
+                offset += 1;
+            });
+        let flushed = offset - self.offset;
+        self.offset = offset % BLOCK_SIZE;
+        flushed
+    }
 }
 
 /// Counter mode.
@@ -223,6 +245,20 @@ impl Ctr {
             offset = (offset + 1) % BLOCK_SIZE;
         });
         self.offset = offset;
+    }
+
+    #[cfg(aes_dma)]
+    pub(super) fn flush(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
+        let mut offset = self.offset;
+        buffer
+            .first_n((BLOCK_SIZE - offset) % BLOCK_SIZE)
+            .for_data_chunks(1, |plaintext, ciphertext, _| {
+                unsafe { ciphertext.write(plaintext.read() ^ self.buffer[offset]) };
+                offset += 1;
+            });
+        let flushed = offset - self.offset;
+        self.offset = offset % BLOCK_SIZE;
+        flushed
     }
 }
 
@@ -332,6 +368,41 @@ impl Cfb128 {
         });
         self.offset = offset;
     }
+
+    #[cfg(aes_dma)]
+    pub(super) fn flush_encrypt(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
+        let mut offset = self.offset;
+        buffer
+            .first_n((BLOCK_SIZE - offset) % BLOCK_SIZE)
+            .for_data_chunks(1, |plaintext, ciphertext, _| {
+                unsafe {
+                    self.iv[offset] ^= plaintext.read();
+                    ciphertext.write(self.iv[offset]);
+                }
+                offset += 1;
+            });
+        let flushed = offset - self.offset;
+        self.offset = offset % BLOCK_SIZE;
+        flushed
+    }
+
+    #[cfg(aes_dma)]
+    pub(super) fn flush_decrypt(&mut self, buffer: UnsafeCryptoBuffers) -> usize {
+        let mut offset = self.offset;
+        buffer
+            .first_n((BLOCK_SIZE - offset) % BLOCK_SIZE)
+            .for_data_chunks(1, |ciphertext, plaintext, _| {
+                unsafe {
+                    let c = ciphertext.read();
+                    plaintext.write(self.iv[offset] ^ c);
+                    self.iv[offset] = c;
+                }
+                offset += 1;
+            });
+        let flushed = offset - self.offset;
+        self.offset = offset % BLOCK_SIZE;
+        flushed
+    }
 }
 
 // Utilities
@@ -350,6 +421,15 @@ impl UnsafeCryptoBuffers {
             .map(|((input, len), (output, _))| (input, output, len))
         {
             cb(input, output, len)
+        }
+    }
+
+    #[cfg(aes_dma)]
+    fn first_n(self, n: usize) -> UnsafeCryptoBuffers {
+        let len = n.min(self.input.len());
+        Self {
+            input: NonNull::slice_from_raw_parts(self.input.cast(), len),
+            output: NonNull::slice_from_raw_parts(self.output.cast(), len),
         }
     }
 }

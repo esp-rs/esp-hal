@@ -28,7 +28,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::println;
-use esp_radio::wifi::{ClientConfiguration, Configuration};
+use esp_radio::wifi::{ClientConfiguration, Configuration, ScanConfig};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::{DhcpOption, IpAddress},
@@ -59,7 +59,7 @@ fn main() -> ! {
     let server_address: Ipv4Addr = HOST_IP.parse().expect("Invalid HOST_IP address");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_radio_preempt_baremetal::init(timg0.timer0);
+    esp_preempt::init(timg0.timer0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
@@ -99,7 +99,8 @@ fn main() -> ! {
     println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let res = controller.scan_n(10).unwrap();
+    let scan_config = ScanConfig::default().with_max(10);
+    let res = controller.scan_with_config_sync(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }

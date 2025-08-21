@@ -22,7 +22,15 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfiguration, Configuration, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{
+        ClientConfiguration,
+        Configuration,
+        ScanConfig,
+        WifiController,
+        WifiDevice,
+        WifiEvent,
+        WifiState,
+    },
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -49,7 +57,7 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_radio_preempt_baremetal::init(timg0.timer0);
+    esp_preempt::init(timg0.timer0);
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
@@ -170,7 +178,11 @@ async fn connection(mut controller: WifiController<'static>) {
             println!("Wifi started!");
 
             println!("Scan");
-            let result = controller.scan_n_async(10).await.unwrap();
+            let scan_config = ScanConfig::default().with_max(10);
+            let result = controller
+                .scan_with_config_async(scan_config)
+                .await
+                .unwrap();
             for ap in result {
                 println!("{:?}", ap);
             }

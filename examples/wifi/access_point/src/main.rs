@@ -43,22 +43,23 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_radio_preempt_baremetal::init(timg0.timer0);
+    esp_preempt::init(timg0.timer0);
 
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
     _ = event::ApStart::replace_handler(|_| println!("ap start event"));
     event::ApStaconnected::update_handler(move |event| {
         connections += 1;
-        println!("connected {}, mac: {:?}", connections, event.0.mac);
+        esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
     event::ApStaconnected::update_handler(|event| {
-        println!("connected aid: {}", event.0.aid);
+        esp_println::println!("connected aid: {}", event.aid());
     });
     event::ApStadisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
-            event.0.mac, event.0.reason
+            event.mac(),
+            event.reason()
         );
     });
 

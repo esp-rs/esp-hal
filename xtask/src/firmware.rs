@@ -100,6 +100,10 @@ impl Metadata {
 
         filter == self.binary_name() || filter == self.output_file_name()
     }
+
+    pub fn matches_name(&self, name: &str) -> bool {
+        name.to_lowercase() == self.binary_name() || name.to_lowercase() == self.output_file_name()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
