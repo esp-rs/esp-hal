@@ -404,7 +404,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
         self.pin.touch_measurement(Internal)
     }
 
-    /// Enables the touch_pad interrupt.
+    /// Listens for the touch_pad interrupt.
     ///
     /// The raised interrupt is actually
     /// [`RTC_CORE`](crate::peripherals::Interrupt::RTC_CORE). A handler can
@@ -417,17 +417,17 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     ///   depends on the configuration of `touch` in [`new`](Self::new) (defaults to below).
     ///
     /// ## Example
-    pub fn enable_interrupt(&mut self, threshold: u16) {
+    pub fn listen(&mut self, threshold: u16) {
         self.pin.set_threshold(threshold, Internal);
-        internal_enable_interrupt(self.pin.touch_nr(Internal))
+        listen(self.pin.touch_nr(Internal))
     }
 
-    /// Disables the touch pad's interrupt.
+    /// Unlisten for the touch pad's interrupt.
     ///
     /// If no other touch pad interrupts are active, the touch interrupt is
     /// disabled completely.
-    pub fn disable_interrupt(&mut self) {
-        internal_disable_interrupt(self.pin.touch_nr(Internal))
+    pub fn unlisten(&mut self) {
+        unlisten(self.pin.touch_nr(Internal))
     }
 
     /// Clears a pending touch interrupt.
@@ -448,7 +448,7 @@ impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Blocking> {
     }
 }
 
-fn internal_enable_interrupt(touch_nr: u8) {
+fn listen(touch_nr: u8) {
     // enable touch interrupts
     LPWR::regs().int_ena().write(|w| w.touch().set_bit());
 
@@ -458,7 +458,7 @@ fn internal_enable_interrupt(touch_nr: u8) {
     });
 }
 
-fn internal_disable_interrupt(touch_nr: u8) {
+fn unlisten(touch_nr: u8) {
     SENS::regs().sar_touch_enable().modify(|r, w| unsafe {
         w.touch_pad_outen1()
             .bits(r.touch_pad_outen1().bits() & !(1 << touch_nr))
@@ -474,7 +474,7 @@ fn internal_disable_interrupt(touch_nr: u8) {
     }
 }
 
-fn internal_disable_interrupts() {
+fn internal_unlisten() {
     SENS::regs()
         .sar_touch_enable()
         .write(|w| unsafe { w.touch_pad_outen1().bits(0) });
@@ -565,7 +565,7 @@ mod asynch {
         }
         TOUCHED_PINS.store(touch_pads, Ordering::Relaxed);
         internal_clear_interrupt();
-        internal_disable_interrupts();
+        internal_unlisten();
     }
 
     impl<P: TouchPin, Tm: TouchMode> TouchPad<P, Tm, Async> {
@@ -573,7 +573,7 @@ mod asynch {
         pub async fn wait_for_touch(&mut self, threshold: u16) {
             self.pin.set_threshold(threshold, Internal);
             let touch_nr = self.pin.touch_nr(Internal);
-            internal_enable_interrupt(touch_nr);
+            listen(touch_nr);
             TouchFuture::new(touch_nr).await;
         }
     }

@@ -296,9 +296,14 @@ where
         self.inner.set_interrupt_handler(handler);
     }
 
-    /// Enable listening for interrupts
-    pub fn enable_interrupt(&mut self, enable: bool) {
-        self.inner.enable_interrupt(enable);
+    /// Listen for interrupt
+    pub fn listen(&mut self) {
+        self.inner.enable_interrupt(true);
+    }
+
+    /// Unlisten for interrupt
+    pub fn unlisten(&mut self) {
+        self.inner.enable_interrupt(false);
     }
 
     /// Clear the interrupt flag
@@ -391,9 +396,14 @@ where
         self.inner.set_interrupt_handler(handler);
     }
 
-    /// Enable/disable listening for interrupts
-    pub fn enable_interrupt(&mut self, enable: bool) {
-        self.inner.enable_interrupt(enable);
+    /// Listen for interrupt
+    pub fn listen(&mut self) {
+        self.inner.enable_interrupt(true);
+    }
+
+    /// Unlisten for interrupt
+    pub fn unlisten(&mut self) {
+        self.inner.enable_interrupt(false);
     }
 
     /// Clear the interrupt flag
