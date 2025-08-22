@@ -8,15 +8,16 @@
 //! Adjust the target and the chip in the following commands according to the
 //! chip used!
 //!
-//! - `cargo xtask build examples examples esp32 --example=gpio_interrupt`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/gpio_interrupt
-//!   examples/target/ota_image`
-//! - `cargo xtask build examples examples esp32 --example=ota_update`
-//! - `espflash save-image --chip=esp32 examples/target/xtensa-esp32-none-elf/release/ota_update
-//!   examples/target/ota_image`
-//! - erase whole flash via `espflash erase-flash` (this is to make sure otadata is cleared and no
-//!   code is flashed to any partition)
-//! - run via `cargo xtask run example examples esp32 --example=ota_update`
+//! ```ignore,bash
+//! cargo xtask build examples gpio --chip=esp32
+//! espflash save-image --chip=esp32 examples/interrupt/gpio/target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
+//! cargo xtask build examples update --chip=esp32
+//! espflash save-image --chip=esp32 examples/ota/update/target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! cargo xtask build examples update --chip=esp32
+//! espflash save-image --chip=esp32 examples/ota/update/target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash erase-flash
+//! cargo xtask run example update --chip=esp32
+//! ```
 //!
 //! On first boot notice the firmware partition gets booted ("Loaded app from
 //! partition at offset 0x10000"). Press the BOOT button, once finished press
@@ -28,7 +29,7 @@
 //! You will see the `gpio_interrupt` example gets booted from OTA1 ("Loaded app
 //! from partition at offset 0x210000")
 //!
-//! See https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html
+//! See <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html>
 
 #![no_std]
 #![no_main]
