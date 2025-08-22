@@ -4,19 +4,26 @@ use portable_atomic_enum::atomic_enum;
 
 use super::WifiEvent;
 
-/// Wifi interface state
+/// Wi-Fi interface state.
 #[atomic_enum]
 #[derive(PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WifiState {
+    /// Station started.
     StaStarted,
+    /// Station connected.
     StaConnected,
+    /// Station disconnected.
     StaDisconnected,
+    /// Station stopped
     StaStopped,
 
+    /// Access point started.
     ApStarted,
+    /// Access point stopped.
     ApStopped,
 
+    /// Invalid Wi-Fi state.
     Invalid,
 }
 
@@ -37,13 +44,13 @@ impl From<WifiEvent> for WifiState {
 pub(crate) static STA_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 pub(crate) static AP_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 
-/// Get the current state of the AP
+/// Get the current state of the AP.
 #[instability::unstable]
 pub fn ap_state() -> WifiState {
     AP_STATE.load(Ordering::Relaxed)
 }
 
-/// Get the current state of the STA
+/// Get the current state of the STA.
 #[instability::unstable]
 pub fn sta_state() -> WifiState {
     STA_STATE.load(Ordering::Relaxed)
@@ -76,7 +83,7 @@ pub(crate) fn reset_sta_state() {
     STA_STATE.store(WifiState::Invalid, Ordering::Relaxed)
 }
 
-/// Returns the current state of the WiFi stack.
+/// Returns the current state of the Wi-Fi stack.
 ///
 /// This does not support AP-STA mode. Use one of `sta_state` or
 /// `ap_state` instead.

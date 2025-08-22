@@ -19,11 +19,11 @@ esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = fals
 critical-section = "1.2.0"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
-enumset   = { version = "1.1.6", default-features = false, optional = true }
+enumset = { version = "1.1.6", default-features = false, optional = true }
 
 # ⚠️ Unstable dependencies
 embedded-io = { version = "0.6.1", default-features = false }
-embedded-io-async = { version = "0.6.1" }
+embedded-io-async = "0.6.1"
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
 instability = "0.3.9"
 
@@ -34,7 +34,7 @@ esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-wifi-sys = "0.7.1"
-num-derive = { version = "0.4.2" }
+num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
 procmacros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
@@ -52,11 +52,11 @@ embassy-net-driver = { version = "0.2.0", optional = true }
 bt-hci = { version = "0.4.0", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
-defmt            = { version = "1.0.1", optional = true }
-log-04           = { package = "log", version = "0.4.27", optional = true }
+defmt = { version = "1.0.1", optional = true }
+log-04 = { package = "log", version = "0.4.27", optional = true }
 
 [build-dependencies]
-esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
+esp-config = { version = "0.5.0", path = "../esp-config", features = ["build"] }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
 
 [features]
