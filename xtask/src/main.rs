@@ -130,13 +130,13 @@ fn main() -> Result<()> {
             Build::Examples(args) => examples(
                 &workspace,
                 args,
-                CargoAction::Build(target_path.join("examples")),
+                CargoAction::Build(Some(target_path.join("examples"))),
             ),
             Build::Package(args) => build_package(&workspace, args),
             Build::Tests(args) => tests(
                 &workspace,
                 args,
-                CargoAction::Build(target_path.join("tests")),
+                CargoAction::Build(Some(target_path.join("tests"))),
             ),
         },
 
@@ -382,10 +382,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 toolchain: args.toolchain.clone(),
                 timings: false,
             },
-            CargoAction::Build(PathBuf::from(format!(
+            CargoAction::Build(Some(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples",
                 args.chip.target()
-            ))),
+            )))),
         )
         .inspect_err(|_| failed.push("Build LP-HAL Examples"))
         .and_then(|_| {
@@ -407,6 +407,13 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             Ok(())
         })
         .ok();
+
+        // remove the (now) obsolete duplicates
+        std::fs::remove_dir_all(PathBuf::from(format!(
+            "./esp-lp-hal/target/{}/release/examples/{}",
+            args.chip.target(),
+            args.chip
+        )))?;
         println!("::endgroup");
 
         // Check documentation
@@ -458,7 +465,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             toolchain: args.toolchain.clone(),
             timings: false,
         },
-        CargoAction::Build(PathBuf::from("./examples/target/")),
+        CargoAction::Build(None),
     )
     .inspect_err(|_| failed.push("Build examples"))
     .ok();
@@ -476,7 +483,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             toolchain: args.toolchain.clone(),
             timings: false,
         },
-        CargoAction::Build(PathBuf::from("./qa-test/target/")),
+        CargoAction::Build(None),
     )
     .inspect_err(|_| failed.push("Build qa-test"))
     .ok();
