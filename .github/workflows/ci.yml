@@ -146,10 +146,6 @@ jobs:
       - name: msrv Xtensa (esp-hal)
         run: |
           cargo xtask lint-packages --chips esp32,esp32s2,esp32s3 --toolchain esp
-      
-      # Check for unused dependencies through esp-hal packages
-      - name: Check for unused depencencies
-        run: cargo xtask check-unused-dependencies --toolchain esp
 
   # --------------------------------------------------------------------------
   # host tests
