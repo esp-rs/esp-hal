@@ -374,5 +374,6 @@ opt-level        = 3
 lto              = false # LTO (thin or fat) miscompiles some tests on RISC-V
 overflow-checks  = true
 
+# `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]
 ignored = ["semihosting"]

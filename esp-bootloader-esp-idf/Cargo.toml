@@ -69,5 +69,6 @@ esp32s2   = ["esp-rom-sys/esp32s2"]
 ## 
 esp32s3   = ["esp-rom-sys/esp32s3"]
 
+# "md-5" is hidden behind `std` feature and `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]
 ignored = ["md-5"]

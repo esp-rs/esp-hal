@@ -185,5 +185,6 @@ features = [
 ]
 default-target = "riscv32imc-unknown-none-elf"
 
+# `esp-alloc` and `xtensa-lx-rt` are hidden behind features so `cargo machete` incorrectly marks it as unused.
 [package.metadata.cargo-machete]
 ignored = ["esp-alloc", "xtensa-lx-rt"]
