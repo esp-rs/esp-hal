@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 - Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
-- ESP32-S3: `PsramConfig::core_clock` is now an `Option`
+- ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
 
 ### Fixed
 
