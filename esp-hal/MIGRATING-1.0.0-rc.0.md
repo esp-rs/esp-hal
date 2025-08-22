@@ -135,3 +135,21 @@ If the `Final` type is not `Self`, `fn from_view()` will need to be updated to r
 + pub fn listen(&mut self) { ... }
 + pub fn unlisten(&mut self) { ... }
 ```
+
+## ESP32-S3 PSRAM Configuration
+
+`PsramConfig::core_clock` is now an `Option`.
+
+```diff
+let peripherals = esp_hal::init(
+    esp_hal::Config::default()
+    .with_cpu_clock(esp_hal::clock::CpuClock::max())
+    .with_psram(esp_hal::psram::PsramConfig {
+        flash_frequency: esp_hal::psram::FlashFreq::FlashFreq20m,
+        ram_frequency: esp_hal::psram::SpiRamFreq::Freq40m,
+-       core_clock: esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m,
++       core_clock: Some(esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m),
+        ..Default::default()
+        })
+    );
+```
