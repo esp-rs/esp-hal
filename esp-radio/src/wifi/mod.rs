@@ -1,5 +1,7 @@
 //! WiFi
 
+#![deny(missing_docs)]
+
 pub mod event;
 mod internal;
 pub(crate) mod os_adapter;
@@ -1000,9 +1002,8 @@ unsafe extern "C" fn csi_rx_cb<C: CsiCallback>(
     }
 }
 
+/// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
-// https://github.com/esp-rs/esp-wifi-sys/blob/main/esp-wifi-sys/headers/local/esp_wifi_types_native.h#L94
-/// Channel state information(CSI) configuration
 #[cfg(all(not(esp32c6), feature = "csi"))]
 pub struct CsiConfig {
     /// Enable to receive legacy long training field(lltf) data.
@@ -1029,9 +1030,9 @@ pub struct CsiConfig {
     pub dump_ack_en: bool,
 }
 
+/// Channel state information (CSI) configuration.
 #[derive(Clone, PartialEq, Eq)]
 #[cfg(all(esp32c6, feature = "csi"))]
-// See https://github.com/esp-rs/esp-wifi-sys/blob/2a466d96fe8119d49852fc794aea0216b106ba7b/esp-wifi-sys/src/include/esp32c6.rs#L5702-L5705
 pub struct CsiConfig {
     /// Enable to acquire CSI.
     pub enable: u32,
@@ -1766,7 +1767,9 @@ mod private {
 /// Provides methods for retrieving the Wi-Fi mode and MAC address.
 #[derive(Debug, Clone, Copy)]
 pub enum WifiDeviceMode {
+    /// Station mode.
     Sta,
+    /// Access Point mode.
     Ap,
 }
 
@@ -2676,11 +2679,15 @@ impl Drop for FreeApListOnDrop {
 /// Represents the Wi-Fi controller and its associated interfaces.
 #[non_exhaustive]
 pub struct Interfaces<'d> {
+    /// Station mode Wi-Fi device.
     pub sta: WifiDevice<'d>,
+    /// Access Point mode Wi-Fi device.
     pub ap: WifiDevice<'d>,
+    /// ESP-NOW interface.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub esp_now: crate::esp_now::EspNow<'d>,
+    /// Wi-Fi sniffer interface.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
     pub sniffer: Sniffer,
@@ -2746,6 +2753,7 @@ pub fn new<'d>(
     ))
 }
 
+/// Wi-Fi controller.
 #[non_exhaustive]
 pub struct WifiController<'d> {
     _phantom: PhantomData<&'d ()>,
@@ -2779,7 +2787,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Set the wifi protocol.
+    /// Set the Wi-Fi protocol.
     ///
     /// This will set the wifi protocol to the desired protocol, the default for
     /// this is: `WIFI_PROTOCOL_11B|WIFI_PROTOCOL_11G|WIFI_PROTOCOL_11N`
@@ -2825,7 +2833,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Configures modem power saving
+    /// Configures modem power saving.
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
     }
@@ -2863,17 +2871,17 @@ impl WifiController<'_> {
         Ok(scanned)
     }
 
-    /// Starts the WiFi controller.
+    /// Starts the Wi-Fi controller.
     pub fn start(&mut self) -> Result<(), WifiError> {
         crate::wifi::wifi_start()
     }
 
-    /// Stops the WiFi controller.
+    /// Stops the Wi-Fi controller.
     pub fn stop(&mut self) -> Result<(), WifiError> {
         self.stop_impl()
     }
 
-    /// Connect WiFi station to the AP.
+    /// Connect Wi-Fi station to the AP.
     ///
     /// - If station is connected , call [Self::disconnect] to disconnect.
     /// - Scanning will not be effective until connection between device and the AP is established.
@@ -2883,12 +2891,12 @@ impl WifiController<'_> {
         self.connect_impl()
     }
 
-    /// Disconnect WiFi station from the AP.
+    /// Disconnect Wi-Fi station from the AP.
     pub fn disconnect(&mut self) -> Result<(), WifiError> {
         self.disconnect_impl()
     }
 
-    /// Get the rssi information of AP to which the device is associated with.
+    /// Get the RSSI information of AP to which the device is associated with.
     /// The value is obtained from the last beacon.
     ///
     /// <div class="warning">
@@ -2926,8 +2934,8 @@ impl WifiController<'_> {
     ///
     /// Passing [Configuration::None] will disable both, AP and STA mode.
     ///
-    /// If you don't intent to use WiFi anymore at all consider tearing down
-    /// WiFi completely.
+    /// If you don't intend to use Wi-Fi anymore at all consider tearing down
+    /// Wi-Fi completely.
     pub fn set_configuration(&mut self, conf: &Configuration) -> Result<(), WifiError> {
         conf.validate()?;
 
@@ -2962,7 +2970,7 @@ impl WifiController<'_> {
         Ok(())
     }
 
-    /// Set the WiFi mode.
+    /// Set the Wi-Fi mode.
     ///
     /// This will override the mode inferred by [Self::set_configuration].
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
@@ -2982,10 +2990,10 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect() })
     }
 
-    /// Checks if the WiFi controller has started.
+    /// Checks if the Wi-Fi controller has started.
     ///
     /// This function should be called after the `start` method to verify if the
-    /// WiFi has started successfully.
+    /// Wi-Fi has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::sta_state(),
@@ -2999,7 +3007,7 @@ impl WifiController<'_> {
         Ok(false)
     }
 
-    /// Checks if the WiFi controller is connected to an AP.
+    /// Checks if the Wi-Fi controller is connected to an AP.
     ///
     /// This function should be called after the `connect` method to verify if
     /// the connection was successful.
@@ -3016,7 +3024,7 @@ impl WifiController<'_> {
         WifiMode::current()
     }
 
-    /// An async wifi network scan with caller-provided scanning options.
+    /// An async Wi-Fi network scan with caller-provided scanning options.
     pub async fn scan_with_config_async(
         &mut self,
         config: ScanConfig<'_>,

@@ -1,3 +1,5 @@
+//! Wi-Fi event handlers.
+
 use alloc::boxed::Box;
 
 use esp_hal::sync::Locked;
@@ -19,6 +21,7 @@ pub(crate) mod sealed {
         unsafe fn from_raw_event_data(ptr: *mut crate::binary::c_types::c_void) -> Self;
     }
 }
+
 /// The type of handlers of events.
 #[instability::unstable]
 pub type Handler<T> = dyn FnMut(&T) + Sync + Send;
@@ -51,6 +54,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
     fn take_handler() -> Box<Handler<Self>> {
         Self::handler().with(|handler| handler.take().unwrap_or_else(default_handler::<Self>))
     }
+
     /// Set the handler for this event, returning the old handler.
     fn replace_handler<F: FnMut(&Self) + Sync + Send + 'static>(f: F) -> Box<Handler<Self>> {
         Self::handler().with(|handler| {
@@ -59,6 +63,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
                 .unwrap_or_else(default_handler::<Self>)
         })
     }
+
     /// Atomic combination of [`Self::take_handler`] and
     /// [`Self::replace_handler`]. Use this to add a new handler which runs
     /// after the previously registered handlers.
@@ -73,6 +78,7 @@ pub trait EventExt: sealed::Event + Sized + 'static {
         })
     }
 }
+
 impl<T: sealed::Event + 'static> EventExt for T {}
 
 macro_rules! impl_wifi_event {
@@ -91,7 +97,7 @@ macro_rules! impl_wifi_event {
             }
         }
     };
-    // data
+
     ($newtype:ident, $data:ident) => {
         use esp_wifi_sys::include::$data;
         /// See [`WifiEvent`].
@@ -355,7 +361,7 @@ impl StaBssRssiLow {
 }
 
 impl ActionTxStatus {
-    /// Get WiFi interface to send request to.
+    /// Get Wi-Fi interface to send request to.
     pub fn ifx(&self) -> u32 {
         self.0.ifx
     }
@@ -384,7 +390,7 @@ impl RocDone {
 }
 
 impl ApWpsRgSuccess {
-    /// Gegt enrollee mac address.
+    /// Get enrollee mac address.
     pub fn peer_mac(&self) -> &[u8] {
         &self.0.peer_macaddr
     }
@@ -396,14 +402,14 @@ impl ApWpsRgFailed {
         self.0.reason
     }
 
-    /// Gegt enrollee mac address.
+    /// Get enrollee mac address.
     pub fn peer_macaddr(&self) -> &[u8; 6] {
         &self.0.peer_macaddr
     }
 }
 
 impl ApWpsRgPin {
-    /// Get the  PIN code of station in enrollee mode.
+    /// Get the PIN code of station in enrollee mode.
     pub fn pin_code(&self) -> &[u8] {
         &self.0.pin_code
     }
@@ -414,17 +420,17 @@ cfg_if::cfg_if! {
         use crate::wifi::include::wifi_twt_setup_config_t;
 
         impl ItwtSetup {
-            /// Get the itwt setup config, this value is determined by the AP.
+            /// Get the ITWT setup config, this value is determined by the AP.
             pub fn config(&self) -> &wifi_twt_setup_config_t {
                 &self.0.config
             }
 
-            /// Get the itwt setup status, 1 indicates success, others indicate setup failure.
+            /// Get the ITWT setup status, 1 indicates success, others indicate setup failure.
             pub fn status(&self) -> i32 {
                 self.0.status
             }
 
-            /// Get the itwt setup frame tx fail reason.
+            /// Get the ITWT setup frame tx fail reason.
             pub fn reason(&self) -> u8 {
                 self.0.reason
             }
@@ -436,12 +442,12 @@ cfg_if::cfg_if! {
         }
 
         impl ItwtTeardown {
-            /// Get flow id.
+            /// Get flow ID.
             pub fn flow_id(&self) -> u8 {
                 self.0.flow_id
             }
 
-            /// Get itwt teardown status.
+            /// Get ITWT teardown status.
             pub fn status(&self) -> u32 {
                 self.0.status
             }
@@ -465,19 +471,19 @@ cfg_if::cfg_if! {
                 self.0.status
             }
 
-            /// Get bitmap of the suspended flow id.
+            /// Get bitmap of the suspended flow ID.
             pub fn flow_id_bitmap(&self) -> u8 {
                 self.0.flow_id_bitmap
             }
 
-            /// Get the actual suspend time for each flow id in milliseconds.
+            /// Get the actual suspend time for each flow ID in milliseconds.
             pub fn actual_suspend_time_ms(&self) -> &[u32] {
                 &self.0.actual_suspend_time_ms
             }
         }
 
         impl BtwtSetup {
-            /// Get the btwt setup status.
+            /// Get the BTWT setup status.
             pub fn status(&self) -> u32 {
                 self.0.status
             }
@@ -518,7 +524,7 @@ cfg_if::cfg_if! {
                 self.0.flow_type
             }
 
-            /// Get the btwt setup frame tx fail reason.
+            /// Get the BTWT setup frame tx fail reason.
             pub fn reason(&self) -> u8 {
                 self.0.reason
             }
@@ -530,7 +536,7 @@ cfg_if::cfg_if! {
         }
 
         impl BtwtTeardown {
-            /// Get the TWT id.
+            /// Get the TWT ID.
             pub fn id(&self) -> u8 {
                 self.0.btwt_id
             }
@@ -544,12 +550,12 @@ cfg_if::cfg_if! {
 }
 
 impl NanSvcMatch {
-    /// Get the Subscribe Service id.
+    /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
     }
 
-    /// Get the Publish Service id.
+    /// Get the Publish Service ID.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
@@ -566,12 +572,12 @@ impl NanSvcMatch {
 }
 
 impl NanReplied {
-    /// Get the Subscribe Service id.
+    /// Get the Subscribe Service ID.
     pub fn subscribe_id(&self) -> u8 {
         self.0.subscribe_id
     }
 
-    /// Get the Publish Service id.
+    /// Get the Publish Service ID.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
@@ -605,12 +611,12 @@ impl NanReceive {
 }
 
 impl NdpIndication {
-    /// Get Publish Id for NAN Service.
+    /// Get Publish ID for NAN Service.
     pub fn publish_id(&self) -> u8 {
         self.0.publish_id
     }
 
-    /// Get NDF instance id.
+    /// Get NDF instance ID.
     pub fn ndp_id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -637,7 +643,7 @@ impl NdpConfirm {
         self.0.status
     }
 
-    /// Get NDP instance id.
+    /// Get NDP instance ID.
     pub fn id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -669,7 +675,7 @@ impl NdpTerminated {
         self.0.reason
     }
 
-    /// Get NDP instance id.
+    /// Get NDP instance ID.
     pub fn id(&self) -> u8 {
         self.0.ndp_id
     }
@@ -713,6 +719,7 @@ impl StaNeighborRep {
         self.0.report_len
     }
 }
+
 /// Handle the given event using the registered event handlers.
 #[instability::unstable]
 pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
@@ -727,6 +734,7 @@ pub fn handle<Event: EventExt>(event_data: &Event) -> bool {
 }
 
 /// Handle an event given the raw pointers.
+///
 /// # Safety
 /// The pointer should be valid to cast to `Event`'s inner type (if it has one)
 pub(crate) unsafe fn handle_raw<Event: EventExt>(
@@ -744,6 +752,7 @@ pub(crate) unsafe fn handle_raw<Event: EventExt>(
 }
 
 /// Handle event regardless of its type.
+/// 
 /// # Safety
 /// Arguments should be self-consistent.
 #[rustfmt::skip]
