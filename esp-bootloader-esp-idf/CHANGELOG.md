@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - FlashRegion: The `capacity` methods implemented for `embedded_storage::ReadStorage` and `embedded_storage::nor_flash::ReadNorFlash` now return the same value (#3902)
 - Don't fail the build on long project names (#3905)
+- FlashRegion: Fix off-by-one bug when bounds checking
 
 ### Removed
 

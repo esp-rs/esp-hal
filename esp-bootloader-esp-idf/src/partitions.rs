@@ -514,7 +514,7 @@ where
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.contains(address + bytes.len() as u32 - 1) {
             return Err(Error::OutOfBounds);
         }
 
@@ -543,7 +543,7 @@ where
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.contains(address + bytes.len() as u32 - 1) {
             return Err(Error::OutOfBounds);
         }
 
@@ -579,7 +579,7 @@ where
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.contains(address + bytes.len() as u32 - 1) {
             return Err(Error::OutOfBounds);
         }
 
@@ -633,7 +633,7 @@ where
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address + bytes.len() as u32) {
+        if !self.contains(address + bytes.len() as u32 - 1) {
             return Err(Error::OutOfBounds);
         }
 
