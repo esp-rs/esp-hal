@@ -1764,7 +1764,7 @@ mod private {
     }
 }
 
-/// Provides methods for retrieving the Wi-Fi mode and MAC address.
+/// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
 pub enum WifiDeviceMode {
     /// Station mode.
