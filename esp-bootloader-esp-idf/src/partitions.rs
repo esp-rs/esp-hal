@@ -7,8 +7,6 @@
 //!
 //! For more information see <https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/partition-tables.html#built-in-partition-tables>
 
-use embedded_storage::Region;
-
 /// Maximum length of a partition table.
 pub const PARTITION_TABLE_MAX_LEN: usize = 0xC00;
 
@@ -493,11 +491,19 @@ impl<F> FlashRegion<'_, F> {
     pub fn partition_size(&self) -> usize {
         self.raw.len() as _
     }
+
+    fn range(&self) -> core::ops::RangeInclusive<u32> {
+        self.raw.offset()..=self.raw.offset() + self.raw.len()
+    }
+
+    fn in_range(&self, start: u32, len: usize) -> bool {
+        self.range().contains(&start) && self.range().contains(&(start + len as u32))
+    }
 }
 
 impl<F> embedded_storage::Region for FlashRegion<'_, F> {
     fn contains(&self, address: u32) -> bool {
-        address >= self.raw.offset() && address < self.raw.offset() + self.raw.len()
+        self.range().contains(&address)
     }
 }
 
@@ -510,11 +516,7 @@ where
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         let address = offset + self.raw.offset();
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32 - 1) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -539,11 +541,7 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32 - 1) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -575,11 +573,7 @@ where
     fn read(&mut self, offset: u32, bytes: &mut [u8]) -> Result<(), Self::Error> {
         let address = offset + self.raw.offset();
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32 - 1) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
@@ -609,11 +603,11 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address_from) {
+        if !self.range().contains(&address_from) {
             return Err(Error::OutOfBounds);
         }
 
-        if !self.contains(address_to) {
+        if !self.range().contains(&address_to) {
             return Err(Error::OutOfBounds);
         }
 
@@ -629,11 +623,7 @@ where
             return Err(Error::WriteProtected);
         }
 
-        if !self.contains(address) {
-            return Err(Error::OutOfBounds);
-        }
-
-        if !self.contains(address + bytes.len() as u32 - 1) {
+        if !self.in_range(address, bytes.len()) {
             return Err(Error::OutOfBounds);
         }
 
