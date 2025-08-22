@@ -124,7 +124,7 @@ pub fn build_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
     package_path: &Path,
-    out_path: &Path,
+    out_path: Option<&Path>,
 ) -> Result<()> {
     let chip = args.chip.unwrap();
 
@@ -160,7 +160,7 @@ pub fn build_examples(
                 chip,
                 &target,
                 example,
-                CargoAction::Build(out_path.to_path_buf()),
+                CargoAction::Build(out_path.map(|p| p.to_path_buf())),
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
@@ -177,7 +177,7 @@ pub fn build_examples(
                 chip,
                 &target,
                 example,
-                CargoAction::Build(out_path.to_path_buf()),
+                CargoAction::Build(out_path.map(|p| p.to_path_buf())),
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
