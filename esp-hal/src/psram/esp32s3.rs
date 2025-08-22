@@ -15,7 +15,7 @@ pub enum FlashFreq {
     #[default]
     FlashFreq80m  = 80,
     /// Flash frequency 120 MHz
-    /// This is not recommended, see https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html
+    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
     FlashFreq120m = 120,
 }
 
@@ -30,7 +30,7 @@ pub enum SpiRamFreq {
     /// PSRAM frequency 80 MHz
     Freq80m  = 80,
     /// PSRAM frequency 120 MHz
-    /// This is not recommended, see https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html
+    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
     Freq120m = 120,
 }
 
