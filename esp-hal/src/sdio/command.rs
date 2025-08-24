@@ -6,6 +6,7 @@ pub mod cmd53;
 mod crc;
 mod flag;
 mod fn_number;
+mod index;
 
 pub use block_mode::BlockMode;
 pub use cmd52::Cmd52;
@@ -13,3 +14,4 @@ pub use cmd53::Cmd53;
 pub use crc::Crc;
 pub use flag::{RawFlag, RwFlag};
 pub use fn_number::FunctionNumber;
+pub use index::CommandIndex;
