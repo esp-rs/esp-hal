@@ -1172,7 +1172,7 @@ impl<'d> Input<'d> {
     /// use esp_hal::gpio::{Input, InputConfig, Level};
     /// let pin = Input::new(peripherals.GPIO5, InputConfig::default());
     /// let level = pin.level();
-///
+    ///
     /// # {after_snippet}
     /// ```
     #[inline]
