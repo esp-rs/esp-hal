@@ -305,6 +305,9 @@ impl<'a> PartitionTable<'a> {
     #[cfg(not(feature = "std"))]
     /// Get the currently booted partition.
     pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+        // Read entry 0 from MMU to know which partition is mapped
+        //
+        // See <https://github.com/espressif/esp-idf/blob/758939caecb16e5542b3adfba0bc85025517db45/components/hal/mmu_hal.c#L124>
         cfg_if::cfg_if! {
             if #[cfg(feature = "esp32")] {
                 let paddr = unsafe {
