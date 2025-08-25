@@ -810,3 +810,89 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod storage_tests {
+    use embedded_storage::{ReadStorage, Storage};
+
+    use super::*;
+
+    struct MockFlash {
+        data: [u8; 0x10000],
+    }
+
+    impl MockFlash {
+        fn new() -> Self {
+            let mut data = [23u8; 0x10000];
+            data[PARTITION_TABLE_OFFSET as usize..][..PARTITION_TABLE_MAX_LEN as usize]
+                .copy_from_slice(include_bytes!("../testdata/single_factory_no_ota.bin"));
+            Self { data }
+        }
+    }
+
+    impl embedded_storage::Storage for MockFlash {
+        fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
+            self.data[offset as usize..][..bytes.len()].copy_from_slice(bytes);
+            Ok(())
+        }
+    }
+
+    impl embedded_storage::ReadStorage for MockFlash {
+        type Error = crate::partitions::Error;
+        fn read(&mut self, offset: u32, buffer: &mut [u8]) -> Result<(), Self::Error> {
+            let l = buffer.len();
+            buffer[..l].copy_from_slice(&self.data[offset as usize..][..l]);
+            Ok(())
+        }
+
+        fn capacity(&self) -> usize {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn can_read_write_all_of_nvs() {
+        let mut storage = MockFlash::new();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        assert_eq!(nvs_partition.raw.offset(), 36864);
+
+        assert_eq!(nvs_partition.capacity(), 24576);
+
+        let mut buffer = [0u8; 24576];
+        nvs_partition.read(0, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 23));
+        buffer.fill(42);
+        nvs_partition.write(0, &mut buffer).unwrap();
+        let mut buffer = [0u8; 24576];
+        nvs_partition.read(0, &mut buffer).unwrap();
+        assert!(buffer.iter().all(|v| *v == 42));
+    }
+
+    #[test]
+    fn cannot_read_write_more_than_partition_size() {
+        let mut storage = MockFlash::new();
+
+        let mut buffer = [0u8; PARTITION_TABLE_MAX_LEN];
+        let pt = read_partition_table(&mut storage, &mut buffer).unwrap();
+
+        let nvs = pt
+            .find_partition(PartitionType::Data(DataPartitionSubType::Nvs))
+            .unwrap()
+            .unwrap();
+        let mut nvs_partition = nvs.as_embedded_storage(&mut storage);
+        assert_eq!(nvs_partition.raw.offset(), 36864);
+
+        assert_eq!(nvs_partition.capacity(), 24576);
+
+        let mut buffer = [0u8; 24577];
+        assert!(nvs_partition.read(0, &mut buffer) == Err(Error::OutOfBounds));
+    }
+}
