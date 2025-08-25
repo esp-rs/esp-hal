@@ -10,7 +10,7 @@ bleps = { git = "https://github.com/bjoernQ/bleps", package = "bleps", rev = "a5
     "macros",
 ] }
 cfg-if = "1.0.0"
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-executor = "0.8.0"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [
     "panic-handler",
