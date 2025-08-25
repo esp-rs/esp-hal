@@ -4,48 +4,59 @@ use crate::peripherals::{EXTMEM, IO_MUX, SPI0, SPI1};
 const EXTMEM_ORIGIN: u32 = 0x3C000000;
 
 /// Frequency of flash memory
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum FlashFreq {
+    /// Flash frequency 20 MHz
     FlashFreq20m  = 20,
+    /// Flash frequency 40 MHz
     FlashFreq40m  = 40,
+    /// Flash frequency 80 MHz
     #[default]
     FlashFreq80m  = 80,
+    /// Flash frequency 120 MHz
+    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
     FlashFreq120m = 120,
 }
 
 /// Frequency of PSRAM memory
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(missing_docs)]
 pub enum SpiRamFreq {
+    /// PSRAM frequency 40 MHz
     #[default]
     Freq40m  = 40,
+    /// PSRAM frequency 80 MHz
     Freq80m  = 80,
+    /// PSRAM frequency 120 MHz
+    /// This is not recommended, see <https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-guides/flash_psram_config.html>
     Freq120m = 120,
 }
 
 /// Core timing configuration
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[allow(missing_docs)]
 pub enum SpiTimingConfigCoreClock {
+    /// Core clock 80 MHz
     #[default]
     SpiTimingConfigCoreClock80m  = 80,
+    /// Core clock 120 MHz
     SpiTimingConfigCoreClock120m = 120,
+    /// Core clock 160 MHz
     SpiTimingConfigCoreClock160m = 160,
+    /// Core clock 240 MHz
     SpiTimingConfigCoreClock240m = 240,
 }
 
 /// PSRAM configuration
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PsramConfig {
     /// PSRAM size
     pub size: PsramSize,
     /// Core timing configuration
-    pub core_clock: SpiTimingConfigCoreClock,
+    pub core_clock: Option<SpiTimingConfigCoreClock>,
     /// Frequency of flash memory
     pub flash_frequency: FlashFreq,
     /// Frequency of PSRAM memory
@@ -58,6 +69,27 @@ pub struct PsramConfig {
 #[procmacros::ram]
 pub(crate) fn init_psram(config: PsramConfig) {
     let mut config = config;
+
+    if config.core_clock.is_none() {
+        cfg_if::cfg_if! {
+            if #[cfg(psram_mode_octal)] {
+                config.core_clock = Some(if config.ram_frequency == SpiRamFreq::Freq80m {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m
+                } else if config.ram_frequency == SpiRamFreq::Freq120m {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock240m
+                } else {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m
+                });
+            } else {
+                config.core_clock = Some( if config.ram_frequency == SpiRamFreq::Freq120m {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock120m
+                } else {
+                    SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m
+                });
+            }
+        }
+    }
+
     utils::psram_init(&mut config);
 
     const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
@@ -468,17 +500,17 @@ pub(crate) mod utils {
 
     #[ram]
     fn mspi_core_clock(config: &PsramConfig) -> SpiTimingConfigCoreClock {
-        config.core_clock
+        config.core_clock.unwrap_or_default()
     }
 
     #[ram]
     fn flash_clock_divider(config: &PsramConfig) -> u32 {
-        config.core_clock as u32 / config.flash_frequency as u32
+        config.core_clock.unwrap_or_default() as u32 / config.flash_frequency as u32
     }
 
     #[ram]
     fn psram_clock_divider(config: &PsramConfig) -> u32 {
-        config.core_clock as u32 / config.ram_frequency as u32
+        config.core_clock.unwrap_or_default() as u32 / config.ram_frequency as u32
     }
 
     // send reset command to psram, in spi mode
@@ -1264,14 +1296,11 @@ pub(crate) mod utils {
     // This function should always be called after `spi_timing_flash_tuning` or
     // `calculate_best_flash_tuning_config`
     fn spi_timing_enter_mspi_high_speed_mode(control_spi1: bool, config: &PsramConfig) {
-        // spi_timing_config_core_clock_t core_clock = mspi_core_clock();
-        let core_clock = SpiTimingConfigCoreClock::SpiTimingConfigCoreClock80m;
-
         let flash_div: u32 = flash_clock_divider(config);
         let psram_div: u32 = psram_clock_divider(config);
 
         // Set SPI01 core clock
-        spi0_timing_config_set_core_clock(core_clock); // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
+        spi0_timing_config_set_core_clock(config.core_clock.unwrap_or_default()); // SPI0 and SPI1 share the register for core clock. So we only set SPI0 here.
         // Set FLASH module clock
         spi0_timing_config_set_flash_clock(flash_div);
         if control_spi1 {
@@ -1627,11 +1656,11 @@ pub(crate) mod utils {
 
     #[ram]
     fn flash_clock_divider(config: &PsramConfig) -> u32 {
-        config.core_clock as u32 / config.flash_frequency as u32
+        config.core_clock.unwrap_or_default() as u32 / config.flash_frequency as u32
     }
 
     #[ram]
     fn psram_clock_divider(config: &PsramConfig) -> u32 {
-        config.core_clock as u32 / config.ram_frequency as u32
+        config.core_clock.unwrap_or_default() as u32 / config.ram_frequency as u32
     }
 }

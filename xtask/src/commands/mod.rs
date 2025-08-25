@@ -129,7 +129,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
 
     // Execute the specified action:
     match action {
-        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, &out_path),
+        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, out_path.as_ref().map(|p| p.as_path())),
         CargoAction::Run => run_examples(args, examples, &package_path),
     }
 }

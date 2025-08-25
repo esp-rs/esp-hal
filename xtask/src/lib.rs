@@ -452,23 +452,25 @@ pub fn execute_app(
     };
 
     if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, &cwd, env_vars, false)?;
+        if let Some(out_dir) = out_dir {
+            cargo::run_with_env(&args, &cwd, env_vars, false)?;
 
-        // Now that the build has succeeded and we printed the output, we can
-        // rerun the build again quickly enough to capture JSON. We'll use this to
-        // copy the binary to the output directory.
-        builder.add_arg("--message-format=json");
-        let args = builder.build();
+            // Now that the build has succeeded and we printed the output, we can
+            // rerun the build again quickly enough to capture JSON. We'll use this to
+            // copy the binary to the output directory.
+            builder.add_arg("--message-format=json");
+            let args = builder.build();
 
-        let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
-        for line in output.lines() {
-            if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(chip.to_string());
-                std::fs::create_dir_all(&out_dir)?;
+            let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
+            for line in output.lines() {
+                if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
+                    let out_dir = out_dir.join(chip.to_string());
+                    std::fs::create_dir_all(&out_dir)?;
 
-                let output_file = out_dir.join(app.output_file_name());
-                std::fs::copy(artifact.executable, &output_file)?;
-                log::info!("Output ready: {}", output_file.display());
+                    let output_file = out_dir.join(app.output_file_name());
+                    std::fs::copy(artifact.executable, &output_file)?;
+                    log::info!("Output ready: {}", output_file.display());
+                }
             }
         }
     } else {
