@@ -66,6 +66,8 @@ fn main() -> ! {
         println!("{:?}", pt.get_partition(i));
     }
 
+    println!("Currently booted partition {:?}", pt.booted_partition());
+
     // Find the OTA-data partition and show the currently active partition
     let ota_part = pt
         .find_partition(esp_bootloader_esp_idf::partitions::PartitionType::Data(
