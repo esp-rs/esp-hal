@@ -92,29 +92,11 @@ pub(crate) fn init_psram(config: PsramConfig) {
 
     utils::psram_init(&mut config);
 
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE: u32 = 0x4000;
-    const CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS: u8 = 8;
-    const CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE: u8 = 32;
-    const CONFIG_ESP32S3_DATA_CACHE_SIZE: u32 = 0x8000;
-    const CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS: u8 = 8;
-    const CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE: u8 = 32;
     const MMU_ACCESS_SPIRAM: u32 = 1 << 15;
     const START_PAGE: u32 = 0;
 
     unsafe extern "C" {
-        fn rom_config_instruction_cache_mode(
-            cfg_cache_size: u32,
-            cfg_cache_ways: u8,
-            cfg_cache_line_size: u8,
-        );
-
         fn Cache_Suspend_DCache();
-
-        fn rom_config_data_cache_mode(
-            cfg_cache_size: u32,
-            cfg_cache_ways: u8,
-            cfg_cache_line_size: u8,
-        );
 
         fn Cache_Resume_DCache(param: u32);
 
@@ -164,22 +146,8 @@ pub(crate) fn init_psram(config: PsramConfig) {
         let start = EXTMEM_ORIGIN + (MMU_PAGE_SIZE * mapped_pages);
         debug!("PSRAM start address = {:x}", start);
 
-        // Configure the mode of instruction cache : cache size, cache line size.
-        rom_config_instruction_cache_mode(
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_SIZE,
-            CONFIG_ESP32S3_ICACHE_ASSOCIATED_WAYS,
-            CONFIG_ESP32S3_INSTRUCTION_CACHE_LINE_SIZE,
-        );
-
-        // If we need use SPIRAM, we should use data cache.Configure the mode of data :
-        // cache size, cache line size.
+        // If we need use SPIRAM, we should use data cache.
         Cache_Suspend_DCache();
-
-        rom_config_data_cache_mode(
-            CONFIG_ESP32S3_DATA_CACHE_SIZE,
-            CONFIG_ESP32S3_DCACHE_ASSOCIATED_WAYS,
-            CONFIG_ESP32S3_DATA_CACHE_LINE_SIZE,
-        );
 
         let cache_dbus_mmu_set_res = cache_dbus_mmu_set(
             MMU_ACCESS_SPIRAM,

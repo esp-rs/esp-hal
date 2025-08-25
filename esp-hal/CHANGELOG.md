@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::{AesBackend, AesContext, dma::AesDmaBackend}`: Work-queue based AES driver (#3880, #3897)
 - `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
+- Expose cache line configuration (#3946)
 
 ### Changed
 
