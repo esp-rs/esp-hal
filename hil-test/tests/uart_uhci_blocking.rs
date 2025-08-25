@@ -6,14 +6,14 @@
 #![no_std]
 #![no_main]
 
+use esp_hal::dma::DmaRxBuf;
+use esp_hal::dma::DmaTxBuf;
+use esp_hal::dma_buffers;
+use esp_hal::uart::uhci::Uhci;
 use esp_hal::{
     Blocking,
     uart::{self, Uart},
 };
-use esp_hal::uart::uhci::Uhci;
-use esp_hal::dma::DmaTxBuf;
-use esp_hal::dma::DmaRxBuf;
-use esp_hal::dma_buffers;
 
 use hil_test as _;
 
@@ -63,13 +63,19 @@ mod tests {
         const SEND: &[u8] = b"Hello ESP32";
         ctx.dma_tx.as_mut_slice()[0..SEND.len()].copy_from_slice(&SEND);
         ctx.dma_tx.set_length(SEND.len());
-        let transfer = ctx
-            .uhci
-            .read_write_transfer(ctx.dma_rx, ctx.dma_tx)
+
+        let (uhci_rx, uhci_tx) = ctx.uhci.split();
+        let transfer_rx = uhci_rx
+            .read(ctx.dma_rx)
             .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-        let (res, _uhci, dma_rx, _dma_tx) = transfer.wait();
+        let transfer_tx = uhci_tx
+            .write(ctx.dma_tx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        let (res, _uhci_tx, _dma_tx) = transfer_tx.wait();
         res.unwrap();
-        
+        let (res, _uhci_rx, dma_rx) = transfer_rx.wait();
+        res.unwrap();
+
         assert_eq!(
             &dma_rx.as_slice()[0..dma_rx.number_of_received_bytes()],
             SEND
@@ -82,11 +88,17 @@ mod tests {
         ctx.dma_tx.as_mut_slice()[0..LONG_TEST_STRING.len()]
             .copy_from_slice(&LONG_TEST_STRING.as_bytes());
         ctx.dma_tx.set_length(LONG_TEST_STRING.len());
-        let transfer = ctx
-            .uhci
-            .read_write_transfer(ctx.dma_rx, ctx.dma_tx)
+
+        let (uhci_rx, uhci_tx) = ctx.uhci.split();
+        let transfer_rx = uhci_rx
+            .read(ctx.dma_rx)
             .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-        let (res, _uhci, dma_rx, _dma_tx) = transfer.wait();
+        let transfer_tx = uhci_tx
+            .write(ctx.dma_tx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        let (res, _uhci_tx, _dma_tx) = transfer_tx.wait();
+        res.unwrap();
+        let (res, _uhci_rx, dma_rx) = transfer_rx.wait();
         res.unwrap();
 
         assert_eq!(
