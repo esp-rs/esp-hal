@@ -1328,13 +1328,13 @@ pub enum InternalWifiError {
     /// Invalid argument
     InvalidArg       = 0x102,
 
-    /// Wi-Fi driver was not installed by esp_wifi_init
+    /// Wi-Fi driver was not installed by [esp_wifi_init](crate::binary::include::esp_wifi_init)
     NotInit          = 0x3001,
 
-    /// Wi-Fi driver was not started by esp_wifi_start
+    /// Wi-Fi driver was not started by [esp_wifi_start]
     NotStarted       = 0x3002,
 
-    /// Wi-Fi driver was not stopped by esp_wifi_stop
+    /// Wi-Fi driver was not stopped by [esp_wifi_stop]
     NotStopped       = 0x3003,
 
     /// Wi-Fi interface error
