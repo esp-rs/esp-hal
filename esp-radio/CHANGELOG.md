@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
 - Update bt-hci version to add additional HCI commands (#3920)
+- A number of enums/structs have been marked as `#[non_exhaustive]` (#3981)
+  - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, and `WifiState`
 
 ### Fixed
 
