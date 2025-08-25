@@ -56,3 +56,9 @@ jobs:
               --body "Nightly CI Workflow Failed! [View the failed job](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})." \
               --label "ci-nightly"
           fi
+
+      # Check for unused dependencies through esp-hal packages
+      - name: Install and run cargo machete
+        run: |
+          cargo install cargo-machete
+          cargo xtask check-unused-deps --toolchain nightly

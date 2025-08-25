@@ -13,7 +13,8 @@
 //! // let esp_radio_controller = esp_radio::init().unwrap();
 //! # }
 //! ```
-
+//! ## Feature Flags
+#![doc = document_features::document_features!()]
 #![no_std]
 #![cfg_attr(xtensa, feature(asm_experimental_arch))]
 
