@@ -19,126 +19,69 @@ use crate::{
         },
     },
     efuse::Efuse,
-    peripherals::TIMG0,
+    peripherals::{LP_AON, LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU, TIMG0},
     rtc_cntl::RtcClock,
     soc::regi2c,
     time::Rate,
 };
 
-unsafe fn pmu<'a>() -> &'a esp32c6::pmu::RegisterBlock {
-    unsafe { &*esp32c6::PMU::ptr() }
-}
-
-unsafe fn modem_lpcon<'a>() -> &'a esp32c6::modem_lpcon::RegisterBlock {
-    unsafe { &*esp32c6::MODEM_LPCON::ptr() }
-}
-
-unsafe fn modem_syscon<'a>() -> &'a esp32c6::modem_syscon::RegisterBlock {
-    unsafe { &*esp32c6::MODEM_SYSCON::ptr() }
-}
-
-unsafe fn lp_clkrst<'a>() -> &'a esp32c6::lp_clkrst::RegisterBlock {
-    unsafe { &*esp32c6::LP_CLKRST::ptr() }
-}
-
-unsafe fn pcr<'a>() -> &'a esp32c6::pcr::RegisterBlock {
-    unsafe { &*esp32c6::PCR::ptr() }
-}
-
-unsafe fn lp_aon<'a>() -> &'a esp32c6::lp_aon::RegisterBlock {
-    unsafe { &*esp32c6::LP_AON::ptr() }
-}
-
 fn pmu_power_domain_force_default() {
-    unsafe {
-        // for bypass reserved power domain
+    // for bypass reserved power domain
 
-        // PMU_HP_PD_TOP
-        pmu().power_pd_top_cntl().modify(|_, w| {
-            w.force_top_reset() // pmu_ll_hp_set_power_force_reset
-                .bit(false)
-                .force_top_iso() // pmu_ll_hp_set_power_force_isolate
-                .bit(false)
-                .force_top_pu() // pmu_ll_hp_set_power_force_power_up
-                .bit(false)
-                .force_top_no_reset() // pmu_ll_hp_set_power_force_no_reset
-                .bit(false)
-                .force_top_no_iso() // pmu_ll_hp_set_power_force_no_isolate
-                .bit(false)
-                .force_top_pd() // pmu_ll_hp_set_power_force_power_down
-                .bit(false)
-        });
+    // PMU_HP_PD_TOP
+    PMU::regs().power_pd_top_cntl().modify(|_, w| {
+        w.force_top_reset().bit(false); // pmu_ll_hp_set_power_force_reset
+        w.force_top_iso().bit(false); // pmu_ll_hp_set_power_force_isolate
+        w.force_top_pu().bit(false); // pmu_ll_hp_set_power_force_power_up
+        w.force_top_no_reset().bit(false); // pmu_ll_hp_set_power_force_no_reset
+        w.force_top_no_iso().bit(false); // pmu_ll_hp_set_power_force_no_isolate
+        w.force_top_pd().bit(false) // pmu_ll_hp_set_power_force_power_down
+    });
 
-        // PMU_HP_PD_HP_AON
-        pmu().power_pd_hpaon_cntl().modify(|_, w| {
-            w.force_hp_aon_reset() // pmu_ll_hp_set_power_force_reset
-                .bit(false)
-                .force_hp_aon_iso() // pmu_ll_hp_set_power_force_isolate
-                .bit(false)
-                .force_hp_aon_pu() // pmu_ll_hp_set_power_force_power_up
-                .bit(false)
-                .force_hp_aon_no_reset() // pmu_ll_hp_set_power_force_no_reset
-                .bit(false)
-                .force_hp_aon_no_iso() // pmu_ll_hp_set_power_force_no_isolate
-                .bit(false)
-                .force_hp_aon_pd() // pmu_ll_hp_set_power_force_power_down
-                .bit(false)
-        });
+    // PMU_HP_PD_HP_AON
+    PMU::regs().power_pd_hpaon_cntl().modify(|_, w| {
+        w.force_hp_aon_reset().bit(false); // pmu_ll_hp_set_power_force_reset
+        w.force_hp_aon_iso().bit(false); // pmu_ll_hp_set_power_force_isolate
+        w.force_hp_aon_pu().bit(false); // pmu_ll_hp_set_power_force_power_up
+        w.force_hp_aon_no_reset().bit(false); // pmu_ll_hp_set_power_force_no_reset
+        w.force_hp_aon_no_iso().bit(false); // pmu_ll_hp_set_power_force_no_isolate
+        w.force_hp_aon_pd().bit(false) // pmu_ll_hp_set_power_force_power_down
+    });
 
-        // PMU_HP_PD_CPU
-        pmu().power_pd_hpcpu_cntl().modify(|_, w| {
-            w.force_hp_cpu_reset() // pmu_ll_hp_set_power_force_reset
-                .bit(false)
-                .force_hp_cpu_iso() // pmu_ll_hp_set_power_force_isolate
-                .bit(false)
-                .force_hp_cpu_pu() // pmu_ll_hp_set_power_force_power_up
-                .bit(false)
-                .force_hp_cpu_no_reset() // pmu_ll_hp_set_power_force_no_reset
-                .bit(false)
-                .force_hp_cpu_no_iso() // pmu_ll_hp_set_power_force_no_isolate
-                .bit(false)
-                .force_hp_cpu_pd() // pmu_ll_hp_set_power_force_power_down
-                .bit(false)
-        });
+    // PMU_HP_PD_CPU
+    PMU::regs().power_pd_hpcpu_cntl().modify(|_, w| {
+        w.force_hp_cpu_reset().bit(false); // pmu_ll_hp_set_power_force_reset
+        w.force_hp_cpu_iso().bit(false); // pmu_ll_hp_set_power_force_isolate
+        w.force_hp_cpu_pu().bit(false); // pmu_ll_hp_set_power_force_power_up
+        w.force_hp_cpu_no_reset().bit(false); // pmu_ll_hp_set_power_force_no_reset
+        w.force_hp_cpu_no_iso().bit(false); // pmu_ll_hp_set_power_force_no_isolate
+        w.force_hp_cpu_pd().bit(false) // pmu_ll_hp_set_power_force_power_down
+    });
 
-        // PMU_HP_PD_WIFI
-        pmu().power_pd_hpwifi_cntl().modify(|_, w| {
-            w.force_hp_wifi_reset() // pmu_ll_hp_set_power_force_reset
-                .bit(false)
-                .force_hp_wifi_iso() // pmu_ll_hp_set_power_force_isolate
-                .bit(false)
-                .force_hp_wifi_pu() // pmu_ll_hp_set_power_force_power_up
-                .bit(false)
-                .force_hp_wifi_no_reset() // pmu_ll_hp_set_power_force_no_reset
-                .bit(false)
-                .force_hp_wifi_no_iso() // pmu_ll_hp_set_power_force_no_isolate
-                .bit(false)
-                .force_hp_wifi_pd() // pmu_ll_hp_set_power_force_power_down
-                .bit(false)
-        });
+    // PMU_HP_PD_WIFI
+    PMU::regs().power_pd_hpwifi_cntl().modify(|_, w| {
+        w.force_hp_wifi_reset().bit(false); // pmu_ll_hp_set_power_force_reset
+        w.force_hp_wifi_iso().bit(false); // pmu_ll_hp_set_power_force_isolate
+        w.force_hp_wifi_pu().bit(false); // pmu_ll_hp_set_power_force_power_up
+        w.force_hp_wifi_no_reset().bit(false); // pmu_ll_hp_set_power_force_no_reset
+        w.force_hp_wifi_no_iso().bit(false); // pmu_ll_hp_set_power_force_no_isolate
+        w.force_hp_wifi_pd().bit(false) // pmu_ll_hp_set_power_force_power_down
+    });
 
-        // Isolate all memory banks while sleeping, avoid memory leakage current
+    // Isolate all memory banks while sleeping, avoid memory leakage current
 
-        pmu().power_pd_mem_cntl().modify(|_, w| {
-            w.force_hp_mem_no_iso() // pmu_ll_hp_set_memory_no_isolate
-                .bits(0)
-        });
+    PMU::regs().power_pd_mem_cntl().modify(|_, w| unsafe {
+        w.force_hp_mem_no_iso().bits(0) // pmu_ll_hp_set_memory_no_isolate
+    });
 
-        pmu().power_pd_lpperi_cntl().modify(|_, w| {
-            w.force_lp_peri_reset() // pmu_ll_lp_set_power_force_reset
-                .bit(false)
-                .force_lp_peri_iso() // pmu_ll_lp_set_power_force_isolate
-                .bit(false)
-                .force_lp_peri_pu() // pmu_ll_lp_set_power_force_power_up
-                .bit(false)
-                .force_lp_peri_no_reset() // pmu_ll_lp_set_power_force_no_reset
-                .bit(false)
-                .force_lp_peri_no_iso() // pmu_ll_lp_set_power_force_no_isolate
-                .bit(false)
-                .force_lp_peri_pd() // pmu_ll_lp_set_power_force_power_down
-                .bit(false)
-        });
-    };
+    PMU::regs().power_pd_lpperi_cntl().modify(|_, w| {
+        w.force_lp_peri_reset().bit(false); // pmu_ll_lp_set_power_force_reset
+        w.force_lp_peri_iso().bit(false); // pmu_ll_lp_set_power_force_isolate
+        w.force_lp_peri_pu().bit(false); // pmu_ll_lp_set_power_force_power_up
+        w.force_lp_peri_no_reset().bit(false); // pmu_ll_lp_set_power_force_no_reset
+        w.force_lp_peri_no_iso().bit(false); // pmu_ll_lp_set_power_force_no_isolate
+        w.force_lp_peri_pd().bit(false) // pmu_ll_lp_set_power_force_power_down
+    });
 }
 
 fn modem_clock_domain_power_state_icg_map_init() {
@@ -148,35 +91,29 @@ fn modem_clock_domain_power_state_icg_map_init() {
     const ICG_NOGATING_MODEM: u8 = 1 << 1;
     const ICG_NOGATING_ACTIVE: u8 = 1 << 2;
 
+    const ICG_NOGATING_ACTIVE_MODEM: u8 = ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM;
+
     // the ICG code's bit 0, 1 and 2 indicates the ICG state
     // of pmu SLEEP, MODEM and ACTIVE mode respectively
-    unsafe {
-        modem_syscon().clk_conf_power_st().modify(|_, w| {
-            w.clk_modem_apb_st_map() // modem_syscon_ll_set_modem_apb_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_modem_peri_st_map() // modem_syscon_ll_set_modem_periph_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE)
-                .clk_wifi_st_map() // modem_syscon_ll_set_wifi_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_bt_st_map() // modem_syscon_ll_set_bt_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_fe_st_map() // modem_syscon_ll_set_fe_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_zb_st_map() // modem_syscon_ll_set_ieee802154_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+    MODEM_SYSCON::regs()
+        .clk_conf_power_st()
+        .modify(|_, w| unsafe {
+            w.clk_modem_apb_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_syscon_ll_set_modem_apb_icg_bitmap
+            w.clk_modem_peri_st_map().bits(ICG_NOGATING_ACTIVE); // modem_syscon_ll_set_modem_periph_icg_bitmap
+            w.clk_wifi_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_syscon_ll_set_wifi_icg_bitmap
+            w.clk_bt_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_syscon_ll_set_bt_icg_bitmap
+            w.clk_fe_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_syscon_ll_set_fe_icg_bitmap
+            w.clk_zb_st_map().bits(ICG_NOGATING_ACTIVE_MODEM) // modem_syscon_ll_set_ieee802154_icg_bitmap
         });
 
-        modem_lpcon().clk_conf_power_st().modify(|_, w| {
-            w.clk_lp_apb_st_map() // modem_lpcon_ll_set_lp_apb_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_i2c_mst_st_map() // modem_lpcon_ll_set_i2c_master_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_coex_st_map() // modem_lpcon_ll_set_coex_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
-                .clk_wifipwr_st_map() // modem_lpcon_ll_set_wifipwr_icg_bitmap
-                .bits(ICG_NOGATING_ACTIVE | ICG_NOGATING_MODEM)
+    MODEM_LPCON::regs()
+        .clk_conf_power_st()
+        .modify(|_, w| unsafe {
+            w.clk_lp_apb_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_lpcon_ll_set_lp_apb_icg_bitmap
+            w.clk_i2c_mst_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_lpcon_ll_set_i2c_master_icg_bitmap
+            w.clk_coex_st_map().bits(ICG_NOGATING_ACTIVE_MODEM); // modem_lpcon_ll_set_coex_icg_bitmap
+            w.clk_wifipwr_st_map().bits(ICG_NOGATING_ACTIVE_MODEM) // modem_lpcon_ll_set_wifipwr_icg_bitmap
         });
-    }
 }
 
 enum RtcSlowClockSource {
@@ -199,8 +136,7 @@ enum RtcSlowClockSource {
 impl RtcSlowClockSource {
     fn current() -> Self {
         // clk_ll_rtc_slow_get_src()
-        let lp_clkrst = unsafe { lp_clkrst() };
-        match lp_clkrst.lp_clk_conf().read().slow_clk_sel().bits() {
+        match LP_CLKRST::regs().lp_clk_conf().read().slow_clk_sel().bits() {
             0 => Self::RcSlow,
             1 => Self::XTAL32K,
             2 => Self::RC32K,
@@ -233,23 +169,18 @@ impl From<RtcSlowClockSource> for ModemClockLpclkSource {
 }
 
 fn modem_clock_hal_deselect_all_wifi_lpclk_source() {
-    unsafe {
-        modem_lpcon().wifi_lp_clk_conf().modify(|_, w| {
-            w.clk_wifipwr_lp_sel_osc_slow()
-                .clear_bit()
-                .clk_wifipwr_lp_sel_osc_fast()
-                .clear_bit()
-                .clk_wifipwr_lp_sel_xtal32k()
-                .clear_bit()
-                .clk_wifipwr_lp_sel_xtal()
-                .clear_bit()
-        });
-    }
+    MODEM_LPCON::regs().wifi_lp_clk_conf().modify(|_, w| {
+        w.clk_wifipwr_lp_sel_osc_slow().clear_bit();
+        w.clk_wifipwr_lp_sel_osc_fast().clear_bit();
+        w.clk_wifipwr_lp_sel_xtal32k().clear_bit();
+        w.clk_wifipwr_lp_sel_xtal().clear_bit()
+    });
 }
 
 fn modem_clock_hal_select_wifi_lpclk_source(src: ModemClockLpclkSource) {
-    unsafe {
-        modem_lpcon().wifi_lp_clk_conf().modify(|_, w| match src {
+    MODEM_LPCON::regs()
+        .wifi_lp_clk_conf()
+        .modify(|_, w| match src {
             ModemClockLpclkSource::RcSlow => w.clk_wifipwr_lp_sel_osc_slow().set_bit(),
             ModemClockLpclkSource::RcFast => w.clk_wifipwr_lp_sel_osc_fast().set_bit(),
             ModemClockLpclkSource::MainXtal => w.clk_wifipwr_lp_sel_xtal().set_bit(),
@@ -259,32 +190,31 @@ fn modem_clock_hal_select_wifi_lpclk_source(src: ModemClockLpclkSource) {
             | ModemClockLpclkSource::EXT32K => w.clk_wifipwr_lp_sel_xtal32k().set_bit(),
         });
 
-        modem_lpcon().modem_32k_clk_conf().modify(|_, w| match src {
-            ModemClockLpclkSource::RcSlow
-            | ModemClockLpclkSource::RcFast
-            | ModemClockLpclkSource::MainXtal => w,
+    MODEM_LPCON::regs()
+        .modem_32k_clk_conf()
+        .modify(|_, w| unsafe {
+            match src {
+                ModemClockLpclkSource::RcSlow
+                | ModemClockLpclkSource::RcFast
+                | ModemClockLpclkSource::MainXtal => w,
 
-            ModemClockLpclkSource::RC32K => w.clk_modem_32k_sel().bits(1),
-            ModemClockLpclkSource::XTAL32K => w.clk_modem_32k_sel().bits(0),
-            ModemClockLpclkSource::EXT32K => w.clk_modem_32k_sel().bits(2),
+                ModemClockLpclkSource::RC32K => w.clk_modem_32k_sel().bits(1),
+                ModemClockLpclkSource::XTAL32K => w.clk_modem_32k_sel().bits(0),
+                ModemClockLpclkSource::EXT32K => w.clk_modem_32k_sel().bits(2),
+            }
         });
-    }
 }
 
 fn modem_lpcon_ll_set_wifi_lpclk_divisor_value(divider: u16) {
-    unsafe {
-        modem_lpcon()
-            .wifi_lp_clk_conf()
-            .modify(|_, w| w.clk_wifipwr_lp_div_num().bits(divider));
-    }
+    MODEM_LPCON::regs()
+        .wifi_lp_clk_conf()
+        .modify(|_, w| unsafe { w.clk_wifipwr_lp_div_num().bits(divider) });
 }
 
 fn modem_clock_hal_enable_wifipwr_clock(enable: bool) {
-    unsafe {
-        modem_lpcon()
-            .clk_conf()
-            .modify(|_, w| w.clk_wifipwr_en().bit(enable));
-    }
+    MODEM_LPCON::regs()
+        .clk_conf()
+        .modify(|_, w| w.clk_wifipwr_en().bit(enable));
 }
 
 // PHY, BT, IEEE802154 are not used by the init code so they are unimplemented
@@ -537,19 +467,19 @@ macro_rules! hp_system_init {
         paste::paste! {
             unsafe {
                 // Default configuration of hp-system power in active, modem and sleep modes
-                pmu().[<$state _dig_power >]().modify(|_, w| w.bits($s.power.dig_power.0));
-                pmu().[<$state _hp_ck_power >]().modify(|_, w| w.bits($s.power.clk.0));
-                pmu().[<$state _xtal >]().modify(|_, w| w
+                PMU::regs().[<$state _dig_power >]().modify(|_, w| w.bits($s.power.dig_power.0));
+                PMU::regs().[<$state _hp_ck_power >]().modify(|_, w| w.bits($s.power.clk.0));
+                PMU::regs().[<$state _xtal >]().modify(|_, w| w
                     .[<$state _xpd_xtal >]().bit($s.power.xtal.xpd_xtal())
                 );
 
                 // Default configuration of hp-system clock in active, modem and sleep modes
-                pmu().[<$state _icg_hp_func >]().write(|w| w.bits($s.clock.icg_func));
-                pmu().[<$state _icg_hp_apb >]().write(|w| w.bits($s.clock.icg_apb));
-                pmu().[<$state _icg_modem >]().write(|w| w
+                PMU::regs().[<$state _icg_hp_func >]().write(|w| w.bits($s.clock.icg_func));
+                PMU::regs().[<$state _icg_hp_apb >]().write(|w| w.bits($s.clock.icg_apb));
+                PMU::regs().[<$state _icg_modem >]().write(|w| w
                     .[<$state _dig_icg_modem_code >]().bits($s.clock.icg_modem.code())
                 );
-                pmu().[<$state _sysclk >]().modify(|_, w| w
+                PMU::regs().[<$state _sysclk >]().modify(|_, w| w
                     .[<$state _dig_sys_clk_no_div >]().bit($s.clock.sysclk.dig_sysclk_nodiv())
                     .[<$state _icg_sys_clock_en >]().bit($s.clock.sysclk.icg_sysclk_en())
                     .[<$state _sys_clk_slp_sel >]().bit($s.clock.sysclk.sysclk_slp_sel())
@@ -559,7 +489,7 @@ macro_rules! hp_system_init {
 
                 // Default configuration of hp-system digital sub-system in active, modem
                 // and sleep modes
-                pmu().[<$state _hp_sys_cntl >]().modify(|_, w| w
+                PMU::regs().[<$state _hp_sys_cntl >]().modify(|_, w| w
                     .[<$state _uart_wakeup_en >]().bit($s.syscntl.uart_wakeup_en())
                     .[<$state _lp_pad_hold_all >]().bit($s.syscntl.lp_pad_hold_all())
                     .[<$state _hp_pad_hold_all >]().bit($s.syscntl.hp_pad_hold_all())
@@ -570,14 +500,14 @@ macro_rules! hp_system_init {
 
                 // Default configuration of hp-system analog sub-system in active, modem and
                 // sleep modes
-                pmu().[<$state _bias >]().modify(|_, w| w
+                PMU::regs().[<$state _bias >]().modify(|_, w| w
                     .[<$state _xpd_bias >]().bit($s.anlg.bias.xpd_bias())
                     .[<$state _dbg_atten >]().bits($s.anlg.bias.dbg_atten())
                     .[<$state _pd_cur >]().bit($s.anlg.bias.pd_cur())
                     .sleep().bit($s.anlg.bias.bias_sleep())
                 );
 
-                pmu().[<$state _hp_regulator0 >]().modify(|_, w| w
+                PMU::regs().[<$state _hp_regulator0 >]().modify(|_, w| w
                     .[<$state _hp_regulator_slp_mem_xpd >]().bit($s.anlg.regulator0.slp_mem_xpd())
                     .[<$state _hp_regulator_slp_logic_xpd >]().bit($s.anlg.regulator0.slp_logic_xpd())
                     .[<$state _hp_regulator_xpd >]().bit($s.anlg.regulator0.xpd())
@@ -586,14 +516,14 @@ macro_rules! hp_system_init {
                     .[<$state _hp_regulator_dbias >]().bits($s.anlg.regulator0.dbias())
                 );
 
-                pmu().[<$state _hp_regulator1 >]().modify(|_, w| w
+                PMU::regs().[<$state _hp_regulator1 >]().modify(|_, w| w
                     .[<$state _hp_regulator_drv_b >]().bits($s.anlg.regulator1.drv_b())
                 );
 
                 // Default configuration of hp-system retention sub-system in active, modem
                 // and sleep modes
-                pmu().[<$state _backup >]().write(|w| w.bits($s.retention));
-                pmu().[<$state _backup_clk >]().write(|w| w.bits($s.backup_clk));
+                PMU::regs().[<$state _backup >]().write(|w| w.bits($s.retention));
+                PMU::regs().[<$state _backup_clk >]().write(|w| w.bits($s.backup_clk));
             }
         }
     };
@@ -884,15 +814,15 @@ impl HpSystemInit {
 
         unsafe {
             // Some PMU initial parameter configuration
-            pmu()
+            PMU::regs()
                 .imm_modem_icg()
                 .write(|w| w.update_dig_icg_modem_en().bit(true));
-            pmu()
+            PMU::regs()
                 .imm_sleep_sysclk()
                 .write(|w| w.update_dig_icg_switch().bit(true));
 
             const PMU_SLEEP_PROTECT_HP_LP_SLEEP: u8 = 2;
-            pmu()
+            PMU::regs()
                 .slp_wakeup_cntl3()
                 .modify(|_, w| w.sleep_prt_sel().bits(PMU_SLEEP_PROTECT_HP_LP_SLEEP));
         }
@@ -981,18 +911,18 @@ macro_rules! lp_system_init {
         paste::paste! {
             unsafe {
                 // Default configuration of lp-system power in active and sleep modes
-                pmu().[< $state _dig_power >]().modify(|_, w| w.bits($s.dig_power.0));
-                pmu().[< $state _ck_power >]().modify(|_, w| w.bits($s.clk_power.0));
+                PMU::regs().[< $state _dig_power >]().modify(|_, w| w.bits($s.dig_power.0));
+                PMU::regs().[< $state _ck_power >]().modify(|_, w| w.bits($s.clk_power.0));
 
                 // Default configuration of lp-system analog sub-system in active and sleep modes
-                pmu().[< $state _regulator0 >]().modify(|_, w| w
+                PMU::regs().[< $state _regulator0 >]().modify(|_, w| w
                     .[< $state _regulator_slp_xpd >]().bit($s.analog_regulator0.slp_xpd())
                     .[< $state _regulator_xpd >]().bit($s.analog_regulator0.xpd())
                     .[< $state _regulator_slp_dbias >]().bits($s.analog_regulator0.slp_dbias())
                     .[< $state _regulator_dbias >]().bits($s.analog_regulator0.dbias())
                 );
 
-                pmu().[< $state _regulator1 >]().modify(|_, w| w
+                PMU::regs().[< $state _regulator1 >]().modify(|_, w| w
                     .[< $state _regulator_drv_b >]().bits($s.analog_regulator1.drv_b())
                 );
             }
@@ -1084,30 +1014,23 @@ impl LpSystemInit {
         lp_system_init!(hp_sleep_lp => active);
         lp_system_init!(lp_sleep_lp => sleep);
 
-        unsafe {
-            pmu()
-                .lp_sleep_xtal()
-                .modify(|_, w| w.lp_sleep_xpd_xtal().bit(sleep.xtal.xpd_xtal()));
+        PMU::regs()
+            .lp_sleep_xtal()
+            .modify(|_, w| w.lp_sleep_xpd_xtal().bit(sleep.xtal.xpd_xtal()));
 
-            pmu().lp_sleep_bias().modify(|_, w| {
-                w.lp_sleep_xpd_bias() // pmu_ll_lp_set_bias_xpd
-                    .bit(sleep.bias.xpd_bias())
-                    .lp_sleep_dbg_atten() // pmu_ll_lp_set_bias_dbg_atten
-                    .bits(sleep.bias.dbg_atten())
-                    .lp_sleep_pd_cur() // pmu_ll_lp_set_bias_pd_cur
-                    .bit(sleep.bias.pd_cur())
-                    .sleep() // pmu_ll_lp_set_bias_sleep
-                    .bit(sleep.bias.bias_sleep())
-            });
-        }
+        PMU::regs().lp_sleep_bias().modify(|_, w| unsafe {
+            w.lp_sleep_xpd_bias().bit(sleep.bias.xpd_bias()); // pmu_ll_lp_set_bias_xpd
+            w.lp_sleep_dbg_atten().bits(sleep.bias.dbg_atten()); // pmu_ll_lp_set_bias_dbg_atten
+            w.lp_sleep_pd_cur().bit(sleep.bias.pd_cur()); // pmu_ll_lp_set_bias_pd_cur
+            w.sleep().bit(sleep.bias.bias_sleep()) // pmu_ll_lp_set_bias_sleep
+        });
     }
 }
 
 pub(crate) fn init() {
     // pmu_init()
-    let pmu = unsafe { pmu() };
-
-    pmu.rf_pwc()
+    PMU::regs()
+        .rf_pwc()
         .modify(|_, w| w.perif_i2c_rstb().set_bit().xpd_perif_i2c().set_bit());
 
     regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
@@ -1150,9 +1073,9 @@ pub(crate) fn configure_clock() {
         }
     };
 
-    unsafe {
-        lp_aon().store1().modify(|_, w| w.bits(cal_val));
-    }
+    LP_AON::regs()
+        .store1()
+        .modify(|_, w| unsafe { w.bits(cal_val) });
 
     modem_clk_domain_active_state_icg_map_preinit();
 }
@@ -1160,16 +1083,16 @@ pub(crate) fn configure_clock() {
 fn modem_clk_domain_active_state_icg_map_preinit() {
     unsafe {
         // Configure modem ICG code in PMU_ACTIVE state
-        pmu()
+        PMU::regs()
             .hp_active_icg_modem()
             .modify(|_, w| w.hp_active_dig_icg_modem_code().bits(ICG_MODEM_CODE_ACTIVE));
 
         // Disable clock gating for MODEM_APB, I2C_MST and LP_APB clock domains in
         // PMU_ACTIVE state
-        modem_syscon()
+        MODEM_SYSCON::regs()
             .clk_conf_power_st()
             .modify(|_, w| w.clk_modem_apb_st_map().bits(1 << ICG_MODEM_CODE_ACTIVE));
-        modem_lpcon().clk_conf_power_st().modify(|_, w| {
+        MODEM_LPCON::regs().clk_conf_power_st().modify(|_, w| {
             w.clk_i2c_mst_st_map()
                 .bits(1 << ICG_MODEM_CODE_ACTIVE)
                 .clk_lp_apb_st_map()
@@ -1177,37 +1100,37 @@ fn modem_clk_domain_active_state_icg_map_preinit() {
         });
 
         // Software trigger force update modem ICG code and ICG switch
-        pmu()
+        PMU::regs()
             .imm_modem_icg()
             .write(|w| w.update_dig_icg_modem_en().set_bit());
-        pmu()
+        PMU::regs()
             .imm_sleep_sysclk()
             .write(|w| w.update_dig_icg_switch().set_bit());
 
         // The following is part of rtc_clk_init
 
-        lp_clkrst()
+        LP_CLKRST::regs()
             .fosc_cntl()
             .modify(|_, w| w.fosc_dfreq().bits(100));
 
         regi2c::I2C_DIG_REG_SCK_DCAP.write_reg(128);
 
-        lp_clkrst()
+        LP_CLKRST::regs()
             .rc32k_cntl()
             .modify(|_, w| w.rc32k_dfreq().bits(700));
 
         regi2c::I2C_DIG_REG_ENIF_RTC_DREG.write_field(1);
         regi2c::I2C_DIG_REG_ENIF_DIG_DREG.write_field(1);
 
-        pmu()
+        PMU::regs()
             .hp_active_hp_regulator0()
             .modify(|_, w| w.hp_active_hp_regulator_dbias().bits(HP_CALI_DBIAS));
-        pmu()
+        PMU::regs()
             .hp_sleep_lp_regulator0()
             .modify(|_, w| w.hp_sleep_lp_regulator_dbias().bits(LP_CALI_DBIAS));
 
         // clk_ll_rc_fast_tick_conf
-        pcr()
+        PCR::regs()
             .ctrl_tick_conf()
             .modify(|_, w| w.fosc_tick_num().bits(255));
     }
@@ -1357,10 +1280,7 @@ impl RtcClock {
 
     /// Get the RTC_SLOW_CLK source
     pub fn slow_freq() -> RtcSlowClock {
-        let lp_clrst = unsafe { lp_clkrst() };
-
-        let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
-        match slow_freq {
+        match LP_CLKRST::regs().lp_clk_conf().read().slow_clk_sel().bits() {
             0 => RtcSlowClock::RtcSlowClockRcSlow,
             1 => RtcSlowClock::RtcSlowClock32kXtal,
             2 => RtcSlowClock::RtcSlowClock32kRc,
@@ -1371,31 +1291,29 @@ impl RtcClock {
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
         unsafe {
-            lp_clkrst()
+            LP_CLKRST::regs()
                 .lp_clk_conf()
                 .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
-
-            lp_clkrst().clk_to_hp().modify(|_, w| {
-                w.icg_hp_xtal32k()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
-                    .icg_hp_xtal32k()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
-            });
         }
+
+        LP_CLKRST::regs().clk_to_hp().modify(|_, w| {
+            w.icg_hp_xtal32k()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal));
+            w.icg_hp_osc32k()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kRc))
+        });
     }
 
     // TODO: IDF-5781 Some of esp32c6 SOC_RTC_FAST_CLK_SRC_XTAL_D2 rtc_fast clock
     // has timing issue Force to use SOC_RTC_FAST_CLK_SRC_RC_FAST since 2nd
     // stage bootloader https://github.com/espressif/esp-idf/blob/master/components/bootloader_support/src/bootloader_clock_init.c#L65-L67
     fn set_fast_freq(fast_freq: RtcFastClock) {
-        unsafe {
-            lp_clkrst().lp_clk_conf().modify(|_, w| {
-                w.fast_clk_sel().bit(match fast_freq {
-                    RtcFastClock::RtcFastClockRcFast => false,
-                    RtcFastClock::RtcFastClockXtalD2 => true,
-                })
-            });
-        }
+        LP_CLKRST::regs().lp_clk_conf().modify(|_, w| {
+            w.fast_clk_sel().bit(match fast_freq {
+                RtcFastClock::RtcFastClockRcFast => false,
+                RtcFastClock::RtcFastClockXtalD2 => true,
+            })
+        });
 
         crate::rom::ets_delay_us(3);
     }
@@ -1419,10 +1337,6 @@ impl RtcClock {
                 _ => cal_clk,
             };
         }
-
-        let lp_clkrst = unsafe { lp_clkrst() };
-        let pcr = unsafe { pcr() };
-        let pmu = unsafe { pmu() };
 
         let clk_src = RtcClock::slow_freq();
 
@@ -1451,18 +1365,22 @@ impl RtcClock {
             cali_clk_sel = RtcCaliClkSel::CaliClkRcSlow;
         } else {
             cali_clk_sel = RtcCaliClkSel::CaliClk32k;
+
             match cal_clk {
                 RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
                 RtcCalSel::RtcCal32kRc => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
                 }
                 RtcCalSel::RtcCal32kXtal => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
                 }
                 RtcCalSel::RtcCal32kOscSlow => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
                 }
             }
@@ -1473,62 +1391,76 @@ impl RtcClock {
         // Only enable if originaly was disabled
         // If clock is already on, do nothing
 
-        let dig_32k_xtal_enabled = lp_clkrst.clk_to_hp().read().icg_hp_xtal32k().bit_is_set();
+        let dig_32k_xtal_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_xtal32k()
+            .bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            LP_CLKRST::regs()
                 .clk_to_hp()
                 .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         }
 
         // TODO: very hacky - icg_hp_xtal32k is already set in the above condition?
         // in ESP-IDF these are not called in this function but the fields are set
-        lp_clkrst
+        LP_CLKRST::regs()
             .clk_to_hp()
             .modify(|_, w| w.icg_hp_xtal32k().set_bit());
-        pmu.hp_sleep_lp_ck_power().modify(|_, w| {
+        PMU::regs().hp_sleep_lp_ck_power().modify(|_, w| {
             w.hp_sleep_xpd_xtal32k().set_bit();
             w.hp_sleep_xpd_rc32k().set_bit()
         });
 
-        let rc_fast_enabled = pmu
+        let rc_fast_enabled = PMU::regs()
             .hp_sleep_lp_ck_power()
             .read()
             .hp_sleep_xpd_fosc_clk()
             .bit_is_set();
-        let dig_rc_fast_enabled = lp_clkrst.clk_to_hp().read().icg_hp_fosc().bit_is_set();
+        let dig_rc_fast_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_fosc()
+            .bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCalRcFast {
             if !rc_fast_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
                 crate::rom::ets_delay_us(50);
             }
 
             if !dig_rc_fast_enabled {
-                lp_clkrst
+                LP_CLKRST::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
                 crate::rom::ets_delay_us(5);
             }
         }
 
-        let rc32k_enabled = pmu
+        let rc32k_enabled = PMU::regs()
             .hp_sleep_lp_ck_power()
             .read()
             .hp_sleep_xpd_rc32k()
             .bit_is_set();
-        let dig_rc32k_enabled = lp_clkrst.clk_to_hp().read().icg_hp_osc32k().bit_is_set();
+        let dig_rc32k_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_osc32k()
+            .bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kRc {
             if !rc32k_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
                 crate::rom::ets_delay_us(300);
             }
 
             if !dig_rc32k_enabled {
-                lp_clkrst
+                LP_CLKRST::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }
@@ -1629,20 +1561,21 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            LP_CLKRST::regs()
                 .clk_to_hp()
                 .modify(|_, w| w.icg_hp_xtal32k().clear_bit());
         }
 
         if cal_clk == RtcCalSel::RtcCalRcFast {
             if rc_fast_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
                 crate::rom::ets_delay_us(50);
             }
 
             if dig_rc_fast_enabled {
-                lp_clkrst
+                LP_CLKRST::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
                 crate::rom::ets_delay_us(5);
@@ -1651,12 +1584,13 @@ impl RtcClock {
 
         if cal_clk == RtcCalSel::RtcCal32kRc {
             if rc32k_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
                 crate::rom::ets_delay_us(300);
             }
             if dig_rc32k_enabled {
-                lp_clkrst
+                LP_CLKRST::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }
@@ -1715,14 +1649,10 @@ impl RtcClock {
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel()
-                .bits(0) // RTC_SLOW_CLK
-                .rtc_cali_max()
-                .bits(100)
-                .rtc_cali_start_cycling()
-                .clear_bit()
-                .rtc_cali_start()
-                .set_bit()
+            w.rtc_cali_clk_sel().bits(0); // RTC_SLOW_CLK
+            w.rtc_cali_max().bits(100);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_start().set_bit()
         });
         timg0
             .rtccalicfg()
@@ -1762,7 +1692,7 @@ pub(crate) enum CpuClockSource {
 
 impl CpuClockSource {
     pub(crate) fn current() -> Result<Self, UnsupportedClockSource> {
-        let source = match unsafe { pcr().sysclk_conf().read().soc_clk_sel().bits() } {
+        let source = match PCR::regs().sysclk_conf().read().soc_clk_sel().bits() {
             0 => CpuClockSource::Xtal,
             1 => CpuClockSource::Pll,
             2 => CpuClockSource::RcFast,
@@ -1773,15 +1703,13 @@ impl CpuClockSource {
     }
 
     pub(crate) fn select(self) {
-        unsafe {
-            pcr().sysclk_conf().modify(|_, w| {
-                w.soc_clk_sel().bits(match self {
-                    CpuClockSource::Xtal => 0,
-                    CpuClockSource::Pll => 1,
-                    CpuClockSource::RcFast => 2,
-                })
-            });
-        }
+        PCR::regs().sysclk_conf().modify(|_, w| unsafe {
+            w.soc_clk_sel().bits(match self {
+                CpuClockSource::Xtal => 0,
+                CpuClockSource::Pll => 1,
+                CpuClockSource::RcFast => 2,
+            })
+        });
     }
 }
 
@@ -1858,32 +1786,23 @@ impl SavedClockConfig {
 }
 
 fn rtc_clk_bbpll_enable() {
-    unsafe {
-        pmu().imm_hp_ck_power().modify(|_, w| {
-            w.tie_high_xpd_bb_i2c()
-                .set_bit()
-                .tie_high_xpd_bbpll()
-                .set_bit()
-                .tie_high_xpd_bbpll_i2c()
-                .set_bit()
-        });
-        pmu()
-            .imm_hp_ck_power()
-            .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
-    }
+    PMU::regs().imm_hp_ck_power().modify(|_, w| {
+        w.tie_high_xpd_bb_i2c().set_bit();
+        w.tie_high_xpd_bbpll().set_bit();
+        w.tie_high_xpd_bbpll_i2c().set_bit()
+    });
+    PMU::regs()
+        .imm_hp_ck_power()
+        .modify(|_, w| w.tie_high_global_bbpll_icg().set_bit());
 }
 
 fn rtc_clk_bbpll_disable() {
-    unsafe {
-        pmu()
-            .imm_hp_ck_power()
-            .modify(|_, w| w.tie_low_global_bbpll_icg().set_bit());
+    PMU::regs()
+        .imm_hp_ck_power()
+        .modify(|_, w| w.tie_low_global_bbpll_icg().set_bit());
 
-        pmu().imm_hp_ck_power().modify(|_, w| {
-            w.tie_low_xpd_bbpll()
-                .set_bit()
-                .tie_low_xpd_bbpll_i2c()
-                .set_bit()
-        });
-    }
+    PMU::regs().imm_hp_ck_power().modify(|_, w| {
+        w.tie_low_xpd_bbpll().set_bit();
+        w.tie_low_xpd_bbpll_i2c().set_bit()
+    });
 }
