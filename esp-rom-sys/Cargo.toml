@@ -31,19 +31,17 @@ esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated"
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
-# The following trailing spaces ("## ") are important to display the feature names.
-
-## 
+##
 esp32   = []
-## 
+##
 esp32c2 = []
-## 
+##
 esp32c3 = []
-## 
+##
 esp32c6 = []
-## 
+##
 esp32h2 = []
-## 
+##
 esp32s2 = []
-## 
+##
 esp32s3 = []
