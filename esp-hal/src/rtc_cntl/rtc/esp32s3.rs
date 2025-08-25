@@ -1,7 +1,6 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::XtalClock,
     peripherals::LPWR,
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
@@ -9,8 +8,6 @@ use crate::{
 pub(crate) fn init() {}
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
-
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
 
     let cal_val = loop {

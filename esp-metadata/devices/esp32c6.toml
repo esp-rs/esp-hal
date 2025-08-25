@@ -134,6 +134,7 @@ memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
 cpu_has_csr_pc = true
 cpu_has_prv_mode = true
 rc_fast_clk_default = 17_500_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"

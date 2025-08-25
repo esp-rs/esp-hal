@@ -54,6 +54,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8000000)
     };
+    ("soc.has_multiple_xtal_options") => {
+        true
+    };
     ("aes.dma") => {
         false
     };
@@ -223,6 +226,15 @@ macro_rules! property {
 macro_rules! memory_range {
     ("DRAM") => {
         1073405952..1073741824
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_soc_xtal_options {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((26)); _for_each_inner!((40)); _for_each_inner!((all(26),
+        (40)));
     };
 }
 #[macro_export]
