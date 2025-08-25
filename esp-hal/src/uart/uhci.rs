@@ -7,10 +7,21 @@ use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
-    Async, Blocking, DriverMode,
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        AnyGdmaRxChannel, AnyGdmaTxChannel, Channel, ChannelRx, ChannelTx, DmaChannelFor,
-        DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel,
+        AnyGdmaRxChannel,
+        AnyGdmaTxChannel,
+        Channel,
+        ChannelRx,
+        ChannelTx,
+        DmaChannelFor,
+        DmaEligible,
+        DmaError,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     peripherals,

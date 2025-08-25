@@ -6,15 +6,12 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::dma::DmaRxBuf;
-use esp_hal::dma::DmaTxBuf;
-use esp_hal::dma_buffers;
-use esp_hal::uart::uhci::Uhci;
 use esp_hal::{
     Blocking,
-    uart::{self, Uart},
+    dma::{DmaRxBuf, DmaTxBuf},
+    dma_buffers,
+    uart::{self, Uart, uhci::Uhci},
 };
-
 use hil_test as _;
 
 esp_bootloader_esp_idf::esp_app_desc!();
