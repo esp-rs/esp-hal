@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         !cfg!(feature = "wifi") || chip.contains("wifi"),
         r#"
 
-        WiFi is not supported on this target.
+        Wi-Fi is not supported on this target.
 
         "#
     );
@@ -104,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             chip.contains("wifi") && chip.contains("bt"),
             r#"
 
-            WiFi/Bluetooth coexistence is not supported on this target.
+            Wi-Fi/Bluetooth coexistence is not supported on this target.
 
             "#
         );
