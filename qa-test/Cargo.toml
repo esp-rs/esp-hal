@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 cfg-if             = "1.0.0"
-embassy-executor   = { version = "0.7.0", features = ["task-arena-size-12288"] }
+embassy-executor   = { version = "0.8" }
 embassy-time       = "0.4.0"
 embassy-futures    = "0.1.1"
 embassy-sync       = "0.6.1"
@@ -37,3 +37,11 @@ debug         = 2
 debug-assertions = true
 lto           = "fat"
 codegen-units = 1
+
+[patch.crates-io]
+embassy-executor = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
+embassy-time = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
+embassy-futures = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
+embassy-sync = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
+embassy-executor-macros = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
+embassy-time-driver = { git = "https://github.com/bugadani/embassy", branch = "time-queue" }
