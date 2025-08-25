@@ -104,6 +104,7 @@ memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
 [device.soc]
 ref_tick_hz = 1_000_000
 rc_fast_clk_default = 8_000_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"

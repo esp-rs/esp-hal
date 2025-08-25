@@ -63,15 +63,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 dcur = 0;
                 bw = 1;
             }
-
-            XtalClock::Other(_) => {
-                div_ref = 12;
-                div7_0 = 224;
-                div10_8 = 4;
-                lref = 0;
-                dcur = 0;
-                bw = 0;
-            }
         }
 
         regi2c::I2C_BBPLL_ENDIV5.write_reg(BBPLL_ENDIV5_VAL_320M);
@@ -100,15 +91,6 @@ pub(crate) fn esp32_rtc_bbpll_configure(xtal_freq: XtalClock, pll_freq: PllClock
                 lref = 1;
                 dcur = 0;
                 bw = 1;
-            }
-
-            XtalClock::Other(_) => {
-                div_ref = 12;
-                div7_0 = 224;
-                div10_8 = 4;
-                lref = 0;
-                dcur = 0;
-                bw = 0;
             }
         }
 

@@ -38,7 +38,7 @@ pub(crate) fn esp32c2_rtc_bbpll_configure(xtal_freq: XtalClock, _pll_freq: PllCl
             dcur = 0;
             dbias = 2;
         }
-        XtalClock::_40M | XtalClock::Other(_) => {
+        XtalClock::_40M => {
             div_ref = 0;
             div7_0 = 8;
             dr1 = 0;

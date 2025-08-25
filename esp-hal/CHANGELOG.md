@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Trng::new` (replaced by `Trng::try_new`) (#3829)
 - `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
+- `Xtal::Other` has been removed (#3983)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
