@@ -497,7 +497,7 @@ impl<F> FlashRegion<'_, F> {
     }
 
     fn in_range(&self, start: u32, len: usize) -> bool {
-        self.range().contains(&start) && self.range().contains(&(start + len as u32 - 1))
+        self.range().contains(&start) && (start + len as u32 <= self.range().end)
     }
 }
 
