@@ -48,6 +48,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("soc.has_multiple_xtal_options") => {
+        true
+    };
     ("assist_debug.has_sp_monitor") => {
         true
     };
@@ -196,6 +199,15 @@ macro_rules! property {
 macro_rules! memory_range {
     ("DRAM") => {
         1070202880..1070465024
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_soc_xtal_options {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((26)); _for_each_inner!((40)); _for_each_inner!((all(26),
+        (40)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
