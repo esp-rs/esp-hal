@@ -492,12 +492,12 @@ impl<F> FlashRegion<'_, F> {
         self.raw.len() as _
     }
 
-    fn range(&self) -> core::ops::RangeInclusive<u32> {
-        self.raw.offset()..=self.raw.offset() + self.raw.len()
+    fn range(&self) -> core::ops::Range<u32> {
+        self.raw.offset()..self.raw.offset() + self.raw.len()
     }
 
     fn in_range(&self, start: u32, len: usize) -> bool {
-        self.range().contains(&start) && self.range().contains(&(start + len as u32))
+        self.range().contains(&start) && self.range().contains(&(start + len as u32 - 1))
     }
 }
 
