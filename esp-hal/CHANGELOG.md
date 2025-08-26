@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
 - ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
 - Check serial instead of jtag fifo status in UsbSerialJtag's async flush function (#3957)
+- ESP32: Enable up to 4M of PSRAM (#3990)
 
 ### Removed
 
