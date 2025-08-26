@@ -141,7 +141,7 @@ sniffer = ["wifi"]
 ## Enable BLE support
 ble = ["esp-hal/__bluetooth", "dep:bt-hci"]
 
-## Software controls WiFi/Bluetooth coexistence.
+## Software controls Wi-Fi/Bluetooth coexistence.
 ## See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/kconfig-reference.html#config-esp-coex-sw-coexist-enable) for details
 coex = []
 
