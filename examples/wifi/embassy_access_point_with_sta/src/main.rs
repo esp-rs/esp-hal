@@ -39,9 +39,9 @@ use esp_println::{print, println};
 use esp_radio::{
     Controller,
     wifi::{
-        AccessPointConfiguration,
-        ClientConfiguration,
-        Configuration,
+        AccessPointConfig,
+        ClientConfig,
+        Config,
         WifiController,
         WifiDevice,
         WifiEvent,
@@ -118,15 +118,15 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Configuration::Mixed(
+    let client_config = Config::Mixed(
         {
-            let mut client_config = ClientConfiguration::default();
+            let mut client_config = ClientConfig::default();
             client_config.ssid = SSID.into();
             client_config.password = PASSWORD.into();
             client_config
         },
         {
-            let mut ap_config = AccessPointConfiguration::default();
+            let mut ap_config = AccessPointConfig::default();
             ap_config.ssid = "esp-radio".into();
             ap_config
         },

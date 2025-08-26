@@ -38,7 +38,7 @@ use esp_hal::{
 use esp_println::{print, println};
 use esp_radio::{
     ble::controller::BleConnector,
-    wifi::{ClientConfiguration, Configuration},
+    wifi::{ClientConfig, Config},
 };
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
@@ -121,8 +121,8 @@ fn main() -> ! {
     let rng = Rng::new();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::Client({
-        let mut config = ClientConfiguration::default();
+    let client_config = Config::Client({
+        let mut config = ClientConfig::default();
         config.ssid = SSID.into();
         config.password = PASSWORD.into();
         config

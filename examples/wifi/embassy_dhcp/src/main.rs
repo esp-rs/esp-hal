@@ -22,15 +22,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{
-        ClientConfiguration,
-        Configuration,
-        ScanConfig,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiState,
-    },
+    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiState},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -167,8 +159,8 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::Client({
-                let mut config = ClientConfiguration::default();
+            let client_config = Config::Client({
+                let mut config = ClientConfig::default();
                 config.ssid = SSID.into();
                 config.password = PASSWORD.into();
                 config
