@@ -16,8 +16,6 @@ use hil_test as _;
 
 extern crate alloc;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[cfg(test)]
 #[embedded_test::tests]
 mod tests {
@@ -160,7 +158,10 @@ mod tests {
         .unwrap();
 
         let app_desc_wanted = unsafe {
-            core::slice::from_raw_parts(core::ptr::addr_of!(crate::ESP_APP_DESC) as *const u8, 256)
+            core::slice::from_raw_parts(
+                core::ptr::addr_of!(hil_test::ESP_APP_DESC) as *const u8,
+                256,
+            )
         };
 
         assert_eq!(&app_desc_wanted, &app_desc);

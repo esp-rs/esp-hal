@@ -23,8 +23,6 @@ use esp_hal::{
 };
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 static SWINT0: Mutex<RefCell<Option<SoftwareInterrupt<0>>>> = Mutex::new(RefCell::new(None));
 
 #[allow(unused)] // TODO: Remove attribute when interrupt latency test re-enabled
