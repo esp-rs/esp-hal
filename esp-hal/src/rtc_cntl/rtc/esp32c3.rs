@@ -1,7 +1,6 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::XtalClock,
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
     soc::regi2c,
@@ -57,8 +56,6 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
-
     unsafe {
         // from esp_clk_init:
         let rtc_cntl = LPWR::regs();

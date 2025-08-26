@@ -7,7 +7,6 @@ use strum::FromRepr;
 use crate::{
     clock::{
         Clock,
-        XtalClock,
         clocks_ll::{
             esp32c6_bbpll_get_freq_mhz,
             esp32c6_cpu_get_hs_divider,
@@ -1060,8 +1059,6 @@ pub(crate) fn init() {
 }
 
 pub(crate) fn configure_clock() {
-    assert!(matches!(RtcClock::xtal_freq(), XtalClock::_40M));
-
     RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
     let cal_val = loop {
@@ -1263,21 +1260,6 @@ pub(crate) enum RtcCaliClkSel {
 
 /// RTC Watchdog Timer driver
 impl RtcClock {
-    // rtc_clk_xtal_freq_get
-    pub(crate) fn xtal_freq_mhz() -> u32 {
-        Self::read_xtal_freq_mhz().unwrap_or(40)
-    }
-
-    /// Get main XTAL frequency
-    /// This is the value stored in RTC register RTC_XTAL_FREQ_REG by the
-    /// bootloader, as passed to rtc_clk_init function.
-    pub fn xtal_freq() -> XtalClock {
-        match Self::xtal_freq_mhz() {
-            40 => XtalClock::_40M,
-            other => XtalClock::Other(other),
-        }
-    }
-
     /// Get the RTC_SLOW_CLK source
     pub fn slow_freq() -> RtcSlowClock {
         match LP_CLKRST::regs().lp_clk_conf().read().slow_clk_sel().bits() {
@@ -1643,32 +1625,11 @@ impl RtcClock {
 
         (100_000_000 * 1000 / period) as u16
     }
-
-    pub(crate) fn estimate_xtal_frequency() -> u32 {
-        let timg0 = TIMG0::regs();
-        while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
-
-        timg0.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel().bits(0); // RTC_SLOW_CLK
-            w.rtc_cali_max().bits(100);
-            w.rtc_cali_start_cycling().clear_bit();
-            w.rtc_cali_start().set_bit()
-        });
-        timg0
-            .rtccalicfg()
-            .modify(|_, w| w.rtc_cali_start().set_bit());
-
-        while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
-
-        (timg0.rtccalicfg1().read().rtc_cali_value().bits()
-            * (RtcSlowClock::RtcSlowClockRcSlow.frequency().as_hz() / 100))
-            / 1_000_000
-    }
 }
 
 pub(crate) fn rtc_clk_cpu_freq_set_xtal() {
     // rtc_clk_cpu_set_to_default_config
-    let freq = RtcClock::xtal_freq_mhz();
+    let freq = RtcClock::xtal_freq().mhz();
 
     esp32c6_rtc_update_to_xtal_raw(freq, 1);
 
@@ -1734,7 +1695,7 @@ impl SavedClockConfig {
         match source {
             CpuClockSource::Xtal => {
                 div = esp32c6_cpu_get_ls_divider();
-                source_freq_mhz = RtcClock::xtal_freq_mhz();
+                source_freq_mhz = RtcClock::xtal_freq().mhz();
             }
             CpuClockSource::Pll => {
                 div = esp32c6_cpu_get_hs_divider();
@@ -1768,7 +1729,7 @@ impl SavedClockConfig {
                 if old_source != CpuClockSource::Pll {
                     rtc_clk_bbpll_enable();
                     esp32c6_rtc_bbpll_configure_raw(
-                        RtcClock::xtal_freq_mhz(),
+                        RtcClock::xtal_freq().mhz(),
                         self.source_freq_mhz,
                     );
                 }
