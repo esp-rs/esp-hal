@@ -585,9 +585,7 @@ impl RtcClock {
     /// Get the RTC_SLOW_CLK source.
     #[cfg(not(any(esp32c6, esp32h2)))]
     pub fn slow_freq() -> RtcSlowClock {
-        let rtc_cntl = LPWR::regs();
-        let slow_freq = rtc_cntl.clk_conf().read().ana_clk_rtc_sel().bits();
-        match slow_freq {
+        match LPWR::regs().clk_conf().read().ana_clk_rtc_sel().bits() {
             0 => RtcSlowClock::RtcSlowClockRtc,
             1 => RtcSlowClock::RtcSlowClock32kXtal,
             2 => RtcSlowClock::RtcSlowClock8mD256,
@@ -598,22 +596,22 @@ impl RtcClock {
     /// Select source for RTC_SLOW_CLK.
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn set_slow_freq(slow_freq: RtcSlowClock) {
-        unsafe {
-            let rtc_cntl = LPWR::regs();
-            rtc_cntl.clk_conf().modify(|_, w| {
-                w.ana_clk_rtc_sel()
-                    .bits(slow_freq as u8)
-                    // Why we need to connect this clock to digital?
-                    // Or maybe this clock should be connected to digital when
-                    // XTAL 32k clock is enabled instead?
-                    .dig_xtal32k_en()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
-                    // The clk_8m_d256 will be closed when rtc_state in SLEEP,
-                    // so if the slow_clk is 8md256, clk_8m must be force power on
-                    .ck8m_force_pu()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock8mD256))
-            });
-        };
+        LPWR::regs().clk_conf().modify(|_, w| {
+            unsafe {
+                w.ana_clk_rtc_sel().bits(slow_freq as u8);
+            }
+
+            // Why we need to connect this clock to digital?
+            // Or maybe this clock should be connected to digital when
+            // XTAL 32k clock is enabled instead?
+            w.dig_xtal32k_en()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal));
+
+            // The clk_8m_d256 will be closed when rtc_state in SLEEP,
+            // so if the slow_clk is 8md256, clk_8m must be force power on
+            w.ck8m_force_pu()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock8mD256))
+        });
 
         crate::rom::ets_delay_us(300u32);
     }
@@ -621,8 +619,7 @@ impl RtcClock {
     /// Select source for RTC_FAST_CLK.
     #[cfg(not(any(esp32c6, esp32h2)))]
     fn set_fast_freq(fast_freq: RtcFastClock) {
-        let rtc_cntl = LPWR::regs();
-        rtc_cntl.clk_conf().modify(|_, w| {
+        LPWR::regs().clk_conf().modify(|_, w| {
             w.fast_clk_rtc_sel().bit(match fast_freq {
                 RtcFastClock::RtcFastClock8m => true,
                 RtcFastClock::RtcFastClockXtalD4 => false,
@@ -635,7 +632,7 @@ impl RtcClock {
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
     /// TIMG0. This feature counts the number of XTAL clock cycles within a
     /// given number of RTC_SLOW_CLK cycles.
-    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[cfg(not(any(esp32c6, esp32h2)))] // TODO: merge with C6/H2 impl
     fn calibrate_internal(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         // Except for ESP32, choosing RTC_CAL_RTC_MUX results in calibration of
         // the 150k RTC clock (90k on ESP32-S2) regardless of the currently selected
@@ -656,18 +653,19 @@ impl RtcClock {
 
         // Enable requested clock (150k clock is always on)
         let dig_32k_xtal_enabled = rtc_cntl.clk_conf().read().dig_xtal32k_en().bit_is_set();
+        let dig_clk8m_d256_enabled = rtc_cntl.clk_conf().read().dig_clk8m_d256_en().bit_is_set();
 
-        if matches!(cal_clk, RtcCalSel::RtcCal32kXtal) && !dig_32k_xtal_enabled {
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.dig_xtal32k_en().set_bit());
-        }
+        rtc_cntl.clk_conf().modify(|_, w| {
+            if matches!(cal_clk, RtcCalSel::RtcCal32kXtal) {
+                w.dig_xtal32k_en().set_bit();
+            }
 
-        if matches!(cal_clk, RtcCalSel::RtcCal8mD256) {
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.dig_clk8m_d256_en().set_bit());
-        }
+            if matches!(cal_clk, RtcCalSel::RtcCal8mD256) {
+                w.dig_clk8m_d256_en().set_bit();
+            }
+
+            w
+        });
 
         // There may be another calibration process already running during we
         // call this function, so we should wait the last process is done.
@@ -760,29 +758,34 @@ impl RtcClock {
         timg0
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
-        rtc_cntl
-            .clk_conf()
-            .modify(|_, w| w.dig_xtal32k_en().bit(dig_32k_xtal_enabled));
-
-        if matches!(cal_clk, RtcCalSel::RtcCal8mD256) {
-            rtc_cntl
-                .clk_conf()
-                .modify(|_, w| w.dig_clk8m_d256_en().clear_bit());
-        }
+        rtc_cntl.clk_conf().modify(|_, w| {
+            w.dig_xtal32k_en().bit(dig_32k_xtal_enabled);
+            w.dig_clk8m_d256_en().bit(dig_clk8m_d256_enabled)
+        });
 
         cal_val
     }
 
-    /// Measure RTC slow clock's period, based on main XTAL frequency.
+    /// Measure RTC slow clock's period, based on main XTAL frequency
     ///
     /// This function will time out and return 0 if the time for the given
     /// number of cycles to be counted exceeds the expected time twice. This
     /// may happen if 32k XTAL is being calibrated, but the oscillator has
     /// not started up (due to incorrect loading capacitance, board design
     /// issue, or lack of 32 XTAL on board).
-    #[cfg(not(any(esp32c6, esp32h2)))]
     fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         let xtal_freq = RtcClock::xtal_freq();
+
+        #[cfg(esp32c6)]
+        let slowclk_cycles = if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RtcCalRcFast {
+            // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
+            // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
+            // chips by 32 to avoid excessive calibration time.
+            slowclk_cycles >>= 5;
+        } else {
+            slowclk_cycles
+        };
+
         let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
         let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
         let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
@@ -791,17 +794,27 @@ impl RtcClock {
     }
 
     /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-    #[cfg(not(any(esp32c6, esp32h2)))]
-    fn cycles_to_1ms() -> u16 {
-        let period_13q19 = RtcClock::calibrate(
-            match RtcClock::slow_freq() {
-                RtcSlowClock::RtcSlowClockRtc => RtcCalSel::RtcCalRtcMux,
-                RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
-                #[cfg(not(any(esp32c6, esp32h2)))]
-                RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
-            },
-            1024,
-        );
+    pub(crate) fn cycles_to_1ms() -> u16 {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32c6, esp32h2))] {
+                let calibration_clock = match RtcClock::slow_freq() {
+                    RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
+                    RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                    RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                    RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
+                    // RtcSlowClock::RtcCalRcFast => RtcCalSel::RtcCalRcFast,
+                };
+            } else {
+                let calibration_clock = match RtcClock::slow_freq() {
+                    RtcSlowClock::RtcSlowClockRtc => RtcCalSel::RtcCalRtcMux,
+                    RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                    RtcSlowClock::RtcSlowClock8mD256 => RtcCalSel::RtcCal8mD256,
+                };
+            }
+        }
+
+        // TODO: store the result somewhere
+        let period_13q19 = RtcClock::calibrate(calibration_clock, 1024);
 
         // 100_000_000 is used to get rid of `float` calculations
         let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
@@ -811,6 +824,7 @@ impl RtcClock {
 
     /// Return estimated XTAL frequency in MHz.
     pub(crate) fn estimate_xtal_frequency() -> u32 {
+        // TODO: this could reuse Self::calibrate_internal
         const SLOW_CLOCK_CYCLES: u32 = 100;
 
         cfg_if::cfg_if! {
