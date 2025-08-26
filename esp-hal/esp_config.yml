@@ -112,3 +112,77 @@ options:
                using `restore-state-u32`."
   default:
     - value: true
+
+- name: instruction-cache-size
+  description: Instruction cache size to be set on application startup.
+  default:
+    - value: '"32KB"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16KB'
+          - '32KB'
+  active: 'chip == "esp32s3"'
+
+- name: instruction-cache-line-size
+  description: Instruction cache line size to be set on application startup.
+  default:
+    - value: '"32B"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16B'
+          - '32B'
+  active: 'chip == "esp32s3"'
+
+- name: icache-associated-ways
+  description: Instruction cache associated ways to be set on application startup.
+  default:
+    - value: '"8"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '4'
+          - '8'
+  active: 'chip == "esp32s3"'
+
+- name: data-cache-size
+  description: Data cache size to be set on application startup.
+  default:
+    - value: '"32KB"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16KB'
+          - '32KB'
+          - '64KB'
+  active: 'chip == "esp32s3"'
+
+- name: data-cache-line-size
+  description: Data cache line size to be set on application startup.
+  default:
+    - value: '"32B"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '16B'
+          - '32B'
+          - '64B'
+  active: 'chip == "esp32s3"'
+
+- name: dcache-associated-ways
+  description: Data cache associated ways to be set on application startup.
+  default:
+    - value: '"8"'
+  constraints:
+    - type:
+        validator: enumeration
+        value:
+          - '4'
+          - '8'
+  active: 'chip == "esp32s3"'
