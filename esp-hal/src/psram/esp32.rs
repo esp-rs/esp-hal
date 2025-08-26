@@ -38,9 +38,7 @@ pub(crate) fn init_psram(config: PsramConfig) {
         // for unknown reason)
         //
         // As a workaround we just map 4m (maximum we can do) and
-        // probe if we can access top of PSRAM - if not we assume it's 2m
-        //
-        // This currently doesn't work as expected because of https://github.com/esp-rs/esp-hal/issues/2182
+        // probe how much memory we can write/read
         utils::s_mapping(EXTMEM_ORIGIN as u32, MAX_MEM_SIZE as u32);
 
         let guessed_size = unsafe {
@@ -448,9 +446,10 @@ pub(crate) mod utils {
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
-        info!("PS-RAM vaddrmode = {:?}", PsramVaddrMode::Lowhigh);
+        let psram_mode = PsramVaddrMode::Normal;
+        info!("PS-RAM vaddrmode = {:?}", psram_mode);
 
-        psram_cache_init(mode, PsramVaddrMode::Lowhigh, clk_mode, extra_dummy);
+        psram_cache_init(mode, psram_mode, clk_mode, extra_dummy);
     }
 
     #[allow(unused)]
