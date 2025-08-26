@@ -275,41 +275,32 @@ impl RtcClock {
 
     fn set_fast_freq(fast_freq: RtcFastClock) {
         // components/hal/esp32s2/include/hal/clk_tree_ll.h
-        unsafe {
-            let lp_clkrst = LPWR::regs();
-            lp_clkrst.lp_clk_conf().modify(|_, w| {
-                w.fast_clk_sel().bits(match fast_freq {
-                    RtcFastClock::RtcFastClockRcFast => 0b00,
-                    RtcFastClock::RtcFastClockXtalD2 => 0b01,
-                })
-            });
-        }
+        LPWR::regs().lp_clk_conf().modify(|_, w| unsafe {
+            w.fast_clk_sel().bits(match fast_freq {
+                RtcFastClock::RtcFastClockRcFast => 0b00,
+                RtcFastClock::RtcFastClockXtalD2 => 0b01,
+            })
+        });
 
         crate::rom::ets_delay_us(3);
     }
 
     fn set_slow_freq(slow_freq: RtcSlowClock) {
-        unsafe {
-            let lp_clkrst = LPWR::regs();
+        LPWR::regs()
+            .lp_clk_conf()
+            .modify(|_, w| unsafe { w.slow_clk_sel().bits(slow_freq as u8) });
 
-            lp_clkrst
-                .lp_clk_conf()
-                .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
-            lp_clkrst.clk_to_hp().modify(|_, w| {
-                w.icg_hp_xtal32k()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
-                    .icg_hp_xtal32k()
-                    .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal))
-            });
-        }
+        LPWR::regs().clk_to_hp().modify(|_, w| {
+            w.icg_hp_xtal32k()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal));
+            w.icg_hp_osc32k()
+                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kRc))
+        });
     }
 
     /// Get the RTC_SLOW_CLK source
     pub fn slow_freq() -> RtcSlowClock {
-        let lp_clrst = LPWR::regs();
-
-        let slow_freq = lp_clrst.lp_clk_conf().read().slow_clk_sel().bits();
-        match slow_freq {
+        match LPWR::regs().lp_clk_conf().read().slow_clk_sel().bits() {
             0 => RtcSlowClock::RtcSlowClockRcSlow,
             1 => RtcSlowClock::RtcSlowClock32kXtal,
             2 => RtcSlowClock::RtcSlowClock32kRc,
@@ -347,10 +338,6 @@ impl RtcClock {
             };
         }
 
-        let lp_clkrst = LPWR::regs();
-        let pcr = PCR::regs();
-        let pmu = PMU::regs();
-
         let clk_src = RtcClock::slow_freq();
 
         if cal_clk == RtcCalSel::RtcCalRtcMux {
@@ -381,15 +368,18 @@ impl RtcClock {
             match cal_clk {
                 RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
                 RtcCalSel::RtcCal32kRc => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
                 }
                 RtcCalSel::RtcCal32kXtal => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
                 }
                 RtcCalSel::RtcCal32kOscSlow => {
-                    pcr.ctrl_32k_conf()
+                    PCR::regs()
+                        .ctrl_32k_conf()
                         .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
                 }
             }
@@ -400,62 +390,68 @@ impl RtcClock {
         // Only enable if originaly was disabled
         // If clock is already on, do nothing
 
-        let dig_32k_xtal_enabled = lp_clkrst.clk_to_hp().read().icg_hp_xtal32k().bit_is_set();
+        let dig_32k_xtal_enabled = LPWR::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_xtal32k()
+            .bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            LPWR::regs()
                 .clk_to_hp()
                 .modify(|_, w| w.icg_hp_xtal32k().set_bit());
         }
 
         // TODO: very hacky - icg_hp_xtal32k is already set in the above condition?
         // in ESP-IDF these are not called in this function but the fields are set
-        lp_clkrst
+        LPWR::regs()
             .clk_to_hp()
             .modify(|_, w| w.icg_hp_xtal32k().set_bit());
-        pmu.hp_sleep_lp_ck_power().modify(|_, w| {
+        PMU::regs().hp_sleep_lp_ck_power().modify(|_, w| {
             w.hp_sleep_xpd_xtal32k().set_bit();
             w.hp_sleep_xpd_rc32k().set_bit()
         });
 
-        let rc_fast_enabled = pmu
+        let rc_fast_enabled = PMU::regs()
             .hp_sleep_lp_ck_power()
             .read()
             .hp_sleep_xpd_fosc_clk()
             .bit_is_set();
-        let dig_rc_fast_enabled = lp_clkrst.clk_to_hp().read().icg_hp_fosc().bit_is_set();
+        let dig_rc_fast_enabled = LPWR::regs().clk_to_hp().read().icg_hp_fosc().bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCalRcFast {
             if !rc_fast_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
                 crate::rom::ets_delay_us(50);
             }
 
             if !dig_rc_fast_enabled {
-                lp_clkrst
+                LPWR::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
                 crate::rom::ets_delay_us(5);
             }
         }
 
-        let rc32k_enabled = pmu
+        let rc32k_enabled = PMU::regs()
             .hp_sleep_lp_ck_power()
             .read()
             .hp_sleep_xpd_rc32k()
             .bit_is_set();
-        let dig_rc32k_enabled = lp_clkrst.clk_to_hp().read().icg_hp_osc32k().bit_is_set();
+        let dig_rc32k_enabled = LPWR::regs().clk_to_hp().read().icg_hp_osc32k().bit_is_set();
 
         if cal_clk == RtcCalSel::RtcCal32kRc {
             if !rc32k_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
                 crate::rom::ets_delay_us(300);
             }
 
             if !dig_rc32k_enabled {
-                lp_clkrst
+                LPWR::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }
@@ -544,20 +540,21 @@ impl RtcClock {
             .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
-            lp_clkrst
+            LPWR::regs()
                 .clk_to_hp()
                 .modify(|_, w| w.icg_hp_xtal32k().clear_bit());
         }
 
         if cal_clk == RtcCalSel::RtcCalRcFast {
             if rc_fast_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
                 crate::rom::ets_delay_us(50);
             }
 
             if dig_rc_fast_enabled {
-                lp_clkrst
+                LPWR::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_fosc().set_bit());
                 crate::rom::ets_delay_us(5);
@@ -566,12 +563,13 @@ impl RtcClock {
 
         if cal_clk == RtcCalSel::RtcCal32kRc {
             if rc32k_enabled {
-                pmu.hp_sleep_lp_ck_power()
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
                     .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
                 crate::rom::ets_delay_us(300);
             }
             if dig_rc32k_enabled {
-                lp_clkrst
+                LPWR::regs()
                     .clk_to_hp()
                     .modify(|_, w| w.icg_hp_osc32k().set_bit());
             }
@@ -603,14 +601,10 @@ impl RtcClock {
         while timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_clear() {}
 
         timg0.rtccalicfg().modify(|_, w| unsafe {
-            w.rtc_cali_clk_sel()
-                .bits(0) // RTC_SLOW_CLK
-                .rtc_cali_max()
-                .bits(100)
-                .rtc_cali_start_cycling()
-                .clear_bit()
-                .rtc_cali_start()
-                .set_bit()
+            w.rtc_cali_clk_sel().bits(0); // RTC_SLOW_CLK
+            w.rtc_cali_max().bits(100);
+            w.rtc_cali_start_cycling().clear_bit();
+            w.rtc_cali_start().set_bit()
         });
 
         timg0
