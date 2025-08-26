@@ -24,8 +24,6 @@ use esp_hal_embassy::InterruptExecutor;
 #[cfg(not(feature = "esp32"))]
 use hil_test::mk_static;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 // List of the functions that are ACTUALLY TESTS but are called in the invokers
 mod test_helpers {
     use super::*;

@@ -23,8 +23,6 @@ use esp_hal::system::{AppCoreGuard, CpuControl, Stack};
 use esp_hal_embassy::{Executor, InterruptExecutor};
 use hil_test::mk_static;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[embassy_executor::task]
 async fn responder_task(
     signal: &'static Signal<CriticalSectionRawMutex, ()>,

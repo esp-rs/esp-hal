@@ -27,8 +27,6 @@ use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
 use portable_atomic::AtomicBool;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 static STOP_INTERRUPT_TASK: AtomicBool = AtomicBool::new(false);
 static INTERRUPT_TASK_WORKING: AtomicBool = AtomicBool::new(false);
 

@@ -21,8 +21,6 @@ use esp_hal::{
 use hil_test as _;
 use nb::block;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 /// Dummy data used to feed the hasher.
 const SOURCE_DATA: &[u8] = &[b'a'; 258];
 

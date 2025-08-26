@@ -19,8 +19,6 @@ use esp_hal::{
 use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 struct Context {
     interrupt: SoftwareInterrupt<'static, 1>,
     uart: Uart<'static, Async>,
