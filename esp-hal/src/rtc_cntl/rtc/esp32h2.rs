@@ -1,10 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{Clock, clocks_ll::regi2c_write_mask},
-    peripherals::{LP_AON, LPWR, PMU},
-    rtc_cntl::{RtcCalSel, RtcClock, RtcSlowClock},
-    time::Rate,
+    clock::clocks_ll::regi2c_write_mask,
+    peripherals::{LP_AON, PMU},
+    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 
 const I2C_PMU: u8 = 0x6d;
@@ -187,62 +186,4 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// Glitch on power resets the digital core
     CorePwrGlitch = 0x17,
-}
-
-/// RTC SLOW_CLK frequency values
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum RtcFastClock {
-    /// Select RC_FAST_CLK as RTC_FAST_CLK source
-    RtcFastClockRcFast = 0,
-    #[allow(dead_code)]
-    /// Select XTAL_D2_CLK as RTC_FAST_CLK source
-    RtcFastClockXtalD2 = 1,
-}
-
-impl Clock for RtcFastClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            RtcFastClock::RtcFastClockXtalD2 => Rate::from_hz(16_000_000),
-            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
-        }
-    }
-}
-
-/// RTC Watchdog Timer driver
-impl RtcClock {
-    fn set_fast_freq(fast_freq: RtcFastClock) {
-        // components/hal/esp32s2/include/hal/clk_tree_ll.h
-        LPWR::regs().lp_clk_conf().modify(|_, w| unsafe {
-            w.fast_clk_sel().bits(match fast_freq {
-                RtcFastClock::RtcFastClockRcFast => 0b00,
-                RtcFastClock::RtcFastClockXtalD2 => 0b01,
-            })
-        });
-
-        crate::rom::ets_delay_us(3);
-    }
-
-    fn set_slow_freq(slow_freq: RtcSlowClock) {
-        LPWR::regs()
-            .lp_clk_conf()
-            .modify(|_, w| unsafe { w.slow_clk_sel().bits(slow_freq as u8) });
-
-        LPWR::regs().clk_to_hp().modify(|_, w| {
-            w.icg_hp_xtal32k()
-                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal));
-            w.icg_hp_osc32k()
-                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kRc))
-        });
-    }
-
-    /// Get the RTC_SLOW_CLK source
-    pub fn slow_freq() -> RtcSlowClock {
-        match LPWR::regs().lp_clk_conf().read().slow_clk_sel().bits() {
-            0 => RtcSlowClock::RtcSlowClockRcSlow,
-            1 => RtcSlowClock::RtcSlowClock32kXtal,
-            2 => RtcSlowClock::RtcSlowClock32kRc,
-            3 => RtcSlowClock::RtcSlowOscSlow,
-            _ => unreachable!(),
-        }
-    }
 }

@@ -8,10 +8,10 @@ use crate::{
 pub(crate) fn init() {}
 
 pub(crate) fn configure_clock() {
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
 
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRtc);
+        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
 
         let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {

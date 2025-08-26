@@ -18,9 +18,8 @@ use crate::{
         },
     },
     peripherals::{LP_AON, LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::{RtcCalSel, RtcClock, RtcSlowClock},
+    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
     soc::regi2c,
-    time::Rate,
 };
 
 fn pmu_power_domain_force_default() {
@@ -1183,71 +1182,6 @@ pub enum SocResetReason {
     CoreUsbJtag   = 0x16,
     /// JTAG resets CPU
     Cpu0JtagCpu   = 0x18,
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone, Copy)]
-/// RTC SLOW_CLK frequency values
-pub(crate) enum RtcFastClock {
-    /// Select RC_FAST_CLK as RTC_FAST_CLK source
-    RtcFastClockRcFast = 0,
-    /// Select XTAL_D2_CLK as RTC_FAST_CLK source
-    RtcFastClockXtalD2 = 1,
-}
-
-impl Clock for RtcFastClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            RtcFastClock::RtcFastClockXtalD2 => {
-                // TODO: Is the value correct?
-                Rate::from_hz(40_000_000 / 2)
-            }
-            RtcFastClock::RtcFastClockRcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
-        }
-    }
-}
-
-/// RTC Watchdog Timer driver
-impl RtcClock {
-    /// Get the RTC_SLOW_CLK source
-    pub fn slow_freq() -> RtcSlowClock {
-        match LP_CLKRST::regs().lp_clk_conf().read().slow_clk_sel().bits() {
-            0 => RtcSlowClock::RtcSlowClockRcSlow,
-            1 => RtcSlowClock::RtcSlowClock32kXtal,
-            2 => RtcSlowClock::RtcSlowClock32kRc,
-            3 => RtcSlowClock::RtcSlowOscSlow,
-            _ => unreachable!(),
-        }
-    }
-
-    fn set_slow_freq(slow_freq: RtcSlowClock) {
-        unsafe {
-            LP_CLKRST::regs()
-                .lp_clk_conf()
-                .modify(|_, w| w.slow_clk_sel().bits(slow_freq as u8));
-        }
-
-        LP_CLKRST::regs().clk_to_hp().modify(|_, w| {
-            w.icg_hp_xtal32k()
-                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kXtal));
-            w.icg_hp_osc32k()
-                .bit(matches!(slow_freq, RtcSlowClock::RtcSlowClock32kRc))
-        });
-    }
-
-    // TODO: IDF-5781 Some of esp32c6 SOC_RTC_FAST_CLK_SRC_XTAL_D2 rtc_fast clock
-    // has timing issue Force to use SOC_RTC_FAST_CLK_SRC_RC_FAST since 2nd
-    // stage bootloader https://github.com/espressif/esp-idf/blob/master/components/bootloader_support/src/bootloader_clock_init.c#L65-L67
-    fn set_fast_freq(fast_freq: RtcFastClock) {
-        LP_CLKRST::regs().lp_clk_conf().modify(|_, w| {
-            w.fast_clk_sel().bit(match fast_freq {
-                RtcFastClock::RtcFastClockRcFast => false,
-                RtcFastClock::RtcFastClockXtalD2 => true,
-            })
-        });
-
-        crate::rom::ets_delay_us(3);
-    }
 }
 
 pub(crate) fn rtc_clk_cpu_freq_set_xtal() {

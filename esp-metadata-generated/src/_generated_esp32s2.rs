@@ -49,10 +49,16 @@ macro_rules! property {
         stringify!(1000000)
     };
     ("soc.rc_fast_clk_default") => {
-        8000000
+        8500000
     };
     ("soc.rc_fast_clk_default", str) => {
-        stringify!(8000000)
+        stringify!(8500000)
+    };
+    ("soc.rc_slow_clock") => {
+        90000
+    };
+    ("soc.rc_slow_clock", str) => {
+        stringify!(90000)
     };
     ("soc.xtal_frequency") => {
         40
