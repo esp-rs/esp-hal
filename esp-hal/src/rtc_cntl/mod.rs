@@ -144,6 +144,8 @@ cfg_if::cfg_if! {
         use crate::peripherals::LP_WDT;
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
+
+        use rtc::{RtcSlowClock, RtcCalSel}; // TODO: bring the types into this module
     } else {
         use crate::peripherals::LPWR as LP_WDT;
         use crate::peripherals::LPWR as LP_TIMER;
@@ -781,7 +783,7 @@ impl RtcClock {
             // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
             // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
             // chips by 32 to avoid excessive calibration time.
-            slowclk_cycles >>= 5;
+            slowclk_cycles >> 5
         } else {
             slowclk_cycles
         };

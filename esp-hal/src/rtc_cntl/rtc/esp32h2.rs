@@ -300,7 +300,7 @@ impl RtcClock {
     /// Calibration of RTC_SLOW_CLK is performed using a special feature of
     /// TIMG0. This feature counts the number of XTAL clock cycles within a
     /// given number of RTC_SLOW_CLK cycles.
-    fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+    pub(crate) fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
         const SOC_CLK_RC_FAST_FREQ_APPROX: u32 = 17_500_000;
         const SOC_CLK_RC_SLOW_FREQ_APPROX: u32 = 136_000;
         const SOC_CLK_XTAL32K_FREQ_APPROX: u32 = 32768;
