@@ -25,7 +25,7 @@ pub enum PsramVaddrMode {
     #[default]
     Normal = 0,
     /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
-    /// CPU has high 2M,
+    /// CPU has high 2M.
     ///
     /// In this mode the two cores will access different parts of PSRAM.
     Lowhigh,
