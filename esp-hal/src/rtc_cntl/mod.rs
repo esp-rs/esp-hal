@@ -115,6 +115,8 @@ use esp_rom_sys::rom::ets_delay_us;
 pub use self::rtc::SocResetReason;
 #[cfg(not(esp32))]
 use crate::efuse::Efuse;
+#[cfg(not(any(esp32c6, esp32h2)))]
+use crate::peripherals::LPWR;
 #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
 use crate::rtc_cntl::sleep::{RtcSleepConfig, WakeSource, WakeTriggers};
 use crate::{
@@ -122,10 +124,8 @@ use crate::{
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, TIMG0},
     system::{Cpu, SleepSource},
-    time::Duration,
+    time::{Duration, Rate},
 };
-#[cfg(not(any(esp32c6, esp32h2)))]
-use crate::{peripherals::LPWR, time::Rate};
 // only include sleep where it's been implemented
 #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
 pub mod sleep;
@@ -144,8 +144,6 @@ cfg_if::cfg_if! {
         use crate::peripherals::LP_WDT;
         use crate::peripherals::LP_TIMER;
         use crate::peripherals::LP_AON;
-
-        use rtc::{RtcSlowClock, RtcCalSel}; // TODO: bring the types into this module
     } else {
         use crate::peripherals::LPWR as LP_WDT;
         use crate::peripherals::LPWR as LP_TIMER;
@@ -254,6 +252,34 @@ impl Clock for RtcSlowClock {
     }
 }
 
+/// RTC SLOW_CLK frequency values
+#[allow(clippy::enum_variant_names)]
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+#[cfg(any(esp32c6, esp32h2))]
+pub enum RtcSlowClock {
+    /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
+    RtcSlowClockRcSlow  = 0,
+    /// Select XTAL32K_CLK as RTC_SLOW_CLK source
+    RtcSlowClock32kXtal = 1,
+    /// Select RC32K_CLK as RTC_SLOW_CLK source
+    RtcSlowClock32kRc   = 2,
+    /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
+    RtcSlowOscSlow      = 3,
+}
+
+#[cfg(any(esp32c6, esp32h2))]
+impl Clock for RtcSlowClock {
+    fn frequency(&self) -> Rate {
+        match self {
+            RtcSlowClock::RtcSlowClockRcSlow => Rate::from_hz(property!("soc.rc_slow_clock")),
+            RtcSlowClock::RtcSlowClock32kXtal => Rate::from_hz(32_768),
+            RtcSlowClock::RtcSlowClock32kRc => Rate::from_hz(32_768),
+            RtcSlowClock::RtcSlowOscSlow => Rate::from_hz(32_768),
+        }
+    }
+}
+
 #[allow(unused)]
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -270,6 +296,24 @@ pub(crate) enum RtcCalSel {
     #[cfg(not(esp32))]
     /// Internal 150 KHz RC oscillator
     RtcCalInternalOsc = 3,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+/// Clock source to be calibrated using rtc_clk_cal function
+pub(crate) enum RtcCalSel {
+    /// Currently selected RTC SLOW_CLK
+    RtcCalRtcMux     = -1,
+    /// Internal 150kHz RC oscillator
+    RtcCalRcSlow     = 0,
+    /// External 32kHz XTAL, as one type of 32k clock
+    RtcCal32kXtal    = 1,
+    /// Internal 32kHz RC oscillator, as one type of 32k clock
+    RtcCal32kRc      = 2,
+    /// External slow clock signal input by lp_pad_gpio0, as one type of 32k
+    /// clock
+    RtcCal32kOscSlow = 3,
+    /// Internal MHz-range RC oscillator
+    RtcCalRcFast,
 }
 
 /// Low-power Management
@@ -768,6 +812,290 @@ impl RtcClock {
         cal_val
     }
 
+    /// Calibration of RTC_SLOW_CLK is performed using a special feature of
+    /// TIMG0. This feature counts the number of XTAL clock cycles within a
+    /// given number of RTC_SLOW_CLK cycles.
+    #[cfg(any(esp32c6, esp32h2))]
+    pub(crate) fn calibrate_internal(mut cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
+        use crate::peripherals::{LP_CLKRST, PCR, PMU};
+
+        #[derive(Clone, Copy)]
+        enum RtcCaliClkSel {
+            CaliClkRcSlow = 0,
+            CaliClkRcFast = 1,
+            CaliClk32k    = 2,
+        }
+
+        if cal_clk == RtcCalSel::RtcCalRtcMux {
+            cal_clk = match cal_clk {
+                RtcCalSel::RtcCalRtcMux => match RtcClock::slow_freq() {
+                    RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                    RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                    _ => cal_clk,
+                },
+                RtcCalSel::RtcCal32kOscSlow => RtcCalSel::RtcCalRtcMux,
+                _ => cal_clk,
+            };
+        }
+
+        let clk_src = RtcClock::slow_freq();
+
+        if cal_clk == RtcCalSel::RtcCalRtcMux {
+            cal_clk = match clk_src {
+                RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRcSlow,
+                RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
+            };
+        }
+
+        let cali_clk_sel;
+        if cal_clk == RtcCalSel::RtcCalRtcMux {
+            cal_clk = match clk_src {
+                RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRcSlow,
+                RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
+                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
+                RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCalRcSlow,
+            }
+        }
+
+        if cal_clk == RtcCalSel::RtcCalRcFast {
+            cali_clk_sel = RtcCaliClkSel::CaliClkRcFast;
+        } else if cal_clk == RtcCalSel::RtcCalRcSlow {
+            cali_clk_sel = RtcCaliClkSel::CaliClkRcSlow;
+        } else {
+            cali_clk_sel = RtcCaliClkSel::CaliClk32k;
+
+            match cal_clk {
+                RtcCalSel::RtcCalRtcMux | RtcCalSel::RtcCalRcSlow | RtcCalSel::RtcCalRcFast => {}
+                RtcCalSel::RtcCal32kRc => {
+                    PCR::regs()
+                        .ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(0) });
+                }
+                RtcCalSel::RtcCal32kXtal => {
+                    PCR::regs()
+                        .ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(1) });
+                }
+                RtcCalSel::RtcCal32kOscSlow => {
+                    PCR::regs()
+                        .ctrl_32k_conf()
+                        .modify(|_, w| unsafe { w.clk_32k_sel().bits(2) });
+                }
+            }
+        }
+
+        // Enable requested clock (150k is always on)
+        // Some delay is required before the time is stable
+        // Only enable if originaly was disabled
+        // If clock is already on, do nothing
+
+        let dig_32k_xtal_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_xtal32k()
+            .bit_is_set();
+
+        if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
+            LP_CLKRST::regs()
+                .clk_to_hp()
+                .modify(|_, w| w.icg_hp_xtal32k().set_bit());
+        }
+
+        // TODO: very hacky - icg_hp_xtal32k is already set in the above condition?
+        // in ESP-IDF these are not called in this function but the fields are set
+        LP_CLKRST::regs()
+            .clk_to_hp()
+            .modify(|_, w| w.icg_hp_xtal32k().set_bit());
+        PMU::regs().hp_sleep_lp_ck_power().modify(|_, w| {
+            w.hp_sleep_xpd_xtal32k().set_bit();
+            w.hp_sleep_xpd_rc32k().set_bit()
+        });
+
+        let rc_fast_enabled = PMU::regs()
+            .hp_sleep_lp_ck_power()
+            .read()
+            .hp_sleep_xpd_fosc_clk()
+            .bit_is_set();
+        let dig_rc_fast_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_fosc()
+            .bit_is_set();
+
+        if cal_clk == RtcCalSel::RtcCalRcFast {
+            if !rc_fast_enabled {
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
+                    .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
+                crate::rom::ets_delay_us(50);
+            }
+
+            if !dig_rc_fast_enabled {
+                LP_CLKRST::regs()
+                    .clk_to_hp()
+                    .modify(|_, w| w.icg_hp_fosc().set_bit());
+                crate::rom::ets_delay_us(5);
+            }
+        }
+
+        let rc32k_enabled = PMU::regs()
+            .hp_sleep_lp_ck_power()
+            .read()
+            .hp_sleep_xpd_rc32k()
+            .bit_is_set();
+        let dig_rc32k_enabled = LP_CLKRST::regs()
+            .clk_to_hp()
+            .read()
+            .icg_hp_osc32k()
+            .bit_is_set();
+
+        if cal_clk == RtcCalSel::RtcCal32kRc {
+            if !rc32k_enabled {
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
+                    .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+                crate::rom::ets_delay_us(300);
+            }
+
+            if !dig_rc32k_enabled {
+                LP_CLKRST::regs()
+                    .clk_to_hp()
+                    .modify(|_, w| w.icg_hp_osc32k().set_bit());
+            }
+        }
+
+        // Check if there is already running calibration process
+        // TODO: &mut TIMG0 for calibration
+        let timg0 = TIMG0::regs();
+
+        if timg0
+            .rtccalicfg()
+            .read()
+            .rtc_cali_start_cycling()
+            .bit_is_set()
+        {
+            timg0
+                .rtccalicfg2()
+                .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(1) });
+
+            // Set small timeout threshold to accelerate the generation of timeot
+            // Internal circuit will be reset when timeout occurs and will not affect the
+            // next calibration
+            while !timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_set()
+                && !timg0.rtccalicfg2().read().rtc_cali_timeout().bit_is_set()
+            {}
+        }
+
+        // Prepare calibration
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| unsafe { w.rtc_cali_clk_sel().bits(cali_clk_sel as u8) });
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start_cycling().clear_bit());
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| unsafe { w.rtc_cali_max().bits(slowclk_cycles as u16) });
+
+        let expected_frequency = match cali_clk_sel {
+            RtcCaliClkSel::CaliClk32k => {
+                timg0.rtccalicfg2().modify(|_, w| unsafe {
+                    w.rtc_cali_timeout_thres().bits(slowclk_cycles << 12)
+                });
+                RtcSlowClock::RtcSlowClock32kXtal.frequency()
+            }
+            RtcCaliClkSel::CaliClkRcFast => {
+                timg0
+                    .rtccalicfg2()
+                    .modify(|_, w| unsafe { w.rtc_cali_timeout_thres().bits(0x01FFFFFF) });
+                rtc::RtcFastClock::RtcFastClockRcFast.frequency()
+            }
+            RtcCaliClkSel::CaliClkRcSlow => {
+                timg0.rtccalicfg2().modify(|_, w| unsafe {
+                    w.rtc_cali_timeout_thres().bits(slowclk_cycles << 10)
+                });
+                RtcSlowClock::RtcSlowClockRcSlow.frequency()
+            }
+        };
+
+        let us_time_estimate = Rate::from_mhz(slowclk_cycles) / expected_frequency;
+
+        // Start calibration
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().set_bit());
+
+        // Wait for calibration to finish up to another us_time_estimate
+        crate::rom::ets_delay_us(us_time_estimate);
+
+        let cal_val = loop {
+            if timg0.rtccalicfg().read().rtc_cali_rdy().bit_is_set() {
+                // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
+                // So we need to multiply the frequency of the Fosc for ECO1 and above chips by
+                // 32 times. And ensure that this modification will not affect
+                // ECO0.
+                // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
+                #[cfg(esp32c6)]
+                if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RtcCalRcFast {
+                    break timg0.rtccalicfg1().read().rtc_cali_value().bits() >> 5;
+                }
+                break timg0.rtccalicfg1().read().rtc_cali_value().bits();
+            }
+
+            if timg0.rtccalicfg2().read().rtc_cali_timeout().bit_is_set() {
+                // Timed out waiting for calibration
+                break 0;
+            }
+        };
+
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+
+        if cal_clk == RtcCalSel::RtcCal32kXtal && !dig_32k_xtal_enabled {
+            LP_CLKRST::regs()
+                .clk_to_hp()
+                .modify(|_, w| w.icg_hp_xtal32k().clear_bit());
+        }
+
+        if cal_clk == RtcCalSel::RtcCalRcFast {
+            if rc_fast_enabled {
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
+                    .modify(|_, w| w.hp_sleep_xpd_fosc_clk().set_bit());
+                crate::rom::ets_delay_us(50);
+            }
+
+            if dig_rc_fast_enabled {
+                LP_CLKRST::regs()
+                    .clk_to_hp()
+                    .modify(|_, w| w.icg_hp_fosc().set_bit());
+                crate::rom::ets_delay_us(5);
+            }
+        }
+
+        if cal_clk == RtcCalSel::RtcCal32kRc {
+            if rc32k_enabled {
+                PMU::regs()
+                    .hp_sleep_lp_ck_power()
+                    .modify(|_, w| w.hp_sleep_xpd_rc32k().set_bit());
+                crate::rom::ets_delay_us(300);
+            }
+            if dig_rc32k_enabled {
+                LP_CLKRST::regs()
+                    .clk_to_hp()
+                    .modify(|_, w| w.icg_hp_osc32k().set_bit());
+            }
+        }
+
+        cal_val
+    }
+
     /// Measure RTC slow clock's period, based on main XTAL frequency
     ///
     /// This function will time out and return 0 if the time for the given
@@ -831,7 +1159,7 @@ impl RtcClock {
 
         cfg_if::cfg_if! {
             if #[cfg(any(esp32h2, esp32c6))] {
-                let calibration_clock = rtc::RtcSlowClock::RtcSlowClockRcSlow;
+                let calibration_clock = RtcSlowClock::RtcSlowClockRcSlow;
             } else {
                 let calibration_clock = RtcSlowClock::RtcSlowClockRtc;
             }
