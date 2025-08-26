@@ -13,6 +13,29 @@ pub enum PsramCacheSpeed {
     PsramCacheF80mS80m,
 }
 
+/// PSRAM virtual address mode.
+///
+/// Specifies how PSRAM is mapped for the CPU cores.
+#[derive(PartialEq, Eq, Clone, Copy, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PsramVaddrMode {
+    /// App and pro CPU use their own flash cache for external RAM access.
+    ///
+    /// In this mode both cores access the same physical PSRAM.
+    #[default]
+    Normal = 0,
+    /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
+    /// CPU has high 2M,
+    ///
+    /// In this mode the two cores will access different parts of PSRAM.
+    Lowhigh,
+    /// App and pro CPU share external RAM caches: pro CPU does even 32 byte
+    /// ranges, app does odd ones.
+    ///
+    /// In this mode the two cores will access different parts of PSRAM.
+    Evenodd,
+}
+
 /// PSRAM configuration
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -21,6 +44,8 @@ pub struct PsramConfig {
     pub size: PsramSize,
     /// Cache speed
     pub cache_speed: PsramCacheSpeed,
+    /// PSRAM virtual address mode
+    pub psram_vaddr_mode: PsramVaddrMode,
 }
 
 /// Initializes the PSRAM memory on supported devices.
@@ -446,24 +471,10 @@ pub(crate) mod utils {
         psram_set_cs_timing_spi0(mode, clk_mode); // SPI_CACHE_PORT
         psram_enable_qio_mode_spi1(clk_mode, mode);
 
-        let psram_mode = PsramVaddrMode::Normal;
-        info!("PS-RAM vaddrmode = {:?}", psram_mode);
+        let psram_vaddr_mode = config.psram_vaddr_mode;
+        info!("PS-RAM vaddrmode = {:?}", psram_vaddr_mode);
 
-        psram_cache_init(mode, psram_mode, clk_mode, extra_dummy);
-    }
-
-    #[allow(unused)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-    enum PsramVaddrMode {
-        /// App and pro CPU use their own flash cache for external RAM access
-        Normal = 0,
-        /// App and pro CPU share external RAM caches: pro CPU has low * 2M, app
-        /// CPU has high 2M
-        Lowhigh,
-        ///  App and pro CPU share external RAM caches: pro CPU does even 32yte
-        /// ranges, app does odd ones.
-        Evenodd,
+        psram_cache_init(mode, psram_vaddr_mode, clk_mode, extra_dummy);
     }
 
     // register initialization for sram cache params and r/w commands
