@@ -592,7 +592,7 @@ pub(crate) mod utils {
             dport
                 .app_cache_ctrl()
                 .modify(|_, w| w.app_dram_hl().clear_bit().app_dram_split().clear_bit());
-            if vaddrmode == PsramVaddrMode::Lowhigh {
+            if vaddrmode == PsramVaddrMode::LowHigh {
                 dport
                     .pro_cache_ctrl()
                     .modify(|_, w| w.pro_dram_hl().set_bit());
