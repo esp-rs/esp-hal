@@ -21,8 +21,6 @@ use esp_hal::{clock::CpuClock, peripherals::Peripherals, timer::timg::TimerGroup
 use esp_radio::ble::controller::BleConnector;
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 // Compile-time test to check that esp-radio can be reinitialized.
 fn _esp_radio_can_be_reinited() {
     let p = esp_hal::init(esp_hal::Config::default());

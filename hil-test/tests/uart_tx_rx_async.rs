@@ -12,8 +12,6 @@ use esp_hal::{
 };
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 struct Context {
     rx: UartRx<'static, Async>,
     tx: UartTx<'static, Async>,

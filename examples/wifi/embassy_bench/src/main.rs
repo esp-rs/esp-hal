@@ -158,10 +158,11 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::Client(ClientConfiguration {
-                ssid: SSID.into(),
-                password: PASSWORD.into(),
-                ..Default::default()
+            let client_config = Configuration::Client({
+                let mut config = ClientConfiguration::default();
+                config.ssid = SSID.into();
+                config.password = PASSWORD.into();
+                config
             });
             controller.set_configuration(&client_config).unwrap();
             println!("Starting wifi");

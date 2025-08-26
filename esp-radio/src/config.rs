@@ -1,6 +1,6 @@
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Tunable parameters for the WiFi driver
+/// Tunable parameters for the Wi-Fi driver
 #[allow(unused)] // currently there are no ble tunables
 pub(crate) struct Config {
     pub(crate) rx_queue_size: usize,
