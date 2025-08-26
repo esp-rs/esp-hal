@@ -1,7 +1,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use anyhow::{Result, anyhow};
@@ -553,27 +552,6 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     }
 
     Ok(())
-}
-
-/// Check for unused dependencies across the entire `esp-hal` workspace using `cargo machete`.
-pub fn check_unused_deps() -> Result<()> {
-    log::info!("Checking unused dependencies across `esp-hal` workspace");
-
-    let status = Command::new("cargo-machete")
-        .arg(".")
-        .status()
-        .expect("Failed to execute cargo machete");
-
-    match status.code() {
-        Some(0) => {
-            log::info!("No unused dependencies found!");
-            Ok(())
-        }
-        Some(1) => Err(anyhow!("Unused dependencies detected!")),
-        Some(2) => Err(anyhow!("cargo machete failed to run!")),
-        Some(code) => Err(anyhow!("Unexpected exit code from cargo machete: {}", code)),
-        None => Err(anyhow!("cargo machete terminated by signal")),
-    }
 }
 
 fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {

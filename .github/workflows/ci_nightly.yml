@@ -61,4 +61,4 @@ jobs:
       - name: Install and run cargo machete
         run: |
           cargo install cargo-machete
-          cargo xtask check-unused-deps --toolchain nightly
+          cargo machete

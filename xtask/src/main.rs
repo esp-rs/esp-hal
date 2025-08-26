@@ -11,7 +11,6 @@ use strum::IntoEnumIterator;
 use xtask::{
     Package,
     cargo::{CargoAction, CargoArgsBuilder},
-    check_unused_deps,
     commands::*,
     update_metadata,
 };
@@ -46,8 +45,6 @@ enum Cli {
     CheckChangelog(CheckChangelogArgs),
     /// Re-generate metadata and the chip support table in the esp-hal README.
     UpdateMetadata(UpdateMetadataArgs),
-    /// Check for unused dependencies accross whole esp-hal workspace.
-    CheckUnusedDeps,
 }
 
 #[derive(Debug, Args)]
@@ -176,7 +173,6 @@ fn main() -> Result<()> {
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
-        Cli::CheckUnusedDeps => check_unused_deps(),
     }
 }
 
