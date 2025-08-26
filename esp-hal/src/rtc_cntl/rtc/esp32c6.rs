@@ -1522,14 +1522,10 @@ impl RtcClock {
                 // 32 times. And ensure that this modification will not affect
                 // ECO0.
                 // https://github.com/espressif/esp-idf/commit/e3148369f32fdc6de62c35a67f7adb6f4faef4e3
-                if Efuse::chip_revision() > 0 {
-                    if cal_clk == RtcCalSel::RtcCalRcFast {
-                        break timg0.rtccalicfg1().read().rtc_cali_value().bits() >> 5;
-                    }
-                    break timg0.rtccalicfg1().read().rtc_cali_value().bits();
-                } else {
-                    break timg0.rtccalicfg1().read().rtc_cali_value().bits();
+                if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RtcCalRcFast {
+                    break timg0.rtccalicfg1().read().rtc_cali_value().bits() >> 5;
                 }
+                break timg0.rtccalicfg1().read().rtc_cali_value().bits();
             }
 
             if timg0.rtccalicfg2().read().rtc_cali_timeout().bit_is_set() {
@@ -1579,51 +1575,6 @@ impl RtcClock {
         }
 
         cal_val
-    }
-
-    /// Measure RTC slow clock's period, based on main XTAL frequency
-    ///
-    /// This function will time out and return 0 if the time for the given
-    /// number of cycles to be counted exceeds the expected time twice. This
-    /// may happen if 32k XTAL is being calibrated, but the oscillator has
-    /// not started up (due to incorrect loading capacitance, board design
-    /// issue, or lack of 32 XTAL on board).
-    fn calibrate(cal_clk: RtcCalSel, slowclk_cycles: u32) -> u32 {
-        let xtal_freq = RtcClock::xtal_freq();
-
-        let mut slowclk_cycles = slowclk_cycles;
-
-        // The Fosc CLK of calibration circuit is divided by 32 for ECO1.
-        // So we need to divide the calibrate cycles of the FOSC for ECO1 and above
-        // chips by 32 to avoid excessive calibration time.
-        if Efuse::chip_revision() > 0 && cal_clk == RtcCalSel::RtcCalRcFast {
-            slowclk_cycles >>= 5;
-        }
-
-        let xtal_cycles = RtcClock::calibrate_internal(cal_clk, slowclk_cycles) as u64;
-        let divider = xtal_freq.mhz() as u64 * slowclk_cycles as u64;
-        let period_64 = ((xtal_cycles << RtcClock::CAL_FRACT) + divider / 2u64 - 1u64) / divider;
-
-        (period_64 & u32::MAX as u64) as u32
-    }
-
-    /// Calculate the necessary RTC_SLOW_CLK cycles to complete 1 millisecond.
-    pub(crate) fn cycles_to_1ms() -> u16 {
-        let period_13q19 = RtcClock::calibrate(
-            match RtcClock::slow_freq() {
-                RtcSlowClock::RtcSlowClockRcSlow => RtcCalSel::RtcCalRtcMux,
-                RtcSlowClock::RtcSlowClock32kXtal => RtcCalSel::RtcCal32kXtal,
-                RtcSlowClock::RtcSlowClock32kRc => RtcCalSel::RtcCal32kRc,
-                RtcSlowClock::RtcSlowOscSlow => RtcCalSel::RtcCal32kOscSlow,
-                // RtcSlowClock::RtcCalRcFast => RtcCalSel::RtcCalRcFast,
-            },
-            1024,
-        );
-
-        // 100_000_000 is used to get rid of `float` calculations
-        let period = (100_000_000 * period_13q19 as u64) / (1 << RtcClock::CAL_FRACT);
-
-        (100_000_000 * 1000 / period) as u16
     }
 }
 

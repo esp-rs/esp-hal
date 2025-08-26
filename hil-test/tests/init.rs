@@ -36,10 +36,14 @@ mod tests {
         let mut wdt0 = timg0.wdt;
         let delay = Delay::new();
 
-        for _ in 0..4 {
+        // Loop for more than the timeout of the watchdog.
+        for _ in 0..6 {
             wdt0.feed();
-            delay.delay(Duration::from_millis(250));
+            delay.delay(Duration::from_millis(100));
         }
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        wdt0.disable();
     }
 
     #[test]
@@ -70,10 +74,14 @@ mod tests {
         let mut wdt1 = timg1.wdt;
         let delay = Delay::new();
 
-        for _ in 0..4 {
+        // Loop for more than the timeout of the watchdog.
+        for _ in 0..6 {
             wdt1.feed();
-            delay.delay(Duration::from_millis(250));
+            delay.delay(Duration::from_millis(100));
         }
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        wdt1.disable();
     }
 
     #[test]
@@ -92,27 +100,36 @@ mod tests {
         let mut wdt0 = timg0.wdt;
         let delay = Delay::new();
 
-        for _ in 0..4 {
+        // Loop for more than the timeout of the watchdog.
+        for _ in 0..6 {
             wdt0.feed();
-            delay.delay(Duration::from_millis(250));
+            delay.delay(Duration::from_millis(100));
         }
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        wdt0.disable();
     }
 
     #[test]
-    #[timeout(4)]
     fn test_feeding_rtc_wdt() {
         let peripherals = esp_hal::init(
             Config::default().with_watchdog(
                 WatchdogConfig::default()
-                    .with_rwdt(WatchdogStatus::Enabled(Duration::from_millis(3000))),
+                    .with_rwdt(WatchdogStatus::Enabled(Duration::from_millis(500))),
             ),
         );
 
         let mut rtc = Rtc::new(peripherals.LPWR);
         let delay = Delay::new();
 
-        rtc.rwdt.feed();
-        delay.delay(Duration::from_millis(2500));
+        // Loop for more than the timeout of the watchdog.
+        for _ in 0..6 {
+            rtc.rwdt.feed();
+            delay.delay(Duration::from_millis(100));
+        }
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        rtc.rwdt.disable();
     }
 
     #[test]
@@ -120,6 +137,6 @@ mod tests {
         esp_hal::init(Config::default());
 
         let delay = Delay::new();
-        delay.delay(Duration::from_millis(2000));
+        delay.delay(Duration::from_millis(1000));
     }
 }
