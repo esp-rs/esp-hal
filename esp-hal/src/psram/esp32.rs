@@ -28,7 +28,7 @@ pub enum PsramVaddrMode {
     /// CPU has high 2M.
     ///
     /// In this mode the two cores will access different parts of PSRAM.
-    Lowhigh,
+    LowHigh,
     /// App and pro CPU share external RAM caches: pro CPU does even 32 byte
     /// ranges, app does odd ones.
     ///
