@@ -119,14 +119,16 @@ async fn main(spawner: Spawner) -> ! {
     );
 
     let client_config = Configuration::Mixed(
-        ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
-            ..Default::default()
+        {
+            let mut client_config = ClientConfiguration::default();
+            client_config.ssid = SSID.into();
+            client_config.password = PASSWORD.into();
+            client_config
         },
-        AccessPointConfiguration {
-            ssid: "esp-radio".into(),
-            ..Default::default()
+        {
+            let mut ap_config = AccessPointConfiguration::default();
+            ap_config.ssid = "esp-radio".into();
+            ap_config
         },
     );
     controller.set_configuration(&client_config).unwrap();
