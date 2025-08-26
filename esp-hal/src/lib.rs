@@ -637,10 +637,10 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
+    Clocks::init(config.cpu_clock);
+
     // RTC domain must be enabled before we try to disable
     let mut rtc = crate::rtc_cntl::Rtc::new(peripherals.LPWR.reborrow());
-
-    Clocks::init(config.cpu_clock);
 
     // Handle watchdog configuration with defaults
     cfg_if::cfg_if! {
