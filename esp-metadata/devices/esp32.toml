@@ -608,7 +608,7 @@ memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]
+algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
 [device.spi_master]
 support_status = "supported"
