@@ -25,7 +25,6 @@ use esp_wifi_sys::include::{
     WIFI_PROTOCOL_11G,
     WIFI_PROTOCOL_11N,
     WIFI_PROTOCOL_LR,
-    wifi_pkt_rx_ctrl_t,
     wifi_scan_channel_bitmap_t,
 };
 #[cfg(feature = "wifi-eap")]
@@ -55,6 +54,7 @@ use esp_wifi_sys::include::{
     esp_wifi_80211_tx,
     esp_wifi_set_promiscuous,
     esp_wifi_set_promiscuous_rx_cb,
+    wifi_pkt_rx_ctrl_t,
     wifi_promiscuous_pkt_t,
     wifi_promiscuous_pkt_type_t,
 };
@@ -149,7 +149,7 @@ use crate::binary::{
 };
 
 /// Supported Wi-Fi authentication methods.
-#[derive(Debug, Default, PartialOrd, EnumSetType)]
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[non_exhaustive]
@@ -210,7 +210,7 @@ pub enum Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(EnumSetType, Debug, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
@@ -271,7 +271,7 @@ impl defmt::Format for Country {
 }
 
 /// Information about a detected Wi-Fi access point.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[non_exhaustive]
@@ -301,33 +301,35 @@ pub struct AccessPointInfo {
 }
 
 /// Configuration for a Wi-Fi access point.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(BuilderLite, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[non_exhaustive]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
-    pub ssid: String,
+    #[builder_lite(reference)]
+    ssid: String,
 
     /// Whether the SSID is hidden or visible.
-    pub ssid_hidden: bool,
+    ssid_hidden: bool,
 
     /// The channel the access point will operate on.
-    pub channel: u8,
+    channel: u8,
 
     /// The secondary channel configuration.
-    pub secondary_channel: Option<u8>,
+    secondary_channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
-    pub protocols: EnumSet<Protocol>,
+    protocols: EnumSet<Protocol>,
 
     /// The authentication method to be used by the access point.
-    pub auth_method: AuthMethod,
+    auth_method: AuthMethod,
 
     /// The password for securing the access point (if applicable).
-    pub password: String,
+    #[builder_lite(reference)]
+    password: String,
 
     /// The maximum number of connections allowed on the access point.
-    pub max_connections: u16,
+    max_connections: u16,
 }
 
 impl AccessPointConfig {
@@ -419,25 +421,27 @@ impl defmt::Format for AccessPointConfig {
 }
 
 /// Client configuration for a Wi-Fi connection.
-#[derive(Clone, PartialEq, Eq, Default)]
+#[derive(BuilderLite, Clone, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[non_exhaustive]
 pub struct ClientConfig {
     /// The SSID of the Wi-Fi network.
-    pub ssid: String,
+    #[builder_lite(reference)]
+    ssid: String,
 
     /// The BSSID (MAC address) of the client.
-    pub bssid: Option<[u8; 6]>,
+    bssid: Option<[u8; 6]>,
 
     // pub protocol: Protocol,
     /// The authentication method for the Wi-Fi connection.
-    pub auth_method: AuthMethod,
+    auth_method: AuthMethod,
 
     /// The password for the Wi-Fi connection.
-    pub password: String,
+    #[builder_lite(reference)]
+    password: String,
 
     /// The Wi-Fi channel to connect to.
-    pub channel: Option<u8>,
+    channel: Option<u8>,
 }
 
 impl ClientConfig {
@@ -908,6 +912,7 @@ impl AuthMethodExt for AuthMethod {
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[non_exhaustive]
 pub enum WifiMode {
     /// Station mode.
     Sta,
@@ -1401,18 +1406,22 @@ pub enum InternalWifiError {
     TxDisallowed     = 0x3016,
 }
 
-/// Get the STA MAC address
-pub fn sta_mac(mac: &mut [u8; 6]) {
+/// Get the AP MAC address of the device.
+pub fn ap_mac() -> [u8; 6] {
+    let mut mac = [0u8; 6];
     unsafe {
-        read_mac(mac as *mut u8, 0);
+        read_mac(mac.as_mut_ptr(), 1);
     }
+    mac
 }
 
-/// Get the AP MAC address
-pub fn ap_mac(mac: &mut [u8; 6]) {
+/// Get the STA MAC address of the device.
+pub fn sta_mac() -> [u8; 6] {
+    let mut mac = [0u8; 6];
     unsafe {
-        read_mac(mac as *mut u8, 1);
+        read_mac(mac.as_mut_ptr(), 0);
     }
+    mac
 }
 
 pub(crate) fn wifi_init() -> Result<(), WifiError> {
@@ -1600,7 +1609,7 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
     Ok(())
 }
 
-/// Configuration for active or passive scan. For details see the [Wi-Fi Alliance FAQ](https://www.wi-fi.org/knowledge-center/faq/what-are-passive-and-active-scanning).
+/// Configuration for active or passive scan.
 ///
 /// # Comparison of active and passive scan
 ///
@@ -1786,7 +1795,7 @@ mod private {
 
 /// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
-pub enum WifiDeviceMode {
+enum WifiDeviceMode {
     /// Station mode.
     Sta,
     /// Access Point mode.
@@ -1796,16 +1805,8 @@ pub enum WifiDeviceMode {
 impl WifiDeviceMode {
     fn mac_address(&self) -> [u8; 6] {
         match self {
-            WifiDeviceMode::Sta => {
-                let mut mac = [0; 6];
-                sta_mac(&mut mac);
-                mac
-            }
-            WifiDeviceMode::Ap => {
-                let mut mac = [0; 6];
-                ap_mac(&mut mac);
-                mac
-            }
+            WifiDeviceMode::Sta => sta_mac(),
+            WifiDeviceMode::Ap => ap_mac(),
         }
     }
 
@@ -1952,9 +1953,10 @@ fn convert_ap_info(record: &include::wifi_ap_record_t) -> AccessPointInfo {
 
 /// The radio metadata header of the received packet, which is the common header
 /// at the beginning of all RX callback buffers in promiscuous mode.
-#[cfg(not(any(esp32c6)))]
+#[cfg(not(esp32c6))]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -2012,6 +2014,7 @@ pub struct RxControlInfo {
 #[cfg(esp32c6)]
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 pub struct RxControlInfo {
     /// Received Signal Strength Indicator (RSSI) of the packet, in dBm.
     pub rssi: i32,
@@ -2054,6 +2057,8 @@ pub struct RxControlInfo {
     /// Indicate whether the reception frame is from interface 0.
     pub rxmatch0: u32,
 }
+
+#[cfg(all(any(feature = "esp-now", feature = "sniffer"), feature = "unstable"))]
 impl RxControlInfo {
     /// Create an instance from a raw pointer to [wifi_pkt_rx_ctrl_t].
     ///
@@ -2168,17 +2173,21 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 #[instability::unstable]
 /// A Wi-Fi sniffer.
 #[non_exhaustive]
-pub struct Sniffer {}
+pub struct Sniffer<'d> {
+    _phantom: PhantomData<&'d ()>,
+}
 
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
-impl Sniffer {
+impl Sniffer<'_> {
     pub(crate) fn new() -> Self {
         // This shouldn't fail, since the way this is created, means that wifi will
         // always be initialized.
         unwrap!(esp_wifi_result!(unsafe {
             esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
         }));
-        Self {}
+        Self {
+            _phantom: PhantomData,
+        }
     }
     /// Set promiscuous mode enabled or disabled.
     #[instability::unstable]
@@ -2710,7 +2719,7 @@ pub struct Interfaces<'d> {
     /// Wi-Fi sniffer interface.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub sniffer: Sniffer,
+    pub sniffer: Sniffer<'d>,
 }
 
 /// Create a Wi-Fi controller and it's associated interfaces.
@@ -2821,6 +2830,8 @@ impl WifiController<'_> {
     /// ```
     /// wifi_controller.set_protocol(Protocol::P802D11BGNLR.into());
     /// ```
+    /// # Note
+    /// Calling this function before `set_config` will return an error.
     pub fn set_protocol(&mut self, protocols: EnumSet<Protocol>) -> Result<(), WifiError> {
         let protocol = protocols
             .into_iter()
@@ -2956,7 +2967,7 @@ impl WifiController<'_> {
     ///
     /// If you don't intend to use Wi-Fi anymore at all consider tearing down
     /// Wi-Fi completely.
-    pub fn set_configuration(&mut self, conf: &Config) -> Result<(), WifiError> {
+    pub fn set_config(&mut self, conf: &Config) -> Result<(), WifiError> {
         conf.validate()?;
 
         let mode = match conf {
@@ -2992,7 +3003,7 @@ impl WifiController<'_> {
 
     /// Set the Wi-Fi mode.
     ///
-    /// This will override the mode inferred by [Self::set_configuration].
+    /// This will override the mode inferred by [Self::set_config].
     pub fn set_mode(&mut self, mode: WifiMode) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode.into()) })?;
         Ok(())

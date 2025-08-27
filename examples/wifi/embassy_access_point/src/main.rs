@@ -249,12 +249,9 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Config::AccessPoint({
-                let mut config = AccessPointConfig::default();
-                config.ssid = "esp-radio".into();
-                config
-            });
-            controller.set_configuration(&client_config).unwrap();
+            let client_config =
+                Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+            controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");
