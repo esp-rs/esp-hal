@@ -53,23 +53,21 @@ pub(crate) fn init() {
     }
 
     regi2c::I2C_ULP_IR_FORCE_XPD_CK.write_field(0);
+
+    // clk_ll_rc_fast_enable();
+    rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
+    rtc_cntl
+        .timer1()
+        .modify(|_, w| unsafe { w.ck8m_wait().bits(5) });
+
+    // esp_rom_delay_us(SOC_DELAY_RC_FAST_ENABLE);
+    crate::rom::ets_delay_us(50);
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
 }
 
 pub(crate) fn configure_clock() {
-    unsafe {
-        // from esp_clk_init:
-        let rtc_cntl = LPWR::regs();
-        // clk_ll_rc_fast_enable();
-        rtc_cntl.clk_conf().modify(|_, w| w.enb_ck8m().clear_bit());
-        rtc_cntl.timer1().modify(|_, w| w.ck8m_wait().bits(5));
-        // esp_rom_delay_us(SOC_DELAY_RC_FAST_ENABLE);
-        crate::rom::ets_delay_us(50);
-    }
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
-
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
-
         let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {
             break res;

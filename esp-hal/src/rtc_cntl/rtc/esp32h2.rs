@@ -39,66 +39,65 @@ const I2C_PMU_OR_XPD_TRX_LSB: u8 = 2;
 
 pub(crate) fn init() {
     // * No peripheral reg i2c power up required on the target */
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_EN_I2C_RTC_DREG,
+        I2C_PMU_EN_I2C_RTC_DREG_MSB,
+        I2C_PMU_EN_I2C_RTC_DREG_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_EN_I2C_DIG_DREG,
+        I2C_PMU_EN_I2C_DIG_DREG_MSB,
+        I2C_PMU_EN_I2C_DIG_DREG_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_EN_I2C_RTC_DREG_SLP,
+        I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB,
+        I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_EN_I2C_DIG_DREG_SLP,
+        I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB,
+        I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_OR_XPD_RTC_REG,
+        I2C_PMU_OR_XPD_RTC_REG_MSB,
+        I2C_PMU_OR_XPD_RTC_REG_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_OR_XPD_DIG_REG,
+        I2C_PMU_OR_XPD_DIG_REG_MSB,
+        I2C_PMU_OR_XPD_DIG_REG_LSB,
+        0,
+    );
+    regi2c_write_mask(
+        I2C_PMU,
+        I2C_PMU_HOSTID,
+        I2C_PMU_OR_XPD_TRX,
+        I2C_PMU_OR_XPD_TRX_MSB,
+        I2C_PMU_OR_XPD_TRX_LSB,
+        0,
+    );
+
+    let pmu = PMU::regs();
     unsafe {
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_EN_I2C_RTC_DREG,
-            I2C_PMU_EN_I2C_RTC_DREG_MSB,
-            I2C_PMU_EN_I2C_RTC_DREG_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_EN_I2C_DIG_DREG,
-            I2C_PMU_EN_I2C_DIG_DREG_MSB,
-            I2C_PMU_EN_I2C_DIG_DREG_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_EN_I2C_RTC_DREG_SLP,
-            I2C_PMU_EN_I2C_RTC_DREG_SLP_MSB,
-            I2C_PMU_EN_I2C_RTC_DREG_SLP_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_EN_I2C_DIG_DREG_SLP,
-            I2C_PMU_EN_I2C_DIG_DREG_SLP_MSB,
-            I2C_PMU_EN_I2C_DIG_DREG_SLP_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_OR_XPD_RTC_REG,
-            I2C_PMU_OR_XPD_RTC_REG_MSB,
-            I2C_PMU_OR_XPD_RTC_REG_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_OR_XPD_DIG_REG,
-            I2C_PMU_OR_XPD_DIG_REG_MSB,
-            I2C_PMU_OR_XPD_DIG_REG_LSB,
-            0,
-        );
-        regi2c_write_mask(
-            I2C_PMU,
-            I2C_PMU_HOSTID,
-            I2C_PMU_OR_XPD_TRX,
-            I2C_PMU_OR_XPD_TRX_MSB,
-            I2C_PMU_OR_XPD_TRX_LSB,
-            0,
-        );
-
-        let pmu = PMU::regs();
-
         pmu.power_pd_top_cntl().write(|w| w.bits(0));
         pmu.power_pd_hpaon_cntl().write(|w| w.bits(0));
         pmu.power_pd_hpcpu_cntl().write(|w| w.bits(0));
@@ -116,14 +115,13 @@ pub(crate) fn init() {
         pmu.slp_wakeup_cntl7()
             .modify(|_, w| w.ana_wait_target().bits(1700));
     }
+
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
 }
 
 pub(crate) fn configure_clock() {
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
-
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
-
         let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {
             break res;

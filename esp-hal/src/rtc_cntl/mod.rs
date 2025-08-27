@@ -325,20 +325,12 @@ impl<'d> Rtc<'d> {
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rtc_cntl: crate::peripherals::LPWR<'d>) -> Self {
-        rtc::init();
-        rtc::configure_clock();
-
-        let this = Self {
+        Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
-        };
-
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
-        RtcSleepConfig::base_settings(&this);
-
-        this
+        }
     }
 
     /// Return estimated XTAL frequency in MHz.
@@ -817,7 +809,10 @@ impl RtcClock {
         // Start calibration
         timg0
             .rtccalicfg()
-            .modify(|_, w| w.rtc_cali_start().clear_bit().rtc_cali_start().set_bit());
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+        timg0
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().set_bit());
 
         // Wait for calibration to finish up to another us_time_estimate
         crate::rom::ets_delay_us(us_time_estimate);
@@ -849,6 +844,7 @@ impl RtcClock {
         timg0
             .rtccalicfg()
             .modify(|_, w| w.rtc_cali_start().clear_bit());
+
         rtc_cntl.clk_conf().modify(|_, w| {
             w.dig_xtal32k_en().bit(dig_32k_xtal_enabled);
             w.dig_clk8m_d256_en().bit(dig_clk8m_d256_enabled)
@@ -1208,6 +1204,10 @@ impl RtcClock {
         #[cfg(not(esp32))]
         TIMG0::regs().rtccalicfg2().reset();
 
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
+
         TIMG0::regs().rtccalicfg().write(|w| unsafe {
             w.rtc_cali_clk_sel().bits(calibration_clock as u8);
             w.rtc_cali_max().bits(SLOW_CLOCK_CYCLES as u16);
@@ -1228,6 +1228,10 @@ impl RtcClock {
         {}
 
         let cali_value = TIMG0::regs().rtccalicfg1().read().rtc_cali_value().bits();
+
+        TIMG0::regs()
+            .rtccalicfg()
+            .modify(|_, w| w.rtc_cali_start().clear_bit());
 
         (cali_value * (calibration_clock.frequency().as_hz() / SLOW_CLOCK_CYCLES)) / 1_000_000
     }
