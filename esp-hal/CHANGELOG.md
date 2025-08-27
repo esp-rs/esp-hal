@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Align `I8080` driver pin configurations with latest guidelines (#3997)
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
+- ESP32-S3: Expose more `Camera` config options (#3996)
 
 ### Changed
 
