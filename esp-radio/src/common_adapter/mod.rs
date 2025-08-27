@@ -34,6 +34,9 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
 
+static CAL_DATA: esp_hal::sync::Locked<[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]> =
+    esp_hal::sync::Locked::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
+
 /// **************************************************************************
 /// Name: esp_semphr_create
 ///
@@ -344,9 +347,6 @@ pub(crate) unsafe fn phy_disable_clock() {
 }
 
 pub(crate) fn phy_calibrate() {
-    let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
-        [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
-
     let phy_version = unsafe { get_phy_version_str() };
     trace!("phy_version {}", unsafe { str_from_c(phy_version) });
 
@@ -354,33 +354,60 @@ pub(crate) fn phy_calibrate() {
 
     unsafe {
         chip_specific::bbpll_en_usb();
+    }
 
-        cfg_if::cfg_if! {
-            if #[cfg(phy_full_calibration)] {
-                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
+    cfg_if::cfg_if! {
+        if #[cfg(phy_full_calibration)] {
+            const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
+        } else {
+            const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
+        }
+    };
+
+    cfg_if::cfg_if! {
+    if #[cfg(phy_skip_calibration_after_deep_sleep)] {
+        let calibration_mode = if crate::hal::system::reset_reason() == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep) {
+            esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
             } else {
-                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
-            }
-        };
+                CALIBRATION_MODE
+            };
+        } else {
+            let calibration_mode = CALIBRATION_MODE;
+        }
+    };
 
-        cfg_if::cfg_if! {
-            if #[cfg(phy_skip_calibration_after_deep_sleep)] {
-                let calibration_mode = if crate::hal::system::reset_reason() == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep) {
-                    esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-                } else {
-                    CALIBRATION_MODE
-                };
-            } else {
-                let calibration_mode = CALIBRATION_MODE;
-            }
-        };
+    debug!("Using calibration mode {}", calibration_mode);
 
-        debug!("Using calibration mode {}", calibration_mode);
-
+    let res = CAL_DATA.with(|cal_data| unsafe {
         register_chipv7_phy(
             init_data,
-            &mut cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
+            cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
             calibration_mode,
-        );
-    }
+        )
+    });
+
+    debug!("register_chipv7_phy result = {}", res);
+}
+
+/// Get calibration data.
+///
+/// Returns the last calibration result.
+///
+/// If you see the data is different than what was persisted before, consider persisting the new
+/// data.
+pub fn calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
+    let mut res = [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
+    CAL_DATA.with(|cal_data| {
+        res[..].copy_from_slice(cal_data);
+    });
+    res
+}
+
+/// Set calibration data.
+///
+/// This will be used next time the phy gets initialized.
+pub fn set_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
+    CAL_DATA.with(|cal_data| {
+        cal_data[..].copy_from_slice(data);
+    });
 }
