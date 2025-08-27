@@ -44,11 +44,23 @@ mod raw;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
-    /// invalid
+    /// invalid.
     Incomplete,
-    /// The requested data content is invalid
+
+    /// The requested data content is invalid.
     BadInput,
 }
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Incomplete => write!(f, "Incomplete data."),
+            Error::BadInput => write!(f, "Bad input data."),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
 
 impl From<byte::Error> for Error {
     fn from(err: byte::Error) -> Self {

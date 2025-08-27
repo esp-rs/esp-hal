@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update bt-hci version to add additional HCI commands (#3920)
 - A number of enums/structs have been marked as `#[non_exhaustive]` (#3981)
   - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, and `WifiState`
+- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
+  - Error types implements `core::error:Error`
 
 ### Fixed
 
