@@ -328,17 +328,12 @@ impl<'d> Rtc<'d> {
         rtc::init();
         rtc::configure_clock();
 
-        let this = Self {
+        Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::new(),
             #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
             swd: Swd::new(),
-        };
-
-        #[cfg(any(esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32c2))]
-        RtcSleepConfig::base_settings(&this);
-
-        this
+        }
     }
 
     /// Return estimated XTAL frequency in MHz.
