@@ -325,9 +325,6 @@ impl<'d> Rtc<'d> {
     ///
     /// Optionally an interrupt handler can be bound.
     pub fn new(rtc_cntl: crate::peripherals::LPWR<'d>) -> Self {
-        rtc::init();
-        rtc::configure_clock();
-
         Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::new(),
