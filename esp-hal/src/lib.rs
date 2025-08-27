@@ -637,8 +637,6 @@ pub fn init(config: Config) -> Peripherals {
 
     let mut peripherals = Peripherals::take();
 
-    crate::rtc_cntl::rtc::init();
-
     Clocks::init(config.cpu_clock);
 
     crate::rtc_cntl::rtc::configure_clock();
