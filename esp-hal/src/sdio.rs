@@ -20,6 +20,7 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
+use crate::gpio::Flex;
 use crate::pac;
 
 pub mod command;
@@ -371,6 +372,45 @@ impl<'d> Sdio<'d> {
         });
 
         Ok(())
+    }
+
+    /// Reads the raw command bytes from the wire.
+    pub fn read_command_raw(&mut self) -> Result<[u8; command::AnyCmd::LEN], Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                let mut buf = [0u8; command::AnyCmd::LEN];
+
+                for b in buf.iter_mut() {
+                    for i in 0..8 {
+                        let shift = 7 - i;
+                        *b |= self.pins.mosi().map(|p| (p.is_set_high() as u8) << shift)?;
+                    }
+                }
+
+                Ok(buf)
+            }
+            _ => Err(Error::Unimplemented),
+        }
+    }
+
+    /// Writes the raw response bytes to the wire.
+    pub fn write_response_raw(&mut self, res: &[u8]) -> Result<(), Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                let mut miso = self.pins.miso().map(Flex::new)?;
+
+                for b in res.iter() {
+                    for i in 0..8 {
+                        let shift = 7 - i;
+                        let level = ((b >> shift) & 0x1) != 0;
+                        miso.set_level(level.into());
+                    }
+                }
+
+                Ok(())
+            }
+            _ => Err(Error::Unimplemented),
+        }
     }
 }
 
