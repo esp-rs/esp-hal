@@ -285,6 +285,8 @@ driver_configs![
             ref_tick_hz: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
+            #[serde(default)]
+            rc_slow_clock: Option<u32>,
             xtal_options: Vec<u32>,
         }
     },
