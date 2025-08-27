@@ -153,3 +153,35 @@ let peripherals = esp_hal::init(
         })
     );
 ```
+
+## `I8080` driver pin configuration changes
+
+```diff
+- let tx_pins = TxEightBits::new(
+-     peripherals.GPIO9,
+-     peripherals.GPIO46,
+-     peripherals.GPIO3,
+-     peripherals.GPIO8,
+-     peripherals.GPIO18,
+-     peripherals.GPIO17,
+-     peripherals.GPIO16,
+-     peripherals.GPIO15,
+- );
++ let mut i8080 = I8080::new(
+     lcd_cam.lcd,
+     peripherals.DMA_CH0,
+-    tx_pins,
+     config,
+  )?
+- .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
++ .with_dc(peripherals.GPIO0)
++ .with_wrx(peripherals.GPIO47)
++ .with_data0(peripherals.GPIO9)
++ .with_data1(peripherals.GPIO46)
++ .with_data2(peripherals.GPIO3)
++ .with_data3(peripherals.GPIO8)
++ .with_data4(peripherals.GPIO18)
++ .with_data5(peripherals.GPIO17)
++ .with_data6(peripherals.GPIO16)
++ .with_data7(peripherals.GPIO15);
+```
