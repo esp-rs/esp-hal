@@ -1054,14 +1054,13 @@ pub(crate) fn init() {
     let modem_lpclk_src = ModemClockLpclkSource::from(RtcSlowClockSource::current());
 
     modem_clock_select_lp_clock_source_wifi(modem_lpclk_src, 0);
+
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
 }
 
 pub(crate) fn configure_clock() {
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
-
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
-
         let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {
             break res;
