@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 cfg-if = "1.0.0"
-embassy-executor = { version = "0.7.0", features = ["nightly"] }
+embassy-executor = { version = "0.7.0", features = ["task-arena-size-10240"] }
 embassy-net = { version = "0.7.0", features = [
     "dhcpv4",
     "medium-ethernet",

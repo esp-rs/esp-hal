@@ -9,8 +9,6 @@
 
 #![no_std]
 #![no_main]
-// TODO: Remove when embassy-executor upgraded to 0.8.0
-#![feature(impl_trait_in_assoc_type)]
 
 use core::net::{IpAddr, SocketAddr};
 
