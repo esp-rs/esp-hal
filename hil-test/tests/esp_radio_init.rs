@@ -23,8 +23,6 @@ use esp_radio::InitializationError;
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
     esp_preempt::init(timer);

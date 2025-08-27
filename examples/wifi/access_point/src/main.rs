@@ -78,9 +78,10 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-radio".into(),
-        ..Default::default()
+    let client_config = Configuration::AccessPoint({
+        let mut config = AccessPointConfiguration::default();
+        config.ssid = "esp-radio".into();
+        config
     });
     let res = controller.set_configuration(&client_config);
     println!("wifi_set_configuration returned {:?}", res);

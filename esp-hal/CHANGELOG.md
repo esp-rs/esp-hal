@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
 - `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871)
 - Expose cache line configuration (#3946)
+- ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
 
 ### Changed
 
@@ -55,12 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Calling `Input::unlisten` in a GPIO interrupt handler no longer panics (#3913)
 - ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
 - Check serial instead of jtag fifo status in UsbSerialJtag's async flush function (#3957)
+- ESP32: Enable up to 4M of PSRAM (#3990)
 
 ### Removed
 
 - `Trng::new` (replaced by `Trng::try_new`) (#3829)
 - `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
+- `Xtal::Other` has been removed (#3983)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

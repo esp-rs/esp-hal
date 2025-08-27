@@ -340,7 +340,7 @@ pub struct EspNowManager<'d> {
 }
 
 impl EspNowManager<'_> {
-    /// Set primary WiFi channel.
+    /// Set primary Wi-Fi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -702,7 +702,7 @@ impl<'d> EspNow<'d> {
         (self.manager, self.sender, self.receiver)
     }
 
-    /// Set primary WiFi channel.
+    /// Set primary Wi-Fi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {

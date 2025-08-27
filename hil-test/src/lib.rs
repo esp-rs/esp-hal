@@ -6,6 +6,8 @@
 // development, and when a test fails. In these cases, you can enable
 // the `defmt` feature to get the output.
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 use esp_hal as _;
 
 #[cfg(not(feature = "defmt"))]

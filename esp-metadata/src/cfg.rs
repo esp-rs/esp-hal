@@ -2,6 +2,8 @@ pub(crate) mod aes;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
 pub(crate) mod rsa;
+pub(crate) mod sha;
+pub(crate) mod soc;
 pub(crate) mod spi_master;
 pub(crate) mod spi_slave;
 pub(crate) mod uart;
@@ -9,6 +11,7 @@ pub(crate) mod uart;
 pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use sha::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
 pub(crate) use uart::*;
@@ -161,10 +164,16 @@ macro_rules! driver_configs {
         $struct:ident $(<$instance_config:ident>)? {
             // This name will be emitted as a cfg symbol, to activate a driver.
             driver: $driver:ident,
+
             // Driver name, used in the generated documentation.
             name: $name:literal,
+
             $(hide_from_peri_table: $hide:literal,)?
+
+            // When set, the type must provide `fn computed_properties(&self) -> impl Iterator<Item = (&str, bool, Value)>`.
+            // The iterator yields `(name_with_prefix, optional, value)`.
             $(has_computed_properties: $computed:literal,)?
+
             properties: $tokens:tt
         },
     )+) => {
@@ -266,6 +275,7 @@ driver_configs![
         driver: soc,
         name: "SOC",
         hide_from_peri_table: true,
+        has_computed_properties: true,
         properties: {
             #[serde(default)]
             cpu_has_csr_pc: bool,
@@ -275,6 +285,7 @@ driver_configs![
             ref_tick_hz: Option<u32>,
             #[serde(default)]
             rc_fast_clk_default: Option<u32>,
+            xtal_options: Vec<u32>,
         }
     },
 
@@ -501,7 +512,7 @@ driver_configs![
             #[serde(default)]
             dma: bool,
             #[serde(default)]
-            algo: Vec<String>,
+            algo: ShaAlgoMap,
         }
     },
     SpiMasterProperties<SpiMasterInstanceConfig> {

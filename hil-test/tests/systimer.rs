@@ -25,8 +25,6 @@ use esp_hal::{
 use hil_test as _;
 use portable_atomic::{AtomicUsize, Ordering};
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 static ALARM_TARGET: Mutex<RefCell<Option<OneShotTimer<'static, Blocking>>>> =
     Mutex::new(RefCell::new(None));
 static ALARM_PERIODIC: Mutex<RefCell<Option<PeriodicTimer<'static, Blocking>>>> =

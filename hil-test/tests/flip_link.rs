@@ -9,8 +9,6 @@
 
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3)]
 mod tests {

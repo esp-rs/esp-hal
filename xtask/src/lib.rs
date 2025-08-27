@@ -452,9 +452,9 @@ pub fn execute_app(
     };
 
     if let CargoAction::Build(out_dir) = action {
-        if let Some(out_dir) = out_dir {
-            cargo::run_with_env(&args, &cwd, env_vars, false)?;
+        cargo::run_with_env(&args, &cwd, env_vars, false)?;
 
+        if let Some(out_dir) = out_dir {
             // Now that the build has succeeded and we printed the output, we can
             // rerun the build again quickly enough to capture JSON. We'll use this to
             // copy the binary to the output directory.

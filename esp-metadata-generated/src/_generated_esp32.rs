@@ -54,6 +54,9 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(8000000)
     };
+    ("soc.has_multiple_xtal_options") => {
+        true
+    };
     ("aes.dma") => {
         false
     };
@@ -227,6 +230,15 @@ macro_rules! memory_range {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_soc_xtal_options {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((26)); _for_each_inner!((40)); _for_each_inner!((all(26),
+        (40)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_aes_key_length {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
@@ -254,6 +266,23 @@ macro_rules! for_each_rsa_multiplication {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner!((512)); _for_each_inner!((1024)); _for_each_inner!((1536));
         _for_each_inner!((2048)); _for_each_inner!((all(512), (1024), (1536), (2048)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Sha1, "SHA-1"(sizes : 64, 20, 8) (insecure_against :
+        "collision", "length extension"), 0)); _for_each_inner!((Sha256, "SHA-256"(sizes
+        : 64, 32, 8) (insecure_against : "length extension"), 0));
+        _for_each_inner!((Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :),
+        0)); _for_each_inner!((Sha512, "SHA-512"(sizes : 128, 64, 16) (insecure_against :
+        "length extension"), 0)); _for_each_inner!((algos(Sha1, "SHA-1"(sizes : 64, 20,
+        8) (insecure_against : "collision", "length extension"), 0), (Sha256,
+        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
+        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.

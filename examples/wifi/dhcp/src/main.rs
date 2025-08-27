@@ -72,10 +72,11 @@ fn main() -> ! {
         .set_power_saving(esp_radio::config::PowerSaveMode::None)
         .unwrap();
 
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
-        password: PASSWORD.into(),
-        ..Default::default()
+    let client_config = Configuration::Client({
+        let mut config = ClientConfiguration::default();
+        config.ssid = SSID.into();
+        config.password = PASSWORD.into();
+        config
     });
     let res = controller.set_configuration(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
