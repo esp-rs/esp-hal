@@ -9,13 +9,10 @@ use esp_hal::{
     peripherals::IEEE802154,
 };
 use esp_wifi_sys::include::{
-    esp_phy_calibration_data_t,
-    esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
     ieee802154_coex_event_t,
     ieee802154_coex_event_t_IEEE802154_IDLE,
     ieee802154_coex_event_t_IEEE802154_LOW,
     ieee802154_coex_event_t_IEEE802154_MIDDLE,
-    register_chipv7_phy,
 };
 
 use super::{
@@ -30,22 +27,20 @@ use super::{
     pib::*,
 };
 
-const PHY_ENABLE_VERSION_PRINT: u32 = 1;
+const PHY_ENABLE_VERSION_PRINT: u8 = 1;
 
 static mut RX_BUFFER: [u8; FRAME_SIZE] = [0u8; FRAME_SIZE];
 static RX_QUEUE: Mutex<RefCell<Queue<RawReceived>>> = Mutex::new(RefCell::new(Queue::new()));
 static STATE: Mutex<RefCell<Ieee802154State>> = Mutex::new(RefCell::new(Ieee802154State::Idle));
 
 unsafe extern "C" {
-    fn bt_bb_v2_init_cmplx(print_version: u32); // from libbtbb.a
+    fn bt_bb_v2_init_cmplx(print_version: u8); // from libbtbb.a
 
     fn bt_bb_set_zb_tx_on_delay(time: u16); // from libbtbb.a
 
     fn esp_coex_ieee802154_ack_pti_set(event: ieee802154_coex_event_t); // from ???
 
     fn esp_coex_ieee802154_txrx_pti_set(event: ieee802154_coex_event_t); // from ???
-
-    fn phy_version_print(); // from libphy.a
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -80,29 +75,14 @@ pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<
     let phy_clock_guard = radio.enable_phy_clock();
     radio.enable_modem_clock(true);
 
-    esp_phy_enable();
+    unsafe {
+        crate::common_adapter::chip_specific::phy_enable();
+    }
     esp_btbb_enable();
     ieee802154_mac_init();
 
-    unsafe { phy_version_print() }; // libphy.a
     info!("date={:x}", mac_date());
     phy_clock_guard
-}
-
-fn esp_phy_enable() {
-    unsafe {
-        let mut calibration_data = esp_phy_calibration_data_t {
-            version: [0u8; 4],
-            mac: [0u8; 6],
-            opaque: [0u8; 1894],
-        };
-
-        register_chipv7_phy(
-            core::ptr::null(),
-            &mut calibration_data as *mut esp_phy_calibration_data_t,
-            esp_phy_calibration_mode_t_PHY_RF_CAL_FULL,
-        );
-    }
 }
 
 fn esp_btbb_enable() {
