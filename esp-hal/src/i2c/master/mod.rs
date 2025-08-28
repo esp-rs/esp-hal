@@ -1677,9 +1677,7 @@ impl Driver<'_> {
                 // Even though C2 and C3 have a FSM reset bit, esp-idf does not
                 // define SOC_I2C_SUPPORT_HW_FSM_RST for them, so include them in the fallback impl.
 
-                // Do the reset
-                crate::system::PeripheralClockControl::disable(self.info.peripheral);
-                crate::system::PeripheralClockControl::enable(self.info.peripheral);
+                                crate::system::PeripheralClockControl::reset(self.info.peripheral);
 
                 // Restore configuration. This operation has succeeded once, so we can
                 // assume that the config is valid and we can ignore the result.
