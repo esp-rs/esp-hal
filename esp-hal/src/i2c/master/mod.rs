@@ -956,7 +956,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Writes bytes to slave with given `address`
+    /// Writes bytes to slave with given `address`.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Example
     ///
@@ -982,7 +985,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Reads enough bytes from slave with `address` to fill `buffer`
+    /// Reads enough bytes from slave with `address` to fill `buffer`.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Errors
     ///
@@ -1015,7 +1021,10 @@ impl<'d> I2c<'d, Async> {
 
     #[procmacros::doc_replace]
     /// Writes bytes to slave with given `address` and then reads enough
-    /// bytes to fill `buffer` *in a single transaction*
+    /// bytes to fill `buffer` *in a single transaction*.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// ## Errors
     ///
@@ -1052,8 +1061,10 @@ impl<'d> I2c<'d, Async> {
     }
 
     #[procmacros::doc_replace]
-    /// Execute the provided operations on the I2C bus as a single
-    /// transaction.
+    /// Execute the provided operations on the I2C bus as a single transaction.
+    ///
+    /// Note that dropping the returned Future will abort the transfer, but doing so will
+    /// block while the driver is finishing clearing and releasing the bus.
     ///
     /// Transaction contract:
     /// - Before executing the first operation an ST is sent automatically. This is followed by
