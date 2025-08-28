@@ -3053,17 +3053,12 @@ mod bus_clear {
             driver.info.scl_output.disconnect_from(&scl);
             driver.info.sda_output.disconnect_from(&sda);
 
-            let state = if sda.is_input_high() {
-                // SDA is high, the device is not holding it, we don't need to do anything.
-                State::Idle
-            } else {
                 // Starting from (9, false), becase:
                 // - we start with SCL low
                 // - a complete SCL cycle consists of a high period and a low period
-                // - we decrement the remaining counter at the beginning of a cycle, which gives us
-                //   9 complete SCL cycles.
-                State::SendClock(Self::BUS_CLEAR_BITS, false)
-            };
+            // - we decrement the remaining counter at the beginning of a cycle, which gives us 9
+            //   complete SCL cycles.
+            let state = State::SendClock(Self::BUS_CLEAR_BITS, false);
 
             Self {
                 driver,
@@ -3108,19 +3103,22 @@ mod bus_clear {
                     self.state = State::SendStop;
                 }
                 State::SendClock(n, false) => {
-                    if let Some((_sda, scl)) = self.pins.as_ref() {
+                    if let Some((sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(true);
+                        if sda.is_input_high() {
+                            sda.set_output_high(false);
+                            // The device has released SDA, we can move on to generating a STOP
+                            // condition
+                            self.wait = Instant::now() + Self::SCL_DELAY;
+                            self.state = State::SendStop;
+                            return Poll::Pending;
+                        }
                     }
                     self.state = State::SendClock(n - 1, true);
                 }
                 State::SendClock(n, true) => {
-                    if let Some((sda, scl)) = self.pins.as_ref() {
+                    if let Some((_sda, scl)) = self.pins.as_ref() {
                         scl.set_output_high(false);
-                        if sda.is_input_high() {
-                            // The device has released SDA, we can move on to generating a NACK
-                            self.state = State::SendClock(0, false);
-                            return Poll::Pending;
-                        }
                     }
                     self.state = State::SendClock(n, false);
                 }
