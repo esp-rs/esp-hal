@@ -1,7 +1,10 @@
 //! CSI Example
 //!
-//!
 //! Set SSID and PASSWORD env variable before running this example.
+
+//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32s2 esp32s3
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/smoltcp esp-radio/log-04 esp-radio/csi
+//% FEATURES: esp-radio/unstable esp-hal/unstable
 
 #![no_std]
 #![no_main]

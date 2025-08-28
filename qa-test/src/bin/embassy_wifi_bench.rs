@@ -13,6 +13,9 @@
 //! Because of the huge task-arena size configured this won't work on ESP32-S2
 //! and ESP32-C2
 
+//% FEATURES: esp-radio esp-radio/wifi esp-radio/unstable esp-hal/unstable
+//% CHIPS: esp32 esp32c3 esp32c6 esp32s2 esp32s3
+
 #![allow(static_mut_refs)]
 #![no_std]
 #![no_main]
