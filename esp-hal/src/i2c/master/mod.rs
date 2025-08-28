@@ -824,6 +824,7 @@ struct I2cFuture<'a> {
     events: EnumSet<Event>,
     driver: Driver<'a>,
     deadline: Option<Instant>,
+    /// True if the Future has been polled to completion.
     finished: bool,
 }
 
@@ -882,28 +883,32 @@ impl<'a> I2cFuture<'a> {
         };
         let error = self.driver.check_errors();
 
-        if self.is_done() {
-            self.finished = true;
-            // Even though we are done, we have to check for NACK and arbitration loss.
+let result = if self.is_done() {
+                        // Even though we are done, we have to check for NACK and arbitration loss.
             let result = if error == Err(Error::Timeout) {
+// We are both done, and timed out. Likely the transaction has completed, but we
+                // checked too late?
                 Ok(())
             } else {
                 error
             };
             Poll::Ready(result)
         } else if error.is_err() {
-            self.finished = true;
-            Poll::Ready(error)
-        } else {
-            if let Some(deadline) = self.deadline
+                        Poll::Ready(error)
+        } else if let Some(deadline) = self.deadline
                 && now > deadline
             {
                 // If the deadline is reached, we return an error.
-                return Poll::Ready(Err(Error::Timeout));
-            }
-
+                Poll::Ready(Err(Error::Timeout))
+        } else {
             Poll::Pending
+        };
+
+        if result.is_ready() {
+            self.finished = true;
         }
+
+        result
     }
 }
 
