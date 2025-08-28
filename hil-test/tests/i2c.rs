@@ -217,34 +217,41 @@ mod tests {
         // Read a lot of data to ensure that the transaction is cancelled mid-transfer.
         let mut read_data = [0u8; 220];
 
-        defmt::info!("Running transaction to be cancelled");
+        for n_yield in 1..20 {
+            defmt::info!("Running transaction to be cancelled");
 
-        // Start a transaction that will be cancelled.
-        let select_result = select(
-            i2c.transaction_async(
-                DUT_ADDRESS,
-                &mut [
-                    Operation::Write(READ_DATA_COMMAND),
-                    Operation::Read(&mut read_data),
-                ],
-            ),
-            async {
-                // Let the transaction run for a tiny bit.
-                for _ in 0..10 {
-                    embassy_futures::yield_now().await;
-                }
-            },
-        )
-        .await;
+            // Start a transaction that will be cancelled.
+            let select_result = select(
+                i2c.transaction_async(
+                    DUT_ADDRESS,
+                    &mut [
+                        Operation::Write(READ_DATA_COMMAND),
+                        Operation::Read(&mut read_data),
+                    ],
+                ),
+                async {
+                    // Let the transaction run for a tiny bit.
+                    for _ in 0..n_yield {
+                        embassy_futures::yield_now().await;
+                    }
+                },
+            )
+            .await;
 
-        // Assert that the I2C transaction was cancelled.
-        hil_test::assert!(
-            matches!(select_result, Either::Second(_)),
-            "Transaction completed with {:?}",
-            select_result
-        );
+            if matches!(select_result, Either::First(Ok(_))) {
+                break;
+            }
 
-        defmt::info!("Transaction cancelled");
+            // Assert that the I2C transaction was cancelled.
+            hil_test::assert!(
+                matches!(select_result, Either::Second(_)),
+                "({}) Transaction completed with {:?}",
+                n_yield,
+                select_result
+            );
+
+            defmt::info!("Transaction cancelled");
+        }
 
         let mut read_data = [0u8; 22];
         // do the real read which should succeed
