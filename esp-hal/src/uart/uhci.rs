@@ -1,57 +1,80 @@
 #![cfg_attr(docsrs, procmacros::doc_replace)]
 //! ## Usage
 //! ```rust, no_run
-//! let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
-//! let peripherals = esp_hal::init(config);
-//! 
-//! let config = uart::Config::default()
-//!     .with_rx(RxConfig::default().with_fifo_full_threshold(64))
-//!     .with_baudrate(115200);
-//! 
-//! let uart = Uart::new(peripherals.UART1, config)
-//!     .unwrap()
-//!     .with_tx(peripherals.GPIO2)
-//!     .with_rx(peripherals.GPIO3);
-//! 
-//! let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
-//! let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
-//! let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
-//! 
-//! let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-//! uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
-//!     .unwrap();
-//! 
-//! let config = uart::Config::default()
-//!     .with_rx(RxConfig::default().with_fifo_full_threshold(64))
-//!     .with_baudrate(9600);
-//! uhci.set_uart_config(&config).unwrap();
-//! 
-//! let (uhci_rx, uhci_tx) = uhci.split();
-//! println!("Waiting for message");
-//! let transfer = uhci_rx
-//!     .read(dma_rx)
-//!     .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-//! let (err, _uhci_rx, dma_rx) = transfer.wait();
-//! err.unwrap();
-//! 
-//! let received = dma_rx.number_of_received_bytes();
-//! println!("Received dma bytes: {}", received);
-//! 
-//! let rec_slice = &dma_rx.as_slice()[0..received];
-//! if received > 0 {
-//!     match core::str::from_utf8(&rec_slice) {
-//!         Ok(x) => {
-//!             println!("Received DMA message: \"{}\"", x);
-//!             dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
-//!             dma_tx.set_length(received);
-//!             let transfer = uhci_tx
-//!                 .write(dma_tx)
-//!                 .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
-//!             let (err, _uhci, _dma_tx) = transfer.wait();
-//!             err.unwrap();
+//! #![no_std]
+//! #![no_main]
+//!
+//! #[panic_handler]
+//! fn panic(_: &core::panic::PanicInfo) -> ! {
+//!     loop {}
+//! }
+//!
+//! use esp_hal::{
+//!     clock::CpuClock,
+//!     dma::{DmaRxBuf, DmaTxBuf},
+//!     dma_buffers, main,
+//!     rom::software_reset,
+//!     uart,
+//!     uart::{RxConfig, Uart, uhci, uhci::Uhci},
+//! };
+//!
+//! #[main]
+//! fn main() -> ! {
+//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//!     let peripherals = esp_hal::init(config);
+//!     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
+//!     let peripherals = esp_hal::init(config);
+//!
+//!     let config = uart::Config::default()
+//!         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
+//!         .with_baudrate(115200);
+//!
+//!     let uart = Uart::new(peripherals.UART1, config)
+//!         .unwrap()
+//!         .with_tx(peripherals.GPIO2)
+//!         .with_rx(peripherals.GPIO3);
+//!
+//!     let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(4092);
+//!     let dma_rx = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
+//!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
+//!
+//!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
+//!     uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
+//!         .unwrap();
+//!
+//!     let config = uart::Config::default()
+//!         .with_rx(RxConfig::default().with_fifo_full_threshold(64))
+//!         .with_baudrate(9600);
+//!     uhci.set_uart_config(&config).unwrap();
+//!
+//!     let (uhci_rx, uhci_tx) = uhci.split();
+//!     // Waiting for message
+//!     let transfer = uhci_rx
+//!         .read(dma_rx)
+//!         .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+//!     let (err, _uhci_rx, dma_rx) = transfer.wait();
+//!     err.unwrap();
+//!
+//!     let received = dma_rx.number_of_received_bytes();
+//!     // println!("Received dma bytes: {}", received);
+//!
+//!     let rec_slice = &dma_rx.as_slice()[0..received];
+//!     if received > 0 {
+//!         match core::str::from_utf8(&rec_slice) {
+//!             Ok(x) => {
+//!                 // println!("Received DMA message: \"{}\"", x);
+//!                 dma_tx.as_mut_slice()[0..received].copy_from_slice(&rec_slice);
+//!                 dma_tx.set_length(received);
+//!                 let transfer = uhci_tx
+//!                     .write(dma_tx)
+//!                     .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+//!                 let (err, _uhci, _dma_tx) = transfer.wait();
+//!                 err.unwrap();
+//!             }
+//!             Err(x) => panic!("Error string: {}", x),
 //!         }
-//!         Err(x) => println!("Error string: {}", x),
 //!     }
+//!     software_reset()
 //! }
 //! ```
 
@@ -64,21 +87,10 @@ use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
+    Async, Blocking, DriverMode,
     dma::{
-        AnyGdmaRxChannel,
-        AnyGdmaTxChannel,
-        Channel,
-        ChannelRx,
-        ChannelTx,
-        DmaChannelFor,
-        DmaEligible,
-        DmaError,
-        DmaRxBuffer,
-        DmaTxBuffer,
-        PeripheralDmaChannel,
+        AnyGdmaRxChannel, AnyGdmaTxChannel, Channel, ChannelRx, ChannelTx, DmaChannelFor,
+        DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     peripherals,
