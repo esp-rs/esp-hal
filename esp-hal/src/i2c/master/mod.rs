@@ -2900,6 +2900,8 @@ fn calculate_chunk_size(remaining: usize) -> usize {
 
 #[cfg(i2c_master_has_hw_bus_clear)]
 mod bus_clear {
+use esp_rom_sys::rom::ets_delay_us;
+
     use super::*;
 
     pub struct ClearBusFuture<'a> {
@@ -2944,9 +2946,43 @@ mod bus_clear {
 
     impl Drop for ClearBusFuture<'_> {
         fn drop(&mut self) {
+use crate::gpio::AnyPin;
             if !self.is_done() {
                 self.configure(0);
             }
+
+            // Generate a stop condition
+            let sda = self
+                .driver
+                .config
+                .sda_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+            let scl = self
+                .driver
+                .config
+                .scl_pin
+                .pin_number()
+                .map(|n| unsafe { AnyPin::steal(n) });
+
+            if let (Some(sda), Some(scl)) = (sda, scl) {
+                sda.set_output_high(true);
+                scl.set_output_high(false);
+
+                self.driver.info.scl_output.disconnect_from(&scl);
+                self.driver.info.sda_output.disconnect_from(&sda);
+
+                ets_delay_us(5);
+                sda.set_output_high(false);
+                ets_delay_us(5);
+                scl.set_output_high(true);
+                ets_delay_us(5);
+                sda.set_output_high(true);
+
+                self.driver.info.sda_output.connect_to(&sda);
+                self.driver.info.scl_output.connect_to(&scl);
+            }
+
             // We don't care about errors during bus clearing
             self.driver.clear_all_interrupts();
         }
