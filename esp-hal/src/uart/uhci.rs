@@ -85,7 +85,7 @@ use core::{
 };
 
 use embassy_embedded_hal::SetConfig;
-use esp32c6::uhci0;
+use crate::pac::uhci0;
 
 use crate::{
     Async,
