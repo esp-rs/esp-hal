@@ -5,14 +5,13 @@ use crate::{
     rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
 };
 
-pub(crate) fn init() {}
+pub(crate) fn init() {
+    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
+}
 
 pub(crate) fn configure_clock() {
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClock8m);
-
     let cal_val = loop {
-        RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRtc);
-
         let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
         if res != 0 {
             break res;

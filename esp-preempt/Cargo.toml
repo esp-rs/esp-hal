@@ -46,13 +46,26 @@ esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"]
 
 [features]
 default = ["esp-alloc"]
+
+## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
 esp-alloc = ["dep:esp-alloc"]
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
 esp32 = ["esp-hal/esp32", "esp-metadata-generated/esp32"]
+##
 esp32c2 = ["esp-hal/esp32c2", "esp-metadata-generated/esp32c2"]
+##
 esp32c3 = ["esp-hal/esp32c3", "esp-metadata-generated/esp32c3"]
+##
 esp32c6 = ["esp-hal/esp32c6", "esp-metadata-generated/esp32c6"]
+##
 esp32h2 = ["esp-hal/esp32h2", "esp-metadata-generated/esp32h2"]
+##
 esp32s2 = ["esp-hal/esp32s2", "esp-metadata-generated/esp32s2"]
+##
 esp32s3 = ["esp-hal/esp32s3", "esp-metadata-generated/esp32s3"]
 
 #! ### Logging Feature Flags

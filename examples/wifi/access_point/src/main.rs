@@ -26,8 +26,8 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
-    AccessPointConfiguration,
-    Configuration,
+    AccessPointConfig,
+    Config,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -78,8 +78,8 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::AccessPoint({
-        let mut config = AccessPointConfiguration::default();
+    let client_config = Config::AccessPoint({
+        let mut config = AccessPointConfig::default();
         config.ssid = "esp-radio".into();
         config
     });

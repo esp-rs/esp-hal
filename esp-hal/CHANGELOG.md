@@ -21,8 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
 - `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871)
+- Align `I8080` driver pin configurations with latest guidelines (#3997)
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
+- ESP32-S3: Expose more `Camera` config options (#3996)
 
 ### Changed
 
@@ -46,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 - Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
 - ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
+- `RtcSlowClock::RtcFastClock8m` has been renamed to `RtcFastClock::RtcFastClockRcFast` (#3993)
+- `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
 
 ### Fixed
 

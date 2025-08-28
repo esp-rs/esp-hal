@@ -20,11 +20,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let chip = esp_metadata_generated::Chip::from_cargo_feature()?;
 
-    // Log and defmt are mutually exclusive features. The main technical reason is
-    // that allowing both would make the exact panicking behaviour a fragile
-    // implementation detail.
-    assert_unique_features!("log-04", "defmt");
-
     // Define all necessary configuration symbols for the configured device:
     chip.define_cfgs();
 

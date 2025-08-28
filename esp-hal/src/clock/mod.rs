@@ -331,6 +331,8 @@ static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 impl Clocks {
     pub(crate) fn init(cpu_clock_speed: CpuClock) {
         critical_section::with(|_| {
+            crate::rtc_cntl::rtc::init();
+
             let config = Self::configure(cpu_clock_speed);
             crate::rtc_cntl::RtcClock::update_xtal_freq_mhz(config.xtal_clock.as_mhz());
             unsafe { ACTIVE_CLOCKS = Some(config) };

@@ -14,7 +14,7 @@ use esp_hal::{
     lcd_cam::{
         BitOrder,
         LcdCam,
-        lcd::i8080::{Command, Config, I8080, TxEightBits, TxSixteenBits},
+        lcd::i8080::{Command, Config, I8080},
     },
     pcnt::{
         Pcnt,
@@ -75,12 +75,9 @@ mod tests {
 
     #[test]
     fn test_i8080_8bit(ctx: Context<'static>) {
-        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
-
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             ctx.dma,
-            pins,
             Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap();
@@ -129,26 +126,17 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let pins = TxEightBits::new(
-            unit0_signal,
-            unit1_signal,
-            unit2_signal,
-            unit3_signal,
-            NoPin,
-            NoPin,
-            NoPin,
-            NoPin,
-        );
-
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             ctx.dma,
-            pins,
             Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap()
         .with_cs(cs_signal)
-        .with_ctrl_pins(NoPin, NoPin);
+        .with_data0(unit0_signal)
+        .with_data1(unit1_signal)
+        .with_data2(unit2_signal)
+        .with_data3(unit3_signal);
 
         // explicitly drop the camera half to see if it disables clocks (unexpectedly,
         // I8080 should keep it alive)
@@ -243,34 +231,17 @@ mod tests {
             .channel0
             .set_input_mode(EdgeMode::Hold, EdgeMode::Increment);
 
-        let pins = TxSixteenBits::new(
-            NoPin,
-            NoPin,
-            NoPin,
-            unit0_signal,
-            NoPin,
-            NoPin,
-            NoPin,
-            unit1_signal,
-            NoPin,
-            NoPin,
-            NoPin,
-            unit2_signal,
-            NoPin,
-            NoPin,
-            NoPin,
-            unit3_signal,
-        );
-
         let mut i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             ctx.dma,
-            pins,
             Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap()
         .with_cs(cs_signal)
-        .with_ctrl_pins(NoPin, NoPin);
+        .with_data3(unit0_signal)
+        .with_data7(unit1_signal)
+        .with_data11(unit2_signal)
+        .with_data15(unit3_signal);
 
         // This is to make the test values look more intuitive.
         i8080.set_bit_order(BitOrder::Inverted);
