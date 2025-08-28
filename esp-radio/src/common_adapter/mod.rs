@@ -393,14 +393,14 @@ pub(crate) fn phy_calibrate() {
 ///
 /// If you see the data is different than what was persisted before, consider persisting the new
 /// data.
-pub fn calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
+pub fn phy_calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
     CAL_DATA.with(|cal_data| *cal_data)
 }
 
 /// Set calibration data.
 ///
 /// This will be used next time the phy gets initialized.
-pub fn set_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
+pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
     CAL_DATA.with(|cal_data| {
         *cal_data = *data;
     });
