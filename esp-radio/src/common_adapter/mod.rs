@@ -356,25 +356,23 @@ pub(crate) fn phy_calibrate() {
         chip_specific::bbpll_en_usb();
     }
 
-    cfg_if::cfg_if! {
-        if #[cfg(phy_full_calibration)] {
-            const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
-        } else {
-            const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
-        }
-    };
+    #[cfg(phy_full_calibration)]
+    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
+    #[cfg(not(phy_full_calibration))]
+    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
 
-    cfg_if::cfg_if! {
-    if #[cfg(phy_skip_calibration_after_deep_sleep)] {
-        let calibration_mode = if crate::hal::system::reset_reason() == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep) {
-            esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-            } else {
-                CALIBRATION_MODE
-            };
-        } else {
-            let calibration_mode = CALIBRATION_MODE;
-        }
+    #[cfg(phy_skip_calibration_after_deep_sleep)]
+    let calibration_mode = if crate::hal::system::reset_reason()
+        == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep)
+    {
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+    } else {
+        CALIBRATION_MODE
     };
+    #[cfg(not(phy_skip_calibration_after_deep_sleep))]
+    let calibration_mode = CALIBRATION_MODE;
 
     debug!("Using calibration mode {}", calibration_mode);
 
@@ -396,11 +394,7 @@ pub(crate) fn phy_calibrate() {
 /// If you see the data is different than what was persisted before, consider persisting the new
 /// data.
 pub fn calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
-    let mut res = [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
-    CAL_DATA.with(|cal_data| {
-        res[..].copy_from_slice(cal_data);
-    });
-    res
+    CAL_DATA.with(|cal_data| *cal_data)
 }
 
 /// Set calibration data.
@@ -408,6 +402,6 @@ pub fn calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_
 /// This will be used next time the phy gets initialized.
 pub fn set_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
     CAL_DATA.with(|cal_data| {
-        cal_data[..].copy_from_slice(data);
+        *cal_data = *data;
     });
 }
