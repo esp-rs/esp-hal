@@ -121,7 +121,7 @@ macro_rules! property {
         true
     };
     ("i2c_master.has_hw_bus_clear") => {
-        true
+        false
     };
     ("i2c_master.has_bus_timeout_enable") => {
         true
