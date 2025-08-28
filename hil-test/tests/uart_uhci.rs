@@ -1,7 +1,7 @@
-//! UART UHCI test, blocking
+//! UART UHCI test, async
 
 //% CHIPS: esp32c6
-//% FEATURES: unstable
+//% FEATURES: unstable embassy
 
 #![no_std]
 #![no_main]
@@ -12,9 +12,6 @@ use esp_hal::{
     dma_buffers,
     uart::{self, Uart, uhci::Uhci},
 };
-use hil_test as _;
-
-esp_bootloader_esp_idf::esp_app_desc!();
 
 struct Context {
     uhci: Uhci<'static, Blocking>,
@@ -23,15 +20,13 @@ struct Context {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
 
     #[init]
-    fn init() -> Context {
-        let peripherals = esp_hal::init(
-            esp_hal::Config::default().with_cpu_clock(esp_hal::clock::CpuClock::max()),
-        );
+    async fn init() -> Context {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
 
         let (rx, tx) = hil_test::common_test_pins!(peripherals);
 
@@ -95,6 +90,61 @@ mod tests {
             .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
         let (res, _uhci_tx, _dma_tx) = transfer_tx.wait();
         res.unwrap();
+        let (res, _uhci_rx, dma_rx) = transfer_rx.wait();
+        res.unwrap();
+
+        assert_eq!(
+            &dma_rx.as_slice()[0..dma_rx.number_of_received_bytes()],
+            LONG_TEST_STRING.as_bytes()
+        );
+    }
+
+    #[test]
+    async fn test_send_receive_async(mut ctx: Context) {
+        let uhci = ctx.uhci.into_async();
+        const SEND: &[u8] = b"Hello ESP32";
+        ctx.dma_tx.as_mut_slice()[0..SEND.len()].copy_from_slice(&SEND);
+        ctx.dma_tx.set_length(SEND.len());
+
+        let (uhci_rx, uhci_tx) = uhci.split();
+        let mut transfer_rx = uhci_rx
+            .read(ctx.dma_rx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        let mut transfer_tx = uhci_tx
+            .write(ctx.dma_tx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        transfer_tx.wait_for_done().await;
+        let (res, _uhci_tx, _dma_tx) = transfer_tx.wait();
+        res.unwrap();
+        transfer_rx.wait_for_done().await;
+        let (res, _uhci_rx, dma_rx) = transfer_rx.wait();
+        res.unwrap();
+
+        assert_eq!(
+            &dma_rx.as_slice()[0..dma_rx.number_of_received_bytes()],
+            SEND
+        );
+    }
+
+    #[test]
+    async fn test_long_strings_async(mut ctx: Context) {
+        let uhci = ctx.uhci.into_async();
+        const LONG_TEST_STRING: &str = "Loremipsumdolorsitamet,consecteturadipiscingelit.Suspendissemetusnisl,pretiumsedeuismodeget,bibendumeusem.Donecaccumsanrisusnibh,etefficiturnisivehiculatempus.Etiamegestasenimatduieleifendmaximus.Nuncinsemperest.Etiamvelodioultrices,interdumeratsed,dignissimmetus.Phasellusexleo,eleifendquisexid,laciniavenenatisneque.Sednuncdiam,molestieveltinciduntnec,ornareetnisi.Maecenasetmolestietortor.Nullaeupulvinarquam.Aeneanmolestieliberoquistortorviverralobortis.Praesentlaoreetlectusattinciduntscelerisque.Suspendisseegeterateleifend,posuerenuncvenenatis,faucibusdolor.Nuncvitaeluctusmetus.Nullamultriciesarcuvitaeestfermentumeleifend.Suspendisselaoreetmaximuslacus,utlaoreetnisiiaculisvitae.Nullamscelerisqueporttitorpulvinar.Intinciduntipsummauris,velaliquetmetusdictumut.Nunceratelit,suscipitacnisiac,volutpatporttitormauris.Aliquampretiumnisidiam,molestietemporlacusplaceratid.Mauristinciduntmattisturpis,velconvallisurnatempusnon.Integermattismetusnoneuismodcursus.Namideratetmassapretiumfinibus.Praesentfermentumnuncurna,quissagittismaurisimperdieteu.InLoremipsumdolorsitamet,consecteturadipiscingelit.Suspendissemetusnisl,pretiumsedeuismodeget,bibendumeusem.Donecaccumsanrisusnibh,etefficiturnisivehiculatempus.Etiamegestasenimatduieleifendmaximus.Nuncinsemperest.Etiamvelodioultrices,interdumeratsed,dignissimmetus.Phasellusexleo,eleifendquisexid,laciniavenenatisneque.Sednuncdiam,molestieveltinciduntnec,ornareetnisi.Maecenasetmolestietortor.Nullaeupulvinarquam.Aeneanmolestieliberoquistortorviverralobortis.Praesentlaoreetlectusattinciduntscelerisque.Suspendisseegeterateleifend,posuerenuncvenenatis,faucibusdolor.Nuncvitaeluctusmetus.Nullamultriciesarcuvitaeestfermentumeleifend.Suspendisselaoreetmaximuslacus,utlaoreetnisiiaculisvitae.Nullamscelerisqueporttitorpulvinar.Intinciduntipsummauris,velaliquetmetusdictumut.Nunceratelit,suscipitacnisiac,volutpatporttitormauris.Aliquampretiumnisidiam,molestietemporlacusplaceratid.Mauristinciduntmattisturpis,velconvallisurnatempusnon.Integermattismetusnoneuismodcursus.Namideratetmassapretiumfinibus.Praesentfermentumnuncurna,quissagittismaurisimperdieteu.Inefficituraliquamdui.Phasellussempermaurisacconvallismollis.Suspendisseintellusanuncvariusiaculisutegetlibero.Inmalesuada,nislquisconsecteturposuere,nullaipsumfringillaeros,egetrhoncussapienarcunecenim.Proinvenenatistortorveltristiquealiquam.Utelementumtellusligula,velauctorexfermentuma.Vestibulummaximusanteinvulputateornare.Sedquisnislaligulaporttitorfacilisismattissedmi.Crasconsecteturexegetsagittisfeugiat.Invenenatisminectinciduntaliquet.Sedcommodonecorciidvenenatis.Vestibulumanteipsumprimisinfaucibusorciluctusetultricesposuerecubiliacurae;Phasellusinterdumorcefficituraliquamdui.Phasellussempermaurisacconvallismollis.Suspendisseintellusanuncvariusiaculisutegetlibero.Inmalesuada,nislquisconsecteturposuere,nullaipsumfringillaeros,egetrhoncussapienarcunecenim.Proinvenenatistortorveltristiquealiquam.Utelementumtellusligula,velauctorexfermentuma.Vestibulummaximusanteinvulputateornare.Sedquisnislaligulaporttitorfacilisismattissedmi.Crasconsecteturexegetsagittisfeugiat.Invenenatisminectinciduntaliquet.Sedcommodonecorciidvenenatis.Vestibulumanteipsumprimisinfaucibusorciluctusetultricesposuerecubiliacurae;Phasellusinterdumorcrtis.Praesentlaoreetlectusattinciduntscelerisque.Suspendisseegeterateleifend,posuerenuncvenenatis,faucibusdolor.Nuncvitaeluctusmetus.Nullamultriciesarcuvitaeestfermentumeleifend.Suspendisselaoreetmaximuslacus,utlaoreetnisiiaculisvitae.Nullamscelerisqueporttitorpulvinar.Intinciduntipsummauris,velaliquetmetusdictumut.Nunceratelit,suscipitacnisiac,volutpatporttitormauris.Aliquampretiumnisidiam,molestietemporlacusplaceratid.Mauristinciduntmattisturpis,velconvallisurnatempusnon.Integermattismetusnoneuismodcursus.Namideratetmassapretiumfinibus.Praesentfermentumnuncurna,quissagittismaurisimperdieteu.Inefficituraliquamdui.Phasellussempermaurisacconvallismollis.Suspendisseintellusanuncvariusiaculisutegetlibero.Inmalesuada,nislquisconsecteturposuere,nullaipsumfringillaeros,egetrhoncussapienarcunece";
+        ctx.dma_tx.as_mut_slice()[0..LONG_TEST_STRING.len()]
+            .copy_from_slice(&LONG_TEST_STRING.as_bytes());
+        ctx.dma_tx.set_length(LONG_TEST_STRING.len());
+
+        let (uhci_rx, uhci_tx) = uhci.split();
+        let mut transfer_rx = uhci_rx
+            .read(ctx.dma_rx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        let mut transfer_tx = uhci_tx
+            .write(ctx.dma_tx)
+            .unwrap_or_else(|x| panic!("Something went horribly wrong: {:?}", x.0));
+        transfer_tx.wait_for_done().await;
+        let (res, _uhci_tx, _dma_tx) = transfer_tx.wait();
+        res.unwrap();
+        transfer_rx.wait_for_done().await;
         let (res, _uhci_rx, dma_rx) = transfer_rx.wait();
         res.unwrap();
 

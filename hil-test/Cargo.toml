@@ -174,13 +174,9 @@ harness           = false
 required-features = ["embassy"]
 
 [[test]]
-name              = "uart_uhci_async"
+name              = "uart_uhci"
 harness           = false
 required-features = ["embassy"]
-
-[[test]]
-name              = "uart_uhci_blocking"
-harness           = false
 
 [[test]]
 name    = "uart_regression"

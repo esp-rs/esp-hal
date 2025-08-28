@@ -243,7 +243,7 @@ where
         Ok(())
     }
 
-    /// todo
+    /// Split the Uhci into UhciRx and UhciTx
     pub fn split(self) -> (UhciRx<'d, Dm>, UhciTx<'d, Dm>) {
         let (uart_rx, uart_tx) = self.uart.split();
         (
@@ -302,7 +302,7 @@ impl<'d> Uhci<'d, Async> {
     }
 }
 
-/// todo
+/// Splitted Uhci structs, Tx part for sending data
 pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
@@ -338,7 +338,7 @@ where
     }
 }
 
-/// todo
+/// Splitted Uhci structs, Rx part for receiving data
 pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
