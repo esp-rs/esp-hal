@@ -12,7 +12,8 @@
 //! use esp_hal::{
 //!     clock::CpuClock,
 //!     dma::{DmaRxBuf, DmaTxBuf},
-//!     dma_buffers, main,
+//!     dma_buffers,
+//!     main,
 //!     rom::software_reset,
 //!     uart,
 //!     uart::{RxConfig, Uart, uhci, uhci::Uhci},
@@ -87,10 +88,21 @@ use embassy_embedded_hal::SetConfig;
 use esp32c6::uhci0;
 
 use crate::{
-    Async, Blocking, DriverMode,
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        AnyGdmaRxChannel, AnyGdmaTxChannel, Channel, ChannelRx, ChannelTx, DmaChannelFor,
-        DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel,
+        AnyGdmaRxChannel,
+        AnyGdmaTxChannel,
+        Channel,
+        ChannelRx,
+        ChannelTx,
+        DmaChannelFor,
+        DmaEligible,
+        DmaError,
+        DmaRxBuffer,
+        DmaTxBuffer,
+        PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     peripherals,
