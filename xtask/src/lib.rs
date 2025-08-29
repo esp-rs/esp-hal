@@ -219,11 +219,16 @@ impl Package {
                 if config.contains("bt") {
                     features.push("ble".to_owned());
                 }
+                if config.contains("ieee802154") {
+                    features.push("ieee802154".to_owned());
+                    // allow wifi + 802.15.4
+                    features.push("__docs_build".to_owned());
+                }
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
                 if features.iter().any(|f| {
-                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex"
+                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex" || f == "ieee802154"
                 }) {
                     features.push("unstable".to_owned());
                 }

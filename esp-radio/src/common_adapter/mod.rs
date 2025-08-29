@@ -347,6 +347,13 @@ pub(crate) unsafe fn phy_disable_clock() {
 }
 
 pub(crate) fn phy_calibrate() {
+    // Set PHY whether in combo module
+    // For comode mode, phy enable will be not in WiFi RX state
+    #[cfg(not(any(esp32s2, esp32h2)))]
+    unsafe {
+        esp_wifi_sys::include::phy_init_param_set(1);
+    }
+
     let phy_version = unsafe { get_phy_version_str() };
     trace!("phy_version {}", unsafe { str_from_c(phy_version) });
 
