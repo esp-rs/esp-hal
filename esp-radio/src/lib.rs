@@ -112,6 +112,7 @@ mod fmt;
 use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
+pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
