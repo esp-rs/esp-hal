@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updates for embassy-executor 0.9, embassy-time 0.5 (#3945)
 
 ### Fixed
 

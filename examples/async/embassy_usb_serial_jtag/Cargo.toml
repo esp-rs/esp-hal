@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
+embassy-executor = "0.9.0"
 embassy-sync = "0.7.0"
 embedded-io-async = "0.6.1"
 esp-backtrace = { path = "../../../esp-backtrace", features = [

@@ -13,7 +13,7 @@
 #![no_std]
 #![no_main]
 
-use embassy_executor::Spawner;
+use embassy_executor::SendSpawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(aes_dma)]
 use esp_hal::aes::dma::AesDmaBackend;
@@ -564,7 +564,7 @@ mod tests {
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         // Start task before we'd start the AES operation
-        let spawner = Spawner::for_current_executor().await;
+        let spawner = SendSpawner::for_current_executor().await;
         spawner.must_spawn(aes_task(signal));
 
         signal.wait().await;

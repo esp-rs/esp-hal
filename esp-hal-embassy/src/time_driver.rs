@@ -290,7 +290,7 @@ impl EmbassyTimer {
         // time. In this case the interrupt handler will pend a wake-up when we exit the
         // critical section.
         //
-        // This is correct behavior. See https://docs.rs/embassy-time-driver/0.1.0/embassy_time_driver/trait.Driver.html#tymethod.set_alarm
+        // This is correct behavior. See https://docs.rs/embassy-time-driver/0.2.1/embassy_time_driver/trait.Driver.html#tymethod.set_alarm
         // (... the driver should return true and arrange to call the alarm callback as
         // soon as possible, but not synchronously.)
 
@@ -319,7 +319,9 @@ impl Driver for EmbassyTimer {
             // If we have multiple queues, we have integrated timers and our own timer queue
             // implementation.
             use embassy_executor::raw::Executor as RawExecutor;
-            use portable_atomic::{AtomicPtr, Ordering};
+            use portable_atomic::Ordering;
+
+            use crate::timer_queue::queue_impl::QueueItem;
 
             let task = embassy_executor::raw::task_from_waker(waker);
 
@@ -327,10 +329,7 @@ impl Driver for EmbassyTimer {
             // so the executor is guaranteed to be set to a non-null value.
             let mut executor = task.executor().unwrap_unchecked() as *const RawExecutor;
 
-            let owner = task
-                .timer_queue_item()
-                .payload
-                .as_ref::<AtomicPtr<RawExecutor>>();
+            let owner = &task.timer_queue_item().as_mut::<QueueItem>().owner;
 
             // Try to take ownership over the timer item.
             let owner = owner.compare_exchange(
