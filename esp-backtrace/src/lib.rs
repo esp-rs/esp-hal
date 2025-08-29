@@ -192,10 +192,10 @@ fn halt() -> ! {
                 pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
             }
 
-            #[cfg(feature = "esp32p4")]
-            mod registers {
-                pub(crate) const SW_CPU_STALL: u32 = 0x50115200;
-            }
+            // #[cfg(feature = "esp32p4")]
+            // mod registers {
+            //     pub(crate) const SW_CPU_STALL: u32 = 0x50115200;
+            // }
 
             #[cfg(feature = "esp32s3")]
             mod registers {
@@ -247,8 +247,10 @@ fn abort() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {
             semihosting::process::abort();
-        } else {
+        } else if #[cfg(feature = "halt-cores")] {
             halt();
+        } else {
+            loop {}
         }
     }
 }
