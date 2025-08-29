@@ -214,7 +214,7 @@ options:
     description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL."
     default:
       - value: true
-      
+
   - name: ieee802154_rx_queue_size
     description: Size of the RX queue in frames
     default:
