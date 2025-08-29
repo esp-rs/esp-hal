@@ -228,6 +228,10 @@ required-features = ["esp-radio", "esp-alloc"]
 name    = "otadata"
 harness = false
 
+[[test]]
+name    = "sdio"
+harness = false
+
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
 cfg-if             = "1.0.0"

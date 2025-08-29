@@ -55,6 +55,7 @@ embassy-usb-synopsys-otg = { version = "0.3.0", optional = true }
 embedded-can             = { version = "0.4.1", optional = true }
 esp-synopsys-usb-otg     = { version = "0.4.2", optional = true }
 nb                       = { version = "1.1.0", optional = true }
+embedded-hal-sdmmc       = { version = "0.1.0-alpha.3", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt                    = { version = "1.0.1", optional = true }
@@ -69,6 +70,9 @@ embedded-io-async        = { version = "0.6.1", optional = true }
 rand_core-06             = { package = "rand_core", version = "0.6.4", optional = true }
 rand_core-09             = { package = "rand_core", version = "0.9.0", optional = true }
 ufmt-write               = { version = "0.1.0", optional = true }
+
+# Alternative bitfield implementation with better performance
+bitfielder               = { version = "0.1.1", optional = true }
 
 # IMPORTANT:
 # Each supported device MUST have its PAC included below along with a
@@ -248,6 +252,8 @@ unstable = [
     "dep:rand_core-09",
     "dep:nb",
     "dep:ufmt-write",
+    "dep:embedded-hal-sdmmc",
+    "dep:bitfielder",
 ]
 
 ## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
