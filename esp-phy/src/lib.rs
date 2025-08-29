@@ -235,6 +235,18 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
 
         PhyInitGuard { _phy_clock_guard }
     }
+    /// Decreases the PHY init reference count for this modem ignoring
+    /// currently alive [PhyInitGuard]s.
+    ///
+    /// This will also decrease the PHY clock ref count.
+    /// # Panics
+    /// This function panics if the PHY is inactive. If the ref count is
+    /// lower than the number of alive [PhyInitGuard]s, dropping a guard can
+    /// now panic.
+    fn decrease_phy_init_ref_count(&self) {
+        critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
+        self.decrease_phy_clock_ref_count();
+    }
 }
 macro_rules! impl_phy_controller {
     ($feature_gate:ident, $peripheral:tt) => {

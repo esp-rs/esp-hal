@@ -988,10 +988,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-
-    unsafe {
-        crate::common_adapter::chip_specific::phy_disable();
-    }
+    unsafe { WIFI::steal() }.decrease_phy_init_ref_count();
 }
 
 /// **************************************************************************
@@ -1010,7 +1007,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    unsafe { WIFI::steal() }.enable_phy();
+    core::mem::forget(unsafe { WIFI::steal() }.enable_phy());
 }
 
 /// **************************************************************************
