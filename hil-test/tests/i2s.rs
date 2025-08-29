@@ -15,7 +15,7 @@ use esp_hal::{
     delay::Delay,
     dma_buffers,
     gpio::{AnyPin, NoPin, Pin},
-    i2s::master::{DataFormat, I2s, I2sTx, Standard},
+    i2s::master::{Channels, DataFormat, I2s, I2sTx},
     peripherals::I2S0,
     time::Rate,
 };
@@ -137,11 +137,12 @@ mod tests {
 
         let i2s = I2s::new(
             ctx.i2s,
-            Standard::Philips,
-            DataFormat::Data16Channel16,
-            Rate::from_hz(16000),
             ctx.dma_channel,
-        )
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )?
         .into_async();
 
         let (din, dout) = unsafe { ctx.dout.split() };
@@ -188,11 +189,12 @@ mod tests {
 
         let i2s = I2s::new(
             ctx.i2s,
-            Standard::Philips,
-            DataFormat::Data16Channel16,
-            Rate::from_hz(16000),
             ctx.dma_channel,
-        );
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )?;
 
         let (din, dout) = unsafe { ctx.dout.split() };
 
@@ -295,11 +297,12 @@ mod tests {
 
         let i2s = I2s::new(
             ctx.i2s,
-            Standard::Philips,
-            DataFormat::Data16Channel16,
-            Rate::from_hz(16000),
             ctx.dma_channel,
-        );
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )?;
 
         let mut i2s_tx = i2s
             .i2s_tx
@@ -323,11 +326,12 @@ mod tests {
 
         let i2s = I2s::new(
             ctx.i2s,
-            Standard::Philips,
-            DataFormat::Data16Channel16,
-            Rate::from_hz(16000),
             ctx.dma_channel,
-        );
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )?;
 
         let mut i2s_rx = i2s
             .i2s_rx
