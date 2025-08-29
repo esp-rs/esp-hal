@@ -22,12 +22,6 @@ pub const PHY_CALIBRATION_DATA_LENGTH: usize =
 /// Type alias for opaque calibration data.
 pub type PhyCalibrationData = [u8; PHY_CALIBRATION_DATA_LENGTH];
 
-enum PhyCalibrationMode {
-    None    = 0,
-    Partial = 1,
-    Full    = 2,
-}
-
 #[cfg(phy_backed_up_digital_register_count_is_set)]
 type PhyDigRegsBackup = [u32; esp_metadata_generated::property!("phy.backed_up_digital_register_count")];
 
@@ -242,6 +236,18 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
         PhyInitGuard { _phy_clock_guard }
     }
 }
+macro_rules! impl_phy_controller {
+    ($feature_gate:ident, $peripheral:tt) => {
+        #[cfg($feature_gate)]
+        impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
+        #[cfg($feature_gate)]
+        impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
+    }
+}
+impl_phy_controller!(wifi, WIFI);
+impl_phy_controller!(bt, BT);
+impl_phy_controller!(ieee802154, IEEE802154);
+
 #[cfg(esp32)]
 /// Trait providing MAC time functionality for the Wi-Fi peripheral.
 pub trait MacTimeExt {

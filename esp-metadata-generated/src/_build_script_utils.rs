@@ -1948,7 +1948,6 @@ impl Chip {
                     "timergroup_default_clock_source=\"0\"",
                     "timergroup_default_clock_source_is_set",
                     "uart_ram_size=\"128\"",
-                    "phy_combo_module",
                     "has_dram_region",
                 ],
                 cfgs: &[
@@ -2118,7 +2117,6 @@ impl Chip {
                     "cargo:rustc-cfg=timergroup_default_clock_source=\"0\"",
                     "cargo:rustc-cfg=timergroup_default_clock_source_is_set",
                     "cargo:rustc-cfg=uart_ram_size=\"128\"",
-                    "cargo:rustc-cfg=phy_combo_module",
                     "cargo:rustc-cfg=has_dram_region",
                 ],
             },
@@ -2834,6 +2832,7 @@ impl Config {
         println!(
             "cargo:rustc-check-cfg=cfg(timergroup_default_wdt_clock_source, values(\"0\",\"1\",\"2\"))"
         );
+        println!("cargo:rustc-check-cfg=cfg(soc_xtal_frequency, values(\"40\",\"32\"))");
         println!("cargo:rustc-check-cfg=cfg(phy_backed_up_digital_register_count, values(\"21\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_i2c_master_fifo_size, values(\"16\"))");
         println!("cargo:rustc-check-cfg=cfg(lp_uart_ram_size, values(\"32\"))");

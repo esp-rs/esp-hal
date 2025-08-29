@@ -235,7 +235,7 @@ macro_rules! property {
         false
     };
     ("phy.combo_module") => {
-        true
+        false
     };
 }
 /// Macro to get the address range of the given memory region.

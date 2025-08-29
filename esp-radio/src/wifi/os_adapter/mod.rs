@@ -1010,7 +1010,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-    WIFI::enable_phy();
+    unsafe { WIFI::steal() }.enable_phy();
 }
 
 /// **************************************************************************
