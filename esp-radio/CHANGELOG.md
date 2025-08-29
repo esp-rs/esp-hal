@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `AccessPointInfo::country` to access the Country Code from the Wi-Fi scan results (#3837)
 - `unstable` feature to opt into `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` APIs (#3865)
+- Added unstable `wifi-eap` feature (#3924)
+- Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
+- `set_phy_calibration_data` and `phy_calibration_data` (#4001)
 
 ### Changed
 
@@ -21,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename `esp-wifi` to `esp-radio`. (#3858)
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
+- Update bt-hci version to add additional HCI commands (#3920)
+- A number of enums/structs have been marked as `#[non_exhaustive]` (#3981)
+  - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, and `WifiState`
+- The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
+  - Error types implements `core::error:Error`
 
 ### Fixed
 
@@ -30,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions (#3963)
 
 ## [v0.15.0] - 2025-07-16
 

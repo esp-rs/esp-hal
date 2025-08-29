@@ -177,7 +177,7 @@ pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bo
 }
 
 #[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
-pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
+pub(crate) fn compat_timer_disarm(ets_timer: *mut ets_timer) {
     trace!("timer disarm");
     TIMERS.with(|timers| {
         if let Some(timer) = timers.find(ets_timer) {
@@ -190,7 +190,7 @@ pub fn compat_timer_disarm(ets_timer: *mut ets_timer) {
 }
 
 #[cfg(feature = "wifi")]
-pub fn compat_timer_done(ets_timer: *mut ets_timer) {
+pub(crate) fn compat_timer_done(ets_timer: *mut ets_timer) {
     trace!("timer done");
     TIMERS.with(|timers| {
         if let Some(timer) = timers.find(ets_timer) {

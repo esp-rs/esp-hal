@@ -6,6 +6,8 @@
 // development, and when a test fails. In these cases, you can enable
 // the `defmt` feature to get the output.
 
+esp_bootloader_esp_idf::esp_app_desc!();
+
 use esp_hal as _;
 
 #[cfg(not(feature = "defmt"))]
@@ -27,8 +29,20 @@ use esp_backtrace as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
+macro_rules! assert {
+    ($($t:tt)*) => { defmt::assert!($($t)*) }
+}
+
+#[cfg(feature = "defmt")]
+#[macro_export]
 macro_rules! assert_eq {
     ($($t:tt)*) => { defmt::assert_eq!($($t)*) }
+}
+
+#[cfg(not(feature = "defmt"))]
+#[macro_export]
+macro_rules! assert {
+    ($($t:tt)*) => { ::core::assert!($($t)*) }
 }
 
 #[cfg(not(feature = "defmt"))]

@@ -84,15 +84,12 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
         self.buf_fill = 0;
     }
 
-    pub const fn align_size(&self) -> usize {
-        U32_ALIGN_SIZE
-    }
-
     // This function will write any remaining buffer to dst and return the
     // amount of *bytes* written (0 means no write). If the buffer is not
     // aligned to the size of the register destination, it will append the '0'
     // value.
     pub fn flush_to(&mut self, dst_ptr: *mut u32, offset: usize) -> usize {
+        let offset = offset / U32_ALIGN_SIZE;
         if self.buf_fill != 0 {
             for i in self.buf_fill..U32_ALIGN_SIZE {
                 self.buf[i] = 0;
@@ -104,7 +101,8 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
                     .write_volatile(E::u32_from_bytes(self.buf));
             }
 
-            let ret = self.align_size() - self.buf_fill;
+            // We return the **extra** bytes appended besides those already written into the buffer.
+            let ret = U32_ALIGN_SIZE - self.buf_fill;
             self.buf_fill = 0;
 
             ret
@@ -116,6 +114,9 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
     // This function is similar to `volatile_set_memory` but will prepend data that
     // was previously ingested and ensure aligned (u32) writes.
     pub fn volatile_write(&mut self, dst_ptr: *mut u32, val: u8, count: usize, offset: usize) {
+        let count = count.div_ceil(U32_ALIGN_SIZE);
+        let offset = offset / U32_ALIGN_SIZE;
+
         let dst_ptr = unsafe { dst_ptr.add(offset) };
 
         let mut cursor = if self.buf_fill != 0 {
@@ -157,6 +158,9 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
         dst_bound: usize,
         offset: usize,
     ) -> (&'a [u8], bool) {
+        let dst_bound = dst_bound / U32_ALIGN_SIZE;
+        let offset = offset / U32_ALIGN_SIZE;
+
         assert!(dst_bound > 0);
 
         let dst_ptr = unsafe { dst_ptr.add(offset) };
@@ -223,6 +227,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
 
     #[allow(dead_code)]
     pub fn volatile_write_regset(&mut self, dst_ptr: *mut u32, src: &[u8], dst_bound: usize) {
+        let dst_bound = dst_bound / U32_ALIGN_SIZE;
         assert!(dst_bound > 0);
         assert!(src.len() <= dst_bound * 4);
 
@@ -238,6 +243,7 @@ impl<E: EndianessConverter> AlignmentHelper<E> {
     }
 
     pub fn volatile_read_regset(&self, src_ptr: *const u32, dst: &mut [u8], dst_bound: usize) {
+        let dst_bound = dst_bound / U32_ALIGN_SIZE;
         assert!(dst.len() >= dst_bound * 4);
 
         let chunks = dst.chunks_exact_mut(U32_ALIGN_SIZE);

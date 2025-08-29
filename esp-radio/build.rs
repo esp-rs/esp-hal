@@ -45,12 +45,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         || cfg!(feature = "esp-now")
         || cfg!(feature = "ieee802154")
         || cfg!(feature = "smoltcp")
-        || cfg!(feature = "sniffer"))
+        || cfg!(feature = "sniffer")
+        || cfg!(feature = "wifi-eap"))
         && !cfg!(feature = "unstable")
         && !suppress_panics
     {
         panic!(
-            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`.\n\n"
+            "\n\nThe `unstable` feature was not provided, but is required for the following features: `ble`, `coex`, `csi`, `esp-now`, `ieee802154`, `smoltcp`, `sniffer`, `wifi-eap`.\n\n"
         )
     }
 
@@ -71,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         !cfg!(feature = "wifi") || chip.contains("wifi"),
         r#"
 
-        WiFi is not supported on this target.
+        Wi-Fi is not supported on this target.
 
         "#
     );
@@ -103,7 +104,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             chip.contains("wifi") && chip.contains("bt"),
             r#"
 
-            WiFi/Bluetooth coexistence is not supported on this target.
+            Wi-Fi/Bluetooth coexistence is not supported on this target.
 
             "#
         );

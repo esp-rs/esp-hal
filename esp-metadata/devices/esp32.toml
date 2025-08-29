@@ -39,7 +39,7 @@ peripherals = [
     { name = "PCNT" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
@@ -104,7 +104,9 @@ memory = [{ name = "dram", start = 0x3FFA_E000, end = 0x4000_0000 }]
 
 [device.soc]
 ref_tick_hz = 1_000_000
-rc_fast_clk_default = 8_000_000
+rc_fast_clk_default = 8_500_000
+rc_slow_clock = 150_000
+xtal_options = [26, 40]
 
 [device.adc]
 support_status = "partial"
@@ -602,12 +604,12 @@ channel_ram_size = 64
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 512, max = 4096 }
-multiplication = { increment = 512, max = 2048 }
+size_increment = 512
+memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]
+algo = { sha1 = 0, sha256 = 0, sha384 = 0, sha512 = 0 } # fake mode bits, ESP32 has separate register sets
 
 [device.spi_master]
 support_status = "supported"

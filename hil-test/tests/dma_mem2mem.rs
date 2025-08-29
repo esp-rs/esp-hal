@@ -14,8 +14,6 @@ use esp_hal::{
 };
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 const DATA_SIZE: usize = 1024 * 10;
 
 struct Context {

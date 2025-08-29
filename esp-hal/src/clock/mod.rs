@@ -53,9 +53,7 @@ use crate::peripherals::BT;
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
-#[cfg(any(esp32, esp32c2))]
-use crate::rtc_cntl::RtcClock;
-use crate::{private::Sealed, time::Rate};
+use crate::{private::Sealed, rtc_cntl::RtcClock, time::Rate};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -160,37 +158,55 @@ impl Clock for CpuClock {
     }
 }
 
-/// XTAL clock speed
-#[instability::unstable]
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum XtalClock {
-    /// 26MHz XTAL clock
-    #[cfg(any(esp32, esp32c2))]
-    _26M,
-    /// 32MHz XTAL clock
-    #[cfg(any(esp32c3, esp32h2, esp32s3))]
-    _32M,
-    /// 40MHz XTAL clock
-    #[cfg(not(esp32h2))]
-    _40M,
-    /// Other XTAL clock
-    Other(u32),
-}
+for_each_soc_xtal_options!(
+    (all $( ($freq:literal) ),*) => {
+        paste::paste! {
+            /// XTAL clock speed
+            #[instability::unstable]
+            #[derive(Debug, Clone, Copy)]
+            #[non_exhaustive]
+            pub enum XtalClock {
+                $(
+                    #[doc = concat!(stringify!($freq), "MHz XTAL clock")]
+                    [<_ $freq M>],
+                )*
+            }
 
-impl Clock for XtalClock {
-    fn frequency(&self) -> Rate {
-        match self {
-            #[cfg(any(esp32, esp32c2))]
-            XtalClock::_26M => Rate::from_mhz(26),
-            #[cfg(any(esp32c3, esp32h2, esp32s3))]
-            XtalClock::_32M => Rate::from_mhz(32),
-            #[cfg(not(esp32h2))]
-            XtalClock::_40M => Rate::from_mhz(40),
-            XtalClock::Other(mhz) => Rate::from_mhz(*mhz),
+            impl XtalClock {
+                pub(crate) const fn closest_from_mhz(mhz: u32) -> Self {
+                    let options = [
+                        $( ($freq, XtalClock::[<_ $freq M>] ), )*
+                    ];
+
+                    let mut error = mhz.abs_diff(options[0].0);
+                    let mut selected = options[0].1;
+
+                    let mut idx = 1;
+                    while idx < options.len() {
+                        let e = mhz.abs_diff(options[idx].0);
+                        if e < error {
+                            selected = options[idx].1;
+                            error = e;
+                        }
+                        idx += 1;
+                    }
+
+                    selected
+                }
+            }
+
+            impl Clock for XtalClock {
+                fn frequency(&self) -> Rate {
+                    match self {
+                        $(
+                            XtalClock::[<_ $freq M>] => Rate::from_mhz($freq),
+                        )*
+                    }
+                }
+            }
         }
-    }
-}
+    };
+);
 
 #[allow(clippy::enum_variant_names, unused)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -315,7 +331,11 @@ static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 impl Clocks {
     pub(crate) fn init(cpu_clock_speed: CpuClock) {
         critical_section::with(|_| {
-            unsafe { ACTIVE_CLOCKS = Some(Self::configure(cpu_clock_speed)) };
+            crate::rtc_cntl::rtc::init();
+
+            let config = Self::configure(cpu_clock_speed);
+            crate::rtc_cntl::RtcClock::update_xtal_freq_mhz(config.xtal_clock.as_mhz());
+            unsafe { ACTIVE_CLOCKS = Some(config) };
         })
     }
 
@@ -347,30 +367,47 @@ impl Clocks {
 
         Self::measure_xtal_frequency().frequency()
     }
+
+    const fn xtal_frequency_from_config() -> Option<XtalClock> {
+        let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
+
+        for_each_soc_xtal_options!(
+            (all $( ($freq:literal) ),*) => {
+                paste::paste! {
+                    return match frequency_conf.as_bytes() {
+                        b"auto" => None,
+
+                        // If the frequency is a pre-set value for the chip, return the associated enum variant.
+                        $( _ if esp_config::esp_config_int_parse!(u32, frequency_conf) == $freq => Some(XtalClock::[<_ $freq M>]), )*
+
+                        _ => None,
+                    };
+                }
+            };
+        );
+    }
+
+    fn measure_xtal_frequency() -> XtalClock {
+        if let Some(clock) = const { Self::xtal_frequency_from_config() } {
+            // Use the configured frequency
+            clock
+        } else if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
+            // TODO: we should be able to read from a retention register, but probe-rs flashes a
+            // bootloader that assumes a frequency, instead of choosing a matching one.
+            let mhz = RtcClock::estimate_xtal_frequency();
+
+            debug!("Working with a {}MHz crystal", mhz);
+
+            // Try to guess the closest possible crystal value.
+            XtalClock::closest_from_mhz(mhz)
+        } else {
+            unreachable!("Invalid crystal frequency configured, this should not be possible.")
+        }
+    }
 }
 
 #[cfg(esp32)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
-            } else {
-                XtalClock::_26M
-            }
-        } else {
-            const {
-                let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-                match frequency_conf.as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    _ => XtalClock::Other(esp_config::esp_config_int_parse!(u32, frequency_conf)),
-                }
-            }
-        }
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -403,26 +440,6 @@ impl Clocks {
 
 #[cfg(esp32c2)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        if esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY") == "auto" {
-            if RtcClock::estimate_xtal_frequency() > 33 {
-                XtalClock::_40M
-            } else {
-                XtalClock::_26M
-            }
-        } else {
-            const {
-                let frequency_conf = esp_config::esp_config_str!("ESP_HAL_CONFIG_XTAL_FREQUENCY");
-                match frequency_conf.as_bytes() {
-                    b"auto" => XtalClock::Other(0), // Can't be `unreachable!` due to const eval.
-                    b"26" => XtalClock::_26M,
-                    b"40" => XtalClock::_40M,
-                    _ => XtalClock::Other(esp_config::esp_config_int_parse!(u32, frequency_conf)),
-                }
-            }
-        }
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -456,10 +473,6 @@ impl Clocks {
 
 #[cfg(esp32c3)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -492,10 +505,6 @@ impl Clocks {
 
 #[cfg(esp32c6)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -529,10 +538,6 @@ impl Clocks {
 
 #[cfg(esp32h2)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_32M
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -568,10 +573,6 @@ impl Clocks {
 
 #[cfg(esp32s2)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -590,10 +591,6 @@ impl Clocks {
 
 #[cfg(esp32s3)]
 impl Clocks {
-    fn measure_xtal_frequency() -> XtalClock {
-        XtalClock::_40M
-    }
-
     /// Configure the CPU clock speed.
     pub(crate) fn configure(cpu_clock_speed: CpuClock) -> Self {
         let xtal_freq = Self::measure_xtal_frequency();
@@ -615,6 +612,7 @@ impl Clocks {
 /// Tracks the number of references to the PHY clock.
 static PHY_CLOCK_REF_COUNTER: critical_section::Mutex<Cell<u8>> =
     critical_section::Mutex::new(Cell::new(0));
+
 #[cfg(any(bt, ieee802154, wifi))]
 fn increase_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
@@ -628,6 +626,7 @@ fn increase_phy_clock_ref_count_internal() {
         phy_clock_ref_counter.set(phy_clock_ref_count + 1);
     });
 }
+
 #[cfg(any(bt, ieee802154, wifi))]
 fn decrease_phy_clock_ref_count_internal() {
     critical_section::with(|cs| {
@@ -644,12 +643,14 @@ fn decrease_phy_clock_ref_count_internal() {
         phy_clock_ref_counter.set(new_phy_clock_ref_count);
     });
 }
+
 #[inline]
 #[instability::unstable]
 /// Do any common initial initialization needed for the radio clocks
 pub fn init_radio_clocks() {
     clocks_ll::init_clocks();
 }
+
 #[instability::unstable]
 #[cfg(any(bt, ieee802154, wifi))]
 #[derive(Debug)]
@@ -661,6 +662,7 @@ pub fn init_radio_clocks() {
 pub struct PhyClockGuard<'d> {
     _phantom: PhantomData<&'d ()>,
 }
+
 #[cfg(any(bt, ieee802154, wifi))]
 impl PhyClockGuard<'_> {
     #[instability::unstable]
@@ -670,12 +672,14 @@ impl PhyClockGuard<'_> {
     /// The PHY clock will be disabled, if this is the last clock guard.
     pub fn release(self) {}
 }
+
 #[cfg(any(bt, ieee802154, wifi))]
 impl Drop for PhyClockGuard<'_> {
     fn drop(&mut self) {
         decrease_phy_clock_ref_count_internal();
     }
 }
+
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
 /// This trait provides common functionality for all

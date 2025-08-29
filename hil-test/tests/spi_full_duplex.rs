@@ -19,8 +19,6 @@ use esp_hal::{
 };
 use hil_test as _;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 cfg_if::cfg_if! {
     if #[cfg(feature = "unstable")] {
         use esp_hal::{

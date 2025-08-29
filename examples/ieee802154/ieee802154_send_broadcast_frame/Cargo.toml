@@ -1,0 +1,40 @@
+[package]
+name    = "ieee802154-send-broadcast-frame"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+esp-alloc = { path = "../../../esp-alloc" }
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-println = { path = "../../../esp-println", features = ["log-04"] }
+esp-radio = { path = "../../../esp-radio", features = [
+    "ieee802154",
+    "unstable",
+] }
+ieee802154 = "0.6.1"
+
+[features]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal/esp32c6",
+    "esp-radio/esp32c6",
+]
+esp32h2 = [
+    "esp-backtrace/esp32h2",
+    "esp-bootloader-esp-idf/esp32h2",
+    "esp-hal/esp32h2",
+    "esp-radio/esp32h2",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1

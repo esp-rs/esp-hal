@@ -13,7 +13,7 @@ cores  = 2
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s3_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
@@ -40,14 +40,14 @@ peripherals = [
     { name = "PERI_BACKUP" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SDHOST" },
     { name = "SENS" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },
@@ -116,6 +116,8 @@ memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
 [device.soc]
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"
@@ -574,7 +576,7 @@ instances = [
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 has_fsm_timeouts = true
-has_hw_bus_clear = true
+has_hw_bus_clear = false
 ll_intr_mask = 0x3ffff
 fifo_size = 32
 has_bus_timeout_enable = true
@@ -599,21 +601,13 @@ channel_ram_size = 48
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 4096 }
-multiplication = { increment = 32, max = 2048 }
+size_increment = 32
+memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = [
-    "SHA-1",
-    "SHA-224",
-    "SHA-256",
-    "SHA-384",
-    "SHA-512",
-    "SHA-512/224",
-    "SHA-512/256",
-    "SHA-512/t",
-]
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.spi_master]
 support_status = "supported"

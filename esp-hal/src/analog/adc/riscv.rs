@@ -551,16 +551,16 @@ pub(crate) fn adc_interrupt_handler() {
 
 fn handle_async<ADCI: Instance>(_instance: ADCI) {
     ADCI::waker().wake();
-    ADCI::disable_interrupt();
+    ADCI::unlisten();
 }
 
 /// Enable asynchronous access.
 pub trait Instance: crate::private::Sealed {
     /// Enable the ADC interrupt
-    fn enable_interrupt();
+    fn listen();
 
     /// Disable the ADC interrupt
-    fn disable_interrupt();
+    fn unlisten();
 
     /// Clear the ADC interrupt
     fn clear_interrupt();
@@ -571,13 +571,13 @@ pub trait Instance: crate::private::Sealed {
 
 #[cfg(adc_adc1)]
 impl Instance for crate::peripherals::ADC1<'_> {
-    fn enable_interrupt() {
+    fn listen() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc1_done().set_bit());
     }
 
-    fn disable_interrupt() {
+    fn unlisten() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc1_done().clear_bit());
@@ -598,13 +598,13 @@ impl Instance for crate::peripherals::ADC1<'_> {
 
 #[cfg(adc_adc2)]
 impl Instance for crate::peripherals::ADC2<'_> {
-    fn enable_interrupt() {
+    fn listen() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc2_done().set_bit());
     }
 
-    fn disable_interrupt() {
+    fn unlisten() {
         APB_SARADC::regs()
             .int_ena()
             .modify(|_, w| w.adc2_done().clear_bit());
@@ -645,7 +645,7 @@ impl<ADCI: Instance + super::RegisterAccess> core::future::Future for AdcFuture<
             Poll::Ready(())
         } else {
             ADCI::waker().register(cx.waker());
-            ADCI::enable_interrupt();
+            ADCI::listen();
             Poll::Pending
         }
     }
@@ -653,6 +653,6 @@ impl<ADCI: Instance + super::RegisterAccess> core::future::Future for AdcFuture<
 
 impl<ADCI: Instance> Drop for AdcFuture<ADCI> {
     fn drop(&mut self) {
-        ADCI::disable_interrupt();
+        ADCI::unlisten();
     }
 }

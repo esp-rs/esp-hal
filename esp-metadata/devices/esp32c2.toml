@@ -31,7 +31,7 @@ peripherals = [
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "MODEM_CLKRST" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },
@@ -83,6 +83,8 @@ memory = [{ name = "dram", start = 0x3FCA_0000, end = 0x3FCE_0000 }]
 [device.soc]
 cpu_has_csr_pc = true
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [26, 40]
 
 [device.adc]
 support_status = "partial"
@@ -250,7 +252,8 @@ status_registers = 2
 
 [device.sha]
 support_status = "partial"
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"

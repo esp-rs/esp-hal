@@ -1,25 +1,36 @@
 //! AES Tests
 
-//% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% CHIPS(quad): esp32s2
+// The S3 dev kit in the HIL-tester has octal PSRAM.
+//% CHIPS(octal): esp32s3
+// ESP32 has no AES-DMA, no point in setting up PSRAM
+//% CHIPS(no_psram): esp32 esp32c3 esp32c6 esp32h2
+
+//% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
+//% FEATURES(quad, octal): psram
+//% FEATURES: unstable esp-alloc/nightly
 
 #![no_std]
 #![no_main]
 
+use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
+#[cfg(aes_dma)]
+use esp_hal::aes::dma::AesDmaBackend;
 use esp_hal::{
     Config,
     aes::{
         Aes,
         AesBackend,
         AesContext,
-        CipherModeState,
+        CipherState,
         Key,
         Operation,
         cipher_modes::{Cbc, Cfb8, Cfb128, Ctr, Ecb, Ofb},
     },
     clock::CpuClock,
 };
-use hil_test as _;
+use hil_test::mk_static;
 
 const KEY: &[u8] = b"SUp4SeCp@sSw0rd";
 const KEY_128: [u8; 16] = pad_to::<16>(KEY);
@@ -110,7 +121,7 @@ const CIPHERTEXT_CBC_128: [u8; PLAINTEXT_BUF_SIZE] = [
     0xbc, 0xfa, 0x56, 0xe, 0xa7, 0x1, 0xa1, 0x63, 0x1f, 0xbf, 0xf6, 0xb9, 0x46, 0xa5, 0x5, 0x29,
     0x84, 0xe1, 0x23, 0xab, 0x8f, 0x3a, 0x1f, 0x89, 0xa1, 0x8e, 0x23, 0xce, 0x74, 0x31, 0x1a, 0x36,
 ];
-#[cfg(any(esp32, esp32s2))]
+#[cfg(esp32s2)]
 const CIPHERTEXT_CBC_192: [u8; PLAINTEXT_BUF_SIZE] = [
     0xfe, 0x14, 0x13, 0xbf, 0x53, 0xe5, 0xbb, 0x1c, 0x66, 0x5b, 0x32, 0x2e, 0x9b, 0xb9, 0x35, 0xcb,
     0xf6, 0x6c, 0xb8, 0x26, 0x22, 0xca, 0x57, 0x9a, 0xe9, 0x98, 0x8f, 0x2f, 0xd1, 0xb1, 0xff, 0xa7,
@@ -221,7 +232,8 @@ const CIPHERTEXT_CFB128: [u8; PLAINTEXT_BUF_SIZE] = [
     0xa5, 0x1b, 0xae, 0xdc, 0x78, 0x4f, 0xcf, 0xcf, 0x31, 0xee, 0xb6, 0xc5, 0x7c, 0x2d, 0x81, 0x37,
 ];
 
-esp_bootloader_esp_idf::esp_app_desc!();
+#[cfg(aes_dma)]
+extern crate alloc;
 
 const fn pad_to<const K: usize>(input: &[u8]) -> [u8; K] {
     let mut out = [0; K];
@@ -252,7 +264,7 @@ where
 
 fn aes_roundtrip<const K: usize>(
     tag: &'static str,
-    block_ctx: impl Into<CipherModeState>,
+    block_ctx: impl Into<CipherState>,
     plaintext: &[u8],
     ciphertext: &[u8],
     buffer: &mut [u8],
@@ -282,8 +294,18 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
     fill_with_plaintext(&mut plaintext);
 
+    // Let's use ECB as a test case for short unaligned DMA transfers.
+    let short_len = 16;
+    aes_roundtrip::<16>(
+        "Short ECB",
+        Ecb,
+        &plaintext[0..short_len],
+        &CIPHERTEXT_ECB_128[0..short_len],
+        &mut buffer[0..short_len],
+    );
+
     aes_roundtrip::<16>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
-    #[cfg(esp32s2)]
+    #[cfg(any(esp32, esp32s2))]
     aes_roundtrip::<24>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
     aes_roundtrip::<32>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
 
@@ -305,7 +327,7 @@ fn run_cipher_tests(buffer: &mut [u8]) {
 }
 
 #[cfg(test)]
-#[embedded_test::tests(default_timeout = 3)]
+#[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())] // defmt slows the tests down a bit
 mod tests {
     use super::*;
 
@@ -338,7 +360,7 @@ mod tests {
     #[cfg(not(esp32))]
     fn test_aes_dma_ecb() {
         use esp_hal::{
-            aes::dma::{AesDma, CipherMode},
+            aes::dma::AesDma,
             dma::{DmaRxBuf, DmaTxBuf},
             dma_buffers,
         };
@@ -351,6 +373,8 @@ mod tests {
         where
             Key: From<[u8; K]>,
         {
+            use esp_hal::aes::dma::DmaCipherState;
+
             const DMA_BUFFER_SIZE: usize = 16;
 
             let (output, rx_descriptors, input, tx_descriptors) = dma_buffers!(DMA_BUFFER_SIZE);
@@ -365,7 +389,7 @@ mod tests {
                     output,
                     input,
                     Operation::Encrypt,
-                    CipherMode::Ecb,
+                    &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
@@ -381,7 +405,7 @@ mod tests {
                     output,
                     input,
                     Operation::Decrypt,
-                    CipherMode::Ecb,
+                    &DmaCipherState::from(Ecb),
                     pad_to::<K>(KEY),
                 )
                 .map_err(|e| e.0)
@@ -433,6 +457,66 @@ mod tests {
     }
 
     #[test]
+    #[cfg(aes_dma)]
+    fn test_aes_dma_work_queue() {
+        use allocator_api2::vec::Vec;
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        esp_alloc::heap_allocator!(size: 32 * 1024);
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
+            } else {
+                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
+            }
+        }
+        let _backend = aes.start();
+
+        let mut internal_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + 15, esp_alloc::InternalMemory);
+        internal_memory.resize(PLAINTEXT_BUF_SIZE + 15, 0);
+
+        // Different alignments in internal memory
+        for shift in 0..15 {
+            let buffer = &mut internal_memory[shift..][..PLAINTEXT_BUF_SIZE];
+            run_cipher_tests(buffer);
+        }
+    }
+
+    #[test]
+    #[cfg(all(aes_dma, psram))]
+    fn test_aes_dma_work_queue_psram() {
+        use allocator_api2::vec::Vec;
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+        esp_alloc::psram_allocator!(p.PSRAM, esp_hal::psram);
+
+        cfg_if::cfg_if! {
+            if #[cfg(esp32s2)] {
+                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CRYPTO);
+            } else {
+                let mut aes = AesDmaBackend::new(p.AES, p.DMA_CH0);
+            }
+        }
+        let _backend = aes.start();
+
+        let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+        fill_with_plaintext(&mut plaintext);
+
+        // Different alignments in external memory
+        let mut external_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + 15, esp_alloc::ExternalMemory);
+        external_memory.resize(PLAINTEXT_BUF_SIZE + 15, 0);
+
+        for shift in 0..15 {
+            let buffer = &mut external_memory[shift..][..PLAINTEXT_BUF_SIZE];
+            run_cipher_tests(buffer);
+        }
+    }
+
+    #[test]
     fn test_aes_work_queue_work_posted_before_queue_started() {
         let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
 
@@ -450,6 +534,45 @@ mod tests {
         handle.wait_blocking();
 
         hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+    }
+
+    #[test]
+    async fn test_aes_work_queue_work_posted_before_queue_started_async() {
+        #[embassy_executor::task]
+        async fn aes_task(signal: &'static Signal<CriticalSectionRawMutex, ()>) {
+            let mut output = [0; PLAINTEXT_BUF_SIZE];
+            let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
+            fill_with_plaintext(&mut plaintext);
+
+            let mut ecb_encrypt = AesContext::new(Ecb, Operation::Encrypt, KEY_128);
+            let mut handle = ecb_encrypt.process(&plaintext, &mut output).unwrap();
+
+            // Backend can start now
+            signal.signal(());
+
+            handle.wait().await;
+            core::mem::drop(handle);
+
+            hil_test::assert_eq!(output, CIPHERTEXT_ECB_128);
+
+            // Test can end now
+            signal.signal(());
+        }
+
+        let p = esp_hal::init(Config::default().with_cpu_clock(CpuClock::max()));
+
+        let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+
+        // Start task before we'd start the AES operation
+        let spawner = Spawner::for_current_executor().await;
+        spawner.must_spawn(aes_task(signal));
+
+        signal.wait().await;
+
+        let mut aes = AesBackend::new(p.AES);
+        let _backend = aes.start();
+
+        signal.wait().await;
     }
 
     #[test]

@@ -28,7 +28,6 @@ static_cell               = "2.1.0"
 # Unstable dependencies that are not (strictly) part of the public API
 document-features         = "0.2.11"
 embassy-sync              = { version = "0.6.2" }
-embassy-time              = { version = "0.4.0" }
 embassy-time-driver       = { version = "0.2.0", features = [ "tick-hz-1_000_000" ] }
 embassy-time-queue-utils  = { version = "0.1.0", features = ["_generic-queue"] }
 esp-config                = { version = "0.5.0", path = "../esp-config" }

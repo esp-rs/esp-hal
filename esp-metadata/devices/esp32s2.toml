@@ -13,7 +13,7 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-s2_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_SARADC" },
     { name = "DEDICATED_GPIO" },
     { name = "DS" },
@@ -36,12 +36,12 @@ peripherals = [
     { name = "PMS" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "RTC_I2C" },
     { name = "RTC_IO" },
     { name = "SENS" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2", dma = "SPI2_DMA" } },
@@ -103,7 +103,9 @@ memory = [{ name = "dram", start = 0x3FFB_0000, end = 0x4000_0000 }]
 
 [device.soc]
 ref_tick_hz = 1_000_000
-rc_fast_clk_default = 8_000_000
+rc_fast_clk_default = 8_500_000
+rc_slow_clock = 90_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"
@@ -402,6 +404,7 @@ instances = [
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 ll_intr_mask = 0x1ffff
+has_hw_bus_clear = false
 fifo_size = 32
 has_bus_timeout_enable = true
 max_bus_timeout = 0xFFFFFF
@@ -423,21 +426,13 @@ channel_ram_size = 64
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 4096 }
-multiplication = { increment = 32, max = 2048 }
+size_increment = 32
+memory_size_bytes = 512
 
 [device.sha]
 support_status = "partial"
-algo = [
-    "SHA-1",
-    "SHA-224",
-    "SHA-256",
-    "SHA-384",
-    "SHA-512",
-    "SHA-512/224",
-    "SHA-512/256",
-    "SHA-512/t",
-]
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.spi_master]
 support_status = "supported"

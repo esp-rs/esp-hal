@@ -109,6 +109,7 @@ pub enum Error {
 
 impl Error {
     #[instability::unstable]
+    /// Create an `Error` from a raw error code.
     pub fn from_code(code: u32) -> Error {
         match code {
             12389 => Error::NotInitialized,
@@ -124,6 +125,29 @@ impl Error {
     }
 }
 
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::NotInitialized => write!(f, "ESP-NOW is not initialized."),
+            Error::InvalidArgument => write!(f, "Invalid argument."),
+            Error::OutOfMemory => write!(f, "Insufficient memory to complete the operation."),
+            Error::PeerListFull => write!(f, "ESP-NOW peer list is full."),
+            Error::NotFound => write!(f, "ESP-NOW peer is not found."),
+            Error::Internal => write!(f, "Internal error."),
+            Error::PeerExists => write!(f, "ESP-NOW peer already exists."),
+            Error::InterfaceMismatch => {
+                write!(
+                    f,
+                    "The Wi-Fi interface used for ESP-NOW doesn't match the expected one for the peer."
+                )
+            }
+            Error::Other(code) => write!(f, "Unknown error with code: {code}."),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
+
 /// Common errors that can occur while using ESP-NOW driver.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -138,6 +162,21 @@ pub enum EspNowError {
     /// Initialization error
     Initialization(WifiError),
 }
+
+impl core::fmt::Display for EspNowError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            EspNowError::Error(e) => write!(f, "Internal error: {e}."),
+            EspNowError::SendFailed => write!(f, "Failed to send an ESP-NOW message."),
+            EspNowError::DuplicateInstance => {
+                write!(f, "Attempt to create `EspNow` instance twice.")
+            }
+            EspNowError::Initialization(e) => write!(f, "Initialization error: {e}."),
+        }
+    }
+}
+
+impl core::error::Error for EspNowError {}
 
 impl From<WifiError> for EspNowError {
     fn from(f: WifiError) -> Self {
@@ -276,6 +315,7 @@ pub struct ReceiveInfo {
 #[instability::unstable]
 pub struct ReceivedData {
     data: Box<[u8]>,
+    /// Information about the received packet.
     pub info: ReceiveInfo,
 }
 
@@ -340,7 +380,7 @@ pub struct EspNowManager<'d> {
 }
 
 impl EspNowManager<'_> {
-    /// Set primary WiFi channel.
+    /// Set primary Wi-Fi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {
@@ -702,7 +742,7 @@ impl<'d> EspNow<'d> {
         (self.manager, self.sender, self.receiver)
     }
 
-    /// Set primary WiFi channel.
+    /// Set primary Wi-Fi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     #[instability::unstable]
     pub fn set_channel(&self, channel: u8) -> Result<(), EspNowError> {

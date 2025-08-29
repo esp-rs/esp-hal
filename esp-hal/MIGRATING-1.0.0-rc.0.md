@@ -27,11 +27,12 @@ The previous way to obtain RNG object has changed like so:
 
 ## AES changes
 
-The `esp_hal::aes::Aes` driver has been slightly reworked:
+The `esp_hal::aes::Aes` and `esp_hal::aes::AesDma` drivers has been slightly reworked:
 
 - `Mode` has been replaced by `Operation`. Operation has `Encrypt` and `Decrypt` variants, but the key length is no longer part of the enum. The key length is specified by the key. AesDma now takes this `Operation`.
 - `Aes::process` has been split into `encrypt` and `decrypt`. These functions no longer take a mode parameter.
-- `AesDma::write_block` has been removed.
+- `AesDma::write_block` and `AesDma::write_key` have been removed.
+- `AesDma::process` now takes `DmaCipherState` which includes information to initialize the block cipher mode of operation.
 
 ```diff
 -aes.process(block, Mode::Encrypt128, key);
@@ -40,6 +41,26 @@ The `esp_hal::aes::Aes` driver has been slightly reworked:
 -aes.process(block, Mode::Decrypt256, key);
 +aes.decrypt(block, key_32_bytes);
 ```
+
+```diff
++use esp_hal::aes::dma::DmaCipherState;
++use esp_hal::aes::cipher_modes::Ecb;
+
+ let transfer = aes_dma
+     .process(
+         1,
+         output,
+         input,
+         Operation::Encrypt,
+-        CipherMode::Ecb,
++        &DmaCipherState::from(Ecb),
+         key,
+     )
+     .map_err(|e| e.0)
+     .unwrap();
+ (aes_dma, output, input) = transfer.wait();
+```
+
 ## ISR Callback Changes
 
 Previously callbacks were of type `extern "C" fn()`, now they are `IsrCallback`. In most places no changes are needed but when using `bind_interrupt` directly
@@ -90,4 +111,77 @@ Nevertheless, type annotations will require some changes:
 let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
+```
+
+## DMA changes
+
+DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
+so there is no code change necessary in user codebases. Library writes will need to add the type to their
+DMA buffer implementations.
+
+```diff
+ unsafe impl DmaTxBuffer for MyTxBuf {
+     type View = BufView<Self>;
++    type Final = Self;
+     // ...
+ }
+```
+
+If the `Final` type is not `Self`, `fn from_view()` will need to be updated to return `Self::Final`.
+
+## Timer interrupts
+```diff
+- pub fn enable_interrupt(&mut self, enable: bool) { ... }
++ pub fn listen(&mut self) { ... }
++ pub fn unlisten(&mut self) { ... }
+```
+
+## ESP32-S3 PSRAM Configuration
+
+`PsramConfig::core_clock` is now an `Option`.
+
+```diff
+let peripherals = esp_hal::init(
+    esp_hal::Config::default()
+    .with_cpu_clock(esp_hal::clock::CpuClock::max())
+    .with_psram(esp_hal::psram::PsramConfig {
+        flash_frequency: esp_hal::psram::FlashFreq::FlashFreq20m,
+        ram_frequency: esp_hal::psram::SpiRamFreq::Freq40m,
+-       core_clock: esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m,
++       core_clock: Some(esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m),
+        ..Default::default()
+        })
+    );
+```
+
+## `I8080` driver pin configuration changes
+
+```diff
+- let tx_pins = TxEightBits::new(
+-     peripherals.GPIO9,
+-     peripherals.GPIO46,
+-     peripherals.GPIO3,
+-     peripherals.GPIO8,
+-     peripherals.GPIO18,
+-     peripherals.GPIO17,
+-     peripherals.GPIO16,
+-     peripherals.GPIO15,
+- );
++ let mut i8080 = I8080::new(
+     lcd_cam.lcd,
+     peripherals.DMA_CH0,
+-    tx_pins,
+     config,
+  )?
+- .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
++ .with_dc(peripherals.GPIO0)
++ .with_wrx(peripherals.GPIO47)
++ .with_data0(peripherals.GPIO9)
++ .with_data1(peripherals.GPIO46)
++ .with_data2(peripherals.GPIO3)
++ .with_data3(peripherals.GPIO8)
++ .with_data4(peripherals.GPIO18)
++ .with_data5(peripherals.GPIO17)
++ .with_data6(peripherals.GPIO16)
++ .with_data7(peripherals.GPIO15);
 ```

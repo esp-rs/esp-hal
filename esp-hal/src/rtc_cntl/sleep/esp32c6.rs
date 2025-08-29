@@ -6,6 +6,7 @@ use crate::{
     gpio::RtcFunction,
     rtc_cntl::{
         Rtc,
+        RtcCalSel,
         RtcClock,
         rtc::{
             HpAnalog,
@@ -13,7 +14,6 @@ use crate::{
             HpSysPower,
             LpAnalog,
             LpSysPower,
-            RtcCalSel,
             SavedClockConfig,
             rtc_clk_cpu_freq_set_xtal,
         },

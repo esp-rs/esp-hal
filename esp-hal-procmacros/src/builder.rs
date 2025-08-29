@@ -34,6 +34,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
 
     let span = input.span();
     let ident = input.ident;
+    let generics = input.generics;
 
     let mut fns = Vec::new();
     let Data::Struct(DataStruct { fields, .. }) = &input.data else {
@@ -142,7 +143,7 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
 
     let implementation = quote! {
         #[automatically_derived]
-        impl #ident {
+        impl #generics #ident #generics {
             #(#fns)*
         }
     };

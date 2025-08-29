@@ -15,7 +15,7 @@ use crate::{Package, windows_safe_path};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
-    Build(PathBuf),
+    Build(Option<PathBuf>),
     Run,
 }
 

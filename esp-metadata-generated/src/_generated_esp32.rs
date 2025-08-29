@@ -49,10 +49,19 @@ macro_rules! property {
         stringify!(1000000)
     };
     ("soc.rc_fast_clk_default") => {
-        8000000
+        8500000
     };
     ("soc.rc_fast_clk_default", str) => {
-        stringify!(8000000)
+        stringify!(8500000)
+    };
+    ("soc.rc_slow_clock") => {
+        150000
+    };
+    ("soc.rc_slow_clock", str) => {
+        stringify!(150000)
+    };
+    ("soc.has_multiple_xtal_options") => {
+        true
     };
     ("aes.dma") => {
         false
@@ -183,6 +192,21 @@ macro_rules! property {
     ("rng.apb_cycle_wait_num", str) => {
         stringify!(16)
     };
+    ("rsa.size_increment") => {
+        512
+    };
+    ("rsa.size_increment", str) => {
+        stringify!(512)
+    };
+    ("rsa.memory_size_bytes") => {
+        512
+    };
+    ("rsa.memory_size_bytes", str) => {
+        stringify!(512)
+    };
+    ("sha.dma") => {
+        false
+    };
     ("spi_master.has_octal") => {
         false
     };
@@ -215,6 +239,15 @@ macro_rules! memory_range {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_soc_xtal_options {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((26)); _for_each_inner!((40)); _for_each_inner!((all(26),
+        (40)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_aes_key_length {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
@@ -242,6 +275,23 @@ macro_rules! for_each_rsa_multiplication {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
         _for_each_inner!((512)); _for_each_inner!((1024)); _for_each_inner!((1536));
         _for_each_inner!((2048)); _for_each_inner!((all(512), (1024), (1536), (2048)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Sha1, "SHA-1"(sizes : 64, 20, 8) (insecure_against :
+        "collision", "length extension"), 0)); _for_each_inner!((Sha256, "SHA-256"(sizes
+        : 64, 32, 8) (insecure_against : "length extension"), 0));
+        _for_each_inner!((Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :),
+        0)); _for_each_inner!((Sha512, "SHA-512"(sizes : 128, 64, 16) (insecure_against :
+        "length extension"), 0)); _for_each_inner!((algos(Sha1, "SHA-1"(sizes : 64, 20,
+        8) (insecure_against : "collision", "length extension"), 0), (Sha256,
+        "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"), 0),
+        (Sha384, "SHA-384"(sizes : 128, 48, 16) (insecure_against :), 0), (Sha512,
+        "SHA-512"(sizes : 128, 64, 16) (insecure_against : "length extension"), 0)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
@@ -405,61 +455,64 @@ macro_rules! for_each_peripheral {
         _for_each_inner!((MCPWM1 <= MCPWM1() (unstable))); _for_each_inner!((NRX <= NRX()
         (unstable))); _for_each_inner!((PCNT <= PCNT() (unstable)));
         _for_each_inner!((RMT <= RMT() (unstable))); _for_each_inner!((RNG <= RNG()
-        (unstable))); _for_each_inner!((RSA <= RSA() (unstable))); _for_each_inner!((LPWR
-        <= RTC_CNTL() (unstable))); _for_each_inner!((RTC_I2C <= RTC_I2C() (unstable)));
-        _for_each_inner!((RTC_IO <= RTC_IO() (unstable))); _for_each_inner!((SDHOST <=
-        SDHOST() (unstable))); _for_each_inner!((SENS <= SENS() (unstable)));
-        _for_each_inner!((SHA <= SHA() (unstable))); _for_each_inner!((SLC <= SLC()
-        (unstable))); _for_each_inner!((SLCHOST <= SLCHOST() (unstable)));
-        _for_each_inner!((SPI0 <= SPI0() (unstable))); _for_each_inner!((SPI1 <= SPI1()
-        (unstable))); _for_each_inner!((SPI2 <= SPI2(SPI2_DMA : { bind_dma_interrupt,
-        enable_dma_interrupt, disable_dma_interrupt }, SPI2 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((SPI3 <=
-        SPI3(SPI3_DMA : { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt
-        }, SPI3 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }))); _for_each_inner!((TIMG0 <= TIMG0() (unstable))); _for_each_inner!((TIMG1 <=
-        TIMG1() (unstable))); _for_each_inner!((TWAI0 <= TWAI0() (unstable)));
-        _for_each_inner!((UART0 <= UART0(UART0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((UART1 <=
-        UART1(UART1 : { bind_peri_interrupt, enable_peri_interrupt,
-        disable_peri_interrupt }))); _for_each_inner!((UART2 <= UART2(UART2 : {
+        (unstable))); _for_each_inner!((RSA <= RSA(RSA : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)));
+        _for_each_inner!((LPWR <= RTC_CNTL() (unstable))); _for_each_inner!((RTC_I2C <=
+        RTC_I2C() (unstable))); _for_each_inner!((RTC_IO <= RTC_IO() (unstable)));
+        _for_each_inner!((SDHOST <= SDHOST() (unstable))); _for_each_inner!((SENS <=
+        SENS() (unstable))); _for_each_inner!((SHA <= SHA() (unstable)));
+        _for_each_inner!((SLC <= SLC() (unstable))); _for_each_inner!((SLCHOST <=
+        SLCHOST() (unstable))); _for_each_inner!((SPI0 <= SPI0() (unstable)));
+        _for_each_inner!((SPI1 <= SPI1() (unstable))); _for_each_inner!((SPI2 <=
+        SPI2(SPI2_DMA : { bind_dma_interrupt, enable_dma_interrupt, disable_dma_interrupt
+        }, SPI2 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
+        }))); _for_each_inner!((SPI3 <= SPI3(SPI3_DMA : { bind_dma_interrupt,
+        enable_dma_interrupt, disable_dma_interrupt }, SPI3 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((TIMG0 <=
+        TIMG0() (unstable))); _for_each_inner!((TIMG1 <= TIMG1() (unstable)));
+        _for_each_inner!((TWAI0 <= TWAI0() (unstable))); _for_each_inner!((UART0 <=
+        UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }))); _for_each_inner!((UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((UHCI1 <=
-        UHCI1() (unstable))); _for_each_inner!((WIFI <= WIFI() (unstable)));
-        _for_each_inner!((DMA_SPI2 <= SPI2() (unstable))); _for_each_inner!((DMA_SPI3 <=
-        SPI3() (unstable))); _for_each_inner!((DMA_I2S0 <= I2S0() (unstable)));
-        _for_each_inner!((DMA_I2S1 <= I2S1() (unstable))); _for_each_inner!((ADC1 <=
-        virtual() (unstable))); _for_each_inner!((ADC2 <= virtual() (unstable)));
-        _for_each_inner!((BT <= virtual() (unstable))); _for_each_inner!((CPU_CTRL <=
-        virtual() (unstable))); _for_each_inner!((DAC1 <= virtual() (unstable)));
-        _for_each_inner!((DAC2 <= virtual() (unstable))); _for_each_inner!((PSRAM <=
-        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
-        _for_each_inner!((TOUCH <= virtual() (unstable))); _for_each_inner!((all(GPIO0 <=
-        virtual()), (GPIO1 <= virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()),
-        (GPIO4 <= virtual()), (GPIO5 <= virtual()), (GPIO6 <= virtual()), (GPIO7 <=
-        virtual()), (GPIO8 <= virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()),
-        (GPIO11 <= virtual()), (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <=
-        virtual()), (GPIO15 <= virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()),
-        (GPIO18 <= virtual()), (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <=
-        virtual()), (GPIO22 <= virtual()), (GPIO23 <= virtual()), (GPIO25 <= virtual()),
-        (GPIO26 <= virtual()), (GPIO27 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <=
-        virtual()), (GPIO34 <= virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()),
-        (GPIO37 <= virtual()), (GPIO38 <= virtual()), (GPIO39 <= virtual()), (AES <=
-        AES() (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (BB <= BB() (unstable)),
-        (DPORT <= DPORT() (unstable)), (SYSTEM <= DPORT() (unstable)), (EFUSE <= EFUSE()
-        (unstable)), (EMAC_DMA <= EMAC_DMA() (unstable)), (EMAC_EXT <= EMAC_EXT()
-        (unstable)), (EMAC_MAC <= EMAC_MAC() (unstable)), (FLASH_ENCRYPTION <=
-        FLASH_ENCRYPTION() (unstable)), (FRC_TIMER <= FRC_TIMER() (unstable)), (GPIO <=
-        GPIO() (unstable)), (GPIO_SD <= GPIO_SD() (unstable)), (HINF <= HINF()
-        (unstable)), (I2C0 <= I2C0(I2C_EXT0 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt })), (I2C1 <= I2C1(I2C_EXT1 : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })), (I2S0 <=
-        I2S0(I2S0 : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt
-        }) (unstable)), (I2S1 <= I2S1(I2S1 : { bind_peri_interrupt,
-        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (IO_MUX <= IO_MUX()
-        (unstable)), (LEDC <= LEDC() (unstable)), (MCPWM0 <= MCPWM0() (unstable)),
-        (MCPWM1 <= MCPWM1() (unstable)), (NRX <= NRX() (unstable)), (PCNT <= PCNT()
-        (unstable)), (RMT <= RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA()
+        _for_each_inner!((UART2 <= UART2(UART2 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }))); _for_each_inner!((UHCI0 <=
+        UHCI0() (unstable))); _for_each_inner!((UHCI1 <= UHCI1() (unstable)));
+        _for_each_inner!((WIFI <= WIFI() (unstable))); _for_each_inner!((DMA_SPI2 <=
+        SPI2() (unstable))); _for_each_inner!((DMA_SPI3 <= SPI3() (unstable)));
+        _for_each_inner!((DMA_I2S0 <= I2S0() (unstable))); _for_each_inner!((DMA_I2S1 <=
+        I2S1() (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
+        _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((BT <=
+        virtual() (unstable))); _for_each_inner!((CPU_CTRL <= virtual() (unstable)));
+        _for_each_inner!((DAC1 <= virtual() (unstable))); _for_each_inner!((DAC2 <=
+        virtual() (unstable))); _for_each_inner!((PSRAM <= virtual() (unstable)));
+        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable))); _for_each_inner!((TOUCH
+        <= virtual() (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <=
+        virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()),
+        (GPIO5 <= virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <=
+        virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()),
+        (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <=
+        virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()),
+        (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (GPIO22 <=
+        virtual()), (GPIO23 <= virtual()), (GPIO25 <= virtual()), (GPIO26 <= virtual()),
+        (GPIO27 <= virtual()), (GPIO32 <= virtual()), (GPIO33 <= virtual()), (GPIO34 <=
+        virtual()), (GPIO35 <= virtual()), (GPIO36 <= virtual()), (GPIO37 <= virtual()),
+        (GPIO38 <= virtual()), (GPIO39 <= virtual()), (AES <= AES() (unstable)),
+        (APB_CTRL <= APB_CTRL() (unstable)), (BB <= BB() (unstable)), (DPORT <= DPORT()
+        (unstable)), (SYSTEM <= DPORT() (unstable)), (EFUSE <= EFUSE() (unstable)),
+        (EMAC_DMA <= EMAC_DMA() (unstable)), (EMAC_EXT <= EMAC_EXT() (unstable)),
+        (EMAC_MAC <= EMAC_MAC() (unstable)), (FLASH_ENCRYPTION <= FLASH_ENCRYPTION()
+        (unstable)), (FRC_TIMER <= FRC_TIMER() (unstable)), (GPIO <= GPIO() (unstable)),
+        (GPIO_SD <= GPIO_SD() (unstable)), (HINF <= HINF() (unstable)), (I2C0 <=
+        I2C0(I2C_EXT0 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt })), (I2C1 <= I2C1(I2C_EXT1 : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt })), (I2S0 <= I2S0(I2S0 : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        (unstable)), (I2S1 <= I2S1(I2S1 : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable)), (IO_MUX <= IO_MUX() (unstable)), (LEDC <=
+        LEDC() (unstable)), (MCPWM0 <= MCPWM0() (unstable)), (MCPWM1 <= MCPWM1()
+        (unstable)), (NRX <= NRX() (unstable)), (PCNT <= PCNT() (unstable)), (RMT <=
+        RMT() (unstable)), (RNG <= RNG() (unstable)), (RSA <= RSA(RSA : {
+        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (LPWR <= RTC_CNTL() (unstable)), (RTC_I2C <= RTC_I2C() (unstable)),
         (RTC_IO <= RTC_IO() (unstable)), (SDHOST <= SDHOST() (unstable)), (SENS <= SENS()
         (unstable)), (SHA <= SHA() (unstable)), (SLC <= SLC() (unstable)), (SLCHOST <=

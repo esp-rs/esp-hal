@@ -45,7 +45,7 @@
 //! a feature flag of the `log` crate. See [documentation](https://docs.rs/log/0.4.19/log/#compile-time-filters).
 //! You should set it to `release_max_level_off`.
 //!
-//! ### WiFi performance considerations
+//! ### Wi-Fi performance considerations
 //!
 //! The default configuration is quite conservative to reduce power and memory consumption.
 //!
@@ -112,6 +112,7 @@ mod fmt;
 use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
+pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
@@ -251,7 +252,7 @@ impl Drop for Controller<'_> {
     }
 }
 
-/// Initialize for using WiFi and or BLE.
+/// Initialize for using Wi-Fi and or BLE.
 ///
 /// Make sure to **not** call this function while interrupts are disabled.
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
@@ -268,7 +269,7 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::SchedulerNotInitialized);
     }
 
-    // A minimum clock of 80MHz is required to operate WiFi module.
+    // A minimum clock of 80MHz is required to operate Wi-Fi module.
     const MIN_CLOCK: Rate = Rate::from_mhz(80);
     let clocks = Clocks::get();
     if clocks.cpu_clock < MIN_CLOCK {
@@ -320,7 +321,7 @@ pub enum InitializationError {
     /// A general error occurred.
     /// The internal error code is reported.
     General(i32),
-    /// An error from the WiFi driver.
+    /// An error from the Wi-Fi driver.
     #[cfg(feature = "wifi")]
     WifiError(WifiError),
     /// The current CPU clock frequency is too low.
@@ -342,7 +343,7 @@ impl From<WifiError> for InitializationError {
     }
 }
 
-/// Enable verbose logging within the WiFi driver
+/// Enable verbose logging within the Wi-Fi driver
 /// Does nothing unless the `sys-logs` feature is enabled.
 #[instability::unstable]
 pub fn wifi_set_log_verbose() {

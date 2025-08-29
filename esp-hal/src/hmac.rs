@@ -198,7 +198,7 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().rd_result_mem(0).as_ptr(),
             output,
-            core::cmp::min(output.len(), 32) / self.alignment_helper.align_size(),
+            core::cmp::min(output.len(), 32),
         );
 
         self.regs()
@@ -231,16 +231,14 @@ impl<'d> Hmac<'d> {
     }
 
     fn write_data<'a>(&mut self, incoming: &'a [u8]) -> nb::Result<&'a [u8], Infallible> {
-        let mod_length = self.byte_written % 64;
-
         let (remaining, bound_reached) = self.alignment_helper.aligned_volatile_copy(
             #[cfg(esp32s2)]
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             incoming,
-            64 / self.alignment_helper.align_size(),
-            mod_length / self.alignment_helper.align_size(),
+            64,
+            self.byte_written % 64,
         );
 
         self.byte_written = self
@@ -272,7 +270,7 @@ impl<'d> Hmac<'d> {
             self.regs().wr_message_(0).as_ptr(),
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
-            (self.byte_written % 64) / self.alignment_helper.align_size(),
+            self.byte_written % 64,
         );
 
         self.byte_written = self.byte_written.wrapping_add(flushed);
@@ -299,8 +297,8 @@ impl<'d> Hmac<'d> {
                 #[cfg(not(esp32s2))]
                 self.regs().wr_message_mem(0).as_ptr(),
                 0_u8,
-                pad_len / self.alignment_helper.align_size(),
-                mod_cursor / self.alignment_helper.align_size(),
+                pad_len,
+                mod_cursor,
             );
             self.regs()
                 .set_message_one()
@@ -321,8 +319,8 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             0_u8,
-            pad_len / self.alignment_helper.align_size(),
-            mod_cursor / self.alignment_helper.align_size(),
+            pad_len,
+            mod_cursor,
         );
 
         self.byte_written = self.byte_written.wrapping_add(pad_len);
@@ -338,8 +336,8 @@ impl<'d> Hmac<'d> {
             #[cfg(not(esp32s2))]
             self.regs().wr_message_mem(0).as_ptr(),
             &len_mem,
-            64 / self.alignment_helper.align_size(),
-            (64 - core::mem::size_of::<u64>()) / self.alignment_helper.align_size(),
+            64,
+            64 - core::mem::size_of::<u64>(),
         );
         self.regs()
             .set_message_one()

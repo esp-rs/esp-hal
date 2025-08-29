@@ -742,9 +742,9 @@ impl UsbSerialJtagTx<'_, Async> {
     async fn flush_tx_async(&mut self) -> Result<(), Error> {
         if self
             .regs()
-            .jfifo_st()
+            .ep1_conf()
             .read()
-            .out_fifo_empty()
+            .serial_in_ep_data_free()
             .bit_is_clear()
         {
             UsbSerialJtagWriteFuture::new(self.peripheral.reborrow()).await;

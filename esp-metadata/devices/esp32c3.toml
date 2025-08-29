@@ -13,7 +13,7 @@ cores  = 1
 trm    = "https://www.espressif.com/sites/default/files/documentation/esp32-c3_technical_reference_manual_en.pdf"
 
 peripherals = [
-    { name = "AES" },
+    { name = "AES", interrupts = { peri = "AES" } },
     { name = "APB_CTRL" },
     { name = "APB_SARADC" },
     { name = "ASSIST_DEBUG" },
@@ -36,10 +36,10 @@ peripherals = [
     { name = "NRX" },
     { name = "RMT" },
     { name = "RNG" },
-    { name = "RSA" },
+    { name = "RSA", interrupts = { peri = "RSA" } },
     { name = "LPWR", pac = "RTC_CNTL" },
     { name = "SENSITIVE" },
-    { name = "SHA" },
+    { name = "SHA", interrupts = { peri = "SHA" } },
     { name = "SPI0" },
     { name = "SPI1" },
     { name = "SPI2", interrupts = { peri = "SPI2" } },
@@ -92,6 +92,8 @@ memory = [{ name = "dram", start = 0x3FC8_0000, end = 0x3FCE_0000 }]
 [device.soc]
 cpu_has_csr_pc = true
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"
@@ -307,12 +309,13 @@ channel_ram_size = 48
 
 [device.rsa]
 support_status = "partial"
-exponentiation = { increment = 32, max = 3072 }
-multiplication = { increment = 32, max = 1536 }
+size_increment = 32
+memory_size_bytes = 384
 
 [device.sha]
 support_status = "partial"
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+dma = true
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"

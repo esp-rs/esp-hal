@@ -10,22 +10,12 @@ As previously stated, we use the [cargo-xtask] pattern for automation. Commands 
 
 [cargo-xtask]: https://github.com/matklad/cargo-xtask
 
-## Building Tests
-
-You can build all examples for a given device using the `build-examples` subcommand:
-
-```shell
-cargo xtask build-examples qa-test esp32
-```
-
-Note that we must specify which package to build the tests for, since this repository contains multiple packages.
-
 ## Running Tests
 
-You can also build and then subsequently flash and run an test using the `run-example` subcommand. With a target device connected to your host system, run:
+You can build and then subsequently flash and run an test using the `run example` subcommand. With a target device connected to your host system, run:
 
 ```shell
-cargo xtask run-example qa-test esp32c6 hello_world
+cargo xtask run example --package qa-test --chip esp32c6 sleep_timer
 ```
 
 Again, note that we must specify which package to build the test from, plus which test to build and flash to the target device.
@@ -36,11 +26,11 @@ If you are contributing to `esp-hal` and would like to add an test, the process 
 
 One major difference in our case is the metadata comments which state the compatible devices and required features for an test. Both of these designators are optional; if `//% CHIPS:` is omitted then all devices considered to be supported, and if `//% FEATURES:` is omitted then no features are enabled at build time.
 
-To demonstrated, in `src/bin/embassy_hello_world.rs` you will see the following:
+To demonstrated, in `src/bin/psram.rs` you will see the following:
 
 ```rust
-//% CHIPS: esp32 esp32c2 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: embassy esp-hal-embassy/integrated-timers
+//% CHIPS: esp32 esp32s2 esp32s3
+//% FEATURES: esp-hal/psram esp-alloc/internal-heap-stats
 ```
 
 Another thing to be aware of is the GPIO pins being used. We have tried to use pins available the DevKit-C boards from Espressif, however this is being done on a best-effort basis.

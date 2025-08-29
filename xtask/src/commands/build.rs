@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 use strum::IntoEnumIterator as _;
@@ -124,39 +124,60 @@ pub fn build_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
     package_path: &Path,
-    out_path: &Path,
+    out_path: Option<&Path>,
 ) -> Result<()> {
-    // Determine the appropriate build target for the given package and chip:
-    let target = args.package.target_triple(&args.chip)?;
+    let chip = args.chip.unwrap();
 
-    if examples.iter().any(|ex| ex.matches(&args.example)) {
+    // Determine the appropriate build target for the given package and chip:
+    let target = args.package.target_triple(&chip)?;
+
+    if !args.example.eq_ignore_ascii_case("all") {
         // Attempt to build only the specified example:
-        for example in examples.iter().filter(|ex| ex.matches(&args.example)) {
+        let mut filtered = examples
+            .iter()
+            .filter(|ex| ex.matches_name(&args.example))
+            .collect::<Vec<_>>();
+
+        if filtered.is_empty() {
+            log::warn!(
+                "Example '{}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package.",
+                args.example
+            );
+
+            let example_idx = inquire::Select::new(
+                "Select the example:",
+                examples.iter().map(|ex| ex.binary_name()).collect(),
+            ).prompt()?;
+
+            if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_idx) {
+                filtered.push(selected);
+            }
+        }
+
+        for example in filtered {
             crate::execute_app(
                 package_path,
-                args.chip,
+                chip,
                 &target,
                 example,
-                CargoAction::Build(out_path.to_path_buf()),
+                CargoAction::Build(out_path.map(|p| p.to_path_buf())),
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
                 args.timings,
             )?;
         }
+
         Ok(())
-    } else if args.example.is_some() {
-        // An invalid argument was provided:
-        bail!("Example not found or unsupported for the given chip")
     } else {
         // Attempt to build each supported example, with all required features enabled:
         examples.iter().try_for_each(|example| {
             crate::execute_app(
                 package_path,
-                args.chip,
+                chip,
                 &target,
                 example,
-                CargoAction::Build(out_path.to_path_buf()),
+                CargoAction::Build(out_path.map(|p| p.to_path_buf())),
                 1,
                 args.debug,
                 args.toolchain.as_deref(),
