@@ -41,6 +41,11 @@
 //! [embedded-hal-async]: embedded_hal_async
 //! [embedded-io-async]: embedded_io_async
 
+/// UHCI wrapper around UART (Only esp32c6)
+#[cfg(esp32c6)]
+#[cfg(feature = "unstable")]
+pub mod uhci;
+
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 #[cfg(feature = "unstable")]
