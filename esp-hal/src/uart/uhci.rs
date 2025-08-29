@@ -135,6 +135,7 @@ impl From<TxError> for Error {
     }
 }
 
+// TODO: ESP32 and S2 have UHCI1. Revisit when adding support to PDMA devices.
 crate::any_peripheral! {
     pub peripheral AnyUhci<'d> {
         Uhci0(crate::peripherals::UHCI0<'d>),
@@ -154,9 +155,9 @@ impl<'d> DmaEligible for AnyUhci<'d> {
 
 impl AnyUhci<'_> {
     /// Opens the enum into the peripheral below
-    fn give_uhci(&self) -> &peripherals::UHCI0<'_> {
+    fn register_block(&self) -> &uhci0::RegisterBlock {
         match &self.0 {
-            any::Inner::Uhci0(x) => x,
+            any::Inner::Uhci0(x) => x.register_block(),
         }
     }
 }
@@ -243,12 +244,12 @@ where
     fn init(&self) {
         self.clean_turn_on();
         self.reset();
-        self.conf_uart();
+        self.select_uart();
     }
 
     fn clean_turn_on(&self) {
         // General conf registers
-        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg = self.uhci.register_block();
         reg.conf0().modify(|_, w| w.clk_en().set_bit());
         reg.conf0().write(|w| {
             unsafe { w.bits(0) };
@@ -261,33 +262,46 @@ where
     }
 
     fn reset(&self) {
-        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
-        reg.conf0().modify(|_, w| w.rx_rst().set_bit());
-        reg.conf0().modify(|_, w| w.rx_rst().clear_bit());
-
-        reg.conf0().modify(|_, w| w.tx_rst().set_bit());
-        reg.conf0().modify(|_, w| w.tx_rst().clear_bit());
+        let reg = self.uhci.register_block();
+        reg.conf0().modify(|_, w| {
+            w.rx_rst().set_bit();
+            w.tx_rst().set_bit()
+        });
+        reg.conf0().modify(|_, w| {
+            w.rx_rst().clear_bit();
+            w.tx_rst().clear_bit()
+        });
     }
 
-    fn conf_uart(&self) {
-        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+    fn select_uart(&self) {
+        let reg = self.uhci.register_block();
 
-        // Idk if there is a better way to check it, but it works
-        match &self.uart.tx.uart.0 {
-            super::any::Inner::Uart0(_) => {
-                info!("Uhci will use uart0");
-                reg.conf0().modify(|_, w| w.uart0_ce().set_bit());
-            }
-            super::any::Inner::Uart1(_) => {
-                info!("Uhci will use uart1");
-                reg.conf0().modify(|_, w| w.uart1_ce().set_bit());
-            }
+        for_each_uart! {
+            (all $( ($peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
+
+                reg.conf0().modify(|_, w| {
+                    paste::paste! {
+                        // Clear any previous selection
+                        $(
+                        w.[< $peri:lower _ce >]().clear_bit();
+                        )*
+
+                        // Select UART
+                        match &self.uart.tx.uart.0 {
+                            $(super::any::Inner::$variant(_) => {
+                                debug!("Uhci will use {}", stringify!($peri));
+                                w.[< $peri:lower _ce >]().set_bit()
+                            })*
+                        }
+                    }
+                });
+            };
         }
     }
 
     #[allow(dead_code)]
     fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
-        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg = self.uhci.register_block();
         // let val = reg.pkt_thres().read().pkt_thrs().bits();
         // info!("Read limit value: {} to set: {}", val, limit);
 
@@ -309,13 +323,12 @@ where
 
     /// Sets the config to the UHCI peripheral
     pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
+        let reg = self.uhci.register_block();
 
-        reg.conf0()
-            .modify(|_, w| w.uart_idle_eof_en().bit(config.idle_eof));
-
-        reg.conf0()
-            .modify(|_, w| w.len_eof_en().bit(config.len_eof));
+        reg.conf0().modify(|_, w| {
+            w.uart_idle_eof_en().bit(config.idle_eof);
+            w.len_eof_en().bit(config.len_eof)
+        });
 
         if self.set_chunk_limit(config.chunk_limit).is_err() {
             return Err(ConfigError::AboveReadLimit);
