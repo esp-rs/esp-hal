@@ -1,6 +1,6 @@
 //! UART UHCI test, async
 
-//% CHIPS: esp32c6
+//% CHIPS: esp32c6 esp32h2
 //% FEATURES: unstable embassy
 
 #![no_std]
