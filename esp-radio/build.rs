@@ -39,6 +39,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
 
+    #[cfg(not(feature = "__docs_build"))]
+    if cfg!(feature = "ieee802154") && (cfg!(feature = "wifi") || cfg!(feature = "wifi-eap")) {
+        panic!("\n\n802.15.4 and Wi-Fi won't work together\n\n");
+    }
+
     if (cfg!(feature = "ble")
         || cfg!(feature = "coex")
         || cfg!(feature = "csi")

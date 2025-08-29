@@ -177,6 +177,10 @@ unstable = []
 ## For development you can enable the `unstable` and the chip feature by adding esp-radio as a dev-dependency.
 requires-unstable = []
 
+# These features are considered private and unstable. They are not covered by
+# semver guarantees and may change or be removed without notice.
+__docs_build = []
+
 [package.metadata.docs.rs]
 features = [
   "esp32c3",

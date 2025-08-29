@@ -221,6 +221,8 @@ impl Package {
                 }
                 if config.contains("ieee802154") {
                     features.push("ieee802154".to_owned());
+                    // allow wifi + 802.15.4
+                    features.push("__docs_build".to_owned());
                 }
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
