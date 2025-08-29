@@ -51,7 +51,6 @@ peripherals = [
     { name = "UART0", interrupts = { peri = "UART0" } },
     { name = "UART1", interrupts = { peri = "UART1" } },
     { name = "UHCI0" },
-    { name = "UHCI1" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "XTS_AES" },
 

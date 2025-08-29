@@ -68,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
 - `Xtal::Other` has been removed (#3983)
+- ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 
