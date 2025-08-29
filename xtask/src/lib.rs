@@ -371,6 +371,7 @@ pub fn execute_app(
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
+    extra_args: &[&str],
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -446,6 +447,8 @@ pub fn execute_app(
         }
         builder = builder.toolchain(toolchain);
     }
+
+    builder = builder.args(extra_args);
 
     let args = builder.build();
     log::debug!("{args:#?}");
