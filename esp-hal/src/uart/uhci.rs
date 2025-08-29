@@ -250,7 +250,7 @@ where
         // General conf registers
         let reg: &uhci0::RegisterBlock = self.uhci.give_uhci().register_block();
         reg.conf0().modify(|_, w| w.clk_en().set_bit());
-        reg.conf0().modify(|_, w| {
+        reg.conf0().write(|w| {
             unsafe { w.bits(0) };
             w.clk_en().set_bit()
         });
