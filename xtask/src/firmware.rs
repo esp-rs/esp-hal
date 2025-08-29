@@ -93,8 +93,8 @@ impl Metadata {
         self.description.clone()
     }
 
-    pub fn matches(&self, filter: &Option<String>) -> bool {
-        let Some(filter) = filter.as_deref() else {
+    pub fn matches(&self, filter: Option<&str>) -> bool {
+        let Some(filter) = filter else {
             return false;
         };
 
