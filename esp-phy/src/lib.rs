@@ -6,10 +6,11 @@ use esp_hal::clock::{ModemClockController, PhyClockGuard};
 use esp_hal::time::{Duration, Instant};
 use esp_wifi_sys::include::*;
 
+mod fmt;
+
 mod ffi;
 mod phy_init_data;
-
-use esp_metadata_generated::property;
+mod common_adapter;
 
 pub(crate) mod private {
     pub trait Sealed {}
@@ -28,7 +29,7 @@ enum PhyCalibrationMode {
 }
 
 #[cfg(phy_backed_up_digital_register_count_is_set)]
-type PhyDigRegsBackup = [u32; property!("phy.backed_up_digital_register_count")];
+type PhyDigRegsBackup = [u32; esp_metadata_generated::property!("phy.backed_up_digital_register_count")];
 
 #[cfg(esp32)]
 /// Callback to update the MAC time.
@@ -88,24 +89,21 @@ impl PhyState {
     /// If no calibration data is available, it will be initialized to zero.
     pub fn calibration_data(&mut self) -> &mut PhyCalibrationData {
         self.calibration_data
-            .get_or_insert_with(|| [0u8; PHY_CALIBRATION_DATA_LENGTH])
+            .get_or_insert([0u8; PHY_CALIBRATION_DATA_LENGTH])
     }
     fn calibrate(&mut self) {
         #[cfg(esp32s2)]
         unsafe {
             use esp_hal::efuse::Efuse;
-            use esp_wifi_sys::include::phy_eco_version_sel;
             phy_eco_version_sel(Efuse::major_chip_version());
         }
         #[cfg(phy_combo_module)]
         unsafe {
-            use esp_wifi_sys::include::phy_init_param_set;
             phy_init_param_set(1);
         }
 
         #[cfg(all(phy_enable_usb, any(soc_has_usb0, soc_has_usb_device), not(esp32s2)))]
         unsafe {
-            use esp_wifi_sys::include::phy_bbpll_en_usb;
             phy_bbpll_en_usb(true);
         }
 
@@ -281,7 +279,7 @@ pub fn set_phy_calibration_data(
         if phy_state.calibration_data.is_some() {
             Err(CalibrationDataAlreadySetError)
         } else {
-            phy_state.calibration_data.insert(*calibration_data);
+            phy_state.calibration_data = Some(*calibration_data);
             Ok(())
         }
     })

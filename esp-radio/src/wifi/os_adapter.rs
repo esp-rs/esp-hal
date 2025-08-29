@@ -37,6 +37,7 @@ use crate::{
     memory_fence::memory_fence,
     preempt::yield_task,
 };
+use esp_phy::PhyController;
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 
@@ -1009,10 +1010,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-
-    unsafe {
-        crate::common_adapter::chip_specific::phy_enable();
-    }
+    WIFI::enable_phy();
 }
 
 /// **************************************************************************

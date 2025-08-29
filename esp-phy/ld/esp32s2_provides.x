@@ -1,4 +1,5 @@
 EXTERN( __esp_radio_strdup );
+EXTERN( __esp_radio_esp_timer_get_time );
 EXTERN( __ESP_RADIO_G_WIFI_OSI_FUNCS );
 EXTERN( __ESP_RADIO_G_WIFI_FEATURE_CAPS );
 EXTERN( __ESP_RADIO_WIFI_EVENT );
@@ -20,9 +21,11 @@ EXTERN( __esp_radio_fgets );
 EXTERN( __esp_radio_fclose );
 EXTERN( __esp_radio_sleep );
 EXTERN( __esp_radio_usleep );
-EXTERN( __esp_radio_esp_timer_get_time );
+EXTERN( __esp_radio_phy_enter_critical );
+EXTERN( __esp_radio_phy_exit_critical );
 
 PROVIDE( strdup = __esp_radio_strdup );
+PROVIDE( esp_timer_get_time = __esp_radio_esp_timer_get_time );
 PROVIDE( g_wifi_osi_funcs = __ESP_RADIO_G_WIFI_OSI_FUNCS );
 PROVIDE( g_wifi_feature_caps = __ESP_RADIO_G_WIFI_FEATURE_CAPS );
 PROVIDE( WIFI_EVENT = __ESP_RADIO_WIFI_EVENT );
@@ -44,4 +47,5 @@ PROVIDE( fgets = __esp_radio_fgets );
 PROVIDE( fclose = __esp_radio_fclose );
 PROVIDE( sleep = __esp_radio_sleep );
 PROVIDE( usleep = __esp_radio_usleep );
-PROVIDE( esp_timer_get_time = __esp_radio_esp_timer_get_time );
+PROVIDE( phy_enter_critical = __esp_radio_phy_enter_critical );
+PROVIDE( phy_exit_critical = __esp_radio_phy_exit_critical );
