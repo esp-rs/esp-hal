@@ -85,7 +85,6 @@ use core::{
 };
 
 use embassy_embedded_hal::SetConfig;
-use crate::pac::uhci0;
 
 use crate::{
     Async,
@@ -105,6 +104,7 @@ use crate::{
         PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
+    pac::uhci0,
     peripherals,
     uart::{self, TxError, Uart, UartRx, UartTx, uhci::Error::AboveReadLimit},
 };
