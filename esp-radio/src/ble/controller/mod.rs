@@ -2,19 +2,19 @@ use embedded_io::{Error, ErrorType, Read, Write};
 
 use super::{read_hci, read_next, send_hci};
 use crate::Controller;
+use esp_phy::PhyInitGuard;
 
 /// A blocking HCI connector
 #[instability::unstable]
 pub struct BleConnector<'d> {
+    _phy_init_guard: PhyInitGuard<'d>,
     _device: crate::hal::peripherals::BT<'d>,
 }
-
 impl Drop for BleConnector<'_> {
     fn drop(&mut self) {
         crate::ble::ble_deinit();
     }
 }
-
 impl<'d> BleConnector<'d> {
     /// Create and init a new BLE connector.
     #[instability::unstable]
@@ -22,9 +22,10 @@ impl<'d> BleConnector<'d> {
         _init: &'d Controller<'d>,
         device: crate::hal::peripherals::BT<'d>,
     ) -> BleConnector<'d> {
-        crate::ble::ble_init();
-
-        Self { _device: device }
+        Self {
+            _phy_init_guard: crate::ble::ble_init(),
+            _device: device,
+        }
     }
 
     /// Read the next HCI packet from the BLE controller.

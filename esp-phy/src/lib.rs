@@ -98,6 +98,9 @@ impl PhyState {
 
         #[cfg(all(phy_enable_usb, any(soc_has_usb0, soc_has_usb_device), not(esp32s2)))]
         unsafe {
+            unsafe extern "C" {
+                fn phy_bbpll_en_usb(param: bool);
+            }
             phy_bbpll_en_usb(true);
         }
 

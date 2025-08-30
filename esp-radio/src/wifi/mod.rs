@@ -1444,7 +1444,7 @@ pub(crate) fn wifi_init() -> Result<(), WifiError> {
         #[cfg(any(esp32, esp32s3))]
         {
             static mut NVS_STRUCT: [u32; 12] = [0; 12];
-            chip_specific::__ESP_RADIO_G_MISC_NVS = addr_of!(NVS_STRUCT) as u32;
+            __ESP_RADIO_G_MISC_NVS = addr_of!(NVS_STRUCT) as u32;
         }
 
         Ok(())

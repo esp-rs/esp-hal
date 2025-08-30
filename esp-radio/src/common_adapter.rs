@@ -1,12 +1,6 @@
 use esp_wifi_sys::{
     c_types::c_char,
-    include::{
-        esp_phy_calibration_data_t,
-        esp_phy_calibration_mode_t,
-        get_phy_version_str,
-        register_chipv7_phy,
-        timeval,
-    },
+    include::{esp_phy_calibration_data_t, timeval},
 };
 use portable_atomic::{AtomicU32, Ordering};
 
@@ -15,24 +9,6 @@ use crate::{
     compat::common::*,
     hal::{self, clock::ModemClockController, ram},
 };
-
-#[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "common_adapter_esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "common_adapter_esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "common_adapter_esp32h2.rs")]
-#[cfg_attr(esp32, path = "common_adapter_esp32.rs")]
-#[cfg_attr(esp32s3, path = "common_adapter_esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "common_adapter_esp32s2.rs")]
-pub(crate) mod chip_specific;
-
-#[cfg_attr(esp32c3, path = "phy_init_data_esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "phy_init_data_esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "phy_init_data_esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "phy_init_data_esp32h2.rs")]
-#[cfg_attr(esp32, path = "phy_init_data_esp32.rs")]
-#[cfg_attr(esp32s3, path = "phy_init_data_esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
-pub(crate) mod phy_init_data;
 
 static CAL_DATA: esp_hal::sync::Locked<[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]> =
     esp_hal::sync::Locked::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
@@ -316,6 +292,32 @@ pub unsafe extern "C" fn __esp_radio_strrchr(_s: *const (), _c: u32) -> *const u
     todo!("strrchr");
 }
 
+#[unsafe(no_mangle)]
+static mut __ESP_RADIO_G_LOG_LEVEL: i32 = 0;
+
+#[unsafe(no_mangle)]
+pub static mut __ESP_RADIO_G_MISC_NVS: u32 = 0;
+
+// For some reason these are only necessary on Xtensa chips.
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_deinit() {
+    trace!("misc_nvs_deinit")
+}
+
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_init() -> i32 {
+    trace!("misc_nvs_init");
+    0
+}
+
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
+    todo!("misc_nvs_restore")
+}
+
 static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
 
 // We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
@@ -345,46 +347,25 @@ pub(crate) unsafe fn phy_disable_clock() {
         trace!("phy_disable_clock done!");
     }
 }
-
-pub(crate) fn phy_calibrate() {
-    let phy_version = unsafe { get_phy_version_str() };
-    trace!("phy_version {}", unsafe { str_from_c(phy_version) });
-
-    let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
-
-    unsafe {
-        chip_specific::bbpll_en_usb();
-    }
-
-    #[cfg(phy_full_calibration)]
-    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
-    #[cfg(not(phy_full_calibration))]
-    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
-
-    #[cfg(phy_skip_calibration_after_deep_sleep)]
-    let calibration_mode = if crate::hal::system::reset_reason()
-        == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep)
+pub(crate) fn enable_wifi_power_domain() {
+    #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-    } else {
-        CALIBRATION_MODE
-    };
-    #[cfg(not(phy_skip_calibration_after_deep_sleep))]
-    let calibration_mode = CALIBRATION_MODE;
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_lpwr)] {
+                let rtc_cntl = esp_hal::peripherals::LPWR::regs();
+            } else {
+                let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
+            }
+        }
 
-    debug!("Using calibration mode {}", calibration_mode);
+        rtc_cntl
+            .dig_pwc()
+            .modify(|_, w| w.wifi_force_pd().clear_bit());
 
-    let res = CAL_DATA.with(|cal_data| unsafe {
-        register_chipv7_phy(
-            init_data,
-            cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
-            calibration_mode,
-        )
-    });
-
-    debug!("register_chipv7_phy result = {}", res);
+        rtc_cntl
+            .dig_iso()
+            .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
 }
 
 /// Get calibration data.
