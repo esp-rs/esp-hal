@@ -521,24 +521,23 @@ macro_rules! for_each_peripheral {
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner!((UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((UHCI1 <=
-        UHCI1() (unstable))); _for_each_inner!((USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable))); _for_each_inner!((XTS_AES <= XTS_AES() (unstable)));
-        _for_each_inner!((DMA_CH0 <= virtual() (unstable))); _for_each_inner!((DMA_CH1 <=
-        virtual() (unstable))); _for_each_inner!((DMA_CH2 <= virtual() (unstable)));
-        _for_each_inner!((ADC1 <= virtual() (unstable))); _for_each_inner!((ADC2 <=
-        virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
-        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable))); _for_each_inner!((TSENS
-        <= virtual() (unstable))); _for_each_inner!((WIFI <= virtual() (unstable)));
-        _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
-        virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
-        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
-        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
-        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()), (GPIO16 <=
-        virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <= virtual()),
-        (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <= AES(AES : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((USB_DEVICE <=
+        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((XTS_AES <= XTS_AES()
+        (unstable))); _for_each_inner!((DMA_CH0 <= virtual() (unstable)));
+        _for_each_inner!((DMA_CH1 <= virtual() (unstable))); _for_each_inner!((DMA_CH2 <=
+        virtual() (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
+        _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((BT <=
+        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
+        _for_each_inner!((TSENS <= virtual() (unstable))); _for_each_inner!((WIFI <=
+        virtual() (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <=
+        virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()),
+        (GPIO5 <= virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <=
+        virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()),
+        (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <=
+        virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()),
+        (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <=
+        AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (APB_SARADC <= APB_SARADC()
         (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (BB <= BB()
         (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)), (EFUSE <=
@@ -562,13 +561,13 @@ macro_rules! for_each_peripheral {
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (UART1 <= UART1(UART1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (UHCI0 <= UHCI0() (unstable)),
-        (UHCI1 <= UHCI1() (unstable)), (USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (XTS_AES <= XTS_AES() (unstable)), (DMA_CH0 <= virtual()
-        (unstable)), (DMA_CH1 <= virtual() (unstable)), (DMA_CH2 <= virtual()
-        (unstable)), (ADC1 <= virtual() (unstable)), (ADC2 <= virtual() (unstable)), (BT
-        <= virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (TSENS <=
-        virtual() (unstable)), (WIFI <= virtual() (unstable))));
+        (USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (XTS_AES <=
+        XTS_AES() (unstable)), (DMA_CH0 <= virtual() (unstable)), (DMA_CH1 <= virtual()
+        (unstable)), (DMA_CH2 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
+        (ADC2 <= virtual() (unstable)), (BT <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (TSENS <= virtual() (unstable)), (WIFI <= virtual()
+        (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.
