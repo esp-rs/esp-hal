@@ -2,7 +2,7 @@ use esp_wifi_sys::{
     c_types::c_char,
     include::{esp_phy_calibration_data_t, timeval},
 };
-use portable_atomic::{AtomicU32, Ordering};
+
 
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
@@ -318,34 +318,24 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
-
-// We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
+    // We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only                                                          
 // chip, with BT but without WIFI.
 #[cfg(not(esp32h2))]
 type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
 #[cfg(esp32h2)]
 type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
 
+#[allow(unused)]
 pub(crate) unsafe fn phy_enable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
-    if count == 0 {
-        // Stealing the peripheral is safe here, as they must have been passed into the relevant
-        // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
-        let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
-        core::mem::forget(clock_guard);
-
-        trace!("phy_enable_clock done!");
-    }
+    // Stealing the peripheral is safe here, as they must have been passed into the relevant
+    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
+    core::mem::forget(clock_guard);
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
-    if count == 1 {
-        unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
-        trace!("phy_disable_clock done!");
-    }
+    unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
 }
 pub(crate) fn enable_wifi_power_domain() {
     #[cfg(not(any(soc_has_pmu, esp32c2)))]
