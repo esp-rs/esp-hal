@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
+use esp_phy::{PhyController, PhyInitGuard};
 use esp_wifi_sys::c_types::{c_char, c_void};
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -371,7 +372,8 @@ unsafe extern "C" fn custom_queue_create(
     todo!();
 }
 
-pub(crate) fn ble_init() {
+pub(crate) fn ble_init() -> PhyInitGuard<'static> {
+    let phy_init_guard;
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
         // turn on logging
@@ -430,7 +432,7 @@ pub(crate) fn ble_init() {
         #[cfg(coex)]
         crate::binary::include::coex_enable();
 
-        crate::common_adapter::chip_specific::phy_enable();
+        phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
 
         #[cfg(esp32)]
         {
@@ -452,6 +454,7 @@ pub(crate) fn ble_init() {
 
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+    phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
@@ -465,8 +468,8 @@ pub(crate) fn ble_deinit() {
 
     unsafe {
         btdm_controller_deinit();
-        crate::common_adapter::chip_specific::phy_disable();
     }
+    // Disabling the PHY happens automatically, when the BLEController gets dropped.
 }
 /// Sends HCI data to the BLE controller.
 #[instability::unstable]

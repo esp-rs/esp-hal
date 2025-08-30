@@ -111,7 +111,6 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-use common_adapter::chip_specific::phy_mem_init;
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_config::*;
 use esp_hal::{self as hal};
@@ -277,8 +276,7 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     }
 
     info!("esp-radio configuration {:?}", crate::CONFIG);
-    crate::common_adapter::chip_specific::enable_wifi_power_domain();
-    phy_mem_init();
+    crate::common_adapter::enable_wifi_power_domain();
 
     setup_radio_isr();
 

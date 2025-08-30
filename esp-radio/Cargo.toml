@@ -33,6 +33,7 @@ esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-wifi-sys = "0.7.1"
+esp-phy = { path = "../esp-phy/" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
@@ -65,30 +66,35 @@ default = ["esp-alloc"]
 # Target the ESP32-C2.
 esp32c2 = [
   "esp-hal/esp32c2",
+  "esp-phy/esp32c2",
   "esp-wifi-sys/esp32c2",
   "esp-metadata-generated/esp32c2",
 ]
 # Target the ESP32-C3.
 esp32c3 = [
   "esp-hal/esp32c3",
+  "esp-phy/esp32c3",
   "esp-wifi-sys/esp32c3",
   "esp-metadata-generated/esp32c3",
 ]
 # Target the ESP32-C6.
 esp32c6 = [
   "esp-hal/esp32c6",
+  "esp-phy/esp32c6",
   "esp-wifi-sys/esp32c6",
   "esp-metadata-generated/esp32c6",
 ]
 # Target the ESP32-H2.
 esp32h2 = [
   "esp-hal/esp32h2",
+  "esp-phy/esp32h2",
   "esp-wifi-sys/esp32h2",
   "esp-metadata-generated/esp32h2",
 ]
 # Target the ESP32.
 esp32 = [
   "esp-hal/esp32",
+  "esp-phy/esp32",
   "esp-wifi-sys/esp32",
   "esp-metadata-generated/esp32",
   "xtensa-lx-rt/float-save-restore",
@@ -96,6 +102,7 @@ esp32 = [
 # Target the ESP32-S2.
 esp32s2 = [
   "esp-hal/esp32s2",
+  "esp-phy/esp32s2",
   "esp-wifi-sys/esp32s2",
   "esp-metadata-generated/esp32s2",
   "xtensa-lx-rt/float-save-restore",
@@ -103,6 +110,7 @@ esp32s2 = [
 # Target the ESP32-S3.
 esp32s3 = [
   "esp-hal/esp32s3",
+  "esp-phy/esp32s3",
   "esp-wifi-sys/esp32s3",
   "esp-metadata-generated/esp32s3",
   "xtensa-lx-rt/float-save-restore",
