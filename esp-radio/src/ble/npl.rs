@@ -1066,6 +1066,7 @@ pub(crate) struct BleNplCountInfoT {
 }
 
 pub(crate) fn ble_init() {
+    let phy_init_guard;
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
 
@@ -1152,7 +1153,7 @@ pub(crate) fn ble_init() {
             os_msys_init();
         }
 
-        crate::common_adapter::chip_specific::phy_enable();
+        phy_init_guard = crate::common_adapter::phy_enable();
 
         // init bb
         bt_bb_v2_init_cmplx(1);
@@ -1243,6 +1244,7 @@ pub(crate) fn ble_init() {
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
 
     debug!("The ble_controller_init was initialized");
+    phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
@@ -1275,7 +1277,7 @@ pub(crate) fn ble_deinit() {
 
         npl::esp_unregister_ext_funcs();
 
-        crate::common_adapter::chip_specific::phy_disable();
+        crate::common_adapter::phy_disable();
     }
 }
 
