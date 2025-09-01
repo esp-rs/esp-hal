@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, and `WifiState`
 - The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
   - Error types implements `core::error:Error`
+- Use `esp-phy` internally for PHY initialization (#3892)
 
 ### Fixed
 
