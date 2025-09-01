@@ -7,12 +7,12 @@ use crate::{
 
 const RC_FAST_CLK: u32 = property!("soc.rc_fast_clk_default");
 
-#[doc(hidden)]
+/// Trait representing the RTC_I2C SDA pin.
 pub trait Sda: RtcPin + OutputPin + InputPin {
     fn selector(&self) -> u8;
 }
 
-#[doc(hidden)]
+/// Trait representing the RTC_I2C SCL pin.
 pub trait Scl: RtcPin + OutputPin + InputPin {
     fn selector(&self) -> u8;
 }
