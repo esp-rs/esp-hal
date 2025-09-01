@@ -170,7 +170,7 @@ fn is_valid_ram_address(address: u32) -> bool {
     true
 }
 
-#[cfg(feature = "panic-handler")]
+#[cfg(feature = "halt-cores")]
 fn halt() -> ! {
     cfg_if::cfg_if! {
         if #[cfg(feature = "custom-halt")] {
