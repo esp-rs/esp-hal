@@ -353,10 +353,20 @@ impl TryFrom<usize> for AlternateFunction {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(not(esp32h2))]
 pub enum RtcFunction {
-    /// RTC mode.
-    Rtc     = 0,
-    /// Digital mode.
-    Digital = 1,
+    /// Rtc function 0.
+    _0 = 0,
+    /// Rtc function 1.
+    _1 = 1,
+    /// Rtc function 2.
+    _2 = 2,
+    /// Rtc function 3.
+    _3 = 3,
+}
+
+impl RtcFunction {
+    const RTC: Self = Self::_0;
+
+    const DIGITAL: Self = Self::_1;
 }
 
 /// Trait implemented by RTC pins
@@ -375,6 +385,9 @@ pub trait RtcPin: Pin {
     /// Enable or disable PAD_HOLD
     #[doc(hidden)]
     fn rtcio_pad_hold(&self, enable: bool);
+
+    #[doc(hidden)]
+    fn functions(&self, _: private::Internal) -> &'static [RtcFunction];
 
     /// # Safety
     ///
@@ -2277,6 +2290,12 @@ impl RtcPin for AnyPin<'_> {
     fn rtcio_pad_hold(&self, enable: bool) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtcio_pad_hold(&target, enable) };
+        }
+    }
+
+    fn functions(&self, i: private::Internal) -> &'static [RtcFunction] {
+        for_each_rtcio_pin! {
+            (self, target) => { RtcPin::functions(&target, i) };
         }
     }
 

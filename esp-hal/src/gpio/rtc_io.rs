@@ -128,7 +128,7 @@ impl<'d, const PIN: u8> LowPowerOutputOpenDrain<'d, PIN> {
     where
         P: InputPin + OutputPin + RtcPin + 'd,
     {
-        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+        pin.rtc_set_config(true, true, RtcFunction::RTC);
 
         let this = Self {
             phantom: PhantomData,
