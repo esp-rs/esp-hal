@@ -29,9 +29,23 @@ fn main() {
     // Ensure that there aren't multiple halt methods selected:
     assert_unique_features!("custom-halt", "halt-cores", "semihosting");
 
+    if !cfg!(feature = "panic-handler")
+        && cfg!(any(
+            feature = "custom-halt",
+            feature = "halt-cores",
+            feature = "semihosting"
+        ))
+    {
+        print_warning("A halt method is selected, but esp-backtrace is not the panic handler.")
+    }
+
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");
     let cfg_yaml = std::fs::read_to_string("./esp_config.yml")
         .expect("Failed to read esp_config.yml for esp-backtrace");
     generate_config_from_yaml_definition(&cfg_yaml, true, true, None).unwrap();
+}
+
+fn print_warning(message: impl core::fmt::Display) {
+    println!("cargo:warning={message}");
 }
