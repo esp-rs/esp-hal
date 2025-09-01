@@ -219,6 +219,8 @@ impl PhyState {
 /// Global PHY initialization state
 static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
     critical_section::Mutex::new(RefCell::new(PhyState::new()));
+
+#[derive(Debug)]
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }

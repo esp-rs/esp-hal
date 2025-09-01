@@ -21,6 +21,7 @@ use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
+use esp_phy::PhyInitGuard;
 
 use self::{
     frame::FRAME_SIZE,
@@ -113,6 +114,7 @@ pub struct Ieee802154<'a> {
     _align: u32,
     transmit_buffer: [u8; FRAME_SIZE],
     _phy_clock_guard: PhyClockGuard<'a>,
+    _phy_init_guard: PhyInitGuard<'a>,
 }
 
 impl<'a> Ieee802154<'a> {
@@ -121,10 +123,12 @@ impl<'a> Ieee802154<'a> {
     /// NOTE: Coexistence with Wi-Fi or Bluetooth is currently not possible. If you do it anyway,
     /// things will break.
     pub fn new(radio: IEEE802154<'a>) -> Self {
+        let (_phy_clock_guard, _phy_init_guard) = esp_ieee802154_enable(radio);
         Self {
             _align: 0,
             transmit_buffer: [0u8; FRAME_SIZE],
-            _phy_clock_guard: esp_ieee802154_enable(radio),
+            _phy_clock_guard,
+            _phy_init_guard,
         }
     }
 
