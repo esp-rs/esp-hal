@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added functions to query chip revision for every chip (#3892)
+
 ### Added
 
 - A reimplemntation of the `assign_resources!` macro (#3809)
