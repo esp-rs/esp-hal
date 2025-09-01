@@ -74,7 +74,9 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
+pub(crate) fn esp_ieee802154_enable(
+    mut radio: IEEE802154<'_>,
+) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
     radio.enable_modem_clock(true);

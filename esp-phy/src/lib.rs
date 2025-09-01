@@ -8,9 +8,9 @@ use esp_wifi_sys::include::*;
 
 mod fmt;
 
+mod common_adapter;
 mod ffi;
 mod phy_init_data;
-mod common_adapter;
 
 pub(crate) mod private {
     pub trait Sealed {}
@@ -23,7 +23,8 @@ pub const PHY_CALIBRATION_DATA_LENGTH: usize =
 pub type PhyCalibrationData = [u8; PHY_CALIBRATION_DATA_LENGTH];
 
 #[cfg(phy_backed_up_digital_register_count_is_set)]
-type PhyDigRegsBackup = [u32; esp_metadata_generated::property!("phy.backed_up_digital_register_count")];
+type PhyDigRegsBackup =
+    [u32; esp_metadata_generated::property!("phy.backed_up_digital_register_count")];
 
 #[cfg(esp32)]
 /// Callback to update the MAC time.
@@ -259,7 +260,7 @@ macro_rules! impl_phy_controller {
         impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
         #[cfg($feature_gate)]
         impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
-    }
+    };
 }
 impl_phy_controller!(wifi, WIFI);
 impl_phy_controller!(bt, BT);

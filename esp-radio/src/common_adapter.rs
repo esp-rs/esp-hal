@@ -3,7 +3,6 @@ use esp_wifi_sys::{
     include::{esp_phy_calibration_data_t, timeval},
 };
 
-
 use crate::{
     binary::include::{esp_event_base_t, esp_timer_get_time},
     compat::common::*,
@@ -318,7 +317,7 @@ unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
     todo!("misc_nvs_restore")
 }
 
-    // We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only                                                          
+// We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
 // chip, with BT but without WIFI.
 #[cfg(not(esp32h2))]
 type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;

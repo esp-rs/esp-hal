@@ -1,8 +1,8 @@
 use embedded_io::{Error, ErrorType, Read, Write};
+use esp_phy::PhyInitGuard;
 
 use super::{read_hci, read_next, send_hci};
 use crate::Controller;
-use esp_phy::PhyInitGuard;
 
 /// A blocking HCI connector
 #[instability::unstable]

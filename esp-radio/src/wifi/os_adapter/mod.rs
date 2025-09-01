@@ -10,6 +10,7 @@ pub(crate) mod os_adapter_chip_specific;
 use core::{cell::RefCell, ptr::addr_of_mut};
 
 use enumset::EnumSet;
+use esp_phy::PhyController;
 
 use super::WifiEvent;
 use crate::{
@@ -37,7 +38,6 @@ use crate::{
     memory_fence::memory_fence,
     preempt::yield_task,
 };
-use esp_phy::PhyController;
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
 

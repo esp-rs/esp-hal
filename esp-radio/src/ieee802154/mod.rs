@@ -20,8 +20,8 @@ use core::cell::RefCell;
 use byte::{BytesExt, TryRead};
 use critical_section::Mutex;
 use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
-use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 use esp_phy::PhyInitGuard;
+use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
 use self::{
     frame::FRAME_SIZE,
