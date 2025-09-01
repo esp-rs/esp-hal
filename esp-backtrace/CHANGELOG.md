@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `exception-handler` now panics. (#3838)
+- Only halt cores in panics when `halt-cores` feature is enabled. (#4010)
 
 ### Fixed
 
