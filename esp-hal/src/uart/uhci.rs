@@ -106,6 +106,7 @@ use crate::{
     },
     pac::uhci0,
     peripherals,
+    system::{GenericPeripheralGuard, Peripheral},
     uart::{self, TxError, Uart, UartRx, UartTx, uhci::Error::AboveReadLimit},
 };
 
@@ -235,6 +236,8 @@ where
     uart: Uart<'d, Dm>,
     uhci: AnyUhci<'static>,
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
+    // TODO: devices with UHCI1 need the non-generic guard
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm> Uhci<'d, Dm>
@@ -345,11 +348,13 @@ where
                 uhci: unsafe { self.uhci.clone_unchecked() },
                 uart_rx,
                 channel_rx: self.channel.rx,
+                _guard: self._guard.clone(),
             },
             UhciTx {
                 uhci: self.uhci,
                 uart_tx,
                 channel_tx: self.channel.tx,
+                _guard: self._guard.clone(),
             },
         )
     }
@@ -362,6 +367,8 @@ impl<'d> Uhci<'d, Blocking> {
         uhci: peripherals::UHCI0<'static>,
         channel: impl DmaChannelFor<AnyUhci<'d>>,
     ) -> Self {
+        let guard = GenericPeripheralGuard::new();
+
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&uhci);
 
@@ -369,6 +376,7 @@ impl<'d> Uhci<'d, Blocking> {
             uart,
             uhci: uhci.into(),
             channel,
+            _guard: guard,
         };
 
         uhci.init();
@@ -381,6 +389,7 @@ impl<'d> Uhci<'d, Blocking> {
             uart: self.uart.into_async(),
             uhci: self.uhci,
             channel: self.channel.into_async(),
+            _guard: self._guard,
         }
     }
 }
@@ -392,6 +401,7 @@ impl<'d> Uhci<'d, Async> {
             uart: self.uart.into_blocking(),
             uhci: self.uhci,
             channel: self.channel.into_blocking(),
+            _guard: self._guard,
         }
     }
 }
@@ -404,6 +414,8 @@ where
     uhci: AnyUhci<'static>,
     uart_tx: UartTx<'d, Dm>,
     channel_tx: ChannelTx<Dm, AnyGdmaTxChannel<'d>>,
+    // TODO: devices with UHCI1 need the non-generic guard
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm> UhciTx<'d, Dm>
@@ -441,6 +453,8 @@ where
     #[allow(dead_code)]
     uart_rx: UartRx<'d, Dm>,
     channel_rx: ChannelRx<Dm, AnyGdmaRxChannel<'d>>,
+    // TODO: devices with UHCI1 need the non-generic guard
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm> UhciRx<'d, Dm>
