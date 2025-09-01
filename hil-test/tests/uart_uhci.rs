@@ -42,7 +42,7 @@ mod tests {
         let dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 
         let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
+        uhci.uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
             .unwrap();
 
         Context {

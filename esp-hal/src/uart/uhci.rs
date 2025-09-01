@@ -80,6 +80,7 @@
 //! ```
 
 use core::{
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -87,21 +88,10 @@ use core::{
 use embassy_embedded_hal::SetConfig;
 
 use crate::{
-    Async,
-    Blocking,
-    DriverMode,
+    Async, Blocking, DriverMode,
     dma::{
-        AnyGdmaRxChannel,
-        AnyGdmaTxChannel,
-        Channel,
-        ChannelRx,
-        ChannelTx,
-        DmaChannelFor,
-        DmaEligible,
-        DmaError,
-        DmaRxBuffer,
-        DmaTxBuffer,
-        PeripheralDmaChannel,
+        AnyGdmaRxChannel, AnyGdmaTxChannel, Channel, ChannelRx, ChannelTx, DmaChannelFor,
+        DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     pac::uhci0,
@@ -215,25 +205,14 @@ impl core::fmt::Display for ConfigError {
     }
 }
 
-impl<Dm> embassy_embedded_hal::SetConfig for Uhci<'_, Dm>
-where
-    Dm: DriverMode,
-{
-    type Config = Config;
-    type ConfigError = ConfigError;
-
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
-    }
-}
-
 /// UHCI (To use with UART over DMA)
 pub struct Uhci<'d, Dm>
 where
     Dm: DriverMode,
 {
     uart: Uart<'d, Dm>,
-    uhci: AnyUhci<'static>,
+    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    pub uhci: UhciInternal<Dm>,
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
 }
 
@@ -249,7 +228,7 @@ where
 
     fn clean_turn_on(&self) {
         // General conf registers
-        let reg = self.uhci.register_block();
+        let reg = self.uhci.uhci_per.register_block();
         reg.conf0().modify(|_, w| w.clk_en().set_bit());
         reg.conf0().write(|w| {
             unsafe { w.bits(0) };
@@ -262,7 +241,7 @@ where
     }
 
     fn reset(&self) {
-        let reg = self.uhci.register_block();
+        let reg = self.uhci.uhci_per.register_block();
         reg.conf0().modify(|_, w| {
             w.rx_rst().set_bit();
             w.tx_rst().set_bit()
@@ -274,7 +253,7 @@ where
     }
 
     fn select_uart(&self) {
-        let reg = self.uhci.register_block();
+        let reg = self.uhci.uhci_per.register_block();
 
         for_each_uart! {
             (all $( ($peri:ident, $variant:ident, $($pins:ident),*) ),*) => {
@@ -299,42 +278,9 @@ where
         }
     }
 
-    #[allow(dead_code)]
-    fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
-        let reg = self.uhci.register_block();
-        // let val = reg.pkt_thres().read().pkt_thrs().bits();
-        // info!("Read limit value: {} to set: {}", val, limit);
-
-        // limit is 12 bits
-        // Above this value, it will probably split the messages, anyway, the point is below (the
-        // dma buffer length) it it will not freeze itself
-        if limit > 4095 {
-            return Err(AboveReadLimit);
-        }
-
-        reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
-        Ok(())
-    }
-
     /// Sets the config the the consumed UART
     pub fn set_uart_config(&mut self, uart_config: &uart::Config) -> Result<(), uart::ConfigError> {
         self.uart.set_config(uart_config)
-    }
-
-    /// Sets the config to the UHCI peripheral
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
-        let reg = self.uhci.register_block();
-
-        reg.conf0().modify(|_, w| {
-            w.uart_idle_eof_en().bit(config.idle_eof);
-            w.len_eof_en().bit(config.len_eof)
-        });
-
-        if self.set_chunk_limit(config.chunk_limit).is_err() {
-            return Err(ConfigError::AboveReadLimit);
-        }
-
-        Ok(())
     }
 
     /// Split the Uhci into UhciRx and UhciTx
@@ -342,12 +288,12 @@ where
         let (uart_rx, uart_tx) = self.uart.split();
         (
             UhciRx {
-                uhci: unsafe { self.uhci.clone_unchecked() },
+                uhci: UhciInternal::new(unsafe { self.uhci.uhci_per.clone_unchecked() }),
                 uart_rx,
                 channel_rx: self.channel.rx,
             },
             UhciTx {
-                uhci: self.uhci,
+                uhci: UhciInternal::new(self.uhci.uhci_per),
                 uart_tx,
                 channel_tx: self.channel.tx,
             },
@@ -367,7 +313,7 @@ impl<'d> Uhci<'d, Blocking> {
 
         let uhci = Uhci {
             uart,
-            uhci: uhci.into(),
+            uhci: UhciInternal::new(uhci.into()),
             channel,
         };
 
@@ -379,7 +325,7 @@ impl<'d> Uhci<'d, Blocking> {
     pub fn into_async(self) -> Uhci<'d, Async> {
         Uhci {
             uart: self.uart.into_async(),
-            uhci: self.uhci,
+            uhci: self.uhci.into_async(),
             channel: self.channel.into_async(),
         }
     }
@@ -390,9 +336,88 @@ impl<'d> Uhci<'d, Async> {
     pub fn into_blocking(self) -> Uhci<'d, Blocking> {
         Uhci {
             uart: self.uart.into_blocking(),
-            uhci: self.uhci,
+            uhci: self.uhci.into_blocking(),
             channel: self.channel.into_blocking(),
         }
+    }
+}
+
+impl<Dm> embassy_embedded_hal::SetConfig for UhciInternal<Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+/// Internal UHCI struct, to configure the UHCI peripheral
+pub struct UhciInternal<Dm>
+where
+    Dm: DriverMode,
+{
+    uhci_per: AnyUhci<'static>,
+    phantom: PhantomData<Dm>,
+}
+
+impl<'d, Dm> UhciInternal<Dm>
+where
+    Dm: DriverMode,
+{
+    fn new(uhci_per: AnyUhci<'static>) -> Self {
+        Self {
+            uhci_per,
+            phantom: PhantomData,
+        }
+    }
+
+    fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
+        let reg = self.uhci_per.register_block();
+        // let val = reg.pkt_thres().read().pkt_thrs().bits();
+        // info!("Read limit value: {} to set: {}", val, limit);
+
+        // limit is 12 bits
+        // Above this value, it will probably split the messages, anyway, the point is below (the
+        // dma buffer length) it it will not freeze itself
+        if limit > 4095 {
+            return Err(AboveReadLimit);
+        }
+
+        reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
+        Ok(())
+    }
+
+    /// Sets the config to the UHCI peripheral
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        let reg = self.uhci_per.register_block();
+
+        reg.conf0().modify(|_, w| {
+            w.uart_idle_eof_en().bit(config.idle_eof);
+            w.len_eof_en().bit(config.len_eof)
+        });
+
+        if self.set_chunk_limit(config.chunk_limit).is_err() {
+            return Err(ConfigError::AboveReadLimit);
+        }
+
+        Ok(())
+    }
+}
+
+impl<'d> UhciInternal<Async> {
+    /// Create a new instance in [crate::Blocking] mode.
+    pub fn into_blocking(self) -> UhciInternal<Blocking> {
+        UhciInternal::new(self.uhci_per)
+    }
+}
+
+impl<'d> UhciInternal<Blocking> {
+    /// Create a new instance in [crate::Blocking] mode.
+    pub fn into_async(self) -> UhciInternal<Async> {
+        UhciInternal::new(self.uhci_per)
     }
 }
 
@@ -401,8 +426,10 @@ pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    uhci: AnyUhci<'static>,
-    uart_tx: UartTx<'d, Dm>,
+    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    pub uhci: UhciInternal<Dm>,
+    /// Tx of the used uart. You can configure it by accessing the value
+    pub uart_tx: UartTx<'d, Dm>,
     channel_tx: ChannelTx<Dm, AnyGdmaTxChannel<'d>>,
 }
 
@@ -417,7 +444,7 @@ where
     ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
-                .prepare_transfer(self.uhci.dma_peripheral(), &mut tx_buffer)
+                .prepare_transfer(self.uhci.uhci_per.dma_peripheral(), &mut tx_buffer)
         };
         if let Err(err) = res {
             return Err((err.into(), self, tx_buffer));
@@ -437,9 +464,10 @@ pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
 {
-    uhci: AnyUhci<'static>,
-    #[allow(dead_code)]
-    uart_rx: UartRx<'d, Dm>,
+    /// Internal UHCI struct. Use it to configure the UHCI peripheral
+    pub uhci: UhciInternal<Dm>,
+    /// Rx of the used uart. You can configure it by accessing the value
+    pub uart_rx: UartRx<'d, Dm>,
     channel_rx: ChannelRx<Dm, AnyGdmaRxChannel<'d>>,
 }
 
@@ -455,7 +483,7 @@ where
         {
             let res = unsafe {
                 self.channel_rx
-                    .prepare_transfer(self.uhci.dma_peripheral(), &mut rx_buffer)
+                    .prepare_transfer(self.uhci.uhci_per.dma_peripheral(), &mut rx_buffer)
             };
             if let Err(err) = res {
                 return Err((err.into(), self, rx_buffer));
