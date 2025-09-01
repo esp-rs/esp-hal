@@ -25,6 +25,9 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
+#[macro_use]
+extern crate esp_metadata_generated;
+
 #[cfg(feature = "defmt")]
 use defmt as _;
 #[cfg(feature = "println")]
@@ -120,54 +123,11 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     abort();
 }
 
-// Ensure that the address is in DRAM and that it is 16-byte aligned.
+// Ensure that the address is in DRAM.
 //
-// Based loosely on the `esp_stack_ptr_in_dram` function from
-// `components/esp_hw_support/include/esp_memory_utils.h` in ESP-IDF.
-//
-// Address ranges can be found in `components/soc/$CHIP/include/soc/soc.h` as
-// `SOC_DRAM_LOW` and `SOC_DRAM_HIGH`.
+// Address ranges can be found in `esp-metadata/devices/$CHIP.toml` in the `device` table.
 fn is_valid_ram_address(address: u32) -> bool {
-    if (address & 0xF) != 0 {
-        return false;
-    }
-
-    #[cfg(feature = "esp32")]
-    if !(0x3FFA_E000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c2")]
-    if !(0x3FCA_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c3")]
-    if !(0x3FC8_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c6")]
-    if !(0x4080_0000..=0x4088_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32h2")]
-    if !(0x4080_0000..=0x4085_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s2")]
-    if !(0x3FFB_0000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s3")]
-    if !(0x3FC8_8000..=0x3FD0_0000).contains(&address) {
-        return false;
-    }
-
-    true
+    memory_range!("DRAM").contains(&address)
 }
 
 #[cfg(feature = "halt-cores")]
