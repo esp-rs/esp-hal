@@ -9,9 +9,6 @@ use crate::{
     hal::{self, clock::ModemClockController, ram},
 };
 
-static CAL_DATA: esp_hal::sync::Locked<[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]> =
-    esp_hal::sync::Locked::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
-
 /// **************************************************************************
 /// Name: esp_semphr_create
 ///
@@ -363,15 +360,17 @@ pub(crate) fn enable_wifi_power_domain() {
 ///
 /// If you see the data is different than what was persisted before, consider persisting the new
 /// data.
-pub fn phy_calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
-    CAL_DATA.with(|cal_data| *cal_data)
+pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::backup_calibration_data(data);
 }
 
 /// Set calibration data.
 ///
 /// This will be used next time the phy gets initialized.
 pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
-    CAL_DATA.with(|cal_data| {
-        *cal_data = *data;
-    });
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::set_calibration_data(data);
 }
