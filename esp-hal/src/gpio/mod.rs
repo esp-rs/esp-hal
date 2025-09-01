@@ -357,6 +357,9 @@ pub enum RtcFunction {
     Rtc     = 0,
     /// Digital mode.
     Digital = 1,
+    /// RTC_I2C mode.
+    #[cfg(soc_has_rtc_i2c)]
+    I2c     = 3,
 }
 
 /// Trait implemented by RTC pins

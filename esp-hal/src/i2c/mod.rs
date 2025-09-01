@@ -14,3 +14,9 @@ pub mod master;
 crate::unstable_module! {
     pub mod lp_i2c;
 }
+
+#[cfg(soc_has_rtc_i2c)]
+crate::unstable_module! {
+    /// TODO
+    pub mod rtc;
+}
