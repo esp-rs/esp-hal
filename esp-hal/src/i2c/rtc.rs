@@ -9,63 +9,28 @@ const RC_FAST_CLK: u32 = property!("soc.rc_fast_clk_default");
 
 /// Trait representing the RTC_I2C SDA pin.
 pub trait Sda: RtcPin + OutputPin + InputPin {
+    #[doc(hidden)]
     fn selector(&self) -> u8;
 }
 
 /// Trait representing the RTC_I2C SCL pin.
 pub trait Scl: RtcPin + OutputPin + InputPin {
+    #[doc(hidden)]
     fn selector(&self) -> u8;
 }
 
-impl Sda for crate::peripherals::GPIO1<'_> {
-    fn selector(&self) -> u8 {
-        0
-    }
-}
-impl Sda for crate::peripherals::GPIO3<'_> {
-    fn selector(&self) -> u8 {
-        1
-    }
-}
-
-impl Scl for crate::peripherals::GPIO0<'_> {
-    fn selector(&self) -> u8 {
-        0
-    }
-}
-impl Scl for crate::peripherals::GPIO2<'_> {
-    fn selector(&self) -> u8 {
-        1
-    }
-}
-
-// Not working
-for_each_analog_function! {
-    (SAR_I2C_SCL_0, $gpio:ident) => {
+for_each_lp_function! {
+    (($_func:ident, SAR_I2C_SCL_n, $n:literal), $gpio:ident) => {
         impl Scl for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
-                0
+                $n
             }
         }
     };
-    (SAR_I2C_SDA_0, $gpio:ident) => {
+    (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
-                0
-            }
-        }
-    };
-    (SAR_I2C_SCL_1, $gpio:ident) => {
-        impl Scl for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                1
-            }
-        }
-    };
-    (SAR_I2C_SDA_1, $gpio:ident) => {
-        impl Sda for crate::peripherals::$gpio<'_> {
-            fn selector(&self) -> u8 {
-                1
+                $n
             }
         }
     };
