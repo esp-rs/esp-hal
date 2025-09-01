@@ -57,7 +57,7 @@ macro_rules! i2c_pins {
         // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($peripherals.GPIO2, $peripherals.GPIO3)
+                ($peripherals.GPIO3, $peripherals.GPIO2)
             } else if #[cfg(esp32)] {
                 ($peripherals.GPIO32, $peripherals.GPIO33)
             } else if #[cfg(esp32c6)] {
