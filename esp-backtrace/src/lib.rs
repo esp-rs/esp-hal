@@ -25,6 +25,9 @@
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/46717278")]
 #![no_std]
 
+#[macro_use]
+extern crate esp_metadata_generated;
+
 #[cfg(feature = "defmt")]
 use defmt as _;
 #[cfg(feature = "println")]
@@ -120,101 +123,48 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
     abort();
 }
 
-// Ensure that the address is in DRAM and that it is 16-byte aligned.
+// Ensure that the address is in DRAM.
 //
-// Based loosely on the `esp_stack_ptr_in_dram` function from
-// `components/esp_hw_support/include/esp_memory_utils.h` in ESP-IDF.
-//
-// Address ranges can be found in `components/soc/$CHIP/include/soc/soc.h` as
-// `SOC_DRAM_LOW` and `SOC_DRAM_HIGH`.
+// Address ranges can be found in `esp-metadata/devices/$CHIP.toml` in the `device` table.
 fn is_valid_ram_address(address: u32) -> bool {
-    if (address & 0xF) != 0 {
-        return false;
-    }
-
-    #[cfg(feature = "esp32")]
-    if !(0x3FFA_E000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c2")]
-    if !(0x3FCA_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c3")]
-    if !(0x3FC8_0000..=0x3FCE_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32c6")]
-    if !(0x4080_0000..=0x4088_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32h2")]
-    if !(0x4080_0000..=0x4085_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s2")]
-    if !(0x3FFB_0000..=0x4000_0000).contains(&address) {
-        return false;
-    }
-
-    #[cfg(feature = "esp32s3")]
-    if !(0x3FC8_8000..=0x3FD0_0000).contains(&address) {
-        return false;
-    }
-
-    true
+    memory_range!("DRAM").contains(&address)
 }
 
 #[cfg(feature = "halt-cores")]
-fn halt() -> ! {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "custom-halt")] {
-            // call custom code
-            unsafe extern "Rust" {
-                fn custom_halt() -> !;
-            }
-            unsafe { custom_halt() }
-        } else if #[cfg(any(feature = "esp32", feature = "esp32s3"))] {
-            // multi-core
-            #[cfg(feature = "esp32")]
-            mod registers {
-                pub(crate) const OPTIONS0: u32 = 0x3ff48000;
-                pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
-            }
+fn halt() {
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+    {
+        #[cfg(feature = "esp32")]
+        mod registers {
+            pub(crate) const OPTIONS0: u32 = 0x3ff48000;
+            pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
+        }
 
-            #[cfg(feature = "esp32s3")]
-            mod registers {
-                pub(crate) const OPTIONS0: u32 = 0x60008000;
-                pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
-            }
+        #[cfg(feature = "esp32s3")]
+        mod registers {
+            pub(crate) const OPTIONS0: u32 = 0x60008000;
+            pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
+        }
 
-            let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
+        let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
 
-            unsafe {
-                // We need to write the value "0x86" to stall a particular core. The write
-                // location is split into two separate bit fields named "c0" and "c1", and the
-                // two fields are located in different registers. Each core has its own pair of
-                // "c0" and "c1" bit fields.
+        unsafe {
+            // We need to write the value "0x86" to stall a particular core. The write
+            // location is split into two separate bit fields named "c0" and "c1", and the
+            // two fields are located in different registers. Each core has its own pair of
+            // "c0" and "c1" bit fields.
 
-                let options0 = registers::OPTIONS0 as *mut u32;
+            let options0 = registers::OPTIONS0 as *mut u32;
 
-                options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
+            options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
 
-                sw_cpu_stall.write_volatile(
-                    sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
-                        | (0x21 << 20)
-                        | (0x21 << 26),
-                );
-            }
+            sw_cpu_stall.write_volatile(
+                sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
+                    | (0x21 << 20)
+                    | (0x21 << 26),
+            );
         }
     }
-
-    loop {}
 }
 
 #[cfg(feature = "panic-handler")]
@@ -236,13 +186,20 @@ fn abort() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {
-            semihosting::process::abort();
+            critical_section::with(|_| {
+                semihosting::process::abort();
+            });
         } else if #[cfg(feature = "halt-cores")] {
             halt();
-        } else {
-            critical_section::with(|_| {
-                loop {}
-            })
+        } else if #[cfg(feature = "custom-halt")] {
+            // call custom code
+            unsafe extern "Rust" {
+                fn custom_halt() -> !;
+            }
+            unsafe { custom_halt() }
         }
     }
+
+    #[allow(unreachable_code)]
+    critical_section::with(|_| loop {})
 }
