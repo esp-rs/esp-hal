@@ -240,7 +240,9 @@ fn abort() -> ! {
         } else if #[cfg(feature = "halt-cores")] {
             halt();
         } else {
-            loop {}
+            critical_section::with(|_| {
+                loop {}
+            })
         }
     }
 }
