@@ -157,11 +157,6 @@ fn is_valid_ram_address(address: u32) -> bool {
         return false;
     }
 
-    #[cfg(feature = "esp32p4")]
-    if !(0x4FF0_0000..=0x4FFC_0000).contains(&address) {
-        return false;
-    }
-
     #[cfg(feature = "esp32s2")]
     if !(0x3FFB_0000..=0x4000_0000).contains(&address) {
         return false;
@@ -184,18 +179,13 @@ fn halt() -> ! {
                 fn custom_halt() -> !;
             }
             unsafe { custom_halt() }
-        } else if #[cfg(any(feature = "esp32", /*feature = "esp32p4",*/ feature = "esp32s3"))] {
+        } else if #[cfg(any(feature = "esp32", feature = "esp32s3"))] {
             // multi-core
             #[cfg(feature = "esp32")]
             mod registers {
                 pub(crate) const OPTIONS0: u32 = 0x3ff48000;
                 pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
             }
-
-            // #[cfg(feature = "esp32p4")]
-            // mod registers {
-            //     pub(crate) const SW_CPU_STALL: u32 = 0x50115200;
-            // }
 
             #[cfg(feature = "esp32s3")]
             mod registers {
