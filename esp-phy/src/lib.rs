@@ -16,9 +16,11 @@ pub(crate) mod private {
     pub trait Sealed {}
 }
 
+#[instability::unstable]
 /// Length of the PHY calibration data.
 pub const PHY_CALIBRATION_DATA_LENGTH: usize =
     core::mem::size_of::<esp_wifi_sys::include::esp_phy_calibration_data_t>();
+#[instability::unstable]
 /// Type alias for opaque calibration data.
 pub type PhyCalibrationData = [u8; PHY_CALIBRATION_DATA_LENGTH];
 
@@ -86,6 +88,7 @@ impl PhyState {
         self.calibration_data
             .get_or_insert([0u8; PHY_CALIBRATION_DATA_LENGTH])
     }
+    /// Calibrate the PHY.
     fn calibrate(&mut self) {
         #[cfg(esp32s2)]
         unsafe {
@@ -97,7 +100,11 @@ impl PhyState {
             phy_init_param_set(1);
         }
 
-        #[cfg(all(phy_enable_usb, any(soc_has_usb0, soc_has_usb_device), not(esp32s2)))]
+        #[cfg(all(
+            phy_enable_usb,
+            any(soc_has_usb0, soc_has_usb_device),
+            not(any(esp32s2, esp32h2))
+        ))]
         unsafe {
             unsafe extern "C" {
                 fn phy_bbpll_en_usb(param: bool);
@@ -190,6 +197,12 @@ impl PhyState {
             self.mac_clock_delta_since_last_call = Duration::ZERO;
         }
     }
+    /// Decrease the number of reference to the PHY.
+    ///
+    /// If the ref count hits zero, the PHY will be deinitialized.
+    ///
+    /// # Panics
+    /// This panics, if the PHY ref count is already at zero.
     pub fn decrease_ref_count(&mut self) {
         self.ref_count = self
             .ref_count
@@ -221,9 +234,23 @@ impl PhyState {
 static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
     critical_section::Mutex::new(RefCell::new(PhyState::new()));
 
+#[instability::unstable]
 #[derive(Debug)]
+/// Prevents the PHY from being deinitialized.
+///
+/// As long as at least one [PhyInitGuard] exists, the PHY will remain initialized. To release this
+/// guard, you can either let it go out of scope, or use [PhyInitGuard::release] to explicitly
+/// release it.
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
+}
+impl PhyInitGuard<'_> {
+    #[instability::unstable]
+    #[inline]
+    /// Release the init guard.
+    ///
+    /// The PHY will be disabled, if this is the last init guard.
+    pub fn release(self) {}
 }
 impl Drop for PhyInitGuard<'_> {
     fn drop(&mut self) {
@@ -231,6 +258,8 @@ impl Drop for PhyInitGuard<'_> {
     }
 }
 
+#[instability::unstable]
+/// Common functionality for controlling PHY initialization.
 pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     fn enable_phy(&self) -> PhyInitGuard<'d> {
         // In esp-idf, this is done after calculating the MAC time delta, but it shouldn't make
@@ -259,6 +288,7 @@ macro_rules! impl_phy_controller {
         #[cfg($feature_gate)]
         impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
         #[cfg($feature_gate)]
+        #[instability::unstable]
         impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
     };
 }
@@ -281,15 +311,18 @@ pub trait MacTimeExt {
 #[cfg(esp32)]
 impl MacTimeExt for esp_hal::peripherals::WIFI<'_> {}
 
+#[instability::unstable]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Calibration data was already set.
 pub struct CalibrationDataAlreadySetError;
+#[instability::unstable]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// No calibration data is available.
 pub struct NoCalibrationDataError;
 
+#[instability::unstable]
 /// Load previously backed up PHY calibration data.
 ///
 /// If `no_calibration` is `false`, a partial calibration will be performed. Otherwise no extra
@@ -308,6 +341,7 @@ pub fn set_phy_calibration_data(
         }
     })
 }
+#[instability::unstable]
 /// Backup the PHY calibration data to the provided slice.
 pub fn backup_phy_calibration_data(
     buffer: &mut PhyCalibrationData,
