@@ -120,6 +120,9 @@ pub enum Peripheral {
     /// Temperature sensor peripheral.
     #[cfg(soc_has_tsens)]
     Tsens,
+    /// UHCI0
+    #[cfg(soc_has_uhci0)]
+    Uhci0,
 }
 
 impl Peripheral {
@@ -207,6 +210,8 @@ impl Peripheral {
         Self::Systimer,
         #[cfg(soc_has_tsens)]
         Self::Tsens,
+        #[cfg(soc_has_uhci0)]
+        Self::Uhci0,
     ];
 }
 
@@ -475,6 +480,10 @@ impl PeripheralClockControl {
             Peripheral::Tsens => {
                 perip_clk_en1.modify(|_, w| w.tsens_clk_en().bit(enable));
             }
+            #[cfg(soc_has_uhci0)]
+            Peripheral::Uhci0 => {
+                perip_clk_en0.modify(|_, w| w.uhci0_clk_en().bit(enable));
+            }
         }
     }
 
@@ -652,6 +661,12 @@ impl PeripheralClockControl {
                     w.tsens_clk_sel().bit(enable)
                 });
             }
+            #[cfg(soc_has_uhci0)]
+            Peripheral::Uhci0 => {
+                system
+                    .uhci_conf()
+                    .modify(|_, w| w.uhci_clk_en().bit(enable));
+            }
         }
     }
 
@@ -826,6 +841,10 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
                 }
             }
         }
+        #[cfg(soc_has_uhci0)]
+        Peripheral::Uhci0 => {
+            perip_rst_en0.modify(|_, w| w.uhci0_rst().bit(reset));
+        }
     });
 }
 
@@ -957,6 +976,10 @@ fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
             system
                 .tsens_clk_conf()
                 .modify(|_, w| w.tsens_rst_en().bit(reset));
+        }
+        #[cfg(soc_has_uhci0)]
+        Peripheral::Uhci0 => {
+            system.uhci_conf().modify(|_, w| w.uhci_rst_en().bit(reset));
         }
     }
 }
