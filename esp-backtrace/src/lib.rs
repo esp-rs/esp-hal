@@ -171,50 +171,40 @@ fn is_valid_ram_address(address: u32) -> bool {
 }
 
 #[cfg(feature = "halt-cores")]
-fn halt() -> ! {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "custom-halt")] {
-            // call custom code
-            unsafe extern "Rust" {
-                fn custom_halt() -> !;
-            }
-            unsafe { custom_halt() }
-        } else if #[cfg(any(feature = "esp32", feature = "esp32s3"))] {
-            // multi-core
-            #[cfg(feature = "esp32")]
-            mod registers {
-                pub(crate) const OPTIONS0: u32 = 0x3ff48000;
-                pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
-            }
+fn halt() {
+    #[cfg(any(feature = "esp32", feature = "esp32s3"))]
+    {
+        #[cfg(feature = "esp32")]
+        mod registers {
+            pub(crate) const OPTIONS0: u32 = 0x3ff48000;
+            pub(crate) const SW_CPU_STALL: u32 = 0x3ff480ac;
+        }
 
-            #[cfg(feature = "esp32s3")]
-            mod registers {
-                pub(crate) const OPTIONS0: u32 = 0x60008000;
-                pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
-            }
+        #[cfg(feature = "esp32s3")]
+        mod registers {
+            pub(crate) const OPTIONS0: u32 = 0x60008000;
+            pub(crate) const SW_CPU_STALL: u32 = 0x600080bc;
+        }
 
-            let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
+        let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
 
-            unsafe {
-                // We need to write the value "0x86" to stall a particular core. The write
-                // location is split into two separate bit fields named "c0" and "c1", and the
-                // two fields are located in different registers. Each core has its own pair of
-                // "c0" and "c1" bit fields.
+        unsafe {
+            // We need to write the value "0x86" to stall a particular core. The write
+            // location is split into two separate bit fields named "c0" and "c1", and the
+            // two fields are located in different registers. Each core has its own pair of
+            // "c0" and "c1" bit fields.
 
-                let options0 = registers::OPTIONS0 as *mut u32;
+            let options0 = registers::OPTIONS0 as *mut u32;
 
-                options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
+            options0.write_volatile(options0.read_volatile() & !(0b1111) | 0b1010);
 
-                sw_cpu_stall.write_volatile(
-                    sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
-                        | (0x21 << 20)
-                        | (0x21 << 26),
-                );
-            }
+            sw_cpu_stall.write_volatile(
+                sw_cpu_stall.read_volatile() & !(0b111111 << 20) & !(0b111111 << 26)
+                    | (0x21 << 20)
+                    | (0x21 << 26),
+            );
         }
     }
-
-    loop {}
 }
 
 #[cfg(feature = "panic-handler")]
@@ -236,13 +226,20 @@ fn abort() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {
-            semihosting::process::abort();
+            critical_section::with(|_| {
+                semihosting::process::abort();
+            });
         } else if #[cfg(feature = "halt-cores")] {
             halt();
-        } else {
-            critical_section::with(|_| {
-                loop {}
-            })
+        } else if #[cfg(feature = "custom-halt")] {
+            // call custom code
+            unsafe extern "Rust" {
+                fn custom_halt() -> !;
+            }
+            unsafe { custom_halt() }
         }
     }
+
+    #[allow(unreachable_code)]
+    critical_section::with(|_| loop {})
 }

@@ -1,6 +1,17 @@
 use esp_config::generate_config_from_yaml_definition;
 
 #[macro_export]
+macro_rules! assert_unique_features {
+    ($($feature:literal),+ $(,)?) => {
+        assert!(
+            (0 $(+ cfg!(feature = $feature) as usize)+ ) <= 1,
+            "At most one of the following features must be enabled: {}",
+            [$($feature),+].join(", ")
+        );
+    };
+}
+
+#[macro_export]
 macro_rules! assert_unique_used_features {
     ($($feature:literal),+ $(,)?) => {
         assert!(
@@ -15,9 +26,8 @@ fn main() {
     // Ensure that exactly a backend is selected:
     assert_unique_used_features!("defmt", "println");
 
-    if cfg!(feature = "custom-halt") && cfg!(feature = "halt-cores") {
-        panic!("Only one of `custom-halt` and `halt-cores` can be enabled");
-    }
+    // Ensure that there aren't multiple halt methods selected:
+    assert_unique_features!("custom-halt", "halt-cores", "semihosting");
 
     // emit config
     println!("cargo:rerun-if-changed=./esp_config.yml");

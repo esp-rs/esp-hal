@@ -60,6 +60,8 @@ custom-halt          = []
 custom-pre-backtrace = []
 ## Halt both CPUs on ESP32 / ESP32-S3 instead of doing a `loop {}` in case of a panic
 halt-cores           = []
+## Exit with a semihosting call in case of a panic
+semihosting = ["dep:semihosting"]
 ## Include a panic handler
 panic-handler        = []
 
