@@ -18,6 +18,5 @@ crate::unstable_module! {
 #[cfg(esp32s3)] // Only support ESP32-S3 for now.
 #[cfg(soc_has_rtc_i2c)]
 crate::unstable_module! {
-    /// TODO
     pub mod rtc;
 }

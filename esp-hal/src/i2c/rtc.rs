@@ -1,3 +1,73 @@
+//! # RTC I2C driver
+//!
+//! ## Overview
+//!
+//! This is the host driver for the RTC_I2C peripheral which is primarily for the ULP.
+//!
+//! ## Configuration
+//!
+//! The driver can be configured using the [`Config`] struct. To create a
+//! configuration, you can use the [`Config::default()`] method, and then modify
+//! the individual settings as needed, by calling `with_*` methods on the
+//! [`Config`] struct.
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! use core::time::Duration;
+//!
+//! use esp_hal::i2c::rtc::Config;
+//!
+//! let config = Config::default().with_timeout(Duration::from_micros(100));
+//! # {after_snippet}
+//! ```
+//!
+//! You will then need to pass the configuration to [`I2c::new`], and you can
+//! also change the configuration later by calling [`I2c::apply_config`].
+//!
+//! You will also need to specify the SDA and SCL pins when you create the
+//! driver instance.
+//! ```rust, no_run
+//! # {before_snippet}
+//! use esp_hal::i2c::rtc::I2c;
+//! # use core::time::Duration;
+//! # use esp_hal::i2c::rtc::Config;
+//! #
+//! # let config = Config::default();
+//! #
+//! // You need to configure the driver during initialization:
+//! let mut i2c = I2c::new(
+//!     peripherals.RTC_I2C,
+//!     config,
+//!     peripherals.GPIO3,
+//!     peripherals.GPIO2,
+//! )?;
+//!
+//! // You can change the configuration later:
+//! let new_config = config.with_timeout(Duration::from_micros(150));
+//! i2c.apply_config(&new_config)?;
+//! # {after_snippet}
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust, no_run
+//! # {before_snippet}
+//! # use esp_hal::i2c::rtc::{I2c, Config};
+//! # let config = Config::default();
+//! # let mut i2c = I2c::new(peripherals.RTC_I2C, config, peripherals.GPIO3, peripherals.GPIO2)?;
+//! #
+//! // `u8` is automatically converted to `I2cAddress::SevenBit`. The device
+//! // address does not contain the `R/W` bit!
+//! const DEVICE_ADDR: u8 = 0x77;
+//! const DEVICE_REG: u8 = 0x01;
+//! let write_buffer = [0xAA];
+//! let mut read_buffer = [0u8; 22];
+//!
+//! i2c.write(DEVICE_ADDR, DEVICE_REG, &write_buffer)?;
+//! i2c.read(DEVICE_ADDR, DEVICE_REG, &mut read_buffer)?;
+//! # {after_snippet}
+//! ```
+
 use core::time::Duration;
 
 use crate::{
