@@ -363,7 +363,7 @@ pub(crate) fn enable_wifi_power_domain() {
 pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
     // Although we're ignoring the result here, this doesn't change the behavior, as this just
     // doesn't do anything in case an error is returned.
-    let _ = esp_phy::backup_calibration_data(data);
+    let _ = esp_phy::backup_phy_calibration_data(data);
 }
 
 /// Set calibration data.
@@ -372,5 +372,5 @@ pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH
 pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
     // Although we're ignoring the result here, this doesn't change the behavior, as this just
     // doesn't do anything in case an error is returned.
-    let _ = esp_phy::set_calibration_data(data);
+    let _ = esp_phy::set_phy_calibration_data(data);
 }

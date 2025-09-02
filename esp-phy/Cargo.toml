@@ -75,11 +75,11 @@ esp32s3 = [
 #! Unstable APIs are not covered by semver guarantees.
 
 ## Enables APIs that are not stable and thus come with no stability guarantees.
-## Never enable this feature in a library crate using esp-hal.
+## Never enable this feature in a library crate using esp-phy.
 unstable = []
 
 ## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
 ## However, they must **not** enable the `unstable` feature themselves.
 ##
-## For development you can enable the `unstable` and the chip feature by adding esp-hal as a dev-dependency.
+## For development you can enable the `unstable` and the chip feature by adding esp-phy as a dev-dependency.
 requires-unstable = []
