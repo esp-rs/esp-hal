@@ -31,10 +31,10 @@ use core::ffi::c_void;
 use allocator_api2::boxed::Box;
 use esp_hal::{
     Blocking,
-    sync::Locked,
     time::{Duration, Instant, Rate},
     timer::{AnyTimer, PeriodicTimer},
 };
+use esp_sync::NonReentrantMutex;
 
 use crate::{task::Context, timer::TIMER};
 
@@ -112,6 +112,8 @@ struct SchedulerState {
     /// Pointer to the task that is scheduled for deletion.
     to_delete: *mut Context,
 }
+
+unsafe impl Send for SchedulerState {}
 
 impl SchedulerState {
     const fn new() -> Self {
@@ -233,7 +235,8 @@ fn usleep(us: u32) {
     }
 }
 
-static SCHEDULER_STATE: Locked<SchedulerState> = Locked::new(SchedulerState::new());
+static SCHEDULER_STATE: NonReentrantMutex<SchedulerState> =
+    NonReentrantMutex::new(SchedulerState::new());
 
 struct Scheduler {}
 

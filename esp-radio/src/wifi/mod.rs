@@ -19,6 +19,7 @@ use core::{
 
 use enumset::{EnumSet, EnumSetType};
 use esp_hal::{asynch::AtomicWaker, sync::Locked};
+use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
 use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;
 use esp_wifi_sys::include::{
@@ -1181,9 +1182,11 @@ impl CsiConfig {
 const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
 const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
 
-pub(crate) static DATA_QUEUE_RX_AP: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
+    NonReentrantMutex::new(VecDeque::new());
 
-pub(crate) static DATA_QUEUE_RX_STA: Locked<VecDeque<PacketBuffer>> = Locked::new(VecDeque::new());
+pub(crate) static DATA_QUEUE_RX_STA: NonReentrantMutex<VecDeque<PacketBuffer>> =
+    NonReentrantMutex::new(VecDeque::new());
 
 /// Common errors.
 #[derive(Debug, Clone, Copy)]
@@ -1811,7 +1814,7 @@ impl WifiDeviceMode {
         }
     }
 
-    fn data_queue_rx(&self) -> &'static Locked<VecDeque<PacketBuffer>> {
+    fn data_queue_rx(&self) -> &'static NonReentrantMutex<VecDeque<PacketBuffer>> {
         match self {
             WifiDeviceMode::Sta => &DATA_QUEUE_RX_STA,
             WifiDeviceMode::Ap => &DATA_QUEUE_RX_AP,
@@ -2158,7 +2161,7 @@ impl PromiscuousPkt<'_> {
 }
 
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
-static SNIFFER_CB: Locked<Option<fn(PromiscuousPkt<'_>)>> = Locked::new(None);
+static SNIFFER_CB: NonReentrantMutex<Option<fn(PromiscuousPkt<'_>)>> = NonReentrantMutex::new(None);
 
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
 unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: u32) {
@@ -3154,7 +3157,7 @@ impl WifiController<'_> {
     }
 
     fn clear_events(events: impl Into<EnumSet<WifiEvent>>) {
-        WIFI_EVENTS.with(|evts| evts.get_mut().remove_all(events.into()));
+        WIFI_EVENTS.with(|evts| evts.remove_all(events.into()));
     }
 
     /// Wait for one [`WifiEvent`].
@@ -3223,7 +3226,7 @@ impl core::future::Future for WifiEventFuture {
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         self.event.waker().register(cx.waker());
-        if WIFI_EVENTS.with(|events| events.get_mut().remove(self.event)) {
+        if WIFI_EVENTS.with(|events| events.remove(self.event)) {
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -3251,7 +3254,6 @@ impl core::future::Future for MultiWifiEventFuture {
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Self::Output> {
         let output = WIFI_EVENTS.with(|events| {
-            let events = events.get_mut();
             let active = events.intersection(self.event);
             events.remove_all(active);
             active

@@ -34,8 +34,9 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
 
-static CAL_DATA: esp_hal::sync::Locked<[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]> =
-    esp_hal::sync::Locked::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
+static CAL_DATA: esp_sync::NonReentrantMutex<
+    [u8; core::mem::size_of::<esp_phy_calibration_data_t>()],
+> = esp_sync::NonReentrantMutex::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
 
 /// **************************************************************************
 /// Name: esp_semphr_create

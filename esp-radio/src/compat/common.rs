@@ -9,13 +9,13 @@ use core::{
 };
 
 use esp_hal::time::{Duration, Instant};
+use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::malloc::free;
 use crate::{
     CONFIG,
     binary::c_types::{c_int, c_void},
-    hal::sync::Locked,
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
 };
@@ -30,13 +30,13 @@ struct Mutex {
 }
 
 pub(crate) struct ConcurrentQueue {
-    raw_queue: Locked<RawQueue>,
+    raw_queue: NonReentrantMutex<RawQueue>,
 }
 
 impl ConcurrentQueue {
     pub(crate) fn new(count: usize, item_size: usize) -> Self {
         Self {
-            raw_queue: Locked::new(RawQueue::new(count, item_size)),
+            raw_queue: NonReentrantMutex::new(RawQueue::new(count, item_size)),
         }
     }
 

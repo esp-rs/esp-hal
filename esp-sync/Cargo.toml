@@ -1,0 +1,55 @@
+[package]
+name          = "esp-sync"
+version       = "0.0.0"
+edition       = "2024"
+rust-version  = "1.88.0"
+description   = "Synchronization primitives for Espressif devices"
+documentation = "https://docs.espressif.com/projects/rust/esp-sync/latest/"
+categories    = ["no-std", "embedded", "concurrency"]
+repository    = "https://github.com/esp-rs/esp-hal"
+license       = "MIT OR Apache-2.0"
+exclude       = [ "MIGRATING-*", "CHANGELOG.md" ]
+
+[dependencies]
+cfg-if = "1"
+document-features = "0.2"
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
+embassy-sync-06 = { package = "embassy-sync", version = "0.6" }
+embassy-sync-07 = { package = "embassy-sync", version = "0.7" }
+
+# Logging interfaces, they are mutually exclusive so they need to be behind separate features.
+defmt  = { version = "1.0.1", optional = true }
+log-04 = { package = "log", version = "0.4", optional = true }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+riscv            = { version = "0.14.0" }
+
+[target.'cfg(target_arch = "xtensa")'.dependencies]
+xtensa-lx        = { version = "0.12.0", path = "../xtensa-lx" }
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated", features = ["build-script"] }
+
+[features]
+#! ### Chip Support Feature Flags
+## Target the ESP32.
+esp32   = ["esp-metadata-generated/esp32"]
+## Target the ESP32-C2.
+esp32c2 = ["esp-metadata-generated/esp32c2"]
+## Target the ESP32-C3.
+esp32c3 = ["esp-metadata-generated/esp32c3"]
+## Target the ESP32-C6.
+esp32c6 = ["esp-metadata-generated/esp32c6"]
+## Target the ESP32-H2.
+esp32h2 = ["esp-metadata-generated/esp32h2"]
+## Target the ESP32-S2.
+esp32s2 = ["esp-metadata-generated/esp32s2"]
+## Target the ESP32-S3.
+esp32s3 = ["esp-metadata-generated/esp32s3"]
+
+#! ### Logging Feature Flags
+## Enable logging output using version 0.4 of the `log` crate.
+log-04 = ["dep:log-04"]
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+defmt = ["dep:defmt"]

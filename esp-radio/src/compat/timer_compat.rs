@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use esp_hal::sync::Locked;
+use esp_sync::NonReentrantMutex;
 
 use crate::binary::{
     c_types,
@@ -147,7 +147,7 @@ impl TimerQueue {
 
 unsafe impl Send for TimerQueue {}
 
-pub(crate) static TIMERS: Locked<TimerQueue> = Locked::new(TimerQueue::new());
+pub(crate) static TIMERS: NonReentrantMutex<TimerQueue> = NonReentrantMutex::new(TimerQueue::new());
 
 #[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {

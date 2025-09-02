@@ -2,8 +2,7 @@
 use core::task::Waker;
 
 use embassy_sync::waitqueue::GenericAtomicWaker;
-
-use crate::sync::RawMutex;
+use esp_sync::RawMutex;
 
 /// Utility struct to register and wake a waker.
 pub struct AtomicWaker {

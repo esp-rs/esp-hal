@@ -37,14 +37,15 @@ esp-rom-sys              = { version = "0.1.1", path = "../esp-rom-sys" }
 bitfield                 = "0.19.0"
 delegate                 = "0.13.3"
 document-features        = "0.2.11"
-embassy-futures          = "0.1.1"
-embassy-sync             = "0.6.2"
+embassy-futures          = "0.1"
+embassy-sync             = "0.7"
 fugit                    = "0.3.7"
 instability              = "0.3.9"
 strum                    = { version = "0.27.1", default-features = false, features = ["derive"] }
 
 esp-config               = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated   = { version = "0.1.0", path = "../esp-metadata-generated" }
+esp-sync                 = { version = "0.0.0", path = "../esp-sync" }
 procmacros               = { version = "0.19.0", package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Dependencies that are optional because they are used by unstable drivers.
@@ -127,6 +128,7 @@ esp32   = [
     "dep:esp32",
     "procmacros/rtc-slow",
     "esp-rom-sys/esp32",
+    "esp-sync/esp32",
     "esp-metadata-generated/esp32",
     "dep:sha1",
     "dep:sha2"
@@ -137,6 +139,7 @@ esp32c2 = [
     "dep:riscv",
     "portable-atomic/unsafe-assume-single-core",
     "esp-rom-sys/esp32c2",
+    "esp-sync/esp32c2",
     "esp-metadata-generated/esp32c2",
 ]
 # Target the ESP32-C3.
@@ -146,6 +149,7 @@ esp32c3 = [
     "esp-riscv-rt/rtc-ram",
     "portable-atomic/unsafe-assume-single-core",
     "esp-rom-sys/esp32c3",
+    "esp-sync/esp32c3",
     "esp-metadata-generated/esp32c3",
 ]
 # Target the ESP32-C6.
@@ -156,6 +160,7 @@ esp32c6 = [
     "esp-riscv-rt/has-mie-mip",
     "procmacros/has-lp-core",
     "esp-rom-sys/esp32c6",
+    "esp-sync/esp32c6",
     "esp-metadata-generated/esp32c6",
 ]
 # Target the ESP32-H2.
@@ -165,6 +170,7 @@ esp32h2 = [
     "esp-riscv-rt/rtc-ram",
     "esp-riscv-rt/has-mie-mip",
     "esp-rom-sys/esp32h2",
+    "esp-sync/esp32h2",
     "esp-metadata-generated/esp32h2",
 ]
 # Target the ESP32-S2.
@@ -175,6 +181,7 @@ esp32s2 = [
     "procmacros/rtc-slow",
     "__usb_otg",
     "esp-rom-sys/esp32s2",
+    "esp-sync/esp32s2",
     "esp-metadata-generated/esp32s2",
 ]
 # Target the ESP32-S3.
@@ -184,6 +191,7 @@ esp32s3 = [
     "procmacros/rtc-slow",
     "__usb_otg",
     "esp-rom-sys/esp32s3",
+    "esp-sync/esp32s3",
     "esp-metadata-generated/esp32s3",
 ]
 
