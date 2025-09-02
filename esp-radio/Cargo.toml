@@ -33,7 +33,7 @@ esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-wifi-sys = "0.7.1"
-esp-phy = { path = "../esp-phy/", features = ["requires-unstable"] }
+esp-phy = { path = "../esp-phy/" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
