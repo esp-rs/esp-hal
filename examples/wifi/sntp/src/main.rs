@@ -215,13 +215,12 @@ async fn connection(mut controller: WifiController<'static>) {
             Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Config::Client({
-                let mut config = ClientConfig::default();
-                config.ssid = SSID.into();
-                config.password = PASSWORD.into();
-                config
-            });
-            controller.set_configuration(&client_config).unwrap();
+            let client_config = Config::Client(
+                ClientConfig::default()
+                    .with_ssid(SSID.into())
+                    .with_password(PASSWORD.into()),
+            );
+            controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

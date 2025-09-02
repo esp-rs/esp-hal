@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added unstable `wifi-eap` feature (#3924)
 - Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
 - `set_phy_calibration_data` and `phy_calibration_data` (#4001)
+- common traits for `Protocol`, `Country`,  (#4017)
+- `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig` (#4017)
+- lifetime to `Sniffer` (#4017)
 
 ### Changed
 
@@ -25,10 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `esp-ieee802154` package has been folded into `esp-radio`, it's now alloc. (#3861, #3890)
 - `ble`, `esp-now`, `csi`, `sniffer`, `esp-ieee802154` and `smoltcp` features and APIs marked as unstable (#3865)
 - Update bt-hci version to add additional HCI commands (#3920)
-- A number of enums/structs have been marked as `#[non_exhaustive]` (#3981)
-  - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, and `WifiState`
+- A number of enums/structs have been marked as `#[non_exhaustive]` (#3981, #4017)
+  - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode`
 - The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
   - Error types implements `core::error:Error`
+- `ap_state()` and `sta_state()` marked as stable (#4017)  
+- `wifi_state()` marked as unstable (#4017)
+- `ap_mac` and `sta_mac` returns `[u8; 6]` instead of taking an `[u8; 6]` argument (#4017)
+- `RxControlInfo` hidden behind `esp-now` feature (#4017)
+- `set_configuration()` to `set_config() (#4017)
 
 ### Fixed
 
@@ -39,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions (#3963)
+- `EnumSetType` from `Protocol`, `Country` enums (#4017)
+- `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
 
 ## [v0.15.0] - 2025-07-16
 
