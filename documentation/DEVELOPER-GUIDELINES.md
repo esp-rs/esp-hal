@@ -41,7 +41,7 @@ In general, the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines
     - Implement `Copy` if possible.
     - The fields should be private. The `BuilderLite` macro generates setters and getters automatically.
     - If the configuration is expected to be applied more than once (as, for example, different device configurations on a shared SPI bus may be) and calculating register values based on the configuration is costly, the configuration struct should precompute and store the result of those calculations.
-- If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::Mode` type parameter.
+- If a driver implements both blocking and async operations, or only implements blocking operations, but may support asynchronous ones in the future, the driver's type signature must include a `crate::DriverMode` type parameter.
 - By default, constructors must configure the driver for blocking mode. The driver must implement `into_async` (and a matching `into_blocking`) function that reconfigures the driver.
   - `into_async` must configure the driver and/or the associated DMA channels. This most often means enabling an interrupt handler.
   - `into_blocking` must undo the configuration done by `into_async`.
