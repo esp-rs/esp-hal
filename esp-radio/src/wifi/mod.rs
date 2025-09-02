@@ -1786,7 +1786,7 @@ mod private {
 
 /// Wi-Fi device operational modes.
 #[derive(Debug, Clone, Copy)]
-pub enum WifiDeviceMode {
+enum WifiDeviceMode {
     /// Station mode.
     Sta,
     /// Access Point mode.
