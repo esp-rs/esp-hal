@@ -1,3 +1,4 @@
+#![cfg_attr(docsrs, procmacros::doc_replace)]
 //! # RTC I2C driver
 //!
 //! ## Overview
