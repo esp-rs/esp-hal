@@ -642,7 +642,7 @@ pub struct Timing {
 
 impl Timing {
     /// I2C timings for standard mode (100 kHz).
-    pub const fn standard_mode() -> Self {
+    pub fn standard_mode() -> Self {
         Self::default()
             .with_scl_low_period(clock_from_micros(5))
             .with_scl_high_period(clock_from_micros(5))
@@ -652,7 +652,7 @@ impl Timing {
     }
 
     /// I2C timings for fast mode (400 kHz).
-    pub const fn fast_mode() -> Self {
+    pub fn fast_mode() -> Self {
         Self::default()
             .with_scl_low_period(clock_from_nanos(1_400))
             .with_scl_high_period(clock_from_nanos(300))
