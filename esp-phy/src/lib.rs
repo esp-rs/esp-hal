@@ -16,11 +16,11 @@ pub(crate) mod private {
     pub trait Sealed {}
 }
 
-#[instability::unstable]
+
 /// Length of the PHY calibration data.
 pub const PHY_CALIBRATION_DATA_LENGTH: usize =
     core::mem::size_of::<esp_wifi_sys::include::esp_phy_calibration_data_t>();
-#[instability::unstable]
+
 /// Type alias for opaque calibration data.
 pub type PhyCalibrationData = [u8; PHY_CALIBRATION_DATA_LENGTH];
 
@@ -234,7 +234,7 @@ impl PhyState {
 static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
     critical_section::Mutex::new(RefCell::new(PhyState::new()));
 
-#[instability::unstable]
+
 #[derive(Debug)]
 /// Prevents the PHY from being deinitialized.
 ///
@@ -245,7 +245,7 @@ pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }
 impl PhyInitGuard<'_> {
-    #[instability::unstable]
+
     #[inline]
     /// Release the init guard.
     ///
@@ -258,7 +258,7 @@ impl Drop for PhyInitGuard<'_> {
     }
 }
 
-#[instability::unstable]
+
 /// Common functionality for controlling PHY initialization.
 pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     fn enable_phy(&self) -> PhyInitGuard<'d> {
@@ -288,7 +288,7 @@ macro_rules! impl_phy_controller {
         #[cfg($feature_gate)]
         impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
         #[cfg($feature_gate)]
-        #[instability::unstable]
+
         impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
     };
 }
@@ -311,18 +311,18 @@ pub trait MacTimeExt {
 #[cfg(esp32)]
 impl MacTimeExt for esp_hal::peripherals::WIFI<'_> {}
 
-#[instability::unstable]
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Calibration data was already set.
 pub struct CalibrationDataAlreadySetError;
-#[instability::unstable]
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// No calibration data is available.
 pub struct NoCalibrationDataError;
 
-#[instability::unstable]
+
 /// Load previously backed up PHY calibration data.
 ///
 /// If `no_calibration` is `false`, a partial calibration will be performed. Otherwise no extra
@@ -341,7 +341,7 @@ pub fn set_phy_calibration_data(
         }
     })
 }
-#[instability::unstable]
+
 /// Backup the PHY calibration data to the provided slice.
 pub fn backup_phy_calibration_data(
     buffer: &mut PhyCalibrationData,

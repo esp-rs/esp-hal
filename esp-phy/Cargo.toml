@@ -10,7 +10,6 @@ esp-wifi-sys = "0.7.1"
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 
 cfg-if = "1.0.1"
-instability = "0.3.9"
 
 defmt = { version = "1.0.1", optional = true }
 log-04 = { version = "0.4.27", package = "log", optional = true }
@@ -68,18 +67,3 @@ esp32s3 = [
   "esp-wifi-sys/esp32s3",
   "esp-metadata-generated/esp32s3",
 ]
-
-#! ### Unstable APIs
-#! Unstable APIs are drivers and features that are not yet ready for general use.
-#! They may be incomplete, have bugs, or be subject to change without notice.
-#! Unstable APIs are not covered by semver guarantees.
-
-## Enables APIs that are not stable and thus come with no stability guarantees.
-## Never enable this feature in a library crate using esp-phy.
-unstable = []
-
-## Libraries that depend on `esp-hal` should enable this feature to indicate their use of unstable APIs.
-## However, they must **not** enable the `unstable` feature themselves.
-##
-## For development you can enable the `unstable` and the chip feature by adding esp-phy as a dev-dependency.
-requires-unstable = []
