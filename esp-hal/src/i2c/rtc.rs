@@ -641,44 +641,33 @@ pub struct Timing {
 }
 
 impl Timing {
-    /// I2C timing from durations.
-    pub const fn from_config(
-        scl_low_period: Duration,
-        scl_high_period: Duration,
-        sda_duty: Duration,
-        scl_start_period: Duration,
-        scl_stop_period: Duration,
-    ) -> Self {
-        Self {
-            scl_low_period: duration_to_clock(scl_low_period),
-            scl_high_period: duration_to_clock(scl_high_period),
-            sda_duty: duration_to_clock(sda_duty),
-            scl_start_period: duration_to_clock(scl_start_period),
-            scl_stop_period: duration_to_clock(scl_stop_period),
-        }
-    }
-
     /// I2C timings for standard mode (100 kHz).
     pub const fn standard_mode() -> Self {
-        Self::from_config(
-            Duration::from_micros(5),
-            Duration::from_micros(5),
-            Duration::from_micros(2),
-            Duration::from_micros(3),
-            Duration::from_micros(6),
-        )
+        Self::default()
+            .with_scl_low_period(clock_from_micros(5))
+            .with_scl_high_period(clock_from_micros(5))
+            .with_sda_duty(clock_from_micros(2))
+            .with_scl_start_period(clock_from_micros(3))
+            .with_scl_stop_period(clock_from_micros(6))
     }
 
     /// I2C timings for fast mode (400 kHz).
     pub const fn fast_mode() -> Self {
-        Self::from_config(
-            Duration::from_nanos(1_400),
-            Duration::from_nanos(300),
-            Duration::from_nanos(1_000),
-            Duration::from_nanos(2_000),
-            Duration::from_nanos(1_300),
-        )
+        Self::default()
+            .with_scl_low_period(clock_from_nanos(1_400))
+            .with_scl_high_period(clock_from_nanos(300))
+            .with_sda_duty(clock_from_nanos(1_000))
+            .with_scl_start_period(clock_from_nanos(2_000))
+            .with_scl_stop_period(clock_from_nanos(1_300))
     }
+}
+
+const fn clock_from_micros(micros: u64) -> u32 {
+    duration_to_clock(Duration::from_micros(micros))
+}
+
+const fn clock_from_nanos(nanos: u64) -> u32 {
+    duration_to_clock(Duration::from_nanos(nanos))
 }
 
 const fn duration_to_clock(value: Duration) -> u32 {
