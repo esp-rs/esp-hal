@@ -20,12 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::{AesBackend, AesContext, dma::AesDmaBackend}`: Work-queue based AES driver (#3880, #3897)
 - `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
-- `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871, #4008)
+- `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871, #4008, #4011)
 - Align `I8080` driver pin configurations with latest guidelines (#3997)
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
 - ESP32-S3: Expose more `Camera` config options (#3996)
 - Functions to query chip revision for every chip (#3892)
+- `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 
 ### Changed
 
