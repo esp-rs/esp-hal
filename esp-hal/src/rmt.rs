@@ -527,11 +527,6 @@ pub struct Rx;
 pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed {
     #[doc(hidden)]
     const IS_TX: bool;
-
-    #[doc(hidden)]
-    fn is_tx() -> bool {
-        Self::IS_TX
-    }
 }
 
 impl crate::private::Sealed for Tx {}
@@ -1825,7 +1820,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            if Dir::is_tx() {
+            if Dir::IS_TX {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| w.conf_update().set_bit());
             } else {
@@ -1838,7 +1833,7 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            if Dir::is_tx() {
+            if Dir::IS_TX {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| unsafe { w.div_cnt().bits(divider) });
             } else {
@@ -1852,7 +1847,7 @@ mod chip_specific {
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            let blocks = if Dir::is_tx() {
+            let blocks = if Dir::IS_TX {
                 rmt.ch_tx_conf0(ch_idx).read().mem_size().bits()
             } else {
                 rmt.ch_rx_conf0(ch_idx).read().mem_size().bits()
@@ -1866,7 +1861,7 @@ mod chip_specific {
             let rmt = RMT::regs();
             let ch_idx = self.ch_idx as usize;
 
-            if Dir::is_tx() {
+            if Dir::IS_TX {
                 rmt.ch_tx_conf0(ch_idx)
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             } else {
