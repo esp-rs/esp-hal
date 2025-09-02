@@ -1741,7 +1741,7 @@ cfg_if::cfg_if! {
 
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
     // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
-    system::GenericPeripheralGuard::new_with(init_dma)
+    system::GenericPeripheralGuard::new_with(init_dma_racey)
 }
 
 // DMA receive channel

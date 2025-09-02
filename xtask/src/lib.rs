@@ -78,6 +78,7 @@ impl Package {
             self,
             EspBacktrace
                 | EspBootloaderEspIdf
+                | EspAlloc
                 | EspHal
                 | EspHalEmbassy
                 | EspMetadataGenerated

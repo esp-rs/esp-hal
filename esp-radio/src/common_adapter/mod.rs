@@ -1,3 +1,4 @@
+use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{
     c_types::c_char,
     include::{
@@ -33,6 +34,27 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s3, path = "phy_init_data_esp32s3.rs")]
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
+
+static PHY_ACCESS_REF: NonReentrantMutex<usize> = NonReentrantMutex::new(0);
+
+pub(crate) unsafe fn phy_enable() {
+    PHY_ACCESS_REF.with(|ref_count| {
+        *ref_count += 1;
+        if *ref_count == 1 {
+            unsafe { chip_specific::phy_enable_inner() };
+        }
+    })
+}
+
+#[allow(unused)]
+pub(crate) unsafe fn phy_disable() {
+    PHY_ACCESS_REF.with(|ref_count| {
+        *ref_count -= 1;
+        if *ref_count == 0 {
+            unsafe { chip_specific::phy_disable_inner() };
+        }
+    })
+}
 
 static CAL_DATA: esp_sync::NonReentrantMutex<
     [u8; core::mem::size_of::<esp_phy_calibration_data_t>()],

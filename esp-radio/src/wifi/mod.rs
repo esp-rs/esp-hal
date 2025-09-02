@@ -18,7 +18,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_hal::{asynch::AtomicWaker, sync::Locked};
+use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
 use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;

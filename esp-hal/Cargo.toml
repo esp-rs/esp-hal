@@ -238,6 +238,7 @@ defmt = [
     "fugit/defmt",
     "esp-riscv-rt?/defmt",
     "xtensa-lx-rt?/defmt",
+    "esp-sync/defmt"
 ]
 
 #! ### PSRAM Feature Flags

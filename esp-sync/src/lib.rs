@@ -46,7 +46,7 @@ impl RestoreState {
     /// # Safety
     ///
     /// The `inner` value must be appropriate for the [RawMutex] implementation that creates it.
-    pub unsafe fn new(inner: u32) -> Self {
+    pub const unsafe fn new(inner: u32) -> Self {
         Self(inner, PhantomData)
     }
 

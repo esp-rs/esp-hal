@@ -16,7 +16,6 @@ test  = false
 
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-critical-section = "1.2.0"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
 enumset = { version = "1.1.6", default-features = false, optional = true }
@@ -41,6 +40,7 @@ procmacros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../es
 xtensa-lx-rt = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
+heapless = "0.9"
 
 # Optional dependencies enabling ecosystem features
 serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
@@ -165,7 +165,7 @@ serde = ["dep:serde", "enumset?/serde"]
 log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt", "heapless/defmt", "esp-sync/defmt"]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

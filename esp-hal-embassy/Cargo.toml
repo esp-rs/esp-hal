@@ -20,9 +20,7 @@ test  = false
 
 [dependencies]
 cfg-if                    = "1.0.0"
-critical-section          = "1.2.0"
 esp-hal                   = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-esp-sync                  = { version = "0.0.0", path = "../esp-sync" }
 portable-atomic           = "1.11.0"
 static_cell               = "2.1.0"
 
@@ -32,6 +30,7 @@ embassy-sync              = { version = "0.7" }
 embassy-time-driver       = { version = "0.2.0", features = [ "tick-hz-1_000_000" ] }
 embassy-time-queue-utils  = { version = "0.1.0", features = ["_generic-queue"] }
 esp-config                = { version = "0.5.0", path = "../esp-config" }
+esp-sync                  = { version = "0.0.0", path = "../esp-sync" }
 macros                    = { version = "0.19.0", features = ["embassy"], package = "esp-hal-procmacros", path = "../esp-hal-procmacros" }
 
 # Optional dependencies that enable ecosystem support.
@@ -40,6 +39,9 @@ embassy-executor          = { version = "0.7.0", features = ["timer-item-payload
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt                     = { version = "1.0.1", optional = true }
 log-04                    = { package = "log", version = "0.4.27", optional = true }
+
+[target.'cfg(target_arch = "riscv32")'.dependencies]
+riscv            = { version = "0.14.0" }
 
 [build-dependencies]
 esp-config   = { version = "0.5.0", path = "../esp-config", features = ["build"] }
