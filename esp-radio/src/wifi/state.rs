@@ -51,13 +51,11 @@ pub(crate) static STA_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::I
 pub(crate) static AP_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 
 /// Get the current state of the AP.
-#[instability::unstable]
 pub fn ap_state() -> WifiState {
     AP_STATE.load(Ordering::Relaxed)
 }
 
 /// Get the current state of the STA.
-#[instability::unstable]
 pub fn sta_state() -> WifiState {
     STA_STATE.load(Ordering::Relaxed)
 }
@@ -93,6 +91,7 @@ pub(crate) fn reset_sta_state() {
 ///
 /// This does not support AP-STA mode. Use one of `sta_state` or
 /// `ap_state` instead.
+#[instability::unstable]
 pub fn wifi_state() -> WifiState {
     use super::WifiMode;
     match WifiMode::current() {
