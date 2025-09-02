@@ -19,6 +19,8 @@ use core::{
 
 use enumset::{EnumSet, EnumSetType};
 use esp_hal::{asynch::AtomicWaker, sync::Locked};
+#[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
+use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;
 use esp_wifi_sys::include::{
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
@@ -54,7 +56,6 @@ use esp_wifi_sys::include::{
     esp_wifi_80211_tx,
     esp_wifi_set_promiscuous,
     esp_wifi_set_promiscuous_rx_cb,
-    wifi_pkt_rx_ctrl_t,
     wifi_promiscuous_pkt_t,
     wifi_promiscuous_pkt_type_t,
 };
@@ -210,7 +211,7 @@ pub enum Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Default)]
