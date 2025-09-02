@@ -512,6 +512,21 @@ pub(crate) struct Handle<'t, T: Sync + Send> {
 }
 
 impl<'t, T: Sync + Send> Handle<'t, T> {
+    pub(crate) fn from_completed_work_item(
+        queue: &'t WorkQueue<T>,
+        work_item: &'t mut WorkItem<T>,
+    ) -> Self {
+        // Don't use `complete` here, we don't need to wake anything, just ensure that the item will
+        // not be put into the queue.
+        work_item.status = Poll::Ready(Status::Completed);
+
+        Self {
+            queue,
+            work_item: NonNull::from(work_item),
+            _marker: PhantomData,
+        }
+    }
+
     fn poll_inner(&mut self) -> Poll {
         unsafe { self.queue.poll(self.work_item) }
     }
@@ -693,4 +708,11 @@ impl<T: Sync + Send> WorkQueueFrontend<T> {
     pub fn post<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
         queue.post_work(&mut self.work_item)
     }
+
+    /// Creates a Handle for a work item that does not need to be put into the queue.
+    pub fn post_completed<'t>(&'t mut self, queue: &'t WorkQueue<T>) -> Handle<'t, T> {
+        Handle::from_completed_work_item(queue, &mut self.work_item)
+    }
 }
+
+// TODO: implement individual algo context wrappers

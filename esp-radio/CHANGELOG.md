@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions (#3963)
 - `EnumSetType` from `Protocol`, `Country` enums (#4017)
+- `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
 
 ## [v0.15.0] - 2025-07-16
 

@@ -1,31 +1,36 @@
 use core::sync::atomic::Ordering;
 
-use portable_atomic_enum::atomic_enum;
+use private::AtomicWifiState;
+pub use private::WifiState;
 
 use super::WifiEvent;
 
-/// Wi-Fi interface state.
-#[atomic_enum]
-#[derive(PartialEq, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum WifiState {
-    /// Station started.
-    StaStarted,
-    /// Station connected.
-    StaConnected,
-    /// Station disconnected.
-    StaDisconnected,
-    /// Station stopped
-    StaStopped,
+mod private {
+    use portable_atomic_enum::atomic_enum;
 
-    /// Access point started.
-    ApStarted,
-    /// Access point stopped.
-    ApStopped,
+    /// Wi-Fi interface state.
+    #[atomic_enum]
+    #[derive(PartialEq, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[non_exhaustive]
+    pub enum WifiState {
+        /// Station started.
+        StaStarted,
+        /// Station connected.
+        StaConnected,
+        /// Station disconnected.
+        StaDisconnected,
+        /// Station stopped
+        StaStopped,
 
-    /// Invalid Wi-Fi state.
-    Invalid,
+        /// Access point started.
+        ApStarted,
+        /// Access point stopped.
+        ApStopped,
+
+        /// Invalid Wi-Fi state.
+        Invalid,
+    }
 }
 
 impl From<WifiEvent> for WifiState {
