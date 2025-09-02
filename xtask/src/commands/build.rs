@@ -147,7 +147,8 @@ pub fn build_examples(
             let example_idx = inquire::Select::new(
                 "Select the example:",
                 examples.iter().map(|ex| ex.binary_name()).collect(),
-            ).prompt()?;
+            )
+            .prompt()?;
 
             if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_idx) {
                 filtered.push(selected);
@@ -165,6 +166,7 @@ pub fn build_examples(
                 args.debug,
                 args.toolchain.as_deref(),
                 args.timings,
+                &[],
             )?;
         }
 
@@ -182,6 +184,7 @@ pub fn build_examples(
                 args.debug,
                 args.toolchain.as_deref(),
                 args.timings,
+                &[],
             )
         })
     }

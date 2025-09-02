@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
-use super::{ExamplesArgs, TestsArgs, DocTestArgs};
+use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
@@ -162,14 +162,16 @@ pub fn run_examples(
             )
             .prompt()?;
 
-            if let Some(selected) = examples.into_iter().find(|ex| ex.binary_name() == example_idx) {
+            if let Some(selected) = examples
+                .into_iter()
+                .find(|ex| ex.binary_name() == example_idx)
+            {
                 filtered.push(selected);
             }
         }
 
         examples = filtered;
     }
-
 
     examples.sort_by_key(|ex| ex.tag());
 
@@ -213,6 +215,7 @@ pub fn run_examples(
                     args.debug,
                     args.toolchain.as_deref(),
                     args.timings,
+                    &[],
                 )
                 .is_err()
             {

@@ -41,6 +41,12 @@
 //! [embedded-hal-async]: embedded_hal_async
 //! [embedded-io-async]: embedded_io_async
 
+/// UHCI wrapper around UART
+// TODO add support for PDMA and multiple UHCI for 32/S2 support
+#[cfg(all(soc_has_uhci0, gdma))]
+#[cfg(feature = "unstable")]
+pub mod uhci;
+
 use core::{marker::PhantomData, sync::atomic::Ordering, task::Poll};
 
 #[cfg(feature = "unstable")]

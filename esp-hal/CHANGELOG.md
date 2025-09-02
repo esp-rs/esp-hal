@@ -20,11 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `aes::{AesBackend, AesContext, dma::AesDmaBackend}`: Work-queue based AES driver (#3880, #3897)
 - `aes::cipher_modes`, `aes::CipherState` for constructing `AesContext`s (#3895)
 - `aes::dma::DmaCipherState` so that `AesDma` can properly support cipher modes that require state (IV, nonce, etc.) (#3897)
+- `uart::Uhci`: for UART with DMA using the UHCI peripheral (#3871, #4008, #4011)
 - Align `I8080` driver pin configurations with latest guidelines (#3997)
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
 - ESP32-S3: Expose more `Camera` config options (#3996)
 - ESP32-S3: Add RtcI2c driver (#0000)
+- `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 
 ### Changed
 
@@ -61,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32, ESP32-S2: Fixed I2C bus clearing algorithm (#3926)
 - Check serial instead of jtag fifo status in UsbSerialJtag's async flush function (#3957)
 - ESP32: Enable up to 4M of PSRAM (#3990)
+- I2C error recovery logic issues (#4000)
 
 ### Removed
 
@@ -68,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AesDma::{write_key, write_block}` have been removed. (#3880, #3882)
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
 - `Xtal::Other` has been removed (#3983)
+- ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

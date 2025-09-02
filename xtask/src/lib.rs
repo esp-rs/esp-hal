@@ -219,11 +219,16 @@ impl Package {
                 if config.contains("bt") {
                     features.push("ble".to_owned());
                 }
+                if config.contains("ieee802154") {
+                    features.push("ieee802154".to_owned());
+                    // allow wifi + 802.15.4
+                    features.push("__docs_build".to_owned());
+                }
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
                 if features.iter().any(|f| {
-                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex"
+                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex" || f == "ieee802154"
                 }) {
                     features.push("unstable".to_owned());
                 }
@@ -371,6 +376,7 @@ pub fn execute_app(
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
+    extra_args: &[&str],
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -446,6 +452,8 @@ pub fn execute_app(
         }
         builder = builder.toolchain(toolchain);
     }
+
+    builder = builder.args(extra_args);
 
     let args = builder.build();
     log::debug!("{args:#?}");

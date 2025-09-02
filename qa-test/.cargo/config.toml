@@ -29,6 +29,11 @@ rustflags = [
 [env]
 ESP_LOG = "info"
 ESP_HAL_EMBASSY_CONFIG_TIMER_QUEUE="multiple-integrated"
+SSID = "SSID"
+PASSWORD = "PASSWORD"
+STATIC_IP = "1.1.1.1 "
+GATEWAY_IP = "1.1.1.1"
+HOST_IP = "1.1.1.1"
 
 [unstable]
 build-std = ["alloc", "core"]
