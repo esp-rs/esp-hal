@@ -1613,7 +1613,6 @@ impl Channel<Async, Rx> {
     }
 }
 
-// #[cfg(any(esp32, esp32s2))]
 #[handler]
 fn async_interrupt_handler() {
     fn on_tx(raw: DynChannelAccess<Tx>) {
