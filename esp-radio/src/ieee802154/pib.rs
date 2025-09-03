@@ -1,6 +1,4 @@
-use core::cell::RefCell;
-
-use critical_section::Mutex;
+use esp_sync::NonReentrantMutex;
 
 use super::hal::{
     set_cca_mode,
@@ -24,8 +22,6 @@ pub(crate) const IEEE802154_FRAME_EXT_ADDR_SIZE: usize = 8;
 
 const IEEE802154_MULTIPAN_0: u8 = 0;
 const IEEE802154_MULTIPAN_MAX: usize = 4;
-
-static PIB: Mutex<RefCell<Option<Pib>>> = Mutex::new(RefCell::new(None));
 
 /// Frame pending mode
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -76,9 +72,27 @@ struct Pib {
     cca_mode: CcaMode,
 }
 
+static PIB: NonReentrantMutex<Pib> = NonReentrantMutex::new(Pib {
+    auto_ack_tx: false,
+    auto_ack_rx: false,
+    enhance_ack_tx: false,
+    coordinator: false,
+    promiscuous: false,
+    rx_when_idle: false,
+    txpower: 0,
+    channel: 0,
+    pending_mode: PendingMode::Disable,
+    multipan_mask: 0,
+    panid: [0u16; 4],
+    short_addr: [0u16; IEEE802154_MULTIPAN_MAX],
+    ext_addr: [[0; IEEE802154_FRAME_EXT_ADDR_SIZE]; IEEE802154_MULTIPAN_MAX],
+    cca_threshold: 0,
+    cca_mode: CcaMode::Carrier,
+});
+
 pub(crate) fn ieee802154_pib_init() {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).replace(Pib {
+    PIB.with(|pib| {
+        *pib = Pib {
             auto_ack_tx: true,
             auto_ack_rx: true,
             enhance_ack_tx: true,
@@ -94,106 +108,75 @@ pub(crate) fn ieee802154_pib_init() {
             ext_addr: [[0xffu8; IEEE802154_FRAME_EXT_ADDR_SIZE]; IEEE802154_MULTIPAN_MAX],
             cca_threshold: CONFIG_IEEE802154_CCA_THRESHOLD,
             cca_mode: CcaMode::Ed,
-        });
+        }
     });
 }
 
 pub(crate) fn ieee802154_pib_set_panid(index: u8, panid: u16) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().panid[index as usize] = panid;
-    });
+    PIB.with(|pib| pib.panid[index as usize] = panid)
 }
 
 pub(crate) fn ieee802154_pib_set_promiscuous(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().promiscuous = enable;
-    });
+    PIB.with(|pib| pib.promiscuous = enable)
 }
 
 pub(crate) fn ieee802154_pib_set_auto_ack_tx(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().auto_ack_tx = enable;
-    });
+    PIB.with(|pib| pib.auto_ack_tx = enable)
 }
 
 pub(crate) fn ieee802154_pib_set_auto_ack_rx(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().auto_ack_rx = enable;
-    });
+    PIB.with(|pib| pib.auto_ack_rx = enable)
 }
 
 pub(crate) fn ieee802154_pib_set_enhance_ack_tx(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().enhance_ack_tx = enable;
-    });
+    PIB.with(|pib| pib.enhance_ack_tx = enable)
 }
 
 pub(crate) fn ieee802154_pib_set_coordinator(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().coordinator = enable;
-    });
+    PIB.with(|pib| pib.coordinator = enable)
 }
 
 pub(crate) fn ieee802154_pib_set_rx_when_idle(enable: bool) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().rx_when_idle = enable;
-    });
+    PIB.with(|pib| pib.rx_when_idle = enable)
 }
 
 pub(crate) fn ieee802154_pib_get_rx_when_idle() -> bool {
-    critical_section::with(|cs| PIB.borrow_ref_mut(cs).as_mut().unwrap().rx_when_idle)
+    PIB.with(|pib| pib.rx_when_idle)
 }
 
 pub(crate) fn ieee802154_pib_set_tx_power(power: i8) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().txpower = power;
-    });
+    PIB.with(|pib| pib.txpower = power)
 }
 
 pub(crate) fn ieee802154_pib_set_channel(channel: u8) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().channel = channel;
-    });
+    PIB.with(|pib| pib.channel = channel)
 }
 
 pub(crate) fn ieee802154_pib_set_pending_mode(mode: PendingMode) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().pending_mode = mode;
-    });
+    PIB.with(|pib| pib.pending_mode = mode)
 }
 
 pub(crate) fn ieee802154_pib_set_short_address(index: u8, address: u16) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().short_addr[index as usize] = address;
-    });
+    PIB.with(|pib| pib.short_addr[index as usize] = address)
 }
 
 pub(crate) fn ieee802154_pib_set_extended_address(
     index: u8,
     address: [u8; IEEE802154_FRAME_EXT_ADDR_SIZE],
 ) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().ext_addr[index as usize] = address;
-    });
+    PIB.with(|pib| pib.ext_addr[index as usize] = address)
 }
 
 pub(crate) fn ieee802154_pib_set_cca_theshold(cca_threshold: i8) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().cca_threshold = cca_threshold;
-    });
+    PIB.with(|pib| pib.cca_threshold = cca_threshold)
 }
 
 pub(crate) fn ieee802154_pib_set_cca_mode(mode: CcaMode) {
-    critical_section::with(|cs| {
-        PIB.borrow_ref_mut(cs).as_mut().unwrap().cca_mode = mode;
-    });
+    PIB.with(|pib| pib.cca_mode = mode)
 }
 
 pub(crate) fn ieee802154_pib_update() {
-    critical_section::with(|cs| {
-        let mut pib = PIB.borrow_ref_mut(cs);
-        let pib = pib.as_mut().unwrap();
-
+    PIB.with(|pib| {
         set_freq(channel_to_freq(pib.channel));
         set_power(ieee802154_txpower_convert(pib.txpower));
 
@@ -210,7 +193,7 @@ pub(crate) fn ieee802154_pib_update() {
         set_coordinator(pib.coordinator);
         set_promiscuous(pib.promiscuous);
         set_pending_mode(pib.pending_mode == PendingMode::Enhanced);
-    });
+    })
 }
 
 fn channel_to_freq(channel: u8) -> u8 {

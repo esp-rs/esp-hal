@@ -109,6 +109,7 @@ use crate::{
     },
     pac::uhci0,
     peripherals,
+    system::{GenericPeripheralGuard, Peripheral},
     uart::{self, TxError, Uart, UartRx, UartTx, uhci::Error::AboveReadLimit},
 };
 
@@ -227,6 +228,8 @@ where
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     pub uhci: UhciInternal<Dm>,
     channel: Channel<Dm, PeripheralDmaChannel<AnyUhci<'d>>>,
+    // TODO: devices with UHCI1 need the non-generic guard
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm> Uhci<'d, Dm>
@@ -309,11 +312,13 @@ where
                 uhci: UhciInternal::new(unsafe { self.uhci.uhci_per.clone_unchecked() }),
                 uart_rx,
                 channel_rx: self.channel.rx,
+                _guard: self._guard.clone(),
             },
             UhciTx {
                 uhci: UhciInternal::new(self.uhci.uhci_per),
                 uart_tx,
                 channel_tx: self.channel.tx,
+                _guard: self._guard.clone(),
             },
         )
     }
@@ -326,6 +331,8 @@ impl<'d> Uhci<'d, Blocking> {
         uhci: peripherals::UHCI0<'static>,
         channel: impl DmaChannelFor<AnyUhci<'d>>,
     ) -> Self {
+        let guard = GenericPeripheralGuard::new();
+
         let channel = Channel::new(channel.degrade());
         channel.runtime_ensure_compatible(&uhci);
 
@@ -333,6 +340,7 @@ impl<'d> Uhci<'d, Blocking> {
             uart,
             uhci: UhciInternal::new(uhci.into()),
             channel,
+            _guard: guard,
         };
 
         uhci.init();
@@ -345,6 +353,7 @@ impl<'d> Uhci<'d, Blocking> {
             uart: self.uart.into_async(),
             uhci: self.uhci.into_async(),
             channel: self.channel.into_async(),
+            _guard: self._guard,
         }
     }
 }
@@ -356,6 +365,7 @@ impl<'d> Uhci<'d, Async> {
             uart: self.uart.into_blocking(),
             uhci: self.uhci.into_blocking(),
             channel: self.channel.into_blocking(),
+            _guard: self._guard,
         }
     }
 }

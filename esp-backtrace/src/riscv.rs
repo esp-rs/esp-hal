@@ -1,5 +1,8 @@
 use core::arch::asm;
 
+#[cfg(feature = "panic-handler")]
+pub(crate) use riscv::interrupt::free as interrupt_free;
+
 use crate::{Backtrace, BacktraceFrame};
 
 // subtract 4 from the return address

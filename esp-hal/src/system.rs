@@ -1,8 +1,6 @@
 //! # System Control
 
-use core::cell::RefCell;
-
-use critical_section::{CriticalSection, Mutex};
+use esp_sync::NonReentrantMutex;
 
 use crate::peripherals::SYSTEM;
 
@@ -120,6 +118,9 @@ pub enum Peripheral {
     /// Temperature sensor peripheral.
     #[cfg(soc_has_tsens)]
     Tsens,
+    /// UHCI0
+    #[cfg(soc_has_uhci0)]
+    Uhci0,
 }
 
 impl Peripheral {
@@ -207,6 +208,8 @@ impl Peripheral {
         Self::Systimer,
         #[cfg(soc_has_tsens)]
         Self::Tsens,
+        #[cfg(soc_has_uhci0)]
+        Self::Uhci0,
     ];
 }
 
@@ -220,8 +223,20 @@ impl Peripheral {
     }
 }
 
-static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
-    Mutex::new(RefCell::new([0; Peripheral::COUNT]));
+struct RefCounts {
+    counts: [usize; Peripheral::COUNT],
+}
+
+impl RefCounts {
+    pub const fn new() -> Self {
+        Self {
+            counts: [0; Peripheral::COUNT],
+        }
+    }
+}
+
+static PERIPHERAL_REF_COUNT: NonReentrantMutex<RefCounts> =
+    NonReentrantMutex::new(RefCounts::new());
 
 /// Disable all peripherals.
 ///
@@ -229,12 +244,12 @@ static PERIPHERAL_REF_COUNT: Mutex<RefCell<[usize; Peripheral::COUNT]>> =
 #[cfg_attr(not(feature = "rt"), expect(dead_code))]
 pub(crate) fn disable_peripherals() {
     // Take the critical section up front to avoid taking it multiple times.
-    critical_section::with(|cs| {
+    PERIPHERAL_REF_COUNT.with(|refcounts| {
         for p in Peripheral::ALL {
             if Peripheral::KEEP_ENABLED.contains(p) {
                 continue;
             }
-            PeripheralClockControl::enable_forced_with_cs(*p, false, true, cs);
+            PeripheralClockControl::enable_forced_with_counts(*p, false, true, refcounts);
         }
     })
 }
@@ -273,22 +288,22 @@ impl Drop for PeripheralGuard {
 pub(crate) struct GenericPeripheralGuard<const P: u8> {}
 
 impl<const P: u8> GenericPeripheralGuard<P> {
-    pub(crate) fn new_with(init: fn(CriticalSection<'_>)) -> Self {
+    pub(crate) fn new_with(init: fn()) -> Self {
         let peripheral = unwrap!(Peripheral::try_from(P));
-        critical_section::with(|cs| {
-            if !Peripheral::KEEP_ENABLED.contains(&peripheral)
-                && PeripheralClockControl::enable_with_cs(peripheral, cs)
-            {
-                PeripheralClockControl::reset(peripheral);
-                init(cs);
-            }
-        });
+        if !Peripheral::KEEP_ENABLED.contains(&peripheral) {
+            PERIPHERAL_REF_COUNT.with(|ref_counts| {
+                if PeripheralClockControl::enable_with_counts(peripheral, ref_counts) {
+                    unsafe { PeripheralClockControl::reset_racey(peripheral) };
+                    init();
+                }
+            });
+        }
 
         Self {}
     }
 
     pub(crate) fn new() -> Self {
-        Self::new_with(|_| {})
+        Self::new_with(|| {})
     }
 }
 
@@ -316,7 +331,7 @@ pub(crate) struct PeripheralClockControl;
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 impl PeripheralClockControl {
-    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
+    unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
         debug!("Enable {:?} {}", peripheral, enable);
 
         let system = SYSTEM::regs();
@@ -475,21 +490,17 @@ impl PeripheralClockControl {
             Peripheral::Tsens => {
                 perip_clk_en1.modify(|_, w| w.tsens_clk_en().bit(enable));
             }
+            #[cfg(soc_has_uhci0)]
+            Peripheral::Uhci0 => {
+                perip_clk_en0.modify(|_, w| w.uhci0_clk_en().bit(enable));
+            }
         }
-    }
-
-    /// Resets the given peripheral
-    pub(crate) fn reset(peripheral: Peripheral) {
-        debug!("Reset {:?}", peripheral);
-
-        assert_peri_reset(peripheral, true);
-        assert_peri_reset(peripheral, false);
     }
 }
 
 #[cfg(any(esp32c6, esp32h2))]
 impl PeripheralClockControl {
-    fn enable_internal(peripheral: Peripheral, enable: bool, _cs: CriticalSection<'_>) {
+    unsafe fn enable_internal_racey(peripheral: Peripheral, enable: bool) {
         debug!("Enable {:?} {}", peripheral, enable);
         let system = SYSTEM::regs();
 
@@ -652,21 +663,19 @@ impl PeripheralClockControl {
                     w.tsens_clk_sel().bit(enable)
                 });
             }
+            #[cfg(soc_has_uhci0)]
+            Peripheral::Uhci0 => {
+                system
+                    .uhci_conf()
+                    .modify(|_, w| w.uhci_clk_en().bit(enable));
+            }
         }
-    }
-
-    /// Resets the given peripheral
-    pub(crate) fn reset(peripheral: Peripheral) {
-        debug!("Reset {:?}", peripheral);
-
-        assert_peri_reset(peripheral, true);
-        assert_peri_reset(peripheral, false);
     }
 }
 
 #[cfg(not(any(esp32c6, esp32h2)))]
 /// Resets the given peripheral
-pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
+unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
     let system = SYSTEM::regs();
 
     #[cfg(esp32)]
@@ -677,7 +686,7 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
     #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
     let perip_rst_en1 = system.perip_rst_en1();
 
-    critical_section::with(|_cs| match peripheral {
+    match peripheral {
         #[cfg(soc_has_spi2)]
         Peripheral::Spi2 => {
             perip_rst_en0.modify(|_, w| w.spi2_rst().bit(reset));
@@ -826,12 +835,20 @@ pub(crate) fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
                 }
             }
         }
-    });
+        #[cfg(soc_has_uhci0)]
+        Peripheral::Uhci0 => {
+            perip_rst_en0.modify(|_, w| w.uhci0_rst().bit(reset));
+        }
+    }
 }
 
 #[cfg(any(esp32c6, esp32h2))]
-fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
+unsafe fn assert_peri_reset_racey(peripheral: Peripheral, reset: bool) {
     let system = SYSTEM::regs();
+
+    // No need to lock, different peripherals' bits are in separate registers. In theory this may
+    // race with accessing the clk_enable bits, but the peripheral singleton pattern, as well as the
+    // general usage patterns of this code should prevent that.
 
     match peripheral {
         #[cfg(soc_has_spi2)]
@@ -958,6 +975,10 @@ fn assert_peri_reset(peripheral: Peripheral, reset: bool) {
                 .tsens_clk_conf()
                 .modify(|_, w| w.tsens_rst_en().bit(reset));
         }
+        #[cfg(soc_has_uhci0)]
+        Peripheral::Uhci0 => {
+            system.uhci_conf().modify(|_, w| w.uhci_rst_en().bit(reset));
+        }
     }
 }
 
@@ -969,7 +990,7 @@ impl PeripheralClockControl {
     ///
     /// Returns `true` if it actually enabled the peripheral.
     pub(crate) fn enable(peripheral: Peripheral) -> bool {
-        Self::enable_forced(peripheral, true, false)
+        PERIPHERAL_REF_COUNT.with(|ref_counts| Self::enable_with_counts(peripheral, ref_counts))
     }
 
     /// Enables the given peripheral.
@@ -978,8 +999,8 @@ impl PeripheralClockControl {
     /// is only enabled with the first call attempt to enable it.
     ///
     /// Returns `true` if it actually enabled the peripheral.
-    pub(crate) fn enable_with_cs(peripheral: Peripheral, cs: CriticalSection<'_>) -> bool {
-        Self::enable_forced_with_cs(peripheral, true, false, cs)
+    fn enable_with_counts(peripheral: Peripheral, ref_counts: &mut RefCounts) -> bool {
+        Self::enable_forced_with_counts(peripheral, true, false, ref_counts)
     }
 
     /// Disables the given peripheral.
@@ -991,21 +1012,18 @@ impl PeripheralClockControl {
     ///
     /// Before disabling a peripheral it will also get reset
     pub(crate) fn disable(peripheral: Peripheral) -> bool {
-        Self::enable_forced(peripheral, false, false)
+        PERIPHERAL_REF_COUNT.with(|ref_counts| {
+            Self::enable_forced_with_counts(peripheral, false, false, ref_counts)
+        })
     }
 
-    pub(crate) fn enable_forced(peripheral: Peripheral, enable: bool, force: bool) -> bool {
-        critical_section::with(|cs| Self::enable_forced_with_cs(peripheral, enable, force, cs))
-    }
-
-    pub(crate) fn enable_forced_with_cs(
+    fn enable_forced_with_counts(
         peripheral: Peripheral,
         enable: bool,
         force: bool,
-        cs: CriticalSection<'_>,
+        ref_counts: &mut RefCounts,
     ) -> bool {
-        let mut ref_counts = PERIPHERAL_REF_COUNT.borrow_ref_mut(cs);
-        let ref_count = &mut ref_counts[peripheral as usize];
+        let ref_count = &mut ref_counts.counts[peripheral as usize];
         if !force {
             let prev = *ref_count;
             if enable {
@@ -1027,12 +1045,27 @@ impl PeripheralClockControl {
         }
 
         if !enable {
-            Self::reset(peripheral);
+            unsafe { Self::reset_racey(peripheral) };
         }
 
-        Self::enable_internal(peripheral, enable, cs);
+        unsafe { Self::enable_internal_racey(peripheral, enable) };
 
         true
+    }
+
+    /// Resets the given peripheral
+    pub(crate) unsafe fn reset_racey(peripheral: Peripheral) {
+        debug!("Reset {:?}", peripheral);
+
+        unsafe {
+            assert_peri_reset_racey(peripheral, true);
+            assert_peri_reset_racey(peripheral, false);
+        }
+    }
+
+    /// Resets the given peripheral
+    pub(crate) fn reset(peripheral: Peripheral) {
+        PERIPHERAL_REF_COUNT.with(|_| unsafe { Self::reset_racey(peripheral) })
     }
 }
 

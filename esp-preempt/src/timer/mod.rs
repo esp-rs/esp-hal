@@ -3,15 +3,13 @@
 mod arch_specific;
 
 pub(crate) use arch_specific::*;
-use esp_hal::{
-    interrupt::{InterruptHandler, Priority},
-    sync::Locked,
-};
+use esp_hal::interrupt::{InterruptHandler, Priority};
+use esp_sync::NonReentrantMutex;
 
 use crate::TimeBase;
 
 /// The timer responsible for time slicing.
-pub(crate) static TIMER: Locked<Option<TimeBase>> = Locked::new(None);
+pub(crate) static TIMER: NonReentrantMutex<Option<TimeBase>> = NonReentrantMutex::new(None);
 
 pub(crate) fn initialized() -> bool {
     TIMER.with(|timer| timer.is_some())

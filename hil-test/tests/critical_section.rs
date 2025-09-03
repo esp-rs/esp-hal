@@ -14,8 +14,9 @@ use esp_hal::{
         software::{SoftwareInterrupt, SoftwareInterruptControl},
     },
     peripherals::Peripherals,
-    sync::{Locked, RawPriorityLimitedMutex},
+    sync::RawPriorityLimitedMutex,
 };
+use esp_sync::NonReentrantMutex;
 use hil_test as _;
 use portable_atomic::{AtomicU32, Ordering};
 
@@ -62,8 +63,8 @@ mod tests {
     }
 
     #[test]
-    fn locked_can_provide_mutable_access() {
-        let flag = Locked::new(false);
+    fn non_reentrant_mutex_can_provide_mutable_access() {
+        let flag = NonReentrantMutex::new(false);
 
         flag.with(|f| {
             *f = true;
@@ -75,8 +76,8 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn locked_is_not_reentrant() {
-        let flag = Locked::new(false);
+    fn non_reentrant_mutex_is_not_reentrant() {
+        let flag = NonReentrantMutex::new(false);
 
         flag.with(|_f| {
             flag.with(|f| {

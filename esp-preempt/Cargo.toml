@@ -30,6 +30,7 @@ allocator-api2 = { version = "0.3.0", default-features = false, features = ["all
 document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
+esp-sync = { version = "0.0.0", path = "../esp-sync" }
 esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-driver" }
 portable-atomic = { version = "1.11.0", default-features = false }
 
