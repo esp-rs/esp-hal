@@ -7,7 +7,7 @@ use esp_wifi_sys::include::{
     wpa_crypto_funcs_t,
 };
 
-use super::os_adapter::*;
+use super::os_adapter::{self, *};
 use crate::common_adapter::*;
 
 #[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
@@ -120,8 +120,8 @@ static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _dport_access_stall_other_cpu_end_wrap: Some(dport_access_stall_other_cpu_end_wrap),
     _wifi_apb80m_request: Some(wifi_apb80m_request),
     _wifi_apb80m_release: Some(wifi_apb80m_release),
-    _phy_disable: Some(phy_disable),
-    _phy_enable: Some(phy_enable),
+    _phy_disable: Some(os_adapter::phy_disable),
+    _phy_enable: Some(os_adapter::phy_enable),
     _phy_update_country_info: Some(phy_update_country_info),
     _read_mac: Some(read_mac),
     _timer_arm: Some(ets_timer_arm),

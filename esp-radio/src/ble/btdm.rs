@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
+use esp_sync::RawMutex;
 use esp_wifi_sys::c_types::{c_char, c_void};
 use portable_atomic::{AtomicBool, Ordering};
 
@@ -74,10 +75,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
         data: Box::from(data),
     };
 
-    critical_section::with(|cs| {
-        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        queue.push_back(packet);
-    });
+    super::BT_STATE.with(|state| state.rx_queue.push_back(packet));
 
     super::dump_packet_info(data);
 
@@ -86,35 +84,35 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-type InterruptsFlagType = u32;
+// This is fine, we're only accessing it inside a critical section (protected by INTERRUPT_LOCK).
+static mut G_INTER_FLAGS: heapless::Vec<esp_sync::RestoreState, 10> = heapless::Vec::new();
 
-static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
-
-static mut INTERRUPT_DISABLE_CNT: usize = 0;
+static INTERRUPT_LOCK: RawMutex = RawMutex::new();
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
+    #[allow(static_mut_refs)]
     unsafe {
-        INTERRUPT_DISABLE_CNT -= 1;
-        let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
-        trace!("interrupt_enable {}", flags);
-        critical_section::release(core::mem::transmute::<
-            InterruptsFlagType,
-            critical_section::RestoreState,
-        >(flags));
+        let flags = unwrap!(
+            G_INTER_FLAGS.pop(),
+            "interrupt_enable called without prior interrupt_disable"
+        );
+        trace!("interrupt_enable {:?}", flags);
+        INTERRUPT_LOCK.release(flags);
     }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
+    #[allow(static_mut_refs)]
     unsafe {
-        let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
-            critical_section::acquire(),
+        let flags = INTERRUPT_LOCK.acquire();
+        unwrap!(
+            G_INTER_FLAGS.push(flags),
+            "interrupt_disable was called too many times"
         );
-        G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
-        INTERRUPT_DISABLE_CNT += 1;
-        trace!("interrupt_disable {}", flags);
+        trace!("interrupt_disable {:?}", flags);
     }
 }
 
@@ -430,7 +428,7 @@ pub(crate) fn ble_init() {
         #[cfg(coex)]
         crate::binary::include::coex_enable();
 
-        crate::common_adapter::chip_specific::phy_enable();
+        crate::common_adapter::phy_enable();
 
         #[cfg(esp32)]
         {
@@ -465,7 +463,7 @@ pub(crate) fn ble_deinit() {
 
     unsafe {
         btdm_controller_deinit();
-        crate::common_adapter::chip_specific::phy_disable();
+        crate::common_adapter::phy_disable();
     }
 }
 /// Sends HCI data to the BLE controller.

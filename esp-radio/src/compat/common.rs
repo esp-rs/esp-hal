@@ -9,13 +9,14 @@ use core::{
 };
 
 use esp_hal::time::{Duration, Instant};
+use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::malloc::free;
 use crate::{
     CONFIG,
+    ESP_RADIO_LOCK,
     binary::c_types::{c_int, c_void},
-    hal::sync::Locked,
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
 };
@@ -30,13 +31,13 @@ struct Mutex {
 }
 
 pub(crate) struct ConcurrentQueue {
-    raw_queue: Locked<RawQueue>,
+    raw_queue: NonReentrantMutex<RawQueue>,
 }
 
 impl ConcurrentQueue {
     pub(crate) fn new(count: usize, item_size: usize) -> Self {
         Self {
-            raw_queue: Locked::new(RawQueue::new(count, item_size)),
+            raw_queue: NonReentrantMutex::new(RawQueue::new(count, item_size)),
         }
     }
 
@@ -215,8 +216,7 @@ pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
     let sem = semphr as *mut u32;
 
     'outer: loop {
-        let res = critical_section::with(|_| unsafe {
-            memory_fence();
+        let res = ESP_RADIO_LOCK.lock(|| unsafe {
             let cnt = *sem;
             if cnt > 0 {
                 *sem = cnt - 1;
@@ -246,7 +246,7 @@ pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
     trace!("semphr_give {:?}", semphr);
     let sem = semphr as *mut u32;
 
-    critical_section::with(|_| unsafe {
+    ESP_RADIO_LOCK.lock(|| unsafe {
         let cnt = *sem;
         *sem = cnt + 1;
         1
@@ -290,7 +290,7 @@ pub(crate) fn lock_mutex(mutex: *mut c_void) -> i32 {
     let current_task = current_task() as usize;
 
     loop {
-        let mutex_locked = critical_section::with(|_| unsafe {
+        let mutex_locked = ESP_RADIO_LOCK.lock(|| unsafe {
             if (*ptr).count == 0 {
                 (*ptr).locking_pid = current_task;
                 (*ptr).count += 1;
@@ -302,7 +302,6 @@ pub(crate) fn lock_mutex(mutex: *mut c_void) -> i32 {
                 false
             }
         });
-        memory_fence();
 
         if mutex_locked {
             return 1;
@@ -315,11 +314,10 @@ pub(crate) fn lock_mutex(mutex: *mut c_void) -> i32 {
 pub(crate) fn unlock_mutex(mutex: *mut c_void) -> i32 {
     trace!("mutex_unlock {:?}", mutex);
 
-    let ptr = mutex as *mut Mutex;
-    critical_section::with(|_| unsafe {
-        memory_fence();
-        if (*ptr).count > 0 {
-            (*ptr).count -= 1;
+    let mutex = unsafe { &mut *(mutex as *mut Mutex) };
+    ESP_RADIO_LOCK.lock(|| unsafe {
+        if mutex.count > 0 {
+            mutex.count -= 1;
             1
         } else {
             0

@@ -1,5 +1,8 @@
 use core::arch::asm;
 
+#[cfg(feature = "panic-handler")]
+pub(crate) use xtensa_lx::interrupt::free as interrupt_free;
+
 use crate::{Backtrace, BacktraceFrame};
 
 // subtract 3 from the return address

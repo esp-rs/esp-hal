@@ -47,13 +47,16 @@
 
 use core::{cell::Cell, marker::PhantomData};
 
+#[cfg(any(bt, ieee802154, wifi))]
+use esp_sync::RawMutex;
+
 #[cfg(bt)]
 use crate::peripherals::BT;
 #[cfg(all(feature = "unstable", ieee802154))]
 use crate::peripherals::IEEE802154;
 #[cfg(wifi)]
 use crate::peripherals::WIFI;
-use crate::{private::Sealed, rtc_cntl::RtcClock, time::Rate};
+use crate::{ESP_HAL_LOCK, private::Sealed, rtc_cntl::RtcClock, time::Rate};
 
 #[cfg_attr(esp32, path = "clocks_ll/esp32.rs")]
 #[cfg_attr(esp32c2, path = "clocks_ll/esp32c2.rs")]
@@ -330,7 +333,7 @@ static mut ACTIVE_CLOCKS: Option<Clocks> = None;
 
 impl Clocks {
     pub(crate) fn init(cpu_clock_speed: CpuClock) {
-        critical_section::with(|_| {
+        ESP_HAL_LOCK.lock(|| {
             crate::rtc_cntl::rtc::init();
 
             let config = Self::configure(cpu_clock_speed);
@@ -610,13 +613,12 @@ impl Clocks {
 
 #[cfg(any(bt, ieee802154, wifi))]
 /// Tracks the number of references to the PHY clock.
-static PHY_CLOCK_REF_COUNTER: critical_section::Mutex<Cell<u8>> =
-    critical_section::Mutex::new(Cell::new(0));
+static PHY_CLOCK_REF_COUNTER: embassy_sync::blocking_mutex::Mutex<RawMutex, Cell<u8>> =
+    embassy_sync::blocking_mutex::Mutex::new(Cell::new(0));
 
 #[cfg(any(bt, ieee802154, wifi))]
 fn increase_phy_clock_ref_count_internal() {
-    critical_section::with(|cs| {
-        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTER.borrow(cs);
+    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
         let phy_clock_ref_count = phy_clock_ref_counter.get();
 
         if phy_clock_ref_count == 0 {
@@ -624,14 +626,12 @@ fn increase_phy_clock_ref_count_internal() {
         }
 
         phy_clock_ref_counter.set(phy_clock_ref_count + 1);
-    });
+    })
 }
 
 #[cfg(any(bt, ieee802154, wifi))]
 fn decrease_phy_clock_ref_count_internal() {
-    critical_section::with(|cs| {
-        let phy_clock_ref_counter = PHY_CLOCK_REF_COUNTER.borrow(cs);
-
+    PHY_CLOCK_REF_COUNTER.lock(|phy_clock_ref_counter| {
         let new_phy_clock_ref_count = unwrap!(
             phy_clock_ref_counter.get().checked_sub(1),
             "PHY clock ref count underflowed. Either you forgot a PhyClockGuard, or used ModemClockController::decrease_phy_clock_ref_count incorrectly."
@@ -641,7 +641,7 @@ fn decrease_phy_clock_ref_count_internal() {
             clocks_ll::enable_phy(false);
         }
         phy_clock_ref_counter.set(new_phy_clock_ref_count);
-    });
+    })
 }
 
 #[inline]

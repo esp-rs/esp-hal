@@ -7,9 +7,10 @@
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
-use core::{cell::RefCell, ptr::addr_of_mut};
+use core::ptr::addr_of_mut;
 
 use enumset::EnumSet;
+use esp_sync::{NonReentrantMutex, RawMutex};
 
 use super::WifiEvent;
 use crate::{
@@ -29,11 +30,7 @@ use crate::{
         },
         malloc::calloc_internal,
     },
-    hal::{
-        clock::ModemClockController,
-        peripherals::WIFI,
-        sync::{Locked, RawMutex},
-    },
+    hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
     preempt::yield_task,
 };
@@ -44,8 +41,8 @@ static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
-pub(crate) static WIFI_EVENTS: Locked<RefCell<EnumSet<WifiEvent>>> =
-    Locked::new(RefCell::new(enumset::enum_set!()));
+pub(crate) static WIFI_EVENTS: NonReentrantMutex<EnumSet<WifiEvent>> =
+    NonReentrantMutex::new(enumset::enum_set!());
 
 /// **************************************************************************
 /// Name: wifi_env_is_chip
@@ -223,7 +220,7 @@ pub unsafe extern "C" fn wifi_int_disable(
     trace!("wifi_int_disable");
     // TODO: can we use wifi_int_mux?
     let token = unsafe { WIFI_LOCK.acquire() };
-    unsafe { core::mem::transmute::<esp_hal::sync::RestoreState, u32>(token) }
+    unsafe { core::mem::transmute::<esp_sync::RestoreState, u32>(token) }
 }
 
 /// **************************************************************************
@@ -246,7 +243,7 @@ pub unsafe extern "C" fn wifi_int_restore(
     tmp: u32,
 ) {
     trace!("wifi_int_restore");
-    let token = unsafe { core::mem::transmute::<u32, esp_hal::sync::RestoreState>(tmp) };
+    let token = unsafe { core::mem::transmute::<u32, esp_sync::RestoreState>(tmp) };
     unsafe { WIFI_LOCK.release(token) }
 }
 
@@ -871,7 +868,7 @@ pub unsafe extern "C" fn event_post(
     let event = unwrap!(WifiEvent::from_i32(event_id));
     trace!("EVENT: {:?}", event);
 
-    WIFI_EVENTS.with(|events| events.borrow_mut().insert(event));
+    WIFI_EVENTS.with(|events| events.insert(event));
     let handled =
         unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
 
@@ -988,9 +985,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
 
-    unsafe {
-        crate::common_adapter::chip_specific::phy_disable();
-    }
+    unsafe { crate::common_adapter::phy_disable() }
 }
 
 /// **************************************************************************
@@ -1010,9 +1005,7 @@ pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
 
-    unsafe {
-        crate::common_adapter::chip_specific::phy_enable();
-    }
+    unsafe { crate::common_adapter::phy_enable() }
 }
 
 /// **************************************************************************

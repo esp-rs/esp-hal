@@ -248,9 +248,10 @@ esp-alloc          = { path = "../esp-alloc", optional = true }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-preempt = { path = "../esp-preempt", optional = true }
+esp-preempt        = { path = "../esp-preempt", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
-esp-radio           = { path = "../esp-radio", optional = true }
+esp-sync           = { path = "../esp-sync" }
+esp-radio          = { path = "../esp-radio", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }

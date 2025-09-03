@@ -15,8 +15,7 @@
 use core::{future::poll_fn, marker::PhantomData, ptr::NonNull, task::Context};
 
 use embassy_sync::waitqueue::WakerRegistration;
-
-use crate::sync::Locked;
+use esp_sync::NonReentrantMutex;
 
 /// Queue driver operations.
 ///
@@ -79,6 +78,9 @@ struct Inner<T: Sync + Send> {
     // time).
     suspend_waker: WakerRegistration,
 }
+
+unsafe impl<T: Sync + Send> Send for Inner<T> {}
+unsafe impl<T: Sync + Send> Sync for Inner<T> {}
 
 impl<T: Sync + Send> Inner<T> {
     /// Places a work item at the end of the queue.
@@ -337,14 +339,14 @@ impl<T: Sync + Send> Inner<T> {
 
 /// A generic work queue.
 pub(crate) struct WorkQueue<T: Sync + Send> {
-    inner: Locked<Inner<T>>,
+    inner: NonReentrantMutex<Inner<T>>,
 }
 
 impl<T: Sync + Send> WorkQueue<T> {
     /// Creates a new `WorkQueue`.
     pub const fn new() -> Self {
         Self {
-            inner: Locked::new(Inner {
+            inner: NonReentrantMutex::new(Inner {
                 head: None,
                 tail: None,
                 current: None,

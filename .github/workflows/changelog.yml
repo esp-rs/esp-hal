@@ -46,6 +46,8 @@ jobs:
               - 'esp-lp-hal/**'
             esp-metadata:
               - 'esp-metadata/**'
+            esp-preempt:
+              - 'esp-preempt/**'
             esp-println:
               - 'esp-println/**'
             esp-riscv-rt:
@@ -56,6 +58,8 @@ jobs:
               - 'esp-storage/**'
             esp-radio:
               - 'esp-radio/**'
+            esp-sync:
+              - 'esp-sync/**'
             xtensa-lx:
               - 'xtensa-lx/**'
             xtensa-lx-rt:
@@ -133,6 +137,14 @@ jobs:
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-lp-hal/CHANGELOG.md file."
 
+      - name: Check that changelog updated (esp-preempt)
+        if: steps.changes.outputs.esp-preempt == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-preempt/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-preempt/CHANGELOG.md file."
+
       - name: Check that changelog updated (esp-println)
         if: steps.changes.outputs.esp-println == 'true'
         uses: dangoslen/changelog-enforcer@v3
@@ -164,6 +176,14 @@ jobs:
           changeLogPath: esp-radio/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-radio/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-sync)
+        if: steps.changes.outputs.esp-sync == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-sync/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-sync/CHANGELOG.md file."
 
       - name: Check that changelog updated (xtensa-lx)
         if: steps.changes.outputs.xtensa-lx == 'true'

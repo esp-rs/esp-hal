@@ -116,6 +116,7 @@ pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
+use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
@@ -182,6 +183,8 @@ pub(crate) mod common_adapter;
 pub mod tasks;
 
 pub(crate) mod memory_fence;
+
+pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context

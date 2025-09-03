@@ -619,13 +619,14 @@ unsafe extern "C" fn ble_npl_get_time_forever() -> u32 {
 unsafe extern "C" fn ble_npl_hw_exit_critical(mask: u32) {
     trace!("ble_npl_hw_exit_critical {}", mask);
     unsafe {
-        critical_section::release(transmute::<u32, critical_section::RestoreState>(mask));
+        let token = esp_sync::RestoreState::new(mask);
+        crate::ESP_RADIO_LOCK.release(token);
     }
 }
 
 unsafe extern "C" fn ble_npl_hw_enter_critical() -> u32 {
     trace!("ble_npl_hw_enter_critical");
-    unsafe { transmute::<critical_section::RestoreState, u32>(critical_section::acquire()) }
+    unsafe { crate::ESP_RADIO_LOCK.acquire().inner() }
 }
 
 unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {
@@ -1152,7 +1153,7 @@ pub(crate) fn ble_init() {
             os_msys_init();
         }
 
-        crate::common_adapter::chip_specific::phy_enable();
+        crate::common_adapter::phy_enable();
 
         // init bb
         bt_bb_v2_init_cmplx(1);
@@ -1275,7 +1276,7 @@ pub(crate) fn ble_deinit() {
 
         npl::esp_unregister_ext_funcs();
 
-        crate::common_adapter::chip_specific::phy_disable();
+        crate::common_adapter::phy_disable();
     }
 }
 
@@ -1349,8 +1350,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
     let payload = unsafe { core::slice::from_raw_parts(cmd.offset(2), len) };
     trace!("$ pld = {:?}", payload);
 
-    critical_section::with(|cs| {
-        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+    super::BT_STATE.with(|state| {
         let mut data = [0u8; 256];
 
         data[0] = 0x04; // this is an event
@@ -1358,7 +1358,7 @@ unsafe extern "C" fn ble_hs_hci_rx_evt(cmd: *const u8, arg: *const c_void) -> i3
         data[2] = len as u8;
         data[3..][..len].copy_from_slice(payload);
 
-        queue.push_back(ReceivedPacket {
+        state.rx_queue.push_back(ReceivedPacket {
             data: Box::from(&data[..len + 3]),
         });
 
@@ -1381,14 +1381,13 @@ unsafe extern "C" fn ble_hs_rx_data(om: *const OsMbuf, arg: *const c_void) -> i3
     let len = unsafe { (*om).om_len };
     let data_slice = unsafe { core::slice::from_raw_parts(data_ptr, len as usize) };
 
-    critical_section::with(|cs| {
-        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
+    super::BT_STATE.with(|state| {
         let mut data = [0u8; 256];
 
         data[0] = 0x02; // ACL
         data[1..][..data_slice.len()].copy_from_slice(data_slice);
 
-        queue.push_back(ReceivedPacket {
+        state.rx_queue.push_back(ReceivedPacket {
             data: Box::from(&data[..data_slice.len() + 1]),
         });
 
@@ -1419,7 +1418,7 @@ pub fn send_hci(data: &[u8]) {
 
             dump_packet_info(packet);
 
-            critical_section::with(|_cs| {
+            super::BT_STATE.with(|_state| {
                 if packet[0] == DATA_TYPE_COMMAND {
                     let cmd = r_ble_hci_trans_buf_alloc(BLE_HCI_TRANS_BUF_CMD);
                     core::ptr::copy_nonoverlapping(
