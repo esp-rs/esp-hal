@@ -75,7 +75,6 @@ pub use state::*;
 use crate::{
     Controller,
     common_adapter::*,
-    config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
     wifi::private::PacketBuffer,
@@ -212,10 +211,9 @@ pub enum Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
     /// No secondary channel (default).
@@ -332,6 +330,8 @@ pub struct AccessPointConfig {
 
     /// The maximum number of connections allowed on the access point.
     max_connections: u16,
+    /// Dtim period of the access point (Range: 1 ~ 10).
+    dtim_period: u8,
 }
 
 impl AccessPointConfig {
@@ -341,6 +341,10 @@ impl AccessPointConfig {
         }
 
         if self.password.len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if !(1..=10).contains(&self.dtim_period) {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -359,6 +363,7 @@ impl Default for AccessPointConfig {
             auth_method: AuthMethod::None,
             password: String::new(),
             max_connections: 255,
+            dtim_period: 2,
         }
     }
 }
@@ -434,7 +439,6 @@ pub struct ClientConfig {
     /// The BSSID (MAC address) of the client.
     bssid: Option<[u8; 6]>,
 
-    // pub protocol: Protocol,
     /// The authentication method for the Wi-Fi connection.
     auth_method: AuthMethod,
 
@@ -733,7 +737,7 @@ pub enum Capability {
 
     /// The device can operate in both client and access point modes
     /// simultaneously.
-    Mixed,
+    ApSta,
 }
 
 /// Configuration of Wi-Fi operation mode.
@@ -754,7 +758,7 @@ pub enum Config {
     AccessPoint(AccessPointConfig),
 
     /// Simultaneous client and access point configuration.
-    Mixed(ClientConfig, AccessPointConfig),
+    ApSta(ClientConfig, AccessPointConfig),
 
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
@@ -770,7 +774,7 @@ impl Config {
             Config::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            Config::Mixed(client_configuration, access_point_configuration) => {
+            Config::ApSta(client_configuration, access_point_configuration) => {
                 client_configuration.validate()?;
                 access_point_configuration.validate()
             }
@@ -783,7 +787,7 @@ impl Config {
     pub fn as_client_conf_ref(&self) -> Option<&ClientConfig> {
         match self {
             Self::Client(client_conf) => Some(client_conf),
-            Self::Mixed(client_conf, _) => Some(client_conf),
+            Self::ApSta(client_conf, _) => Some(client_conf),
             _ => None,
         }
     }
@@ -792,7 +796,7 @@ impl Config {
     pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfig> {
         match self {
             Self::AccessPoint(ap_conf) => Some(ap_conf),
-            Self::Mixed(_, ap_conf) => Some(ap_conf),
+            Self::ApSta(_, ap_conf) => Some(ap_conf),
             _ => None,
         }
     }
@@ -802,10 +806,10 @@ impl Config {
     pub fn as_client_conf_mut(&mut self) -> &mut ClientConfig {
         match self {
             Self::Client(client_conf) => client_conf,
-            Self::Mixed(_, _) => {
+            Self::ApSta(_, _) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
-                    Self::Mixed(client_conf, _) => {
+                    Self::ApSta(client_conf, _) => {
                         *self = Self::Client(client_conf);
                         self.as_client_conf_mut()
                     }
@@ -824,10 +828,10 @@ impl Config {
     pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfig {
         match self {
             Self::AccessPoint(ap_conf) => ap_conf,
-            Self::Mixed(_, _) => {
+            Self::ApSta(_, _) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
-                    Self::Mixed(_, ap_conf) => {
+                    Self::ApSta(_, ap_conf) => {
                         *self = Self::AccessPoint(ap_conf);
                         self.as_ap_conf_mut()
                     }
@@ -845,12 +849,12 @@ impl Config {
     /// and `AccessPointConfig`.
     pub fn as_mixed_conf_mut(&mut self) -> (&mut ClientConfig, &mut AccessPointConfig) {
         match self {
-            Self::Mixed(client_conf, ap_conf) => (client_conf, ap_conf),
+            Self::ApSta(client_conf, ap_conf) => (client_conf, ap_conf),
             Self::AccessPoint(_) => {
                 let prev = mem::replace(self, Self::None);
                 match prev {
                     Self::AccessPoint(ap_conf) => {
-                        *self = Self::Mixed(Default::default(), ap_conf);
+                        *self = Self::ApSta(Default::default(), ap_conf);
                         self.as_mixed_conf_mut()
                     }
                     _ => unreachable!(),
@@ -860,14 +864,14 @@ impl Config {
                 let prev = mem::replace(self, Self::None);
                 match prev {
                     Self::Client(client_conf) => {
-                        *self = Self::Mixed(client_conf, Default::default());
+                        *self = Self::ApSta(client_conf, Default::default());
                         self.as_mixed_conf_mut()
                     }
                     _ => unreachable!(),
                 }
             }
             _ => {
-                *self = Self::Mixed(Default::default(), Default::default());
+                *self = Self::ApSta(Default::default(), Default::default());
                 self.as_mixed_conf_mut()
             }
         }
@@ -958,7 +962,7 @@ impl TryFrom<&Config> for WifiMode {
             Config::None => return Err(WifiError::UnknownWifiMode),
             Config::AccessPoint(_) => Self::Ap,
             Config::Client(_) => Self::Sta,
-            Config::Mixed(_, _) => Self::ApSta,
+            Config::ApSta(_, _) => Self::ApSta,
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(_) => Self::Sta,
         };
@@ -1673,30 +1677,31 @@ impl ScanTypeConfig {
 
 /// Scan configuration
 #[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
+#[non_exhaustive]
 pub struct ScanConfig<'a> {
     /// SSID to filter for.
     /// If [`None`] is passed, all SSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given SSID will be
     /// returned.
-    pub ssid: Option<&'a str>,
+    ssid: Option<&'a str>,
     /// BSSID to filter for.
     /// If [`None`] is passed, all BSSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given BSSID will be
     /// returned.
-    pub bssid: Option<[u8; 6]>,
+    bssid: Option<[u8; 6]>,
     /// Channel to filter for.
     /// If [`None`] is passed, all channels will be returned.
     /// If [`Some`] is passed, only the APs on the given channel will be
     /// returned.
-    pub channel: Option<u8>,
+    channel: Option<u8>,
     /// Whether to show hidden networks.
-    pub show_hidden: bool,
+    show_hidden: bool,
     /// Scan type, active or passive.
-    pub scan_type: ScanTypeConfig,
+    scan_type: ScanTypeConfig,
     /// The maximum number of networks to return when scanning.
     /// If [`None`] is passed, all networks will be returned.
     /// If [`Some`] is passed, the specified number of networks will be returned.
-    pub max: Option<usize>,
+    max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(
@@ -2388,7 +2393,7 @@ fn apply_ap_config(config: &AccessPointConfig) -> Result<(), WifiError> {
             },
             sae_pwe_h2e: 0,
             csa_count: 3,
-            dtim_period: 2,
+            dtim_period: config.dtim_period,
         },
     };
 
@@ -2689,6 +2694,30 @@ pub(crate) mod embassy {
     }
 }
 
+/// Power saving mode settings for the modem.
+#[non_exhaustive]
+#[derive(Default)]
+pub enum PowerSaveMode {
+    /// No power saving.
+    #[default]
+    None,
+    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM period.
+    Minimum,
+    /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
+    /// `ESP_RADIO_CONFIG_LISTEN_INTERVAL` config option.
+    Maximum,
+}
+
+impl From<PowerSaveMode> for esp_wifi_sys::include::wifi_ps_type_t {
+    fn from(s: PowerSaveMode) -> Self {
+        match s {
+            PowerSaveMode::None => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_NONE,
+            PowerSaveMode::Minimum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM,
+            PowerSaveMode::Maximum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
+        }
+    }
+}
+
 pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
     esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
     Ok(())
@@ -2959,7 +2988,7 @@ impl WifiController<'_> {
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
         let caps =
-            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::Mixed };
+            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::ApSta };
 
         Ok(caps)
     }
@@ -2980,7 +3009,7 @@ impl WifiController<'_> {
             Config::None => wifi_mode_t_WIFI_MODE_NULL,
             Config::Client(_) => wifi_mode_t_WIFI_MODE_STA,
             Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            Config::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            Config::ApSta(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
         };
@@ -2991,7 +3020,7 @@ impl WifiController<'_> {
             Config::None => Ok::<(), WifiError>(()),
             Config::Client(config) => apply_sta_config(config),
             Config::AccessPoint(config) => apply_ap_config(config),
-            Config::Mixed(sta_config, ap_config) => {
+            Config::ApSta(sta_config, ap_config) => {
                 apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
             }
             #[cfg(feature = "wifi-eap")]
