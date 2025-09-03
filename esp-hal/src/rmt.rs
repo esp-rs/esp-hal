@@ -2161,12 +2161,21 @@ mod chip_specific {
         for ch_idx in ChannelIndex::iter_all() {
             let raw_tx = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
             let raw_rx = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+            let ch_idx = ch_idx as u8;
 
-            let channel = if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
-                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
+            let channel = if st.ch_tx_end(ch_idx).bit() || st.ch_tx_err(ch_idx).bit() {
+                raw_tx.unlisten_tx_interrupt(EnumSet::all());
                 raw_tx.channel()
-            } else if st.ch_rx_end(ch_idx as u8).bit() || st.ch_rx_err(ch_idx as u8).bit() {
-                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
+            } else if st.ch_tx_thr_event(ch_idx).bit() {
+                // RmtTxFuture will enable the interrupt again if required.
+                raw_tx.unlisten_tx_interrupt(Event::Threshold);
+                raw_tx.channel()
+            } else if st.ch_rx_end(ch_idx).bit() || st.ch_rx_err(ch_idx).bit() {
+                raw_rx.unlisten_rx_interrupt(EnumSet::all());
+                raw_rx.channel()
+            } else if st.ch_rx_thr_event(ch_idx).bit() {
+                // RmtRxFuture will enable the interrupt again if required.
+                raw_rx.unlisten_rx_interrupt(Event::Threshold);
                 raw_rx.channel()
             } else {
                 continue;
@@ -2582,16 +2591,19 @@ mod chip_specific {
         for ch_idx in ChannelIndex::iter_all() {
             let raw_tx = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
             let raw_rx = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+            let ch_idx = ch_idx as u8;
 
-            if st.ch_tx_end(ch_idx as u8).bit() {
-                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
-            } else if st.ch_rx_end(ch_idx as u8).bit() {
-                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
-            } else if st.ch_err(ch_idx as u8).bit() {
+            if st.ch_tx_end(ch_idx).bit() {
+                raw_tx.unlisten_tx_interrupt(EnumSet::all());
+            } else if st.ch_rx_end(ch_idx).bit() {
+                raw_rx.unlisten_rx_interrupt(EnumSet::all());
+            } else if st.ch_err(ch_idx).bit() {
                 // On error interrupts, don't bother whether the channel is in Rx or Tx mode, just
                 // unlisten all interrupts and wake.
-                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
-                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
+                raw_tx.unlisten_tx_interrupt(EnumSet::all());
+                raw_rx.unlisten_rx_interrupt(EnumSet::all());
+            } else if st.ch_tx_thr_event(ch_idx).bit() {
+                raw_tx.unlisten_tx_interrupt(Event::Threshold);
             } else {
                 continue;
             }
