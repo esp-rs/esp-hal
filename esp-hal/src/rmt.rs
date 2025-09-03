@@ -1055,6 +1055,12 @@ where
     _guard: DropState,
 }
 
+/// Per-channel size of the RMT hardware buffer (number of `PulseCode`s).
+pub const CHANNEL_RAM_SIZE: usize = property!("rmt.channel_ram_size");
+
+/// Whether the channel supports wrapping rx (wrapping tx is supported on all devices)
+pub const HAS_RX_WRAP: bool = property!("rmt.has_rx_wrap");
+
 impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
