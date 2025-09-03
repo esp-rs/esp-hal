@@ -998,6 +998,23 @@ where
     _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
 }
 
+impl<Dm, Dir> Channel<'_, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    /// Get the size of this channel's hardware buffer (number of `PulseCode`s).
+    pub fn buffer_size(&self) -> usize {
+        self.raw.memsize().codes()
+    }
+
+    // FIXME: Use property!("rmt_has_rx_wrap")
+    /// Return whether the channel supports wrapping rx/tx.
+    pub const fn supports_wrap(&self) -> bool {
+        DynChannelAccess::<Dir>::supports_wrap()
+    }
+}
+
 impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
@@ -2158,6 +2175,10 @@ mod chip_specific {
                     .modify(|_, w| unsafe { w.mem_size().bits(blocks) });
             }
         }
+
+        pub const fn supports_wrap() -> bool {
+            true
+        }
     }
 
     impl DynChannelAccess<Tx> {
@@ -2560,6 +2581,10 @@ mod chip_specific {
             let rmt = crate::peripherals::RMT::regs();
             rmt.chconf0(self.ch_idx as usize)
                 .modify(|_, w| unsafe { w.mem_size().bits(value.blocks()) });
+        }
+
+        pub const fn supports_wrap() -> bool {
+            Dir::IS_TX
         }
     }
 
