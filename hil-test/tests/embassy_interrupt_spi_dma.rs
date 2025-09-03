@@ -300,7 +300,6 @@ mod test {
         let cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let mut _cpu_control = cpu_control;
 
-        #[allow(static_mut_refs)]
         let _guard = _cpu_control
             .start_app_core(app_core_stack, cpu1_fnctn)
             .unwrap();
