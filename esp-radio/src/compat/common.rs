@@ -12,7 +12,7 @@ use esp_hal::time::{Duration, Instant};
 use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
-use super::malloc::free;
+use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
     CONFIG,
     ESP_RADIO_LOCK,
@@ -20,8 +20,6 @@ use crate::{
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
 };
-
-pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;
 
 #[derive(Clone, Copy, Debug)]
 struct Mutex {
@@ -178,84 +176,11 @@ pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
     }
 }
 
-pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
-    unsafe {
-        let ptr = malloc(4) as *mut u32;
-        ptr.write_volatile(init);
-
-        trace!("sem created res = {:?}", ptr);
-        ptr.cast()
-    }
-}
-
-pub(crate) fn sem_delete(semphr: *mut c_void) {
-    trace!(">>> sem delete");
-
-    unsafe {
-        free(semphr.cast());
-    }
-}
-
-pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
-    // This shouldn't normally happen if we always report the correct state from
-    // `is_in_isr`. This is a last resort if the driver calls this anyways.
-    // (I haven't observed this to happen)
-    let tick = if tick == OSI_FUNCS_TIME_BLOCKING && crate::is_interrupts_disabled() {
-        warn!("blocking sem_take probably called from an ISR - return early");
-        1
-    } else {
-        tick
-    };
-
-    trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
-
-    let forever = tick == OSI_FUNCS_TIME_BLOCKING;
-    let timeout = tick as u64;
-    let start = crate::time::systimer_count();
-
-    let sem = semphr as *mut u32;
-
-    'outer: loop {
-        let res = ESP_RADIO_LOCK.lock(|| unsafe {
-            let cnt = *sem;
-            if cnt > 0 {
-                *sem = cnt - 1;
-                1
-            } else {
-                0
-            }
-        });
-
-        if res == 1 {
-            trace!(">>>> return from semphr_take");
-            return 1;
-        }
-
-        if !forever && crate::time::elapsed_time_since(start) > timeout {
-            break 'outer;
-        }
-
-        yield_task();
-    }
-
-    trace!(">>>> return from semphr_take with timeout");
-    0
-}
-
-pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
-    trace!("semphr_give {:?}", semphr);
-    let sem = semphr as *mut u32;
-
-    ESP_RADIO_LOCK.lock(|| unsafe {
-        let cnt = *sem;
-        *sem = cnt + 1;
-        1
-    })
-}
-
 pub(crate) fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
     crate::preempt::current_task_thread_semaphore()
+        .as_ptr()
+        .cast::<c_void>()
 }
 
 pub(crate) fn create_recursive_mutex() -> *mut c_void {

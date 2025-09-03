@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{
     c_types::c_char,
@@ -12,8 +14,11 @@ use esp_wifi_sys::{
 use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
-    binary::include::{esp_event_base_t, esp_timer_get_time},
-    compat::common::*,
+    binary::{
+        c_types::c_void,
+        include::{esp_event_base_t, esp_timer_get_time},
+    },
+    compat::{common::*, semaphore::*},
     hal::{self, clock::ModemClockController, ram},
 };
 
@@ -75,7 +80,7 @@ static CAL_DATA: esp_sync::NonReentrantMutex<
 ///
 /// *************************************************************************
 #[allow(unused)]
-pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut c_void {
     trace!("semphr_create - max {} init {}", max, init);
     sem_create(max, init)
 }
@@ -94,7 +99,7 @@ pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut crate::binar
 ///
 /// *************************************************************************
 #[allow(unused)]
-pub unsafe extern "C" fn semphr_delete(semphr: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn semphr_delete(semphr: *mut c_void) {
     trace!("semphr_delete {:?}", semphr);
     sem_delete(semphr);
 }
@@ -114,11 +119,18 @@ pub unsafe extern "C" fn semphr_delete(semphr: *mut crate::binary::c_types::c_vo
 ///
 /// *************************************************************************
 #[ram]
-pub unsafe extern "C" fn semphr_take(
-    semphr: *mut crate::binary::c_types::c_void,
-    tick: u32,
-) -> i32 {
+pub unsafe extern "C" fn semphr_take(semphr: *mut c_void, tick: u32) -> i32 {
+    trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
     sem_take(semphr, tick)
+}
+
+#[ram]
+pub unsafe extern "C" fn semphr_take_from_isr(
+    semphr: *mut c_void,
+    higher_priority_task_waken: *mut bool,
+) -> i32 {
+    trace!(">>>> semphr_take_from_isr {:?}", semphr);
+    sem_take_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -135,8 +147,18 @@ pub unsafe extern "C" fn semphr_take(
 ///
 /// *************************************************************************
 #[ram]
-pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void) -> i32 {
+pub unsafe extern "C" fn semphr_give(semphr: *mut c_void) -> i32 {
+    trace!(">>>> semphr_give {:?}", semphr);
     sem_give(semphr)
+}
+
+#[ram]
+pub unsafe extern "C" fn semphr_give_from_isr(
+    semphr: *mut c_void,
+    higher_priority_task_waken: *mut bool,
+) -> i32 {
+    trace!(">>>> semphr_give_from_isr {:?}", semphr);
+    sem_give_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -212,26 +234,6 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
     0
 }
 
-#[allow(unused)]
-#[ram]
-pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *const ()) -> i32 {
-    trace!("sem take from isr");
-    unsafe {
-        (hptw as *mut u32).write_volatile(0);
-        crate::common_adapter::semphr_take(sem as *mut crate::binary::c_types::c_void, 0)
-    }
-}
-
-#[allow(unused)]
-#[ram]
-pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *const ()) -> i32 {
-    trace!("sem give from isr");
-    unsafe {
-        (hptw as *mut u32).write_volatile(0);
-        crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void)
-    }
-}
-
 // other functions
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn puts(s: *const c_char) {
@@ -246,48 +248,37 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 static mut __ESP_RADIO_WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn ets_timer_disarm(timer: *mut c_void) {
     crate::compat::timer_compat::compat_timer_disarm(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn ets_timer_done(timer: *mut c_void) {
     crate::compat::timer_compat::compat_timer_done(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_setfn(
-    ptimer: *mut crate::binary::c_types::c_void,
-    pfunction: *mut crate::binary::c_types::c_void,
-    parg: *mut crate::binary::c_types::c_void,
+    ptimer: *mut c_void,
+    pfunction: *mut c_void,
+    parg: *mut c_void,
 ) {
     unsafe {
         crate::compat::timer_compat::compat_timer_setfn(
             ptimer.cast(),
-            core::mem::transmute::<
-                *mut crate::binary::c_types::c_void,
-                unsafe extern "C" fn(*mut crate::binary::c_types::c_void),
-            >(pfunction),
+            core::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut c_void)>(pfunction),
             parg,
         );
     }
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm(
-    timer: *mut crate::binary::c_types::c_void,
-    tmout: u32,
-    repeat: bool,
-) {
+pub unsafe extern "C" fn ets_timer_arm(timer: *mut c_void, tmout: u32, repeat: bool) {
     crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm_us(
-    timer: *mut crate::binary::c_types::c_void,
-    tmout: u32,
-    repeat: bool,
-) {
+pub unsafe extern "C" fn ets_timer_arm_us(timer: *mut c_void, tmout: u32, repeat: bool) {
     crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), tmout, repeat);
 }
 
