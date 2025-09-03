@@ -225,9 +225,9 @@ use crate::{
 };
 
 mod reader;
-use reader::RmtReader;
+use reader::{ReaderState, RmtReader};
 mod writer;
-use writer::RmtWriter;
+use writer::{RmtWriter, WriterState};
 
 /// Errors
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -528,7 +528,7 @@ pub struct Rx;
 /// A trait implemented by the `Rx` and `Tx` marker structs.
 ///
 /// For internal use by the driver.
-pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed {
+pub trait Direction: Copy + Clone + core::fmt::Debug + crate::private::Sealed + Unpin {
     #[doc(hidden)]
     const IS_TX: bool;
 }
@@ -1429,7 +1429,10 @@ where
         let raw = self.channel.raw;
 
         let status = raw.get_rx_status();
-        if status == Some(Event::End) {
+
+        // This must only be run once, even if poll_internal is called repeatedly after the
+        // receiver finished!
+        if self.reader.state == ReaderState::Active && status == Some(Event::End) {
             // Do not clear the interrupt flags here: Subsequent calls of wait() must
             // be able to observe them if this is currently called via poll()
             raw.stop_rx();
@@ -1504,10 +1507,12 @@ impl Channel<Blocking, Rx> {
 }
 
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
+
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 struct RmtTxFuture<'a> {
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<&'a mut Channel<Async, Tx>>,
+    writer: RmtWriter,
 }
 
 impl core::future::Future for RmtTxFuture<'_> {
@@ -1515,9 +1520,16 @@ impl core::future::Future for RmtTxFuture<'_> {
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let this = self.get_mut();
+        let raw = this.raw;
 
-        match self.raw.get_tx_status() {
+        if let WriterState::Error(err) = this.writer.state {
+            return Poll::Ready(Err(err));
+        }
+
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match raw.get_tx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
             Some(Event::End) => Poll::Ready(Ok(())),
             _ => Poll::Pending,
@@ -1531,7 +1543,7 @@ impl Channel<Async, Tx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn transmit<T>(&mut self, mut data: &[T]) -> Result<(), Error>
+    pub fn transmit<T>(&mut self, mut data: &[T]) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
         T: Into<PulseCode> + Copy,
@@ -1539,47 +1551,77 @@ impl Channel<Async, Tx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
+        let mut writer = RmtWriter::new(memsize);
+
         match data.last() {
-            None => return Err(Error::InvalidArgument),
+            None => {
+                writer.state = WriterState::Error(Error::InvalidArgument);
+            }
             Some(&code) if code.into().is_end_marker() => (),
-            Some(_) => return Err(Error::EndMarkerMissing),
+            Some(_) => {
+                writer.state = WriterState::Error(Error::EndMarkerMissing);
+            }
         }
 
         if data.len() > memsize.codes() {
-            return Err(Error::InvalidDataLength);
+            writer.state = WriterState::Error(Error::InvalidDataLength);
         }
 
-        let mut writer = RmtWriter::new(memsize);
-        writer.write(&mut data, raw, true);
+        if !matches!(writer.state, WriterState::Error(_)) {
+            writer.write(&mut data, raw, true);
 
-        raw.clear_tx_interrupts();
-        raw.listen_tx_interrupt(Event::End | Event::Error);
-        raw.start_send(false, 0, memsize);
+            raw.clear_tx_interrupts();
+            raw.listen_tx_interrupt(Event::End | Event::Error);
+            raw.start_send(false, 0, memsize);
+        }
 
-        (RmtTxFuture {
+        RmtTxFuture {
             raw,
             _phantom: PhantomData,
-        })
-        .await
+            writer,
+        }
     }
 }
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtRxFuture<'a> {
+struct RmtRxFuture<'a, T>
+where
+    T: From<PulseCode> + Unpin,
+{
     raw: DynChannelAccess<Rx>,
     _phantom: PhantomData<&'a mut Channel<Async, Rx>>,
+    reader: RmtReader,
+    data: &'a mut [T],
 }
 
-impl core::future::Future for RmtRxFuture<'_> {
+impl<T> core::future::Future for RmtRxFuture<'_, T>
+where
+    T: From<PulseCode> + Unpin,
+{
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        WAKER[self.raw.channel() as usize].register(ctx.waker());
+        let this = self.get_mut();
+        let raw = this.raw;
 
-        match self.raw.get_rx_status() {
+        if let ReaderState::Error(err) = this.reader.state {
+            return Poll::Ready(Err(err));
+        }
+
+        WAKER[raw.channel() as usize].register(ctx.waker());
+
+        match raw.get_rx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
+            Some(Event::End) => {
+                raw.stop_rx();
+                raw.clear_rx_interrupts();
+                raw.update();
+
+                this.reader.read(&mut this.data, raw, true);
+
+                Poll::Ready(Ok(()))
+            }
             _ => Poll::Pending,
         }
     }
@@ -1591,39 +1633,30 @@ impl Channel<Async, Rx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub async fn receive<T>(&mut self, mut data: &mut [T]) -> Result<(), Error>
+    pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<(), Error>>
     where
         Self: Sized,
-        T: From<PulseCode>,
+        T: From<PulseCode> + Unpin,
     {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        if data.len() > memsize.codes() {
-            return Err(Error::InvalidDataLength);
-        }
-
         let mut reader = RmtReader::new(memsize);
 
-        raw.clear_rx_interrupts();
-        raw.listen_rx_interrupt(Event::End | Event::Error);
-        raw.start_receive();
+        if data.len() > memsize.codes() {
+            reader.state = ReaderState::Error(Error::InvalidDataLength);
+        } else {
+            raw.clear_rx_interrupts();
+            raw.listen_rx_interrupt(Event::End | Event::Error);
+            raw.start_receive();
+        }
 
-        let result = RmtRxFuture {
+        RmtRxFuture {
             raw,
+            reader,
+            data,
             _phantom: PhantomData,
         }
-        .await;
-
-        if result.is_ok() {
-            raw.stop_rx();
-            raw.clear_rx_interrupts();
-            raw.update();
-
-            reader.read(&mut data, raw, true);
-        }
-
-        result
     }
 }
 
