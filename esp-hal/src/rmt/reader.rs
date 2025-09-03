@@ -17,6 +17,8 @@ pub(crate) struct RmtReader {
     // The position may be invalid if there's no data left.
     offset: u16,
 
+    pub total: usize,
+
     pub state: ReaderState,
 }
 
@@ -25,6 +27,7 @@ impl RmtReader {
         Self {
             memsize,
             offset: 0,
+            total: 0,
             state: ReaderState::Active,
         }
     }
@@ -65,6 +68,7 @@ impl RmtReader {
         // Otherwise, for count != memsize / 2, the new position is invalid but the new slice is
         // empty and we won't use the offset again.
         self.offset = (memsize / 2) as u16 - self.offset;
+        self.total += count;
         data.split_off_mut(..count).unwrap();
 
         if max_count > count {
