@@ -838,8 +838,8 @@ impl<'d> I2s<'d, Blocking> {
         let rx_guard = PeripheralGuard::new(peripheral);
         let tx_guard = PeripheralGuard::new(peripheral);
 
-        i2s.configure(&config)?;
         i2s.set_master();
+        i2s.configure(&config)?;
         i2s.update();
 
         Ok(Self {
@@ -847,11 +847,15 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: unsafe { i2s.clone_unchecked() },
                 rx_channel: channel.rx,
                 guard: rx_guard,
+                #[cfg(any(esp32, esp32s2))]
+                data_format: config.data_format,
             },
             i2s_tx: TxCreator {
                 i2s,
                 tx_channel: channel.tx,
                 guard: tx_guard,
+                #[cfg(any(esp32, esp32s2))]
+                data_format: config.data_format,
             },
         })
     }
@@ -863,11 +867,15 @@ impl<'d> I2s<'d, Blocking> {
                 i2s: self.i2s_rx.i2s,
                 rx_channel: self.i2s_rx.rx_channel.into_async(),
                 guard: self.i2s_rx.guard,
+                #[cfg(any(esp32, esp32s2))]
+                data_format: self.i2s_rx.data_format,
             },
             i2s_tx: TxCreator {
                 i2s: self.i2s_tx.i2s,
                 tx_channel: self.i2s_tx.tx_channel.into_async(),
                 guard: self.i2s_tx.guard,
+                #[cfg(any(esp32, esp32s2))]
+                data_format: self.i2s_tx.data_format,
             },
         }
     }
@@ -899,6 +907,8 @@ where
     tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
     tx_chain: DescriptorChain,
     _guard: PeripheralGuard,
+    #[cfg(any(esp32, esp32s2))]
+    data_format: DataFormat,
 }
 
 impl<Dm> core::fmt::Debug for I2sTx<'_, Dm>
@@ -985,6 +995,17 @@ where
         Ok(())
     }
 
+    /// Change the I2S Tx unit configuration.
+    pub fn apply_config(&mut self, tx_config: &UnitConfig) -> Result<(), ConfigError> {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.i2s.configure_tx(tx_config, self.data_format)
+            } else {
+                self.i2s.configure_tx(tx_config)
+            }
+        }
+    }
+
     /// Writes a slice of data to the I2S peripheral.
     pub fn write_words(&mut self, words: &[impl AcceptedWord]) -> Result<(), Error> {
         self.write(unsafe {
@@ -1029,6 +1050,8 @@ where
     rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
     rx_chain: DescriptorChain,
     _guard: PeripheralGuard,
+    #[cfg(any(esp32, esp32s2))]
+    data_format: DataFormat,
 }
 
 impl<Dm> core::fmt::Debug for I2sRx<'_, Dm>
@@ -1116,6 +1139,17 @@ where
         Ok(())
     }
 
+    /// Change the I2S Rx unit configuration.
+    pub fn apply_config(&mut self, rx_config: &UnitConfig) -> Result<(), ConfigError> {
+        cfg_if::cfg_if! {
+            if #[cfg(any(esp32, esp32s2))] {
+                self.i2s.configure_rx(rx_config, self.data_format)
+            } else {
+                self.i2s.configure_rx(rx_config)
+            }
+        }
+    }
+
     /// Reads a slice of data from the I2S peripheral and stores it in the
     /// provided buffer.
     pub fn read_words(&mut self, words: &mut [impl AcceptedWord]) -> Result<(), Error> {
@@ -1200,6 +1234,8 @@ mod private {
         pub i2s: AnyI2s<'d>,
         pub tx_channel: ChannelTx<Dm, PeripheralTxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
+        #[cfg(any(esp32, esp32s2))]
+        pub(crate) data_format: DataFormat,
     }
 
     impl<'d, Dm> TxCreator<'d, Dm>
@@ -1213,6 +1249,8 @@ mod private {
                 tx_channel: self.tx_channel,
                 tx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
+                #[cfg(any(esp32, esp32s2))]
+                data_format: self.data_format,
             }
         }
 
@@ -1257,6 +1295,8 @@ mod private {
         pub i2s: AnyI2s<'d>,
         pub rx_channel: ChannelRx<Dm, PeripheralRxChannel<AnyI2s<'d>>>,
         pub(crate) guard: PeripheralGuard,
+        #[cfg(any(esp32, esp32s2))]
+        pub(crate) data_format: DataFormat,
     }
 
     impl<'d, Dm> RxCreator<'d, Dm>
@@ -1270,6 +1310,8 @@ mod private {
                 rx_channel: self.rx_channel,
                 rx_chain: DescriptorChain::new(descriptors),
                 _guard: PeripheralGuard::new(peripheral),
+                #[cfg(any(esp32, esp32s2))]
+                data_format: self.data_format,
             }
         }
 
@@ -1390,41 +1432,8 @@ mod private {
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
             config.validate()?;
 
-            let tx_chan_mod = match config.tx_config.channels {
-                Channels::STEREO | Channels::MONO => 0,
-                Channels::LEFT => 3,
-                Channels::RIGHT => 4,
-                _ => unreachable!(),
-            };
-
-            let rx_chan_mod = match config.rx_config.channels {
-                Channels::STEREO => 0,
-                Channels::LEFT | Channels::MONO => 1,
-                Channels::RIGHT => 2,
-                _ => unreachable!(),
-            };
-
-            let tx_fifo_mod = match (
-                config.data_format.data_bits(),
-                config.tx_config.channels == Channels::STEREO,
-            ) {
-                (8 | 16, true) => 0,
-                (8 | 16, false) => 1,
-                (24 | 32, true) => 2,
-                (24 | 32, false) => 3,
-                _ => unreachable!(),
-            };
-
-            let rx_fifo_mod = match (
-                config.data_format.data_bits(),
-                config.rx_config.channels == Channels::STEREO,
-            ) {
-                (8 | 16, true) => 0,
-                (8 | 16, false) => 1,
-                (24 | 32, true) => 2,
-                (24 | 32, false) => 3,
-                _ => unreachable!(),
-            };
+            self.configure_tx(&config.tx_config, config.data_format)?;
+            self.configure_rx(&config.rx_config, config.data_format)?;
 
             self.set_clock(config.calculate_clock());
 
@@ -1438,16 +1447,6 @@ mod private {
             self.regs().conf().modify(|_, w| {
                 w.tx_slave_mod().clear_bit();
                 w.rx_slave_mod().clear_bit();
-                // If the I2S_RX_MSB_SHIFT bit and the I2S_TX_MSB_SHIFT bit of register
-                // I2S_CONF_REG are set to 1, respectively, the I2S module will use the Philips
-                // standard when receiving and transmitting data.
-                w.tx_msb_shift().bit(config.tx_config.msb_shift);
-                w.rx_msb_shift().bit(config.rx_config.msb_shift);
-                // Short frame synchronization
-                w.tx_short_sync()
-                    .bit(config.tx_config.ws_width == WsWidth::Bit);
-                w.rx_short_sync()
-                    .bit(config.rx_config.ws_width == WsWidth::Bit);
                 // Send MSB to the right channel to be consistent with ESP32-S3 et al.
                 w.tx_msb_right().set_bit();
                 w.rx_msb_right().set_bit();
@@ -1462,38 +1461,7 @@ mod private {
                 w.sig_loopback().clear_bit()
             });
 
-            #[cfg(not(esp32))]
-            self.regs().conf().modify(|_, w| {
-                // Channel configurations other than Stereo should use same data from DMA
-                // for both channels
-                w.tx_dma_equal()
-                    .bit(config.tx_config.channels != Channels::STEREO);
-                w.rx_dma_equal()
-                    .bit(config.rx_config.channels != Channels::STEREO);
-                // Byte endianness
-                w.tx_big_endian()
-                    .bit(config.tx_config.endianness == Endianness::BigEndian);
-                w.rx_big_endian()
-                    .bit(config.rx_config.endianness == Endianness::BigEndian)
-            });
-
-            self.regs().fifo_conf().modify(|_, w| unsafe {
-                w.tx_fifo_mod().bits(tx_fifo_mod);
-                w.tx_fifo_mod_force_en().set_bit();
-                w.dscr_en().set_bit();
-                w.rx_fifo_mod().bits(rx_fifo_mod);
-                w.rx_fifo_mod_force_en().set_bit()
-            });
-
-            self.regs().conf_sigle_data().modify(|_, w| unsafe {
-                w.sigle_data()
-                    .bits(config.tx_config.channels.fill.unwrap_or(0))
-            });
-
-            self.regs().conf_chan().modify(|_, w| unsafe {
-                w.tx_chan_mod().bits(tx_chan_mod);
-                w.rx_chan_mod().bits(rx_chan_mod)
-            });
+            self.regs().fifo_conf().modify(|_, w| w.dscr_en().set_bit());
 
             self.regs().conf1().modify(|_, w| {
                 w.tx_pcm_bypass().set_bit();
@@ -1509,6 +1477,110 @@ mod private {
                 w.camera_en().clear_bit();
                 w.lcd_en().clear_bit()
             });
+
+            Ok(())
+        }
+
+        fn configure_tx(
+            &self,
+            config: &UnitConfig,
+            data_format: DataFormat,
+        ) -> Result<(), ConfigError> {
+            config.validate()?;
+
+            let chan_mod = match config.channels {
+                Channels::STEREO | Channels::MONO => 0,
+                Channels::LEFT => 3,
+                Channels::RIGHT => 4,
+                _ => unreachable!(),
+            };
+
+            let fifo_mod = match (data_format.data_bits(), config.channels == Channels::STEREO) {
+                (8 | 16, true) => 0,
+                (8 | 16, false) => 1,
+                (24 | 32, true) => 2,
+                (24 | 32, false) => 3,
+                _ => unreachable!(),
+            };
+
+            self.regs().conf().modify(|_, w| {
+                w.tx_msb_shift().bit(config.msb_shift);
+                // Short frame synchronization
+                w.tx_short_sync().bit(config.ws_width == WsWidth::Bit)
+            });
+
+            #[cfg(not(esp32))]
+            self.regs().conf().modify(|_, w| {
+                // Channel configurations other than Stereo should use same data from DMA
+                // for both channels
+                w.tx_dma_equal().bit(config.channels != Channels::STEREO);
+                // Byte endianness
+                w.tx_big_endian()
+                    .bit(config.endianness == Endianness::BigEndian)
+            });
+
+            self.regs().fifo_conf().modify(|_, w| unsafe {
+                w.tx_fifo_mod().bits(fifo_mod);
+                w.tx_fifo_mod_force_en().set_bit()
+            });
+
+            self.regs()
+                .conf_sigle_data()
+                .modify(|_, w| unsafe { w.sigle_data().bits(config.channels.fill.unwrap_or(0)) });
+
+            self.regs()
+                .conf_chan()
+                .modify(|_, w| unsafe { w.tx_chan_mod().bits(chan_mod) });
+
+            Ok(())
+        }
+
+        fn configure_rx(
+            &self,
+            config: &UnitConfig,
+            data_format: DataFormat,
+        ) -> Result<(), ConfigError> {
+            config.validate()?;
+
+            let chan_mod = match config.channels {
+                Channels::STEREO => 0,
+                Channels::LEFT | Channels::MONO => 1,
+                Channels::RIGHT => 2,
+                _ => unreachable!(),
+            };
+
+            let fifo_mod = match (data_format.data_bits(), config.channels == Channels::STEREO) {
+                (8 | 16, true) => 0,
+                (8 | 16, false) => 1,
+                (24 | 32, true) => 2,
+                (24 | 32, false) => 3,
+                _ => unreachable!(),
+            };
+
+            self.regs().conf().modify(|_, w| {
+                w.rx_msb_shift().bit(config.msb_shift);
+                // Short frame synchronization
+                w.rx_short_sync().bit(config.ws_width == WsWidth::Bit)
+            });
+
+            #[cfg(not(esp32))]
+            self.regs().conf().modify(|_, w| {
+                // Channel configurations other than Stereo should use same data from DMA
+                // for both channels
+                w.rx_dma_equal().bit(config.channels != Channels::STEREO);
+                // Byte endianness
+                w.rx_big_endian()
+                    .bit(config.endianness == Endianness::BigEndian)
+            });
+
+            self.regs().fifo_conf().modify(|_, w| unsafe {
+                w.rx_fifo_mod().bits(fifo_mod);
+                w.rx_fifo_mod_force_en().set_bit()
+            });
+
+            self.regs()
+                .conf_chan()
+                .modify(|_, w| unsafe { w.rx_chan_mod().bits(chan_mod) });
 
             Ok(())
         }
@@ -1795,120 +1867,99 @@ mod private {
         }
 
         fn configure(&self, config: &Config) -> Result<(), ConfigError> {
+            config.validate()?;
+
+            self.configure_tx(&config.tx_config)?;
+            self.configure_rx(&config.rx_config)?;
+
+            Ok(())
+        }
+
+        fn configure_tx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
             use bitfield::Bit;
 
             config.validate()?;
 
-            let tx_ws_width = config.tx_config.calculate_ws_width()?;
-            let rx_ws_width = config.rx_config.calculate_ws_width()?;
-
-            self.set_rx_clock(config.rx_config.calculate_clock());
-            self.set_tx_clock(config.tx_config.calculate_clock());
+            let ws_width = config.calculate_ws_width()?;
+            self.set_tx_clock(config.calculate_clock());
 
             self.regs().tx_conf1().modify(|_, w| unsafe {
+                #[cfg(not(esp32h2))]
+                w.tx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
-                w.tx_tdm_ws_width()
-                    .bits((tx_ws_width - 1).try_into().unwrap());
-                w.tx_bits_mod()
-                    .bits(config.tx_config.data_format.data_bits() - 1);
+                w.tx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
+                w.tx_bits_mod().bits(config.data_format.data_bits() - 1);
                 w.tx_tdm_chan_bits()
-                    .bits(config.tx_config.data_format.channel_bits() - 1);
-                w.tx_half_sample_bits().bits(
-                    (config.tx_config.data_format.data_bits() * config.tx_config.channels.count)
-                        / 2
-                        - 1,
-                )
+                    .bits(config.data_format.channel_bits() - 1);
+                w.tx_half_sample_bits()
+                    .bits((config.data_format.data_bits() * config.channels.count) / 2 - 1)
             });
-            #[cfg(not(esp32h2))]
-            self.regs()
-                .tx_conf1()
-                .modify(|_, w| w.tx_msb_shift().bit(config.tx_config.msb_shift));
-            #[cfg(esp32h2)]
-            self.regs()
-                .tx_conf()
-                .modify(|_, w| w.tx_msb_shift().bit(config.tx_config.msb_shift));
+
             self.regs().tx_conf().modify(|_, w| unsafe {
                 w.tx_mono().clear_bit();
                 w.tx_mono_fst_vld().set_bit();
                 w.tx_stop_en().set_bit();
-                w.tx_chan_equal()
-                    .bit(config.tx_config.channels.fill.is_none());
+                w.tx_chan_equal().bit(config.channels.fill.is_none());
                 w.tx_tdm_en().set_bit();
                 w.tx_pdm_en().clear_bit();
                 w.tx_pcm_bypass().set_bit();
+                #[cfg(esp32h2)]
+                w.tx_msb_shift().bit(config.msb_shift);
                 w.tx_big_endian()
-                    .bit(config.tx_config.endianness == Endianness::BigEndian);
-                w.tx_bit_order()
-                    .bit(config.tx_config.bit_order == BitOrder::LsbFirst);
+                    .bit(config.endianness == Endianness::BigEndian);
+                w.tx_bit_order().bit(config.bit_order == BitOrder::LsbFirst);
                 w.tx_ws_idle_pol()
-                    .bit(config.tx_config.ws_polarity == Polarity::ActiveHigh);
+                    .bit(config.ws_polarity == Polarity::ActiveHigh);
                 w.tx_chan_mod().bits(0)
             });
 
             self.regs().tx_tdm_ctrl().modify(|_, w| unsafe {
-                w.tx_tdm_tot_chan_num()
-                    .bits(config.tx_config.channels.count - 1);
-                w.tx_tdm_chan0_en()
-                    .bit(config.tx_config.channels.mask.bit(0));
-                w.tx_tdm_chan1_en()
-                    .bit(config.tx_config.channels.mask.bit(1));
-                w.tx_tdm_chan2_en()
-                    .bit(config.tx_config.channels.mask.bit(2));
-                w.tx_tdm_chan3_en()
-                    .bit(config.tx_config.channels.mask.bit(3));
-                w.tx_tdm_chan4_en()
-                    .bit(config.tx_config.channels.mask.bit(4));
-                w.tx_tdm_chan5_en()
-                    .bit(config.tx_config.channels.mask.bit(5));
-                w.tx_tdm_chan6_en()
-                    .bit(config.tx_config.channels.mask.bit(6));
-                w.tx_tdm_chan7_en()
-                    .bit(config.tx_config.channels.mask.bit(7));
-                w.tx_tdm_chan8_en()
-                    .bit(config.tx_config.channels.mask.bit(8));
-                w.tx_tdm_chan9_en()
-                    .bit(config.tx_config.channels.mask.bit(9));
-                w.tx_tdm_chan10_en()
-                    .bit(config.tx_config.channels.mask.bit(10));
-                w.tx_tdm_chan11_en()
-                    .bit(config.tx_config.channels.mask.bit(11));
-                w.tx_tdm_chan12_en()
-                    .bit(config.tx_config.channels.mask.bit(12));
-                w.tx_tdm_chan13_en()
-                    .bit(config.tx_config.channels.mask.bit(13));
-                w.tx_tdm_chan14_en()
-                    .bit(config.tx_config.channels.mask.bit(14));
-                w.tx_tdm_chan15_en()
-                    .bit(config.tx_config.channels.mask.bit(15));
+                w.tx_tdm_tot_chan_num().bits(config.channels.count - 1);
+                w.tx_tdm_chan0_en().bit(config.channels.mask.bit(0));
+                w.tx_tdm_chan1_en().bit(config.channels.mask.bit(1));
+                w.tx_tdm_chan2_en().bit(config.channels.mask.bit(2));
+                w.tx_tdm_chan3_en().bit(config.channels.mask.bit(3));
+                w.tx_tdm_chan4_en().bit(config.channels.mask.bit(4));
+                w.tx_tdm_chan5_en().bit(config.channels.mask.bit(5));
+                w.tx_tdm_chan6_en().bit(config.channels.mask.bit(6));
+                w.tx_tdm_chan7_en().bit(config.channels.mask.bit(7));
+                w.tx_tdm_chan8_en().bit(config.channels.mask.bit(8));
+                w.tx_tdm_chan9_en().bit(config.channels.mask.bit(9));
+                w.tx_tdm_chan10_en().bit(config.channels.mask.bit(10));
+                w.tx_tdm_chan11_en().bit(config.channels.mask.bit(11));
+                w.tx_tdm_chan12_en().bit(config.channels.mask.bit(12));
+                w.tx_tdm_chan13_en().bit(config.channels.mask.bit(13));
+                w.tx_tdm_chan14_en().bit(config.channels.mask.bit(14));
+                w.tx_tdm_chan15_en().bit(config.channels.mask.bit(15));
                 w.tx_tdm_skip_msk_en().clear_bit()
             });
 
-            self.regs().conf_sigle_data().modify(|_, w| unsafe {
-                w.single_data()
-                    .bits(config.tx_config.channels.fill.unwrap_or(0))
-            });
+            self.regs()
+                .conf_sigle_data()
+                .modify(|_, w| unsafe { w.single_data().bits(config.channels.fill.unwrap_or(0)) });
+
+            Ok(())
+        }
+
+        fn configure_rx(&self, config: &UnitConfig) -> Result<(), ConfigError> {
+            use bitfield::Bit;
+
+            config.validate()?;
+
+            let ws_width = config.calculate_ws_width()?;
+            self.set_rx_clock(config.calculate_clock());
 
             self.regs().rx_conf1().modify(|_, w| unsafe {
+                #[cfg(not(esp32h2))]
+                w.rx_msb_shift().bit(config.msb_shift);
                 #[allow(clippy::useless_conversion)]
-                w.rx_tdm_ws_width()
-                    .bits((rx_ws_width - 1).try_into().unwrap());
-                w.rx_bits_mod()
-                    .bits(config.rx_config.data_format.data_bits() - 1);
+                w.rx_tdm_ws_width().bits((ws_width - 1).try_into().unwrap());
+                w.rx_bits_mod().bits(config.data_format.data_bits() - 1);
                 w.rx_tdm_chan_bits()
-                    .bits(config.rx_config.data_format.channel_bits() - 1);
-                w.rx_half_sample_bits().bits(
-                    (config.rx_config.data_format.data_bits() * config.rx_config.channels.count)
-                        / 2,
-                )
+                    .bits(config.data_format.channel_bits() - 1);
+                w.rx_half_sample_bits()
+                    .bits((config.data_format.data_bits() * config.channels.count) / 2)
             });
-            #[cfg(not(esp32h2))]
-            self.regs()
-                .rx_conf1()
-                .modify(|_, w| w.rx_msb_shift().bit(config.rx_config.msb_shift));
-            #[cfg(esp32h2)]
-            self.regs()
-                .rx_conf()
-                .modify(|_, w| w.rx_msb_shift().bit(config.rx_config.msb_shift));
 
             self.regs().rx_conf().modify(|_, w| unsafe {
                 w.rx_mono().clear_bit();
@@ -1917,49 +1968,33 @@ mod private {
                 w.rx_tdm_en().set_bit();
                 w.rx_pdm_en().clear_bit();
                 w.rx_pcm_bypass().set_bit();
+                #[cfg(esp32h2)]
+                w.rx_msb_shift().bit(config.msb_shift);
                 w.rx_big_endian()
-                    .bit(config.rx_config.endianness == Endianness::BigEndian);
-                w.rx_bit_order()
-                    .bit(config.rx_config.bit_order == BitOrder::LsbFirst);
+                    .bit(config.endianness == Endianness::BigEndian);
+                w.rx_bit_order().bit(config.bit_order == BitOrder::LsbFirst);
                 w.rx_ws_idle_pol()
-                    .bit(config.rx_config.ws_polarity == Polarity::ActiveHigh)
+                    .bit(config.ws_polarity == Polarity::ActiveHigh)
             });
 
             self.regs().rx_tdm_ctrl().modify(|_, w| unsafe {
-                w.rx_tdm_tot_chan_num()
-                    .bits(config.rx_config.channels.count - 1);
-                w.rx_tdm_pdm_chan0_en()
-                    .bit(config.rx_config.channels.mask.bit(0));
-                w.rx_tdm_pdm_chan1_en()
-                    .bit(config.rx_config.channels.mask.bit(1));
-                w.rx_tdm_pdm_chan2_en()
-                    .bit(config.rx_config.channels.mask.bit(2));
-                w.rx_tdm_pdm_chan3_en()
-                    .bit(config.rx_config.channels.mask.bit(3));
-                w.rx_tdm_pdm_chan4_en()
-                    .bit(config.rx_config.channels.mask.bit(4));
-                w.rx_tdm_pdm_chan5_en()
-                    .bit(config.rx_config.channels.mask.bit(5));
-                w.rx_tdm_pdm_chan6_en()
-                    .bit(config.rx_config.channels.mask.bit(6));
-                w.rx_tdm_pdm_chan7_en()
-                    .bit(config.rx_config.channels.mask.bit(7));
-                w.rx_tdm_chan8_en()
-                    .bit(config.rx_config.channels.mask.bit(8));
-                w.rx_tdm_chan9_en()
-                    .bit(config.rx_config.channels.mask.bit(9));
-                w.rx_tdm_chan10_en()
-                    .bit(config.rx_config.channels.mask.bit(10));
-                w.rx_tdm_chan11_en()
-                    .bit(config.rx_config.channels.mask.bit(11));
-                w.rx_tdm_chan12_en()
-                    .bit(config.rx_config.channels.mask.bit(12));
-                w.rx_tdm_chan13_en()
-                    .bit(config.rx_config.channels.mask.bit(13));
-                w.rx_tdm_chan14_en()
-                    .bit(config.rx_config.channels.mask.bit(14));
-                w.rx_tdm_chan15_en()
-                    .bit(config.rx_config.channels.mask.bit(15))
+                w.rx_tdm_tot_chan_num().bits(config.channels.count - 1);
+                w.rx_tdm_pdm_chan0_en().bit(config.channels.mask.bit(0));
+                w.rx_tdm_pdm_chan1_en().bit(config.channels.mask.bit(1));
+                w.rx_tdm_pdm_chan2_en().bit(config.channels.mask.bit(2));
+                w.rx_tdm_pdm_chan3_en().bit(config.channels.mask.bit(3));
+                w.rx_tdm_pdm_chan4_en().bit(config.channels.mask.bit(4));
+                w.rx_tdm_pdm_chan5_en().bit(config.channels.mask.bit(5));
+                w.rx_tdm_pdm_chan6_en().bit(config.channels.mask.bit(6));
+                w.rx_tdm_pdm_chan7_en().bit(config.channels.mask.bit(7));
+                w.rx_tdm_chan8_en().bit(config.channels.mask.bit(8));
+                w.rx_tdm_chan9_en().bit(config.channels.mask.bit(9));
+                w.rx_tdm_chan10_en().bit(config.channels.mask.bit(10));
+                w.rx_tdm_chan11_en().bit(config.channels.mask.bit(11));
+                w.rx_tdm_chan12_en().bit(config.channels.mask.bit(12));
+                w.rx_tdm_chan13_en().bit(config.channels.mask.bit(13));
+                w.rx_tdm_chan14_en().bit(config.channels.mask.bit(14));
+                w.rx_tdm_chan15_en().bit(config.channels.mask.bit(15))
             });
 
             Ok(())
