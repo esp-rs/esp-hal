@@ -139,10 +139,10 @@
 //!     }
 //!
 //!     match transaction.wait() {
-//!         Ok(channel_res) => {
+//!         Ok((symbol_count, channel_res)) => {
 //!             channel = channel_res;
 //!             let mut total = 0usize;
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..symbol_count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -154,7 +154,7 @@
 //!                 total += entry.length2() as usize;
 //!             }
 //!
-//!             for entry in &data[..data.len()] {
+//!             for entry in &data[..symbol_count] {
 //!                 if entry.length1() == 0 {
 //!                     break;
 //!                 }
@@ -1662,15 +1662,17 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
+    // The return type isn't nice, but the blocking API needs a broader redesign anyway.
+    #[allow(clippy::type_complexity)]
     pub fn wait(
         mut self,
-    ) -> Result<Channel<'ch, Blocking, Rx>, (Error, Channel<'ch, Blocking, Rx>)> {
+    ) -> Result<(usize, Channel<'ch, Blocking, Rx>), (Error, Channel<'ch, Blocking, Rx>)> {
         let raw = self.channel.raw;
 
         let result = loop {
             match self.poll_internal() {
                 Some(Event::Error) => break Err(Error::ReceiverError),
-                Some(Event::End) => break Ok(()),
+                Some(Event::End) => break Ok(self.reader.total),
                 _ => continue,
             }
         };
@@ -1685,7 +1687,7 @@ where
         raw.clear_rx_interrupts();
 
         match result {
-            Ok(()) => Ok(channel),
+            Ok(total) => Ok((total, channel)),
             Err(err) => Err((err, channel)),
         }
     }
@@ -1849,7 +1851,7 @@ impl<T> core::future::Future for RmtRxFuture<'_, T>
 where
     T: From<PulseCode> + Unpin,
 {
-    type Output = Result<(), Error>;
+    type Output = Result<usize, Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     fn poll(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -1867,7 +1869,7 @@ where
             Some(Event::End) => {
                 this.reader.read(&mut this.data, raw, true);
 
-                Poll::Ready(Ok(()))
+                Poll::Ready(Ok(this.reader.total))
             }
             _ => Poll::Pending,
         }
@@ -1894,7 +1896,7 @@ impl Channel<'_, Async, Rx> {
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<(), Error>>
+    pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<usize, Error>>
     where
         Self: Sized,
         T: From<PulseCode> + Unpin,
