@@ -42,9 +42,43 @@ impl RmtReader {
         }
 
         let memsize = self.memsize.codes();
-        let max_count = if final_ { memsize } else { memsize / 2 };
+        let offset = self.offset as usize;
+
+        let max_count = if final_ {
+            // points to the next code that would be written!
+            let hw_offset = raw.hw_offset();
+
+            // self.offset == next code we would read
+            // hw_offset = next code the hardware would write
+            // => If both are the same, we're done, max_count = 0
+            // FIXME: Check that this is also correct if the end marker is in the second field of a
+            // pulse code!
+            let max_count = (if offset <= hw_offset { 0 } else { memsize }) + hw_offset - offset;
+
+            // FIXME: This might not be true when not wrapping and the data exactly fits the
+            // buffer!
+            debug_assert!(
+                max_count == 0 && self.total == 0
+                    || unsafe { raw.channel_ram_start().add(hw_offset - 1).read_volatile() }
+                        .is_end_marker()
+            );
+
+            max_count
+        } else {
+            memsize / 2
+        };
+
+        // defmt::info!(
+        //     "final {}: hw_offset {} -> {}, self.offset {}, max_count {}",
+        //     final_,
+        //     hw_offset,
+        //     code,
+        //     offset,
+        //     max_count
+        // );
+
         let count = data.len().min(max_count);
-        let mut count0 = count.min(memsize - self.offset as usize);
+        let mut count0 = count.min(memsize - offset);
         let mut count1 = count - count0;
 
         // Read in up to 2 chunks to allow wrapping around the buffer end
