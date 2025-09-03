@@ -40,7 +40,7 @@
 //!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-//!     uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
+//!     uhci.uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
 //!         .unwrap();
 //!
 //!     let config = uart::Config::default()
@@ -88,10 +88,23 @@ use core::{
 use embassy_embedded_hal::SetConfig;
 
 use crate::{
-    Async, Blocking, DriverMode,
+    Async,
+    Blocking,
+    DriverMode,
     dma::{
-        AnyGdmaRxChannel, AnyGdmaTxChannel, Channel, ChannelRx, ChannelTx, DmaChannelFor,
-        DmaEligible, DmaError, DmaRxBuffer, DmaTxBuffer, PeripheralDmaChannel,
+        Channel,
+        ChannelRx,
+        ChannelTx,
+        DmaChannelFor,
+        DmaEligible,
+        DmaError,
+        DmaRxBuffer,
+        DmaRxChannel,
+        DmaTxBuffer,
+        DmaTxChannel,
+        PeripheralDmaChannel,
+        PeripheralRxChannel,
+        PeripheralTxChannel,
         asynch::{DmaRxFuture, DmaTxFuture},
     },
     pac::uhci0,
@@ -284,7 +297,12 @@ where
     }
 
     /// Split the Uhci into UhciRx and UhciTx
-    pub fn split(self) -> (UhciRx<'d, Dm>, UhciTx<'d, Dm>) {
+    pub fn split(
+        self,
+    ) -> (
+        UhciRx<'d, Dm, PeripheralRxChannel<AnyUhci<'d>>>,
+        UhciTx<'d, Dm, PeripheralTxChannel<AnyUhci<'d>>>,
+    ) {
         let (uart_rx, uart_tx) = self.uart.split();
         (
             UhciRx {
@@ -363,7 +381,7 @@ where
     phantom: PhantomData<Dm>,
 }
 
-impl<'d, Dm> UhciInternal<Dm>
+impl<Dm> UhciInternal<Dm>
 where
     Dm: DriverMode,
 {
@@ -407,14 +425,14 @@ where
     }
 }
 
-impl<'d> UhciInternal<Async> {
+impl UhciInternal<Async> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_blocking(self) -> UhciInternal<Blocking> {
         UhciInternal::new(self.uhci_per)
     }
 }
 
-impl<'d> UhciInternal<Blocking> {
+impl UhciInternal<Blocking> {
     /// Create a new instance in [crate::Blocking] mode.
     pub fn into_async(self) -> UhciInternal<Async> {
         UhciInternal::new(self.uhci_per)
@@ -422,26 +440,28 @@ impl<'d> UhciInternal<Blocking> {
 }
 
 /// Splitted Uhci structs, Tx part for sending data
-pub struct UhciTx<'d, Dm>
+pub struct UhciTx<'d, Dm, CH>
 where
     Dm: DriverMode,
+    CH: DmaTxChannel,
 {
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     pub uhci: UhciInternal<Dm>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, AnyGdmaTxChannel<'d>>,
+    channel_tx: ChannelTx<Dm, CH>,
 }
 
-impl<'d, Dm> UhciTx<'d, Dm>
+impl<'d, Dm, CH> UhciTx<'d, Dm, CH>
 where
     Dm: DriverMode,
+    CH: DmaTxChannel,
 {
     /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
     pub fn write<Buf: DmaTxBuffer>(
         mut self,
         mut tx_buffer: Buf,
-    ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
+    ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf, CH>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
                 .prepare_transfer(self.uhci.uhci_per.dma_peripheral(), &mut tx_buffer)
@@ -460,26 +480,28 @@ where
 }
 
 /// Splitted Uhci structs, Rx part for receiving data
-pub struct UhciRx<'d, Dm>
+pub struct UhciRx<'d, Dm, CH>
 where
     Dm: DriverMode,
+    CH: DmaRxChannel,
 {
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     pub uhci: UhciInternal<Dm>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, AnyGdmaRxChannel<'d>>,
+    channel_rx: ChannelRx<Dm, CH>,
 }
 
-impl<'d, Dm> UhciRx<'d, Dm>
+impl<'d, Dm, CH> UhciRx<'d, Dm, CH>
 where
     Dm: DriverMode,
+    CH: DmaRxChannel,
 {
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
     pub fn read<Buf: DmaRxBuffer>(
         mut self,
         mut rx_buffer: Buf,
-    ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
+    ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf, CH>, (Error, Self, Buf)> {
         {
             let res = unsafe {
                 self.channel_rx
@@ -503,19 +525,20 @@ where
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-pub struct UhciDmaTxTransfer<'d, Dm, Buf>
+pub struct UhciDmaTxTransfer<'d, Dm, Buf, CH>
 where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
+    CH: DmaTxChannel,
 {
-    uhci: ManuallyDrop<UhciTx<'d, Dm>>,
+    uhci: ManuallyDrop<UhciTx<'d, Dm, CH>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
     saved_err: Result<(), Error>,
 }
 
-impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
-    fn new(uhci: UhciTx<'d, Dm>, dma_buf: Buf) -> Self {
+impl<'d, Buf: DmaTxBuffer, Dm: DriverMode, CH: DmaTxChannel> UhciDmaTxTransfer<'d, Dm, Buf, CH> {
+    fn new(uhci: UhciTx<'d, Dm, CH>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
@@ -530,7 +553,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (UhciTx<'d, Dm>, Buf::Final) {
+    pub fn cancel(mut self) -> (UhciTx<'d, Dm, CH>, Buf::Final) {
         self.uhci.channel_tx.stop_transfer();
 
         let retval = unsafe {
@@ -547,7 +570,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm>, Buf::Final) {
+    pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm, CH>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
                 Err(err),
@@ -582,7 +605,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
     }
 }
 
-impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
+impl<'d, Buf: DmaTxBuffer, CH: DmaTxChannel> UhciDmaTxTransfer<'d, Async, Buf, CH> {
     /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
@@ -603,7 +626,9 @@ impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaTxBuffer> Deref for UhciDmaTxTransfer<'_, Dm, Buf> {
+impl<Dm: DriverMode, Buf: DmaTxBuffer, CH: DmaTxChannel> Deref
+    for UhciDmaTxTransfer<'_, Dm, Buf, CH>
+{
     type Target = Buf::View;
 
     fn deref(&self) -> &Self::Target {
@@ -611,16 +636,19 @@ impl<Dm: DriverMode, Buf: DmaTxBuffer> Deref for UhciDmaTxTransfer<'_, Dm, Buf> 
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaTxBuffer> DerefMut for UhciDmaTxTransfer<'_, Dm, Buf> {
+impl<Dm: DriverMode, Buf: DmaTxBuffer, CH: DmaTxChannel> DerefMut
+    for UhciDmaTxTransfer<'_, Dm, Buf, CH>
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.dma_buf
     }
 }
 
-impl<Dm, Buf> Drop for UhciDmaTxTransfer<'_, Dm, Buf>
+impl<Dm, Buf, CH> Drop for UhciDmaTxTransfer<'_, Dm, Buf, CH>
 where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
+    CH: DmaTxChannel,
 {
     fn drop(&mut self) {
         self.uhci.channel_tx.stop_transfer();
@@ -636,19 +664,20 @@ where
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-pub struct UhciDmaRxTransfer<'d, Dm, Buf>
+pub struct UhciDmaRxTransfer<'d, Dm, Buf, CH>
 where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
+    CH: DmaRxChannel,
 {
-    uhci: ManuallyDrop<UhciRx<'d, Dm>>,
+    uhci: ManuallyDrop<UhciRx<'d, Dm, CH>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
     saved_err: Result<(), Error>,
 }
 
-impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
-    fn new(uhci: UhciRx<'d, Dm>, dma_buf: Buf) -> Self {
+impl<'d, Buf: DmaRxBuffer, Dm: DriverMode, CH: DmaRxChannel> UhciDmaRxTransfer<'d, Dm, Buf, CH> {
+    fn new(uhci: UhciRx<'d, Dm, CH>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
@@ -663,7 +692,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (UhciRx<'d, Dm>, Buf::Final) {
+    pub fn cancel(mut self) -> (UhciRx<'d, Dm, CH>, Buf::Final) {
         self.uhci.channel_rx.stop_transfer();
 
         let retval = unsafe {
@@ -680,7 +709,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm>, Buf::Final) {
+    pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm, CH>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
                 Err(err),
@@ -706,7 +735,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
     }
 }
 
-impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
+impl<'d, Buf: DmaRxBuffer, CH: DmaRxChannel> UhciDmaRxTransfer<'d, Async, Buf, CH> {
     /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel_rx).await;
@@ -719,7 +748,9 @@ impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaRxBuffer> Deref for UhciDmaRxTransfer<'_, Dm, Buf> {
+impl<Dm: DriverMode, Buf: DmaRxBuffer, CH: DmaRxChannel> Deref
+    for UhciDmaRxTransfer<'_, Dm, Buf, CH>
+{
     type Target = Buf::View;
 
     fn deref(&self) -> &Self::Target {
@@ -727,16 +758,19 @@ impl<Dm: DriverMode, Buf: DmaRxBuffer> Deref for UhciDmaRxTransfer<'_, Dm, Buf> 
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaRxBuffer> DerefMut for UhciDmaRxTransfer<'_, Dm, Buf> {
+impl<Dm: DriverMode, Buf: DmaRxBuffer, CH: DmaRxChannel> DerefMut
+    for UhciDmaRxTransfer<'_, Dm, Buf, CH>
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.dma_buf
     }
 }
 
-impl<Dm, Buf> Drop for UhciDmaRxTransfer<'_, Dm, Buf>
+impl<Dm, Buf, CH> Drop for UhciDmaRxTransfer<'_, Dm, Buf, CH>
 where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
+    CH: DmaRxChannel,
 {
     fn drop(&mut self) {
         self.uhci.channel_rx.stop_transfer();

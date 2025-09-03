@@ -6,10 +6,10 @@
 #![no_std]
 #![no_main]
 
-use esp_hal::peripherals::Peripherals;
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
+    peripherals::Peripherals,
     uart::{self, Uart, uhci::Uhci},
 };
 
