@@ -14,7 +14,6 @@ use esp_wifi_sys::{c_types::c_char, include::malloc};
 
 use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
-    CONFIG,
     ESP_RADIO_LOCK,
     binary::c_types::{c_int, c_void},
     memory_fence::memory_fence,

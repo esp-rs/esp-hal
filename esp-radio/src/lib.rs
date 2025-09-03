@@ -54,7 +54,7 @@
 //!
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 //!
-//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default.
+//! By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default.
 //!
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
@@ -113,7 +113,6 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
-use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
 use esp_sync::RawMutex;
@@ -202,57 +201,6 @@ const _: () = {
     };
 };
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-/// Tunable parameters for the Wi-Fi driver
-#[allow(unused)] // currently there are no ble tunables
-pub(crate) struct Config {
-    pub(crate) rx_queue_size: usize,
-    pub(crate) tx_queue_size: usize,
-    pub(crate) static_rx_buf_num: usize,
-    pub(crate) dynamic_rx_buf_num: usize,
-    pub(crate) static_tx_buf_num: usize,
-    pub(crate) dynamic_tx_buf_num: usize,
-    pub(crate) ampdu_rx_enable: bool,
-    pub(crate) ampdu_tx_enable: bool,
-    pub(crate) amsdu_tx_enable: bool,
-    pub(crate) rx_ba_win: usize,
-    pub(crate) max_burst_size: usize,
-    pub(crate) country_code: &'static str,
-    pub(crate) country_code_operating_class: u8,
-    pub(crate) mtu: usize,
-    pub(crate) listen_interval: u16,
-    pub(crate) beacon_timeout: u16,
-    pub(crate) ap_beacon_timeout: u16,
-    pub(crate) failure_retry_cnt: u8,
-    pub(crate) scan_method: u32,
-}
-
-pub(crate) const CONFIG: Config = Config {
-    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
-    ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE"),
-    country_code_operating_class: esp_config_int!(
-        u8,
-        "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
-    ),
-    mtu: esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU"),
-    listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
-};
-
 #[derive(Debug, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Controller for the ESP Radio driver.
@@ -304,7 +252,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    info!("esp-radio configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
 

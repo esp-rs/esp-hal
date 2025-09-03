@@ -40,7 +40,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `set_configuration()` to `set_config() (#4017)
 - `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
 - `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
-- `config::Config` was moved to `wifi` module (#4040)
 
 ### Fixed
 

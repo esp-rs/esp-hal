@@ -18,6 +18,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use esp_config::{esp_config_int, esp_config_str};
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
@@ -80,7 +81,7 @@ use crate::{
     wifi::private::PacketBuffer,
 };
 
-const MTU: usize = crate::CONFIG.mtu;
+const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU");
 
 #[cfg(all(feature = "csi", esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
@@ -303,7 +304,6 @@ pub struct AccessPointInfo {
 /// Configuration for a Wi-Fi access point.
 #[derive(BuilderLite, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[non_exhaustive]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
     #[builder_lite(reference)]
@@ -430,7 +430,6 @@ impl defmt::Format for AccessPointConfig {
 /// Client configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[non_exhaustive]
 pub struct ClientConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]
@@ -1183,8 +1182,8 @@ impl CsiConfig {
     }
 }
 
-const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
-const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
+const RX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE");
+const TX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE");
 
 pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
@@ -1603,13 +1602,13 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         if mode.is_ap() {
             esp_wifi_result!(include::esp_wifi_set_inactive_time(
                 wifi_interface_t_WIFI_IF_AP,
-                crate::CONFIG.ap_beacon_timeout
+                esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT")
             ))?;
         }
         if mode.is_sta() {
             esp_wifi_result!(include::esp_wifi_set_inactive_time(
                 wifi_interface_t_WIFI_IF_STA,
-                crate::CONFIG.beacon_timeout
+                esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT")
             ))?;
         };
     }
@@ -1677,7 +1676,6 @@ impl ScanTypeConfig {
 
 /// Scan configuration
 #[derive(Clone, Copy, Default, PartialEq, Eq, BuilderLite)]
-#[non_exhaustive]
 pub struct ScanConfig<'a> {
     /// SSID to filter for.
     /// If [`None`] is passed, all SSIDs will be returned.
@@ -2259,10 +2257,10 @@ impl Device for WifiDevice<'_> {
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
+        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0 {
             None
         } else {
-            Some(crate::CONFIG.max_burst_size)
+            Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
         };
         caps
     }
@@ -2415,11 +2413,11 @@ fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
         sta: wifi_sta_config_t {
             ssid: [0; 32],
             password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
+            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
             bssid_set: config.bssid.is_some(),
             bssid: config.bssid.unwrap_or_default(),
             channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
+            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
             sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
@@ -2432,7 +2430,7 @@ fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
             sae_pwe_h2e: 3,
             _bitfield_align_1: [0; 0],
             _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
+            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
             _bitfield_align_2: [0; 0],
             _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
             sae_pk_mode: 0, // ??
@@ -2458,11 +2456,11 @@ fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
         sta: wifi_sta_config_t {
             ssid: [0; 32],
             password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
+            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
             bssid_set: config.bssid.is_some(),
             bssid: config.bssid.unwrap_or_default(),
             channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
+            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
             sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
@@ -2475,7 +2473,7 @@ fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
             sae_pwe_h2e: 3,
             _bitfield_align_1: [0; 0],
             _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
+            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
             _bitfield_align_2: [0; 0],
             _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
             sae_pk_mode: 0, // ??
@@ -2680,10 +2678,11 @@ pub(crate) mod embassy {
         fn capabilities(&self) -> Capabilities {
             let mut caps = Capabilities::default();
             caps.max_transmission_unit = MTU;
-            caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
+            caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0
+            {
                 None
             } else {
-                Some(crate::CONFIG.max_burst_size)
+                Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
             };
             caps
         }
@@ -2708,18 +2707,14 @@ pub enum PowerSaveMode {
     Maximum,
 }
 
-impl From<PowerSaveMode> for esp_wifi_sys::include::wifi_ps_type_t {
-    fn from(s: PowerSaveMode) -> Self {
-        match s {
+pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
+    esp_wifi_result!(unsafe {
+        esp_wifi_sys::include::esp_wifi_set_ps(match ps {
             PowerSaveMode::None => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_NONE,
             PowerSaveMode::Minimum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM,
             PowerSaveMode::Maximum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
-        }
-    }
-}
-
-pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
-    esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
+        })
+    })?;
     Ok(())
 }
 
@@ -2772,10 +2767,9 @@ pub fn new<'d>(
     crate::wifi::wifi_init()?;
 
     let mut cntry_code = [0u8; 3];
-    cntry_code[..crate::CONFIG.country_code.len()]
-        .copy_from_slice(crate::CONFIG.country_code.as_bytes());
-    cntry_code[2] = crate::CONFIG.country_code_operating_class;
-
+    cntry_code[..esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").len()]
+        .copy_from_slice(esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").as_bytes());
+    cntry_code[2] = esp_config_int!(u8, "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS");
     unsafe {
         let country = wifi_country_t {
             cc: cntry_code,
