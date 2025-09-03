@@ -40,7 +40,8 @@
 //!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-//!     uhci.uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
+//!     uhci.uhci
+//!         .apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
 //!         .unwrap();
 //!
 //!     let config = uart::Config::default()
@@ -460,6 +461,8 @@ where
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
     channel_tx: ChannelTx<Dm, CH>,
+    // TODO: devices with UHCI1 need the non-generic guard
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm, CH> UhciTx<'d, Dm, CH>
@@ -500,6 +503,7 @@ where
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
     channel_rx: ChannelRx<Dm, CH>,
+    _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
 impl<'d, Dm, CH> UhciRx<'d, Dm, CH>

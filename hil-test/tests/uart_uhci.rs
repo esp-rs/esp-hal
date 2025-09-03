@@ -318,8 +318,8 @@ mod tests {
         }
     }
 
-    #[test]
-    async fn test_baudrate_change_tx(ctx: Context) {
-        return;
-    }
+    // #[test]
+    // async fn test_baudrate_change_tx(ctx: Context) {
+    // return;
+    // }
 }
