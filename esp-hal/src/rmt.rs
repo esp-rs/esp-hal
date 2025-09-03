@@ -1951,10 +1951,14 @@ enum Event {
 
 impl<Dir: Direction> DynChannelAccess<Dir> {
     #[inline]
+    fn channel_ram_start_offset(&self) -> usize {
+        usize::from(self.channel()) * property!("rmt.channel_ram_size")
+    }
+
+    #[inline]
     fn channel_ram_start(&self) -> *mut PulseCode {
         unsafe {
-            (property!("rmt.ram_start") as *mut PulseCode)
-                .add(usize::from(self.channel()) * property!("rmt.channel_ram_size"))
+            (property!("rmt.ram_start") as *mut PulseCode).add(self.channel_ram_start_offset())
         }
     }
 }
@@ -2414,6 +2418,16 @@ mod chip_specific {
                 w
             });
         }
+
+        #[allow(unused)]
+        #[inline]
+        pub fn hw_offset(&self) -> usize {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx as usize;
+
+            let offset = rmt.ch_tx_status(ch_idx).read().mem_raddr_ex().bits();
+            usize::from(offset) - self.channel_ram_start_offset()
+        }
     }
 
     // documented in re-export below
@@ -2542,6 +2556,15 @@ mod chip_specific {
                 }
                 w
             });
+        }
+
+        #[inline]
+        pub fn hw_offset(&self) -> usize {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx as usize;
+
+            let offset = rmt.ch_rx_status(ch_idx).read().mem_waddr_ex().bits();
+            usize::from(offset) - self.channel_ram_start_offset()
         }
     }
 }
@@ -2843,6 +2866,16 @@ mod chip_specific {
                 w
             });
         }
+
+        #[allow(unused)]
+        #[inline]
+        pub fn hw_offset(&self) -> usize {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx as usize;
+
+            let offset = rmt.chstatus(ch_idx).read().mem_raddr_ex().bits();
+            usize::from(offset) - self.channel_ram_start_offset()
+        }
     }
 
     // documented in re-export below
@@ -3013,6 +3046,15 @@ mod chip_specific {
                 }
                 w
             });
+        }
+
+        #[inline]
+        pub fn hw_offset(&self) -> usize {
+            let rmt = crate::peripherals::RMT::regs();
+            let ch_idx = self.ch_idx as usize;
+
+            let offset = rmt.chstatus(ch_idx).read().mem_waddr_ex().bits();
+            usize::from(offset) - self.channel_ram_start_offset()
         }
     }
 }
