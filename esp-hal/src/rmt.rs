@@ -219,7 +219,6 @@ use crate::{
         OutputConfig,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
-    handler,
     peripherals::{Interrupt, RMT},
     system::{self, GenericPeripheralGuard},
     time::Rate,
@@ -865,7 +864,7 @@ impl<'d> Rmt<'d, Blocking> {
 
     /// Reconfigures the driver for asynchronous operation.
     pub fn into_async(mut self) -> Rmt<'d, Async> {
-        self.set_interrupt_handler(async_interrupt_handler);
+        self.set_interrupt_handler(chip_specific::async_interrupt_handler);
         Rmt::create(self.peripheral)
     }
 
@@ -1620,23 +1619,6 @@ impl Channel<Async, Rx> {
     }
 }
 
-#[handler]
-fn async_interrupt_handler() {
-    fn on_tx(raw: DynChannelAccess<Tx>) {
-        raw.unlisten_tx_interrupt(Event::End | Event::Error);
-
-        WAKER[raw.channel() as usize].wake();
-    }
-
-    fn on_rx(raw: DynChannelAccess<Rx>) {
-        raw.unlisten_rx_interrupt(Event::End | Event::Error);
-
-        WAKER[raw.channel() as usize].wake();
-    }
-
-    chip_specific::handle_channel_interrupts(on_tx, on_rx);
-}
-
 #[derive(Debug, EnumSetType)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 enum Event {
@@ -1721,6 +1703,7 @@ mod chip_specific {
         MemSize,
         Rx,
         Tx,
+        WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
@@ -1773,25 +1756,26 @@ mod chip_specific {
         Ok(())
     }
 
-    #[allow(unused)]
-    #[inline]
-    pub(super) fn handle_channel_interrupts(
-        on_tx: fn(DynChannelAccess<Tx>),
-        on_rx: fn(DynChannelAccess<Rx>),
-    ) {
+    #[crate::handler]
+    pub(super) fn async_interrupt_handler() {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in ChannelIndex::iter_all() {
-            if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                on_tx(raw);
-                return;
-            }
-            if st.ch_rx_end(ch_idx as u8).bit() || st.ch_rx_err(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                on_rx(raw);
-                return;
-            }
+            let raw_tx = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+            let raw_rx = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+
+            let channel = if st.ch_tx_end(ch_idx as u8).bit() || st.ch_tx_err(ch_idx as u8).bit() {
+                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
+                raw_tx.channel()
+            } else if st.ch_rx_end(ch_idx as u8).bit() || st.ch_rx_err(ch_idx as u8).bit() {
+                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
+                raw_rx.channel()
+            } else {
+                continue;
+            };
+
+            WAKER[channel as usize].wake();
+            return;
         }
     }
 
@@ -2132,7 +2116,6 @@ mod chip_specific {
 #[cfg(any(esp32, esp32s2))]
 mod chip_specific {
     use enumset::EnumSet;
-    use portable_atomic::Ordering;
 
     use super::{
         ChannelIndex,
@@ -2143,9 +2126,9 @@ mod chip_specific {
         Level,
         MemSize,
         NUM_CHANNELS,
-        RmtState,
         Rx,
         Tx,
+        WAKER,
     };
     use crate::{peripherals::RMT, time::Rate};
 
@@ -2169,41 +2152,30 @@ mod chip_specific {
         Ok(())
     }
 
-    #[allow(unused)]
-    #[inline]
-    pub(super) fn handle_channel_interrupts(
-        on_tx: fn(DynChannelAccess<Tx>),
-        on_rx: fn(DynChannelAccess<Rx>),
-    ) {
+    #[crate::handler]
+    pub(super) fn async_interrupt_handler() {
         let st = RMT::regs().int_st().read();
 
         for ch_idx in ChannelIndex::iter_all() {
-            if st.ch_rx_end(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                on_rx(raw);
-                return;
-            }
+            let raw_tx = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
+            let raw_rx = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
+
             if st.ch_tx_end(ch_idx as u8).bit() {
-                let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                on_tx(raw);
-                return;
+                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
+            } else if st.ch_rx_end(ch_idx as u8).bit() {
+                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
+            } else if st.ch_err(ch_idx as u8).bit() {
+                // On error interrupts, don't bother whether the channel is in Rx or Tx mode, just
+                // unlisten all interrupts and wake.
+                raw_tx.unlisten_tx_interrupt(Event::End | Event::Error);
+                raw_rx.unlisten_rx_interrupt(Event::End | Event::Error);
+            } else {
+                continue;
             }
-            if st.ch_err(ch_idx as u8).bit() {
-                // SAFETY: channel number == ch_idx for these chips, so the argument is correct and
-                // in range.
-                let state =
-                    unsafe { RmtState::load_by_channel_number(ch_idx as u8, Ordering::Relaxed) };
-                if let Some(is_tx) = state.is_tx() {
-                    if is_tx {
-                        let raw = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx) };
-                        on_tx(raw);
-                    } else {
-                        let raw = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx) };
-                        on_rx(raw);
-                    }
-                    return;
-                }
-            }
+
+            // raw_tx.channel() == raw_rx.channel() == ch_idx for these devices
+            WAKER[ch_idx as usize].wake();
+            return;
         }
     }
 
