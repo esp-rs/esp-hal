@@ -1,31 +1,36 @@
 use core::sync::atomic::Ordering;
 
-use portable_atomic_enum::atomic_enum;
+use private::AtomicWifiState;
+pub use private::WifiState;
 
 use super::WifiEvent;
 
-/// Wi-Fi interface state.
-#[atomic_enum]
-#[derive(PartialEq, Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[non_exhaustive]
-pub enum WifiState {
-    /// Station started.
-    StaStarted,
-    /// Station connected.
-    StaConnected,
-    /// Station disconnected.
-    StaDisconnected,
-    /// Station stopped
-    StaStopped,
+mod private {
+    use portable_atomic_enum::atomic_enum;
 
-    /// Access point started.
-    ApStarted,
-    /// Access point stopped.
-    ApStopped,
+    /// Wi-Fi interface state.
+    #[atomic_enum]
+    #[derive(PartialEq, Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+    #[non_exhaustive]
+    pub enum WifiState {
+        /// Station started.
+        StaStarted,
+        /// Station connected.
+        StaConnected,
+        /// Station disconnected.
+        StaDisconnected,
+        /// Station stopped
+        StaStopped,
 
-    /// Invalid Wi-Fi state.
-    Invalid,
+        /// Access point started.
+        ApStarted,
+        /// Access point stopped.
+        ApStopped,
+
+        /// Invalid Wi-Fi state.
+        Invalid,
+    }
 }
 
 impl From<WifiEvent> for WifiState {
@@ -46,13 +51,11 @@ pub(crate) static STA_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::I
 pub(crate) static AP_STATE: AtomicWifiState = AtomicWifiState::new(WifiState::Invalid);
 
 /// Get the current state of the AP.
-#[instability::unstable]
 pub fn ap_state() -> WifiState {
     AP_STATE.load(Ordering::Relaxed)
 }
 
 /// Get the current state of the STA.
-#[instability::unstable]
 pub fn sta_state() -> WifiState {
     STA_STATE.load(Ordering::Relaxed)
 }
@@ -88,6 +91,7 @@ pub(crate) fn reset_sta_state() {
 ///
 /// This does not support AP-STA mode. Use one of `sta_state` or
 /// `ap_state` instead.
+#[instability::unstable]
 pub fn wifi_state() -> WifiState {
     use super::WifiMode;
     match WifiMode::current() {
