@@ -8,10 +8,7 @@ use esp_hal::time::{Duration, Instant};
 
 use super::*;
 use crate::{
-    binary::{
-        c_types::{c_char, c_void},
-        include::*,
-    },
+    binary::{c_types::*, include::*},
     compat::{
         self,
         common::{ConcurrentQueue, str_from_c},
@@ -26,7 +23,7 @@ pub(crate) mod ble_os_adapter_chip_specific;
 
 const EVENT_QUEUE_SIZE: usize = 16;
 
-const TIME_FOREVER: u32 = crate::compat::common::OSI_FUNCS_TIME_BLOCKING;
+const TIME_FOREVER: u32 = crate::compat::OSI_FUNCS_TIME_BLOCKING;
 
 #[cfg(esp32c2)]
 const OS_MSYS_1_BLOCK_COUNT: i32 = 24;

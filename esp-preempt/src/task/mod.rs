@@ -10,6 +10,7 @@ use arch_specific::Registers;
 pub(crate) use arch_specific::*;
 #[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame;
+use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
 
@@ -19,7 +20,7 @@ pub(crate) struct Context {
     pub trap_frame: Registers,
     #[cfg(xtensa)]
     pub trap_frame: TrapFrame,
-    pub thread_semaphore: u32,
+    pub thread_semaphore: Option<SemaphorePtr>,
     pub next: *mut Context,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
 }
@@ -38,9 +39,18 @@ impl Context {
 
         Context {
             trap_frame: task::new_task_context(task_fn, param, stack_top),
-            thread_semaphore: 0,
+            thread_semaphore: None,
             next: core::ptr::null_mut(),
             _allocated_stack: stack,
+        }
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        if let Some(sem) = self.thread_semaphore {
+            let sem = unsafe { SemaphoreHandle::from_ptr(sem) };
+            core::mem::drop(sem)
         }
     }
 }
@@ -53,7 +63,7 @@ pub(super) fn allocate_main_task() {
             trap_frame: Registers::default(),
             #[cfg(xtensa)]
             trap_frame: TrapFrame::default(),
-            thread_semaphore: 0,
+            thread_semaphore: None,
             next: core::ptr::null_mut(),
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
         },
@@ -107,8 +117,12 @@ pub(super) fn delete_all_tasks() {
     }
 }
 
+pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Context) -> R) -> R {
+    SCHEDULER_STATE.with(|state| cb(unsafe { &mut *state.current_task }))
+}
+
 pub(super) fn current_task() -> *mut Context {
-    SCHEDULER_STATE.with(|state| state.current_task)
+    with_current_task(|task| task as *mut Context)
 }
 
 pub(super) fn schedule_task_deletion(task: *mut Context) {

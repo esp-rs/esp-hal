@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
 use esp_sync::RawMutex;
-use esp_wifi_sys::c_types::{c_char, c_void};
+use esp_wifi_sys::c_types::*;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::ReceivedPacket;
@@ -122,30 +122,9 @@ unsafe extern "C" fn task_yield() {
 }
 
 unsafe extern "C" fn task_yield_from_isr() {
+    // This is not called because we never set xHigherPriorityTaskWoken = true in the `_from_isr`
+    // functions. This should be revisited if a scheduler needs it.
     todo!();
-}
-
-unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *const () {
-    unsafe { crate::common_adapter::semphr_create(max, init) as *const () }
-}
-
-unsafe extern "C" fn semphr_delete(sem: *const ()) {
-    unsafe {
-        crate::common_adapter::semphr_delete(sem as *mut crate::binary::c_types::c_void);
-    }
-}
-
-unsafe extern "C" fn semphr_take(sem: *const (), block_time_ms: u32) -> i32 {
-    unsafe {
-        crate::common_adapter::semphr_take(
-            sem as *mut crate::binary::c_types::c_void,
-            block_time_ms,
-        )
-    }
-}
-
-unsafe extern "C" fn semphr_give(sem: *const ()) -> i32 {
-    unsafe { crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void) }
 }
 
 unsafe extern "C" fn mutex_create() -> *const () {
