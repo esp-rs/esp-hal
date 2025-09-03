@@ -15,6 +15,8 @@ pub(crate) struct RmtReader {
     // The position may be invalid if there's no data left.
     offset: u16,
 
+    pub total: usize,
+
     pub state: ReaderState,
 }
 
@@ -22,6 +24,7 @@ impl RmtReader {
     pub(crate) fn new() -> Self {
         Self {
             offset: 0,
+            total: 0,
             state: ReaderState::Active,
         }
     }
@@ -80,6 +83,7 @@ impl RmtReader {
         // where we stopped reading, but the new offset will not be used again since further calls
         // will immediately return due to `self.state != Active`.
         self.offset = (memsize / 2) as u16 - self.offset;
+        self.total += count;
         data.split_off_mut(..count).unwrap();
 
         if count < max_count {
