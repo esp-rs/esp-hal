@@ -24,8 +24,6 @@ unsafe impl defmt::Logger for Logger {
 
 #[cfg(feature = "defmt")]
 use defmt_rtt as _;
-// Make sure esp_backtrace is not removed.
-use esp_backtrace as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
