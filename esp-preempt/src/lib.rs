@@ -24,6 +24,7 @@ extern crate alloc;
 mod fmt;
 
 mod mutex;
+mod queue;
 mod semaphore;
 mod task;
 mod timer;
