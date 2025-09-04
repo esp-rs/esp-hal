@@ -478,6 +478,11 @@ mod tests {
     }
 
     #[test]
+    async fn rmt_loopback_rx_wrap_async(mut ctx: Context) {
+        do_rmt_loopback_async::<80>(&mut ctx, 2, 1).await;
+    }
+
+    #[test]
     fn rmt_single_shot_wrap(ctx: Context) {
         // Single RAM block (48 or 64 codes), requires wrappin, falseg
         do_rmt_single_shot::<80>(ctx, 1, true).unwrap();

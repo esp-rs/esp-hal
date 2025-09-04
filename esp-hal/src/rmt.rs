@@ -1949,6 +1949,18 @@ where
 
                 Poll::Ready(Ok(this.reader.total))
             }
+            #[cfg(rmt_has_rx_wrap)]
+            Some(Event::Threshold) => {
+                raw.reset_rx_threshold_set();
+
+                this.reader.read(&mut this.data, raw, false);
+
+                if this.reader.state == ReaderState::Active {
+                    raw.listen_rx_interrupt(Event::Threshold);
+                }
+
+                Poll::Pending
+            }
             _ => Poll::Pending,
         }
     }
@@ -1971,8 +1983,8 @@ where
 /// RX channel in async mode
 impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
-    /// The length of sequence cannot exceed the size of the allocated RMT
-    /// RAM.
+    ///
+    /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn receive<T>(&mut self, data: &mut [T]) -> impl Future<Output = Result<usize, Error>>
     where
@@ -1984,12 +1996,12 @@ impl Channel<'_, Async, Rx> {
 
         let mut reader = RmtReader::new();
 
-        if data.len() > memsize.codes() {
+        if !property!("rmt.has_rx_wrap") && data.len() > memsize.codes() {
             reader.state = ReaderState::Error(Error::InvalidDataLength);
         } else {
             raw.clear_rx_interrupts();
-            raw.listen_rx_interrupt(Event::End | Event::Error);
-            raw.start_receive(false, memsize);
+            raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
+            raw.start_receive(true, memsize);
         }
 
         RmtRxFuture {
