@@ -47,6 +47,15 @@ pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
 pub use state::State;
 pub use timing::Timing;
 
+/// Represents the direction of a SPI transmission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpiDirection {
+    /// Indicates a read transmission (host-to-device).
+    Read,
+    /// Indicates a write transmission (device-to-host).
+    Write,
+}
+
 /// Represents the transmission modes for the SDIO peripheral.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -373,6 +382,167 @@ impl<'d> Sdio<'d> {
         });
 
         Ok(())
+    }
+
+    /// Waits for the CLK/SCLK line to be idle.
+    pub(crate) fn wait_for_idle(&self) -> Result<(), Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                // Mode 0 + 1 idles low, mode 2 + 3 idles high
+                let idle = matches!(self.config.spi_mode(), SpiMode::_2 | SpiMode::_3);
+
+                while self.pins.sclk().map(|p| p.is_set_high() == idle)? {
+                    core::hint::spin_loop();
+                }
+
+                Ok(())
+            }
+            _ => {
+                while self.pins.clk().map(|p| !p.is_set_high())? {
+                    core::hint::spin_loop();
+                }
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Waits for a clock edge transition to indicate when to read/write data.
+    // TODO: configure SPI modes
+    pub(crate) fn wait_for_clock_edge(&self, direction: SpiDirection) -> Result<(), Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                let mode = self.config.spi_mode();
+
+                // Mode 0 + 1 idles low, mode 2 + 3 idles high
+                let idle = matches!(mode, SpiMode::_2 | SpiMode::_3);
+
+                // Checks if we are waiting for a first transition from the IDLE state
+                let first_transition = matches!(
+                    (mode, direction),
+                    (SpiMode::_0, SpiDirection::Read)
+                        | (SpiMode::_2, SpiDirection::Read)
+                        | (SpiMode::_1, SpiDirection::Write)
+                        | (SpiMode::_3, SpiDirection::Write)
+                );
+
+                // Check if we need to wait for a second edge transition
+                let second_transition = matches!(
+                    (mode, direction),
+                    (SpiMode::_0, SpiDirection::Write)
+                        | (SpiMode::_2, SpiDirection::Write)
+                        | (SpiMode::_1, SpiDirection::Read)
+                        | (SpiMode::_3, SpiDirection::Read)
+                );
+
+                let edge = second_transition ^ idle;
+
+                // wait for first SCLK edge change from IDLE
+                if first_transition {
+                    while self.pins.sclk().map(|p| p.is_set_high() == idle)? {
+                        core::hint::spin_loop();
+                    }
+                }
+
+                // wait for second edge transition for the appropriate mode + direction combinations
+                if second_transition {
+                    while self.pins.sclk().map(|p| p.is_set_high() == edge)? {
+                        core::hint::spin_loop();
+                    }
+                }
+
+                Ok(())
+            }
+            _ => Err(Error::Unimplemented),
+        }
+    }
+
+    /// Waits for the CS pin to be asserted in SPI mode.
+    ///
+    /// Returns an error if not in SPI mode.
+    // TODO: add a timeout parameter
+    pub fn wait_for_cs(&self) -> Result<(), Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                // block until CS pin is asserted (driven low)
+                while self.pins.cs().map(|p| p.is_set_high())? {
+                    core::hint::spin_loop();
+                }
+
+                Ok(())
+            }
+            _ => Err(Error::General),
+        }
+    }
+
+    /// Asserts the CS pin to indicate starting of data transmission.
+    pub(crate) fn assert_cs(&self) -> Result<(), Error> {
+        // assert the CS pin
+        self.pins
+            .cs()
+            .map(Flex::new)
+            .map(|mut p| p.set_level(false.into()))
+    }
+
+    /// Deasserts the CS pin to indicate ending of data transmission.
+    pub(crate) fn deassert_cs(&self) -> Result<(), Error> {
+        // deassert the CS pin
+        self.pins
+            .cs()
+            .map(Flex::new)
+            .map(|mut p| p.set_level(true.into()))
+    }
+
+    /// Reads the raw command bytes from the wire.
+    pub fn read_command_raw(&mut self) -> Result<[u8; command::AnyCmd::LEN], Error> {
+        self.wait_for_idle()?;
+
+        match self.pins.mode() {
+            Mode::Spi => {
+                self.wait_for_cs()?;
+
+                let mut buf = [0u8; command::AnyCmd::LEN];
+
+                for b in buf.iter_mut() {
+                    for i in 0..8 {
+                        self.wait_for_clock_edge(SpiDirection::Read)?;
+
+                        let shift = 7 - i;
+                        *b |= self.pins.mosi().map(|p| (p.is_set_high() as u8) << shift)?;
+                    }
+                }
+
+                Ok(buf)
+            }
+            _ => Err(Error::Unimplemented),
+        }
+    }
+
+    /// Writes the raw response bytes to the wire.
+    pub fn write_response_raw(&mut self, res: &[u8]) -> Result<(), Error> {
+        match self.pins.mode() {
+            Mode::Spi => {
+                self.assert_cs()?;
+
+                let mut miso = self.pins.miso().map(Flex::new)?;
+
+                for b in res.iter() {
+                    for i in 0..8 {
+                        self.wait_for_clock_edge(SpiDirection::Write)?;
+
+                        let shift = 7 - i;
+                        let level = ((b >> shift) & 0x1) != 0;
+
+                        miso.set_level(level.into());
+                    }
+                }
+
+                self.deassert_cs()?;
+
+                Ok(())
+            }
+            _ => Err(Error::Unimplemented),
+        }
     }
 }
 
