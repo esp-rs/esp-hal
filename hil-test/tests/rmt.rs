@@ -178,7 +178,17 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
-    let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+    let supports_rx_wrap = rx_channel.supports_wrap();
+    let rx_buffer_size = rx_channel.buffer_size();
+
+    let mut rx_transaction = match rx_channel.receive(&mut rcv_data) {
+        Ok(t) => t,
+        Err(Error::InvalidDataLength) if !supports_rx_wrap => {
+            assert!(TX_LEN > rx_buffer_size);
+            return;
+        }
+        Err(e) => panic!("unexpected rx error {:?}", e),
+    };
     let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
 
     loop {
