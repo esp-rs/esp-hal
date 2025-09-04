@@ -270,10 +270,6 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer::initialized()
     }
 
-    fn usleep(&self, us: u32) {
-        usleep(us)
-    }
-
     fn enable(&self) {
         // allocate the main task
         task::allocate_main_task();
@@ -335,5 +331,16 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
 
             unwrap!(task.thread_semaphore)
         })
+    }
+
+    fn usleep(&self, us: u32) {
+        usleep(us)
+    }
+
+    fn now(&self) -> u64 {
+        // FIXME: this function needs to return the timestamp of the scheduler's timer
+        esp_hal::time::Instant::now()
+            .duration_since_epoch()
+            .as_micros()
     }
 }

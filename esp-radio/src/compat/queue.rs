@@ -1,7 +1,9 @@
-use esp_radio_preempt_driver::queue::{QueueHandle, QueuePtr};
 use esp_wifi_sys::c_types::*;
 
-use crate::compat::OSI_FUNCS_TIME_BLOCKING;
+use crate::{
+    compat::OSI_FUNCS_TIME_BLOCKING,
+    preempt::queue::{QueueHandle, QueuePtr},
+};
 
 pub(crate) fn queue_create(queue_len: c_int, item_size: c_int) -> *mut c_void {
     trace!("queue_create len={} size={}", queue_len, item_size);

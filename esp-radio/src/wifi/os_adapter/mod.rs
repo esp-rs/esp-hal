@@ -530,10 +530,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::time::systimer_count();
-    while crate::time::elapsed_time_since(start_time) < tick as u64 {
-        yield_task();
-    }
+    crate::preempt::usleep(tick)
 }
 
 /// **************************************************************************
