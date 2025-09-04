@@ -1666,7 +1666,8 @@ where
         let status = raw.get_rx_status();
 
         match status {
-            Some(Event::End) => {
+            // Read all available data also on error
+            Some(Event::End | Event::Error) => {
                 // Do not clear the interrupt flags here: Subsequent calls of wait() must
                 // be able to observe them if this is currently called via poll()
                 // FIXME: rx should be stopped here, attempt removing this
@@ -1946,11 +1947,14 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         match raw.get_rx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => {
+            // Read all available data also on error
+            Some(ev @ (Event::End | Event::Error)) => {
                 this.reader.read(&mut this.data, raw, true);
 
-                Poll::Ready(Ok(this.reader.total))
+                match ev {
+                    Event::Error => Poll::Ready(Err(Error::ReceiverError)),
+                    _ => Poll::Ready(Ok(this.reader.total)),
+                }
             }
             #[cfg(rmt_has_rx_wrap)]
             Some(Event::Threshold) => {
