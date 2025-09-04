@@ -73,7 +73,7 @@ fn main() -> ! {
     let iface = create_interface(&mut device);
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();

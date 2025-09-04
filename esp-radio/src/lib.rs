@@ -53,9 +53,10 @@
 //! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
 //!
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
-//!
-//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default.
-//!
+#![cfg_attr(
+    feature = "wifi",
+    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default."
+)]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
 //! - `ESP_RADIO_TX_QUEUE_SIZE`
@@ -113,7 +114,6 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
-use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
 use esp_sync::RawMutex;
@@ -175,7 +175,6 @@ unstable_module! {
     #[cfg(feature = "ieee802154")]
     pub mod ieee802154;
 }
-pub mod config;
 
 pub(crate) mod common_adapter;
 
@@ -201,31 +200,6 @@ const _: () = {
             core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
         }
     };
-};
-
-pub(crate) const CONFIG: config::Config = config::Config {
-    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
-    ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE"),
-    country_code_operating_class: esp_config_int!(
-        u8,
-        "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
-    ),
-    mtu: esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU"),
-    listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
 };
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -279,7 +253,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    info!("esp-radio configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
 

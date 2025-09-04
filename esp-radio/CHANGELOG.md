@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - common traits for `Protocol`, `Country`,  (#4017)
 - `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig` (#4017)
 - lifetime to `Sniffer` (#4017)
+- `dtim_period` parameter for `PowerSaveMode` (#4040)
 
 ### Changed
 
@@ -38,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RxControlInfo` hidden behind `esp-now` feature (#4017)
 - `set_configuration()` to `set_config() (#4017)
 - `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
+- `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
 
 ### Fixed
 
@@ -51,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EnumSetType` from `Protocol`, `Country` enums (#4017)
 - `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
 - `wifi_state()` and `WifiState` are not available anymore (#4046)
+- `config` module (#4040)
 
 ## [v0.15.0] - 2025-07-16
 

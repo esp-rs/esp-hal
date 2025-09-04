@@ -86,7 +86,7 @@ async fn main(spawner: Spawner) -> ! {
     let wifi_interface = interfaces.sta;
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     cfg_if::cfg_if! {

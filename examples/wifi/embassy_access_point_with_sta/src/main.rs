@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Config::Mixed(
+    let client_config = Config::ApSta(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
