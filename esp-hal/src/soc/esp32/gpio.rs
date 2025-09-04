@@ -55,8 +55,8 @@ macro_rules! rtcio_analog {
                         .modify(|_, w| w.$hold().bit(enable));
                 }
 
-                fn functions(&self, _: private::Internal) -> &'static [RtcFunction] {
-                    &[RtcFunction::_0, RtcFunction::_1, /* macros hard :'( */]
+                fn functions(&self, _: crate::private::Internal) -> &'static [$crate::gpio::RtcFunction] {
+                    &[$crate::gpio::RtcFunction::_0, $crate::gpio::RtcFunction::_1, /* macros hard :'( */]
                 }
             }
 

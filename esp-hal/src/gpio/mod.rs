@@ -389,6 +389,7 @@ pub trait RtcPin: Pin {
     #[doc(hidden)]
     fn rtcio_pad_hold(&self, enable: bool);
 
+    #[cfg(any(xtensa, esp32c6))]
     #[doc(hidden)]
     fn functions(&self, _: private::Internal) -> &'static [RtcFunction];
 

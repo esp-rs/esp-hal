@@ -47,10 +47,6 @@ macro_rules! rtc_pins {
                             .pad_hold().modify(|_, w| w.[< gpio_pin $pin_num _hold >]().bit(enable));
                     }
                 }
-
-                fn functions(&self, _: private::Internal) -> &'static [RtcFunction] {
-                    &[RtcFunction::_0, RtcFunction::_1, /* macros hard :'( */]
-                }
             }
 
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
