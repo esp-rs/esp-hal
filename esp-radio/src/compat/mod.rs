@@ -3,6 +3,7 @@
 pub mod common;
 pub mod malloc;
 pub mod misc;
+pub mod mutex;
 pub mod semaphore;
 pub mod timer_compat;
 
