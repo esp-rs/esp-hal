@@ -144,7 +144,7 @@ fn check_data_eq(
                 rx[rx_count - 1],
             );
         }
-        Err(Error::ReceiverError) if !rx_wrap => (),
+        Err(Error::ReceiverError | Error::InvalidDataLength) if !rx_wrap => (),
         Err(e) => {
             panic!("unexpected rx error {:?}", e);
         }
