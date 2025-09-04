@@ -388,6 +388,13 @@ mod tests {
         do_rmt_loopback_async::<80>(1, 2).await;
     }
 
+    #[test]
+    fn rmt_loopback_rx_wrap() {
+        // 80 codes require two RAM blocks; thus an rx channel with only 1 block requires
+        // wrapping.
+        do_rmt_loopback::<80>(2, 1);
+    }
+
     // FIXME: This test can't work right now, because wrapping rx is not
     // implemented.
     //
