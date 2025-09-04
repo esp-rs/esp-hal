@@ -34,7 +34,7 @@ use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
     dma_buffers,
-    i2s::master::{DataFormat, I2s, Standard},
+    i2s::master::{Channels, Config, DataFormat, I2s},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -70,11 +70,13 @@ async fn main(_spawner: Spawner) {
 
     let i2s = I2s::new(
         peripherals.I2S0,
-        Standard::Philips,
-        DataFormat::Data16Channel16,
-        Rate::from_hz(44100),
         dma_channel,
+        Config::new_tdm_philips()
+            .with_sample_rate(Rate::from_hz(44100))
+            .with_data_format(DataFormat::Data16Channel16)
+            .with_channels(Channels::STEREO),
     )
+    .unwrap()
     .into_async();
 
     let i2s_tx = i2s

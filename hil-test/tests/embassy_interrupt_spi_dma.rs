@@ -145,11 +145,13 @@ mod test {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         let other_peripheral = esp_hal::i2s::master::I2s::new(
             peripherals.I2S0,
-            esp_hal::i2s::master::Standard::Philips,
-            esp_hal::i2s::master::DataFormat::Data8Channel8,
-            Rate::from_khz(8),
             dma_channel2,
-        );
+            esp_hal::i2s::master::Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_khz(8))
+                .with_data_format(esp_hal::i2s::master::DataFormat::Data16Channel16)
+                .with_channels(esp_hal::i2s::master::Channels::STEREO),
+        )
+        .unwrap();
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
