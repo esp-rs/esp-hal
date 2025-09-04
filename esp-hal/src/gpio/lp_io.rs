@@ -248,6 +248,10 @@ macro_rules! lp_gpio {
                         });
                     }
                 }
+
+                fn functions(&self, _: crate::private::Internal) -> &'static [$crate::gpio::RtcFunction] {
+                    &[$crate::gpio::RtcFunction::_0, $crate::gpio::RtcFunction::_1, /* macros hard :'( */]
+                }
             }
 
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]

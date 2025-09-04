@@ -368,6 +368,7 @@ impl RtcFunction {
     /// RTC mode.
     pub const RTC: Self = Self::_0;
 
+    #[allow(unused)]
     /// Digital mode.
     pub const DIGITAL: Self = Self::_1;
 }
@@ -2297,6 +2298,7 @@ impl RtcPin for AnyPin<'_> {
         }
     }
 
+    #[cfg(any(xtensa, esp32c6))]
     fn functions(&self, i: private::Internal) -> &'static [RtcFunction] {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::functions(&target, i) };
