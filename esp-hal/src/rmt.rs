@@ -1748,7 +1748,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 
         let reader = RmtReader::new();
 
-        raw.start_receive();
+        raw.start_receive(false, memsize);
 
         Ok(RxTransaction {
             channel: self,
@@ -1972,7 +1972,7 @@ impl Channel<'_, Async, Rx> {
         } else {
             raw.clear_rx_interrupts();
             raw.listen_rx_interrupt(Event::End | Event::Error);
-            raw.start_receive();
+            raw.start_receive(false, memsize);
         }
 
         RmtRxFuture {
@@ -2044,9 +2044,13 @@ impl DynChannelAccess<Rx> {
         INPUT_SIGNALS[self.ch_idx as usize]
     }
 
-    fn start_receive(&self) {
+    fn start_receive(&self, wrap: bool, memsize: MemSize) {
         self.clear_rx_interrupts();
-        self.set_rx_wrap_mode(false);
+
+        self.set_rx_threshold((memsize.codes() / 2) as u16);
+        self.set_rx_wrap_mode(wrap);
+        self.update();
+
         self.start_rx();
         self.update();
     }
@@ -2535,6 +2539,21 @@ mod chip_specific {
             }
         }
 
+        #[inline]
+        pub fn reset_rx_threshold_set(&self) {
+            let rmt = crate::peripherals::RMT::regs();
+            rmt.int_clr()
+                .write(|w| w.ch_rx_thr_event(self.ch_idx as u8).set_bit());
+        }
+
+        #[inline]
+        pub fn set_rx_threshold(&self, threshold: u16) {
+            let rmt = crate::peripherals::RMT::regs();
+            rmt.ch_rx_lim(self.ch_idx as usize).modify(|_, w| unsafe {
+                w.rx_lim().bits(threshold)
+            });
+        }
+
         // This is immediate and does not update state flags; do not poll on get_rx_status()
         // afterwards!
         //
@@ -2969,6 +2988,16 @@ mod chip_specific {
             } else {
                 None
             }
+        }
+
+        #[inline]
+        pub fn reset_rx_threshold_set(&self) {
+            // not supported by hardware
+        }
+
+        #[inline]
+        pub fn set_rx_threshold(&self, _threshold: u16) {
+            // not supported by hardware
         }
 
         #[inline]
