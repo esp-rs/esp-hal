@@ -1519,7 +1519,8 @@ where
         let status = raw.get_rx_status();
 
         match status {
-            Some(Event::End) => {
+            // Read all available data also on error
+            Some(Event::End) | Some(Event::Error) => {
                 // This must only be run once, even if poll_internal is called repeatedly after the
                 // receiver finished!
                 if self.reader.state == ReaderState::Active {
@@ -1811,11 +1812,14 @@ where
         WAKER[raw.channel() as usize].register(ctx.waker());
 
         match raw.get_rx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
-            Some(Event::End) => {
+            // Read all available data also on error
+            Some(ev @ (Event::End | Event::Error)) => {
                 this.reader.read(&mut this.data, raw, true);
 
-                Poll::Ready(Ok(this.reader.total))
+                match ev {
+                    Event::Error => Poll::Ready(Err(Error::ReceiverError)),
+                    _ => Poll::Ready(Ok(this.reader.total)),
+                }
             }
             Some(Event::Threshold) if DynChannelAccess::<Rx>::supports_wrap() => {
                 raw.reset_rx_threshold_set();
