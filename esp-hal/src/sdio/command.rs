@@ -19,3 +19,17 @@ pub use crc::Crc;
 pub use flag::{RawFlag, RwFlag};
 pub use fn_number::FunctionNumber;
 pub use index::CommandIndex;
+
+/// Represents any SDIO command structure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AnyCmd {
+    /// Represents the `IO_RW_DIRECT` command.
+    Cmd52(Cmd52),
+    /// Represents the `IO_RW_EXTENDED` command.
+    Cmd53(Cmd53),
+}
+
+impl AnyCmd {
+    /// Represents the byte length of the command.
+    pub const LEN: usize = 6;
+}
