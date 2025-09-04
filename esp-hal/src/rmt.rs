@@ -13,6 +13,10 @@
         cfg(esp32s2) => "4 channels, each of them can be either receiver or transmitter.",
         cfg(esp32s3) => "8 channels, `Channel<0>`-`Channel<3>` hardcoded for transmitting signals and `Channel<4>`-`Channel<7>` hardcoded for receiving signals.",
         cfg(any(esp32c3, esp32c6, esp32h2)) => "4 channels, `Channel<0>` and `Channel<1>` hardcoded for transmitting signals and `Channel<2>` and `Channel<3>` hardcoded for receiving signals.",
+    },
+    "rx_size_limit" => {
+        cfg(any(esp32, esp32s2)) => "The length of the received data cannot exceed the allocated RMT RAM.",
+        _ => ""
     }
 ))]
 //! # Remote Control Peripheral (RMT)
@@ -1512,15 +1516,27 @@ where
 
         let status = raw.get_rx_status();
 
-        // This must only be run once, even if poll_internal is called repeatedly after the
-        // receiver finished!
-        if self.reader.state == ReaderState::Active && status == Some(Event::End) {
-            // Do not clear the interrupt flags here: Subsequent calls of wait() must
-            // be able to observe them if this is currently called via poll()
-            raw.stop_rx();
-            raw.update();
+        match status {
+            Some(Event::End) => {
+                // This must only be run once, even if poll_internal is called repeatedly after the
+                // receiver finished!
+                if self.reader.state == ReaderState::Active {
+                    // Do not clear the interrupt flags here: Subsequent calls of wait() must
+                    // be able to observe them if this is currently called via poll()
+                    raw.stop_rx();
+                    raw.update();
 
-            self.reader.read(&mut self.data, raw, true);
+                    self.reader.read(&mut self.data, raw, true);
+                }
+            }
+            Some(Event::Threshold) if self.channel.supports_wrap() => {
+                raw.reset_rx_threshold_set();
+
+                if self.reader.state == ReaderState::Active {
+                    self.reader.read(&mut self.data, raw, false);
+                }
+            }
+            _ => (),
         }
 
         status
@@ -1594,7 +1610,8 @@ impl Channel<Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
-    /// The length of the received data cannot exceed the allocated RMT RAM.
+    ///
+    /// # {rx_size_limit}
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
     pub fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
     where
@@ -1604,13 +1621,13 @@ impl Channel<Blocking, Rx> {
         let raw = self.raw;
         let memsize = raw.memsize();
 
-        if data.len() > self.raw.memsize().codes() {
+        if !self.supports_wrap() && data.len() > self.raw.memsize().codes() {
             return Err(Error::InvalidDataLength);
         }
 
         let reader = RmtReader::new(memsize);
 
-        raw.start_receive(false, memsize);
+        raw.start_receive(true, memsize);
 
         Ok(RxTransaction {
             channel: self,
