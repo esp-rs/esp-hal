@@ -3025,7 +3025,7 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect() })
     }
 
-    /// Checks if the Wi-Fi controller has started.
+    /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.
     ///
     /// This function should be called after the `start` method to verify if the
     /// Wi-Fi has started successfully.
