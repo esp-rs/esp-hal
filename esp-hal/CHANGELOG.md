@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Add RtcI2c driver (#0000)
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- RMT: add `Channel::buffer_size` and `Channel::supports_wrap` methods (#4049)
 
 ### Changed
 
@@ -55,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
 - The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
 - ESP32-S2: `i2s::master::DataFormat` now includes 8-bit and 24-bit data widths (#3985)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- RMT: Dropping async futures and blocking transactions always stops them and returns the channel to an idle state. Transactions are `#[must_use]` (#4049)
 
 ### Fixed
 
