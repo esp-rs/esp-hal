@@ -117,7 +117,10 @@ struct UpdateMetadataArgs {
 // Application
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let mut builder =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    builder.target(env_logger::Target::Stdout);
+    builder.init();
 
     let workspace = std::env::current_dir()?;
     let target_path = Path::new("target");
