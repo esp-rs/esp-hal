@@ -142,7 +142,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
             // Only keep the example the user wants
             filtered.retain(|ex| ex.matches_name(example));
 
-            if examples.is_empty() {
+            if filtered.is_empty() {
                 log::warn!(
                     "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
                 );
