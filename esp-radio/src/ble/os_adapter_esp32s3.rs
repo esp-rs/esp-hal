@@ -1,18 +1,15 @@
 use super::*;
 use crate::{
     binary::include::esp_bt_controller_config_t,
+    common_adapter::*,
     hal::{interrupt, peripherals::Interrupt},
 };
 
-pub(crate) static mut ISR_INTERRUPT_5: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_5: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub(crate) static mut ISR_INTERRUPT_8: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_8: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
 #[repr(C)]
 pub(super) struct osi_funcs_s {
@@ -27,12 +24,12 @@ pub(super) struct osi_funcs_s {
     interrupt_restore: Option<unsafe extern "C" fn()>,
     task_yield: Option<unsafe extern "C" fn()>,
     task_yield_from_isr: Option<unsafe extern "C" fn()>,
-    semphr_create: Option<unsafe extern "C" fn(u32, u32) -> *const ()>,
-    semphr_delete: Option<unsafe extern "C" fn(*const ())>,
-    semphr_take_from_isr: Option<unsafe extern "C" fn(*const (), *const ()) -> i32>,
-    semphr_give_from_isr: Option<unsafe extern "C" fn(*const (), *const ()) -> i32>,
-    semphr_take: Option<unsafe extern "C" fn(*const (), u32) -> i32>,
-    semphr_give: Option<unsafe extern "C" fn(*const ()) -> i32>,
+    semphr_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
+    semphr_delete: Option<unsafe extern "C" fn(*mut c_void)>,
+    semphr_take_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut bool) -> i32>,
+    semphr_give_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut bool) -> i32>,
+    semphr_take: Option<unsafe extern "C" fn(*mut c_void, u32) -> i32>,
+    semphr_give: Option<unsafe extern "C" fn(*mut c_void) -> i32>,
     mutex_create: Option<unsafe extern "C" fn() -> *const ()>,
     mutex_delete: Option<unsafe extern "C" fn(*const ())>,
     mutex_lock: Option<unsafe extern "C" fn(*const ()) -> i32>,
@@ -45,21 +42,21 @@ pub(super) struct osi_funcs_s {
     queue_recv_from_isr: Option<unsafe extern "C" fn(*const (), *const (), *const ()) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
-            *mut crate::binary::c_types::c_void,
-            *const crate::binary::c_types::c_char,
+            *mut c_void,
+            *const c_char,
             u32,
-            *mut crate::binary::c_types::c_void,
+            *mut c_void,
             u32,
-            *mut crate::binary::c_types::c_void,
+            *mut c_void,
             u32,
         ) -> i32,
     >,
     task_delete: Option<unsafe extern "C" fn(*mut ())>,
     is_in_isr: Option<unsafe extern "C" fn() -> i32>,
     cause_sw_intr_to_core: Option<unsafe extern "C" fn(i32, i32) -> i32>,
-    malloc: Option<unsafe extern "C" fn(u32) -> *mut crate::binary::c_types::c_void>,
-    malloc_internal: Option<unsafe extern "C" fn(u32) -> *mut crate::binary::c_types::c_void>,
-    free: Option<unsafe extern "C" fn(*mut crate::binary::c_types::c_void)>,
+    malloc: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
+    malloc_internal: Option<unsafe extern "C" fn(u32) -> *mut c_void>,
+    free: Option<unsafe extern "C" fn(*mut c_void)>,
     read_efuse_mac: Option<unsafe extern "C" fn(*const ()) -> i32>,
     srand: Option<unsafe extern "C" fn(u32)>,
     rand: Option<unsafe extern "C" fn() -> i32>,
@@ -102,8 +99,8 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     task_yield_from_isr: Some(task_yield_from_isr),
     semphr_create: Some(semphr_create),
     semphr_delete: Some(semphr_delete),
-    semphr_take_from_isr: Some(crate::common_adapter::semphr_take_from_isr),
-    semphr_give_from_isr: Some(crate::common_adapter::semphr_give_from_isr),
+    semphr_take_from_isr: Some(semphr_take_from_isr),
+    semphr_give_from_isr: Some(semphr_give_from_isr),
     semphr_take: Some(semphr_take),
     semphr_give: Some(semphr_give),
     mutex_create: Some(mutex_create),
@@ -161,7 +158,7 @@ extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
     #[cfg(coex)]
     unsafe {
         // COEX_SCHM_CALLBACK_TYPE_BT
-        coex_schm_register_callback(1, _callback as *mut esp_wifi_sys::c_types::c_void)
+        coex_schm_register_callback(1, _callback as *mut c_void)
     }
 
     #[cfg(not(coex))]
@@ -366,20 +363,14 @@ pub(crate) unsafe extern "C" fn interrupt_handler_set(
     unsafe {
         match interrupt_no {
             5 => {
-                ISR_INTERRUPT_5 = (
-                    func as *mut crate::binary::c_types::c_void,
-                    arg as *mut crate::binary::c_types::c_void,
-                );
+                ISR_INTERRUPT_5 = (func as *mut c_void, arg as *mut c_void);
                 unwrap!(interrupt::enable(
                     Interrupt::BT_BB,
                     interrupt::Priority::Priority1,
                 ));
             }
             8 => {
-                ISR_INTERRUPT_8 = (
-                    func as *mut crate::binary::c_types::c_void,
-                    arg as *mut crate::binary::c_types::c_void,
-                );
+                ISR_INTERRUPT_8 = (func as *mut c_void, arg as *mut c_void);
                 unwrap!(interrupt::enable(
                     Interrupt::RWBLE,
                     interrupt::Priority::Priority1,

@@ -175,7 +175,7 @@ pub unsafe extern "C" fn is_from_isr() -> bool {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_void {
-    let ptr = crate::compat::common::sem_create(1, 1);
+    let ptr = crate::compat::semaphore::sem_create(1, 1);
 
     trace!("spin_lock_create {:?}", ptr);
     ptr as *mut crate::binary::c_types::c_void
@@ -197,7 +197,7 @@ pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_vo
 pub unsafe extern "C" fn spin_lock_delete(lock: *mut crate::binary::c_types::c_void) {
     trace!("spin_lock_delete {:?}", lock);
 
-    crate::compat::common::sem_delete(lock);
+    crate::compat::semaphore::sem_delete(lock);
 }
 
 /// **************************************************************************

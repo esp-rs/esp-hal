@@ -9,6 +9,8 @@ use esp_wifi_sys::include::{
 
 use super::os_adapter::{self, *};
 use crate::common_adapter::*;
+#[cfg(coex)]
+use crate::{binary::c_types::c_void, hal::ram};
 
 #[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
 pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter_funcs_t =
@@ -46,19 +48,15 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
     };
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_take_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    unsafe { crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ()) }
+#[ram]
+unsafe extern "C" fn semphr_take_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_take_from_isr(semphr, hptw as *mut bool) }
 }
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_give_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    unsafe { crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ()) }
+#[ram]
+unsafe extern "C" fn semphr_give_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_give_from_isr(semphr, hptw as *mut bool) }
 }
 
 #[cfg(coex)]

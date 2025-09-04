@@ -51,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
 - `RtcSlowClock::RtcFastClock8m` has been renamed to `RtcFastClock::RtcFastClockRcFast` (#3993)
 - `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
+- The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
 
 ### Fixed
 
