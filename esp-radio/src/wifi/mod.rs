@@ -2740,10 +2740,6 @@ pub fn new<'d>(
         return Err(WifiError::Unsupported);
     }
 
-    let mut controller = WifiController {
-        _phantom: Default::default(),
-    };
-
     crate::wifi::wifi_init()?;
 
     let mut cntry_code = [0u8; 3];
@@ -2764,6 +2760,12 @@ pub fn new<'d>(
 
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+
+    // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
+    // function will cause panic because WifiController::drop tries to disable the TRNG.
+    let mut controller = WifiController {
+        _phantom: Default::default(),
+    };
 
     controller.set_power_saving(PowerSaveMode::default())?;
 
