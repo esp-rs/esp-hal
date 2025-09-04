@@ -36,7 +36,7 @@ mod slchost;
 mod state;
 mod timing;
 
-pub use config::Config;
+pub use config::{Config, SpiMode};
 pub use direction::Direction;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::{DeviceInterrupt, HostInterrupt};
@@ -408,7 +408,7 @@ impl<'d> Sdio<'d> {
     }
 
     /// Waits for a clock edge transition to indicate when to read/write data.
-    // TODO: configure SPI modes
+    // TODO: add timeout parameter
     pub(crate) fn wait_for_clock_edge(&self, direction: SpiDirection) -> Result<(), Error> {
         match self.pins.mode() {
             Mode::Spi => {
