@@ -363,10 +363,13 @@ pub enum RtcFunction {
     _3 = 3,
 }
 
+#[cfg(not(esp32h2))]
 impl RtcFunction {
-    const RTC: Self = Self::_0;
+    /// RTC mode.
+    pub const RTC: Self = Self::_0;
 
-    const DIGITAL: Self = Self::_1;
+    /// Digital mode.
+    pub const DIGITAL: Self = Self::_1;
 }
 
 /// Trait implemented by RTC pins

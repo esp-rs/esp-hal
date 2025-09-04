@@ -114,6 +114,10 @@ for_each_lp_function! {
                     .pad_hold()
                     .modify(|_, w| hold_field!(w, $gpio).bit(enable));
             }
+
+            fn functions(&self, _: private::Internal) -> &'static [RtcFunction] {
+                &[RtcFunction::_0, RtcFunction::_1, /* macros hard :'( */]
+            }
         }
 
         #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]

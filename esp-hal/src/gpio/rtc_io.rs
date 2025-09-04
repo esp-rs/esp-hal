@@ -48,7 +48,7 @@ impl<'d, const PIN: u8> LowPowerOutput<'d, PIN> {
     where
         P: OutputPin + RtcPin + 'd,
     {
-        pin.rtc_set_config(false, true, RtcFunction::Rtc);
+        pin.rtc_set_config(false, true, RtcFunction::RTC);
 
         let this = Self {
             phantom: PhantomData,
@@ -84,7 +84,7 @@ impl<'d, const PIN: u8> LowPowerInput<'d, PIN> {
     where
         P: InputPin + RtcPin + 'd,
     {
-        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+        pin.rtc_set_config(true, true, RtcFunction::RTC);
 
         let this = Self {
             phantom: PhantomData,
