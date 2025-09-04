@@ -143,6 +143,7 @@ harness = false
 [[test]]
 name    = "rmt"
 harness = false
+required-features = ["embassy"]
 
 [[test]]
 name    = "rsa"
