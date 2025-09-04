@@ -140,8 +140,8 @@ fn check_data_eq(
                 rx_count,
                 expected_rx_len,
                 "unexpected rx count (last: tx={:?}, rx={:?})",
-                tx[rx_count],
-                rx[rx_count],
+                tx[rx_count - 1],
+                rx[rx_count - 1],
             );
         }
         Err(Error::ReceiverError) if !rx_wrap => (),
