@@ -5,6 +5,12 @@
 //!
 //! This is the host driver for the RTC_I2C peripheral which is primarily for the ULP.
 //!
+//! The RTC I2C peripheral always expects a slave sub-register address to be provided when reading
+//! or writing.
+//! This could make the RTC I2C peripheral incompatible with certain I2C devices or sensors which
+//! do not need any sub-register to be programmed.
+//! It also means a `embedded_hal::i2c::I2c` implementation cannot be provided.
+//!
 //! ## Configuration
 //!
 //! The driver can be configured using the [`Config`] struct. To create a
