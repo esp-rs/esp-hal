@@ -1767,13 +1767,22 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 static WAKER: [AtomicWaker; NUM_CHANNELS] = [const { AtomicWaker::new() }; NUM_CHANNELS];
 
 #[must_use = "futures do nothing unless you `.await` or poll them"]
-struct RmtTxFuture<'a> {
+struct RmtTxFuture<'a, T>
+where
+    T: Into<PulseCode> + Copy,
+{
     raw: DynChannelAccess<Tx>,
     _phantom: PhantomData<Channel<'a, Async, Tx>>,
     writer: RmtWriter,
+
+    // Remaining data that has not yet been written to channel RAM. May be empty.
+    data: &'a [T],
 }
 
-impl core::future::Future for RmtTxFuture<'_> {
+impl<T> core::future::Future for RmtTxFuture<'_, T>
+where
+    T: Into<PulseCode> + Copy,
+{
     type Output = Result<(), Error>;
 
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
@@ -1787,15 +1796,38 @@ impl core::future::Future for RmtTxFuture<'_> {
 
         WAKER[raw.channel() as usize].register(ctx.waker());
 
-        match raw.get_tx_status() {
-            Some(Event::Error) => Poll::Ready(Err(Error::TransmissionError)),
-            Some(Event::End) => Poll::Ready(Ok(())),
-            _ => Poll::Pending,
-        }
+        let result = match raw.get_tx_status() {
+            Some(Event::Error) => Err(Error::TransmissionError),
+            Some(Event::End) => {
+                if this.writer.state == WriterState::Active {
+                    // Unexpectedly done, even though we have data left.
+                    Err(Error::TransmissionError)
+                } else {
+                    Ok(())
+                }
+            }
+            Some(Event::Threshold) => {
+                raw.reset_tx_threshold_set();
+
+                this.writer.write(&mut this.data, raw, false);
+
+                if this.writer.state == WriterState::Active {
+                    raw.listen_tx_interrupt(Event::Threshold);
+                }
+
+                return Poll::Pending;
+            }
+            _ => return Poll::Pending,
+        };
+
+        Poll::Ready(result)
     }
 }
 
-impl Drop for RmtTxFuture<'_> {
+impl<T> Drop for RmtTxFuture<'_, T>
+where
+    T: Into<PulseCode> + Copy,
+{
     fn drop(&mut self) {
         let raw = self.raw;
 
@@ -1839,15 +1871,21 @@ impl Channel<'_, Async, Tx> {
             }
         }
 
-        if data.len() > memsize.codes() {
-            writer.state = WriterState::Error(Error::InvalidDataLength);
-        }
-
         if !matches!(writer.state, WriterState::Error(_)) {
             writer.write(&mut data, raw, true);
 
+            let wrap = match writer.state {
+                WriterState::Error(_) => false,
+                WriterState::Active => true,
+                WriterState::Done => false,
+            };
+
             raw.clear_tx_interrupts();
-            raw.listen_tx_interrupt(Event::End | Event::Error);
+            let mut events = Event::End | Event::Error;
+            if wrap {
+                events |= Event::Threshold;
+            }
+            raw.listen_tx_interrupt(events);
             raw.start_send(None, memsize);
         }
 
@@ -1855,6 +1893,7 @@ impl Channel<'_, Async, Tx> {
             raw,
             _phantom: PhantomData,
             writer,
+            data,
         }
     }
 }
