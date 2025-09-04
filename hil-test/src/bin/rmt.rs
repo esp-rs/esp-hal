@@ -383,6 +383,11 @@ mod tests {
         do_rmt_loopback::<80>(1, 2);
     }
 
+    #[test]
+    async fn rmt_loopback_tx_wrap_async() {
+        do_rmt_loopback_async::<80>(1, 2).await;
+    }
+
     // FIXME: This test can't work right now, because wrapping rx is not
     // implemented.
     //
