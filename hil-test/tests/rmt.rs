@@ -489,6 +489,7 @@ mod tests {
 
     // Test that dropping rx/tx futures returns the hardware to a predictable state from which
     // subsequent transactions are successful.
+    // FIXME: Add blocking version of this test
     #[test]
     async fn rmt_loopback_after_drop_async() {
         const TX_LEN: usize = 20;
@@ -516,6 +517,8 @@ mod tests {
         // (`poll_once` takes the future by value and drops it before returning)
         let _ = embassy_futures::poll_once(rx_fut);
         let _ = embassy_futures::poll_once(tx_fut);
+
+        // FIXME: Add a small delay such that a few codes are actually sent/received
 
         // ...then start over and check that everything still works as expected (i.e. we
         // didn't leave the hardware in an unexpected state or lock up when
