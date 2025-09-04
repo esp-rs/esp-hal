@@ -1759,16 +1759,30 @@ where
         match raw.get_rx_status() {
             Some(Event::Error) => Poll::Ready(Err(Error::ReceiverError)),
             Some(Event::End) => {
-                raw.stop_rx();
-                raw.clear_rx_interrupts();
-                raw.update();
-
                 this.reader.read(&mut this.data, raw, true);
 
                 Poll::Ready(Ok(()))
             }
             _ => Poll::Pending,
         }
+    }
+}
+
+impl<T> Drop for RmtRxFuture<'_, T>
+where
+    T: From<PulseCode> + Unpin,
+{
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
+            // This is immediate and does not update state flags, so we must not poll on
+            // get_rx_status() afterwards!
+            raw.stop_rx();
+            raw.update();
+        }
+
+        raw.clear_rx_interrupts();
     }
 }
 
