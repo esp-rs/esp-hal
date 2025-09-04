@@ -1442,6 +1442,7 @@ impl Channel<Blocking, Tx> {
         let mut writer = RmtWriter::new(memsize);
         writer.write(&mut data, raw, true);
 
+        raw.clear_tx_interrupts();
         raw.start_send(false, 0, memsize);
 
         Ok(SingleShotTxTransaction {
@@ -1487,7 +1488,8 @@ impl Channel<Blocking, Tx> {
         let mut writer = RmtWriter::new(memsize);
         writer.write(&mut data, raw, true);
 
-        self.raw.start_send(true, loopcount, memsize);
+        raw.clear_tx_interrupts();
+        raw.start_send(true, loopcount, memsize);
 
         Ok(ContinuousTxTransaction { channel: self })
     }
@@ -1909,7 +1911,6 @@ impl DynChannelAccess<Tx> {
 
     #[inline]
     fn start_send(&self, continuous: bool, repeat: u16, memsize: MemSize) {
-        self.clear_tx_interrupts();
         self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(continuous);
         self.set_generate_repeat_interrupt(repeat);
