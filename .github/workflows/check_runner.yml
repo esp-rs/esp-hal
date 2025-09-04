@@ -1,0 +1,45 @@
+name: Check Runner
+
+on:
+  workflow_call:
+    inputs:
+      primary-runner:
+        required: true
+        type: string
+      fallback-runner:
+        required: true
+        type: string
+
+    outputs:
+      selected-runner:
+        description: "The runner to use (primary if available, otherwise fallback)"
+        value: ${{ jobs.detect-runner.outputs.selected-runner }}
+
+jobs:
+  detect-runner:
+    runs-on: ubuntu-latest
+    outputs:
+      selected-runner: ${{ steps.runner-check.outputs.runner }}
+    steps:
+      - id: runner-check
+        name: Determine runner availability (org-level)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ORG_NAME: ${{ github.repository_owner }}
+          PRIMARY_RUNNER: ${{ inputs.primary-runner }}
+          FALLBACK_RUNNER: ${{ inputs.fallback-runner }}
+        run: |
+          response=$(curl -s -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/orgs/$ORG_NAME/actions/runners")
+
+          AVAILABLE=$(echo "$response" | jq --arg name "$PRIMARY_RUNNER" \
+            '.runners // [] | map(select(.name == $name and .status == "online" and .busy == false)) | length')
+
+          if [[ "$AVAILABLE" -gt 0 ]]; then
+            echo "$PRIMARY_RUNNER is available"
+            echo "runner=$PRIMARY_RUNNER" >> "$GITHUB_OUTPUT"
+          else
+            echo "Falling back to $FALLBACK_RUNNER"
+            echo "runner=$FALLBACK_RUNNER" >> "$GITHUB_OUTPUT"
+          fi
