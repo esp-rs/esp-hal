@@ -1519,6 +1519,7 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let mut writer = RmtWriter::new();
         writer.write(&mut data, raw, true);
 
+        raw.clear_tx_interrupts();
         raw.start_send(None, memsize);
 
         Ok(SingleShotTxTransaction {
@@ -1561,7 +1562,8 @@ impl<'ch> Channel<'ch, Blocking, Tx> {
         let mut writer = RmtWriter::new();
         writer.write(&mut data, raw, true);
 
-        self.raw.start_send(Some((loopcount, loopstop)), memsize);
+        raw.clear_tx_interrupts();
+        raw.start_send(Some((loopcount, loopstop)), memsize);
 
         Ok(ContinuousTxTransaction { channel: self })
     }
@@ -1976,7 +1978,6 @@ impl DynChannelAccess<Tx> {
     // able to deduplicate.
     #[inline]
     fn start_send(&self, loop_params: Option<(LoopCount, LoopStop)>, memsize: MemSize) {
-        self.clear_tx_interrupts();
         self.set_tx_threshold((memsize.codes() / 2) as u8);
         self.set_tx_continuous(loop_params.is_some());
         #[cfg(rmt_has_tx_loop_count)]
