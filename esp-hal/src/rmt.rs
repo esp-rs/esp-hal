@@ -2157,6 +2157,7 @@ mod chip_specific {
             });
         }
 
+        #[allow(unused)]
         #[inline]
         pub fn hw_offset(&self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
@@ -2568,6 +2569,7 @@ mod chip_specific {
             });
         }
 
+        #[allow(unused)]
         #[inline]
         pub fn hw_offset(&self) -> usize {
             let rmt = crate::peripherals::RMT::regs();
