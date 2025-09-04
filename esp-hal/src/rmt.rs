@@ -1624,6 +1624,7 @@ impl Channel<Blocking, Rx> {
         let memsize = raw.memsize();
 
         if !self.supports_wrap() && data.len() > self.raw.memsize().codes() {
+            // FIXME: Don't consume the channel here!
             return Err(Error::InvalidDataLength);
         }
 
