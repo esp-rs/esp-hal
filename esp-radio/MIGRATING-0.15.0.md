@@ -88,3 +88,12 @@ Same for `set_configuration()` to `set_config()`:
 -     });
 + let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
 ```
+
+## WifiState
+
+`wifi_state()` is removed and `WifiState` is split into `WifiStaState` and `WifiApState`:
+
+```diff
+- if esp_radio::wifi::wifi_state() == WifiState::StaConnected { ... }
++ if esp_radio::wifi::sta_state() == WifiStaState::Connected { ... }
+```
