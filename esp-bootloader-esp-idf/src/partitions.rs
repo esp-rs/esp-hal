@@ -649,7 +649,7 @@ where
             return Err(Error::OutOfBounds);
         }
 
-        if !self.range().contains(&address_to) {
+        if address_to > self.range().end {
             return Err(Error::OutOfBounds);
         }
 
