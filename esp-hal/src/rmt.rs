@@ -1521,16 +1521,10 @@ where
         match status {
             // Read all available data also on error
             Some(Event::End) | Some(Event::Error) => {
-                // This must only be run once, even if poll_internal is called repeatedly after the
-                // receiver finished!
-                if self.reader.state == ReaderState::Active {
-                    // Do not clear the interrupt flags here: Subsequent calls of wait() must
-                    // be able to observe them if this is currently called via poll()
-                    raw.stop_rx();
-                    raw.update();
-
-                    self.reader.read(&mut self.data, raw, true);
-                }
+                // Note that reader.read() is safe to call even if poll_internal is called
+                // repeatedly after the receiver finished since it returns immediately if already
+                // done.
+                self.reader.read(&mut self.data, raw, true);
             }
             Some(Event::Threshold) if self.channel.supports_wrap() => {
                 raw.reset_rx_threshold_set();
