@@ -4,6 +4,7 @@ pub mod common;
 pub mod malloc;
 pub mod misc;
 pub mod mutex;
+pub mod queue;
 pub mod semaphore;
 pub mod timer_compat;
 

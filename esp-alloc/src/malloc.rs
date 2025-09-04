@@ -49,6 +49,11 @@ pub unsafe extern "C" fn free(ptr: *mut u8) {
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn free_internal(ptr: *mut u8) {
+    unsafe { free(ptr) }
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn calloc(number: u32, size: usize) -> *mut u8 {
     let total_size = number as usize * size;
     unsafe {

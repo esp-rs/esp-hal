@@ -33,13 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `AuthMethod`, `Protocol`, `AccessPointInfo`, `AccessPointConfiguration`, `ClientConfiguration`, `Capability`, `Configuration`, `WifiEvent`, `InternalWifiError`, `ScanTypeConfig`, `WifiState`, and `WifiMode`
 - The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig` (#3994)
   - Error types implements `core::error:Error`
-- `ap_state()` and `sta_state()` marked as stable (#4017)  
+- `ap_state()` and `sta_state()` marked as stable (#4017)
 - `wifi_state()` marked as unstable (#4017)
 - `ap_mac` and `sta_mac` returns `[u8; 6]` instead of taking an `[u8; 6]` argument (#4017)
 - `RxControlInfo` hidden behind `esp-now` feature (#4017)
 - `set_configuration()` to `set_config() (#4017)
 - `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
 - `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
+- The memory allocation functions expected by `esp_radio` have been renamed and extended (#3890, #4043)
 
 ### Fixed
 

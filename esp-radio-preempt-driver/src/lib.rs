@@ -29,6 +29,7 @@
 #![no_std]
 
 pub mod mutex;
+pub mod queue;
 pub mod semaphore;
 
 use core::ffi::c_void;

@@ -45,6 +45,7 @@ pub(crate) fn ticks_to_millis(ticks: u64) -> u64 {
 }
 
 /// Do not call this in a critical section!
+#[cfg(feature = "wifi")]
 pub(crate) fn elapsed_time_since(start: u64) -> u64 {
     let now = systimer_count();
     time_diff(start, now)

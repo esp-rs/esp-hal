@@ -15,7 +15,7 @@ use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::{
-        c_types::c_void,
+        c_types::{c_int, c_ulong, c_void},
         include::{esp_event_base_t, esp_timer_get_time},
     },
     compat::{common::*, semaphore::*},
@@ -166,7 +166,7 @@ pub unsafe extern "C" fn semphr_give_from_isr(
 /// *************************************************************************
 #[allow(unused)]
 #[ram]
-pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
+pub unsafe extern "C" fn random() -> c_ulong {
     trace!("random");
 
     let rng = hal::rng::Rng::new();
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
     let base_mac = hal::efuse::Efuse::mac_address();
@@ -418,4 +418,189 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
     CAL_DATA.with(|cal_data| {
         *cal_data = *data;
     });
+}
+
+/// **************************************************************************
+/// Name: esp_queue_create
+///
+/// Description:
+///   Create message queue
+///
+/// Input Parameters:
+///   queue_len - queue message number
+///   item_size - message size
+///
+/// Returned Value:
+///   Message queue data pointer
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_create(queue_len: u32, item_size: u32) -> *mut c_void {
+    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
+    // version - JIRA: WIFI-6676
+    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
+        (queue_len, item_size)
+    } else {
+        warn!("Fixing queue item_size");
+        (3, 8)
+    };
+
+    crate::compat::queue::queue_create(queue_len as i32, item_size as i32).cast()
+}
+
+/// **************************************************************************
+/// Name: esp_queue_delete
+///
+/// Description:
+///   Delete message queue
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///
+/// Returned Value:
+///   None
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_delete(queue: *mut c_void) {
+    crate::compat::queue::queue_delete(queue.cast());
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send
+///
+/// Description:
+///   Send message of low priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_back(queue.cast(), item.cast_const(), block_time_tick)
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_from_isr
+///
+/// Description:
+///   Send message of low priority to queue in ISR within
+///   a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   hptw  - No mean
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_from_isr(
+    queue: *mut c_void,
+    item: *mut c_void,
+    _higher_priority_task_waken: *mut c_void,
+) -> i32 {
+    crate::compat::queue::queue_try_send_to_back(queue.cast(), item.cast_const())
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_to_back
+///
+/// Description:
+///   Send message of low priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_to_back(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_back(queue.cast(), item, block_time_tick)
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_from_to_front
+///
+/// Description:
+///   Send message of high priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_to_front(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_front(queue.cast(), item, block_time_tick)
+}
+
+/// **************************************************************************
+/// Name: esp_queue_recv
+///
+/// Description:
+///   Receive message from queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_recv(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_receive(queue.cast(), item, block_time_tick)
+}
+
+pub unsafe extern "C" fn queue_recv_from_isr(
+    queue: *mut c_void,
+    item: *mut c_void,
+    _higher_priority_task_waken: *mut c_void,
+) -> i32 {
+    crate::compat::queue::queue_try_receive(queue.cast(), item)
+}
+
+/// **************************************************************************
+/// Name: esp_queue_msg_waiting
+///
+/// Description:
+///   Get message number in the message queue
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///
+/// Returned Value:
+///   Message number
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_msg_waiting(queue: *mut c_void) -> u32 {
+    crate::compat::queue::queue_messages_waiting(queue.cast())
 }
