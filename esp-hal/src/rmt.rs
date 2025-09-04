@@ -1164,6 +1164,7 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
+#[must_use = "transactions need to be `poll()`ed / `wait()`ed for to ensure progress"]
 pub struct SingleShotTxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
@@ -1214,23 +1215,60 @@ where
     pub fn wait(
         mut self,
     ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
+        let raw = self.channel.raw;
+
         // Not sure that all the error cases below can happen. However, it's best to
         // handle them to be sure that we don't lock up here in case they can happen.
-        loop {
+        let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
+                Some(Event::Error) => break Err(Error::TransmissionError),
                 Some(Event::End) => {
                     if !self.remaining_data.is_empty() {
                         // Unexpectedly done, even though we have data left: For example, this could
                         // happen if there is a stop code inside the data and not just at the end.
-                        break Err((Error::TransmissionError, self.channel));
+                        break Err(Error::TransmissionError);
                     } else {
-                        break Ok(self.channel);
+                        break Ok(());
                     }
                 }
                 _ => continue,
             }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
+        raw.clear_tx_interrupts();
+
+        match result {
+            Ok(()) => Ok(channel),
+            Err(err) => Err((err, channel)),
         }
+    }
+}
+
+impl<T> Drop for SingleShotTxTransaction<'_, '_, T>
+where
+    T: Into<PulseCode> + Copy,
+{
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
     }
 }
 
