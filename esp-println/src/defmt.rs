@@ -2,9 +2,11 @@
 // Implementation taken from defmt-rtt, with a custom framing prefix
 
 #[cfg(feature = "critical-section")]
-use critical_section::RestoreState;
+use esp_sync::RestoreState;
 
 use super::{LockToken, PrinterImpl};
+#[cfg(feature = "critical-section")]
+use crate::LOCK;
 
 /// Global logger lock.
 #[cfg(feature = "critical-section")]
@@ -20,7 +22,7 @@ unsafe impl defmt::Logger for Logger {
         #[cfg(feature = "critical-section")]
         unsafe {
             // safety: Must be paired with corresponding call to release(), see below
-            let restore = critical_section::acquire();
+            let restore = LOCK.acquire();
 
             // safety: accessing the `static mut` is OK because we have acquired a critical
             // section.
@@ -70,7 +72,7 @@ unsafe impl defmt::Logger for Logger {
                 let restore = CS_RESTORE;
 
                 // safety: Must be paired with corresponding call to acquire(), see above
-                critical_section::release(restore);
+                LOCK.release(restore);
             }
         }
     }

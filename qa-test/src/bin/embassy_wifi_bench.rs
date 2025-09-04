@@ -32,7 +32,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, Config, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{ClientConfig, Config, WifiController, WifiDevice, WifiEvent, WifiStaState},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -86,7 +86,7 @@ async fn main(spawner: Spawner) -> ! {
     let wifi_interface = interfaces.sta;
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     cfg_if::cfg_if! {
@@ -152,8 +152,8 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::wifi_state() {
-            WifiState::StaConnected => {
+        match esp_radio::wifi::sta_state() {
+            WifiStaState::Connected => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::StaDisconnected).await;
                 Timer::after(Duration::from_millis(5000)).await

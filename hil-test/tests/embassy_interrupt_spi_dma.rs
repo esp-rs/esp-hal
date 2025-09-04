@@ -145,11 +145,13 @@ mod test {
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         let other_peripheral = esp_hal::i2s::master::I2s::new(
             peripherals.I2S0,
-            esp_hal::i2s::master::Standard::Philips,
-            esp_hal::i2s::master::DataFormat::Data8Channel8,
-            Rate::from_khz(8),
             dma_channel2,
-        );
+            esp_hal::i2s::master::Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_khz(8))
+                .with_data_format(esp_hal::i2s::master::DataFormat::Data16Channel16)
+                .with_channels(esp_hal::i2s::master::Channels::STEREO),
+        )
+        .unwrap();
 
         let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
 
@@ -191,9 +193,8 @@ mod test {
     #[cfg(multi_core)]
     #[test]
     async fn dma_does_not_lock_up_on_core_1() {
-        use embassy_time::Timer;
+        use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
         use esp_hal::peripherals::SPI2;
-        use portable_atomic::{AtomicU32, Ordering};
 
         cfg_if::cfg_if! {
             if #[cfg(pdma)] {
@@ -204,7 +205,6 @@ mod test {
         }
 
         const BUFFER_SIZE: usize = 256;
-        static LOOP_COUNT: AtomicU32 = AtomicU32::new(0);
 
         pub struct SpiPeripherals {
             pub spi: SPI2<'static>,
@@ -212,7 +212,10 @@ mod test {
         }
 
         #[embassy_executor::task]
-        async fn run_spi(peripherals: SpiPeripherals) {
+        async fn run_spi(
+            peripherals: SpiPeripherals,
+            finished: &'static Signal<CriticalSectionRawMutex, ()>,
+        ) {
             let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(3200);
             let dma_rx_buf = DmaRxBuf::new(rx_descriptors, rx_buffer).unwrap();
             let dma_tx_buf = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
@@ -234,7 +237,7 @@ mod test {
                 embedded_hal_async::spi::SpiBus::transfer(&mut spi, &mut buffer, send_buffer)
                     .await
                     .unwrap();
-                LOOP_COUNT.fetch_add(1, Ordering::Relaxed);
+                finished.signal(());
             }
         }
 
@@ -266,6 +269,8 @@ mod test {
             }
         }
 
+        let transfer_finished = &*mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
+
         let spi_peripherals = SpiPeripherals {
             spi: peripherals.SPI2,
             dma_channel,
@@ -285,8 +290,10 @@ mod test {
                 );
                 let high_pri_spawner = hp_executor.start(Priority::Priority2);
 
-                // hub75 runs as high priority task
-                high_pri_spawner.spawn(run_spi(spi_peripherals)).ok();
+                // spi runs as high priority task
+                high_pri_spawner
+                    .spawn(run_spi(spi_peripherals, transfer_finished))
+                    .ok();
 
                 // This loop is necessary to avoid parking the core after creating the interrupt
                 // executor.
@@ -300,18 +307,13 @@ mod test {
         let cpu_control = CpuControl::new(peripherals.CPU_CTRL);
         let mut _cpu_control = cpu_control;
 
-        #[allow(static_mut_refs)]
         let _guard = _cpu_control
             .start_app_core(app_core_stack, cpu1_fnctn)
             .unwrap();
 
-        let mut last = 0u32;
+        // Wait for a few SPI transfers to happen
         for _ in 0..5 {
-            Timer::after(Duration::from_millis(200)).await;
-
-            let next = LOOP_COUNT.load(Ordering::Relaxed);
-            assert_ne!(next, last, "stuck");
-            last = next;
+            transfer_finished.wait().await;
         }
 
         // make sure the other peripheral didn't get stuck

@@ -22,8 +22,8 @@ test = false
 allocator-api2        = { version = "0.3.0", default-features = false }
 defmt                 = { version = "1.0.1", optional = true }
 cfg-if                = "1.0.0"
-critical-section      = "1.2.0"
 enumset               = "1.1.6"
+esp-sync              = { version = "0.0.0", path = "../esp-sync" }
 linked_list_allocator = { version = "0.10.5", default-features = false, features = ["const_mut_refs"] }
 document-features     = "0.2.11"
 
@@ -46,3 +46,22 @@ internal-heap-stats = []
 
 ## Provide C-compatibility functions (malloc, free, ...)
 compat = []
+
+
+#! ### Chip selection
+#! One of the following features must be enabled to select the target chip:
+
+##
+esp32c2   = ["esp-sync/esp32c2"]
+##
+esp32c3   = ["esp-sync/esp32c3"]
+##
+esp32c6   = ["esp-sync/esp32c6"]
+##
+esp32h2   = ["esp-sync/esp32h2"]
+##
+esp32     = ["esp-sync/esp32"]
+##
+esp32s2   = ["esp-sync/esp32s2"]
+##
+esp32s3   = ["esp-sync/esp32s3"]

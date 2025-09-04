@@ -10,10 +10,10 @@ use embassy_time_driver::Driver;
 use esp_hal::{
     Blocking,
     interrupt::{InterruptHandler, Priority},
-    sync::Locked,
     time::{Duration, Instant},
     timer::{Error, OneShotTimer},
 };
+use esp_sync::NonReentrantMutex;
 
 pub type Timer = OneShotTimer<'static, Blocking>;
 
@@ -67,19 +67,19 @@ struct AlarmInner {
     pub state: AlarmState,
 }
 
+unsafe impl Send for AlarmInner {}
+
 struct Alarm {
     // FIXME: we should be able to use priority-limited locks here, but we can initialize alarms
     // while running at an arbitrary priority level. We need to rework alarm allocation to only use
     // a critical section to allocate an alarm, but not when using it.
-    pub inner: Locked<AlarmInner>,
+    pub inner: NonReentrantMutex<AlarmInner>,
 }
-
-unsafe impl Send for Alarm {}
 
 impl Alarm {
     pub const fn new(handler: extern "C" fn()) -> Self {
         Self {
-            inner: Locked::new(AlarmInner {
+            inner: NonReentrantMutex::new(AlarmInner {
                 #[cfg(not(single_queue))]
                 context: Cell::new(core::ptr::null_mut()),
                 state: AlarmState::Created(handler),
@@ -110,8 +110,10 @@ pub(super) struct EmbassyTimer {
     pub(crate) inner: crate::timer_queue::TimerQueue,
 
     alarms: [Alarm; MAX_SUPPORTED_ALARM_COUNT],
-    available_timers: Locked<Option<&'static mut [Timer]>>,
+    available_timers: NonReentrantMutex<Option<&'static mut [Timer]>>,
 }
+
+unsafe impl Send for EmbassyTimer {}
 
 /// Repeats the `Alarm::new` constructor for each alarm, creating an interrupt
 /// handler for each of them.
@@ -139,7 +141,7 @@ embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyTimer = EmbassyTime
     #[cfg(single_queue)]
     inner: crate::timer_queue::TimerQueue::new(Priority::max()),
     alarms: alarms!(0, 1, 2, 3, 4, 5, 6),
-    available_timers: Locked::new(None),
+    available_timers: NonReentrantMutex::new(None),
 });
 
 impl EmbassyTimer {

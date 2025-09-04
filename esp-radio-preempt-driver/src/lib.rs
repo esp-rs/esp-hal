@@ -28,7 +28,13 @@
 
 #![no_std]
 
+pub mod mutex;
+pub mod queue;
+pub mod semaphore;
+
 use core::ffi::c_void;
+
+use crate::semaphore::SemaphorePtr;
 
 unsafe extern "Rust" {
     fn esp_preempt_initialized() -> bool;
@@ -43,7 +49,7 @@ unsafe extern "Rust" {
         task_stack_size: usize,
     ) -> *mut c_void;
     fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void);
-    fn esp_preempt_current_task_thread_semaphore() -> *mut c_void;
+    fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr;
 }
 
 /// Set the Scheduler implementation.
@@ -71,21 +77,25 @@ macro_rules! scheduler_impl {
         fn esp_preempt_enable() {
             <$t as $crate::Scheduler>::enable(&$name)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_disable() {
             <$t as $crate::Scheduler>::disable(&$name)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_yield_task() {
             <$t as $crate::Scheduler>::yield_task(&$name)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_current_task() -> *mut c_void {
             <$t as $crate::Scheduler>::current_task(&$name)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_task_create(
@@ -95,14 +105,16 @@ macro_rules! scheduler_impl {
         ) -> *mut c_void {
             <$t as $crate::Scheduler>::task_create(&$name, task, param, task_stack_size)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void) {
             <$t as $crate::Scheduler>::schedule_task_deletion(&$name, task_handle)
         }
+
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_current_task_thread_semaphore() -> *mut c_void {
+        fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr {
             <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
         }
     };
@@ -153,7 +165,7 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function should return an opaque per-thread pointer to an
     /// usize-sized memory location, which will be used to store a pointer
     /// to a semaphore for this thread.
-    fn current_task_thread_semaphore(&self) -> *mut c_void;
+    fn current_task_thread_semaphore(&self) -> SemaphorePtr;
 }
 
 // API used (mostly) by esp-radio
@@ -224,6 +236,6 @@ pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
 
 /// Returns a pointer to the current thread's semaphore.
 #[inline]
-pub fn current_task_thread_semaphore() -> *mut c_void {
+pub fn current_task_thread_semaphore() -> SemaphorePtr {
     unsafe { esp_preempt_current_task_thread_semaphore() }
 }

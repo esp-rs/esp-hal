@@ -469,36 +469,26 @@ mod uart_printer {
     }
 }
 
-#[cfg(not(feature = "critical-section"))]
 use core::marker::PhantomData;
 
-#[cfg(not(feature = "critical-section"))]
-type LockInner<'a> = PhantomData<&'a ()>;
-#[cfg(feature = "critical-section")]
-type LockInner<'a> = critical_section::CriticalSection<'a>;
-
 #[derive(Clone, Copy)]
-struct LockToken<'a>(LockInner<'a>);
+struct LockToken<'a>(PhantomData<&'a ()>);
 
 impl LockToken<'_> {
     #[allow(unused)]
     unsafe fn conjure() -> Self {
-        unsafe {
-            #[cfg(feature = "critical-section")]
-            let inner = critical_section::CriticalSection::new();
-            #[cfg(not(feature = "critical-section"))]
-            let inner = PhantomData;
-
-            LockToken(inner)
-        }
+        LockToken(PhantomData)
     }
 }
+
+#[cfg(feature = "critical-section")]
+static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 /// Runs the callback in a critical section, if enabled.
 #[inline]
 fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
     #[cfg(feature = "critical-section")]
-    return critical_section::with(|cs| f(LockToken(cs)));
+    return LOCK.lock(|| f(unsafe { LockToken::conjure() }));
 
     #[cfg(not(feature = "critical-section"))]
     f(unsafe { LockToken::conjure() })
