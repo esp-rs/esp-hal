@@ -77,7 +77,7 @@ impl Ext1WakeupSource<'_, '_> {
         fn uninit_pin(pin: impl RtcPin, wakeup_pins: u8) {
             if wakeup_pins & (1 << pin.number()) != 0 {
                 pin.rtcio_pad_hold(false);
-                pin.rtc_set_config(false, false, RtcFunction::Rtc);
+                pin.rtc_set_config(false, false, RtcFunction::RTC);
             }
         }
 
@@ -114,7 +114,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
                 WakeupLevel::Low => 0,
             };
 
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtc_set_config(true, true, RtcFunction::RTC);
             pin.rtcio_pad_hold(true);
         }
 
@@ -142,7 +142,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+            pin.rtc_set_config(true, false, RtcFunction::RTC);
         }
     }
 }

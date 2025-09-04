@@ -125,7 +125,7 @@ impl<P: RtcPin> WakeSource for Ext0WakeupSource<P> {
         // set pin to RTC function
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, true, RtcFunction::Rtc);
+            .rtc_set_config(true, true, RtcFunction::RTC);
 
         // rtcio_hal_ext0_set_wakeup_pin
         unsafe {
@@ -150,7 +150,7 @@ impl<P: RtcPin> Drop for Ext0WakeupSource<P> {
         // to IO_MUX)
         self.pin
             .borrow_mut()
-            .rtc_set_config(true, false, RtcFunction::Rtc);
+            .rtc_set_config(true, false, RtcFunction::RTC);
     }
 }
 
@@ -172,7 +172,7 @@ impl WakeSource for Ext1WakeupSource<'_, '_> {
         let mut pins = self.pins.borrow_mut();
         let mut bits = 0u32;
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, true, RtcFunction::Rtc);
+            pin.rtc_set_config(true, true, RtcFunction::RTC);
             pin.rtcio_pad_hold(true);
             bits |= 1 << pin.rtc_number();
         }
@@ -200,7 +200,7 @@ impl Drop for Ext1WakeupSource<'_, '_> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for pin in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+            pin.rtc_set_config(true, false, RtcFunction::RTC);
         }
     }
 }
@@ -209,7 +209,7 @@ impl RtcioWakeupSource<'_, '_> {
     fn apply_pin(&self, pin: &mut dyn RtcPin, level: WakeupLevel) {
         let rtcio = RTC_IO::regs();
 
-        pin.rtc_set_config(true, true, RtcFunction::Rtc);
+        pin.rtc_set_config(true, true, RtcFunction::RTC);
 
         rtcio.pin(pin.number() as usize).modify(|_, w| unsafe {
             w.gpio_pin_wakeup_enable().set_bit();
@@ -258,7 +258,7 @@ impl Drop for RtcioWakeupSource<'_, '_> {
         // to IO_MUX)
         let mut pins = self.pins.borrow_mut();
         for (pin, _level) in pins.iter_mut() {
-            pin.rtc_set_config(true, false, RtcFunction::Rtc);
+            pin.rtc_set_config(true, false, RtcFunction::RTC);
         }
     }
 }

@@ -180,7 +180,7 @@ fn isolate_digital_gpio() {
             // make pad work as gpio (otherwise, deep_sleep bottom current will rise)
             io_mux
                 .gpio(pin_num)
-                .modify(|_, w| unsafe { w.mcu_sel().bits(RtcFunction::Digital as u8) });
+                .modify(|_, w| unsafe { w.mcu_sel().bits(RtcFunction::DIGITAL as u8) });
         }
     }
 }
@@ -250,7 +250,7 @@ impl WakeSource for RtcioWakeupSource<'_, '_> {
 // to IO_MUX)
 // let mut pins = self.pins.borrow_mut();
 // for (pin, _level) in pins.iter_mut() {
-// pin.rtc_set_config(true, false, RtcFunction::Rtc);
+// pin.rtc_set_config(true, false, RtcFunction::RTC);
 // }
 // }
 // }

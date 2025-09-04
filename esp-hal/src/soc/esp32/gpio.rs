@@ -54,6 +54,10 @@ macro_rules! rtcio_analog {
                         .hold_force()
                         .modify(|_, w| w.$hold().bit(enable));
                 }
+
+                fn functions(&self, _: private::Internal) -> &'static [RtcFunction] {
+                    &[RtcFunction::_0, RtcFunction::_1, /* macros hard :'( */]
+                }
             }
 
             for_each_gpio! {
