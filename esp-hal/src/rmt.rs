@@ -1554,6 +1554,24 @@ impl core::future::Future for RmtTxFuture<'_> {
     }
 }
 
+impl Drop for RmtTxFuture<'_> {
+    fn drop(&mut self) {
+        let raw = self.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
+    }
+}
+
 /// TX channel in async mode
 impl Channel<Async, Tx> {
     /// Start transmitting the given pulse code sequence.
