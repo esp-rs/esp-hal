@@ -23,6 +23,7 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
+mod mutex;
 mod semaphore;
 mod task;
 mod timer;
