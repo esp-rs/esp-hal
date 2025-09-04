@@ -57,8 +57,7 @@ mod tests {
             .with_tx(tx)
             .with_rx(rx);
         let mut uhci = Uhci::new(uart, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
-        uhci.uhci
-            .apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
+        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
             .unwrap();
         uhci.set_uart_config(&uart::Config::default().with_baudrate(BAUDRATE))
             .unwrap();
@@ -110,8 +109,7 @@ mod tests {
             .with_tx(tx)
             .with_rx(rx);
         let mut uhci = Uhci::new(uart, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
-        uhci.uhci
-            .apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
+        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
             .unwrap();
         uhci.set_uart_config(&uart::Config::default().with_baudrate(BAUDRATE))
             .unwrap();
@@ -163,8 +161,7 @@ mod tests {
             .with_tx(tx)
             .with_rx(rx);
         let mut uhci = Uhci::new(uart, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
-        uhci.uhci
-            .apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
+        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
             .unwrap();
         uhci.set_uart_config(&uart::Config::default().with_baudrate(BAUDRATE))
             .unwrap();
@@ -218,8 +215,7 @@ mod tests {
             .with_tx(tx)
             .with_rx(rx);
         let mut uhci = Uhci::new(uart, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
-        uhci.uhci
-            .apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
+        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
             .unwrap();
         uhci.set_uart_config(&uart::Config::default().with_baudrate(BAUDRATE))
             .unwrap();
@@ -275,8 +271,7 @@ mod tests {
             .with_tx(tx2)
             .with_rx(rx1);
         let mut uhci = Uhci::new(uart0, ctx.peripherals.UHCI0, ctx.peripherals.DMA_CH0);
-        uhci.uhci
-            .apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
+        uhci.apply_config(&uart::uhci::Config::default().with_chunk_limit(DMA_BUFFER_SIZE))
             .unwrap();
 
         let mut uart1 = Uart::new(ctx.peripherals.UART1, uart::Config::default())

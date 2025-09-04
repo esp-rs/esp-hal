@@ -40,8 +40,7 @@
 //!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-//!     uhci.uhci
-//!         .apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
+//!     uhci.apply_config(&uhci::Config::default().with_chunk_limit(dma_rx.len() as u16))
 //!         .unwrap();
 //!
 //!     let config = uart::Config::default()
@@ -100,9 +99,7 @@ use crate::{
         DmaEligible,
         DmaError,
         DmaRxBuffer,
-        DmaRxChannel,
         DmaTxBuffer,
-        DmaTxChannel,
         PeripheralDmaChannel,
         PeripheralRxChannel,
         PeripheralTxChannel,
@@ -111,7 +108,7 @@ use crate::{
     pac::uhci0,
     peripherals,
     system::{GenericPeripheralGuard, Peripheral},
-    uart::{self, TxError, Uart, UartRx, UartTx, uhci::Error::AboveReadLimit},
+    uart::{self, TxError, Uart, UartRx, UartTx},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -119,9 +116,6 @@ use crate::{
 #[non_exhaustive]
 /// Uhci specific errors
 pub enum Error {
-    /// set_chunk_limit() argument is above what's possible by the hardware. It cannot exceed 4095
-    /// (12 bits), above this value it will simply also split the readings
-    AboveReadLimit,
     /// DMA originating error
     Dma(DmaError),
     /// UART Tx originating error
@@ -301,12 +295,7 @@ where
     }
 
     /// Split the Uhci into UhciRx and UhciTx
-    pub fn split(
-        self,
-    ) -> (
-        UhciRx<'d, Dm, PeripheralRxChannel<AnyUhci<'d>>>,
-        UhciTx<'d, Dm, PeripheralTxChannel<AnyUhci<'d>>>,
-    ) {
+    pub fn split(self) -> (UhciRx<'d, Dm>, UhciTx<'d, Dm>) {
         let (uart_rx, uart_tx) = self.uart.split();
         (
             UhciRx {
@@ -322,6 +311,11 @@ where
                 _guard: self._guard.clone(),
             },
         )
+    }
+
+    /// Sets the config to the UHCI peripheral
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uhci.apply_config(config)
     }
 }
 
@@ -371,18 +365,6 @@ impl<'d> Uhci<'d, Async> {
     }
 }
 
-impl<Dm> embassy_embedded_hal::SetConfig for UhciInternal<Dm>
-where
-    Dm: DriverMode,
-{
-    type Config = Config;
-    type ConfigError = ConfigError;
-
-    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
-        self.apply_config(config)
-    }
-}
-
 /// Internal UHCI struct, to configure the UHCI peripheral
 pub struct UhciInternal<Dm>
 where
@@ -403,24 +385,7 @@ where
         }
     }
 
-    fn set_chunk_limit(&self, limit: u16) -> Result<(), Error> {
-        let reg = self.uhci_per.register_block();
-        // let val = reg.pkt_thres().read().pkt_thrs().bits();
-        // info!("Read limit value: {} to set: {}", val, limit);
-
-        // limit is 12 bits
-        // Above this value, it will probably split the messages, anyway, the point is below (the
-        // dma buffer length) it it will not freeze itself
-        if limit > 4095 {
-            return Err(AboveReadLimit);
-        }
-
-        reg.pkt_thres().write(|w| unsafe { w.bits(limit as u32) });
-        Ok(())
-    }
-
-    /// Sets the config to the UHCI peripheral
-    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+    fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
         let reg = self.uhci_per.register_block();
 
         reg.conf0().modify(|_, w| {
@@ -428,9 +393,14 @@ where
             w.len_eof_en().bit(config.len_eof)
         });
 
-        if self.set_chunk_limit(config.chunk_limit).is_err() {
+        // limit is 12 bits
+        // Above this value, it will probably split the messages, anyway, the point is below (the
+        // dma buffer length) it it will not freeze itself
+        if config.chunk_limit > 4095 {
             return Err(ConfigError::AboveReadLimit);
         }
+        reg.pkt_thres()
+            .write(|w| unsafe { w.bits(config.chunk_limit as u32) });
 
         Ok(())
     }
@@ -451,30 +421,28 @@ impl UhciInternal<Blocking> {
 }
 
 /// Splitted Uhci structs, Tx part for sending data
-pub struct UhciTx<'d, Dm, CH>
+pub struct UhciTx<'d, Dm>
 where
     Dm: DriverMode,
-    CH: DmaTxChannel,
 {
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     pub uhci: UhciInternal<Dm>,
     /// Tx of the used uart. You can configure it by accessing the value
     pub uart_tx: UartTx<'d, Dm>,
-    channel_tx: ChannelTx<Dm, CH>,
+    channel_tx: ChannelTx<Dm, PeripheralTxChannel<AnyUhci<'d>>>,
     // TODO: devices with UHCI1 need the non-generic guard
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
-impl<'d, Dm, CH> UhciTx<'d, Dm, CH>
+impl<'d, Dm> UhciTx<'d, Dm>
 where
     Dm: DriverMode,
-    CH: DmaTxChannel,
 {
     /// Starts the write DMA transfer and returns the instance of UhciDmaTxTransfer
     pub fn write<Buf: DmaTxBuffer>(
         mut self,
         mut tx_buffer: Buf,
-    ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf, CH>, (Error, Self, Buf)> {
+    ) -> Result<UhciDmaTxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         let res = unsafe {
             self.channel_tx
                 .prepare_transfer(self.uhci.uhci_per.dma_peripheral(), &mut tx_buffer)
@@ -490,32 +458,35 @@ where
 
         Ok(UhciDmaTxTransfer::new(self, tx_buffer))
     }
+
+    /// Sets the config to the UHCI peripheral
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uhci.apply_config(config)
+    }
 }
 
 /// Splitted Uhci structs, Rx part for receiving data
-pub struct UhciRx<'d, Dm, CH>
+pub struct UhciRx<'d, Dm>
 where
     Dm: DriverMode,
-    CH: DmaRxChannel,
 {
     /// Internal UHCI struct. Use it to configure the UHCI peripheral
     pub uhci: UhciInternal<Dm>,
     /// Rx of the used uart. You can configure it by accessing the value
     pub uart_rx: UartRx<'d, Dm>,
-    channel_rx: ChannelRx<Dm, CH>,
+    channel_rx: ChannelRx<Dm, PeripheralRxChannel<AnyUhci<'d>>>,
     _guard: GenericPeripheralGuard<{ Peripheral::Uhci0 as u8 }>,
 }
 
-impl<'d, Dm, CH> UhciRx<'d, Dm, CH>
+impl<'d, Dm> UhciRx<'d, Dm>
 where
     Dm: DriverMode,
-    CH: DmaRxChannel,
 {
     /// Starts the read DMA transfer and returns the instance of UhciDmaRxTransfer
     pub fn read<Buf: DmaRxBuffer>(
         mut self,
         mut rx_buffer: Buf,
-    ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf, CH>, (Error, Self, Buf)> {
+    ) -> Result<UhciDmaRxTransfer<'d, Dm, Buf>, (Error, Self, Buf)> {
         {
             let res = unsafe {
                 self.channel_rx
@@ -533,26 +504,30 @@ where
             Ok(UhciDmaRxTransfer::new(self, rx_buffer))
         }
     }
+
+    /// Sets the config to the UHCI peripheral
+    pub fn apply_config(&mut self, config: &Config) -> Result<(), ConfigError> {
+        self.uhci.apply_config(config)
+    }
 }
 
 /// A structure representing a DMA transfer for UHCI/UART.
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-pub struct UhciDmaTxTransfer<'d, Dm, Buf, CH>
+pub struct UhciDmaTxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
-    CH: DmaTxChannel,
 {
-    uhci: ManuallyDrop<UhciTx<'d, Dm, CH>>,
+    uhci: ManuallyDrop<UhciTx<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
     saved_err: Result<(), Error>,
 }
 
-impl<'d, Buf: DmaTxBuffer, Dm: DriverMode, CH: DmaTxChannel> UhciDmaTxTransfer<'d, Dm, Buf, CH> {
-    fn new(uhci: UhciTx<'d, Dm, CH>, dma_buf: Buf) -> Self {
+impl<'d, Buf: DmaTxBuffer, Dm: DriverMode> UhciDmaTxTransfer<'d, Dm, Buf> {
+    fn new(uhci: UhciTx<'d, Dm>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
@@ -567,7 +542,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode, CH: DmaTxChannel> UhciDmaTxTransfer<'
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (UhciTx<'d, Dm, CH>, Buf::Final) {
+    pub fn cancel(mut self) -> (UhciTx<'d, Dm>, Buf::Final) {
         self.uhci.channel_tx.stop_transfer();
 
         let retval = unsafe {
@@ -584,7 +559,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode, CH: DmaTxChannel> UhciDmaTxTransfer<'
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm, CH>, Buf::Final) {
+    pub fn wait(mut self) -> (Result<(), Error>, UhciTx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
                 Err(err),
@@ -619,7 +594,7 @@ impl<'d, Buf: DmaTxBuffer, Dm: DriverMode, CH: DmaTxChannel> UhciDmaTxTransfer<'
     }
 }
 
-impl<'d, Buf: DmaTxBuffer, CH: DmaTxChannel> UhciDmaTxTransfer<'d, Async, Buf, CH> {
+impl<'d, Buf: DmaTxBuffer> UhciDmaTxTransfer<'d, Async, Buf> {
     /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         // Workaround for an issue when it doesn't actually wait for the transfer to complete. I'm
@@ -640,9 +615,7 @@ impl<'d, Buf: DmaTxBuffer, CH: DmaTxChannel> UhciDmaTxTransfer<'d, Async, Buf, C
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaTxBuffer, CH: DmaTxChannel> Deref
-    for UhciDmaTxTransfer<'_, Dm, Buf, CH>
-{
+impl<Dm: DriverMode, Buf: DmaTxBuffer> Deref for UhciDmaTxTransfer<'_, Dm, Buf> {
     type Target = Buf::View;
 
     fn deref(&self) -> &Self::Target {
@@ -650,19 +623,16 @@ impl<Dm: DriverMode, Buf: DmaTxBuffer, CH: DmaTxChannel> Deref
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaTxBuffer, CH: DmaTxChannel> DerefMut
-    for UhciDmaTxTransfer<'_, Dm, Buf, CH>
-{
+impl<Dm: DriverMode, Buf: DmaTxBuffer> DerefMut for UhciDmaTxTransfer<'_, Dm, Buf> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.dma_buf
     }
 }
 
-impl<Dm, Buf, CH> Drop for UhciDmaTxTransfer<'_, Dm, Buf, CH>
+impl<Dm, Buf> Drop for UhciDmaTxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
     Buf: DmaTxBuffer,
-    CH: DmaTxChannel,
 {
     fn drop(&mut self) {
         self.uhci.channel_tx.stop_transfer();
@@ -678,20 +648,19 @@ where
 ///
 /// This structure holds references to the UHCI instance, DMA buffers, and
 /// transfer status.
-pub struct UhciDmaRxTransfer<'d, Dm, Buf, CH>
+pub struct UhciDmaRxTransfer<'d, Dm, Buf>
 where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
-    CH: DmaRxChannel,
 {
-    uhci: ManuallyDrop<UhciRx<'d, Dm, CH>>,
+    uhci: ManuallyDrop<UhciRx<'d, Dm>>,
     dma_buf: ManuallyDrop<Buf::View>,
     done: bool,
     saved_err: Result<(), Error>,
 }
 
-impl<'d, Buf: DmaRxBuffer, Dm: DriverMode, CH: DmaRxChannel> UhciDmaRxTransfer<'d, Dm, Buf, CH> {
-    fn new(uhci: UhciRx<'d, Dm, CH>, dma_buf: Buf) -> Self {
+impl<'d, Buf: DmaRxBuffer, Dm: DriverMode> UhciDmaRxTransfer<'d, Dm, Buf> {
+    fn new(uhci: UhciRx<'d, Dm>, dma_buf: Buf) -> Self {
         Self {
             uhci: ManuallyDrop::new(uhci),
             dma_buf: ManuallyDrop::new(dma_buf.into_view()),
@@ -706,7 +675,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode, CH: DmaRxChannel> UhciDmaRxTransfer<'
     }
 
     /// Cancels the DMA transfer.
-    pub fn cancel(mut self) -> (UhciRx<'d, Dm, CH>, Buf::Final) {
+    pub fn cancel(mut self) -> (UhciRx<'d, Dm>, Buf::Final) {
         self.uhci.channel_rx.stop_transfer();
 
         let retval = unsafe {
@@ -723,7 +692,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode, CH: DmaRxChannel> UhciDmaRxTransfer<'
     ///
     /// This method blocks until the transfer is finished and returns the
     /// `Uhci` instance and the associated buffer.
-    pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm, CH>, Buf::Final) {
+    pub fn wait(mut self) -> (Result<(), Error>, UhciRx<'d, Dm>, Buf::Final) {
         if let Err(err) = self.saved_err {
             return (
                 Err(err),
@@ -749,7 +718,7 @@ impl<'d, Buf: DmaRxBuffer, Dm: DriverMode, CH: DmaRxChannel> UhciDmaRxTransfer<'
     }
 }
 
-impl<'d, Buf: DmaRxBuffer, CH: DmaRxChannel> UhciDmaRxTransfer<'d, Async, Buf, CH> {
+impl<'d, Buf: DmaRxBuffer> UhciDmaRxTransfer<'d, Async, Buf> {
     /// Waits for the DMA transfer to complete, but async. After that, you still need to wait()
     pub async fn wait_for_done(&mut self) {
         let res = DmaRxFuture::new(&mut self.uhci.channel_rx).await;
@@ -762,9 +731,7 @@ impl<'d, Buf: DmaRxBuffer, CH: DmaRxChannel> UhciDmaRxTransfer<'d, Async, Buf, C
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaRxBuffer, CH: DmaRxChannel> Deref
-    for UhciDmaRxTransfer<'_, Dm, Buf, CH>
-{
+impl<Dm: DriverMode, Buf: DmaRxBuffer> Deref for UhciDmaRxTransfer<'_, Dm, Buf> {
     type Target = Buf::View;
 
     fn deref(&self) -> &Self::Target {
@@ -772,19 +739,16 @@ impl<Dm: DriverMode, Buf: DmaRxBuffer, CH: DmaRxChannel> Deref
     }
 }
 
-impl<Dm: DriverMode, Buf: DmaRxBuffer, CH: DmaRxChannel> DerefMut
-    for UhciDmaRxTransfer<'_, Dm, Buf, CH>
-{
+impl<Dm: DriverMode, Buf: DmaRxBuffer> DerefMut for UhciDmaRxTransfer<'_, Dm, Buf> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.dma_buf
     }
 }
 
-impl<Dm, Buf, CH> Drop for UhciDmaRxTransfer<'_, Dm, Buf, CH>
+impl<Dm, Buf> Drop for UhciDmaRxTransfer<'_, Dm, Buf>
 where
     Dm: DriverMode,
     Buf: DmaRxBuffer,
-    CH: DmaRxChannel,
 {
     fn drop(&mut self) {
         self.uhci.channel_rx.stop_transfer();
@@ -793,5 +757,41 @@ where
             ManuallyDrop::drop(&mut self.uhci);
             drop(Buf::from_view(ManuallyDrop::take(&mut self.dma_buf)));
         }
+    }
+}
+
+impl<Dm> embassy_embedded_hal::SetConfig for Uhci<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+impl<Dm> embassy_embedded_hal::SetConfig for UhciRx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
+    }
+}
+
+impl<Dm> embassy_embedded_hal::SetConfig for UhciTx<'_, Dm>
+where
+    Dm: DriverMode,
+{
+    type Config = Config;
+    type ConfigError = ConfigError;
+
+    fn set_config(&mut self, config: &Self::Config) -> Result<(), Self::ConfigError> {
+        self.apply_config(config)
     }
 }
