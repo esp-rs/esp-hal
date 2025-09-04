@@ -26,7 +26,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, rtc_cntl::Rtc, timer::timg::TimerGroup}
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiStaState},
 };
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
@@ -209,7 +209,7 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_radio::wifi::wifi_state() == WifiState::StaConnected {
+        if esp_radio::wifi::sta_state() == WifiStaState::Connected {
             // wait until we're no longer connected
             controller.wait_for_event(WifiEvent::StaDisconnected).await;
             Timer::after(Duration::from_millis(5000)).await

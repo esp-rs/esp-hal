@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ap_mac` and `sta_mac` returns `[u8; 6]` instead of taking an `[u8; 6]` argument (#4017)
 - `RxControlInfo` hidden behind `esp-now` feature (#4017)
 - `set_configuration()` to `set_config() (#4017)
+- `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
 
 ### Fixed
 
@@ -49,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions (#3963)
 - `EnumSetType` from `Protocol`, `Country` enums (#4017)
 - `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
+- `wifi_state()` and `WifiState` are not available anymore (#4046)
 
 ## [v0.15.0] - 2025-07-16
 
