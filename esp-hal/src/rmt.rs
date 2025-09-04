@@ -1290,29 +1290,26 @@ pub struct ContinuousTxTransaction {
 
 impl ContinuousTxTransaction {
     /// Stop transaction when the current iteration ends.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop_next(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
-        let raw = self.channel.raw;
-
-        raw.set_tx_continuous(false);
-        raw.update();
-
-        loop {
-            match raw.get_tx_status() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
-                _ => continue,
-            }
-        }
+        self.stop_impl(false)
     }
 
     /// Stop transaction as soon as possible.
-    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
     pub fn stop(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+        self.stop_impl(true)
+    }
+
+    #[cfg_attr(place_rmt_driver_in_ram, ram)]
+    fn stop_impl(
+        self,
+        immediate: bool,
+    ) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
         let raw = self.channel.raw;
 
         raw.set_tx_continuous(false);
-        let immediate = raw.stop_tx();
+        let immediate = if immediate { raw.stop_tx() } else { false };
         raw.update();
 
         if immediate {
