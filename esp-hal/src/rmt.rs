@@ -1273,6 +1273,7 @@ where
 }
 
 /// An in-progress continuous TX transaction
+#[must_use = "transactions will be aborted when dropped"]
 pub struct ContinuousTxTransaction<'ch> {
     channel: Channel<'ch, Blocking, Tx>,
 }
@@ -1303,22 +1304,54 @@ impl<'ch> ContinuousTxTransaction<'ch> {
         let immediate = if immediate { raw.stop_tx() } else { false };
         raw.update();
 
-        if immediate {
-            return Ok(self.channel);
-        }
-
-        loop {
-            match raw.get_tx_status() {
-                Some(Event::Error) => break Err((Error::TransmissionError, self.channel)),
-                Some(Event::End) => break Ok(self.channel),
-                _ => continue,
+        let result = if immediate {
+            Ok(())
+        } else {
+            loop {
+                match raw.get_tx_status() {
+                    Some(Event::Error) => break Err(Error::TransmissionError),
+                    Some(Event::End) => break Ok(()),
+                    _ => continue,
+                }
             }
+        };
+
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
+        raw.clear_tx_interrupts();
+
+        match result {
+            Ok(()) => Ok(channel),
+            Err(err) => Err((err, channel)),
         }
     }
 
     /// Check if the `loopcount` interrupt bit is set
     pub fn is_loopcount_interrupt_set(&self) -> bool {
         self.channel.raw.is_tx_loopcount_interrupt_set()
+    }
+}
+
+impl<'ch> Drop for ContinuousTxTransaction<'ch> {
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            let immediate = raw.stop_tx();
+            raw.update();
+
+            // Block until the channel is safe to use again.
+            if !immediate {
+                while !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {}
+            }
+        }
+
+        raw.clear_tx_interrupts();
     }
 }
 
