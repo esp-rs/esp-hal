@@ -144,7 +144,10 @@ fn check_data_eq(
                 rx[rx_count - 1],
             );
         }
-        Err(Error::ReceiverError | Error::InvalidDataLength) if !rx_wrap => (),
+        Err(Error::InvalidDataLength) if !rx_wrap => {
+            assert!(tx.len() > rx_memsize);
+            return;
+        }
         Err(e) => {
             panic!("unexpected rx error {:?}", e);
         }
@@ -181,36 +184,32 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     let supports_rx_wrap = rx_channel.supports_wrap();
     let rx_buffer_size = rx_channel.buffer_size();
 
-    let mut rx_transaction = match rx_channel.receive(&mut rcv_data) {
-        Ok(t) => t,
-        Err(Error::InvalidDataLength) if !supports_rx_wrap => {
-            assert!(TX_LEN > rx_buffer_size);
-            return;
+    let rx_res = match rx_channel.receive(&mut rcv_data) {
+        Ok(mut rx_transaction) => {
+            let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+            loop {
+                let tx_done = tx_transaction.poll();
+                let rx_done = rx_transaction.poll();
+                if tx_done && rx_done {
+                    break;
+                }
+            }
+
+            tx_transaction.wait().unwrap();
+            match rx_transaction.wait() {
+                Ok((rx_count, _channel)) => Ok(rx_count),
+                Err((err, _channel)) => Err(err),
+            }
         }
-        Err(e) => panic!("unexpected rx error {:?}", e),
+        Err(e) => Err(e),
     };
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
-
-    loop {
-        let tx_done = tx_transaction.poll();
-        let rx_done = rx_transaction.poll();
-        if tx_done && rx_done {
-            break;
-        }
-    }
-
-    tx_transaction.wait().unwrap();
-    let (rx_channel, rx_res) = match rx_transaction.wait() {
-        Ok((rx_count, channel)) => (channel, Ok(rx_count)),
-        Err((err, channel)) => (channel, Err(err)),
-    };
-
     check_data_eq(
         &tx_data,
         &rcv_data,
         rx_res,
-        rx_channel.buffer_size(),
-        rx_channel.supports_wrap(),
+        rx_buffer_size,
+        supports_rx_wrap,
     );
 }
 
