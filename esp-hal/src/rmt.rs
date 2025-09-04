@@ -1772,6 +1772,7 @@ impl<'ch> Channel<'ch, Blocking, Rx> {
 
         let reader = RmtReader::new();
 
+        raw.clear_rx_interrupts();
         raw.start_receive(true, memsize);
 
         Ok(RxTransaction {
@@ -2075,8 +2076,6 @@ impl DynChannelAccess<Rx> {
     }
 
     fn start_receive(&self, _wrap: bool, _memsize: MemSize) {
-        self.clear_rx_interrupts();
-
         #[cfg(rmt_has_rx_wrap)]
         {
             self.set_rx_threshold((_memsize.codes() / 2) as u16);
