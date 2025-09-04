@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ram(reclaimed)` as an alias for `link_section = ".dram2_uninit"` (#4245)
 - `rmt::MAX_TX_LOOPCOUNT` and `rmt::MAX_RX_IDLE_THRESHOLD` constants have been added (#4276)
 - Added support for `embedded-io 0.7` (#4280)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- `rmt::CHANNEL_RAM_SIZE` and `rmt::HAS_RX_WRAP` constants have been added (#4049)
 
 ### Changed
 
@@ -81,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4260)
 - RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4260)
 - RMT: `Channel::transmit_continuously` now verifies that loop counts don't exceed the hardware limit (#4276)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
 
 ### Fixed
 
