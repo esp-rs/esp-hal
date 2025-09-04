@@ -42,10 +42,10 @@ use esp_radio::{
         AccessPointConfig,
         ClientConfig,
         Config,
+        WifiApState,
         WifiController,
         WifiDevice,
         WifiEvent,
-        WifiState,
     },
 };
 
@@ -328,7 +328,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
     loop {
         match esp_radio::wifi::ap_state() {
-            WifiState::ApStarted => {
+            WifiApState::Started => {
                 println!("About to connect...");
 
                 match controller.connect_async().await {

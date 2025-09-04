@@ -1884,14 +1884,14 @@ impl WifiDeviceMode {
     fn link_state(&self) -> embassy_net_driver::LinkState {
         match self {
             WifiDeviceMode::Sta => {
-                if matches!(sta_state(), WifiState::StaConnected) {
+                if matches!(sta_state(), WifiStaState::Connected) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
                 }
             }
             WifiDeviceMode::Ap => {
-                if matches!(ap_state(), WifiState::ApStarted) {
+                if matches!(ap_state(), WifiApState::Started) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
@@ -3032,11 +3032,11 @@ impl WifiController<'_> {
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::sta_state(),
-            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
+            WifiStaState::Started | WifiStaState::Connected | WifiStaState::Disconnected
         ) {
             return Ok(true);
         }
-        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
+        if matches!(crate::wifi::ap_state(), WifiApState::Started) {
             return Ok(true);
         }
         Ok(false)
@@ -3048,8 +3048,8 @@ impl WifiController<'_> {
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::sta_state() {
-            crate::wifi::WifiState::StaConnected => Ok(true),
-            crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
+            crate::wifi::WifiStaState::Connected => Ok(true),
+            crate::wifi::WifiStaState::Disconnected => Err(WifiError::Disconnected),
             // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }
