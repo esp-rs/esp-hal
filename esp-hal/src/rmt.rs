@@ -199,6 +199,7 @@
 use core::{
     default::Default,
     marker::PhantomData,
+    mem::ManuallyDrop,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -1493,15 +1494,43 @@ where
 
         let result = loop {
             match self.poll_internal() {
-                Some(Event::Error) => break Err((Error::ReceiverError, self.channel)),
-                Some(Event::End) => break Ok((self.reader.total, self.channel)),
+                Some(Event::Error) => break Err(Error::ReceiverError),
+                Some(Event::End) => break Ok(self.reader.total),
                 _ => continue,
             }
         };
 
+        // Disable Drop handler since the transaction is stopped already.
+        let this = ManuallyDrop::new(self);
+        // Rust has no safe API to take values out of ManuallyDrop,
+        // cf. https://github.com/rust-lang/rfcs/pull/3466
+        // This is safe since we own `this`, and don't access it below.
+        let channel = unsafe { core::ptr::read(&this.channel) };
+
         raw.clear_rx_interrupts();
 
-        result
+        match result {
+            Ok(total) => Ok((total, channel)),
+            Err(err) => Err((err, channel)),
+        }
+    }
+}
+
+impl<T> Drop for RxTransaction<'_, T>
+where
+    T: From<PulseCode>,
+{
+    fn drop(&mut self) {
+        let raw = self.channel.raw;
+
+        if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
+            // This is immediate and does not update state flags, so we must not poll on
+            // get_rx_status() afterwards!
+            raw.stop_rx();
+            raw.update();
+        }
+
+        raw.clear_rx_interrupts();
     }
 }
 
