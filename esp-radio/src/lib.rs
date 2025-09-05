@@ -61,7 +61,24 @@
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
 //! - `ESP_RADIO_TX_QUEUE_SIZE`
 //! - `ESP_RADIO_MAX_BURST_SIZE`
-//!
+#![cfg_attr(
+    multi_core,
+    doc = concat!(
+        "### Running on the Second Core",
+        "\n\n",
+        "BLE and Wi-Fi can also be run on the second core.",
+        "\n\n",
+        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
+        "which you intend to run the wireless code. This will correctly initialize",
+        "the radio peripheral to run on that core, and ensure that interrupts are",
+        "serviced by the correct core.",
+        "\n\n",
+        "It's also important to allocate adequate stack for the second core; in many",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your",
+        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "such as your application silently failing at some point during execution."
+    )
+)]
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
