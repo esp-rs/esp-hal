@@ -11,6 +11,7 @@ unsafe extern "Rust" {
 
     fn esp_preempt_semaphore_take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
     fn esp_preempt_semaphore_give(semaphore: SemaphorePtr) -> bool;
+    fn esp_preempt_semaphore_current_count(semaphore: SemaphorePtr) -> u32;
 
     fn esp_preempt_semaphore_try_take(semaphore: SemaphorePtr) -> bool;
 }
@@ -50,6 +51,13 @@ pub trait SemaphoreImplementation {
     ///
     /// `semaphore` must be a pointer returned from [`Self::create`].
     unsafe fn give(semaphore: SemaphorePtr) -> bool;
+
+    /// Returns the semaphore's current counter value.
+    ///
+    /// # Safety
+    ///
+    /// `semaphore` must be a pointer returned from [`Self::create`].
+    unsafe fn current_count(semaphore: SemaphorePtr) -> u32;
 
     /// Attempts to decrement the semaphore's counter.
     ///
@@ -91,6 +99,12 @@ macro_rules! register_semaphore_implementation {
         #[inline]
         fn esp_preempt_semaphore_give(semaphore: $crate::semaphore::SemaphorePtr) -> bool {
             unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::give(semaphore) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_semaphore_current_count(semaphore: $crate::semaphore::SemaphorePtr) -> u32 {
+            unsafe { <$t as $crate::semaphore::SemaphoreImplementation>::current_count(semaphore) }
         }
 
         #[unsafe(no_mangle)]
@@ -155,6 +169,11 @@ impl SemaphoreHandle {
     /// maximum.
     pub fn give(&self) -> bool {
         unsafe { esp_preempt_semaphore_give(self.0) }
+    }
+
+    /// Returns the current counter value.
+    pub fn current_count(&self) -> u32 {
+        unsafe { esp_preempt_semaphore_current_count(self.0) }
     }
 
     /// Attempts to decrement the semaphore's counter.
