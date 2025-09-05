@@ -4,7 +4,6 @@
 use esp_alloc as _;
 use esp_backtrace as _;
 use esp_hal::main;
-use esp_preempt as _;
 use esp_println::println;
 use esp_radio::ieee802154::{Config, Ieee802154};
 
