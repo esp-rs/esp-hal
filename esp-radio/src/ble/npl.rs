@@ -399,7 +399,13 @@ unsafe extern "C" fn task_create(
     unsafe {
         let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(task_handle as *mut usize) = task as usize;
     }
 

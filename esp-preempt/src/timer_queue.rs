@@ -284,7 +284,7 @@ register_timer_implementation!(Timer);
 /// Initializes the `timer` task for the Wi-Fi driver.
 pub(crate) fn create_timer_task() {
     // schedule the timer task
-    SCHEDULER.task_create(timer_task, core::ptr::null_mut(), 8192);
+    SCHEDULER.task_create(timer_task, core::ptr::null_mut(), 1, None, 8192);
 }
 
 /// Entry point for the timer task responsible for handling scheduled timer
