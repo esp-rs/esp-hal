@@ -169,13 +169,24 @@ impl SchedulerState {
     }
 
     fn select_next_task(&mut self) -> Option<*mut Context> {
-        let next_task = unsafe { (*self.current_task).next };
+        let mut current = self.current_task;
+        loop {
+            let next_task = unsafe { (*current).next };
 
-        if next_task == self.current_task {
-            return None;
+            if next_task == self.current_task {
+                // We didn't find a new task to switch to.
+                // TODO: mark the current task as Running
+                // Once we have actual task states, yield should marked the current task as Ready,
+                // other stuff as Waiting.
+                return None;
+            }
+
+            if unsafe { (*next_task).state }.is_ready() {
+                // TODO: mark the selected task as Running
+                return Some(next_task);
+            }
+            current = next_task;
         }
-
-        Some(next_task)
     }
 
     #[cfg(xtensa)]
