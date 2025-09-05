@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AtomicWifiState` and `WifiDeviceMode` are not available anymore (#4029)
 - `wifi_state()` and `WifiState` are not available anymore (#4046)
 - `config` module (#4040)
+- Remove `as_client_conf_ref`, `as_ap_conf_ref`, `as_ap_conf_mut`, `as_client_conf_mut` and `as_mixed_conf_mut` from `Config` (#4060)
 
 ## [v0.15.0] - 2025-07-16
 
