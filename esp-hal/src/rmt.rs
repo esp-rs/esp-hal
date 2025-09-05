@@ -1521,6 +1521,9 @@ where
         match status {
             // Read all available data also on error
             Some(Event::End) | Some(Event::Error) => {
+                #[cfg(any(esp32, esp32s2))]
+                raw.stop_rx();
+
                 // Note that reader.read() is safe to call even if poll_internal is called
                 // repeatedly after the receiver finished since it returns immediately if already
                 // done.
@@ -1591,12 +1594,12 @@ where
     fn drop(&mut self) {
         let raw = self.channel.raw;
 
-        if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
+        // if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
             // This is immediate and does not update state flags, so we must not poll on
             // get_rx_status() afterwards!
             raw.stop_rx();
             raw.update();
-        }
+        // }
 
         raw.clear_rx_interrupts();
     }
@@ -1711,6 +1714,8 @@ where
         let raw = self.raw;
 
         if !matches!(raw.get_tx_status(), Some(Event::Error | Event::End)) {
+            raw.unlisten_tx_interrupt(EnumSet::all());
+
             let immediate = raw.stop_tx();
             raw.update();
 
@@ -1838,12 +1843,14 @@ where
     fn drop(&mut self) {
         let raw = self.raw;
 
-        if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
+        // if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
+            raw.unlisten_rx_interrupt(EnumSet::all());
+
             // This is immediate and does not update state flags, so we must not poll on
             // get_rx_status() afterwards!
             raw.stop_rx();
             raw.update();
-        }
+        // }
 
         raw.clear_rx_interrupts();
     }
@@ -2492,11 +2499,13 @@ mod chip_specific {
                 raw_tx.unlisten_tx_interrupt(EnumSet::all());
             } else if st.ch_rx_end(ch_idx).bit() {
                 raw_rx.unlisten_rx_interrupt(EnumSet::all());
+                raw_rx.stop_rx();
             } else if st.ch_err(ch_idx).bit() {
                 // On error interrupts, don't bother whether the channel is in Rx or Tx mode, just
                 // unlisten all interrupts and wake.
                 raw_tx.unlisten_tx_interrupt(EnumSet::all());
                 raw_rx.unlisten_rx_interrupt(EnumSet::all());
+                raw_rx.stop_rx();
             } else if st.ch_tx_thr_event(ch_idx).bit() {
                 raw_tx.unlisten_tx_interrupt(Event::Threshold);
             } else {
@@ -2690,6 +2699,7 @@ mod chip_specific {
             let ptr = self.channel_ram_start();
             for idx in 0..self.memsize().codes() {
                 unsafe {
+                    // FIXME: SHould this use an end marker with the idle_out_lv?
                     ptr.add(idx).write_volatile(super::PulseCode::end_marker());
                 }
             }
