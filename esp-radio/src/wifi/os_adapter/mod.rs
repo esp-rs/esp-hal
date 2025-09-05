@@ -328,7 +328,7 @@ pub unsafe extern "C" fn mutex_delete(mutex: *mut c_void) {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn mutex_lock(mutex: *mut c_void) -> i32 {
-    crate::compat::mutex::mutex_lock(mutex, OSI_FUNCS_TIME_BLOCKING)
+    crate::compat::mutex::mutex_lock(mutex)
 }
 
 /// **************************************************************************
