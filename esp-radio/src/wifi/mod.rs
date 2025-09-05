@@ -1269,11 +1269,11 @@ pub enum WifiEvent {
     /// Soft-AP stop.
     ApStop,
     /// A station connected to Soft-AP.
-    ApStaconnected,
+    ApStaConnected,
     /// A station disconnected from Soft-AP.
-    ApStadisconnected,
+    ApStaDisconnected,
     /// Received probe request packet in Soft-AP interface.
-    ApProbereqrecved,
+    ApProbeReqReceived,
 
     /// Received report of FTM procedure.
     FtmReport,
