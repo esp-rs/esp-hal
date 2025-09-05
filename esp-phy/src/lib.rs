@@ -16,7 +16,6 @@ pub(crate) mod private {
     pub trait Sealed {}
 }
 
-
 /// Length of the PHY calibration data.
 pub const PHY_CALIBRATION_DATA_LENGTH: usize =
     core::mem::size_of::<esp_wifi_sys::include::esp_phy_calibration_data_t>();
@@ -234,7 +233,6 @@ impl PhyState {
 static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
     critical_section::Mutex::new(RefCell::new(PhyState::new()));
 
-
 #[derive(Debug)]
 /// Prevents the PHY from being deinitialized.
 ///
@@ -245,7 +243,6 @@ pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }
 impl PhyInitGuard<'_> {
-
     #[inline]
     /// Release the init guard.
     ///
@@ -257,7 +254,6 @@ impl Drop for PhyInitGuard<'_> {
         critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
     }
 }
-
 
 /// Common functionality for controlling PHY initialization.
 pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
@@ -311,7 +307,6 @@ pub trait MacTimeExt {
 #[cfg(esp32)]
 impl MacTimeExt for esp_hal::peripherals::WIFI<'_> {}
 
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Calibration data was already set.
@@ -321,7 +316,6 @@ pub struct CalibrationDataAlreadySetError;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// No calibration data is available.
 pub struct NoCalibrationDataError;
-
 
 /// Load previously backed up PHY calibration data.
 ///
