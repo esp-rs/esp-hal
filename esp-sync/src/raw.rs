@@ -18,7 +18,7 @@ pub trait RawLock {
     ///
     /// # Safety
     ///
-    /// - The `token` must be created by `self.enter()
+    /// - The `token` must be created by `self.enter()`
     /// - Tokens must be released in reverse order to their creation, on the same thread that they
     ///   were created on.
     unsafe fn exit(&self, token: RestoreState);
