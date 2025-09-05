@@ -2633,9 +2633,11 @@ mod chip_specific {
             rmt.chconf1(ch as usize).modify(|_, w| {
                 w.mem_owner().clear_bit();
                 w.mem_rd_rst().set_bit();
-                w.apb_mem_rst().set_bit();
-                w.tx_start().set_bit()
+                w.apb_mem_rst().set_bit()
             });
+
+            rmt.chconf1(ch as usize)
+                .modify(|_, w| w.tx_start().set_bit());
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
@@ -2775,9 +2777,10 @@ mod chip_specific {
             rmt.chconf1(ch as usize).modify(|_, w| {
                 w.mem_owner().set_bit();
                 w.mem_wr_rst().set_bit();
-                w.apb_mem_rst().set_bit();
-                w.rx_en().set_bit()
+                w.apb_mem_rst().set_bit()
             });
+
+            rmt.chconf1(ch as usize).modify(|_, w| w.rx_en().set_bit());
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
