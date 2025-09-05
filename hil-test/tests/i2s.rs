@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     async fn test_i2s_loopback_async(ctx: Context) {
-        let spawner = embassy_executor::Spawner::for_current_executor().await;
+        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
