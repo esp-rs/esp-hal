@@ -160,34 +160,48 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(xtensa)]
-    fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
-
+    fn delete_marked_tasks(&mut self) {
         if !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);
             self.delete_task(task_to_delete);
         }
+    }
 
-        unsafe { self.current_task = (*self.current_task).next };
+    fn select_next_task(&mut self) -> Option<*mut Context> {
+        let next_task = unsafe { (*self.current_task).next };
+
+        if next_task == self.current_task {
+            return None;
+        }
+
+        Some(next_task)
+    }
+
+    #[cfg(xtensa)]
+    fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
+        self.delete_marked_tasks();
+
+        let Some(next_task) = self.select_next_task() else {
+            return;
+        };
+
+        task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
+
+        self.current_task = next_task;
 
         task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
     }
 
     #[cfg(riscv)]
     fn switch_task(&mut self) {
-        if !self.to_delete.is_null() {
-            let task_to_delete = core::mem::take(&mut self.to_delete);
-            self.delete_task(task_to_delete);
-        }
+        self.delete_marked_tasks();
 
-        let task = self.current_task;
-        let context = unsafe { &mut (*task).trap_frame };
-        let old_ctx = core::ptr::addr_of_mut!(*context);
+        let Some(next_task) = self.select_next_task() else {
+            return;
+        };
 
-        let task = unsafe { (*self.current_task).next };
-        let context = unsafe { &mut (*task).trap_frame };
-        let new_ctx = core::ptr::addr_of_mut!(*context);
+        let old_ctx = unsafe { &raw mut (*self.current_task).trap_frame };
+        let new_ctx = unsafe { &raw mut (*next_task).trap_frame };
 
         if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
             unsafe { self.current_task = (*self.current_task).next };
