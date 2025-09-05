@@ -1081,7 +1081,26 @@ pub(crate) fn ble_init() {
 
         self::ble_os_adapter_chip_specific::ble_rtc_clk_init();
 
+        #[cfg(esp32c2)]
+        let mut cfg = ble_os_adapter_chip_specific::BLE_CONFIG;
+
+        #[cfg(not(esp32c2))]
         let cfg = ble_os_adapter_chip_specific::BLE_CONFIG;
+
+        #[cfg(esp32c2)]
+        {
+            use esp_hal::clock::Clock;
+
+            let xtal = crate::hal::rtc_cntl::RtcClock::xtal_freq();
+            let mhz = xtal.mhz() as u8;
+
+            cfg.main_xtal_freq = mhz;
+
+            if mhz == 26 {
+                cfg.rtc_freq = 40000;
+                cfg.main_xtal_freq = 26;
+            }
+        }
 
         let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
         if res != 0 {
