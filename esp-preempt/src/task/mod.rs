@@ -22,6 +22,7 @@ pub(crate) struct Context {
     pub trap_frame: TrapFrame,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub next: *mut Context,
+    pub next_to_delete: *mut Context,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
 }
 
@@ -41,6 +42,7 @@ impl Context {
             trap_frame: task::new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             next: core::ptr::null_mut(),
+            next_to_delete: core::ptr::null_mut(),
             _allocated_stack: stack,
         }
     }
@@ -65,6 +67,7 @@ pub(super) fn allocate_main_task() {
             trap_frame: TrapFrame::default(),
             thread_semaphore: None,
             next: core::ptr::null_mut(),
+            next_to_delete: core::ptr::null_mut(),
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
         },
         InternalMemory,

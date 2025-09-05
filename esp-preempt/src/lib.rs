@@ -161,8 +161,9 @@ impl SchedulerState {
     }
 
     fn delete_marked_tasks(&mut self) {
-        if !self.to_delete.is_null() {
+        while !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);
+            self.to_delete = unsafe { (*task_to_delete).next_to_delete };
             self.delete_task(task_to_delete);
         }
     }
@@ -208,14 +209,16 @@ impl SchedulerState {
         }
     }
 
-    fn schedule_task_deletion(&mut self, task: *mut Context) -> bool {
-        if task.is_null() {
-            self.to_delete = self.current_task;
-            true
-        } else {
-            self.to_delete = task;
-            core::ptr::eq(task, self.current_task)
+    fn schedule_task_deletion(&mut self, mut task_to_delete: *mut Context) -> bool {
+        if task_to_delete.is_null() {
+            task_to_delete = self.current_task;
         }
+        let is_current = core::ptr::eq(task_to_delete, self.current_task);
+
+        unsafe { (*task_to_delete).next_to_delete = self.to_delete };
+        self.to_delete = task_to_delete;
+
+        is_current
     }
 }
 
