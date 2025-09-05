@@ -32,6 +32,10 @@ impl SemaphoreInner {
             false
         }
     }
+
+    fn current_count(&mut self) -> u32 {
+        self.current
+    }
 }
 
 pub struct Semaphore {
@@ -84,6 +88,10 @@ impl Semaphore {
         Self::yield_loop_with_timeout(timeout_us, || self.try_take())
     }
 
+    pub fn current_count(&self) -> u32 {
+        self.inner.with(|sem| sem.current_count())
+    }
+
     pub fn give(&self) -> bool {
         self.inner.with(|sem| sem.try_give())
     }
@@ -110,6 +118,12 @@ impl SemaphoreImplementation for Semaphore {
         let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
 
         semaphore.give()
+    }
+
+    unsafe fn current_count(semaphore: SemaphorePtr) -> u32 {
+        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+
+        semaphore.current_count()
     }
 
     unsafe fn try_take(semaphore: SemaphorePtr) -> bool {
