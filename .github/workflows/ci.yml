@@ -101,14 +101,24 @@ jobs:
         run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
 
   extras:
-    runs-on: macos-m1-self-hosted
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: ubuntu-latest
+      fallback-runner: macos-m1-self-hosted
 
+  run-extras:
+    needs: extras
+    runs-on: ${{ needs.extras.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
 
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
       # Build the extra crates
       - name: Build the bench-server
         run: cd extras/bench-server && cargo build
@@ -151,8 +161,14 @@ jobs:
   # host tests
 
   host-tests:
-    runs-on: macos-m1-self-hosted
-
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: ubuntu-latest
+      fallback-runner: macos-m1-self-hosted
+    
+  run-host-tests:
+    needs: host-tests
+    runs-on: ${{ needs.host-tests.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v4
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
