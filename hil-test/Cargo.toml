@@ -21,15 +21,7 @@ name    = "clock_monitor"
 harness = false
 
 [[test]]
-name    = "crc"
-harness = false
-
-[[test]]
 name    = "critical_section"
-harness = false
-
-[[test]]
-name    = "delay"
 harness = false
 
 [[test]]
@@ -46,10 +38,6 @@ harness = false
 
 [[test]]
 name    = "ecc"
-harness = false
-
-[[test]]
-name    = "get_time"
 harness = false
 
 [[test]]
@@ -70,10 +58,6 @@ harness = false
 
 [[test]]
 name    = "i2c"
-harness = false
-
-[[test]]
-name    = "i2c_rtc"
 harness = false
 
 [[test]]
@@ -98,6 +82,10 @@ harness = false
 
 [[test]]
 name    = "lcd_cam_i8080_async"
+harness = false
+
+[[test]]
+name    = "misc_simple"
 harness = false
 
 [[test]]
@@ -169,10 +157,6 @@ name    = "uart"
 harness = false
 
 [[test]]
-name    = "usb_serial_jtag"
-harness = false
-
-[[test]]
 name              = "uart_async"
 harness           = false
 required-features = ["embassy"]
@@ -227,10 +211,6 @@ required-features = ["esp-radio", "esp-alloc"]
 name              = "esp_radio_init"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
-
-[[test]]
-name    = "otadata"
-harness = false
 
 [dependencies]
 allocator-api2    = { version = "0.3.0", default-features = false, features = ["alloc"] }
