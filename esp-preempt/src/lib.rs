@@ -28,6 +28,7 @@ mod queue;
 mod semaphore;
 mod task;
 mod timer;
+mod timer_queue;
 
 use core::ffi::c_void;
 
@@ -274,6 +275,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         // allocate the main task
         task::allocate_main_task();
         timer::setup_multitasking();
+        timer_queue::create_timer_task();
 
         TIMER.with(|t| {
             let t = unwrap!(t.as_mut());

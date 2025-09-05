@@ -129,7 +129,6 @@ use crate::wifi::WifiError;
 use crate::{
     preempt::yield_task,
     radio::{setup_radio_isr, shutdown_radio_isr},
-    tasks::init_tasks,
 };
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
@@ -177,10 +176,6 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
-
-#[doc(hidden)]
-pub mod tasks;
-
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
@@ -261,7 +256,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     // This initializes the task switcher
     preempt::enable();
 
-    init_tasks();
     yield_task();
 
     wifi_set_log_verbose();

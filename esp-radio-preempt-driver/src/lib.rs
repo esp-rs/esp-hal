@@ -31,8 +31,12 @@
 pub mod mutex;
 pub mod queue;
 pub mod semaphore;
+pub mod timer;
 
 use core::ffi::c_void;
+
+// Timer callbacks need to be heap-allocated.
+extern crate alloc;
 
 use crate::semaphore::SemaphorePtr;
 
