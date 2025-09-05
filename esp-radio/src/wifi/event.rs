@@ -39,14 +39,14 @@ fn default_handler<Event: 'static>() -> Box<Handler<Event>> {
 ///
 /// ```rust, no_run
 /// # use esp_radio::wifi::event::{self, *};
-/// # fn new_handler(_: &ApStaconnected) {}
-/// event::ApStaconnected::update_handler(|_cs, event| {
+/// # fn new_handler(_: &ApStaConnected) {}
+/// event::ApStaConnected::update_handler(|_cs, event| {
 ///     new_handler(event);
 /// })
 /// ```
 // Implemented like this instead of free functions because the syntax would be
 // ```
-// event::update_handler::<event::ApStaconnected, _>(...)
+// event::update_handler::<event::ApStaConnected, _>(...)
 // ```
 #[instability::unstable]
 pub trait EventExt: sealed::Event + Sized + 'static {
@@ -131,9 +131,9 @@ impl_wifi_event!(StaWpsErPin, wifi_event_sta_wps_er_pin_t);
 impl_wifi_event!(StaWpsErPbcOverlap);
 impl_wifi_event!(ApStart);
 impl_wifi_event!(ApStop);
-impl_wifi_event!(ApStaconnected, wifi_event_ap_staconnected_t);
-impl_wifi_event!(ApStadisconnected, wifi_event_ap_stadisconnected_t);
-impl_wifi_event!(ApProbereqrecved, wifi_event_ap_probe_req_rx_t);
+impl_wifi_event!(ApStaConnected, wifi_event_ap_staconnected_t);
+impl_wifi_event!(ApStaDisconnected, wifi_event_ap_stadisconnected_t);
+impl_wifi_event!(ApProbeReqReceived, wifi_event_ap_probe_req_rx_t);
 impl_wifi_event!(FtmReport, wifi_event_ftm_report_t);
 impl_wifi_event!(StaBssRssiLow, wifi_event_bss_rssi_low_t);
 impl_wifi_event!(ActionTxStatus, wifi_event_action_tx_status_t);
@@ -175,7 +175,7 @@ impl_wifi_event!(NdpTerminated, wifi_event_ndp_terminated_t);
 impl_wifi_event!(HomeChannelChange, wifi_event_home_channel_change_t);
 impl_wifi_event!(StaNeighborRep, wifi_event_neighbor_report_t);
 
-impl ApStaconnected {
+impl ApStaConnected {
     /// Get the MAC address of the connected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -187,7 +187,7 @@ impl ApStaconnected {
     }
 }
 
-impl ApStadisconnected {
+impl ApStaDisconnected {
     /// Get the MAC address of the disconnected station.
     pub fn mac(&self) -> &[u8] {
         &self.0.mac
@@ -343,7 +343,7 @@ impl FtmReport {
     }
 }
 
-impl ApProbereqrecved {
+impl ApProbeReqReceived {
     /// Get received probe request SSID.
     pub fn rssi(&self) -> i32 {
         self.0.rssi
@@ -806,14 +806,14 @@ pub(crate) unsafe fn dispatch_event_handler(
         WifiEvent::ApStop => {
             handle_raw::<ApStop>(event_data, event_data_size)
         }
-        WifiEvent::ApStaconnected => {
-            handle_raw::<ApStaconnected>(event_data, event_data_size)
+        WifiEvent::ApStaConnected => {
+            handle_raw::<ApStaConnected>(event_data, event_data_size)
         }
-        WifiEvent::ApStadisconnected => {
-            handle_raw::<ApStadisconnected>(event_data, event_data_size)
+        WifiEvent::ApStaDisconnected => {
+            handle_raw::<ApStaDisconnected>(event_data, event_data_size)
         }
-        WifiEvent::ApProbereqrecved => {
-            handle_raw::<ApProbereqrecved>(event_data, event_data_size)
+        WifiEvent::ApProbeReqReceived => {
+            handle_raw::<ApProbeReqReceived>(event_data, event_data_size)
         }
         WifiEvent::FtmReport => {
             handle_raw::<FtmReport>(event_data, event_data_size)
