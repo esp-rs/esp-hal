@@ -1,9 +1,6 @@
 use esp_wifi_sys::c_types::c_void;
 
-use crate::{
-    compat::OSI_FUNCS_TIME_BLOCKING,
-    preempt::mutex::{MutexHandle, MutexPtr},
-};
+use crate::preempt::mutex::{MutexHandle, MutexPtr};
 
 pub(crate) fn mutex_create(recursive: bool) -> *mut c_void {
     MutexHandle::new(recursive).leak().as_ptr().cast()
