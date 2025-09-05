@@ -15,7 +15,7 @@ use esp_wifi_sys::{c_types::c_char, include::malloc};
 use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
     ESP_RADIO_LOCK,
-    binary::c_types::{c_int, c_void},
+    binary::c_types::{c_int, c_uint, c_void},
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
 };
@@ -44,14 +44,10 @@ pub(crate) fn thread_sem_get() -> *mut c_void {
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-pub(crate) unsafe extern "C" fn sleep(
-    millis: crate::binary::c_types::c_uint,
-) -> crate::binary::c_types::c_uint {
+pub(crate) unsafe extern "C" fn sleep(seconds: c_uint) -> c_uint {
     trace!("sleep");
 
-    unsafe {
-        usleep(millis * 1_000);
-    }
+    unsafe { usleep(seconds * 1_000_000) };
     0
 }
 
