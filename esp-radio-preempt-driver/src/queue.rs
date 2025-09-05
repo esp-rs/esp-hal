@@ -22,6 +22,7 @@ unsafe extern "Rust" {
     fn esp_preempt_queue_try_send_to_back(queue: QueuePtr, item: *const u8) -> bool;
     fn esp_preempt_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
     fn esp_preempt_queue_try_receive(queue: QueuePtr, item: *mut u8) -> bool;
+    fn esp_preempt_queue_remove(queue: QueuePtr, item: *const u8);
     fn esp_preempt_queue_messages_waiting(queue: QueuePtr) -> usize;
 }
 
@@ -97,6 +98,14 @@ pub trait QueueImplementation {
     /// a size equal to the queue's item size.
     unsafe fn try_receive(queue: QueuePtr, item: *mut u8) -> bool;
 
+    /// Removes an item from the queue.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    unsafe fn remove(queue: QueuePtr, item: *const u8);
+
     /// Returns the number of messages in the queue.
     fn messages_waiting(queue: QueuePtr) -> usize;
 }
@@ -160,6 +169,12 @@ macro_rules! register_queue_implementation {
         #[inline]
         fn esp_preempt_queue_try_receive(queue: QueuePtr, item: *mut u8) -> bool {
             unsafe { <$t as $crate::queue::QueueImplementation>::try_receive(queue, item) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_queue_remove(queue: QueuePtr, item: *mut u8) {
+            unsafe { <$t as $crate::queue::QueueImplementation>::remove(queue, item) }
         }
 
         #[unsafe(no_mangle)]
@@ -276,6 +291,16 @@ impl QueueHandle {
     /// a size equal to the queue's item size.
     pub unsafe fn try_receive(&self, item: *mut u8) -> bool {
         unsafe { esp_preempt_queue_try_receive(self.0, item) }
+    }
+
+    /// Removes an item from the queue.
+    ///
+    /// # Safety
+    ///
+    /// The caller must ensure that `item` can be dereferenced and points to an allocation of
+    /// a size equal to the queue's item size.
+    pub unsafe fn remove(&self, item: *const u8) {
+        unsafe { esp_preempt_queue_remove(self.0, item) }
     }
 
     /// Returns the number of messages in the queue.

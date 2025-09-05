@@ -95,6 +95,16 @@ pub(crate) fn queue_try_receive(queue: *mut c_void, item: *mut c_void) -> i32 {
     unsafe { handle.try_receive(item.cast()) as i32 }
 }
 
+pub(crate) fn queue_remove(queue: *mut c_void, item: *const c_void) {
+    trace!("queue_remove queue {:?} item {:x}", queue, item as usize);
+
+    let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
+
+    let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
+
+    unsafe { handle.remove(item.cast()) }
+}
+
 pub(crate) fn queue_messages_waiting(queue: *mut c_void) -> u32 {
     trace!("queue_msg_waiting {:?}", queue);
 
