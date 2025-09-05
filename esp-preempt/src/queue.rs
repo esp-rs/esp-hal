@@ -68,6 +68,31 @@ impl QueueInner {
         true
     }
 
+    unsafe fn remove(&mut self, item: *const u8) {
+        // do what the ESP-IDF implementations does...
+        // just remove all elements and add them back except the one we need to remove -
+        // good enough for now
+        let count = self.len();
+
+        if count == 0 {
+            return;
+        }
+
+        let mut tmp_item = vec![0; self.item_size];
+
+        let item_slice = unsafe { core::slice::from_raw_parts(item, self.item_size) };
+        for _ in 0..count {
+            if !unsafe { self.try_dequeue(tmp_item.as_mut_ptr().cast()) } {
+                break;
+            }
+            if &tmp_item[..] != item_slice {
+                _ = unsafe { self.try_enqueue(tmp_item.as_mut_ptr().cast()) };
+            }
+            // Note that even if we find our item, we'll need to keep cycling through everything to
+            // keep insertion order.
+        }
+    }
+
     fn len(&self) -> usize {
         if self.current_write >= self.current_read {
             self.current_write - self.current_read
@@ -132,6 +157,10 @@ impl Queue {
         self.inner.with(|queue| unsafe { queue.try_dequeue(item) })
     }
 
+    unsafe fn remove(&self, item: *const u8) {
+        self.inner.with(|queue| unsafe { queue.remove(item) })
+    }
+
     fn messages_waiting(&self) -> usize {
         self.inner.with(|queue| queue.len())
     }
@@ -174,6 +203,12 @@ impl QueueImplementation for Queue {
         let queue = unsafe { Queue::from_ptr(queue) };
 
         unsafe { queue.try_receive(item) }
+    }
+
+    unsafe fn remove(queue: QueuePtr, item: *const u8) {
+        let queue = unsafe { Queue::from_ptr(queue) };
+
+        unsafe { queue.remove(item) }
     }
 
     fn messages_waiting(queue: QueuePtr) -> usize {

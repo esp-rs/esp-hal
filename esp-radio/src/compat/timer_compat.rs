@@ -7,8 +7,8 @@ use crate::{
     preempt::timer::TimerPtr,
 };
 
-pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout: u32, repeat: bool) {
-    compat_timer_arm_us(ets_timer, tmout * 1000, repeat);
+pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout_ms: u32, repeat: bool) {
+    compat_timer_arm_us(ets_timer, tmout_ms * 1000, repeat);
 }
 
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
