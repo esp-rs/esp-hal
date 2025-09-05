@@ -28,7 +28,6 @@ This guide outlines the contribution workflow, from reporting issues and submitt
 
 Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are some resources to get you started:
 
-*   [Understanding the Project]: A high-level overview of `esp-hal`.
 *   Intro to Open Source Contribution: [GitHub's Guide]
 *   [Setting Up Git]
 *   Workflow Insights: [GitHub Flow]
@@ -36,7 +35,6 @@ Welcome aboard! If you're new to `esp-hal` or open-source contribution, here are
 
 Before adding or changing code, review the [esp-rs API guidelines].
 
-[Understanding the Project]: README.md
 [GitHub's Guide]: https://docs.github.com/en/get-started/exploring-projects-on-github/finding-ways-to-contribute-to-open-source-on-github
 [Setting Up Git]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [GitHub Flow]: https://docs.github.com/en/get-started/quickstart/github-flow

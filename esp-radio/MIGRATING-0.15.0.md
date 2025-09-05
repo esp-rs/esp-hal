@@ -44,6 +44,7 @@ Provide these symbols:
 + pub extern "C" fn malloc(size: usize) -> *mut u8 ...
 + pub extern "C" fn malloc_internal(size: usize) -> *mut u8 ...
 + pub extern "C" fn free(ptr: *mut u8) ...
++ pub extern "C" fn free_internal(ptr: *mut u8) ...
 + pub extern "C" fn calloc(number: u32, size: usize) -> *mut u8 ...
 + pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8 ...
 + pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 ...
@@ -69,4 +70,57 @@ use esp_radio::wifi::{
 +    Config,
 +    EapClientConfig
 }
+```
+
+Same for `set_configuration()` to `set_config()`:
+
+```diff
+- let res = controller.set_configuration(&ap_config);
++ let res = controller.set_config(&ap_config);
+```
+
+## BuilderLite pattern `AccessPointConfig` and `ClientConfig`
+
+```diff
+- let ap_config = Config::AccessPoint({
+-         let mut config = AccessPointConfig::default();
+-         config.ssid = "esp-radio".into();
+-         config
+-     });
++ let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+```
+
+## WifiState
+
+`wifi_state()` is removed and `WifiState` is split into `WifiStaState` and `WifiApState`:
+
+```diff
+- if esp_radio::wifi::wifi_state() == WifiState::StaConnected { ... }
++ if esp_radio::wifi::sta_state() == WifiStaState::Connected { ... }
+```
+
+## `Mixed` mode has been renamed to `ApSta`
+
+```diff
+-    let client_config = Config::Mixed(
+-        ClientConfig::default()
+-            .with_ssid("ssid".into())
+-            .with_password("password".into()),
+-        AccessPointConfig::default().with_ssid("esp-radio".into()),
+-    );
++    let client_config = Config::ApSta(
++        ClientConfig::default()
++            .with_ssid("ssid".into())
++            .with_password("password".into()),
++        AccessPointConfig::default().with_ssid("esp-radio".into()),
++    );
+```
+
+## `PowerSaveMode` is moved to `wifi` module
+
+```diff
+    controller
+-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
++        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
+    .unwrap();
 ```

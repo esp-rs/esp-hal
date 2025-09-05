@@ -224,7 +224,7 @@ This will use software-interrupt 3 which isn't available for anything else to wa
     fn wait_impl(cpu: usize) {
         // we do not care about race conditions between the load and store operations,
         // interrupts will only set this value to true.
-        critical_section::with(|_| {
+        riscv::interrupt::free(|| {
             // if there is work to do, loop back to polling
             if !SIGNAL_WORK_THREAD_MODE[cpu].load(Ordering::Relaxed) {
                 // if not, wait for interrupt

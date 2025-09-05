@@ -11,14 +11,13 @@
 
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 use core::{
-    cell::RefCell,
     fmt::Debug,
     marker::PhantomData,
     task::{Context, Poll},
 };
 
-use critical_section::Mutex;
 use esp_hal::asynch::AtomicWaker;
+use esp_sync::NonReentrantMutex;
 use portable_atomic::{AtomicBool, AtomicU8, Ordering};
 
 use super::*;
@@ -37,9 +36,14 @@ pub const ESP_NOW_MAX_DATA_LEN: usize = 250;
 /// Broadcast address
 pub const BROADCAST_ADDRESS: [u8; 6] = [0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8];
 
-// Stores received packets until dequeued by the user
-static RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedData>>> =
-    Mutex::new(RefCell::new(VecDeque::new()));
+struct EspNowState {
+    // Stores received packets until dequeued by the user
+    rx_queue: VecDeque<ReceivedData>,
+}
+
+static STATE: NonReentrantMutex<EspNowState> = NonReentrantMutex::new(EspNowState {
+    rx_queue: VecDeque::new(),
+});
 
 /// This atomic behaves like a guard, so we need strict memory ordering when
 /// operating it.
@@ -49,6 +53,9 @@ static RECEIVE_QUEUE: Mutex<RefCell<VecDeque<ReceivedData>>> =
 static ESP_NOW_SEND_CB_INVOKED: AtomicBool = AtomicBool::new(false);
 /// Status of esp now send, true for success, false for failure
 static ESP_NOW_SEND_STATUS: AtomicBool = AtomicBool::new(true);
+
+static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
+static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
 macro_rules! check_error {
     ($block:block) => {
@@ -632,10 +639,7 @@ impl EspNowReceiver<'_> {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData> {
-        critical_section::with(|cs| {
-            let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.pop_front()
-        })
+        STATE.with(|state| state.rx_queue.pop_front())
     }
 }
 
@@ -842,14 +846,12 @@ impl<'d> EspNow<'d> {
 }
 
 unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t) {
-    critical_section::with(|_| {
-        let is_success = status == esp_now_send_status_t_ESP_NOW_SEND_SUCCESS;
-        ESP_NOW_SEND_STATUS.store(is_success, Ordering::Relaxed);
+    let is_success = status == esp_now_send_status_t_ESP_NOW_SEND_SUCCESS;
+    ESP_NOW_SEND_STATUS.store(is_success, Ordering::Relaxed);
 
-        ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
+    ESP_NOW_SEND_CB_INVOKED.store(true, Ordering::Release);
 
-        ESP_NOW_TX_WAKER.wake();
-    })
+    ESP_NOW_TX_WAKER.wake();
 }
 
 unsafe extern "C" fn rcv_cb(
@@ -888,22 +890,18 @@ unsafe extern "C" fn rcv_cb(
         rx_control,
     };
     let slice = unsafe { core::slice::from_raw_parts(data, data_len as usize) };
-    critical_section::with(|cs| {
-        let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
+
+    STATE.with(|state| {
         let data = Box::from(slice);
 
-        if queue.len() >= RECEIVE_QUEUE_SIZE {
-            queue.pop_front();
+        if state.rx_queue.len() >= RECEIVE_QUEUE_SIZE {
+            state.rx_queue.pop_front();
         }
 
-        queue.push_back(ReceivedData { data, info });
-
+        state.rx_queue.push_back(ReceivedData { data, info });
         ESP_NOW_RX_WAKER.wake();
     });
 }
-
-pub(super) static ESP_NOW_TX_WAKER: AtomicWaker = AtomicWaker::new();
-pub(super) static ESP_NOW_RX_WAKER: AtomicWaker = AtomicWaker::new();
 
 impl EspNowReceiver<'_> {
     /// This function takes mutable reference to self because the
@@ -1004,10 +1002,7 @@ impl core::future::Future for ReceiveFuture<'_> {
     fn poll(self: core::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ESP_NOW_RX_WAKER.register(cx.waker());
 
-        if let Some(data) = critical_section::with(|cs| {
-            let mut queue = RECEIVE_QUEUE.borrow_ref_mut(cs);
-            queue.pop_front()
-        }) {
+        if let Some(data) = STATE.with(|state| state.rx_queue.pop_front()) {
             Poll::Ready(data)
         } else {
             Poll::Pending

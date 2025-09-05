@@ -58,6 +58,7 @@ pub enum Package {
     EspPrintln,
     EspRiscvRt,
     EspStorage,
+    EspSync,
     EspRadio,
     EspRadioPreemptDriver,
     EspPreempt,
@@ -78,6 +79,7 @@ impl Package {
             self,
             EspBacktrace
                 | EspBootloaderEspIdf
+                | EspAlloc
                 | EspHal
                 | EspHalEmbassy
                 | EspMetadataGenerated
@@ -87,6 +89,7 @@ impl Package {
                 | EspPrintln
                 | EspPreempt
                 | EspStorage
+                | EspSync
                 | EspRadio
         )
     }
@@ -231,7 +234,12 @@ impl Package {
                     features.push("coex".to_owned());
                 }
                 if features.iter().any(|f| {
-                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex" || f == "ieee802154"
+                    f == "csi"
+                        || f == "ble"
+                        || f == "esp-now"
+                        || f == "sniffer"
+                        || f == "coex"
+                        || f == "ieee802154"
                 }) {
                     features.push("unstable".to_owned());
                 }

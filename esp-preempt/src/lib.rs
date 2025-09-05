@@ -23,6 +23,9 @@ extern crate alloc;
 // MUST be the first module
 mod fmt;
 
+mod mutex;
+mod queue;
+mod semaphore;
 mod task;
 mod timer;
 
@@ -31,12 +34,13 @@ use core::ffi::c_void;
 use allocator_api2::boxed::Box;
 use esp_hal::{
     Blocking,
-    sync::Locked,
     time::{Duration, Instant, Rate},
     timer::{AnyTimer, PeriodicTimer},
 };
+use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphorePtr};
+use esp_sync::NonReentrantMutex;
 
-use crate::{task::Context, timer::TIMER};
+use crate::{semaphore::Semaphore, task::Context, timer::TIMER};
 
 type TimeBase = PeriodicTimer<'static, Blocking>;
 
@@ -112,6 +116,8 @@ struct SchedulerState {
     /// Pointer to the task that is scheduled for deletion.
     to_delete: *mut Context,
 }
+
+unsafe impl Send for SchedulerState {}
 
 impl SchedulerState {
     const fn new() -> Self {
@@ -233,7 +239,8 @@ fn usleep(us: u32) {
     }
 }
 
-static SCHEDULER_STATE: Locked<SchedulerState> = Locked::new(SchedulerState::new());
+static SCHEDULER_STATE: NonReentrantMutex<SchedulerState> =
+    NonReentrantMutex::new(SchedulerState::new());
 
 struct Scheduler {}
 
@@ -320,7 +327,13 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         task::schedule_task_deletion(task_handle as *mut Context)
     }
 
-    fn current_task_thread_semaphore(&self) -> *mut c_void {
-        unsafe { &mut ((*task::current_task()).thread_semaphore) as *mut _ as *mut c_void }
+    fn current_task_thread_semaphore(&self) -> SemaphorePtr {
+        task::with_current_task(|task| {
+            if task.thread_semaphore.is_none() {
+                task.thread_semaphore = Some(Semaphore::create(1, 0));
+            }
+
+            unwrap!(task.thread_semaphore)
+        })
     }
 }

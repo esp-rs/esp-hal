@@ -2,15 +2,11 @@
 
 This directory contains a number of binary applications demonstrating the use of various hardware peripherals found within the ESP32 family of devices from Espressif.
 
-Each device has its own unique set of peripherals, and as such not every example will run on every device. We recommend building and flashing the examples using the `xtask` method documented below, which will greatly simplify the process.
+Each device has its own unique set of peripherals, and as such not every example will run on every device. We recommend building and flashing the examples using the `xtask` method shown below (no need to install any additional external tools), which will greatly simplify the process.
 
 To check if a device is compatible with a given example, check the features in the `Cargo.toml` file for the example application, which will include a feature for each supported device.
 
-As previously stated, we use the [cargo-xtask] pattern for automation. Commands invoking this tool must be run from the root of the repository.
-
 For more information regarding the examples, refer to the `README.md` file in any of the subdirectories within the `examples/` directory.
-
-[cargo-xtask]: https://github.com/matklad/cargo-xtask
 
 ## Building Examples
 

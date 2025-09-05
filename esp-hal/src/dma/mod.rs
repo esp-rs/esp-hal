@@ -551,7 +551,7 @@ macro_rules! declare_aligned_dma_buffer {
         // ESP32-S2 technically supports byte-aligned DMA buffers, but the
         // transfer ends up writing out of bounds.
         // if the buffer's length is 2 or 3 (mod 4).
-        static mut $name: [u32; ($size + 3) / 4] = [0; ($size + 3) / 4];
+        static mut $name: [u32; ($size as usize).div_ceil(4)] = [0; ($size as usize).div_ceil(4)];
     };
 }
 
@@ -1741,7 +1741,7 @@ cfg_if::cfg_if! {
 
 fn create_guard(_ch: &impl RegisterAccess) -> PeripheralGuard {
     // NOTE(p4): this function will read the channel's DMA peripheral from `_ch`
-    system::GenericPeripheralGuard::new_with(init_dma)
+    system::GenericPeripheralGuard::new_with(init_dma_racey)
 }
 
 // DMA receive channel

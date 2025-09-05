@@ -19,7 +19,7 @@ mod run;
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
-    pub example: String,
+    pub example: Option<String>,
     /// Chip to target.
     #[arg(value_enum, long)]
     pub chip: Option<Chip>,
@@ -126,18 +126,60 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
+    // At this point, chip can never be `None`, so we can safely unwrap it.
+    let chip = args.chip.unwrap();
+
+    // Filter the examples down to only the binaries supported by the given chip
+    examples.retain(|ex| ex.supports_chip(chip));
+
     // Sort all examples by name:
     examples.sort_by_key(|a| a.binary_name());
+
+    let mut filtered = examples.clone();
+
+    if let Some(example) = args.example.as_deref() {
+        if !example.eq_ignore_ascii_case("all") {
+            // Only keep the example the user wants
+            filtered.retain(|ex| ex.matches_name(example));
+
+            if filtered.is_empty() {
+                log::warn!(
+                    "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
+                );
+
+                let example_name = inquire::Select::new(
+                    "Select the example:",
+                    examples.iter().map(|ex| ex.binary_name()).collect(),
+                )
+                .prompt()?;
+
+                if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name)
+                {
+                    filtered.push(selected.clone());
+                }
+            }
+        }
+    } else {
+        let example_name = inquire::Select::new(
+            "Select an example:",
+            examples.iter().map(|ex| ex.binary_name()).collect(),
+        )
+        .prompt()?;
+
+        if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name) {
+            filtered.push(selected.clone());
+        }
+    }
 
     // Execute the specified action:
     match action {
         CargoAction::Build(out_path) => build_examples(
             args,
-            examples,
+            filtered,
             &package_path,
             out_path.as_ref().map(|p| p.as_path()),
         ),
-        CargoAction::Run => run_examples(args, examples, &package_path),
+        CargoAction::Run => run_examples(args, filtered, &package_path),
     }
 }
 

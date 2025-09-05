@@ -79,7 +79,7 @@ esp_hal::interrupt::bind_interrupt(
 );
 ```
 
-## RMT changes
+## RMT PulseCode changes
 
 `PulseCode` used to be an extension trait implemented on `u32`. It is now a
 newtype struct, wrapping `u32`.
@@ -111,6 +111,42 @@ Nevertheless, type annotations will require some changes:
 let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
+```
+
+## RMT Channel Changes
+
+`rmt::Channel` used to have a `Raw: RawChannelAccess` generic parameter,
+which could be either `ConstChannelAccess<Dir, const CHANNEL: u8>` or `DynChannelAccess<Dir>`.
+This generic has been erased, effectively always using `DynChannelAccess`.
+The corresponding parameter of the transaction structs has been removed as well
+(`SingleShotTxTransaction`, `ContinuousTxTransaction`, `RxTransaction`).
+
+Transmit and receive methods are now directly implemented by
+`Channel<Dm: DriverMode, Tx>`
+and
+`Channel<Dm: DriverMode, Rx>`
+respectively and the `RxChannel`, `TxChannel`, `RxChannelAsync` and `TxChannelAsync`
+traits have been removed.
+Several related types that were previously exported have been removed from the
+API as well.
+
+```diff
+-use esp_hal::rmt::{ConstChannelAccess, DynChannelAccess, RawChannelAccess};
+-let mut tx: Channel<Blocking, ConstChannelAccess<Tx, 0>> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
+-let mut rx: Channel<Blocking, ConstChannelAccess<Rx, 2>> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
++let mut tx: Channel<Blocking, Tx> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
++let mut rx: Channel<Blocking, Rx> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
+
+-let mut tx: Channel<Blocking, DynChannelAccess<Tx>> = tx.degrade();
+-let mut rx: Channel<Blocking, DynChannelAccess<Rx>> = rx.degrade();
+
+-// same for TxChannelAsync, RxChannelAsync
+-use esp_hal::rmt::{TxChannel, RxChannel};
+-
+-let tx_transaction: SingleShotTxTransaction<'_, DynChannelAccess<Tx>, PulseCode> = tx.transmit(&data);
+-let rx_transaction: RxTransaction<'_, DynChannelAccess<Rx>, PulseCode> = rx.transmit(&data);
++let tx_transaction: SingleShotTxTransaction<'_, PulseCode> = tx.transmit(&data);
++let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
 ```
 
 ## DMA changes
@@ -184,4 +220,22 @@ let peripherals = esp_hal::init(
 + .with_data5(peripherals.GPIO17)
 + .with_data6(peripherals.GPIO16)
 + .with_data7(peripherals.GPIO15);
+```
+
+## I2S Changes
+
+I2S configuration is now done using `i2s::master::Config`. Sample rate and data format, previously passed
+to the constructor, have to be assigned to `Config` instead.
+
+```diff
+  let i2s = I2s::new(
+      peripherals.I2S0,
+-     Standard::Philips,
+-     DataFormat::Data16Channel16,
+-     Rate::from_hz(44100),
+      dma_channel,
++     Config::new_tdm_philips()
++         .with_data_format(DataFormat::Data16Channel16)
++         .with_sample_rate(Rate::from_hz(44100)),
+  );
 ```

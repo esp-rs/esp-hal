@@ -73,6 +73,10 @@ name    = "i2c"
 harness = false
 
 [[test]]
+name    = "i2c_rtc"
+harness = false
+
+[[test]]
 name    = "init"
 harness = false
 
@@ -245,13 +249,13 @@ embedded-io-async  = "0.6.1"
 embedded-can       = "0.4.1"
 embedded-hal-async = "1.0.0"
 esp-alloc          = { path = "../esp-alloc", optional = true }
-esp-backtrace      = { path = "../esp-backtrace", default-features = false, features = ["defmt", "semihosting"] }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal            = { path = "../esp-hal" }
 esp-hal-embassy    = { path = "../esp-hal-embassy", optional = true }
-esp-preempt = { path = "../esp-preempt", optional = true }
+esp-preempt        = { path = "../esp-preempt", optional = true }
 esp-storage        = { path = "../esp-storage", optional = true }
-esp-radio           = { path = "../esp-radio", optional = true }
+esp-sync           = { path = "../esp-sync" }
+esp-radio          = { path = "../esp-radio", optional = true }
 portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
@@ -283,7 +287,6 @@ esp-radio = ["dep:esp-radio", "dep:esp-preempt"]
 # Device support (required!):
 esp32 = [
     "embedded-test/xtensa-semihosting",
-    "esp-backtrace/esp32",
     "esp-hal/esp32",
     "esp-hal-embassy?/esp32",
     "esp-radio?/esp32",
@@ -293,7 +296,6 @@ esp32 = [
     "esp-preempt?/esp32",
 ]
 esp32c2 = [
-    "esp-backtrace/esp32c2",
     "esp-hal/esp32c2",
     "esp-hal-embassy?/esp32c2",
     "esp-radio?/esp32c2",
@@ -303,7 +305,6 @@ esp32c2 = [
     "esp-preempt?/esp32c2"
 ]
 esp32c3 = [
-    "esp-backtrace/esp32c3",
     "esp-hal/esp32c3",
     "esp-hal-embassy?/esp32c3",
     "esp-radio?/esp32c3",
@@ -313,7 +314,6 @@ esp32c3 = [
     "esp-preempt?/esp32c3",
 ]
 esp32c6 = [
-    "esp-backtrace/esp32c6",
     "esp-hal/esp32c6",
     "esp-hal-embassy?/esp32c6",
     "esp-radio?/esp32c6",
@@ -323,7 +323,6 @@ esp32c6 = [
     "esp-preempt?/esp32c6",
 ]
 esp32h2 = [
-    "esp-backtrace/esp32h2",
     "esp-hal/esp32h2",
     "esp-hal-embassy?/esp32h2",
     "esp-radio?/esp32h2",
@@ -334,7 +333,6 @@ esp32h2 = [
 ]
 esp32s2 = [
     "embedded-test/xtensa-semihosting",
-    "esp-backtrace/esp32s2",
     "esp-hal/esp32s2",
     "esp-hal-embassy?/esp32s2",
     "esp-radio?/esp32s2",
@@ -345,7 +343,6 @@ esp32s2 = [
 ]
 esp32s3 = [
     "embedded-test/xtensa-semihosting",
-    "esp-backtrace/esp32s3",
     "esp-hal/esp32s3",
     "esp-hal-embassy?/esp32s3",
     "esp-radio?/esp32s3",
