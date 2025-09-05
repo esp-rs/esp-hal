@@ -321,10 +321,16 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer::yield_task()
     }
 
+    fn max_task_priority(&self) -> u32 {
+        255
+    }
+
     fn task_create(
         &self,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        _priority: u32,
+        _pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void {
         let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);

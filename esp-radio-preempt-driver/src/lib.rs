@@ -46,9 +46,12 @@ unsafe extern "Rust" {
     fn esp_preempt_disable();
     fn esp_preempt_yield_task();
     fn esp_preempt_current_task() -> *mut c_void;
+    fn esp_preempt_max_task_priority() -> u32;
     fn esp_preempt_task_create(
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        priority: u32,
+        pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void;
     fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void);
@@ -98,12 +101,27 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
+        fn esp_preempt_max_task_priority() -> u32 {
+            <$t as $crate::Scheduler>::max_task_priority(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
         fn esp_preempt_task_create(
             task: extern "C" fn(*mut c_void),
             param: *mut c_void,
+            priority: u32,
+            core_id: Option<u32>,
             task_stack_size: usize,
         ) -> *mut c_void {
-            <$t as $crate::Scheduler>::task_create(&$name, task, param, task_stack_size)
+            <$t as $crate::Scheduler>::task_create(
+                &$name,
+                task,
+                param,
+                priority,
+                core_id,
+                task_stack_size,
+            )
         }
 
         #[unsafe(no_mangle)]
@@ -153,12 +171,18 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to retrieve a pointer to the current task.
     fn current_task(&self) -> *mut c_void;
 
+    /// This function returns the maximum task priority level.
+    /// Higher number is considered to be higher priority.
+    fn max_task_priority(&self) -> u32;
+
     /// This function is used to create threads.
     /// It should allocate the stack.
     fn task_create(
         &self,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        priority: u32,
+        core_id: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void;
 
@@ -218,6 +242,14 @@ pub fn current_task() -> *mut c_void {
     unsafe { esp_preempt_current_task() }
 }
 
+/// Returns the maximum priority a task can have.
+///
+/// This function assumes that a bigger number means higher priority.
+#[inline]
+pub fn max_task_priority() -> u32 {
+    unsafe { esp_preempt_max_task_priority() }
+}
+
 /// Creates a new task with the given initial parameter and stack size.
 ///
 /// ## Safety
@@ -228,9 +260,11 @@ pub fn current_task() -> *mut c_void {
 pub unsafe fn task_create(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,
+    priority: u32,
+    pin_to_core: Option<u32>,
     task_stack_size: usize,
 ) -> *mut c_void {
-    unsafe { esp_preempt_task_create(task, param, task_stack_size) }
+    unsafe { esp_preempt_task_create(task, param, priority, pin_to_core, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.
