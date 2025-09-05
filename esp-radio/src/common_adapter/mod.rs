@@ -308,7 +308,7 @@ pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
+    crate::time::ticks_to_micros(crate::preempt::now()) as i64
 }
 
 #[unsafe(no_mangle)]

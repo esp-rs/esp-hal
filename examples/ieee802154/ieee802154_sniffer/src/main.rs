@@ -14,6 +14,7 @@ use esp_hal::{
     system::software_reset,
     uart::{self, Uart},
 };
+use esp_preempt as _;
 use esp_println::println;
 use esp_radio::ieee802154::{Config, Ieee802154};
 

@@ -38,7 +38,6 @@ use crate::semaphore::SemaphorePtr;
 
 unsafe extern "Rust" {
     fn esp_preempt_initialized() -> bool;
-    fn esp_preempt_usleep(us: u32);
     fn esp_preempt_enable();
     fn esp_preempt_disable();
     fn esp_preempt_yield_task();
@@ -50,6 +49,9 @@ unsafe extern "Rust" {
     ) -> *mut c_void;
     fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void);
     fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr;
+
+    fn esp_preempt_usleep(us: u32);
+    fn esp_preempt_now() -> u64;
 }
 
 /// Set the Scheduler implementation.
@@ -64,12 +66,6 @@ macro_rules! scheduler_impl {
         #[inline]
         fn esp_preempt_initialized() -> bool {
             <$t as $crate::Scheduler>::initialized(&$name)
-        }
-
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_usleep(us: u32) {
-            <$t as $crate::Scheduler>::usleep(&$name, us)
         }
 
         #[unsafe(no_mangle)]
@@ -117,6 +113,18 @@ macro_rules! scheduler_impl {
         fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr {
             <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
         }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_usleep(us: u32) {
+            <$t as $crate::Scheduler>::usleep(&$name, us)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_now() -> u64 {
+            <$t as $crate::Scheduler>::now(&$name)
+        }
     };
 }
 
@@ -128,10 +136,6 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
     /// up.
     fn initialized(&self) -> bool;
-
-    /// This function is called by `esp_radio::init` to put the current task to sleep for the
-    /// specified number of microseconds.
-    fn usleep(&self, us: u32);
 
     /// This function is called by `esp-radio` to start the task scheduler.
     fn enable(&self);
@@ -166,6 +170,16 @@ pub trait Scheduler: Send + Sync + 'static {
     /// usize-sized memory location, which will be used to store a pointer
     /// to a semaphore for this thread.
     fn current_task_thread_semaphore(&self) -> SemaphorePtr;
+
+    /// This function is called by a task to sleep for the specified number of microseconds.
+    fn usleep(&self, us: u32);
+
+    /// Returns the current timestamp in microseconds.
+    ///
+    /// The underlying timer is expected not to overflow during the lifetime of the program.
+    ///
+    /// The clock that generates this timestamp must be the same one used to trigger timer events.
+    fn now(&self) -> u64;
 }
 
 // API used (mostly) by esp-radio
@@ -174,12 +188,6 @@ pub trait Scheduler: Send + Sync + 'static {
 #[inline]
 pub fn initialized() -> bool {
     unsafe { esp_preempt_initialized() }
-}
-
-/// Puts the current task to sleep for the specified number of microseconds.
-#[inline]
-pub fn usleep(us: u32) {
-    unsafe { esp_preempt_usleep(us) }
 }
 
 /// Starts the task scheduler.
@@ -238,4 +246,16 @@ pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
 #[inline]
 pub fn current_task_thread_semaphore() -> SemaphorePtr {
     unsafe { esp_preempt_current_task_thread_semaphore() }
+}
+
+/// Puts the current task to sleep for the specified number of microseconds.
+#[inline]
+pub fn usleep(us: u32) {
+    unsafe { esp_preempt_usleep(us) }
+}
+
+/// Returns the current timestamp, in microseconds.
+#[inline]
+pub fn now() -> u64 {
+    unsafe { esp_preempt_now() }
 }

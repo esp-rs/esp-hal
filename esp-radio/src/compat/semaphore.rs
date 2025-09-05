@@ -1,7 +1,9 @@
-use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 use esp_wifi_sys::c_types::c_void;
 
-use crate::compat::OSI_FUNCS_TIME_BLOCKING;
+use crate::{
+    compat::OSI_FUNCS_TIME_BLOCKING,
+    preempt::semaphore::{SemaphoreHandle, SemaphorePtr},
+};
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
     SemaphoreHandle::new(max, init).leak().as_ptr().cast()
