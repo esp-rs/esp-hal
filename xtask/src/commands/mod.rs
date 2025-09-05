@@ -135,9 +135,10 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // Sort all examples by name:
     examples.sort_by_key(|a| a.binary_name());
 
-    let mut filtered = examples.clone();
+    let mut filtered = vec![];
 
     if let Some(example) = args.example.as_deref() {
+        filtered.clone_from(&examples);
         if !example.eq_ignore_ascii_case("all") {
             // Only keep the example the user wants
             filtered.retain(|ex| ex.matches_name(example));
