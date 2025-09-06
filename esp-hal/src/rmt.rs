@@ -1812,29 +1812,33 @@ where
 
         match raw.get_rx_status() {
             // Read all available data also on error
-            Some(ev @ (Event::End | Event::Error)) => {
-                this.reader.read(&mut this.data, raw, true);
+                Some(ev @ (Event::End | Event::Error)) => {
+                    raw.unlisten_rx_interrupt(EnumSet::all());
+                    raw.stop_rx();
+                    raw.update();
 
-                match ev {
-                    Event::Error => Poll::Ready(Err(Error::ReceiverError)),
-                    _ => Poll::Ready(Ok(this.reader.total)),
+                    this.reader.read(&mut this.data, raw, true);
+
+                    match ev {
+                        Event::Error => Poll::Ready(Err(Error::ReceiverError)),
+                        _ => Poll::Ready(Ok(this.reader.total)),
+                    }
                 }
-            }
-            Some(Event::Threshold) if DynChannelAccess::<Rx>::supports_wrap() => {
-                raw.reset_rx_threshold_set();
+                Some(Event::Threshold) if DynChannelAccess::<Rx>::supports_wrap() => {
+                    raw.reset_rx_threshold_set();
 
-                this.reader.read(&mut this.data, raw, false);
+                    this.reader.read(&mut this.data, raw, false);
 
-                if this.reader.state == ReaderState::Active {
-                    raw.listen_rx_interrupt(Event::Threshold);
+                    if this.reader.state == ReaderState::Active {
+                        raw.listen_rx_interrupt(Event::Threshold);
+                    }
+
+                    Poll::Pending
                 }
-
-                Poll::Pending
+                _ => Poll::Pending,
             }
-            _ => Poll::Pending,
         }
     }
-}
 
 impl<T> Drop for RmtRxFuture<'_, T>
 where
@@ -1843,15 +1847,9 @@ where
     fn drop(&mut self) {
         let raw = self.raw;
 
-        // if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
-            raw.unlisten_rx_interrupt(EnumSet::all());
-
-            // This is immediate and does not update state flags, so we must not poll on
-            // get_rx_status() afterwards!
-            raw.stop_rx();
-            raw.update();
-        // }
-
+        raw.unlisten_rx_interrupt(EnumSet::all());
+        raw.stop_rx();
+        raw.update();
         raw.clear_rx_interrupts();
     }
 }
@@ -1876,7 +1874,7 @@ impl Channel<Async, Rx> {
             reader.state = ReaderState::Error(Error::InvalidDataLength);
         } else {
             raw.clear_rx_interrupts();
-            raw.listen_rx_interrupt(Event::End | Event::Error | Event::Threshold);
+            raw.listen_rx_interrupt(EnumSet::all());
             raw.start_receive(true, memsize);
         }
 
@@ -2392,6 +2390,8 @@ mod chip_specific {
             });
         }
 
+        // This is immediate and does not update state flags, so we must not poll on
+        // get_rx_status() after callign stop_rx()!
         #[inline]
         pub fn stop_rx(&self) {
             let rmt = crate::peripherals::RMT::regs();
