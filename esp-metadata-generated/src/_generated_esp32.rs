@@ -567,45 +567,46 @@ macro_rules! for_each_gpio {
         _for_each_inner!((0, GPIO0(_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK)
         ([Input] [Output]))); _for_each_inner!((1, GPIO1(_5 => EMAC_RXD2) (_0 => U0TXD _1
         => CLK_OUT3) ([Input] [Output]))); _for_each_inner!((2, GPIO2(_1 => HSPIWP _3 =>
-        HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) ([Input]
-        [Output]))); _for_each_inner!((3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2) ([Input]
-        [Output]))); _for_each_inner!((4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 =>
-        SD_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 =>
-        EMAC_TX_ER) ([Input] [Output]))); _for_each_inner!((5, GPIO5(_1 => VSPICS0 _3 =>
-        HS1_DATA6 _5 => EMAC_RX_CLK) (_1 => VSPICS0 _3 => HS1_DATA6) ([Input]
-        [Output]))); _for_each_inner!((6, GPIO6(_1 => SPICLK _4 => U1CTS) (_0 => SD_CLK
+        HS2_DATA0 _4 => SDIO_DATA0) (_1 => HSPIWP _3 => HS2_DATA0 _4 => SDIO_DATA0)
+        ([Input] [Output]))); _for_each_inner!((3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2)
+        ([Input] [Output]))); _for_each_inner!((4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4
+        => SDIO_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SDIO_DATA1 _5
+        => EMAC_TX_ER) ([Input] [Output]))); _for_each_inner!((5, GPIO5(_1 => VSPICS0 _3
+        => HS1_DATA6 _5 => EMAC_RX_CLK) (_1 => VSPICS0 _3 => HS1_DATA6) ([Input]
+        [Output]))); _for_each_inner!((6, GPIO6(_1 => SPICLK _4 => U1CTS) (_0 => SDIO_CLK
         _1 => SPICLK _3 => HS1_CLK) ([Input] [Output]))); _for_each_inner!((7, GPIO7(_0
-        => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 =>
+        => SDIO_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SDIO_DATA0 _1 => SPIQ _3 =>
         HS1_DATA0 _4 => U2RTS) ([Input] [Output]))); _for_each_inner!((8, GPIO8(_0 =>
-        SD_DATA1 _1 => SPID _3 => HS1_DATA1 _4 => U2CTS) (_0 => SD_DATA1 _1 => SPID _3 =>
-        HS1_DATA1) ([Input] [Output]))); _for_each_inner!((9, GPIO9(_0 => SD_DATA2 _1 =>
-        SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2)
-        ([Input] [Output]))); _for_each_inner!((10, GPIO10(_0 => SD_DATA3 _1 => SPIWP _3
-        => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3 _4 => U1TXD) ([Input]
-        [Output]))); _for_each_inner!((11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 =>
-        SD_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])));
-        _for_each_inner!((12, GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2 _4 =>
-        SD_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3) ([Input]
-        [Output]))); _for_each_inner!((13, GPIO13(_0 => MTCK _1 => HSPID _3 => HS2_DATA3
-        _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4 => SD_DATA3 _5
-        => EMAC_RX_ER) ([Input] [Output]))); _for_each_inner!((14, GPIO14(_0 => MTMS _1
-        => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2) ([Input]
-        [Output]))); _for_each_inner!((15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 =>
-        EMAC_RXD3) (_0 => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input]
-        [Output]))); _for_each_inner!((16, GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 =>
-        HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input] [Output]))); _for_each_inner!((17,
-        GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 => EMAC_CLK_180) ([Input]
-        [Output]))); _for_each_inner!((18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1 =>
-        VSPICLK _3 => HS1_DATA7) ([Input] [Output]))); _for_each_inner!((19, GPIO19(_1 =>
-        VSPIQ _3 => U0CTS) (_1 => VSPIQ _5 => EMAC_TXD0) ([Input] [Output])));
-        _for_each_inner!((20, GPIO20() () ([Input] [Output]))); _for_each_inner!((21,
-        GPIO21(_1 => VSPIHD) (_1 => VSPIHD _5 => EMAC_TX_EN) ([Input] [Output])));
-        _for_each_inner!((22, GPIO22(_1 => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 =>
-        EMAC_TXD1) ([Input] [Output]))); _for_each_inner!((23, GPIO23(_1 => VSPID) (_1 =>
-        VSPID _3 => HS1_STROBE) ([Input] [Output]))); _for_each_inner!((25, GPIO25(_5 =>
-        EMAC_RXD0) () ([Input] [Output]))); _for_each_inner!((26, GPIO26(_5 => EMAC_RXD1)
-        () ([Input] [Output]))); _for_each_inner!((27, GPIO27(_5 => EMAC_RX_DV) ()
-        ([Input] [Output]))); _for_each_inner!((32, GPIO32() () ([Input] [Output])));
+        SDIO_DATA1 _1 => SPID _3 => HS1_DATA1 _4 => U2CTS) (_0 => SDIO_DATA1 _1 => SPID
+        _3 => HS1_DATA1) ([Input] [Output]))); _for_each_inner!((9, GPIO9(_0 =>
+        SDIO_DATA2 _1 => SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0 => SDIO_DATA2 _1 => SPIHD
+        _3 => HS1_DATA2) ([Input] [Output]))); _for_each_inner!((10, GPIO10(_0 =>
+        SDIO_DATA3 _1 => SPIWP _3 => HS1_DATA3) (_0 => SDIO_DATA3 _1 => SPIWP _3 =>
+        HS1_DATA3 _4 => U1TXD) ([Input] [Output]))); _for_each_inner!((11, GPIO11(_0 =>
+        SDIO_CMD _1 => SPICS0) (_0 => SDIO_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS)
+        ([Input] [Output]))); _for_each_inner!((12, GPIO12(_0 => MTDI _1 => HSPIQ _3 =>
+        HS2_DATA2 _4 => SDIO_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SDIO_DATA2 _5 =>
+        EMAC_TXD3) ([Input] [Output]))); _for_each_inner!((13, GPIO13(_0 => MTCK _1 =>
+        HSPID _3 => HS2_DATA3 _4 => SDIO_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 =>
+        HS2_DATA3 _4 => SDIO_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])));
+        _for_each_inner!((14, GPIO14(_0 => MTMS _1 => HSPICLK) (_1 => HSPICLK _3 =>
+        HS2_CLK _4 => SDIO_CLK _5 => EMAC_TXD2) ([Input] [Output])));
+        _for_each_inner!((15, GPIO15(_1 => HSPICS0 _4 => SDIO_CMD _5 => EMAC_RXD3) (_0 =>
+        MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SDIO_CMD) ([Input] [Output])));
+        _for_each_inner!((16, GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 =>
+        EMAC_CLK_OUT) ([Input] [Output]))); _for_each_inner!((17, GPIO17(_3 => HS1_DATA5)
+        (_3 => HS1_DATA5 _4 => U2TXD _5 => EMAC_CLK_180) ([Input] [Output])));
+        _for_each_inner!((18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1 => VSPICLK _3 =>
+        HS1_DATA7) ([Input] [Output]))); _for_each_inner!((19, GPIO19(_1 => VSPIQ _3 =>
+        U0CTS) (_1 => VSPIQ _5 => EMAC_TXD0) ([Input] [Output]))); _for_each_inner!((20,
+        GPIO20() () ([Input] [Output]))); _for_each_inner!((21, GPIO21(_1 => VSPIHD) (_1
+        => VSPIHD _5 => EMAC_TX_EN) ([Input] [Output]))); _for_each_inner!((22, GPIO22(_1
+        => VSPIWP) (_1 => VSPIWP _3 => U0RTS _5 => EMAC_TXD1) ([Input] [Output])));
+        _for_each_inner!((23, GPIO23(_1 => VSPID) (_1 => VSPID _3 => HS1_STROBE) ([Input]
+        [Output]))); _for_each_inner!((25, GPIO25(_5 => EMAC_RXD0) () ([Input]
+        [Output]))); _for_each_inner!((26, GPIO26(_5 => EMAC_RXD1) () ([Input]
+        [Output]))); _for_each_inner!((27, GPIO27(_5 => EMAC_RX_DV) () ([Input]
+        [Output]))); _for_each_inner!((32, GPIO32() () ([Input] [Output])));
         _for_each_inner!((33, GPIO33() () ([Input] [Output]))); _for_each_inner!((34,
         GPIO34() () ([Input] []))); _for_each_inner!((35, GPIO35() () ([Input] [])));
         _for_each_inner!((36, GPIO36() () ([Input] []))); _for_each_inner!((37, GPIO37()
@@ -613,29 +614,30 @@ macro_rules! for_each_gpio {
         _for_each_inner!((39, GPIO39() () ([Input] []))); _for_each_inner!((all(0,
         GPIO0(_5 => EMAC_TX_CLK) (_1 => CLK_OUT1 _5 => EMAC_TX_CLK) ([Input] [Output])),
         (1, GPIO1(_5 => EMAC_RXD2) (_0 => U0TXD _1 => CLK_OUT3) ([Input] [Output])), (2,
-        GPIO2(_1 => HSPIWP _3 => HS2_DATA0 _4 => SD_DATA0) (_1 => HSPIWP _3 => HS2_DATA0
-        _4 => SD_DATA0) ([Input] [Output])), (3, GPIO3(_0 => U0RXD) (_1 => CLK_OUT2)
-        ([Input] [Output])), (4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 =>
-        EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SD_DATA1 _5 => EMAC_TX_ER)
-        ([Input] [Output])), (5, GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 => EMAC_RX_CLK)
-        (_1 => VSPICS0 _3 => HS1_DATA6) ([Input] [Output])), (6, GPIO6(_1 => SPICLK _4 =>
-        U1CTS) (_0 => SD_CLK _1 => SPICLK _3 => HS1_CLK) ([Input] [Output])), (7,
-        GPIO7(_0 => SD_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 => SD_DATA0 _1 => SPIQ _3 =>
-        HS1_DATA0 _4 => U2RTS) ([Input] [Output])), (8, GPIO8(_0 => SD_DATA1 _1 => SPID
-        _3 => HS1_DATA1 _4 => U2CTS) (_0 => SD_DATA1 _1 => SPID _3 => HS1_DATA1) ([Input]
-        [Output])), (9, GPIO9(_0 => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0
-        => SD_DATA2 _1 => SPIHD _3 => HS1_DATA2) ([Input] [Output])), (10, GPIO10(_0 =>
-        SD_DATA3 _1 => SPIWP _3 => HS1_DATA3) (_0 => SD_DATA3 _1 => SPIWP _3 => HS1_DATA3
-        _4 => U1TXD) ([Input] [Output])), (11, GPIO11(_0 => SD_CMD _1 => SPICS0) (_0 =>
-        SD_CMD _1 => SPICS0 _3 => HS1_CMD _4 => U1RTS) ([Input] [Output])), (12,
-        GPIO12(_0 => MTDI _1 => HSPIQ _3 => HS2_DATA2 _4 => SD_DATA2) (_1 => HSPIQ _3 =>
-        HS2_DATA2 _4 => SD_DATA2 _5 => EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 =>
-        MTCK _1 => HSPID _3 => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3
-        => HS2_DATA3 _4 => SD_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0
-        => MTMS _1 => HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SD_CLK _5 => EMAC_TXD2)
-        ([Input] [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SD_CMD _5 => EMAC_RXD3) (_0
-        => MTDO _1 => HSPICS0 _3 => HS2_CMD _4 => SD_CMD) ([Input] [Output])), (16,
-        GPIO16(_3 => HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input]
+        GPIO2(_1 => HSPIWP _3 => HS2_DATA0 _4 => SDIO_DATA0) (_1 => HSPIWP _3 =>
+        HS2_DATA0 _4 => SDIO_DATA0) ([Input] [Output])), (3, GPIO3(_0 => U0RXD) (_1 =>
+        CLK_OUT2) ([Input] [Output])), (4, GPIO4(_1 => HSPIHD _3 => HS2_DATA1 _4 =>
+        SDIO_DATA1 _5 => EMAC_TX_ER) (_1 => HSPIHD _3 => HS2_DATA1 _4 => SDIO_DATA1 _5 =>
+        EMAC_TX_ER) ([Input] [Output])), (5, GPIO5(_1 => VSPICS0 _3 => HS1_DATA6 _5 =>
+        EMAC_RX_CLK) (_1 => VSPICS0 _3 => HS1_DATA6) ([Input] [Output])), (6, GPIO6(_1 =>
+        SPICLK _4 => U1CTS) (_0 => SDIO_CLK _1 => SPICLK _3 => HS1_CLK) ([Input]
+        [Output])), (7, GPIO7(_0 => SDIO_DATA0 _1 => SPIQ _3 => HS1_DATA0) (_0 =>
+        SDIO_DATA0 _1 => SPIQ _3 => HS1_DATA0 _4 => U2RTS) ([Input] [Output])), (8,
+        GPIO8(_0 => SDIO_DATA1 _1 => SPID _3 => HS1_DATA1 _4 => U2CTS) (_0 => SDIO_DATA1
+        _1 => SPID _3 => HS1_DATA1) ([Input] [Output])), (9, GPIO9(_0 => SDIO_DATA2 _1 =>
+        SPIHD _3 => HS1_DATA2 _4 => U1RXD) (_0 => SDIO_DATA2 _1 => SPIHD _3 => HS1_DATA2)
+        ([Input] [Output])), (10, GPIO10(_0 => SDIO_DATA3 _1 => SPIWP _3 => HS1_DATA3)
+        (_0 => SDIO_DATA3 _1 => SPIWP _3 => HS1_DATA3 _4 => U1TXD) ([Input] [Output])),
+        (11, GPIO11(_0 => SDIO_CMD _1 => SPICS0) (_0 => SDIO_CMD _1 => SPICS0 _3 =>
+        HS1_CMD _4 => U1RTS) ([Input] [Output])), (12, GPIO12(_0 => MTDI _1 => HSPIQ _3
+        => HS2_DATA2 _4 => SDIO_DATA2) (_1 => HSPIQ _3 => HS2_DATA2 _4 => SDIO_DATA2 _5
+        => EMAC_TXD3) ([Input] [Output])), (13, GPIO13(_0 => MTCK _1 => HSPID _3 =>
+        HS2_DATA3 _4 => SDIO_DATA3 _5 => EMAC_RX_ER) (_1 => HSPID _3 => HS2_DATA3 _4 =>
+        SDIO_DATA3 _5 => EMAC_RX_ER) ([Input] [Output])), (14, GPIO14(_0 => MTMS _1 =>
+        HSPICLK) (_1 => HSPICLK _3 => HS2_CLK _4 => SDIO_CLK _5 => EMAC_TXD2) ([Input]
+        [Output])), (15, GPIO15(_1 => HSPICS0 _4 => SDIO_CMD _5 => EMAC_RXD3) (_0 => MTDO
+        _1 => HSPICS0 _3 => HS2_CMD _4 => SDIO_CMD) ([Input] [Output])), (16, GPIO16(_3
+        => HS1_DATA4 _4 => U2RXD) (_3 => HS1_DATA4 _5 => EMAC_CLK_OUT) ([Input]
         [Output])), (17, GPIO17(_3 => HS1_DATA5) (_3 => HS1_DATA5 _4 => U2TXD _5 =>
         EMAC_CLK_180) ([Input] [Output])), (18, GPIO18(_1 => VSPICLK _3 => HS1_DATA7) (_1
         => VSPICLK _3 => HS1_DATA7) ([Input] [Output])), (19, GPIO19(_1 => VSPIQ _3 =>
@@ -992,11 +994,11 @@ macro_rules! define_io_mux_signals {
             PCMFSYNC              = 204,
             PCMCLK                = 205,
             PCMDIN                = 206,
-            SD_CMD,
-            SD_DATA0,
-            SD_DATA1,
-            SD_DATA2,
-            SD_DATA3,
+            SDIO_CMD,
+            SDIO_DATA0,
+            SDIO_DATA1,
+            SDIO_DATA2,
+            SDIO_DATA3,
             HS1_DATA0,
             HS1_DATA1,
             HS1_DATA2,
@@ -1202,12 +1204,12 @@ macro_rules! define_io_mux_signals {
             CLK_OUT1,
             CLK_OUT2,
             CLK_OUT3,
-            SD_CLK,
-            SD_CMD,
-            SD_DATA0,
-            SD_DATA1,
-            SD_DATA2,
-            SD_DATA3,
+            SDIO_CLK,
+            SDIO_CMD,
+            SDIO_DATA0,
+            SDIO_DATA1,
+            SDIO_DATA2,
+            SDIO_DATA3,
             HS1_CLK,
             HS1_CMD,
             HS1_DATA0,
