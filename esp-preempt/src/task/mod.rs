@@ -2,7 +2,7 @@
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 pub(crate) mod arch_specific;
 
-use core::{ffi::c_void, mem::MaybeUninit};
+use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
 #[cfg(riscv)]
@@ -25,6 +25,88 @@ impl TaskState {
     }
 }
 
+pub(crate) type TaskPtr = NonNull<Context>;
+pub(crate) type TaskListItem = Option<TaskPtr>;
+
+/// An abstraction that allows the task to contain multiple different queue pointers.
+pub(crate) trait TaskListElement {
+    fn next(task: TaskPtr) -> Option<TaskPtr>;
+    fn set_next(task: TaskPtr, next: Option<TaskPtr>);
+}
+
+pub(crate) struct TaskAllocListElement;
+impl TaskListElement for TaskAllocListElement {
+    fn next(task: TaskPtr) -> Option<TaskPtr> {
+        unsafe { task.as_ref().alloc_list_item }
+    }
+
+    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
+        unsafe {
+            task.as_mut().alloc_list_item = next;
+        }
+    }
+}
+
+pub(crate) struct TaskReadyListElement;
+impl TaskListElement for TaskReadyListElement {
+    fn next(task: TaskPtr) -> Option<TaskPtr> {
+        unsafe { task.as_ref().ready_list_item }
+    }
+
+    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
+        unsafe {
+            task.as_mut().ready_list_item = next;
+        }
+    }
+}
+
+pub(crate) struct TaskDeleteListElement;
+impl TaskListElement for TaskDeleteListElement {
+    fn next(task: TaskPtr) -> Option<TaskPtr> {
+        unsafe { task.as_ref().delete_list_item }
+    }
+
+    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
+        unsafe {
+            task.as_mut().delete_list_item = next;
+        }
+    }
+}
+
+/// A singly linked list of tasks.
+///
+/// Use this where you don't care about the order of list elements.
+///
+/// The `E` type parameter is used to access the data in the task object that belongs to this list.
+pub(crate) struct TaskList<E> {
+    head: Option<TaskPtr>,
+    _item: PhantomData<E>,
+}
+
+impl<E: TaskListElement> TaskList<E> {
+    pub const fn new() -> Self {
+        Self {
+            head: None,
+            _item: PhantomData,
+        }
+    }
+
+    pub fn push(&mut self, task: TaskPtr) {
+        E::set_next(task, self.head);
+        self.head = Some(task);
+    }
+
+    pub fn pop(&mut self) -> Option<TaskPtr> {
+        let popped = self.head.take();
+
+        if let Some(task) = popped {
+            self.head = E::next(task);
+        }
+
+        popped
+    }
+}
+
 #[repr(C)]
 pub(crate) struct Context {
     #[cfg(riscv)]
@@ -32,10 +114,18 @@ pub(crate) struct Context {
     #[cfg(xtensa)]
     pub trap_frame: TrapFrame,
     pub thread_semaphore: Option<SemaphorePtr>,
-    pub next: *mut Context,
-    pub next_to_delete: *mut Context,
     pub state: TaskState,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
+
+    // Lists a task can be in:
+    /// The list of all allocated tasks
+    pub alloc_list_item: TaskListItem,
+
+    /// The list of ready tasks
+    pub ready_list_item: TaskListItem,
+
+    /// The list of tasks scheduled for deletion
+    pub delete_list_item: TaskListItem,
 }
 
 impl Context {
@@ -53,10 +143,12 @@ impl Context {
         Context {
             trap_frame: task::new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
-            next: core::ptr::null_mut(),
-            next_to_delete: core::ptr::null_mut(),
             state: TaskState::Ready,
             _allocated_stack: stack,
+
+            alloc_list_item: TaskListItem::None,
+            ready_list_item: TaskListItem::None,
+            delete_list_item: TaskListItem::None,
         }
     }
 }
@@ -79,63 +171,54 @@ pub(super) fn allocate_main_task() {
             #[cfg(xtensa)]
             trap_frame: TrapFrame::default(),
             thread_semaphore: None,
-            next: core::ptr::null_mut(),
-            next_to_delete: core::ptr::null_mut(),
             state: TaskState::Ready,
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
+
+            alloc_list_item: TaskListItem::None,
+            ready_list_item: TaskListItem::None,
+            delete_list_item: TaskListItem::None,
         },
         InternalMemory,
     );
 
-    let context_ptr = Box::into_raw(context);
-    unsafe {
-        // The first task loops back to itself.
-        (*context_ptr).next = context_ptr;
-    }
-
     SCHEDULER_STATE.with(|state| {
         debug_assert!(
-            state.current_task.is_null(),
+            state.current_task.is_none(),
             "Tried to allocate main task multiple times"
         );
-        state.current_task = context_ptr;
+
+        let main_task = NonNull::from(Box::leak(context));
+
+        state.all_tasks.push(main_task);
+        state.current_task = Some(main_task);
+
+        // The first task loops back to itself.
+        TaskReadyListElement::set_next(main_task, Some(main_task));
     })
 }
 
 pub(super) fn delete_all_tasks() {
-    let first_task = SCHEDULER_STATE.with(|state| {
-        // Remove all tasks from the list. We will drop them outside of the critical
-        // section.
-        core::mem::take(&mut state.current_task)
+    let mut all_tasks = SCHEDULER_STATE.with(|state| {
+        // Since we delete all tasks, we walk through the allocation list - we just need to clear
+        // the delete list.
+        state.to_delete = TaskList::new();
+
+        // Clear the current task.
+        state.current_task = None;
+
+        // Take the allocation list
+        core::mem::replace(&mut state.all_tasks, TaskList::new())
     });
 
-    if first_task.is_null() {
-        return;
-    }
-
-    let mut task_to_delete = first_task;
-
-    loop {
-        let next_task = unsafe {
-            // SAFETY: Tasks are in a circular linked list. We are guaranteed that the next
-            // task is a valid pointer, or the first task that may already have been
-            // deleted. In the second case, we will not move on to the next
-            // iteration, so the loop will not try to free a task twice.
-            let next_task = (*task_to_delete).next;
-            core::ptr::drop_in_place(task_to_delete);
-            next_task
-        };
-
-        if core::ptr::eq(next_task, first_task) {
-            break;
+    while let Some(task) = all_tasks.pop() {
+        unsafe {
+            core::ptr::drop_in_place(task.as_ptr());
         }
-
-        task_to_delete = next_task;
     }
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Context) -> R) -> R {
-    SCHEDULER_STATE.with(|state| cb(unsafe { &mut *state.current_task }))
+    SCHEDULER_STATE.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
 }
 
 pub(super) fn current_task() -> *mut Context {

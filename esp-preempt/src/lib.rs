@@ -30,7 +30,7 @@ mod task;
 mod timer;
 mod timer_queue;
 
-use core::ffi::c_void;
+use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
 use esp_hal::{
@@ -41,7 +41,19 @@ use esp_hal::{
 use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
-use crate::{semaphore::Semaphore, task::Context, timer::TIMER};
+use crate::{
+    semaphore::Semaphore,
+    task::{
+        Context,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskList,
+        TaskListElement,
+        TaskPtr,
+        TaskReadyListElement,
+    },
+    timer::TIMER,
+};
 
 type TimeBase = PeriodicTimer<'static, Blocking>;
 
@@ -109,13 +121,13 @@ where
 
 struct SchedulerState {
     /// Pointer to the current task.
-    ///
-    /// Tasks are stored in a circular linked list. CTX_NOW points to the
-    /// current task.
-    current_task: *mut Context,
+    current_task: Option<TaskPtr>,
+
+    /// A list of all allocated tasks
+    all_tasks: TaskList<TaskAllocListElement>,
 
     /// Pointer to the task that is scheduled for deletion.
-    to_delete: *mut Context,
+    to_delete: TaskList<TaskDeleteListElement>,
 }
 
 unsafe impl Send for SchedulerState {}
@@ -123,57 +135,48 @@ unsafe impl Send for SchedulerState {}
 impl SchedulerState {
     const fn new() -> Self {
         Self {
-            current_task: core::ptr::null_mut(),
-            to_delete: core::ptr::null_mut(),
+            current_task: None,
+            all_tasks: TaskList::new(),
+            to_delete: TaskList::new(),
         }
     }
 
-    fn delete_task(&mut self, task: *mut Context) {
-        let mut current_task = self.current_task;
-        // Save the first pointer so we can prevent an accidental infinite loop.
-        let initial = current_task;
-        loop {
-            // We don't have the previous pointer, so we need to walk forward in the circle
-            // even if we need to delete the first task.
+    fn delete_task(&mut self, task: NonNull<Context>) {
+        // Remove the task for the list of allocated tasks.
+        let mut allocated = core::mem::replace(&mut self.all_tasks, TaskList::new());
 
-            // If the next task is the one we want to delete, we need to remove it from the
-            // list, then drop it.
-            let next_task = unsafe { (*current_task).next };
-            if core::ptr::eq(next_task, task) {
+        while let Some(popped) = allocated.pop() {
+            if popped == task {
                 unsafe {
-                    (*current_task).next = (*next_task).next;
-
-                    core::ptr::drop_in_place(task);
-                    break;
+                    core::ptr::drop_in_place(task.as_ptr());
                 }
+            } else {
+                self.all_tasks.push(popped);
             }
-
-            // If the next task is the first task, we can stop. If we needed to delete the
-            // first task, we have already handled it in the above case. If we needed to
-            // delete another task, it has already been deleted in a previous iteration.
-            if core::ptr::eq(next_task, initial) {
-                break;
-            }
-
-            // Move to the next task.
-            current_task = next_task;
         }
     }
 
     fn delete_marked_tasks(&mut self) {
-        while !self.to_delete.is_null() {
-            let task_to_delete = core::mem::take(&mut self.to_delete);
-            self.to_delete = unsafe { (*task_to_delete).next_to_delete };
-            self.delete_task(task_to_delete);
+        // TODO: this is pretty expensive, we may want a Deleted task state and go through the
+        // allocated tasks once.
+        while let Some(to_delte) = self.to_delete.pop() {
+            self.delete_task(to_delte);
         }
     }
 
-    fn select_next_task(&mut self) -> Option<*mut Context> {
-        let mut current = self.current_task;
-        loop {
-            let next_task = unsafe { (*current).next };
+    fn select_next_task(&mut self) -> Option<TaskPtr> {
+        // TODO: maintain a (non-circular) run queue and just pop the next item from it.
 
-            if next_task == self.current_task {
+        let currently_active_task = unwrap!(self.current_task);
+        let mut current = currently_active_task;
+
+        loop {
+            let next_task = unwrap!(
+                TaskReadyListElement::next(current),
+                "There is no next task. This is currently impossible."
+            );
+
+            if next_task == currently_active_task {
                 // We didn't find a new task to switch to.
                 // TODO: mark the current task as Running
                 // Once we have actual task states, yield should marked the current task as Ready,
@@ -181,7 +184,7 @@ impl SchedulerState {
                 return None;
             }
 
-            if unsafe { (*next_task).state }.is_ready() {
+            if unsafe { next_task.as_ref().state }.is_ready() {
                 // TODO: mark the selected task as Running
                 return Some(next_task);
             }
@@ -193,41 +196,43 @@ impl SchedulerState {
     fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
         self.delete_marked_tasks();
 
-        let Some(next_task) = self.select_next_task() else {
+        let Some(mut next_task) = self.select_next_task() else {
             return;
         };
 
-        task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
+        let mut current_task = unwrap!(self.current_task);
 
-        self.current_task = next_task;
+        task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
 
-        task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
+        self.current_task = Some(next_task);
+
+        task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
     }
 
     #[cfg(riscv)]
     fn switch_task(&mut self) {
         self.delete_marked_tasks();
 
-        let Some(next_task) = self.select_next_task() else {
+        let Some(mut next_task) = self.select_next_task() else {
             return;
         };
 
-        let old_ctx = unsafe { &raw mut (*self.current_task).trap_frame };
-        let new_ctx = unsafe { &raw mut (*next_task).trap_frame };
+        let mut current_task = unwrap!(self.current_task);
+
+        let old_ctx = unsafe { &raw mut current_task.as_mut().trap_frame };
+        let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
 
         if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
-            unsafe { self.current_task = (*self.current_task).next };
+            self.current_task = Some(next_task);
         }
     }
 
-    fn schedule_task_deletion(&mut self, mut task_to_delete: *mut Context) -> bool {
-        if task_to_delete.is_null() {
-            task_to_delete = self.current_task;
-        }
-        let is_current = core::ptr::eq(task_to_delete, self.current_task);
+    fn schedule_task_deletion(&mut self, task_to_delete: *mut Context) -> bool {
+        let current_task = unwrap!(self.current_task);
+        let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
+        let is_current = task_to_delete == current_task;
 
-        unsafe { (*task_to_delete).next_to_delete = self.to_delete };
-        self.to_delete = task_to_delete;
+        self.to_delete.push(task_to_delete);
 
         is_current
     }
@@ -338,21 +343,24 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         task_stack_size: usize,
     ) -> *mut c_void {
         let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
-        let task_ptr = Box::into_raw(task);
+        let task_ptr = NonNull::from(Box::leak(task));
 
-        SCHEDULER_STATE.with(|state| unsafe {
-            let current_task = state.current_task;
-            debug_assert!(
-                !current_task.is_null(),
+        SCHEDULER_STATE.with(|state| {
+            let current_task = unwrap!(
+                state.current_task,
                 "Tried to allocate a task before allocating the main task"
             );
-            // Insert the new task at the next position.
-            let next = (*current_task).next;
-            (*task_ptr).next = next;
-            (*current_task).next = task_ptr;
+
+            state.all_tasks.push(task_ptr);
+
+            // Insert into the circular run list
+            // TODO: replace this with marking as Ready in the run queue
+            let next = TaskReadyListElement::next(current_task);
+            TaskReadyListElement::set_next(task_ptr, next);
+            TaskReadyListElement::set_next(current_task, Some(task_ptr));
         });
 
-        task_ptr as *mut c_void
+        task_ptr.as_ptr().cast()
     }
 
     fn current_task(&self) -> *mut c_void {
