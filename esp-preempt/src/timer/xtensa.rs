@@ -50,6 +50,6 @@ pub(crate) extern "C" fn timer_tick_handler(_context: &mut TrapFrame) {
     if cfg!(esp32) {
         yield_task();
     } else {
-        crate::task::task_switch(_context);
+        task_switch(_context);
     }
 }

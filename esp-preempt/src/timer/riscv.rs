@@ -22,7 +22,6 @@ pub(crate) fn disable_multitasking() {
 
 #[esp_hal::ram]
 extern "C" fn swint2_handler() {
-    // clear FROM_CPU_INTR2
     let swi = unsafe { SoftwareInterrupt::<2>::steal() };
     swi.reset();
 
@@ -31,13 +30,22 @@ extern "C" fn swint2_handler() {
 
 #[inline]
 pub(crate) fn yield_task() {
-    // clear FROM_CPU_INTR2
     let swi = unsafe { SoftwareInterrupt::<2>::steal() };
     swi.raise();
+
+    // It takes a bit for the software interrupt to be serviced.
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
 }
 
 #[esp_hal::ram]
 pub(crate) extern "C" fn timer_tick_handler() {
     super::clear_timer_interrupt();
-    crate::task::task_switch();
+    // `task_switch` must be called from a single place only. esp-hal's interrupt handler can
+    // process multiple interrupts before handing control back to the interrupted context. This can
+    // result in two task switches before the first one's context save could run. To prevent this,
+    // here we only trigger the software interrupt which will then run the scheduler.
+    yield_task();
 }

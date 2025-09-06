@@ -19,65 +19,43 @@ pub(crate) enum TaskState {
     Ready,
 }
 
-impl TaskState {
-    pub fn is_ready(self) -> bool {
-        matches!(self, Self::Ready)
-    }
-}
-
 pub(crate) type TaskPtr = NonNull<Context>;
 pub(crate) type TaskListItem = Option<TaskPtr>;
 
 /// An abstraction that allows the task to contain multiple different queue pointers.
-pub(crate) trait TaskListElement {
+pub(crate) trait TaskListElement: Default {
     fn next(task: TaskPtr) -> Option<TaskPtr>;
     fn set_next(task: TaskPtr, next: Option<TaskPtr>);
 }
 
-pub(crate) struct TaskAllocListElement;
-impl TaskListElement for TaskAllocListElement {
-    fn next(task: TaskPtr) -> Option<TaskPtr> {
-        unsafe { task.as_ref().alloc_list_item }
-    }
+macro_rules! task_list_item {
+    ($struct:ident, $field:ident) => {
+        #[derive(Default)]
+        pub(crate) struct $struct;
+        impl TaskListElement for $struct {
+            fn next(task: TaskPtr) -> Option<TaskPtr> {
+                unsafe { task.as_ref().$field }
+            }
 
-    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
-        unsafe {
-            task.as_mut().alloc_list_item = next;
+            fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
+                unsafe {
+                    task.as_mut().$field = next;
+                }
+            }
         }
-    }
+    };
 }
 
-pub(crate) struct TaskReadyListElement;
-impl TaskListElement for TaskReadyListElement {
-    fn next(task: TaskPtr) -> Option<TaskPtr> {
-        unsafe { task.as_ref().ready_list_item }
-    }
-
-    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
-        unsafe {
-            task.as_mut().ready_list_item = next;
-        }
-    }
-}
-
-pub(crate) struct TaskDeleteListElement;
-impl TaskListElement for TaskDeleteListElement {
-    fn next(task: TaskPtr) -> Option<TaskPtr> {
-        unsafe { task.as_ref().delete_list_item }
-    }
-
-    fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
-        unsafe {
-            task.as_mut().delete_list_item = next;
-        }
-    }
-}
+task_list_item!(TaskAllocListElement, alloc_list_item);
+task_list_item!(TaskReadyListElement, ready_list_item);
+task_list_item!(TaskDeleteListElement, delete_list_item);
 
 /// A singly linked list of tasks.
 ///
 /// Use this where you don't care about the order of list elements.
 ///
 /// The `E` type parameter is used to access the data in the task object that belongs to this list.
+#[derive(Default)]
 pub(crate) struct TaskList<E> {
     head: Option<TaskPtr>,
     _item: PhantomData<E>,
@@ -104,6 +82,71 @@ impl<E: TaskListElement> TaskList<E> {
         }
 
         popped
+    }
+
+    pub fn remove(&mut self, task: TaskPtr) {
+        // TODO: maybe this (and TaskQueue::remove) may prove too expensive.
+        let mut list = core::mem::take(self);
+        while let Some(popped) = list.pop() {
+            if popped != task {
+                self.push(popped);
+            }
+        }
+    }
+}
+
+/// A singly linked queue of tasks.
+///
+/// Use this where you care about the order of list elements. Elements are popped from the front,
+/// and pushed to the back.
+///
+/// The `E` type parameter is used to access the data in the task object that belongs to this list.
+#[derive(Default)]
+pub(crate) struct TaskQueue<E> {
+    head: Option<TaskPtr>,
+    tail: Option<TaskPtr>,
+    _item: PhantomData<E>,
+}
+
+impl<E: TaskListElement> TaskQueue<E> {
+    pub const fn new() -> Self {
+        Self {
+            head: None,
+            tail: None,
+            _item: PhantomData,
+        }
+    }
+
+    pub fn push(&mut self, task: TaskPtr) {
+        E::set_next(task, None);
+        if let Some(tail) = self.tail {
+            E::set_next(tail, Some(task));
+        } else {
+            self.head = Some(task);
+        }
+        self.tail = Some(task);
+    }
+
+    pub fn pop(&mut self) -> Option<TaskPtr> {
+        let popped = self.head.take();
+
+        if let Some(task) = popped {
+            self.head = E::next(task);
+            if self.head.is_none() {
+                self.tail = None;
+            }
+        }
+
+        popped
+    }
+
+    pub fn remove(&mut self, task: TaskPtr) {
+        let mut list = core::mem::take(self);
+        while let Some(popped) = list.pop() {
+            if popped != task {
+                self.push(popped);
+            }
+        }
     }
 }
 
@@ -164,7 +207,7 @@ impl Drop for Context {
 
 pub(super) fn allocate_main_task() {
     // This context will be filled out by the first context switch.
-    let context = Box::new_in(
+    let task = Box::new_in(
         Context {
             #[cfg(riscv)]
             trap_frame: Registers::default(),
@@ -180,6 +223,7 @@ pub(super) fn allocate_main_task() {
         },
         InternalMemory,
     );
+    let main_task_ptr = NonNull::from(Box::leak(task));
 
     SCHEDULER_STATE.with(|state| {
         debug_assert!(
@@ -187,32 +231,30 @@ pub(super) fn allocate_main_task() {
             "Tried to allocate main task multiple times"
         );
 
-        let main_task = NonNull::from(Box::leak(context));
-
-        state.all_tasks.push(main_task);
-        state.current_task = Some(main_task);
-
-        // The first task loops back to itself.
-        TaskReadyListElement::set_next(main_task, Some(main_task));
+        // The main task is already running, no need to add it to the ready queue.
+        state.all_tasks.push(main_task_ptr);
+        state.current_task = Some(main_task_ptr);
     })
 }
 
 pub(super) fn delete_all_tasks() {
     let mut all_tasks = SCHEDULER_STATE.with(|state| {
         // Since we delete all tasks, we walk through the allocation list - we just need to clear
-        // the delete list.
+        // the lists.
         state.to_delete = TaskList::new();
+        state.ready_tasks = TaskQueue::new();
 
         // Clear the current task.
         state.current_task = None;
 
         // Take the allocation list
-        core::mem::replace(&mut state.all_tasks, TaskList::new())
+        core::mem::take(&mut state.all_tasks)
     });
 
     while let Some(task) = all_tasks.pop() {
         unsafe {
-            core::ptr::drop_in_place(task.as_ptr());
+            let task = Box::from_raw_in(task.as_ptr(), InternalMemory);
+            core::mem::drop(task);
         }
     }
 }
