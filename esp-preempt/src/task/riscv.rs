@@ -1,6 +1,12 @@
 use core::ffi::c_void;
 
-use esp_hal::riscv::register;
+use esp_hal::{
+    interrupt::{self, software::SoftwareInterrupt},
+    peripherals::Interrupt,
+    riscv::register,
+};
+
+use crate::SCHEDULER;
 
 unsafe extern "C" {
     fn sys_switch();
@@ -259,3 +265,38 @@ sys_switch:
     _CURRENT_CTX_PTR = sym _CURRENT_CTX_PTR,
     _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
+
+pub(crate) fn setup_multitasking() {
+    // Register the interrupt handler without nesting to satisfy the requirements of the task
+    // switching code
+    let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint2_handler as *const ()) },
+        esp_hal::interrupt::Priority::Priority1,
+    );
+
+    unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
+}
+
+pub(crate) fn disable_multitasking() {
+    interrupt::disable(esp_hal::system::Cpu::ProCpu, Interrupt::FROM_CPU_INTR2);
+}
+
+#[esp_hal::ram]
+extern "C" fn swint2_handler() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.reset();
+
+    SCHEDULER.with(|scheduler| scheduler.switch_task());
+}
+
+#[inline]
+pub(crate) fn yield_task() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.raise();
+
+    // It takes a bit for the software interrupt to be serviced.
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+}

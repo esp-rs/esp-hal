@@ -12,7 +12,7 @@ pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER, task, timer};
+use crate::{InternalMemory, SCHEDULER};
 
 #[derive(Clone, Copy)]
 pub(crate) enum TaskState {
@@ -184,7 +184,7 @@ impl Context {
         let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size).cast() };
 
         Context {
-            trap_frame: task::new_task_context(task_fn, param, stack_top),
+            trap_frame: new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: stack,
@@ -274,17 +274,7 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     // deleting the current task.
     if deleting_current {
         loop {
-            timer::yield_task();
+            SCHEDULER.yield_task();
         }
     }
-}
-
-#[cfg(riscv)]
-pub(crate) fn task_switch() {
-    SCHEDULER.with(|state| state.switch_task());
-}
-
-#[cfg(xtensa)]
-pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
-    SCHEDULER.with(|state| state.switch_task(trap_frame));
 }

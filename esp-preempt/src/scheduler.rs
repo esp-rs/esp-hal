@@ -1,12 +1,12 @@
 use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-use esp_alloc::InternalMemory;
 use esp_hal::time::{Duration, Instant, Rate};
 use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
 use crate::{
+    InternalMemory,
     TICK_RATE,
     semaphore::Semaphore,
     task::{
@@ -19,7 +19,7 @@ use crate::{
         TaskQueue,
         TaskReadyListElement,
     },
-    timer::{self, TIMER},
+    timer::TimeDriver,
     timer_queue,
 };
 
@@ -37,6 +37,8 @@ pub(crate) struct SchedulerState {
 
     /// Pointer to the task that is scheduled for deletion.
     pub(crate) to_delete: TaskList<TaskDeleteListElement>,
+
+    pub(crate) time_driver: Option<TimeDriver>,
 }
 
 unsafe impl Send for SchedulerState {}
@@ -48,7 +50,13 @@ impl SchedulerState {
             all_tasks: TaskList::new(),
             ready_tasks: TaskQueue::new(),
             to_delete: TaskList::new(),
+
+            time_driver: None,
         }
+    }
+
+    pub(crate) fn set_time_driver(&mut self, driver: TimeDriver) {
+        self.time_driver = Some(driver);
     }
 
     fn delete_marked_tasks(&mut self) {
@@ -121,8 +129,12 @@ pub(crate) struct Scheduler {
 }
 
 impl Scheduler {
-    pub(crate) fn with<R>(&self, cb: impl FnMut(&mut SchedulerState) -> R) -> R {
+    pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
         self.inner.with(cb)
+    }
+
+    pub(crate) fn yield_task(&self) {
+        task::yield_task()
     }
 }
 
@@ -132,29 +144,28 @@ esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler
 
 impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
-        timer::initialized()
+        self.with(|scheduler| scheduler.time_driver.is_some())
     }
 
     fn enable(&self) {
         // allocate the main task
         task::allocate_main_task();
-        timer::setup_multitasking();
+        task::setup_multitasking();
         timer_queue::create_timer_task();
 
-        TIMER.with(|t| {
-            let t = unwrap!(t.as_mut());
-            unwrap!(t.start(TIMESLICE_FREQUENCY.as_duration()));
+        self.with(|scheduler| {
+            unwrap!(scheduler.time_driver.as_mut()).start(TIMESLICE_FREQUENCY.as_duration())
         });
     }
 
     fn disable(&self) {
-        timer::disable_timebase();
-        timer::disable_multitasking();
+        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).stop());
+        task::disable_multitasking();
         task::delete_all_tasks();
     }
 
     fn yield_task(&self) {
-        timer::yield_task()
+        self.yield_task();
     }
 
     fn yield_task_from_isr(&self) {
@@ -218,7 +229,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
             let start = Instant::now();
             loop {
                 // Yield to other tasks
-                timer::yield_task();
+                self.yield_task();
 
                 let elapsed = start.elapsed();
                 if elapsed.as_micros() > us as u64 {

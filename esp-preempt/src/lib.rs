@@ -31,11 +31,18 @@ mod task;
 mod timer;
 mod timer_queue;
 
+pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
     timer::{AnyTimer, PeriodicTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
+
+use crate::timer::TimeDriver;
+
+// TODO: use OneShotTimer. The time driver should be able to stop ticking when time slicing is not
+// necessary (no tasks ready on current priority level). This allows us to fix `now`, and to
+// implement a timer queue on top of this timer.
 
 type TimeBase = PeriodicTimer<'static, Blocking>;
 
@@ -69,8 +76,6 @@ mod esp_alloc {
         }
     }
 }
-
-pub(crate) use esp_alloc::InternalMemory;
 
 /// A trait to allow better UX for initializing esp-preempt.
 ///
@@ -114,7 +119,7 @@ where
 ///
 /// For an example, see the [crate-level documentation][self].
 pub fn init(timer: impl TimerSource) {
-    timer::setup_timebase(timer.timer());
+    SCHEDULER.with(move |scheduler| scheduler.set_time_driver(TimeDriver::new(timer.timer())))
 }
 
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");

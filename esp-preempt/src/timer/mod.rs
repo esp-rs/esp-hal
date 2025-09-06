@@ -1,50 +1,75 @@
-#[cfg_attr(riscv, path = "riscv.rs")]
-#[cfg_attr(xtensa, path = "xtensa.rs")]
-mod arch_specific;
+use esp_hal::{
+    interrupt::{InterruptHandler, Priority},
+    time::Duration,
+};
 
-pub(crate) use arch_specific::*;
-use esp_hal::interrupt::{InterruptHandler, Priority};
-use esp_sync::NonReentrantMutex;
+use crate::{SCHEDULER, TimeBase};
 
-use crate::TimeBase;
-
-/// The timer responsible for time slicing.
-pub(crate) static TIMER: NonReentrantMutex<Option<TimeBase>> = NonReentrantMutex::new(None);
-
-pub(crate) fn initialized() -> bool {
-    TIMER.with(|timer| timer.is_some())
+pub(crate) struct TimeDriver {
+    timer: TimeBase,
 }
 
-pub(crate) fn setup_timebase(mut timer: TimeBase) {
-    // The timer needs to tick at Priority 1 to prevent accidentally interrupting
-    // priority 1 limited locks.
-    let cb: extern "C" fn() = unsafe { core::mem::transmute(timer_tick_handler as *const ()) };
+impl TimeDriver {
+    pub(crate) fn new(mut timer: TimeBase) -> Self {
+        // The timer needs to tick at Priority 1 to prevent accidentally interrupting
+        // priority limited locks.
+        let timer_priority = Priority::Priority1;
 
-    // Register the interrupt handler without nesting to satisfy the requirements of the task
-    // switching code
-    #[cfg(riscv)]
-    let handler = InterruptHandler::new_not_nested(cb, Priority::Priority1);
+        let cb: extern "C" fn() = unsafe { core::mem::transmute(timer_tick_handler as *const ()) };
 
-    #[cfg(xtensa)]
-    let handler = InterruptHandler::new(cb, Priority::Priority1);
+        cfg_if::cfg_if! {
+            if #[cfg(riscv)] {
+                // Register the interrupt handler without nesting to satisfy the requirements of the
+                // task switching code
+                let handler = InterruptHandler::new_not_nested(cb, timer_priority);
+            } else {
+                let handler = InterruptHandler::new(cb, timer_priority);
+            }
+        };
 
-    timer.set_interrupt_handler(handler);
-    TIMER.with(|t| {
-        timer.listen();
-        t.replace(timer);
-    });
+        timer.set_interrupt_handler(handler);
+
+        Self { timer }
+    }
+
+    pub(crate) fn start(&mut self, period: Duration) {
+        self.timer.listen();
+
+        unwrap!(self.timer.start(period));
+    }
+
+    pub(crate) fn stop(&mut self) {
+        self.timer.unlisten();
+        unwrap!(self.timer.cancel());
+    }
+
+    pub(crate) fn handle_alarm(&mut self) {
+        self.timer.clear_interrupt();
+    }
 }
 
-pub(crate) fn clear_timer_interrupt() {
-    TIMER.with(|timer| {
-        unwrap!(timer.as_mut()).clear_interrupt();
-    });
-}
+#[esp_hal::ram]
+extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
+    SCHEDULER.with(|scheduler| {
+        unwrap!(scheduler.time_driver.as_mut()).handle_alarm();
 
-pub(crate) fn disable_timebase() {
-    TIMER.with(|timer| {
-        let mut timer = unwrap!(timer.take());
-        timer.unlisten();
-        unwrap!(timer.cancel());
+        // `Scheduler::switch_task` must be called on a single interrupt priority level only.
+        // To ensure this, we call yield_task to pend the software interrupt.
+        //
+        // RISC-V: esp-hal's interrupt handler can process multiple interrupts before handing
+        // control back to the interrupted context. This can result in two task switches
+        // before the first one's context save could run. To prevent this, here we only
+        // trigger the software interrupt which will then run the scheduler.
+        //
+        // ESP32: Because on ESP32 the software interrupt is triggered at priority 3 but
+        // the timer interrupt is triggered at priority 1, we need to trigger the
+        // software interrupt manually.
+        cfg_if::cfg_if! {
+            if #[cfg(any(riscv, esp32))] {
+                SCHEDULER.yield_task();
+            } else {
+                scheduler.switch_task(_context)
+            }
+        }
     });
 }

@@ -12,7 +12,7 @@ use esp_radio_preempt_driver::{
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::{SCHEDULER, timer::yield_task};
+use crate::SCHEDULER;
 
 static TIMER_QUEUE: TimerQueue = TimerQueue::new();
 
@@ -309,7 +309,7 @@ pub(crate) extern "C" fn timer_task(_: *mut c_void) {
         debug!("Timer task");
         TIMER_QUEUE.process();
         while SCHEDULER.now() < TIMER_QUEUE.next_wakeup() {
-            yield_task();
+            SCHEDULER.yield_task();
         }
     }
 }
