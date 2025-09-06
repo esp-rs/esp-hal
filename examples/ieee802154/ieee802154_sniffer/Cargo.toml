@@ -13,6 +13,7 @@ esp-backtrace = { path = "../../../esp-backtrace", features = [
 ] }
 esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
 esp-hal = { path = "../../../esp-hal", features = ["log-04", "unstable"] }
+esp-preempt = { path = "../../../esp-preempt", features = ["log-04"] }
 esp-println = { path = "../../../esp-println", features = ["log-04"] }
 esp-radio = { path = "../../../esp-radio", features = [
     "ieee802154",
@@ -25,12 +26,14 @@ esp32c6 = [
     "esp-backtrace/esp32c6",
     "esp-bootloader-esp-idf/esp32c6",
     "esp-hal/esp32c6",
+    "esp-preempt/esp32c6",
     "esp-radio/esp32c6",
 ]
 esp32h2 = [
     "esp-backtrace/esp32h2",
     "esp-bootloader-esp-idf/esp32h2",
     "esp-hal/esp32h2",
+    "esp-preempt/esp32h2",
     "esp-radio/esp32h2",
 ]
 

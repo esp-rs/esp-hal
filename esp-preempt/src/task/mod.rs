@@ -14,6 +14,17 @@ use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
 use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
 
+#[derive(Clone, Copy)]
+pub(crate) enum TaskState {
+    Ready,
+}
+
+impl TaskState {
+    pub fn is_ready(self) -> bool {
+        matches!(self, Self::Ready)
+    }
+}
+
 #[repr(C)]
 pub(crate) struct Context {
     #[cfg(riscv)]
@@ -22,6 +33,8 @@ pub(crate) struct Context {
     pub trap_frame: TrapFrame,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub next: *mut Context,
+    pub next_to_delete: *mut Context,
+    pub state: TaskState,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
 }
 
@@ -41,6 +54,8 @@ impl Context {
             trap_frame: task::new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             next: core::ptr::null_mut(),
+            next_to_delete: core::ptr::null_mut(),
+            state: TaskState::Ready,
             _allocated_stack: stack,
         }
     }
@@ -65,6 +80,8 @@ pub(super) fn allocate_main_task() {
             trap_frame: TrapFrame::default(),
             thread_semaphore: None,
             next: core::ptr::null_mut(),
+            next_to_delete: core::ptr::null_mut(),
+            state: TaskState::Ready,
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
         },
         InternalMemory,

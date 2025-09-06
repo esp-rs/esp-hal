@@ -258,7 +258,15 @@ pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
+    // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
+    // will not need to have a scheduler in their firmware.
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "wifi", feature = "ble"))] {
+            crate::time::ticks_to_micros(crate::preempt::now()) as i64
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 #[unsafe(no_mangle)]

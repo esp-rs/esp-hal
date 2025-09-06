@@ -457,7 +457,13 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(task_func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(task_handle as *mut usize) = task as usize;
 
         1
@@ -531,10 +537,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::time::systimer_count();
-    while crate::time::elapsed_time_since(start_time) < tick as u64 {
-        yield_task();
-    }
+    crate::preempt::usleep(tick)
 }
 
 /// **************************************************************************
@@ -587,7 +590,7 @@ pub unsafe extern "C" fn task_get_current_task() -> *mut c_void {
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_max_priority() -> i32 {
     trace!("task_get_max_priority");
-    255
+    crate::preempt::max_task_priority() as i32
 }
 
 /// **************************************************************************

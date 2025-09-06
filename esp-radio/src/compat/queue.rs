@@ -1,7 +1,9 @@
-use esp_radio_preempt_driver::queue::{QueueHandle, QueuePtr};
 use esp_wifi_sys::c_types::*;
 
-use crate::compat::OSI_FUNCS_TIME_BLOCKING;
+use crate::{
+    compat::OSI_FUNCS_TIME_BLOCKING,
+    preempt::queue::{QueueHandle, QueuePtr},
+};
 
 pub(crate) fn queue_create(queue_len: c_int, item_size: c_int) -> *mut c_void {
     trace!("queue_create len={} size={}", queue_len, item_size);
@@ -91,6 +93,16 @@ pub(crate) fn queue_try_receive(queue: *mut c_void, item: *mut c_void) -> i32 {
     let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
 
     unsafe { handle.try_receive(item.cast()) as i32 }
+}
+
+pub(crate) fn queue_remove(queue: *mut c_void, item: *const c_void) {
+    trace!("queue_remove queue {:?} item {:x}", queue, item as usize);
+
+    let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
+
+    let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
+
+    unsafe { handle.remove(item.cast()) }
 }
 
 pub(crate) fn queue_messages_waiting(queue: *mut c_void) -> u32 {

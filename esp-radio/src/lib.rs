@@ -61,7 +61,24 @@
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
 //! - `ESP_RADIO_TX_QUEUE_SIZE`
 //! - `ESP_RADIO_MAX_BURST_SIZE`
-//!
+#![cfg_attr(
+    multi_core,
+    doc = concat!(
+        "### Running on the Second Core",
+        "\n\n",
+        "BLE and Wi-Fi can also be run on the second core.",
+        "\n\n",
+        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
+        "which you intend to run the wireless code. This will correctly initialize",
+        "the radio peripheral to run on that core, and ensure that interrupts are",
+        "serviced by the correct core.",
+        "\n\n",
+        "It's also important to allocate adequate stack for the second core; in many",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your",
+        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "such as your application silently failing at some point during execution."
+    )
+)]
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
@@ -128,7 +145,6 @@ use crate::wifi::WifiError;
 use crate::{
     preempt::yield_task,
     radio::{setup_radio_isr, shutdown_radio_isr},
-    tasks::init_tasks,
 };
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
@@ -176,10 +192,6 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
-
-#[doc(hidden)]
-pub mod tasks;
-
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
@@ -260,7 +272,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     // This initializes the task switcher
     preempt::enable();
 
-    init_tasks();
     yield_task();
 
     wifi_set_log_verbose();

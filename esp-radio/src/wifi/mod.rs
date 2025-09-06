@@ -10,7 +10,6 @@ use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    mem,
     mem::MaybeUninit,
     ptr::addr_of,
     task::Poll,
@@ -779,100 +778,6 @@ impl Config {
             }
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(eap_client_configuration) => eap_client_configuration.validate(),
-        }
-    }
-
-    /// Returns a reference to the client configuration if available.
-    pub fn as_client_conf_ref(&self) -> Option<&ClientConfig> {
-        match self {
-            Self::Client(client_conf) => Some(client_conf),
-            Self::ApSta(client_conf, _) => Some(client_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the access point configuration if available.
-    pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfig> {
-        match self {
-            Self::AccessPoint(ap_conf) => Some(ap_conf),
-            Self::ApSta(_, ap_conf) => Some(ap_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a mutable reference to the client configuration, creating it if
-    /// necessary.
-    pub fn as_client_conf_mut(&mut self) -> &mut ClientConfig {
-        match self {
-            Self::Client(client_conf) => client_conf,
-            Self::ApSta(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::ApSta(client_conf, _) => {
-                        *self = Self::Client(client_conf);
-                        self.as_client_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::Client(Default::default());
-                self.as_client_conf_mut()
-            }
-        }
-    }
-
-    /// Returns a mutable reference to the access point configuration, creating
-    /// it if necessary.
-    pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfig {
-        match self {
-            Self::AccessPoint(ap_conf) => ap_conf,
-            Self::ApSta(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::ApSta(_, ap_conf) => {
-                        *self = Self::AccessPoint(ap_conf);
-                        self.as_ap_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::AccessPoint(Default::default());
-                self.as_ap_conf_mut()
-            }
-        }
-    }
-
-    /// Retrieves mutable references to both the `ClientConfig`
-    /// and `AccessPointConfig`.
-    pub fn as_mixed_conf_mut(&mut self) -> (&mut ClientConfig, &mut AccessPointConfig) {
-        match self {
-            Self::ApSta(client_conf, ap_conf) => (client_conf, ap_conf),
-            Self::AccessPoint(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::AccessPoint(ap_conf) => {
-                        *self = Self::ApSta(Default::default(), ap_conf);
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            Self::Client(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Client(client_conf) => {
-                        *self = Self::ApSta(client_conf, Default::default());
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::ApSta(Default::default(), Default::default());
-                self.as_mixed_conf_mut()
-            }
         }
     }
 }
@@ -1834,6 +1739,7 @@ impl WifiDeviceMode {
 
     fn tx_token(&self) -> Option<WifiTxToken> {
         if !self.can_send() {
+            // TODO: perhaps we can use a counting semaphore with a short blocking timeout
             crate::preempt::yield_task();
         }
 
@@ -1847,6 +1753,7 @@ impl WifiDeviceMode {
     fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
         let is_empty = self.data_queue_rx().with(|q| q.is_empty());
         if is_empty || !self.can_send() {
+            // TODO: use an OS queue with a short timeout
             crate::preempt::yield_task();
         }
 

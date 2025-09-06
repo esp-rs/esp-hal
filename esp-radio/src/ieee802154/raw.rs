@@ -323,25 +323,31 @@ fn ieee802154_sec_update() {
     // ieee802154_sec_clr_transmit_security();
 }
 
-fn next_operation() {
-    let previous_operation = STATE.with(|state| {
-        let prev_state = state.state;
-        state.state = if ieee802154_pib_get_rx_when_idle() {
-            enable_rx();
-            Ieee802154State::Receive
-        } else {
-            Ieee802154State::Idle
-        };
+fn next_operation_inner(state: &mut IeeeState) -> Ieee802154State {
+    let prev_state = state.state;
+    state.state = if ieee802154_pib_get_rx_when_idle() {
+        enable_rx();
+        Ieee802154State::Receive
+    } else {
+        Ieee802154State::Idle
+    };
 
-        prev_state
-    });
+    prev_state
+}
 
-    match previous_operation {
+fn notify_state(state: Ieee802154State) {
+    match state {
         Ieee802154State::Receive => super::rx_available(),
         Ieee802154State::Transmit => super::tx_done(),
         Ieee802154State::TxAck => super::tx_done(),
         _ => (),
     }
+}
+
+fn next_operation() {
+    let previous_operation = STATE.with(next_operation_inner);
+
+    notify_state(previous_operation)
 }
 
 #[handler(priority = Priority::Priority1)]
@@ -377,6 +383,7 @@ fn zb_mac_handler() {
                 "Received raw {:?}",
                 crate::fmt::Bytes(&*core::ptr::addr_of!(RX_BUFFER))
             );
+            let mut state_for_notify = Ieee802154State::Idle;
             STATE.with(|state| {
                 if state.rx_queue.len() <= RX_QUEUE_SIZE {
                     let item = RawReceived {
@@ -399,10 +406,12 @@ fn zb_mac_handler() {
                 } else if should_send_enhanced_ack(frm) {
                     // TODO
                 } else {
+                    state_for_notify = next_operation_inner(state)
                     // esp_ieee802154_coex_pti_set(IEEE802154_IDLE_RX);
-                    next_operation();
                 }
             });
+
+            notify_state(state_for_notify)
         }
     }
 
