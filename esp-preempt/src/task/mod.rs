@@ -12,7 +12,7 @@ pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
+use crate::{InternalMemory, SCHEDULER, task, timer};
 
 #[derive(Clone, Copy)]
 pub(crate) enum TaskState {
@@ -225,7 +225,7 @@ pub(super) fn allocate_main_task() {
     );
     let main_task_ptr = NonNull::from(Box::leak(task));
 
-    SCHEDULER_STATE.with(|state| {
+    SCHEDULER.with(|state| {
         debug_assert!(
             state.current_task.is_none(),
             "Tried to allocate main task multiple times"
@@ -238,7 +238,7 @@ pub(super) fn allocate_main_task() {
 }
 
 pub(super) fn delete_all_tasks() {
-    let mut all_tasks = SCHEDULER_STATE.with(|state| {
+    let mut all_tasks = SCHEDULER.with(|state| {
         // Since we delete all tasks, we walk through the allocation list - we just need to clear
         // the lists.
         state.to_delete = TaskList::new();
@@ -260,7 +260,7 @@ pub(super) fn delete_all_tasks() {
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Context) -> R) -> R {
-    SCHEDULER_STATE.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
+    SCHEDULER.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
 }
 
 pub(super) fn current_task() -> *mut Context {
@@ -268,7 +268,7 @@ pub(super) fn current_task() -> *mut Context {
 }
 
 pub(super) fn schedule_task_deletion(task: *mut Context) {
-    let deleting_current = SCHEDULER_STATE.with(|state| state.schedule_task_deletion(task));
+    let deleting_current = SCHEDULER.with(|state| state.schedule_task_deletion(task));
 
     // Tasks are deleted during context switches, so we need to yield if we are
     // deleting the current task.
@@ -281,10 +281,10 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
 
 #[cfg(riscv)]
 pub(crate) fn task_switch() {
-    SCHEDULER_STATE.with(|state| state.switch_task());
+    SCHEDULER.with(|state| state.switch_task());
 }
 
 #[cfg(xtensa)]
 pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
-    SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
+    SCHEDULER.with(|state| state.switch_task(trap_frame));
 }

@@ -245,12 +245,19 @@ fn usleep(us: u32) {
     }
 }
 
-static SCHEDULER_STATE: NonReentrantMutex<SchedulerState> =
-    NonReentrantMutex::new(SchedulerState::new());
+struct Scheduler {
+    inner: NonReentrantMutex<SchedulerState>,
+}
 
-struct Scheduler {}
+impl Scheduler {
+    pub(crate) fn with<R>(&self, cb: impl FnMut(&mut SchedulerState) -> R) -> R {
+        self.inner.with(cb)
+    }
+}
 
-esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {});
+esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: Scheduler = Scheduler {
+    inner: NonReentrantMutex::new(SchedulerState::new())
+});
 
 /// Initializes the scheduler.
 ///
@@ -317,7 +324,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
         let task_ptr = NonNull::from(Box::leak(task));
 
-        SCHEDULER_STATE.with(|state| {
+        SCHEDULER.with(|state| {
             state.all_tasks.push(task_ptr);
             state.ready_tasks.push(task_ptr);
         });
