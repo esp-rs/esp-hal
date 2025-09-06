@@ -36,8 +36,8 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup<Dm: DriverMode>(
-    rmt: Rmt<'static, Dm>,
+fn setup<'a, Dm: DriverMode>(
+    rmt: Rmt<'a, Dm>,
     rx: impl InputPin,
     tx: impl OutputPin,
     tx_config: TxChannelConfig,
@@ -75,6 +75,105 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
+// Run tests with a large buffer like `DEFMT_RTT_BUFFER_SIZE=32768 xtask run ...` to avoid
+// truncated output when running this with defmt!
+// Note that probe-rs reading the buffer might mess up timing-sensitive tests.
+fn check_data_eq(
+    tx: &[PulseCode],
+    rx: &[PulseCode],
+    rx_res: Result<usize, Error>,
+    rx_memsize: usize,
+    rx_wrap: bool,
+) {
+    // Only checks the buffer sizes; the rx buffer might still contain garbage after a certain
+    // index.
+    assert_eq!(tx.len(), rx.len(), "tx and rx len mismatch");
+
+    // Last tx code is the stop code, which won't be received
+    let mut expected_rx_len = tx.len() - 1;
+
+    // Some device don't support wrapping rx, and will terminate rx when the buffer is full.
+    if !rx_wrap {
+        expected_rx_len = expected_rx_len.min(rx_memsize)
+    };
+
+    let mut errors: usize = 0;
+    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        let mut _msg = "";
+
+        if idx < expected_rx_len {
+            if idx == tx.len() - 2 {
+                // The second-to-last pulse-code is the one which exceeds the idle threshold and
+                // should be received as stop code.
+                if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
+                    _msg = "rx code not a stop code!";
+                    errors += 1;
+                }
+            } else if code_tx != code_rx {
+                _msg = "rx/tx code mismatch!";
+                errors += 1;
+            }
+        }
+
+        #[cfg(feature = "defmt")]
+        if _msg.len() > 0 {
+            defmt::error!(
+                "loopback @ idx {}: {:?} (tx) -> {:?} (rx): {}",
+                idx,
+                code_tx,
+                code_rx,
+                _msg
+            );
+        } else {
+            defmt::info!(
+                "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
+                idx,
+                code_tx,
+                code_rx,
+            );
+        }
+    }
+
+    match rx_res {
+        Ok(rx_count) => {
+            assert_eq!(
+                rx_count,
+                expected_rx_len,
+                "unexpected rx count (last: tx={:?}, rx={:?})",
+                tx[rx_count - 1],
+                rx[rx_count - 1],
+            );
+        }
+        Err(Error::InvalidDataLength) if !rx_wrap => {
+            assert!(tx.len() > rx_memsize);
+            return;
+        }
+        Err(e) => {
+            panic!("unexpected rx error {:?}", e);
+        }
+    }
+
+    // The driver shouldn't have touched the rx buffer beyond expected_rx_len, and
+    // we initialized the buffer to PulseCode::end_marker()
+    assert!(
+        rx[expected_rx_len..]
+            .iter()
+            .all(|c| *c == PulseCode::end_marker()),
+        "rx buffer unexpectedly overwritten beyond rx end"
+    );
+
+    // FIXME: Show first mismatch, not first code!
+    assert_eq!(
+        errors,
+        0,
+        "rx/tx code mismatch at {}/{} indices (First: tx={:?}, rx={:?})",
+        errors,
+        tx.len() - 2,
+        tx.first(),
+        rx.first(),
+    );
+}
+
 fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
@@ -82,23 +181,36 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
-    let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
-    let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+    let supports_rx_wrap = rx_channel.supports_wrap();
+    let rx_buffer_size = rx_channel.buffer_size();
 
-    loop {
-        let tx_done = tx_transaction.poll();
-        let rx_done = rx_transaction.poll();
-        if tx_done && rx_done {
-            break;
+    let rx_res = match rx_channel.receive(&mut rcv_data) {
+        Ok(mut rx_transaction) => {
+            let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+            loop {
+                let tx_done = tx_transaction.poll();
+                let rx_done = rx_transaction.poll();
+                if tx_done && rx_done {
+                    break;
+                }
+            }
+
+            tx_transaction.wait().unwrap();
+            match rx_transaction.wait() {
+                Ok((rx_count, _channel)) => Ok(rx_count),
+                Err((err, _channel)) => Err(err),
+            }
         }
-    }
-
-    tx_transaction.wait().unwrap();
-    rx_transaction.wait().unwrap();
-
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+        Err(e) => Err(e),
+    };
+    check_data_eq(
+        &tx_data,
+        &rcv_data,
+        rx_res,
+        rx_buffer_size,
+        supports_rx_wrap,
+    );
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -141,12 +253,15 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     )
     .await;
 
-    assert!(tx_res.is_ok());
-    assert!(rx_res.is_ok());
+    tx_res.unwrap();
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(
+        &tx_data,
+        &rcv_data,
+        rx_res,
+        rx_channel.buffer_size(),
+        rx_channel.supports_wrap(),
+    );
 }
 
 // Run a test that just sends some data, without trying to recive it.
@@ -196,18 +311,28 @@ mod tests {
         do_rmt_loopback::<80>(2, 2);
     }
 
-    // FIXME: This test currently fails on esp32 with an rmt::Error::ReceiverError,
-    // which should imply a receiver overrun, which is unexpected (the buffer
-    // should hold 2 * 64 codes, which is sufficient).
-    // However, the problem already exists exists in the original code that added
-    // support for extended channel RAM, so we can't bisect to find a
-    // regression. Skip the test for now.
-    #[cfg(not(esp32))]
     #[test]
     fn rmt_loopback_tx_wrap() {
         // 80 codes require two RAM blocks; thus a tx channel with only 1 block requires
         // wrapping.
         do_rmt_loopback::<80>(1, 2);
+    }
+
+    #[test]
+    async fn rmt_loopback_tx_wrap_async() {
+        do_rmt_loopback_async::<80>(1, 2).await;
+    }
+
+    #[test]
+    fn rmt_loopback_rx_wrap() {
+        // 80 codes require two RAM blocks; thus an rx channel with only 1 block requires
+        // wrapping.
+        do_rmt_loopback::<80>(2, 1);
+    }
+
+    #[test]
+    async fn rmt_loopback_rx_wrap_async() {
+        do_rmt_loopback_async::<80>(2, 1).await;
     }
 
     // FIXME: This test can't work right now, because wrapping rx is not
@@ -242,7 +367,7 @@ mod tests {
     fn rmt_single_shot_fails_without_end_marker() {
         let result = do_rmt_single_shot::<20>(1, false);
 
-        assert!(matches!(result, Err(Error::EndMarkerMissing)));
+        assert_eq!(result, Err(Error::EndMarkerMissing));
     }
 
     #[test]
@@ -369,5 +494,100 @@ mod tests {
             test_channel_pair!(p, tx, rx, channel0, channel2);
             test_channel_pair!(p, tx, rx, channel1, channel3);
         }
+    }
+
+    // Test that dropping rx/tx transactions returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    fn rmt_loopback_after_drop() {
+        const TX_LEN: usize = 20;
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+        let (mut rx, mut tx) = hil_test::common_test_pins!(peripherals);
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high afte
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (tx_channel, rx_channel) = setup(rmt, rx.reborrow(), tx.reborrow(), tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
+        rx_transaction.poll();
+        tx_transaction.poll();
+
+        core::mem::drop(rx_transaction);
+        core::mem::drop(tx_transaction);
+
+        // FIXME: Add a small delay such that a few codes are actually sent/received
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+        let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel);
+    }
+
+    // Test that dropping rx/tx futures returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    async fn rmt_loopback_after_drop_async() {
+        const TX_LEN: usize = 20;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+        let (rx, tx) = hil_test::common_test_pins!(peripherals);
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high afte
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let rx_fut = rx_channel.receive(&mut rcv_data);
+        let tx_fut = tx_channel.transmit(&tx_data);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let _ = embassy_futures::poll_once(rx_fut);
+        let _ = embassy_futures::poll_once(tx_fut);
+
+        // FIXME: Add a small delay such that a few codes are actually sent/received
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+        let (rx_res, tx_res) = embassy_futures::join::join(
+            rx_channel.receive(&mut rcv_data),
+            tx_channel.transmit(&tx_data),
+        )
+        .await;
+
+        tx_res.unwrap();
+
+        check_data_eq(
+            &tx_data,
+            &rcv_data,
+            rx_res,
+            rx_channel.buffer_size(),
+            rx_channel.supports_wrap(),
+        );
     }
 }
