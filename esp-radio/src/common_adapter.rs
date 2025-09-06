@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{
     c_types::c_char,
     include::{esp_phy_calibration_data_t, timeval},
