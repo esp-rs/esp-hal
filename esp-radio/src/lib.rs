@@ -264,7 +264,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    info!("esp-radio configuration {:?}", crate::CONFIG);
     crate::common_adapter::enable_wifi_power_domain();
 
     setup_radio_isr();
