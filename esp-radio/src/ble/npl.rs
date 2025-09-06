@@ -4,6 +4,7 @@ use core::{
     ptr::{addr_of, addr_of_mut},
 };
 
+use esp_phy::{PhyController, PhyInitGuard};
 use esp_hal::time::Instant;
 
 use super::*;
@@ -1037,7 +1038,8 @@ pub(crate) struct BleNplCountInfoT {
     mutex_count: u16,
 }
 
-pub(crate) fn ble_init() {
+pub(crate) fn ble_init() -> PhyInitGuard<'static> {
+    let phy_init_guard;
     unsafe {
         (*addr_of_mut!(HCI_OUT_COLLECTOR)).write(HciOutCollector::new());
 
@@ -1143,7 +1145,7 @@ pub(crate) fn ble_init() {
             os_msys_init();
         }
 
-        crate::common_adapter::phy_enable();
+        phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
 
         // init bb
         bt_bb_v2_init_cmplx(1);
@@ -1234,6 +1236,7 @@ pub(crate) fn ble_init() {
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
 
     debug!("The ble_controller_init was initialized");
+    phy_init_guard
 }
 
 pub(crate) fn ble_deinit() {
@@ -1265,8 +1268,6 @@ pub(crate) fn ble_deinit() {
         npl::esp_unregister_npl_funcs();
 
         npl::esp_unregister_ext_funcs();
-
-        crate::common_adapter::phy_disable();
     }
 }
 

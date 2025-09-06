@@ -682,7 +682,7 @@ impl Drop for PhyClockGuard<'_> {
 
 #[cfg(any(bt, ieee802154, wifi))]
 #[instability::unstable]
-/// This trait provides common functionality for all
+/// This trait provides common clock functionality for all modem peripherals.
 pub trait ModemClockController<'d>: Sealed + 'd {
     /// Enable the modem clock for this controller.
     fn enable_modem_clock(&mut self, enable: bool);
