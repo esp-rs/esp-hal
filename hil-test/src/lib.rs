@@ -24,8 +24,6 @@ unsafe impl defmt::Logger for Logger {
 
 #[cfg(feature = "defmt")]
 use defmt_rtt as _;
-// Make sure esp_backtrace is not removed.
-use esp_backtrace as _;
 
 #[cfg(feature = "defmt")]
 #[macro_export]
@@ -57,7 +55,7 @@ macro_rules! i2c_pins {
         // Order: (SDA, SCL)
         cfg_if::cfg_if! {
             if #[cfg(any(esp32s2, esp32s3))] {
-                ($peripherals.GPIO2, $peripherals.GPIO3)
+                ($peripherals.GPIO3, $peripherals.GPIO2)
             } else if #[cfg(esp32)] {
                 ($peripherals.GPIO32, $peripherals.GPIO33)
             } else if #[cfg(esp32c6)] {

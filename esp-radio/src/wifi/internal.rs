@@ -1,3 +1,4 @@
+use esp_config::{esp_config_bool, esp_config_int};
 use esp_wifi_sys::include::{
     ESP_WIFI_OS_ADAPTER_MAGIC,
     ESP_WIFI_OS_ADAPTER_VERSION,
@@ -7,8 +8,10 @@ use esp_wifi_sys::include::{
     wpa_crypto_funcs_t,
 };
 
-use super::os_adapter::*;
+use super::os_adapter::{self, *};
 use crate::common_adapter::*;
+#[cfg(coex)]
+use crate::{binary::c_types::c_void, hal::ram};
 
 #[cfg(all(coex, any(esp32, esp32c2, esp32c3, esp32c6, esp32s3)))]
 pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter_funcs_t =
@@ -46,19 +49,15 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
     };
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_take_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    unsafe { crate::common_adapter::semphr_take_from_isr(semphr as *const (), hptw as *const ()) }
+#[ram]
+unsafe extern "C" fn semphr_take_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_take_from_isr(semphr, hptw as *mut bool) }
 }
 
 #[cfg(coex)]
-unsafe extern "C" fn semphr_give_from_isr_wrapper(
-    semphr: *mut crate::binary::c_types::c_void,
-    hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    unsafe { crate::common_adapter::semphr_give_from_isr(semphr as *const (), hptw as *const ()) }
+#[ram]
+unsafe extern "C" fn semphr_give_from_isr_wrapper(semphr: *mut c_void, hptw: *mut c_void) -> i32 {
+    unsafe { crate::common_adapter::semphr_give_from_isr(semphr, hptw as *mut bool) }
 }
 
 #[cfg(coex)]
@@ -120,8 +119,8 @@ static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _dport_access_stall_other_cpu_end_wrap: Some(dport_access_stall_other_cpu_end_wrap),
     _wifi_apb80m_request: Some(wifi_apb80m_request),
     _wifi_apb80m_release: Some(wifi_apb80m_release),
-    _phy_disable: Some(phy_disable),
-    _phy_enable: Some(phy_enable),
+    _phy_disable: Some(os_adapter::phy_disable),
+    _phy_enable: Some(os_adapter::phy_enable),
     _phy_update_country_info: Some(phy_update_country_info),
     _read_mac: Some(read_mac),
     _timer_arm: Some(ets_timer_arm),
@@ -259,21 +258,21 @@ pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
         sha256_vector: None,
         crc32: None,
     },
-    static_rx_buf_num: crate::CONFIG.static_rx_buf_num as i32,
-    dynamic_rx_buf_num: crate::CONFIG.dynamic_rx_buf_num as i32,
+    static_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
+    dynamic_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
     tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-    static_tx_buf_num: crate::CONFIG.static_tx_buf_num as i32,
-    dynamic_tx_buf_num: crate::CONFIG.dynamic_tx_buf_num as i32,
+    static_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
+    dynamic_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
     rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
     rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
     cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
     csi_enable: cfg!(feature = "csi") as i32,
-    ampdu_rx_enable: crate::CONFIG.ampdu_rx_enable as i32,
-    ampdu_tx_enable: crate::CONFIG.ampdu_tx_enable as i32,
-    amsdu_tx_enable: crate::CONFIG.amsdu_tx_enable as i32,
+    ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE") as i32,
+    ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE") as i32,
+    amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE") as i32,
     nvs_enable: 0,
     nano_enable: 0,
-    rx_ba_win: crate::CONFIG.rx_ba_win as i32,
+    rx_ba_win: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_BA_WIN"),
     wifi_task_core_id: 0,
     beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
     mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,

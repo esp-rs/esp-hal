@@ -74,6 +74,7 @@ mod placeholder;
 
 use core::fmt::Display;
 
+use esp_sync::RawMutex;
 pub use placeholder::NoPin;
 use portable_atomic::AtomicU32;
 use strum::EnumCount;
@@ -83,7 +84,6 @@ use crate::{
     interrupt::{InterruptHandler, Priority},
     peripherals::{GPIO, IO_MUX, Interrupt},
     private::{self, Sealed},
-    sync::RawMutex,
 };
 
 define_io_mux_signals!();

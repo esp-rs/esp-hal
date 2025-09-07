@@ -218,6 +218,7 @@ metadata!("build_info", CHIP_NAME, chip!());
 #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", feature = "rt"))))]
 #[cfg_attr(not(feature = "unstable"), doc(hidden))]
 pub use esp_riscv_rt::{self, riscv};
+use esp_sync::RawMutex;
 pub(crate) use peripherals::pac;
 #[cfg(xtensa)]
 #[cfg(all(xtensa, feature = "rt"))]
@@ -585,6 +586,9 @@ use crate::clock::CpuClock;
 use crate::config::{WatchdogConfig, WatchdogStatus};
 #[cfg(feature = "rt")]
 use crate::{clock::Clocks, peripherals::Peripherals};
+
+/// A spinlock for seldom called stuff. Users assume that lock contention is not an issue.
+pub(crate) static ESP_HAL_LOCK: RawMutex = RawMutex::new();
 
 /// System configuration.
 ///

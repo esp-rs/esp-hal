@@ -11,7 +11,7 @@
 
 use core::marker::PhantomData;
 
-use critical_section::CriticalSection;
+use esp_sync::RawMutex;
 
 use crate::{pcnt::channel::Channel, peripherals::PCNT, system::GenericPeripheralGuard};
 
@@ -82,6 +82,7 @@ pub struct Unit<'d, const NUM: usize> {
     pub channel0: Channel<'d, NUM, 0>,
     /// The second channel in PCNT unit.
     pub channel1: Channel<'d, NUM, 1>,
+    mutex: RawMutex,
 }
 
 impl<const NUM: usize> Unit<'_, NUM> {
@@ -91,6 +92,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
             counter: Counter::new(),
             channel0: Channel::new(),
             channel1: Channel::new(),
+            mutex: RawMutex::new(),
         }
     }
 
@@ -216,7 +218,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Resets the counter value to zero.
     pub fn clear(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.ctrl().modify(|_, w| w.cnt_rst_u(NUM as u8).set_bit());
             // TODO: does this need a delay? (liebman / Jan 2 2023)
             pcnt.ctrl()
@@ -227,7 +229,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Pause the counter
     pub fn pause(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).set_bit());
         });
@@ -236,7 +238,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Resume the counter
     pub fn resume(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.ctrl()
                 .modify(|_, w| w.cnt_pause_u(NUM as u8).clear_bit());
         });
@@ -265,16 +267,16 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Enable interrupts for this unit.
     pub fn listen(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });
     }
 
     /// Disable interrupts for this unit.
-    pub fn unlisten(&self, _cs: CriticalSection<'_>) {
+    pub fn unlisten(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.int_ena()
                 .modify(|_, w| w.cnt_thr_event_u(NUM as u8).clear_bit());
         });
@@ -289,7 +291,7 @@ impl<const NUM: usize> Unit<'_, NUM> {
     /// Clear the interrupt bit for this unit.
     pub fn reset_interrupt(&self) {
         let pcnt = PCNT::regs();
-        critical_section::with(|_cs| {
+        self.mutex.lock(|| {
             pcnt.int_clr()
                 .write(|w| w.cnt_thr_event_u(NUM as u8).set_bit());
         });

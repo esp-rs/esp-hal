@@ -53,14 +53,32 @@
 //! You can get inspiration from the [ESP-IDF examples](https://github.com/espressif/esp-idf/tree/release/v5.3/examples/wifi/iperf)
 //!
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
-//!
-//! By default the power-saving mode is [PowerSaveMode::None](crate::config::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default.
-//!
+#![cfg_attr(
+    feature = "wifi",
+    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default."
+)]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
 //! - `ESP_RADIO_TX_QUEUE_SIZE`
 //! - `ESP_RADIO_MAX_BURST_SIZE`
-//!
+#![cfg_attr(
+    multi_core,
+    doc = concat!(
+        "### Running on the Second Core",
+        "\n\n",
+        "BLE and Wi-Fi can also be run on the second core.",
+        "\n\n",
+        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
+        "which you intend to run the wireless code. This will correctly initialize",
+        "the radio peripheral to run on that core, and ensure that interrupts are",
+        "serviced by the correct core.",
+        "\n\n",
+        "It's also important to allocate adequate stack for the second core; in many",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your",
+        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "such as your application silently failing at some point during execution."
+    )
+)]
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
@@ -113,9 +131,9 @@ use core::marker::PhantomData;
 
 use common_adapter::chip_specific::phy_mem_init;
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
-use esp_config::*;
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
+use esp_sync::RawMutex;
 #[cfg(esp32)]
 use hal::analog::adc::{release_adc2, try_claim_adc2};
 use hal::{
@@ -128,7 +146,6 @@ use crate::wifi::WifiError;
 use crate::{
     preempt::yield_task,
     radio::{setup_radio_isr, shutdown_radio_isr},
-    tasks::init_tasks,
 };
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
@@ -174,14 +191,11 @@ unstable_module! {
     #[cfg(feature = "ieee802154")]
     pub mod ieee802154;
 }
-pub mod config;
 
 pub(crate) mod common_adapter;
-
-#[doc(hidden)]
-pub mod tasks;
-
 pub(crate) mod memory_fence;
+
+pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
 
 // this is just to verify that we use the correct defaults in `build.rs`
 #[allow(clippy::assertions_on_constants)] // TODO: try assert_eq once it's usable in const context
@@ -198,31 +212,6 @@ const _: () = {
             core::assert!(binary::include::CONFIG_ESP32_WIFI_RX_BA_WIN == 6);
         }
     };
-};
-
-pub(crate) const CONFIG: config::Config = config::Config {
-    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
-    tx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE"),
-    static_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_RX_BUF_NUM"),
-    dynamic_rx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
-    static_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
-    dynamic_tx_buf_num: esp_config_int!(usize, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
-    ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE"),
-    ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE"),
-    amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE"),
-    rx_ba_win: esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_BA_WIN"),
-    max_burst_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"),
-    country_code: esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE"),
-    country_code_operating_class: esp_config_int!(
-        u8,
-        "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS"
-    ),
-    mtu: esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU"),
-    listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
-    beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT"),
-    ap_beacon_timeout: esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT"),
-    failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
-    scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
 };
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -276,7 +265,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    info!("esp-radio configuration {:?}", crate::CONFIG);
     crate::common_adapter::chip_specific::enable_wifi_power_domain();
     phy_mem_init();
 
@@ -285,7 +273,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     // This initializes the task switcher
     preempt::enable();
 
-    init_tasks();
     yield_task();
 
     wifi_set_log_verbose();

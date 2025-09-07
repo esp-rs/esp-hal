@@ -1,4 +1,6 @@
-use crate::{clock::Clocks, peripherals::RNG, sync::Locked};
+use esp_sync::NonReentrantMutex;
+
+use crate::{clock::Clocks, peripherals::RNG};
 
 // TODO: find a better place for these
 #[inline]
@@ -49,7 +51,7 @@ fn current_cpu_cycles() -> usize {
     }
 }
 
-static LAST_READ: Locked<usize> = Locked::new(0);
+static LAST_READ: NonReentrantMutex<usize> = NonReentrantMutex::new(0);
 
 fn read_one(wait_cycles: usize) -> u32 {
     loop {

@@ -73,7 +73,7 @@ fn main() -> ! {
     let iface = create_interface(&mut device);
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -90,13 +90,12 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Config::Client({
-        let mut config = ClientConfig::default();
-        config.ssid = SSID.into();
-        config.password = PASSWORD.into();
-        config
-    });
-    let res = controller.set_configuration(&client_config);
+    let client_config = Config::Client(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+    );
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

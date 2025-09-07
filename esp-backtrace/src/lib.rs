@@ -201,5 +201,5 @@ fn abort() -> ! {
     }
 
     #[allow(unreachable_code)]
-    critical_section::with(|_| loop {})
+    arch::interrupt_free(|| loop {})
 }

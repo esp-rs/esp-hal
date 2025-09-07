@@ -19,12 +19,13 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+use esp_sync::RawMutex;
+
 use super::{Error, Timer as _};
 use crate::{
     asynch::AtomicWaker,
     interrupt::{self, InterruptHandler},
     peripherals::{Interrupt, SYSTIMER},
-    sync::RawMutex,
     system::{Cpu, Peripheral as PeripheralEnable, PeripheralClockControl},
     time::{Duration, Instant},
 };

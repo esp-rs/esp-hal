@@ -27,8 +27,14 @@ const KNOWN_HELPERS: &[&str] = &[
     "skip_getter",
     // Feature gate the generated setters and getters by the "unstable" feature
     "unstable",
+    // Generate a by-reference getter instead of a by-value getter for non-`Copy` types
+    "reference",
 ];
 
+/// A lightweight version of the `Builder` derive macro that only generates
+/// setters and getters for each field of a struct.
+///
+/// <https://matklad.github.io/2022/05/29/builder-lite.html>
 pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
 
@@ -131,13 +137,28 @@ pub fn builder_lite_derive(item: TokenStream) -> TokenStream {
                     None
                 }
             });
-            fns.push(quote! {
-                #(#docs)*
-                #unstable
-                pub fn #field_ident(&self) -> #field_type {
-                    self.#field_ident
-                }
-            });
+
+            let is_non_copy = helper_attributes.iter().any(|h| h == "reference");
+
+            if is_non_copy {
+                // Generate a by-reference getter for non-`Copy` types
+                fns.push(quote! {
+                    #(#docs)*
+                    #unstable
+                    pub fn #field_ident(&self) -> &#field_type {
+                        &self.#field_ident
+                    }
+                });
+            } else {
+                // Generate a by-value getter for `Copy` types (the default)
+                fns.push(quote! {
+                    #(#docs)*
+                    #unstable
+                    pub fn #field_ident(&self) -> #field_type {
+                        self.#field_ident
+                    }
+                });
+            }
         }
     }
 

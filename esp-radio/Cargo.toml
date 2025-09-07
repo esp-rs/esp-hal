@@ -16,7 +16,6 @@ test  = false
 
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-critical-section = "1.2.0"
 cfg-if = "1.0.0"
 portable-atomic = { version = "1.11.0", default-features = false }
 enumset = { version = "1.1.6", default-features = false, optional = true }
@@ -28,10 +27,12 @@ esp-radio-preempt-driver = { version = "0.0.1", path = "../esp-radio-preempt-dri
 instability = "0.3.9"
 
 # Unstable dependencies that are not (strictly) part of the public API
+allocator-api2 = { version = "0.3.0", default-features = false, features = ["alloc"] }
 document-features  = "0.2.11"
 esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
+esp-sync = { version = "0.0.0", path = "../esp-sync" }
 esp-wifi-sys = "0.7.1"
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
@@ -40,6 +41,7 @@ procmacros = { version = "0.19.0", package = "esp-hal-procmacros", path = "../es
 xtensa-lx-rt = { version = "0.20.0", path = "../xtensa-lx-rt", optional = true }
 byte = { version = "0.2.7", optional = true }
 ieee802154 = { version = "0.6.1", optional = true }
+heapless = "0.9"
 
 # Optional dependencies enabling ecosystem features
 serde = { version = "1.0.218", default-features = false, features = ["derive"], optional = true }
@@ -114,6 +116,7 @@ esp32s3 = [
 ## - `pub extern "C" fn malloc(size: usize) -> *mut u8`
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free(ptr: *mut u8)`
+## - `pub extern "C" fn free_internal(ptr: *mut u8)`
 ## - `pub extern "C" fn calloc(number: u32, size: usize) -> *mut u8`
 ## - `pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8`
 ## - `pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8`
@@ -164,7 +167,7 @@ serde = ["dep:serde", "enumset?/serde"]
 log-04 = ["dep:log-04", "esp-hal/log-04", "esp-wifi-sys/log"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
-defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt"]
+defmt = ["dep:defmt", "smoltcp?/defmt", "esp-hal/defmt", "bt-hci?/defmt", "esp-wifi-sys/defmt", "enumset/defmt", "heapless/defmt", "esp-sync/defmt"]
 
 #! ### Unstable APIs
 #! Unstable APIs are drivers and features that are not yet ready for general use.

@@ -26,7 +26,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, rtc_cntl::Rtc, timer::timg::TimerGroup}
 use esp_println::println;
 use esp_radio::{
     Controller,
-    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{ClientConfig, Config, ScanConfig, WifiController, WifiDevice, WifiEvent, WifiStaState},
 };
 use log::{error, info};
 use sntpc::{NtpContext, NtpTimestampGenerator, get_time};
@@ -209,19 +209,18 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        if esp_radio::wifi::wifi_state() == WifiState::StaConnected {
+        if esp_radio::wifi::sta_state() == WifiStaState::Connected {
             // wait until we're no longer connected
             controller.wait_for_event(WifiEvent::StaDisconnected).await;
             Timer::after(Duration::from_millis(5000)).await
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Config::Client({
-                let mut config = ClientConfig::default();
-                config.ssid = SSID.into();
-                config.password = PASSWORD.into();
-                config
-            });
-            controller.set_configuration(&client_config).unwrap();
+            let client_config = Config::Client(
+                ClientConfig::default()
+                    .with_ssid(SSID.into())
+                    .with_password(PASSWORD.into()),
+            );
+            controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

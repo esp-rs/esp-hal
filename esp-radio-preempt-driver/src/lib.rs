@@ -28,22 +28,37 @@
 
 #![no_std]
 
+pub mod mutex;
+pub mod queue;
+pub mod semaphore;
+pub mod timer;
+
 use core::ffi::c_void;
+
+// Timer callbacks need to be heap-allocated.
+extern crate alloc;
+
+use crate::semaphore::SemaphorePtr;
 
 unsafe extern "Rust" {
     fn esp_preempt_initialized() -> bool;
-    fn esp_preempt_usleep(us: u32);
     fn esp_preempt_enable();
     fn esp_preempt_disable();
     fn esp_preempt_yield_task();
     fn esp_preempt_current_task() -> *mut c_void;
+    fn esp_preempt_max_task_priority() -> u32;
     fn esp_preempt_task_create(
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        priority: u32,
+        pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void;
     fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void);
-    fn esp_preempt_current_task_thread_semaphore() -> *mut c_void;
+    fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr;
+
+    fn esp_preempt_usleep(us: u32);
+    fn esp_preempt_now() -> u64;
 }
 
 /// Set the Scheduler implementation.
@@ -62,48 +77,75 @@ macro_rules! scheduler_impl {
 
         #[unsafe(no_mangle)]
         #[inline]
+        fn esp_preempt_enable() {
+            <$t as $crate::Scheduler>::enable(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_disable() {
+            <$t as $crate::Scheduler>::disable(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_yield_task() {
+            <$t as $crate::Scheduler>::yield_task(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_current_task() -> *mut c_void {
+            <$t as $crate::Scheduler>::current_task(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_max_task_priority() -> u32 {
+            <$t as $crate::Scheduler>::max_task_priority(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_task_create(
+            task: extern "C" fn(*mut c_void),
+            param: *mut c_void,
+            priority: u32,
+            core_id: Option<u32>,
+            task_stack_size: usize,
+        ) -> *mut c_void {
+            <$t as $crate::Scheduler>::task_create(
+                &$name,
+                task,
+                param,
+                priority,
+                core_id,
+                task_stack_size,
+            )
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void) {
+            <$t as $crate::Scheduler>::schedule_task_deletion(&$name, task_handle)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr {
+            <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
         fn esp_preempt_usleep(us: u32) {
             <$t as $crate::Scheduler>::usleep(&$name, us)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_enable() {
-            <$t as $crate::Scheduler>::enable(&$name)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_disable() {
-            <$t as $crate::Scheduler>::disable(&$name)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_yield_task() {
-            <$t as $crate::Scheduler>::yield_task(&$name)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_current_task() -> *mut c_void {
-            <$t as $crate::Scheduler>::current_task(&$name)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_task_create(
-            task: extern "C" fn(*mut c_void),
-            param: *mut c_void,
-            task_stack_size: usize,
-        ) -> *mut c_void {
-            <$t as $crate::Scheduler>::task_create(&$name, task, param, task_stack_size)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void) {
-            <$t as $crate::Scheduler>::schedule_task_deletion(&$name, task_handle)
-        }
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_current_task_thread_semaphore() -> *mut c_void {
-            <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
+        fn esp_preempt_now() -> u64 {
+            <$t as $crate::Scheduler>::now(&$name)
         }
     };
 }
@@ -117,10 +159,6 @@ pub trait Scheduler: Send + Sync + 'static {
     /// up.
     fn initialized(&self) -> bool;
 
-    /// This function is called by `esp_radio::init` to put the current task to sleep for the
-    /// specified number of microseconds.
-    fn usleep(&self, us: u32);
-
     /// This function is called by `esp-radio` to start the task scheduler.
     fn enable(&self);
 
@@ -133,12 +171,18 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to retrieve a pointer to the current task.
     fn current_task(&self) -> *mut c_void;
 
+    /// This function returns the maximum task priority level.
+    /// Higher number is considered to be higher priority.
+    fn max_task_priority(&self) -> u32;
+
     /// This function is used to create threads.
     /// It should allocate the stack.
     fn task_create(
         &self,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        priority: u32,
+        core_id: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void;
 
@@ -153,7 +197,17 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function should return an opaque per-thread pointer to an
     /// usize-sized memory location, which will be used to store a pointer
     /// to a semaphore for this thread.
-    fn current_task_thread_semaphore(&self) -> *mut c_void;
+    fn current_task_thread_semaphore(&self) -> SemaphorePtr;
+
+    /// This function is called by a task to sleep for the specified number of microseconds.
+    fn usleep(&self, us: u32);
+
+    /// Returns the current timestamp in microseconds.
+    ///
+    /// The underlying timer is expected not to overflow during the lifetime of the program.
+    ///
+    /// The clock that generates this timestamp must be the same one used to trigger timer events.
+    fn now(&self) -> u64;
 }
 
 // API used (mostly) by esp-radio
@@ -162,12 +216,6 @@ pub trait Scheduler: Send + Sync + 'static {
 #[inline]
 pub fn initialized() -> bool {
     unsafe { esp_preempt_initialized() }
-}
-
-/// Puts the current task to sleep for the specified number of microseconds.
-#[inline]
-pub fn usleep(us: u32) {
-    unsafe { esp_preempt_usleep(us) }
 }
 
 /// Starts the task scheduler.
@@ -194,6 +242,14 @@ pub fn current_task() -> *mut c_void {
     unsafe { esp_preempt_current_task() }
 }
 
+/// Returns the maximum priority a task can have.
+///
+/// This function assumes that a bigger number means higher priority.
+#[inline]
+pub fn max_task_priority() -> u32 {
+    unsafe { esp_preempt_max_task_priority() }
+}
+
 /// Creates a new task with the given initial parameter and stack size.
 ///
 /// ## Safety
@@ -204,9 +260,11 @@ pub fn current_task() -> *mut c_void {
 pub unsafe fn task_create(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,
+    priority: u32,
+    pin_to_core: Option<u32>,
     task_stack_size: usize,
 ) -> *mut c_void {
-    unsafe { esp_preempt_task_create(task, param, task_stack_size) }
+    unsafe { esp_preempt_task_create(task, param, priority, pin_to_core, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.
@@ -224,6 +282,18 @@ pub unsafe fn schedule_task_deletion(task_handle: *mut c_void) {
 
 /// Returns a pointer to the current thread's semaphore.
 #[inline]
-pub fn current_task_thread_semaphore() -> *mut c_void {
+pub fn current_task_thread_semaphore() -> SemaphorePtr {
     unsafe { esp_preempt_current_task_thread_semaphore() }
+}
+
+/// Puts the current task to sleep for the specified number of microseconds.
+#[inline]
+pub fn usleep(us: u32) {
+    unsafe { esp_preempt_usleep(us) }
+}
+
+/// Returns the current timestamp, in microseconds.
+#[inline]
+pub fn now() -> u64 {
+    unsafe { esp_preempt_now() }
 }

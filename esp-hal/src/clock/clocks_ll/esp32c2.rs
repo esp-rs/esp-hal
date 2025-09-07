@@ -188,10 +188,14 @@ pub(super) fn ble_rtc_clk_init() {
         w.lp_timer_sel_rtc_slow().clear_bit()
     });
 
-    // assume 40MHz xtal
+    let divider = match crate::rtc_cntl::RtcClock::xtal_freq() {
+        XtalClock::_26M => 129,
+        XtalClock::_40M => 249,
+    };
+
     MODEM_CLKRST::regs()
         .modem_lp_timer_conf()
-        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(249) });
+        .modify(|_, w| unsafe { w.lp_timer_clk_div_num().bits(divider) });
 
     MODEM_CLKRST::regs().etm_clk_conf().modify(|_, w| {
         w.etm_clk_active().set_bit();
