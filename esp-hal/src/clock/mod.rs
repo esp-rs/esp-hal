@@ -85,7 +85,7 @@ pub trait Clock {
 }
 
 /// CPU clock speed
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[allow(
     clippy::enum_variant_names,
@@ -95,10 +95,13 @@ pub trait Clock {
 pub enum CpuClock {
     /// 80MHz CPU clock
     #[cfg(not(esp32h2))]
+    #[default]
+    // FIXME: I don't think this is correct in general?
     _80MHz  = 80,
 
     /// 96MHz CPU clock
     #[cfg(esp32h2)]
+    #[default]
     _96MHz  = 96,
 
     /// 120MHz CPU clock
@@ -112,19 +115,6 @@ pub enum CpuClock {
     /// 240MHz CPU clock
     #[cfg(xtensa)]
     _240MHz = 240,
-}
-
-impl Default for CpuClock {
-    fn default() -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(esp32h2)] {
-                Self::_96MHz
-            } else {
-                // FIXME: I don't think this is correct in general?
-                Self::_80MHz
-            }
-        }
-    }
 }
 
 impl CpuClock {
