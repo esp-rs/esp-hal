@@ -1,9 +1,11 @@
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
-    time::Duration,
+    time::{Duration, Rate},
 };
 
-use crate::{SCHEDULER, TimeBase};
+use crate::{SCHEDULER, TICK_RATE, TimeBase};
+
+const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
 
 pub(crate) struct TimeDriver {
     timer: TimeBase,
@@ -32,19 +34,28 @@ impl TimeDriver {
         Self { timer }
     }
 
-    pub(crate) fn start(&mut self, period: Duration) {
+    pub(crate) fn start(&mut self) {
         self.timer.listen();
-
-        unwrap!(self.timer.start(period));
     }
 
     pub(crate) fn stop(&mut self) {
         self.timer.unlisten();
-        unwrap!(self.timer.cancel());
+        self.timer.stop();
     }
 
     pub(crate) fn handle_alarm(&mut self) {
         self.timer.clear_interrupt();
+        // TODO: we should run through the timer queue here, handle expired timers and calculate
+        // next timer wakeup.
+    }
+
+    pub(crate) fn arm_next_wakeup(&mut self, with_time_slice: bool) {
+        if with_time_slice {
+            let timeout = TIMESLICE_DURATION;
+            unwrap!(self.timer.schedule(timeout));
+        } else {
+            self.timer.stop();
+        }
     }
 }
 

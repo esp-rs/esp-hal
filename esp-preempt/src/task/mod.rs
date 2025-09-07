@@ -148,6 +148,10 @@ impl<E: TaskListElement> TaskQueue<E> {
             }
         }
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
 }
 
 #[repr(C)]

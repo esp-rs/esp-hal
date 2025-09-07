@@ -1,7 +1,7 @@
 use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-use esp_hal::time::{Duration, Instant, Rate};
+use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
@@ -22,8 +22,6 @@ use crate::{
     timer::TimeDriver,
     timer_queue,
 };
-
-const TIMESLICE_FREQUENCY: Rate = Rate::from_hz(TICK_RATE);
 
 pub(crate) struct SchedulerState {
     /// Pointer to the current task.
@@ -96,6 +94,8 @@ impl SchedulerState {
 
             self.current_task = Some(next_task);
         }
+
+        self.arm_time_slice_alarm();
     }
 
     #[cfg(riscv)]
@@ -111,6 +111,13 @@ impl SchedulerState {
                 self.current_task = Some(next);
             }
         }
+
+        self.arm_time_slice_alarm();
+    }
+
+    fn arm_time_slice_alarm(&mut self) {
+        let ready_tasks = !self.ready_tasks.is_empty();
+        unwrap!(self.time_driver.as_mut()).arm_next_wakeup(ready_tasks);
     }
 
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Context) -> bool {
@@ -134,7 +141,7 @@ impl Scheduler {
     }
 
     pub(crate) fn yield_task(&self) {
-        task::yield_task()
+        task::yield_task();
     }
 }
 
@@ -153,9 +160,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         task::setup_multitasking();
         timer_queue::create_timer_task();
 
-        self.with(|scheduler| {
-            unwrap!(scheduler.time_driver.as_mut()).start(TIMESLICE_FREQUENCY.as_duration())
-        });
+        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
     }
 
     fn disable(&self) {
@@ -249,7 +254,8 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn now(&self) -> u64 {
-        // FIXME: this function needs to return the timestamp of the scheduler's timer
+        // We're using a SingleShotTimer as the time driver, which lets us use the system timer's
+        // timestamps.
         esp_hal::time::Instant::now()
             .duration_since_epoch()
             .as_micros()

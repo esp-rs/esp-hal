@@ -34,17 +34,13 @@ mod timer_queue;
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
-    timer::{AnyTimer, PeriodicTimer},
+    timer::{AnyTimer, OneShotTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
 
 use crate::timer::TimeDriver;
 
-// TODO: use OneShotTimer. The time driver should be able to stop ticking when time slicing is not
-// necessary (no tasks ready on current priority level). This allows us to fix `now`, and to
-// implement a timer queue on top of this timer.
-
-type TimeBase = PeriodicTimer<'static, Blocking>;
+type TimeBase = OneShotTimer<'static, Blocking>;
 
 // Polyfill the InternalMemory allocator
 #[cfg(not(feature = "esp-alloc"))]
