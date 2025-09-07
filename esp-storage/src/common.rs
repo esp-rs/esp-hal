@@ -2,6 +2,9 @@ use core::mem::MaybeUninit;
 
 use crate::chip_specific;
 
+#[cfg(multi_core)]
+use crate::multi_core::MultiCoreStrategy;
+
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum FlashStorageError {
@@ -10,6 +13,8 @@ pub enum FlashStorageError {
     CantUnlock,
     NotAligned,
     OutOfBounds,
+    #[cfg(multi_core)]
+    SecondCoreRunning,
     Other(i32),
 }
 
@@ -27,6 +32,8 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
 pub struct FlashStorage {
     pub(crate) capacity: usize,
     unlocked: bool,
+    #[cfg(multi_core)]
+    pub(crate) multi_core_strategy: MultiCoreStrategy,
 }
 
 impl Default for FlashStorage {
@@ -43,6 +50,8 @@ impl FlashStorage {
         let mut storage = FlashStorage {
             capacity: 0,
             unlocked: false,
+            #[cfg(multi_core)]
+            multi_core_strategy: MultiCoreStrategy::Error,
         };
 
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
@@ -113,8 +122,15 @@ impl FlashStorage {
 
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
+        let operation = || check_rc(chip_specific::spiflash_erase_sector(sector));
 
-        check_rc(chip_specific::spiflash_erase_sector(sector))
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                self.multi_core_strategy.with_checks(operation)
+            } else {
+                operation()
+            }
+        }
     }
 
     pub(crate) fn internal_write(
@@ -124,10 +140,20 @@ impl FlashStorage {
     ) -> Result<(), FlashStorageError> {
         self.unlock_once()?;
 
-        check_rc(chip_specific::spiflash_write(
-            offset,
-            bytes.as_ptr() as *const u32,
-            bytes.len() as u32,
-        ))
+        let operation = || {
+            check_rc(chip_specific::spiflash_write(
+                offset,
+                bytes.as_ptr() as *const u32,
+                bytes.len() as u32,
+            ))
+        };
+
+        cfg_if::cfg_if! {
+            if #[cfg(multi_core)] {
+                self.multi_core_strategy.with_checks(operation)
+            } else {
+                operation()
+            }
+        }
     }
 }
