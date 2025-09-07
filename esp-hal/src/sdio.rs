@@ -20,10 +20,13 @@ use embedded_hal_sdmmc::{
 
 use crate::pac;
 
+pub mod command;
 mod config;
+mod direction;
 pub mod dma;
 mod hinf;
 mod interrupt;
+mod io_ocr;
 mod pins;
 mod slc;
 mod slchost;
@@ -31,8 +34,10 @@ mod state;
 mod timing;
 
 pub use config::Config;
+pub use direction::Direction;
 pub use hinf::{AnyHinf, HinfInfo, HinfInstance};
 pub use interrupt::{DeviceInterrupt, HostInterrupt};
+pub use io_ocr::IoOcr;
 pub use pins::Pins;
 pub use slc::{AnySlc, SlcInfo, SlcInstance};
 pub use slchost::{AnySlchost, SlchostInfo, SlchostInstance};
