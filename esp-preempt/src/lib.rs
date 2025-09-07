@@ -53,26 +53,24 @@ mod esp_alloc {
 
     use allocator_api2::alloc::{AllocError, Allocator};
 
+    unsafe extern "C" {
+        fn malloc_internal(size: usize) -> *mut u8;
+
+        fn free_internal(ptr: *mut u8);
+    }
+
     /// An allocator that uses internal memory only.
     pub struct InternalMemory;
 
     unsafe impl Allocator for InternalMemory {
         fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
-            unsafe extern "C" {
-                fn esp_radio_allocate_from_internal_ram(size: usize) -> *mut u8;
-            }
-            let raw_ptr = unsafe { esp_radio_allocate_from_internal_ram(layout.size()) };
+            let raw_ptr = unsafe { malloc_internal(layout.size()) };
             let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
             Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
         }
 
         unsafe fn deallocate(&self, ptr: NonNull<u8>, _layout: Layout) {
-            unsafe extern "C" {
-                fn esp_radio_deallocate_internal_ram(ptr: *mut u8);
-            }
-            unsafe {
-                esp_radio_deallocate_internal_ram(ptr.as_ptr());
-            }
+            unsafe { free_internal(ptr.as_ptr()) };
         }
     }
 }
