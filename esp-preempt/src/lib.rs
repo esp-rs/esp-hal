@@ -160,48 +160,76 @@ impl SchedulerState {
         }
     }
 
-    #[cfg(xtensa)]
-    fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
-
-        if !self.to_delete.is_null() {
+    fn delete_marked_tasks(&mut self) {
+        while !self.to_delete.is_null() {
             let task_to_delete = core::mem::take(&mut self.to_delete);
+            self.to_delete = unsafe { (*task_to_delete).next_to_delete };
             self.delete_task(task_to_delete);
         }
+    }
 
-        unsafe { self.current_task = (*self.current_task).next };
+    fn select_next_task(&mut self) -> Option<*mut Context> {
+        let mut current = self.current_task;
+        loop {
+            let next_task = unsafe { (*current).next };
+
+            if next_task == self.current_task {
+                // We didn't find a new task to switch to.
+                // TODO: mark the current task as Running
+                // Once we have actual task states, yield should marked the current task as Ready,
+                // other stuff as Waiting.
+                return None;
+            }
+
+            if unsafe { (*next_task).state }.is_ready() {
+                // TODO: mark the selected task as Running
+                return Some(next_task);
+            }
+            current = next_task;
+        }
+    }
+
+    #[cfg(xtensa)]
+    fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
+        self.delete_marked_tasks();
+
+        let Some(next_task) = self.select_next_task() else {
+            return;
+        };
+
+        task::save_task_context(unsafe { &mut *self.current_task }, trap_frame);
+
+        self.current_task = next_task;
 
         task::restore_task_context(unsafe { &mut *self.current_task }, trap_frame);
     }
 
     #[cfg(riscv)]
     fn switch_task(&mut self) {
-        if !self.to_delete.is_null() {
-            let task_to_delete = core::mem::take(&mut self.to_delete);
-            self.delete_task(task_to_delete);
-        }
+        self.delete_marked_tasks();
 
-        let task = self.current_task;
-        let context = unsafe { &mut (*task).trap_frame };
-        let old_ctx = core::ptr::addr_of_mut!(*context);
+        let Some(next_task) = self.select_next_task() else {
+            return;
+        };
 
-        let task = unsafe { (*self.current_task).next };
-        let context = unsafe { &mut (*task).trap_frame };
-        let new_ctx = core::ptr::addr_of_mut!(*context);
+        let old_ctx = unsafe { &raw mut (*self.current_task).trap_frame };
+        let new_ctx = unsafe { &raw mut (*next_task).trap_frame };
 
         if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
             unsafe { self.current_task = (*self.current_task).next };
         }
     }
 
-    fn schedule_task_deletion(&mut self, task: *mut Context) -> bool {
-        if task.is_null() {
-            self.to_delete = self.current_task;
-            true
-        } else {
-            self.to_delete = task;
-            core::ptr::eq(task, self.current_task)
+    fn schedule_task_deletion(&mut self, mut task_to_delete: *mut Context) -> bool {
+        if task_to_delete.is_null() {
+            task_to_delete = self.current_task;
         }
+        let is_current = core::ptr::eq(task_to_delete, self.current_task);
+
+        unsafe { (*task_to_delete).next_to_delete = self.to_delete };
+        self.to_delete = task_to_delete;
+
+        is_current
     }
 }
 
@@ -293,10 +321,16 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer::yield_task()
     }
 
+    fn max_task_priority(&self) -> u32 {
+        255
+    }
+
     fn task_create(
         &self,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
+        _priority: u32,
+        _pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void {
         let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);

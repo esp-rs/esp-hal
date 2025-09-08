@@ -13,7 +13,7 @@ For more information regarding the examples, refer to the `README.md` file in an
 You can build all examples for a given device using the `build examples` subcommand:
 
 ```shell
-cargo xtask build examples esp-hal esp32
+cargo xtask build examples esp-hal --chip esp32 all
 ```
 
 Note that we must specify which package to build the examples for, since this repository contains multiple packages. Specifying `esp-hal` will build the examples in the `examples/` directory instead.
@@ -23,7 +23,7 @@ Note that we must specify which package to build the examples for, since this re
 You can also build and then subsequently flash and run an example using the `run example` subcommand. With a target device connected to your host system, run:
 
 ```shell
-cargo xtask run example esp-hal esp32c6 --example embassy_hello_world
+cargo xtask run example embassy_hello_world --chip=esp32c6
 ```
 
 Again, note that we must specify which package to build the example from, plus which example to build and flash to the target device.
