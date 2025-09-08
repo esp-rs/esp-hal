@@ -48,14 +48,14 @@ fn main() -> ! {
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
     _ = event::ApStart::replace_handler(|_| println!("ap start event"));
-    event::ApStaconnected::update_handler(move |event| {
+    event::ApStaConnected::update_handler(move |event| {
         connections += 1;
         esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
-    event::ApStaconnected::update_handler(|event| {
+    event::ApStaConnected::update_handler(|event| {
         esp_println::println!("connected aid: {}", event.aid());
     });
-    event::ApStadisconnected::update_handler(|event| {
+    event::ApStaDisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
             event.mac(),
