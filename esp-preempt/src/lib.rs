@@ -321,6 +321,10 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer::yield_task()
     }
 
+    fn yield_task_from_isr(&self) {
+        self.yield_task();
+    }
+
     fn max_task_priority(&self) -> u32 {
         255
     }

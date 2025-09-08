@@ -16,13 +16,12 @@ use super::WifiEvent;
 use crate::{
     binary::c_types::*,
     compat::{
-        OSI_FUNCS_TIME_BLOCKING,
         common::{str_from_c, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
-    preempt::yield_task,
+    time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
@@ -242,9 +241,8 @@ pub unsafe extern "C" fn wifi_int_restore(_wifi_int_mux: *mut c_void, tmp: u32) 
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_yield_from_isr() {
-    // original: /* Do nothing */
     trace!("task_yield_from_isr");
-    yield_task();
+    crate::preempt::yield_task_from_isr();
 }
 
 /// **************************************************************************
@@ -329,7 +327,7 @@ pub unsafe extern "C" fn mutex_delete(mutex: *mut c_void) {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn mutex_lock(mutex: *mut c_void) -> i32 {
-    crate::compat::mutex::mutex_lock(mutex, OSI_FUNCS_TIME_BLOCKING)
+    crate::compat::mutex::mutex_lock(mutex)
 }
 
 /// **************************************************************************
@@ -537,7 +535,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    crate::preempt::usleep(tick)
+    crate::preempt::usleep(blob_ticks_to_micros(tick))
 }
 
 /// **************************************************************************
@@ -555,7 +553,7 @@ pub unsafe extern "C" fn task_delay(tick: u32) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
     trace!("task_ms_to_tick ms {}", ms);
-    crate::time::millis_to_ticks(ms as u64) as i32
+    millis_to_blob_ticks(ms) as i32
 }
 
 /// **************************************************************************

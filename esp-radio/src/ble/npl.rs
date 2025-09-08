@@ -11,6 +11,7 @@ use super::*;
 use crate::{
     binary::{c_types::*, include::*},
     compat::{self, OSI_FUNCS_TIME_BLOCKING, common::str_from_c, queue},
+    time::{blob_ticks_to_micros, blob_ticks_to_millis, millis_to_blob_ticks},
 };
 
 #[cfg_attr(esp32c2, path = "os_adapter_esp32c2.rs")]
@@ -634,28 +635,19 @@ unsafe extern "C" fn ble_npl_hw_set_isr(_no: i32, _mask: u32) {
     todo!()
 }
 
-// NPL counts in milliseconds. Let's not lose range by using micros for our tick rate.
-const fn npl_time_to_ms(time: ble_npl_time_t) -> u32 {
-    time
-}
-
-const fn npl_ms_to_time(ms: u32) -> ble_npl_time_t {
-    ms
-}
-
 unsafe extern "C" fn ble_npl_time_delay(time: ble_npl_time_t) {
-    let time = npl_time_to_ms(time);
-    crate::preempt::usleep(time * 1000);
+    let time = blob_ticks_to_micros(time);
+    crate::preempt::usleep(time);
 }
 
 unsafe extern "C" fn ble_npl_time_ticks_to_ms32(time: ble_npl_time_t) -> u32 {
     trace!("ble_npl_time_ticks_to_ms32 {}", time);
-    npl_time_to_ms(time)
+    blob_ticks_to_millis(time)
 }
 
 unsafe extern "C" fn ble_npl_time_ms_to_ticks32(ms: u32) -> ble_npl_time_t {
     trace!("ble_npl_time_ms_to_ticks32 {}", ms);
-    npl_ms_to_time(ms)
+    millis_to_blob_ticks(ms)
 }
 
 unsafe extern "C" fn ble_npl_time_ticks_to_ms(
@@ -663,7 +655,7 @@ unsafe extern "C" fn ble_npl_time_ticks_to_ms(
     p_ms: *mut u32,
 ) -> ble_npl_error_t {
     trace!("ble_npl_time_ticks_to_ms {}", time);
-    unsafe { *p_ms = npl_time_to_ms(time) };
+    unsafe { *p_ms = blob_ticks_to_millis(time) };
     0
 }
 
@@ -672,7 +664,7 @@ unsafe extern "C" fn ble_npl_time_ms_to_ticks(
     p_time: *mut ble_npl_time_t,
 ) -> ble_npl_error_t {
     trace!("ble_npl_time_ms_to_ticks {}", ms);
-    unsafe { *p_time = npl_ms_to_time(ms) };
+    unsafe { *p_time = millis_to_blob_ticks(ms) };
     0
 }
 
@@ -725,7 +717,7 @@ unsafe extern "C" fn ble_npl_callout_stop(callout: *const ble_npl_callout) {
     unsafe {
         let co = (*callout).dummy as *mut Callout;
         // stop timer
-        compat::timer_compat::compat_timer_disarm(addr_of_mut!((*co).timer_handle));
+        compat::timer_compat::compat_timer_disarm(&raw mut (*co).timer_handle);
     }
 }
 
@@ -738,7 +730,11 @@ unsafe extern "C" fn ble_npl_callout_reset(
     let co = unsafe { (*callout).dummy } as *mut Callout;
     unsafe {
         // start timer
-        compat::timer_compat::compat_timer_arm(addr_of_mut!((*co).timer_handle), time, false);
+        compat::timer_compat::compat_timer_arm(
+            &raw mut (*co).timer_handle,
+            blob_ticks_to_millis(time),
+            false,
+        );
     }
     0
 }
@@ -943,7 +939,12 @@ unsafe extern "C" fn ble_npl_eventq_get(
     let mut evt = core::ptr::null_mut::<ble_npl_event>();
     let wrapper = unwrap!(unsafe { queue.as_mut() }, "queue wrapper is null");
 
-    if queue::queue_receive(wrapper.dummy as _, (&raw mut evt).cast(), timeout) == 1 {
+    if queue::queue_receive(
+        wrapper.dummy as _,
+        (&raw mut evt).cast(),
+        blob_ticks_to_micros(timeout),
+    ) == 1
+    {
         trace!("got {:x}", evt as usize);
         unsafe {
             let evt = (*evt).dummy as *mut Event;
@@ -1229,7 +1230,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
 
         // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
         // we wait a bit to make sure the ble task initialized everything
-        crate::compat::common::sleep(10);
+        crate::preempt::usleep(10_000);
     }
 
     // At some point the "High-speed ADC" entropy source became available.
@@ -1248,7 +1249,7 @@ pub(crate) fn ble_deinit() {
         // Prevent ASSERT r_ble_ll_reset:1069 ... ...
         // TODO: the cause of the issue is that the BLE controller can be dropped while the driver
         // is in the process of handling a HCI command.
-        crate::compat::common::sleep(10);
+        crate::preempt::usleep(10_000);
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
