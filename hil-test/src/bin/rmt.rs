@@ -81,6 +81,16 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
+// Most of the time, the codes received in tests match exactly, but every once in a while, a test
+// fails with pulse lengths off by one. Allow for that here, there is no hardware synchronization
+// between rx/tx that would guarantee them to be identical.
+fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool {
+    left.level1() == right.level1()
+        && left.level2() == right.level2()
+        && left.length1().abs_diff(right.length1()) <= tolerance
+        && left.length2().abs_diff(right.length2()) <= tolerance
+}
+
 // When running this with defmt, consider increasing embedded_test's default_timeout below to avoid
 // timeouts while printing. Note that probe-rs reading the buffer might still mess up
 // timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
@@ -101,7 +111,7 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize) {
             } else {
                 ""
             }
-        } else if code_tx != code_rx {
+        } else if !pulse_code_matches(code_tx, code_rx, 1) {
             errors += 1;
             "rx/tx code mismatch!"
         } else {
