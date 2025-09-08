@@ -26,8 +26,8 @@ use esp_hal::{
 };
 use esp_println::{print, println};
 use esp_radio::wifi::{
-    AccessPointConfiguration,
-    Configuration,
+    AccessPointConfig,
+    Config,
     event::{self, EventExt},
 };
 use smoltcp::iface::{SocketSet, SocketStorage};
@@ -48,17 +48,18 @@ fn main() -> ! {
     // Set event handlers for wifi before init to avoid missing any.
     let mut connections = 0u32;
     _ = event::ApStart::replace_handler(|_| println!("ap start event"));
-    event::ApStaconnected::update_handler(move |event| {
+    event::ApStaConnected::update_handler(move |event| {
         connections += 1;
-        println!("connected {}, mac: {:?}", connections, event.0.mac);
+        esp_println::println!("connected {}, mac: {:?}", connections, event.mac());
     });
-    event::ApStaconnected::update_handler(|event| {
-        println!("connected aid: {}", event.0.aid);
+    event::ApStaConnected::update_handler(|event| {
+        esp_println::println!("connected aid: {}", event.aid());
     });
-    event::ApStadisconnected::update_handler(|event| {
+    event::ApStaDisconnected::update_handler(|event| {
         println!(
             "disconnected mac: {:?}, reason: {:?}",
-            event.0.mac, event.0.reason
+            event.mac(),
+            event.reason()
         );
     });
 
@@ -77,11 +78,8 @@ fn main() -> ! {
     let socket_set = SocketSet::new(&mut socket_set_entries[..]);
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-        ssid: "esp-radio".into(),
-        ..Default::default()
-    });
-    let res = controller.set_configuration(&client_config);
+    let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+    let res = controller.set_config(&ap_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

@@ -29,8 +29,6 @@ use esp_hal::{
 use esp_hal_embassy::InterruptExecutor;
 use hil_test::mk_static;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 struct Context {
     interrupt: SoftwareInterrupt<'static, 1>,
     i2c: I2c<'static, Blocking>,
@@ -219,34 +217,41 @@ mod tests {
         // Read a lot of data to ensure that the transaction is cancelled mid-transfer.
         let mut read_data = [0u8; 220];
 
-        defmt::info!("Running transaction to be cancelled");
+        for n_yield in 1..20 {
+            defmt::info!("Running transaction to be cancelled");
 
-        // Start a transaction that will be cancelled.
-        let select_result = select(
-            i2c.transaction_async(
-                DUT_ADDRESS,
-                &mut [
-                    Operation::Write(READ_DATA_COMMAND),
-                    Operation::Read(&mut read_data),
-                ],
-            ),
-            async {
-                // Let the transaction run for a tiny bit.
-                for _ in 0..10 {
-                    embassy_futures::yield_now().await;
-                }
-            },
-        )
-        .await;
+            // Start a transaction that will be cancelled.
+            let select_result = select(
+                i2c.transaction_async(
+                    DUT_ADDRESS,
+                    &mut [
+                        Operation::Write(READ_DATA_COMMAND),
+                        Operation::Read(&mut read_data),
+                    ],
+                ),
+                async {
+                    // Let the transaction run for a tiny bit.
+                    for _ in 0..n_yield {
+                        embassy_futures::yield_now().await;
+                    }
+                },
+            )
+            .await;
 
-        // Assert that the I2C transaction was cancelled.
-        hil_test::assert!(
-            matches!(select_result, Either::Second(_)),
-            "Transaction completed with {:?}",
-            select_result
-        );
+            if matches!(select_result, Either::First(Ok(_))) {
+                break;
+            }
 
-        defmt::info!("Transaction cancelled");
+            // Assert that the I2C transaction was cancelled.
+            hil_test::assert!(
+                matches!(select_result, Either::Second(_)),
+                "({}) Transaction completed with {:?}",
+                n_yield,
+                select_result
+            );
+
+            defmt::info!("Transaction cancelled");
+        }
 
         let mut read_data = [0u8; 22];
         // do the real read which should succeed
@@ -352,5 +357,29 @@ mod tests {
 
             ticker.next().await;
         }
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn test_read_cali_with_rtc_i2c() {
+        use core::time::Duration;
+
+        use esp_hal::i2c::rtc::{Config, I2c, Timing};
+
+        let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
+
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+
+        let config = Config::default()
+            .with_timing(Timing::standard_mode())
+            .with_timeout(Duration::from_micros(100));
+        let mut i2c = I2c::new(peripherals.RTC_I2C, config, sda, scl).unwrap();
+
+        let mut data = [0; 22];
+
+        i2c.read(DUT_ADDRESS, READ_DATA_COMMAND[0], &mut data)
+            .unwrap();
+
+        assert_ne!(data, [0u8; 22]);
     }
 }

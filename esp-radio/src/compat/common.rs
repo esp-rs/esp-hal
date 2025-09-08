@@ -9,165 +9,22 @@ use core::{
 };
 
 use esp_hal::time::{Duration, Instant};
+use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{c_types::c_char, include::malloc};
 
-use super::malloc::free;
+use super::{OSI_FUNCS_TIME_BLOCKING, malloc::free};
 use crate::{
-    CONFIG,
-    binary::c_types::{c_int, c_void},
-    hal::sync::Locked,
+    ESP_RADIO_LOCK,
+    binary::c_types::{c_int, c_uint, c_void},
     memory_fence::memory_fence,
     preempt::{current_task, yield_task},
 };
-
-pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;
 
 #[derive(Clone, Copy, Debug)]
 struct Mutex {
     locking_pid: usize,
     count: u32,
     recursive: bool,
-}
-
-pub(crate) struct ConcurrentQueue {
-    raw_queue: Locked<RawQueue>,
-}
-
-impl ConcurrentQueue {
-    pub(crate) fn new(count: usize, item_size: usize) -> Self {
-        Self {
-            raw_queue: Locked::new(RawQueue::new(count, item_size)),
-        }
-    }
-
-    pub(crate) fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        self.raw_queue.with(|q| unsafe { q.enqueue(item) })
-    }
-
-    pub(crate) fn try_dequeue(&mut self, item: *mut c_void) -> bool {
-        self.raw_queue.with(|q| unsafe { q.try_dequeue(item) })
-    }
-
-    pub(crate) fn remove(&mut self, item: *mut c_void) {
-        self.raw_queue.with(|q| unsafe { q.remove(item) })
-    }
-
-    pub(crate) fn count(&self) -> usize {
-        self.raw_queue.with(|q| unsafe { q.count() })
-    }
-}
-
-/// A naive and pretty much unsafe queue to back the queues used in drivers and
-/// supplicant code.
-///
-/// The [ConcurrentQueue] wrapper should be used.
-pub struct RawQueue {
-    item_size: usize,
-    capacity: usize,
-    current_read: usize,
-    current_write: usize,
-    storage: Box<[u8]>,
-}
-
-impl RawQueue {
-    /// This allocates underlying storage. See [release_storage]
-    pub fn new(capacity: usize, item_size: usize) -> Self {
-        let storage = unsafe {
-            let mut boxed = Box::new_uninit_slice(capacity * item_size);
-            for i in 0..capacity * item_size {
-                boxed[i].write(0);
-            }
-            boxed.assume_init()
-        };
-
-        Self {
-            item_size,
-            capacity,
-            current_read: 0,
-            current_write: 0,
-            storage,
-        }
-    }
-
-    fn get(&self, index: usize) -> &[u8] {
-        let item_start = self.item_size * index;
-        &self.storage[item_start..][..self.item_size]
-    }
-
-    fn get_mut(&mut self, index: usize) -> &mut [u8] {
-        let item_start = self.item_size * index;
-        &mut self.storage[item_start..][..self.item_size]
-    }
-
-    fn full(&self) -> bool {
-        self.count() == self.capacity
-    }
-
-    fn empty(&self) -> bool {
-        self.count() == 0
-    }
-
-    unsafe fn enqueue(&mut self, item: *mut c_void) -> i32 {
-        if !self.full() {
-            let item = unsafe { core::slice::from_raw_parts(item as *const u8, self.item_size) };
-
-            let dst = self.get_mut(self.current_write);
-            dst.copy_from_slice(item);
-
-            self.current_write = (self.current_write + 1) % self.capacity;
-            1
-        } else {
-            0
-        }
-    }
-
-    unsafe fn try_dequeue(&mut self, item: *mut c_void) -> bool {
-        if !self.empty() {
-            let item = unsafe { core::slice::from_raw_parts_mut(item as *mut u8, self.item_size) };
-
-            let src = self.get(self.current_read);
-            item.copy_from_slice(src);
-
-            self.current_read = (self.current_read + 1) % self.capacity;
-
-            true
-        } else {
-            false
-        }
-    }
-
-    unsafe fn remove(&mut self, item: *mut c_void) {
-        // do what the ESP-IDF implementations does ...
-        // just remove all elements and add them back except the one we need to remove -
-        // good enough for now
-        let item_slice = unsafe { core::slice::from_raw_parts(item as *const u8, self.item_size) };
-        let count = self.count();
-
-        if count == 0 {
-            return;
-        }
-
-        let mut tmp_item = Vec::<u8>::new();
-        tmp_item.reserve_exact(self.item_size);
-        tmp_item.resize(self.item_size, 0);
-
-        for _ in 0..count {
-            if !unsafe { self.try_dequeue(tmp_item.as_mut_ptr().cast()) } {
-                break;
-            }
-            if &tmp_item[..] != item_slice {
-                unsafe { self.enqueue(tmp_item.as_mut_ptr().cast()) };
-            }
-        }
-    }
-
-    fn count(&self) -> usize {
-        if self.current_write >= self.current_read {
-            self.current_write - self.current_read
-        } else {
-            self.capacity - self.current_read + self.current_write
-        }
-    }
 }
 
 pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
@@ -177,240 +34,20 @@ pub unsafe fn str_from_c<'a>(s: *const c_char) -> &'a str {
     }
 }
 
-pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
-    unsafe {
-        let ptr = malloc(4) as *mut u32;
-        ptr.write_volatile(init);
-
-        trace!("sem created res = {:?}", ptr);
-        ptr.cast()
-    }
-}
-
-pub(crate) fn sem_delete(semphr: *mut c_void) {
-    trace!(">>> sem delete");
-
-    unsafe {
-        free(semphr.cast());
-    }
-}
-
-pub(crate) fn sem_take(semphr: *mut c_void, tick: u32) -> i32 {
-    // This shouldn't normally happen if we always report the correct state from
-    // `is_in_isr`. This is a last resort if the driver calls this anyways.
-    // (I haven't observed this to happen)
-    let tick = if tick == OSI_FUNCS_TIME_BLOCKING && crate::is_interrupts_disabled() {
-        warn!("blocking sem_take probably called from an ISR - return early");
-        1
-    } else {
-        tick
-    };
-
-    trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
-
-    let forever = tick == OSI_FUNCS_TIME_BLOCKING;
-    let timeout = tick as u64;
-    let start = crate::time::systimer_count();
-
-    let sem = semphr as *mut u32;
-
-    'outer: loop {
-        let res = critical_section::with(|_| unsafe {
-            memory_fence();
-            let cnt = *sem;
-            if cnt > 0 {
-                *sem = cnt - 1;
-                1
-            } else {
-                0
-            }
-        });
-
-        if res == 1 {
-            trace!(">>>> return from semphr_take");
-            return 1;
-        }
-
-        if !forever && crate::time::elapsed_time_since(start) > timeout {
-            break 'outer;
-        }
-
-        yield_task();
-    }
-
-    trace!(">>>> return from semphr_take with timeout");
-    0
-}
-
-pub(crate) fn sem_give(semphr: *mut c_void) -> i32 {
-    trace!("semphr_give {:?}", semphr);
-    let sem = semphr as *mut u32;
-
-    critical_section::with(|_| unsafe {
-        let cnt = *sem;
-        *sem = cnt + 1;
-        1
-    })
-}
-
 pub(crate) fn thread_sem_get() -> *mut c_void {
     trace!("wifi_thread_semphr_get");
     crate::preempt::current_task_thread_semaphore()
-}
-
-pub(crate) fn create_recursive_mutex() -> *mut c_void {
-    let mutex = Mutex {
-        locking_pid: 0xffff_ffff,
-        count: 0,
-        recursive: true,
-    };
-
-    let ptr = unsafe { malloc(size_of_val(&mutex) as u32) as *mut Mutex };
-    unsafe {
-        ptr.write(mutex);
-    }
-    memory_fence();
-
-    trace!("recursive_mutex_create called {:?}", ptr);
-    ptr as *mut c_void
-}
-
-pub(crate) fn mutex_delete(mutex: *mut c_void) {
-    let ptr = mutex as *mut Mutex;
-    unsafe {
-        free(mutex.cast());
-    }
-}
-
-/// Lock a mutex. Block until successful.
-pub(crate) fn lock_mutex(mutex: *mut c_void) -> i32 {
-    trace!("mutex_lock ptr = {:?}", mutex);
-
-    let ptr = mutex as *mut Mutex;
-    let current_task = current_task() as usize;
-
-    loop {
-        let mutex_locked = critical_section::with(|_| unsafe {
-            if (*ptr).count == 0 {
-                (*ptr).locking_pid = current_task;
-                (*ptr).count += 1;
-                true
-            } else if (*ptr).locking_pid == current_task {
-                (*ptr).count += 1;
-                true
-            } else {
-                false
-            }
-        });
-        memory_fence();
-
-        if mutex_locked {
-            return 1;
-        }
-
-        yield_task();
-    }
-}
-
-pub(crate) fn unlock_mutex(mutex: *mut c_void) -> i32 {
-    trace!("mutex_unlock {:?}", mutex);
-
-    let ptr = mutex as *mut Mutex;
-    critical_section::with(|_| unsafe {
-        memory_fence();
-        if (*ptr).count > 0 {
-            (*ptr).count -= 1;
-            1
-        } else {
-            0
-        }
-    })
-}
-
-pub(crate) fn create_queue(queue_len: c_int, item_size: c_int) -> *mut ConcurrentQueue {
-    trace!("wifi_create_queue len={} size={}", queue_len, item_size,);
-
-    let queue = ConcurrentQueue::new(queue_len as usize, item_size as usize);
-    let ptr = unsafe { malloc(size_of_val(&queue) as u32) as *mut ConcurrentQueue };
-    unsafe {
-        ptr.write(queue);
-    }
-
-    trace!("created queue @{:?}", ptr);
-
-    ptr
-}
-
-pub(crate) fn delete_queue(queue: *mut ConcurrentQueue) {
-    trace!("delete_queue {:?}", queue);
-
-    unsafe {
-        ptr::drop_in_place(queue);
-        crate::compat::malloc::free(queue.cast());
-    }
-}
-
-pub(crate) fn send_queued(
-    queue: *mut ConcurrentQueue,
-    item: *mut c_void,
-    block_time_tick: u32,
-) -> i32 {
-    trace!(
-        "queue_send queue {:?} item {:x} block_time_tick {}",
-        queue, item as usize, block_time_tick
-    );
-
-    let queue: *mut ConcurrentQueue = queue.cast();
-    unsafe { (*queue).enqueue(item) }
-}
-
-pub(crate) fn receive_queued(
-    queue: *mut ConcurrentQueue,
-    item: *mut c_void,
-    block_time_tick: u32,
-) -> i32 {
-    trace!(
-        "queue_recv {:?} item {:?} block_time_tick {}",
-        queue, item, block_time_tick
-    );
-
-    let forever = block_time_tick == OSI_FUNCS_TIME_BLOCKING;
-    let timeout = block_time_tick as u64;
-    let start = crate::time::systimer_count();
-
-    loop {
-        if unsafe { (*queue).try_dequeue(item) } {
-            trace!("received");
-            return 1;
-        }
-
-        if !forever && crate::time::elapsed_time_since(start) > timeout {
-            trace!("queue_recv returns with timeout");
-            return -1;
-        }
-
-        yield_task();
-    }
-}
-
-pub(crate) fn number_of_messages_in_queue(queue: *const ConcurrentQueue) -> u32 {
-    trace!("queue_msg_waiting {:?}", queue);
-
-    let queue: *const ConcurrentQueue = queue.cast();
-    unsafe { (*queue).count() as u32 }
+        .as_ptr()
+        .cast::<c_void>()
 }
 
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-pub(crate) unsafe extern "C" fn sleep(
-    millis: crate::binary::c_types::c_uint,
-) -> crate::binary::c_types::c_uint {
+pub(crate) unsafe extern "C" fn sleep(seconds: c_uint) -> c_uint {
     trace!("sleep");
 
-    unsafe {
-        usleep(millis * 1_000);
-    }
+    unsafe { usleep(seconds * 1_000_000) };
     0
 }
 
@@ -418,6 +55,6 @@ pub(crate) unsafe extern "C" fn sleep(
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
 unsafe extern "C" fn usleep(us: u32) -> c_int {
-    esp_radio_preempt_driver::usleep(us);
+    crate::preempt::usleep(us);
     0
 }

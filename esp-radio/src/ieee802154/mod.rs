@@ -15,13 +15,9 @@
 //! [IEEE 802.15.4]: https://en.wikipedia.org/wiki/IEEE_802.15.4
 //! [esp-openthread]: https://github.com/esp-rs/esp-openthread
 
-use alloc::vec::Vec;
-use core::cell::RefCell;
-
 use byte::{BytesExt, TryRead};
-use critical_section::Mutex;
-use esp_config::*;
 use esp_hal::{clock::PhyClockGuard, peripherals::IEEE802154};
+use esp_sync::NonReentrantMutex;
 use ieee802154::mac::{self, FooterMode, FrameSerDesContext};
 
 use self::{
@@ -44,11 +40,23 @@ mod raw;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// The requested data is bigger than available range, and/or the offset is
-    /// invalid
+    /// invalid.
     Incomplete,
-    /// The requested data content is invalid
+
+    /// The requested data content is invalid.
     BadInput,
 }
+
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::Incomplete => write!(f, "Incomplete data."),
+            Error::BadInput => write!(f, "Bad input data."),
+        }
+    }
+}
+
+impl core::error::Error for Error {}
 
 impl From<byte::Error> for Error {
     fn from(err: byte::Error) -> Self {
@@ -58,14 +66,6 @@ impl From<byte::Error> for Error {
         }
     }
 }
-
-struct QueueConfig {
-    rx_queue_size: usize,
-}
-
-const CONFIG: QueueConfig = QueueConfig {
-    rx_queue_size: esp_config_int!(usize, "ESP_RADIO_CONFIG_IEEE802154_RX_QUEUE_SIZE"),
-};
 
 /// IEEE 802.15.4 driver configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -241,68 +241,48 @@ impl<'a> Ieee802154<'a> {
 
     /// Set the transmit done callback function.
     pub fn set_tx_done_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
-        critical_section::with(|cs| {
-            let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
+        CALLBACKS.with(|cbs| {
             let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
-            tx_done_callback.replace(cb);
+            cbs.tx_done = Some(cb);
         });
     }
 
     /// Clear the transmit done callback function.
     pub fn clear_tx_done_callback(&mut self) {
-        critical_section::with(|cs| {
-            let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
-            tx_done_callback.take();
-        });
+        CALLBACKS.with(|cbs| cbs.tx_done = None);
     }
 
     /// Set the receive available callback function.
     pub fn set_rx_available_callback(&mut self, callback: &'a mut (dyn FnMut() + Send)) {
-        critical_section::with(|cs| {
-            let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
+        CALLBACKS.with(|cbs| {
             let cb: &'static mut (dyn FnMut() + Send) = unsafe { core::mem::transmute(callback) };
-            rx_available_callback.replace(cb);
+            cbs.rx_available = Some(cb);
         });
     }
 
     /// Clear the receive available callback function.
     pub fn clear_rx_available_callback(&mut self) {
-        critical_section::with(|cs| {
-            let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
-            rx_available_callback.take();
-        });
+        CALLBACKS.with(|cbs| cbs.rx_available = None);
     }
 
     /// Set the transmit done callback function.
     pub fn set_tx_done_callback_fn(&mut self, callback: fn()) {
-        critical_section::with(|cs| {
-            let mut tx_done_callback_fn = TX_DONE_CALLBACK_FN.borrow_ref_mut(cs);
-            tx_done_callback_fn.replace(callback);
-        });
+        CALLBACKS.with(|cbs| cbs.tx_done_fn = Some(callback));
     }
 
     /// Clear the transmit done callback function.
     pub fn clear_tx_done_callback_fn(&mut self) {
-        critical_section::with(|cs| {
-            let mut tx_done_callback_fn = TX_DONE_CALLBACK_FN.borrow_ref_mut(cs);
-            tx_done_callback_fn.take();
-        });
+        CALLBACKS.with(|cbs| cbs.tx_done_fn = None);
     }
 
     /// Set the receive available callback function.
     pub fn set_rx_available_callback_fn(&mut self, callback: fn()) {
-        critical_section::with(|cs| {
-            let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
-            rx_available_callback_fn.replace(callback);
-        });
+        CALLBACKS.with(|cbs| cbs.rx_available_fn = Some(callback));
     }
 
     /// Clear the receive available callback function.
     pub fn clear_rx_available_callback_fn(&mut self) {
-        critical_section::with(|cs| {
-            let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
-            rx_available_callback_fn.take();
-        });
+        CALLBACKS.with(|cbs| cbs.rx_available_fn = None);
     }
 }
 
@@ -331,54 +311,49 @@ pub fn rssi_to_lqi(rssi: i8) -> u8 {
     }
 }
 
-static TX_DONE_CALLBACK: Mutex<RefCell<Option<&'static mut (dyn FnMut() + Send)>>> =
-    Mutex::new(RefCell::new(None));
+struct Callbacks {
+    tx_done: Option<&'static mut (dyn FnMut() + Send)>,
+    rx_available: Option<&'static mut (dyn FnMut() + Send)>,
+    // TODO: remove these - Box<dyn FnMut> should be good enough
+    tx_done_fn: Option<fn()>,
+    rx_available_fn: Option<fn()>,
+}
 
-static RX_AVAILABLE_CALLBACK: Mutex<RefCell<Option<&'static mut (dyn FnMut() + Send)>>> =
-    Mutex::new(RefCell::new(None));
+impl Callbacks {
+    fn call_tx_done(&mut self) {
+        if let Some(cb) = self.tx_done.as_mut() {
+            cb();
+        }
+        if let Some(cb) = self.tx_done_fn.as_mut() {
+            cb();
+        }
+    }
 
-#[allow(clippy::type_complexity)]
-static TX_DONE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
+    fn call_rx_available(&mut self) {
+        if let Some(cb) = self.rx_available.as_mut() {
+            cb();
+        }
+        if let Some(cb) = self.rx_available_fn.as_mut() {
+            cb();
+        }
+    }
+}
 
-#[allow(clippy::type_complexity)]
-static RX_AVAILABLE_CALLBACK_FN: Mutex<RefCell<Option<fn()>>> = Mutex::new(RefCell::new(None));
+static CALLBACKS: NonReentrantMutex<Callbacks> = NonReentrantMutex::new(Callbacks {
+    tx_done: None,
+    rx_available: None,
+    tx_done_fn: None,
+    rx_available_fn: None,
+});
 
 fn tx_done() {
     trace!("tx_done callback");
 
-    critical_section::with(|cs| {
-        let mut tx_done_callback = TX_DONE_CALLBACK.borrow_ref_mut(cs);
-        let tx_done_callback = tx_done_callback.as_mut();
-
-        if let Some(tx_done_callback) = tx_done_callback {
-            tx_done_callback();
-        }
-
-        let mut tx_done_callback_fn = TX_DONE_CALLBACK_FN.borrow_ref_mut(cs);
-        let tx_done_callback_fn = tx_done_callback_fn.as_mut();
-
-        if let Some(tx_done_callback_fn) = tx_done_callback_fn {
-            tx_done_callback_fn();
-        }
-    });
+    CALLBACKS.with(|cbs| cbs.call_tx_done());
 }
 
 fn rx_available() {
     trace!("rx available callback");
 
-    critical_section::with(|cs| {
-        let mut rx_available_callback = RX_AVAILABLE_CALLBACK.borrow_ref_mut(cs);
-        let rx_available_callback = rx_available_callback.as_mut();
-
-        if let Some(rx_available_callback) = rx_available_callback {
-            rx_available_callback();
-        }
-
-        let mut rx_available_callback_fn = RX_AVAILABLE_CALLBACK_FN.borrow_ref_mut(cs);
-        let rx_available_callback_fn = rx_available_callback_fn.as_mut();
-
-        if let Some(rx_available_callback_fn) = rx_available_callback_fn {
-            rx_available_callback_fn();
-        }
-    });
+    CALLBACKS.with(|cbs| cbs.call_rx_available());
 }

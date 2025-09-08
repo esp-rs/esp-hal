@@ -32,14 +32,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
     Controller,
-    wifi::{
-        AccessPointConfiguration,
-        Configuration,
-        WifiController,
-        WifiDevice,
-        WifiEvent,
-        WifiState,
-    },
+    wifi::{AccessPointConfig, Config, WifiApState, WifiController, WifiDevice, WifiEvent},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -247,8 +240,8 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::wifi_state() {
-            WifiState::ApStarted => {
+        match esp_radio::wifi::ap_state() {
+            WifiApState::Started => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::ApStop).await;
                 Timer::after(Duration::from_millis(5000)).await
@@ -256,11 +249,9 @@ async fn connection(mut controller: WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = Configuration::AccessPoint(AccessPointConfiguration {
-                ssid: "esp-radio".try_into().unwrap(),
-                ..Default::default()
-            });
-            controller.set_configuration(&client_config).unwrap();
+            let client_config =
+                Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+            controller.set_config(&client_config).unwrap();
             println!("Starting wifi");
             controller.start_async().await.unwrap();
             println!("Wifi started!");

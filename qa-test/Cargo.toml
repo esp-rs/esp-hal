@@ -6,34 +6,118 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 [dependencies]
-cfg-if             = "1.0.0"
-embassy-executor   = { version = "0.7.0", features = ["task-arena-size-12288"] }
-embassy-time       = "0.4.0"
-embassy-futures    = "0.1.1"
-embassy-sync       = "0.6.1"
-embedded-graphics  = "0.8.1"
+blocking-network-stack = { git = "https://github.com/bjoernQ/blocking-network-stack.git", rev = "b3ecefc", optional = true }
+cfg-if = "1.0.0"
+embassy-executor = "0.9.0"
+embassy-time = "0.5.0"
+embassy-futures = "0.1.1"
+embassy-net = { version = "0.7.0", features = [ "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-sync = "0.6.1"
+embedded-graphics = "0.8.1"
 embedded-hal-async = "1.0.0"
-esp-alloc          = { path = "../esp-alloc" }
-esp-backtrace      = { path = "../esp-backtrace", features = ["panic-handler", "println"] }
+embedded-io = { version = "0.6.1", default-features = false }
+esp-alloc = { path = "../esp-alloc" }
+esp-backtrace = { path = "../esp-backtrace", features = [
+    "panic-handler",
+    "println",
+] }
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
-esp-hal            = { path = "../esp-hal", features = ["unstable", "log-04"] }
-esp-hal-embassy    = { path = "../esp-hal-embassy" }
-esp-println        = { path = "../esp-println", features = ["log-04"] }
-lis3dh-async       = "0.9.3"
-ssd1306            = "0.10.0"
+esp-hal = { path = "../esp-hal", features = ["log-04", "unstable"] }
+esp-hal-embassy = { path = "../esp-hal-embassy" }
+esp-preempt = { path = "../esp-preempt", features = [
+    "log-04",
+], optional = true }
+esp-println = { path = "../esp-println", features = ["log-04"] }
+esp-radio = { path = "../esp-radio", features = [
+    "log-04",
+    "smoltcp",
+    "unstable",
+    "wifi",
+], optional = true }
+lis3dh-async = "0.9.3"
+ssd1306 = "0.10.0"
+smoltcp = { version = "0.12.0", default-features = false, features = [
+    "medium-ethernet",
+    "socket-raw",
+], optional = true }
+static_cell = "2.1.1"
 
 [features]
 unstable = []
-esp32   = ["esp-backtrace/esp32",   "esp-hal/esp32",   "esp-hal-embassy/esp32",   "esp-println/esp32",   "esp-bootloader-esp-idf/esp32"]
-esp32c2 = ["esp-backtrace/esp32c2", "esp-hal/esp32c2", "esp-hal-embassy/esp32c2", "esp-println/esp32c2", "esp-bootloader-esp-idf/esp32c2"]
-esp32c3 = ["esp-backtrace/esp32c3", "esp-hal/esp32c3", "esp-hal-embassy/esp32c3", "esp-println/esp32c3", "esp-bootloader-esp-idf/esp32c3"]
-esp32c6 = ["esp-backtrace/esp32c6", "esp-hal/esp32c6", "esp-hal-embassy/esp32c6", "esp-println/esp32c6", "esp-bootloader-esp-idf/esp32c6"]
-esp32h2 = ["esp-backtrace/esp32h2", "esp-hal/esp32h2", "esp-hal-embassy/esp32h2", "esp-println/esp32h2", "esp-bootloader-esp-idf/esp32h2"]
-esp32s2 = ["esp-backtrace/esp32s2", "esp-hal/esp32s2", "esp-hal-embassy/esp32s2", "esp-println/esp32s2", "esp-bootloader-esp-idf/esp32s2"]
-esp32s3 = ["esp-backtrace/esp32s3", "esp-hal/esp32s3", "esp-hal-embassy/esp32s3", "esp-println/esp32s3", "esp-bootloader-esp-idf/esp32s3"]
+
+esp-radio = [
+    "dep:blocking-network-stack",
+    "dep:esp-preempt",
+    "dep:esp-radio",
+    "dep:smoltcp",
+]
+
+esp32 = [
+    "esp-backtrace/esp32",
+    "esp-bootloader-esp-idf/esp32",
+    "esp-hal-embassy/esp32",
+    "esp-hal/esp32",
+    "esp-preempt?/esp32",
+    "esp-println/esp32",
+    "esp-radio?/esp32",
+]
+esp32c2 = [
+    "esp-backtrace/esp32c2",
+    "esp-bootloader-esp-idf/esp32c2",
+    "esp-hal-embassy/esp32c2",
+    "esp-hal/esp32c2",
+    "esp-preempt?/esp32c2",
+    "esp-println/esp32c2",
+    "esp-radio?/esp32c2",
+]
+esp32c3 = [
+    "esp-backtrace/esp32c3",
+    "esp-bootloader-esp-idf/esp32c3",
+    "esp-hal-embassy/esp32c3",
+    "esp-hal/esp32c3",
+    "esp-preempt?/esp32c3",
+    "esp-println/esp32c3",
+    "esp-radio?/esp32c3",
+]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal-embassy/esp32c6",
+    "esp-hal/esp32c6",
+    "esp-preempt?/esp32c6",
+    "esp-println/esp32c6",
+    "esp-radio?/esp32c6",
+]
+esp32h2 = [
+    "esp-backtrace/esp32h2",
+    "esp-bootloader-esp-idf/esp32h2",
+    "esp-hal-embassy/esp32h2",
+    "esp-hal/esp32h2",
+    "esp-preempt?/esp32h2",
+    "esp-println/esp32h2",
+    "esp-radio?/esp32h2",
+]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-hal-embassy/esp32s2",
+    "esp-hal/esp32s2",
+    "esp-preempt?/esp32s2",
+    "esp-println/esp32s2",
+    "esp-radio?/esp32s2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal-embassy/esp32s3",
+    "esp-hal/esp32s3",
+    "esp-preempt?/esp32s3",
+    "esp-println/esp32s3",
+    "esp-radio?/esp32s3",
+]
 
 [profile.release]
-debug         = 2
+debug            = 2
 debug-assertions = true
-lto           = "fat"
-codegen-units = 1
+lto              = "fat"
+codegen-units    = 1

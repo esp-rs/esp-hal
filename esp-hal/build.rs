@@ -70,11 +70,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     // RISC-V and Xtensa devices each require some special handling and processing
     // of linker scripts:
 
-    let mut config_symbols = chip.all_symbols().to_vec();
+    let mut config_symbols: Vec<String> =
+        chip.all_symbols().iter().map(|c| c.to_string()).collect();
 
     for (key, value) in &cfg {
-        if let Value::Bool(true) = value {
-            config_symbols.push(key.as_str());
+        match value {
+            Value::Bool(true) => {
+                config_symbols.push(key.clone());
+            }
+            Value::String(v) => {
+                config_symbols.push(format!("{key}_{v}"));
+            }
+            _ => {}
         }
     }
 
@@ -140,7 +147,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 // Helper Functions
 #[cfg(feature = "rt")]
 fn copy_dir_all(
-    config_symbols: &[&str],
+    config_symbols: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -171,7 +178,7 @@ fn copy_dir_all(
 /// A naive pre-processor for linker scripts
 #[cfg(feature = "rt")]
 fn preprocess_file(
-    config: &[&str],
+    config: &[String],
     cfg: &HashMap<String, Value>,
     src: impl AsRef<Path>,
     dst: impl AsRef<Path>,
@@ -190,7 +197,7 @@ fn preprocess_file(
 
         if let Some(condition) = trimmed.strip_prefix("#IF ") {
             let should_take = take.iter().all(|v| *v);
-            let should_take = should_take && config.contains(&condition);
+            let should_take = should_take && config.iter().any(|c| c == condition);
             take.push(should_take);
             continue;
         } else if trimmed == "#ELSE" {

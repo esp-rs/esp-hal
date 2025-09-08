@@ -1,3 +1,4 @@
+use super::*;
 use crate::{
     binary::include::esp_bt_controller_config_t,
     hal::{
@@ -7,15 +8,11 @@ use crate::{
     },
 };
 
-pub(crate) static mut ISR_INTERRUPT_4: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_4: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
-pub(crate) static mut ISR_INTERRUPT_7: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
 // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
 // ideally _some_ of these values should be configurable
@@ -84,9 +81,9 @@ pub(crate) fn disable_sleep_mode() {
 pub(super) unsafe extern "C" fn esp_intr_alloc(
     source: u32,
     flags: u32,
-    handler: *mut crate::binary::c_types::c_void,
-    arg: *mut crate::binary::c_types::c_void,
-    ret_handle: *mut *mut crate::binary::c_types::c_void,
+    handler: *mut c_void,
+    arg: *mut c_void,
+    ret_handle: *mut *mut c_void,
 ) -> i32 {
     trace!(
         "esp_intr_alloc {} {} {:?} {:?} {:?}",

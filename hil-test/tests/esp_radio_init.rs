@@ -23,8 +23,6 @@ use esp_radio::InitializationError;
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
     esp_preempt::init(timer);
@@ -109,5 +107,16 @@ mod tests {
             res,
             Some(esp_radio::InitializationError::InterruptsDisabled),
         ));
+    }
+
+    #[test]
+    #[cfg(soc_has_wifi)]
+    fn test_wifi_can_be_initialized(peripherals: Peripherals) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_preempt::init(timg0.timer0);
+
+        let esp_radio_ctrl = esp_radio::init().unwrap();
+
+        _ = esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
     }
 }

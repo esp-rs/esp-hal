@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+
+use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{
     c_types::c_char,
     include::{
@@ -11,9 +14,13 @@ use esp_wifi_sys::{
 use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
-    binary::include::{esp_event_base_t, esp_timer_get_time},
-    compat::common::*,
+    binary::{
+        c_types::{c_int, c_ulong, c_void},
+        include::esp_event_base_t,
+    },
+    compat::{common::*, semaphore::*},
     hal::{self, clock::ModemClockController, ram},
+    time::blob_ticks_to_micros,
 };
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
@@ -34,6 +41,31 @@ pub(crate) mod chip_specific;
 #[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
 pub(crate) mod phy_init_data;
 
+static PHY_ACCESS_REF: NonReentrantMutex<usize> = NonReentrantMutex::new(0);
+
+pub(crate) unsafe fn phy_enable() {
+    PHY_ACCESS_REF.with(|ref_count| {
+        *ref_count += 1;
+        if *ref_count == 1 {
+            unsafe { chip_specific::phy_enable_inner() };
+        }
+    })
+}
+
+#[allow(unused)]
+pub(crate) unsafe fn phy_disable() {
+    PHY_ACCESS_REF.with(|ref_count| {
+        *ref_count -= 1;
+        if *ref_count == 0 {
+            unsafe { chip_specific::phy_disable_inner() };
+        }
+    })
+}
+
+static CAL_DATA: esp_sync::NonReentrantMutex<
+    [u8; core::mem::size_of::<esp_phy_calibration_data_t>()],
+> = esp_sync::NonReentrantMutex::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
+
 /// **************************************************************************
 /// Name: esp_semphr_create
 ///
@@ -49,7 +81,7 @@ pub(crate) mod phy_init_data;
 ///
 /// *************************************************************************
 #[allow(unused)]
-pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut c_void {
     trace!("semphr_create - max {} init {}", max, init);
     sem_create(max, init)
 }
@@ -68,7 +100,7 @@ pub unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *mut crate::binar
 ///
 /// *************************************************************************
 #[allow(unused)]
-pub unsafe extern "C" fn semphr_delete(semphr: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn semphr_delete(semphr: *mut c_void) {
     trace!("semphr_delete {:?}", semphr);
     sem_delete(semphr);
 }
@@ -88,11 +120,18 @@ pub unsafe extern "C" fn semphr_delete(semphr: *mut crate::binary::c_types::c_vo
 ///
 /// *************************************************************************
 #[ram]
-pub unsafe extern "C" fn semphr_take(
-    semphr: *mut crate::binary::c_types::c_void,
-    tick: u32,
+pub unsafe extern "C" fn semphr_take(semphr: *mut c_void, tick: u32) -> i32 {
+    trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
+    sem_take(semphr, blob_ticks_to_micros(tick))
+}
+
+#[ram]
+pub unsafe extern "C" fn semphr_take_from_isr(
+    semphr: *mut c_void,
+    higher_priority_task_waken: *mut bool,
 ) -> i32 {
-    sem_take(semphr, tick)
+    trace!(">>>> semphr_take_from_isr {:?}", semphr);
+    sem_take_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -109,8 +148,18 @@ pub unsafe extern "C" fn semphr_take(
 ///
 /// *************************************************************************
 #[ram]
-pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void) -> i32 {
+pub unsafe extern "C" fn semphr_give(semphr: *mut c_void) -> i32 {
+    trace!(">>>> semphr_give {:?}", semphr);
     sem_give(semphr)
+}
+
+#[ram]
+pub unsafe extern "C" fn semphr_give_from_isr(
+    semphr: *mut c_void,
+    higher_priority_task_waken: *mut bool,
+) -> i32 {
+    trace!(">>>> semphr_give_from_isr {:?}", semphr);
+    sem_give_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -118,7 +167,7 @@ pub unsafe extern "C" fn semphr_give(semphr: *mut crate::binary::c_types::c_void
 /// *************************************************************************
 #[allow(unused)]
 #[ram]
-pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
+pub unsafe extern "C" fn random() -> c_ulong {
     trace!("random");
 
     let rng = hal::rng::Rng::new();
@@ -139,7 +188,7 @@ pub unsafe extern "C" fn random() -> crate::binary::c_types::c_ulong {
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
     trace!("read_mac {:?} {}", mac, type_);
 
     let base_mac = hal::efuse::Efuse::mac_address();
@@ -150,9 +199,11 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
         }
     }
 
+    const ESP_MAC_WIFI_SOFTAP: u32 = 1;
+    const ESP_MAC_BT: u32 = 2;
+
     unsafe {
-        // ESP_MAC_WIFI_SOFTAP
-        if type_ == 1 {
+        if type_ == ESP_MAC_WIFI_SOFTAP {
             let tmp = mac.offset(0).read_volatile();
             for i in 0..64 {
                 mac.offset(0).write_volatile(tmp | 0x02);
@@ -163,10 +214,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
                     break;
                 }
             }
-        }
-
-        // ESP_MAC_BT
-        if type_ == 2 {
+        } else if type_ == ESP_MAC_BT {
             let tmp = mac.offset(0).read_volatile();
             for i in 0..64 {
                 mac.offset(0).write_volatile(tmp | 0x02);
@@ -180,30 +228,12 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> crate::binary::c_
 
             mac.offset(5)
                 .write_volatile(mac.offset(5).read_volatile() + 1);
+        } else {
+            return -1;
         }
     }
 
     0
-}
-
-#[allow(unused)]
-#[ram]
-pub(crate) unsafe extern "C" fn semphr_take_from_isr(sem: *const (), hptw: *const ()) -> i32 {
-    trace!("sem take from isr");
-    unsafe {
-        (hptw as *mut u32).write_volatile(0);
-        crate::common_adapter::semphr_take(sem as *mut crate::binary::c_types::c_void, 0)
-    }
-}
-
-#[allow(unused)]
-#[ram]
-pub(crate) unsafe extern "C" fn semphr_give_from_isr(sem: *const (), hptw: *const ()) -> i32 {
-    trace!("sem give from isr");
-    unsafe {
-        (hptw as *mut u32).write_volatile(0);
-        crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void)
-    }
 }
 
 // other functions
@@ -220,56 +250,45 @@ pub unsafe extern "C" fn puts(s: *const c_char) {
 static mut __ESP_RADIO_WIFI_EVENT: esp_event_base_t = c"WIFI_EVENT".as_ptr();
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_disarm(timer: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn ets_timer_disarm(timer: *mut c_void) {
     crate::compat::timer_compat::compat_timer_disarm(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_done(timer: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn ets_timer_done(timer: *mut c_void) {
     crate::compat::timer_compat::compat_timer_done(timer.cast());
 }
 
 #[cfg(feature = "wifi")]
 pub unsafe extern "C" fn ets_timer_setfn(
-    ptimer: *mut crate::binary::c_types::c_void,
-    pfunction: *mut crate::binary::c_types::c_void,
-    parg: *mut crate::binary::c_types::c_void,
+    ptimer: *mut c_void,
+    pfunction: *mut c_void,
+    parg: *mut c_void,
 ) {
     unsafe {
         crate::compat::timer_compat::compat_timer_setfn(
             ptimer.cast(),
-            core::mem::transmute::<
-                *mut crate::binary::c_types::c_void,
-                unsafe extern "C" fn(*mut crate::binary::c_types::c_void),
-            >(pfunction),
+            core::mem::transmute::<*mut c_void, unsafe extern "C" fn(*mut c_void)>(pfunction),
             parg,
         );
     }
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm(
-    timer: *mut crate::binary::c_types::c_void,
-    tmout: u32,
-    repeat: bool,
-) {
-    crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
+pub unsafe extern "C" fn ets_timer_arm(timer: *mut c_void, ms: u32, repeat: bool) {
+    crate::compat::timer_compat::compat_timer_arm(timer.cast(), ms, repeat);
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm_us(
-    timer: *mut crate::binary::c_types::c_void,
-    tmout: u32,
-    repeat: bool,
-) {
-    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), tmout, repeat);
+pub unsafe extern "C" fn ets_timer_arm_us(timer: *mut c_void, us: u32, repeat: bool) {
+    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), us, repeat);
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
-            let microseconds = esp_timer_get_time();
+            let microseconds = __esp_radio_esp_timer_get_time();
             (*tv).tv_sec = (microseconds / 1_000_000) as u64;
             (*tv).tv_usec = (microseconds % 1_000_000) as u32;
         }
@@ -291,7 +310,16 @@ pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     trace!("esp_timer_get_time");
-    crate::time::ticks_to_micros(crate::time::systimer_count()) as i64
+    // Just using IEEE802.15.4 doesn't need the current time. If we don't use `preempt::now`, users
+    // will not need to have a scheduler in their firmware.
+    cfg_if::cfg_if! {
+        if #[cfg(any(feature = "wifi", feature = "ble"))] {
+            crate::preempt::now() as i64
+        } else {
+            // In this case we don't have a scheduler, we can return esp-hal's timestamp.
+            esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
+        }
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -344,9 +372,6 @@ pub(crate) unsafe fn phy_disable_clock() {
 }
 
 pub(crate) fn phy_calibrate() {
-    let mut cal_data: [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] =
-        [0u8; core::mem::size_of::<esp_phy_calibration_data_t>()];
-
     let phy_version = unsafe { get_phy_version_str() };
     trace!("phy_version {}", unsafe { str_from_c(phy_version) });
 
@@ -354,33 +379,251 @@ pub(crate) fn phy_calibrate() {
 
     unsafe {
         chip_specific::bbpll_en_usb();
+    }
 
-        cfg_if::cfg_if! {
-            if #[cfg(phy_full_calibration)] {
-                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
-            } else {
-                const CALIBRATION_MODE: esp_phy_calibration_mode_t = esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
-            }
-        };
+    #[cfg(phy_full_calibration)]
+    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
+    #[cfg(not(phy_full_calibration))]
+    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
 
-        cfg_if::cfg_if! {
-            if #[cfg(phy_skip_calibration_after_deep_sleep)] {
-                let calibration_mode = if crate::hal::system::reset_reason() == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep) {
-                    esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-                } else {
-                    CALIBRATION_MODE
-                };
-            } else {
-                let calibration_mode = CALIBRATION_MODE;
-            }
-        };
+    #[cfg(phy_skip_calibration_after_deep_sleep)]
+    let calibration_mode = if crate::hal::system::reset_reason()
+        == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep)
+    {
+        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
+    } else {
+        CALIBRATION_MODE
+    };
+    #[cfg(not(phy_skip_calibration_after_deep_sleep))]
+    let calibration_mode = CALIBRATION_MODE;
 
-        debug!("Using calibration mode {}", calibration_mode);
+    debug!("Using calibration mode {}", calibration_mode);
 
+    let res = CAL_DATA.with(|cal_data| unsafe {
         register_chipv7_phy(
             init_data,
-            &mut cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
+            cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
             calibration_mode,
-        );
-    }
+        )
+    });
+
+    debug!("register_chipv7_phy result = {}", res);
+}
+
+/// Get calibration data.
+///
+/// Returns the last calibration result.
+///
+/// If you see the data is different than what was persisted before, consider persisting the new
+/// data.
+pub fn phy_calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
+    CAL_DATA.with(|cal_data| *cal_data)
+}
+
+/// Set calibration data.
+///
+/// This will be used next time the phy gets initialized.
+pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
+    CAL_DATA.with(|cal_data| {
+        *cal_data = *data;
+    });
+}
+
+/// **************************************************************************
+/// Name: esp_queue_create
+///
+/// Description:
+///   Create message queue
+///
+/// Input Parameters:
+///   queue_len - queue message number
+///   item_size - message size
+///
+/// Returned Value:
+///   Message queue data pointer
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_create(queue_len: u32, item_size: u32) -> *mut c_void {
+    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
+    // version - JIRA: WIFI-6676
+    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
+        (queue_len, item_size)
+    } else {
+        warn!("Fixing queue item_size");
+        (3, 8)
+    };
+
+    crate::compat::queue::queue_create(queue_len as i32, item_size as i32).cast()
+}
+
+/// **************************************************************************
+/// Name: esp_queue_delete
+///
+/// Description:
+///   Delete message queue
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///
+/// Returned Value:
+///   None
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_delete(queue: *mut c_void) {
+    crate::compat::queue::queue_delete(queue.cast());
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send
+///
+/// Description:
+///   Send message of low priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_back(
+        queue.cast(),
+        item.cast_const(),
+        blob_ticks_to_micros(block_time_tick),
+    )
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_from_isr
+///
+/// Description:
+///   Send message of low priority to queue in ISR within
+///   a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   hptw  - No mean
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_from_isr(
+    queue: *mut c_void,
+    item: *mut c_void,
+    _higher_priority_task_waken: *mut c_void,
+) -> i32 {
+    crate::compat::queue::queue_try_send_to_back(queue.cast(), item.cast_const())
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_to_back
+///
+/// Description:
+///   Send message of low priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_to_back(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_back(
+        queue.cast(),
+        item,
+        blob_ticks_to_micros(block_time_tick),
+    )
+}
+
+/// **************************************************************************
+/// Name: esp_queue_send_from_to_front
+///
+/// Description:
+///   Send message of high priority to queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_send_to_front(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_tick: u32,
+) -> i32 {
+    crate::compat::queue::queue_send_to_front(
+        queue.cast(),
+        item,
+        blob_ticks_to_micros(block_time_tick),
+    )
+}
+
+/// **************************************************************************
+/// Name: esp_queue_recv
+///
+/// Description:
+///   Receive message from queue within a certain period of time
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///   item  - Message data pointer
+///   ticks - Wait ticks
+///
+/// Returned Value:
+///   True if success or false if fail
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_recv(
+    queue: *mut c_void,
+    item: *mut c_void,
+    block_time_ms: u32,
+) -> i32 {
+    crate::compat::queue::queue_receive(queue.cast(), item, blob_ticks_to_micros(block_time_ms))
+}
+
+pub unsafe extern "C" fn queue_recv_from_isr(
+    queue: *mut c_void,
+    item: *mut c_void,
+    _higher_priority_task_waken: *mut c_void,
+) -> i32 {
+    crate::compat::queue::queue_try_receive(queue.cast(), item)
+}
+
+/// **************************************************************************
+/// Name: esp_queue_msg_waiting
+///
+/// Description:
+///   Get message number in the message queue
+///
+/// Input Parameters:
+///   queue - Message queue data pointer
+///
+/// Returned Value:
+///   Message number
+///
+/// *************************************************************************
+pub unsafe extern "C" fn queue_msg_waiting(queue: *mut c_void) -> u32 {
+    crate::compat::queue::queue_messages_waiting(queue.cast())
 }

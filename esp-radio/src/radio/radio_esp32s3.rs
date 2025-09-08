@@ -1,6 +1,9 @@
 #[cfg(any(feature = "wifi", feature = "ble"))]
 #[allow(unused_imports)]
-use crate::hal::{interrupt, peripherals::Interrupt};
+use crate::{
+    ESP_RADIO_LOCK,
+    hal::{interrupt, peripherals::Interrupt},
+};
 
 pub(crate) fn setup_radio_isr() {
     // no-op
@@ -41,13 +44,13 @@ extern "C" fn WIFI_PWR() {
         }
 
         trace!("interrupt 1 done");
-    };
+    }
 }
 
 #[cfg(feature = "ble")]
 #[unsafe(no_mangle)]
 extern "C" fn RWBLE() {
-    critical_section::with(|_| unsafe {
+    ESP_RADIO_LOCK.lock(|| unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_8;
         trace!("interrupt RWBLE {:?} {:?}", fnc, arg);
         if !fnc.is_null() {
@@ -60,7 +63,7 @@ extern "C" fn RWBLE() {
 #[cfg(feature = "ble")]
 #[unsafe(no_mangle)]
 extern "C" fn BT_BB() {
-    critical_section::with(|_| unsafe {
+    ESP_RADIO_LOCK.lock(|| unsafe {
         let (fnc, arg) = crate::ble::btdm::ble_os_adapter_chip_specific::ISR_INTERRUPT_5;
         trace!("interrupt RWBT {:?} {:?}", fnc, arg);
 

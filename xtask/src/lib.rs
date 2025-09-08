@@ -41,6 +41,7 @@ pub mod semver_check;
 )]
 #[serde(rename_all = "kebab-case")]
 #[strum(serialize_all = "kebab-case")]
+/// Represents the packages in the `esp-hal` workspace.
 pub enum Package {
     EspAlloc,
     EspBacktrace,
@@ -56,6 +57,7 @@ pub enum Package {
     EspPrintln,
     EspRiscvRt,
     EspStorage,
+    EspSync,
     EspRadio,
     EspRadioPreemptDriver,
     EspPreempt,
@@ -76,6 +78,7 @@ impl Package {
             self,
             EspBacktrace
                 | EspBootloaderEspIdf
+                | EspAlloc
                 | EspHal
                 | EspHalEmbassy
                 | EspMetadataGenerated
@@ -84,6 +87,7 @@ impl Package {
                 | EspPrintln
                 | EspPreempt
                 | EspStorage
+                | EspSync
                 | EspRadio
         )
     }
@@ -110,6 +114,7 @@ impl Package {
             .any(|line| line.contains("asm_experimental_arch"))
     }
 
+    /// Does the package have a migration guide?
     pub fn has_migration_guide(&self, workspace: &Path) -> bool {
         let package_path = workspace.join(self.to_string());
 
@@ -130,6 +135,7 @@ impl Package {
         false
     }
 
+    /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
 
@@ -207,6 +213,7 @@ impl Package {
                 features.push("defmt".to_owned());
                 if config.contains("wifi") {
                     features.push("wifi".to_owned());
+                    features.push("wifi-eap".to_owned());
                     features.push("esp-now".to_owned());
                     features.push("sniffer".to_owned());
                     features.push("smoltcp/proto-ipv4".to_owned());
@@ -215,11 +222,21 @@ impl Package {
                 if config.contains("bt") {
                     features.push("ble".to_owned());
                 }
+                if config.contains("ieee802154") {
+                    features.push("ieee802154".to_owned());
+                    // allow wifi + 802.15.4
+                    features.push("__docs_build".to_owned());
+                }
                 if config.contains("wifi") && config.contains("bt") {
                     features.push("coex".to_owned());
                 }
                 if features.iter().any(|f| {
-                    f == "csi" || f == "ble" || f == "esp-now" || f == "sniffer" || f == "coex"
+                    f == "csi"
+                        || f == "ble"
+                        || f == "esp-now"
+                        || f == "sniffer"
+                        || f == "coex"
+                        || f == "ieee802154"
                 }) {
                     features.push("unstable".to_owned());
                 }
@@ -277,12 +294,19 @@ impl Package {
             Package::EspRadio => {
                 // Minimal set of features that when enabled _should_ still compile:
                 cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                // This tests if `wifi` feature works without `unstable`
                 if config.contains("wifi") {
+                    // This tests if `wifi` feature works without `esp-radio/unstable`
                     cases.push(vec![
                         "esp-hal/rt".to_owned(),
                         "esp-hal/unstable".to_owned(),
                         "wifi".to_owned(),
+                    ]);
+                    // This tests `wifi-eap` feature
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi-eap".to_owned(),
+                        "unstable".to_owned(),
                     ]);
                 }
             }
@@ -329,6 +353,7 @@ impl Package {
         }
     }
 
+    /// Creates a tag string for this [`Package`] combined with a semantic version.
     pub fn tag(&self, version: &semver::Version) -> String {
         format!("{self}-v{version}")
     }
@@ -341,6 +366,7 @@ impl Package {
 
 #[derive(Debug, Clone, Copy, strum::Display, clap::ValueEnum, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
+/// Represents the versioning scheme for a package.
 pub enum Version {
     Major,
     Minor,
@@ -358,6 +384,7 @@ pub fn execute_app(
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
+    extra_args: &[&str],
 ) -> Result<()> {
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
@@ -434,6 +461,8 @@ pub fn execute_app(
         builder = builder.toolchain(toolchain);
     }
 
+    builder = builder.args(extra_args);
+
     let args = builder.build();
     log::debug!("{args:#?}");
 
@@ -446,21 +475,23 @@ pub fn execute_app(
     if let CargoAction::Build(out_dir) = action {
         cargo::run_with_env(&args, &cwd, env_vars, false)?;
 
-        // Now that the build has succeeded and we printed the output, we can
-        // rerun the build again quickly enough to capture JSON. We'll use this to
-        // copy the binary to the output directory.
-        builder.add_arg("--message-format=json");
-        let args = builder.build();
+        if let Some(out_dir) = out_dir {
+            // Now that the build has succeeded and we printed the output, we can
+            // rerun the build again quickly enough to capture JSON. We'll use this to
+            // copy the binary to the output directory.
+            builder.add_arg("--message-format=json");
+            let args = builder.build();
 
-        let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
-        for line in output.lines() {
-            if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                let out_dir = out_dir.join(chip.to_string());
-                std::fs::create_dir_all(&out_dir)?;
+            let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
+            for line in output.lines() {
+                if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
+                    let out_dir = out_dir.join(chip.to_string());
+                    std::fs::create_dir_all(&out_dir)?;
 
-                let output_file = out_dir.join(app.output_file_name());
-                std::fs::copy(artifact.executable, &output_file)?;
-                log::info!("Output ready: {}", output_file.display());
+                    let output_file = out_dir.join(app.output_file_name());
+                    std::fs::copy(artifact.executable, &output_file)?;
+                    log::info!("Output ready: {}", output_file.display());
+                }
             }
         }
     } else {
@@ -523,6 +554,7 @@ pub fn windows_safe_path(path: &Path) -> PathBuf {
     PathBuf::from(path.to_str().unwrap().to_string().replace("\\\\?\\", ""))
 }
 
+/// Format the specified package in the workspace using `cargo fmt`.
 pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result<()> {
     log::info!("Formatting package: {}", package);
     let package_path = workspace.join(package.as_ref());
@@ -574,6 +606,7 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     cargo::run(&cargo_args, &package_path)
 }
 
+/// Update the metadata and chip support table in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
@@ -667,6 +700,7 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Recursively find all packages in the given path that contain a `Cargo.toml` file.
 pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 

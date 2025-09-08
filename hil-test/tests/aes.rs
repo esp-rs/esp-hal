@@ -13,7 +13,7 @@
 #![no_std]
 #![no_main]
 
-use embassy_executor::Spawner;
+use embassy_executor::SendSpawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(aes_dma)]
 use esp_hal::aes::dma::AesDmaBackend;
@@ -121,7 +121,7 @@ const CIPHERTEXT_CBC_128: [u8; PLAINTEXT_BUF_SIZE] = [
     0xbc, 0xfa, 0x56, 0xe, 0xa7, 0x1, 0xa1, 0x63, 0x1f, 0xbf, 0xf6, 0xb9, 0x46, 0xa5, 0x5, 0x29,
     0x84, 0xe1, 0x23, 0xab, 0x8f, 0x3a, 0x1f, 0x89, 0xa1, 0x8e, 0x23, 0xce, 0x74, 0x31, 0x1a, 0x36,
 ];
-#[cfg(any(esp32, esp32s2))]
+#[cfg(esp32s2)]
 const CIPHERTEXT_CBC_192: [u8; PLAINTEXT_BUF_SIZE] = [
     0xfe, 0x14, 0x13, 0xbf, 0x53, 0xe5, 0xbb, 0x1c, 0x66, 0x5b, 0x32, 0x2e, 0x9b, 0xb9, 0x35, 0xcb,
     0xf6, 0x6c, 0xb8, 0x26, 0x22, 0xca, 0x57, 0x9a, 0xe9, 0x98, 0x8f, 0x2f, 0xd1, 0xb1, 0xff, 0xa7,
@@ -232,8 +232,6 @@ const CIPHERTEXT_CFB128: [u8; PLAINTEXT_BUF_SIZE] = [
     0xa5, 0x1b, 0xae, 0xdc, 0x78, 0x4f, 0xcf, 0xcf, 0x31, 0xee, 0xb6, 0xc5, 0x7c, 0x2d, 0x81, 0x37,
 ];
 
-esp_bootloader_esp_idf::esp_app_desc!();
-
 #[cfg(aes_dma)]
 extern crate alloc;
 
@@ -307,7 +305,7 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 
     aes_roundtrip::<16>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_128, buffer);
-    #[cfg(esp32s2)]
+    #[cfg(any(esp32, esp32s2))]
     aes_roundtrip::<24>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_192, buffer);
     aes_roundtrip::<32>("ECB", Ecb, &plaintext, &CIPHERTEXT_ECB_256, buffer);
 
@@ -566,7 +564,7 @@ mod tests {
         let signal = mk_static!(Signal<CriticalSectionRawMutex, ()>, Signal::new());
 
         // Start task before we'd start the AES operation
-        let spawner = Spawner::for_current_executor().await;
+        let spawner = SendSpawner::for_current_executor().await;
         spawner.must_spawn(aes_task(signal));
 
         signal.wait().await;

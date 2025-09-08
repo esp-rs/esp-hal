@@ -7,24 +7,24 @@
 #![no_main]
 
 use esp_hal::{
+    Blocking,
     DriverMode,
     gpio::{InputPin, Level, NoPin, OutputPin},
     rmt::{
-        AnyRxChannel,
-        AnyTxChannel,
+        Channel,
         Error,
         PulseCode,
         Rmt,
+        Rx,
         RxChannelConfig,
         RxChannelCreator,
+        Tx,
         TxChannelConfig,
         TxChannelCreator,
     },
     time::Rate,
 };
 use hil_test as _;
-
-esp_bootloader_esp_idf::esp_app_desc!();
 
 cfg_if::cfg_if! {
     if #[cfg(esp32h2)] {
@@ -42,12 +42,11 @@ fn setup<Dm: DriverMode>(
     tx: impl OutputPin,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (AnyTxChannel<Dm>, AnyRxChannel<Dm>) {
+) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     cfg_if::cfg_if! {
         if #[cfg(any(esp32, esp32s3))] {
@@ -58,8 +57,7 @@ fn setup<Dm: DriverMode>(
     };
     let rx_channel = rx_channel_creator
         .configure_rx(rx, rx_config.with_clk_divider(DIV))
-        .unwrap()
-        .degrade();
+        .unwrap();
 
     (tx_channel, rx_channel)
 }
@@ -77,22 +75,10 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
-// Run a test where some data is sent from one channel and looped back to
-// another one for receive, and verify that the data matches.
-fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannel, TxChannel};
-
-    let peripherals = esp_hal::init(esp_hal::Config::default());
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
-    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
-
-    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
-    let rx_config = RxChannelConfig::default()
-        .with_idle_threshold(1000)
-        .with_memsize(rx_memsize);
-
-    let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
-
+fn do_rmt_loopback_inner<const TX_LEN: usize>(
+    tx_channel: Channel<Blocking, Tx>,
+    rx_channel: Channel<Blocking, Rx>,
+) {
     let tx_data: [_; TX_LEN] = generate_tx_data(true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
@@ -117,9 +103,24 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 
 // Run a test where some data is sent from one channel and looped back to
 // another one for receive, and verify that the data matches.
-async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
-    use esp_hal::rmt::{RxChannelAsync, TxChannelAsync};
+fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
+    let peripherals = esp_hal::init(esp_hal::Config::default());
+    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
+    let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
+    let rx_config = RxChannelConfig::default()
+        .with_idle_threshold(1000)
+        .with_memsize(rx_memsize);
+
+    let (tx_channel, rx_channel) = setup(rmt, rx, tx, tx_config, rx_config);
+
+    do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel);
+}
+
+// Run a test where some data is sent from one channel and looped back to
+// another one for receive, and verify that the data matches.
+async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
@@ -154,8 +155,6 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
     tx_memsize: u8,
     write_end_marker: bool,
 ) -> Result<(), Error> {
-    use esp_hal::rmt::TxChannel;
-
     let peripherals = esp_hal::init(esp_hal::Config::default());
     let (rx, tx) = hil_test::common_test_pins!(peripherals);
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
@@ -252,7 +251,7 @@ mod tests {
 
         let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
-        let ch0 = rmt
+        let _ch0 = rmt
             .channel0
             .configure_tx(NoPin, TxChannelConfig::default().with_memsize(2))
             .unwrap();
@@ -282,5 +281,93 @@ mod tests {
         rmt.channel1
             .configure_tx(NoPin, TxChannelConfig::default())
             .unwrap();
+    }
+
+    macro_rules! test_channel_pair {
+        (
+            $peripherals:ident,
+            $tx_pin:ident,
+            $rx_pin:ident,
+            $tx_channel:ident,
+            $rx_channel:ident
+        ) => {
+            // It's currently not possible to reborrow ChannelCreators and reconfigure channels, so
+            // we reconfigure the whole peripheral for each sub-test.
+            let rmt = Rmt::new($peripherals.RMT.reborrow(), FREQ).unwrap();
+
+            let tx_config = TxChannelConfig::default();
+            let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+            let tx_channel = rmt
+                .$tx_channel
+                .configure_tx($tx_pin.reborrow(), tx_config)
+                .unwrap();
+
+            let rx_channel = rmt
+                .$rx_channel
+                .configure_rx($rx_pin.reborrow(), rx_config)
+                .unwrap();
+
+            do_rmt_loopback_inner::<20>(tx_channel, rx_channel);
+        };
+    }
+
+    // A simple test that uses all channels: This is useful to verify that all channel/register
+    // indexing in the driver is correct. The other tests are prone to hide related issues due to
+    // using low channel numbers only (in particular 0 for the tx channel).
+    #[test]
+    fn rmt_use_all_channels() {
+        let mut p = esp_hal::init(esp_hal::Config::default());
+        let (mut rx, mut tx) = hil_test::common_test_pins!(p);
+
+        // FIXME: Find a way to implement these with less boilerplate and without a macro.
+        // Maybe use ChannelCreator::steal() (doesn't help right now because it uses a const
+        // generic channel number)?
+
+        // Chips with combined RxTx channels
+        #[cfg(esp32)]
+        {
+            test_channel_pair!(p, tx, rx, channel0, channel1);
+            test_channel_pair!(p, tx, rx, channel0, channel2);
+            test_channel_pair!(p, tx, rx, channel0, channel3);
+            test_channel_pair!(p, tx, rx, channel0, channel4);
+            test_channel_pair!(p, tx, rx, channel0, channel5);
+            test_channel_pair!(p, tx, rx, channel0, channel6);
+            test_channel_pair!(p, tx, rx, channel0, channel7);
+
+            test_channel_pair!(p, tx, rx, channel1, channel0);
+            test_channel_pair!(p, tx, rx, channel2, channel0);
+            test_channel_pair!(p, tx, rx, channel3, channel0);
+            test_channel_pair!(p, tx, rx, channel4, channel0);
+            test_channel_pair!(p, tx, rx, channel5, channel0);
+            test_channel_pair!(p, tx, rx, channel6, channel0);
+            test_channel_pair!(p, tx, rx, channel7, channel0);
+        }
+
+        #[cfg(esp32s2)]
+        {
+            test_channel_pair!(p, tx, rx, channel0, channel1);
+            test_channel_pair!(p, tx, rx, channel0, channel2);
+            test_channel_pair!(p, tx, rx, channel0, channel3);
+
+            test_channel_pair!(p, tx, rx, channel1, channel0);
+            test_channel_pair!(p, tx, rx, channel2, channel0);
+            test_channel_pair!(p, tx, rx, channel3, channel0);
+        }
+
+        // Chips with separate Rx and Tx channels
+        #[cfg(esp32s3)]
+        {
+            test_channel_pair!(p, tx, rx, channel0, channel4);
+            test_channel_pair!(p, tx, rx, channel1, channel5);
+            test_channel_pair!(p, tx, rx, channel2, channel6);
+            test_channel_pair!(p, tx, rx, channel3, channel7);
+        }
+
+        #[cfg(not(any(esp32, esp32s2, esp32s3)))]
+        {
+            test_channel_pair!(p, tx, rx, channel0, channel2);
+            test_channel_pair!(p, tx, rx, channel1, channel3);
+        }
     }
 }

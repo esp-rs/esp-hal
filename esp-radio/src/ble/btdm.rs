@@ -1,7 +1,8 @@
 use alloc::boxed::Box;
 use core::ptr::{addr_of, addr_of_mut};
 
-use esp_wifi_sys::c_types::{c_char, c_void};
+use esp_sync::RawMutex;
+use esp_wifi_sys::c_types::*;
 use portable_atomic::{AtomicBool, Ordering};
 
 use super::ReceivedPacket;
@@ -12,7 +13,7 @@ use crate::{
         HciOutCollector,
         btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
     },
-    compat::common::{self, ConcurrentQueue, str_from_c},
+    compat::common::str_from_c,
     hal::ram,
 };
 
@@ -74,10 +75,7 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
         data: Box::from(data),
     };
 
-    critical_section::with(|cs| {
-        let mut queue = super::BT_RECEIVE_QUEUE.borrow_ref_mut(cs);
-        queue.push_back(packet);
-    });
+    super::BT_STATE.with(|state| state.rx_queue.push_back(packet));
 
     super::dump_packet_info(data);
 
@@ -86,35 +84,35 @@ extern "C" fn notify_host_recv(data: *mut u8, len: u16) -> i32 {
     0
 }
 
-type InterruptsFlagType = u32;
+// This is fine, we're only accessing it inside a critical section (protected by INTERRUPT_LOCK).
+static mut G_INTER_FLAGS: heapless::Vec<esp_sync::RestoreState, 10> = heapless::Vec::new();
 
-static mut G_INTER_FLAGS: [InterruptsFlagType; 10] = [0; 10];
-
-static mut INTERRUPT_DISABLE_CNT: usize = 0;
+static INTERRUPT_LOCK: RawMutex = RawMutex::new();
 
 #[ram]
 unsafe extern "C" fn interrupt_enable() {
+    #[allow(static_mut_refs)]
     unsafe {
-        INTERRUPT_DISABLE_CNT -= 1;
-        let flags = G_INTER_FLAGS[INTERRUPT_DISABLE_CNT];
-        trace!("interrupt_enable {}", flags);
-        critical_section::release(core::mem::transmute::<
-            InterruptsFlagType,
-            critical_section::RestoreState,
-        >(flags));
+        let flags = unwrap!(
+            G_INTER_FLAGS.pop(),
+            "interrupt_enable called without prior interrupt_disable"
+        );
+        trace!("interrupt_enable {:?}", flags);
+        INTERRUPT_LOCK.release(flags);
     }
 }
 
 #[ram]
 unsafe extern "C" fn interrupt_disable() {
     trace!("interrupt_disable");
+    #[allow(static_mut_refs)]
     unsafe {
-        let flags = core::mem::transmute::<critical_section::RestoreState, InterruptsFlagType>(
-            critical_section::acquire(),
+        let flags = INTERRUPT_LOCK.acquire();
+        unwrap!(
+            G_INTER_FLAGS.push(flags),
+            "interrupt_disable was called too many times"
         );
-        G_INTER_FLAGS[INTERRUPT_DISABLE_CNT] = flags;
-        INTERRUPT_DISABLE_CNT += 1;
-        trace!("interrupt_disable {}", flags);
+        trace!("interrupt_disable {:?}", flags);
     }
 }
 
@@ -124,30 +122,9 @@ unsafe extern "C" fn task_yield() {
 }
 
 unsafe extern "C" fn task_yield_from_isr() {
+    // This is not called because we never set xHigherPriorityTaskWoken = true in the `_from_isr`
+    // functions. This should be revisited if a scheduler needs it.
     todo!();
-}
-
-unsafe extern "C" fn semphr_create(max: u32, init: u32) -> *const () {
-    unsafe { crate::common_adapter::semphr_create(max, init) as *const () }
-}
-
-unsafe extern "C" fn semphr_delete(sem: *const ()) {
-    unsafe {
-        crate::common_adapter::semphr_delete(sem as *mut crate::binary::c_types::c_void);
-    }
-}
-
-unsafe extern "C" fn semphr_take(sem: *const (), block_time_ms: u32) -> i32 {
-    unsafe {
-        crate::common_adapter::semphr_take(
-            sem as *mut crate::binary::c_types::c_void,
-            block_time_ms,
-        )
-    }
-}
-
-unsafe extern "C" fn semphr_give(sem: *const ()) -> i32 {
-    unsafe { crate::common_adapter::semphr_give(sem as *mut crate::binary::c_types::c_void) }
 }
 
 unsafe extern "C" fn mutex_create() -> *const () {
@@ -163,55 +140,6 @@ unsafe extern "C" fn mutex_lock(_mutex: *const ()) -> i32 {
 }
 
 unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
-    todo!();
-}
-
-unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    let ptr = common::create_queue(len as i32, item_size as i32);
-    ptr.cast()
-}
-
-unsafe extern "C" fn queue_delete(queue: *const ()) {
-    common::delete_queue(queue as *mut ConcurrentQueue)
-}
-
-#[ram]
-unsafe extern "C" fn queue_send(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    common::send_queued(
-        queue as *mut ConcurrentQueue,
-        item as *mut c_void,
-        block_time_ms,
-    )
-}
-
-#[ram]
-unsafe extern "C" fn queue_send_from_isr(
-    _queue: *const (),
-    _item: *const (),
-    _hptw: *const (),
-) -> i32 {
-    trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
-    // Force to set the value to be false
-    unsafe {
-        *(_hptw as *mut bool) = false;
-    }
-    unsafe { queue_send(_queue, _item, 0) }
-}
-
-unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    common::receive_queued(
-        queue as *mut ConcurrentQueue,
-        item as *mut c_void,
-        block_time_ms,
-    )
-}
-
-#[ram]
-unsafe extern "C" fn queue_recv_from_isr(
-    _queue: *const (),
-    _item: *const (),
-    _hptw: *const (),
-) -> i32 {
     todo!();
 }
 
@@ -238,7 +166,13 @@ unsafe extern "C" fn task_create(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(handle as *mut usize) = task as usize;
     }
 
@@ -430,7 +364,7 @@ pub(crate) fn ble_init() {
         #[cfg(coex)]
         crate::binary::include::coex_enable();
 
-        crate::common_adapter::chip_specific::phy_enable();
+        crate::common_adapter::phy_enable();
 
         #[cfg(esp32)]
         {
@@ -465,7 +399,7 @@ pub(crate) fn ble_deinit() {
 
     unsafe {
         btdm_controller_deinit();
-        crate::common_adapter::chip_specific::phy_disable();
+        crate::common_adapter::phy_disable();
     }
 }
 /// Sends HCI data to the BLE controller.

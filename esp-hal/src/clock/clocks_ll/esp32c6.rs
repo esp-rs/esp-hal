@@ -16,7 +16,7 @@ pub(crate) fn esp32c6_rtc_bbpll_configure_raw(_xtal_freq: u32, pll_freq: u32) {
     // Do nothing
     debug_assert!(pll_freq == 480);
 
-    critical_section::with(|_| {
+    crate::ESP_HAL_LOCK.lock(|| {
         // enable i2c mst clk by force on (temporarily)
         let was_i2c_mst_en = MODEM_LPCON::regs().clk_conf().read().clk_i2c_mst_en().bit();
         MODEM_LPCON::regs()

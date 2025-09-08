@@ -134,6 +134,8 @@ memory = [{ name = "dram", start = 0x4080_0000, end = 0x4088_0000 }]
 cpu_has_csr_pc = true
 cpu_has_prv_mode = true
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"
@@ -432,7 +434,7 @@ instances = [
     { name = "i2c0", sys_instance = "I2cExt0", scl = "I2CEXT0_SCL", sda = "I2CEXT0_SDA" },
 ]
 has_fsm_timeouts = true
-# has_hw_bus_clear = true # Maybe on >v0.0?
+has_hw_bus_clear = true
 ll_intr_mask = 0x3ffff
 fifo_size = 32
 has_bus_timeout_enable = true
@@ -468,7 +470,7 @@ memory_size_bytes = 384
 [device.sha]
 support_status = "partial"
 dma = true
-algo = ["SHA-1", "SHA-224", "SHA-256"]
+algo = { sha1 = 0, sha224 = 1, sha256 = 2 }
 
 [device.spi_master]
 support_status = "supported"

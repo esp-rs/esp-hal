@@ -10,17 +10,14 @@ use esp_hal::{
     Async,
     dma::DmaTxBuf,
     dma_buffers,
-    gpio::NoPin,
     lcd_cam::{
         LcdCam,
-        lcd::i8080::{Command, Config, I8080, TxEightBits},
+        lcd::i8080::{Command, Config, I8080},
     },
     peripherals::DMA_CH0,
     time::Rate,
 };
 use hil_test as _;
-
-esp_bootloader_esp_idf::esp_app_desc!();
 
 const DATA_SIZE: usize = 1024 * 10;
 
@@ -52,12 +49,9 @@ mod tests {
 
     #[test]
     async fn test_i8080_8bit(ctx: Context<'static>) {
-        let pins = TxEightBits::new(NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin, NoPin);
-
         let i8080 = I8080::new(
             ctx.lcd_cam.lcd,
             ctx.dma,
-            pins,
             Config::default().with_frequency(Rate::from_mhz(20)),
         )
         .unwrap();

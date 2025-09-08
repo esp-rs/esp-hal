@@ -19,6 +19,7 @@ exclude  = [
     "esp-riscv-rt",
     "esp-radio",
     "esp-storage",
+    "esp-sync",
     "examples",
     "extras/bench-server",
     "extras/esp-wifishark",

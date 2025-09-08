@@ -61,7 +61,6 @@ peripherals = [
     { name = "UART1", interrupts = { peri = "UART1" } },
     { name = "UART2", interrupts = { peri = "UART2" } },
     { name = "UHCI0" },
-    { name = "UHCI1" },
     { name = "USB0" },
     { name = "USB_DEVICE", interrupts = { peri = "USB_DEVICE" } },
     { name = "USB_WRAP" },
@@ -116,6 +115,8 @@ memory = [{ name = "dram", start = 0x3FC8_8000, end = 0x3FD0_0000 }]
 
 [device.soc]
 rc_fast_clk_default = 17_500_000
+rc_slow_clock = 136_000
+xtal_options = [40]
 
 [device.adc]
 support_status = "partial"
@@ -574,7 +575,7 @@ instances = [
     { name = "i2c1", sys_instance = "I2cExt1", scl = "I2CEXT1_SCL", sda = "I2CEXT1_SDA" },
 ]
 has_fsm_timeouts = true
-has_hw_bus_clear = true
+has_hw_bus_clear = false
 ll_intr_mask = 0x3ffff
 fifo_size = 32
 has_bus_timeout_enable = true
@@ -605,16 +606,7 @@ memory_size_bytes = 512
 [device.sha]
 support_status = "partial"
 dma = true
-algo = [
-    "SHA-1",
-    "SHA-224",
-    "SHA-256",
-    "SHA-384",
-    "SHA-512",
-    "SHA-512/224",
-    "SHA-512/256",
-    "SHA-512/t",
-]
+algo = { sha1 = 0, sha224 = 1, sha256 = 2, sha384 = 3, sha512 = 4, sha512_224 = 5, sha512_256 = 6, sha512_t = 7 }
 
 [device.spi_master]
 support_status = "supported"

@@ -8,7 +8,7 @@ use anyhow::{Context as _, Result, bail};
 use clap::{Args, Subcommand};
 use esp_metadata::Chip;
 
-use super::{ExamplesArgs, TestsArgs, DocTestArgs};
+use super::{DocTestArgs, ExamplesArgs, TestsArgs};
 use crate::{
     cargo::{CargoAction, CargoArgsBuilder},
     firmware::Metadata,
@@ -134,42 +134,7 @@ pub fn run_examples(
 
     // At this point, chip can never be `None`, so we can safely unwrap it.
     let chip = args.chip.unwrap();
-
-    // Determine the appropriate build target for the given package and chip:
     let target = args.package.target_triple(&chip)?;
-
-    // Filter the examples down to only the binaries supported by the given chip
-    examples.retain(|ex| ex.supports_chip(chip));
-
-    // Handle "all" examples and specific example
-    if !args.example.eq_ignore_ascii_case("all") {
-        let mut filtered = examples
-            .iter()
-            .filter(|ex| ex.matches_name(&args.example))
-            .cloned()
-            .collect::<Vec<_>>();
-
-        if filtered.is_empty() {
-            log::warn!(
-                "Example '{}' not found or unsupported for {}. Please select one of the existing examples in the desired package.",
-                args.example,
-                chip
-            );
-
-            let example_idx = inquire::Select::new(
-                "Select the example:",
-                examples.iter().map(|ex| ex.binary_name()).collect(),
-            )
-            .prompt()?;
-
-            if let Some(selected) = examples.into_iter().find(|ex| ex.binary_name() == example_idx) {
-                filtered.push(selected);
-            }
-        }
-
-        examples = filtered;
-    }
-
 
     examples.sort_by_key(|ex| ex.tag());
 
@@ -213,6 +178,7 @@ pub fn run_examples(
                     args.debug,
                     args.toolchain.as_deref(),
                     args.timings,
+                    &[],
                 )
                 .is_err()
             {

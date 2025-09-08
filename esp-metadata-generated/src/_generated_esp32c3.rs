@@ -48,6 +48,18 @@ macro_rules! property {
     ("soc.rc_fast_clk_default", str) => {
         stringify!(17500000)
     };
+    ("soc.rc_slow_clock") => {
+        136000
+    };
+    ("soc.rc_slow_clock", str) => {
+        stringify!(136000)
+    };
+    ("soc.xtal_frequency") => {
+        40
+    };
+    ("soc.xtal_frequency", str) => {
+        stringify!(40)
+    };
     ("aes.dma") => {
         true
     };
@@ -233,6 +245,14 @@ macro_rules! memory_range {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_soc_xtal_options {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((40)); _for_each_inner!((all(40)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_aes_key_length {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
@@ -316,6 +336,22 @@ macro_rules! for_each_rsa_multiplication {
         (672), (704), (736), (768), (800), (832), (864), (896), (928), (960), (992),
         (1024), (1056), (1088), (1120), (1152), (1184), (1216), (1248), (1280), (1312),
         (1344), (1376), (1408), (1440), (1472), (1504), (1536)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_sha_algorithm {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Sha1, "SHA-1"(sizes : 64, 20, 8) (insecure_against :
+        "collision", "length extension"), 0)); _for_each_inner!((Sha224, "SHA-224"(sizes
+        : 64, 28, 8) (insecure_against : "length extension"), 1));
+        _for_each_inner!((Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against :
+        "length extension"), 2)); _for_each_inner!((algos(Sha1, "SHA-1"(sizes : 64, 20,
+        8) (insecure_against : "collision", "length extension"), 0), (Sha224,
+        "SHA-224"(sizes : 64, 28, 8) (insecure_against : "length extension"), 1),
+        (Sha256, "SHA-256"(sizes : 64, 32, 8) (insecure_against : "length extension"),
+        2)));
     };
 }
 /// This macro can be used to generate code for each peripheral instance of the I2C master driver.
@@ -476,24 +512,23 @@ macro_rules! for_each_peripheral {
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt }))); _for_each_inner!((UART1 <= UART1(UART1 : {
         bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })));
-        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((UHCI1 <=
-        UHCI1() (unstable))); _for_each_inner!((USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable))); _for_each_inner!((XTS_AES <= XTS_AES() (unstable)));
-        _for_each_inner!((DMA_CH0 <= virtual() (unstable))); _for_each_inner!((DMA_CH1 <=
-        virtual() (unstable))); _for_each_inner!((DMA_CH2 <= virtual() (unstable)));
-        _for_each_inner!((ADC1 <= virtual() (unstable))); _for_each_inner!((ADC2 <=
-        virtual() (unstable))); _for_each_inner!((BT <= virtual() (unstable)));
-        _for_each_inner!((SW_INTERRUPT <= virtual() (unstable))); _for_each_inner!((TSENS
-        <= virtual() (unstable))); _for_each_inner!((WIFI <= virtual() (unstable)));
-        _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <= virtual()), (GPIO2 <=
-        virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()), (GPIO5 <= virtual()),
-        (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <= virtual()), (GPIO9 <=
-        virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()), (GPIO12 <= virtual()),
-        (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <= virtual()), (GPIO16 <=
-        virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()), (GPIO19 <= virtual()),
-        (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <= AES(AES : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
+        _for_each_inner!((UHCI0 <= UHCI0() (unstable))); _for_each_inner!((USB_DEVICE <=
+        USB_DEVICE(USB_DEVICE : { bind_peri_interrupt, enable_peri_interrupt,
+        disable_peri_interrupt }) (unstable))); _for_each_inner!((XTS_AES <= XTS_AES()
+        (unstable))); _for_each_inner!((DMA_CH0 <= virtual() (unstable)));
+        _for_each_inner!((DMA_CH1 <= virtual() (unstable))); _for_each_inner!((DMA_CH2 <=
+        virtual() (unstable))); _for_each_inner!((ADC1 <= virtual() (unstable)));
+        _for_each_inner!((ADC2 <= virtual() (unstable))); _for_each_inner!((BT <=
+        virtual() (unstable))); _for_each_inner!((SW_INTERRUPT <= virtual() (unstable)));
+        _for_each_inner!((TSENS <= virtual() (unstable))); _for_each_inner!((WIFI <=
+        virtual() (unstable))); _for_each_inner!((all(GPIO0 <= virtual()), (GPIO1 <=
+        virtual()), (GPIO2 <= virtual()), (GPIO3 <= virtual()), (GPIO4 <= virtual()),
+        (GPIO5 <= virtual()), (GPIO6 <= virtual()), (GPIO7 <= virtual()), (GPIO8 <=
+        virtual()), (GPIO9 <= virtual()), (GPIO10 <= virtual()), (GPIO11 <= virtual()),
+        (GPIO12 <= virtual()), (GPIO13 <= virtual()), (GPIO14 <= virtual()), (GPIO15 <=
+        virtual()), (GPIO16 <= virtual()), (GPIO17 <= virtual()), (GPIO18 <= virtual()),
+        (GPIO19 <= virtual()), (GPIO20 <= virtual()), (GPIO21 <= virtual()), (AES <=
+        AES(AES : { bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
         (unstable)), (APB_CTRL <= APB_CTRL() (unstable)), (APB_SARADC <= APB_SARADC()
         (unstable)), (ASSIST_DEBUG <= ASSIST_DEBUG() (unstable)), (BB <= BB()
         (unstable)), (DMA <= DMA() (unstable)), (DS <= DS() (unstable)), (EFUSE <=
@@ -517,13 +552,13 @@ macro_rules! for_each_peripheral {
         UART0(UART0 : { bind_peri_interrupt, enable_peri_interrupt,
         disable_peri_interrupt })), (UART1 <= UART1(UART1 : { bind_peri_interrupt,
         enable_peri_interrupt, disable_peri_interrupt })), (UHCI0 <= UHCI0() (unstable)),
-        (UHCI1 <= UHCI1() (unstable)), (USB_DEVICE <= USB_DEVICE(USB_DEVICE : {
-        bind_peri_interrupt, enable_peri_interrupt, disable_peri_interrupt })
-        (unstable)), (XTS_AES <= XTS_AES() (unstable)), (DMA_CH0 <= virtual()
-        (unstable)), (DMA_CH1 <= virtual() (unstable)), (DMA_CH2 <= virtual()
-        (unstable)), (ADC1 <= virtual() (unstable)), (ADC2 <= virtual() (unstable)), (BT
-        <= virtual() (unstable)), (SW_INTERRUPT <= virtual() (unstable)), (TSENS <=
-        virtual() (unstable)), (WIFI <= virtual() (unstable))));
+        (USB_DEVICE <= USB_DEVICE(USB_DEVICE : { bind_peri_interrupt,
+        enable_peri_interrupt, disable_peri_interrupt }) (unstable)), (XTS_AES <=
+        XTS_AES() (unstable)), (DMA_CH0 <= virtual() (unstable)), (DMA_CH1 <= virtual()
+        (unstable)), (DMA_CH2 <= virtual() (unstable)), (ADC1 <= virtual() (unstable)),
+        (ADC2 <= virtual() (unstable)), (BT <= virtual() (unstable)), (SW_INTERRUPT <=
+        virtual() (unstable)), (TSENS <= virtual() (unstable)), (WIFI <= virtual()
+        (unstable))));
     };
 }
 /// This macro can be used to generate code for each `GPIOn` instance.

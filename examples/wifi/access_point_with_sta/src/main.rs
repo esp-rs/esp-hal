@@ -27,7 +27,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{AccessPointConfiguration, ClientConfiguration, Configuration};
+use esp_radio::wifi::{AccessPointConfig, ClientConfig, Config};
 use smoltcp::{
     iface::{SocketSet, SocketStorage},
     wire::IpAddress,
@@ -71,18 +71,13 @@ fn main() -> ! {
     sta_socket_set.add(smoltcp::socket::dhcpv4::Socket::new());
     let sta_stack = Stack::new(sta_interface, sta_device, sta_socket_set, now, rng.random());
 
-    let client_config = Configuration::Mixed(
-        ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
-            ..Default::default()
-        },
-        AccessPointConfiguration {
-            ssid: "esp-radio".into(),
-            ..Default::default()
-        },
+    let client_config = Config::ApSta(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+        AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    let res = controller.set_configuration(&client_config);
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();

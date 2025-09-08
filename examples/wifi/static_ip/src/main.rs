@@ -21,7 +21,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_println::{print, println};
-use esp_radio::wifi::{ClientConfiguration, Configuration};
+use esp_radio::wifi::{ClientConfig, Config, ScanConfig};
 use smoltcp::iface::{SocketSet, SocketStorage};
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -51,7 +51,7 @@ fn main() -> ! {
     let iface = create_interface(&mut device);
 
     controller
-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
+        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
         .unwrap();
 
     let mut socket_set_entries: [SocketStorage; 3] = Default::default();
@@ -61,19 +61,20 @@ fn main() -> ! {
     let now = || time::Instant::now().duration_since_epoch().as_millis();
     let mut stack = Stack::new(iface, device, socket_set, now, rng.random());
 
-    let client_config = Configuration::Client(ClientConfiguration {
-        ssid: SSID.into(),
-        password: PASSWORD.into(),
-        ..Default::default()
-    });
-    let res = controller.set_configuration(&client_config);
+    let client_config = Config::Client(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+    );
+    let res = controller.set_config(&client_config);
     println!("wifi_set_configuration returned {:?}", res);
 
     controller.start().unwrap();
     println!("is wifi started: {:?}", controller.is_started());
 
     println!("Start Wifi Scan");
-    let res = controller.scan_n(10).unwrap();
+    let scan_config = ScanConfig::default().with_max(10);
+    let res = controller.scan_with_config_sync(scan_config).unwrap();
     for ap in res {
         println!("{:?}", ap);
     }

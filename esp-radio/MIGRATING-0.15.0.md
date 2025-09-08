@@ -19,10 +19,10 @@ Furthermore, `esp_wifi::init` no longer requires `RNG` or a timer.
 
 `esp_wifi` crate has been renamed to `esp_radio`
 
-```diff 
+```diff
 - esp-wifi = "0.15.0"
 + esp-radio = "{{currentVersion}}"
-``` 
+```
 
 ## `EspWifi` prefix has been removed
 
@@ -44,8 +44,83 @@ Provide these symbols:
 + pub extern "C" fn malloc(size: usize) -> *mut u8 ...
 + pub extern "C" fn malloc_internal(size: usize) -> *mut u8 ...
 + pub extern "C" fn free(ptr: *mut u8) ...
++ pub extern "C" fn free_internal(ptr: *mut u8) ...
 + pub extern "C" fn calloc(number: u32, size: usize) -> *mut u8 ...
 + pub extern "C" fn calloc_internal(number: u32, size: usize) -> *mut u8 ...
 + pub extern "C" fn realloc(ptr: *mut u8, new_size: usize) -> *mut u8 ...
 + pub extern "C" fn get_free_internal_heap_size() -> usize; ...
+```
+
+## Scanning Functions
+
+The `scan_with_config_sync_max`, `scan_with_config_sync_max`, `scan_n`, and `scan_n_async` functions have been removed. You can instead use the `scan_with_config_async` or `scan_with_config_sync` funtions while specifying a `max` value in `ScanConfig`.
+
+## Configuration
+
+The `Configuration`, `ClientConfiguration`, `AccessPointConfiguration`, and `EapClientConfiguration` enums have been renamed to `Config`, `ClientConfig`, `AccessPointConfig`, and `EapClientConfig`:
+
+```diff
+use esp_radio::wifi::{
+-    AccessPointConfiguration,
+-    ClientConfiguration,
+-    Configuration,
+-    EapClientConfiguration,
++    AccessPointConfig,
++    ClientConfig,
++    Config,
++    EapClientConfig
+}
+```
+
+Same for `set_configuration()` to `set_config()`:
+
+```diff
+- let res = controller.set_configuration(&ap_config);
++ let res = controller.set_config(&ap_config);
+```
+
+## BuilderLite pattern `AccessPointConfig` and `ClientConfig`
+
+```diff
+- let ap_config = Config::AccessPoint({
+-         let mut config = AccessPointConfig::default();
+-         config.ssid = "esp-radio".into();
+-         config
+-     });
++ let ap_config = Config::AccessPoint(AccessPointConfig::default().with_ssid("esp-radio".into()));
+```
+
+## WifiState
+
+`wifi_state()` is removed and `WifiState` is split into `WifiStaState` and `WifiApState`:
+
+```diff
+- if esp_radio::wifi::wifi_state() == WifiState::StaConnected { ... }
++ if esp_radio::wifi::sta_state() == WifiStaState::Connected { ... }
+```
+
+## `Mixed` mode has been renamed to `ApSta`
+
+```diff
+-    let client_config = Config::Mixed(
+-        ClientConfig::default()
+-            .with_ssid("ssid".into())
+-            .with_password("password".into()),
+-        AccessPointConfig::default().with_ssid("esp-radio".into()),
+-    );
++    let client_config = Config::ApSta(
++        ClientConfig::default()
++            .with_ssid("ssid".into())
++            .with_password("password".into()),
++        AccessPointConfig::default().with_ssid("esp-radio".into()),
++    );
+```
+
+## `PowerSaveMode` is moved to `wifi` module
+
+```diff
+    controller
+-        .set_power_saving(esp_radio::config::PowerSaveMode::None)
++        .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
+    .unwrap();
 ```

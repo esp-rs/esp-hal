@@ -31,7 +31,7 @@ use esp_hal::{
     gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
     lcd_cam::{
         LcdCam,
-        lcd::i8080::{Config, I8080, TxEightBits},
+        lcd::i8080::{Config, I8080},
     },
     main,
     time::Rate,
@@ -59,26 +59,23 @@ fn main() -> ! {
     let mut reset = Output::new(lcd_reset, Level::Low, OutputConfig::default());
     let tear_effect = Input::new(lcd_te, InputConfig::default().with_pull(Pull::None));
 
-    let tx_pins = TxEightBits::new(
-        peripherals.GPIO9,
-        peripherals.GPIO46,
-        peripherals.GPIO3,
-        peripherals.GPIO8,
-        peripherals.GPIO18,
-        peripherals.GPIO17,
-        peripherals.GPIO16,
-        peripherals.GPIO15,
-    );
-
     let lcd_cam = LcdCam::new(peripherals.LCD_CAM);
     let i8080 = I8080::new(
         lcd_cam.lcd,
         peripherals.DMA_CH0,
-        tx_pins,
         Config::default().with_frequency(Rate::from_mhz(20)),
     )
     .unwrap()
-    .with_ctrl_pins(lcd_rs, lcd_wr);
+    .with_dc(lcd_rs)
+    .with_wrx(lcd_wr)
+    .with_data0(peripherals.GPIO9)
+    .with_data1(peripherals.GPIO46)
+    .with_data2(peripherals.GPIO3)
+    .with_data3(peripherals.GPIO8)
+    .with_data4(peripherals.GPIO18)
+    .with_data5(peripherals.GPIO17)
+    .with_data6(peripherals.GPIO16)
+    .with_data7(peripherals.GPIO15);
 
     // Note: This isn't provided in the HAL since different drivers may require
     // different considerations, like how to manage the CS pin, the CD pin,

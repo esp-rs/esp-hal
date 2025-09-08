@@ -6,14 +6,14 @@ publish = false
 
 [dependencies]
 cfg-if = "1.0.0"
-embassy-executor = { version = "0.7.0", features = ["task-arena-size-20480"] }
-embassy-net = { version = "0.6.0", features = [
+embassy-executor = "0.9.0"
+embassy-net = { version = "0.7.0", features = [
     "dhcpv4",
     "medium-ethernet",
     "tcp",
     "udp",
 ] }
-embassy-time = "0.4.0"
+embassy-time = "0.5.0"
 embedded-io-async = "0.6.1"
 esp-alloc = { path = "../../../esp-alloc" }
 esp-backtrace = { path = "../../../esp-backtrace", features = [

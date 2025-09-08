@@ -39,13 +39,13 @@ use esp_println::{print, println};
 use esp_radio::{
     Controller,
     wifi::{
-        AccessPointConfiguration,
-        ClientConfiguration,
-        Configuration,
+        AccessPointConfig,
+        ClientConfig,
+        Config,
+        WifiApState,
         WifiController,
         WifiDevice,
         WifiEvent,
-        WifiState,
     },
 };
 
@@ -118,18 +118,13 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Configuration::Mixed(
-        ClientConfiguration {
-            ssid: SSID.into(),
-            password: PASSWORD.into(),
-            ..Default::default()
-        },
-        AccessPointConfiguration {
-            ssid: "esp-radio".into(),
-            ..Default::default()
-        },
+    let client_config = Config::ApSta(
+        ClientConfig::default()
+            .with_ssid(SSID.into())
+            .with_password(PASSWORD.into()),
+        AccessPointConfig::default().with_ssid("esp-radio".into()),
     );
-    controller.set_configuration(&client_config).unwrap();
+    controller.set_config(&client_config).unwrap();
 
     spawner.spawn(connection(controller)).ok();
     spawner.spawn(net_task(ap_runner)).ok();
@@ -333,7 +328,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
     loop {
         match esp_radio::wifi::ap_state() {
-            WifiState::ApStarted => {
+            WifiApState::Started => {
                 println!("About to connect...");
 
                 match controller.connect_async().await {

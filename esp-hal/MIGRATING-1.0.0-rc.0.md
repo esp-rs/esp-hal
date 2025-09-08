@@ -79,7 +79,7 @@ esp_hal::interrupt::bind_interrupt(
 );
 ```
 
-## RMT changes
+## RMT PulseCode changes
 
 `PulseCode` used to be an extension trait implemented on `u32`. It is now a
 newtype struct, wrapping `u32`.
@@ -113,6 +113,42 @@ let _ = tx_channel.transmit(&tx_data).wait().unwrap();
 let _ = rx_channel.transmit(&mut rx_data).wait().unwrap();
 ```
 
+## RMT Channel Changes
+
+`rmt::Channel` used to have a `Raw: RawChannelAccess` generic parameter,
+which could be either `ConstChannelAccess<Dir, const CHANNEL: u8>` or `DynChannelAccess<Dir>`.
+This generic has been erased, effectively always using `DynChannelAccess`.
+The corresponding parameter of the transaction structs has been removed as well
+(`SingleShotTxTransaction`, `ContinuousTxTransaction`, `RxTransaction`).
+
+Transmit and receive methods are now directly implemented by
+`Channel<Dm: DriverMode, Tx>`
+and
+`Channel<Dm: DriverMode, Rx>`
+respectively and the `RxChannel`, `TxChannel`, `RxChannelAsync` and `TxChannelAsync`
+traits have been removed.
+Several related types that were previously exported have been removed from the
+API as well.
+
+```diff
+-use esp_hal::rmt::{ConstChannelAccess, DynChannelAccess, RawChannelAccess};
+-let mut tx: Channel<Blocking, ConstChannelAccess<Tx, 0>> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
+-let mut rx: Channel<Blocking, ConstChannelAccess<Rx, 2>> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
++let mut tx: Channel<Blocking, Tx> = rmt.channel0.configure_tx(NoPin, TxChannelConfig::default());
++let mut rx: Channel<Blocking, Rx> = rmt.channel2.configure_rx(NoPin, RxChannelConfig::default());
+
+-let mut tx: Channel<Blocking, DynChannelAccess<Tx>> = tx.degrade();
+-let mut rx: Channel<Blocking, DynChannelAccess<Rx>> = rx.degrade();
+
+-// same for TxChannelAsync, RxChannelAsync
+-use esp_hal::rmt::{TxChannel, RxChannel};
+-
+-let tx_transaction: SingleShotTxTransaction<'_, DynChannelAccess<Tx>, PulseCode> = tx.transmit(&data);
+-let rx_transaction: RxTransaction<'_, DynChannelAccess<Rx>, PulseCode> = rx.transmit(&data);
++let tx_transaction: SingleShotTxTransaction<'_, PulseCode> = tx.transmit(&data);
++let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
+```
+
 ## DMA changes
 
 DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
@@ -128,3 +164,78 @@ DMA buffer implementations.
 ```
 
 If the `Final` type is not `Self`, `fn from_view()` will need to be updated to return `Self::Final`.
+
+## Timer interrupts
+```diff
+- pub fn enable_interrupt(&mut self, enable: bool) { ... }
++ pub fn listen(&mut self) { ... }
++ pub fn unlisten(&mut self) { ... }
+```
+
+## ESP32-S3 PSRAM Configuration
+
+`PsramConfig::core_clock` is now an `Option`.
+
+```diff
+let peripherals = esp_hal::init(
+    esp_hal::Config::default()
+    .with_cpu_clock(esp_hal::clock::CpuClock::max())
+    .with_psram(esp_hal::psram::PsramConfig {
+        flash_frequency: esp_hal::psram::FlashFreq::FlashFreq20m,
+        ram_frequency: esp_hal::psram::SpiRamFreq::Freq40m,
+-       core_clock: esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m,
++       core_clock: Some(esp_hal::psram::SpiTimingConfigCoreClock::SpiTimingConfigCoreClock160m),
+        ..Default::default()
+        })
+    );
+```
+
+## `I8080` driver pin configuration changes
+
+```diff
+- let tx_pins = TxEightBits::new(
+-     peripherals.GPIO9,
+-     peripherals.GPIO46,
+-     peripherals.GPIO3,
+-     peripherals.GPIO8,
+-     peripherals.GPIO18,
+-     peripherals.GPIO17,
+-     peripherals.GPIO16,
+-     peripherals.GPIO15,
+- );
++ let mut i8080 = I8080::new(
+     lcd_cam.lcd,
+     peripherals.DMA_CH0,
+-    tx_pins,
+     config,
+  )?
+- .with_ctrl_pins(peripherals.GPIO0, peripherals.GPIO47);
++ .with_dc(peripherals.GPIO0)
++ .with_wrx(peripherals.GPIO47)
++ .with_data0(peripherals.GPIO9)
++ .with_data1(peripherals.GPIO46)
++ .with_data2(peripherals.GPIO3)
++ .with_data3(peripherals.GPIO8)
++ .with_data4(peripherals.GPIO18)
++ .with_data5(peripherals.GPIO17)
++ .with_data6(peripherals.GPIO16)
++ .with_data7(peripherals.GPIO15);
+```
+
+## I2S Changes
+
+I2S configuration is now done using `i2s::master::Config`. Sample rate and data format, previously passed
+to the constructor, have to be assigned to `Config` instead.
+
+```diff
+  let i2s = I2s::new(
+      peripherals.I2S0,
+-     Standard::Philips,
+-     DataFormat::Data16Channel16,
+-     Rate::from_hz(44100),
+      dma_channel,
++     Config::new_tdm_philips()
++         .with_data_format(DataFormat::Data16Channel16)
++         .with_sample_rate(Rate::from_hz(44100)),
+  );
+```

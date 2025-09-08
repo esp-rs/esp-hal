@@ -9,13 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New default feature (`compat`) enables implementations for `malloc`, `free`, `calloc`, `realloc` (#3890)
+- Added chip-selection features (#4023)
+- New default feature (`compat`) enables implementations for `malloc`, `free`, `calloc`, `realloc` and others (#3890, #4043)
 
 ### Changed
+
 - Make stats structs fields public (#3828)
 
 ### Fixed
 
+- Fix problem of not de-allocating memory in some situations (#3949)
 
 ### Removed
 

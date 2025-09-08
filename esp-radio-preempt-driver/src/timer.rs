@@ -1,0 +1,130 @@
+//! Timers
+
+use alloc::boxed::Box;
+use core::ptr::NonNull;
+
+/// Pointer to an opaque timer created by the driver implementation.
+pub type TimerPtr = NonNull<()>;
+
+unsafe extern "Rust" {
+    fn esp_preempt_timer_create(callback: Box<dyn FnMut() + Send>) -> TimerPtr;
+    fn esp_preempt_timer_delete(timer: TimerPtr);
+
+    fn esp_preempt_timer_arm(timer: TimerPtr, timeout: u64, periodic: bool);
+    fn esp_preempt_timer_disarm(timer: TimerPtr);
+}
+
+pub trait TimerImplementation {
+    /// Creates a new timer instance from the given callback.
+    fn create(callback: Box<dyn FnMut() + Send>) -> TimerPtr;
+
+    /// Deletes a timer instance.
+    ///
+    /// # Safety
+    ///
+    /// `timer` must be a pointer returned from [`Self::create`].
+    unsafe fn delete(timer: TimerPtr);
+
+    /// Configures the timer to be triggered after the given timeout.
+    ///
+    /// The timeout is specified in microsecond. If the timer is set to be periodic,
+    /// the timer will be triggered with a constant frequency.
+    ///
+    /// # Safety
+    ///
+    /// `timer` must be a pointer returned from [`Self::create`].
+    unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool);
+
+    /// Stops the timer.
+    ///
+    /// # Safety
+    ///
+    /// `timer` must be a pointer returned from [`Self::create`].
+    unsafe fn disarm(timer: TimerPtr);
+}
+
+#[macro_export]
+macro_rules! register_timer_implementation {
+    ($t: ty) => {
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_timer_create(callback: Box<dyn FnMut() + Send>) -> $crate::timer::TimerPtr {
+            <$t as $crate::timer::TimerImplementation>::create(callback)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_timer_delete(timer: $crate::timer::TimerPtr) {
+            unsafe { <$t as $crate::timer::TimerImplementation>::delete(timer) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_timer_arm(timer: $crate::timer::TimerPtr, timeout: u64, periodic: bool) {
+            unsafe { <$t as $crate::timer::TimerImplementation>::arm(timer, timeout, periodic) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_timer_disarm(timer: $crate::timer::TimerPtr) {
+            unsafe { <$t as $crate::timer::TimerImplementation>::disarm(timer) }
+        }
+    };
+}
+
+#[repr(transparent)]
+pub struct TimerHandle(TimerPtr);
+impl TimerHandle {
+    /// Creates a new timer instance from the given callback.
+    pub fn new(callback: Box<dyn FnMut() + Send>) -> Self {
+        let ptr = unsafe { esp_preempt_timer_create(callback) };
+        Self(ptr)
+    }
+
+    /// Converts this object into a pointer without dropping it.
+    pub fn leak(self) -> TimerPtr {
+        let ptr = self.0;
+        core::mem::forget(self);
+        ptr
+    }
+
+    /// Recovers the object from a leaked pointer.
+    ///
+    /// # Safety
+    ///
+    /// - The caller must only use pointers created using [`Self::leak`].
+    /// - The caller must ensure the pointer is not shared.
+    pub unsafe fn from_ptr(ptr: TimerPtr) -> Self {
+        Self(ptr)
+    }
+
+    /// Creates a reference to this object from a leaked pointer.
+    ///
+    /// This function is used in the esp-radio code to interact with the timer.
+    ///
+    /// # Safety
+    ///
+    /// - The caller must only use pointers created using [`Self::leak`].
+    pub unsafe fn ref_from_ptr(ptr: &TimerPtr) -> &Self {
+        unsafe { core::mem::transmute(ptr) }
+    }
+
+    /// Configures the timer to be triggered after the given timeout.
+    ///
+    /// The timeout is specified in microsecond. If the timer is set to be periodic,
+    /// the timer will be triggered with a constant frequency.
+    pub fn arm(&self, timeout: u64, periodic: bool) {
+        unsafe { esp_preempt_timer_arm(self.0, timeout, periodic) }
+    }
+
+    /// Stops the timer.
+    pub fn disarm(&self) {
+        unsafe { esp_preempt_timer_disarm(self.0) }
+    }
+}
+
+impl Drop for TimerHandle {
+    fn drop(&mut self) {
+        unsafe { esp_preempt_timer_delete(self.0) };
+    }
+}

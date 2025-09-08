@@ -17,10 +17,13 @@ mod storage;
 
 #[cfg(not(feature = "emulation"))]
 #[inline(always)]
-#[cfg_attr(not(target_os = "macos"), unsafe(link_section = ".rwtext"))]
 fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     #[cfg(feature = "critical-section")]
-    return critical_section::with(|_| f());
+    {
+        static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
+
+        return LOCK.lock(f);
+    }
 
     #[cfg(not(feature = "critical-section"))]
     f()

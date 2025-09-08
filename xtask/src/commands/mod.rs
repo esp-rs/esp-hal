@@ -3,11 +3,11 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
+use inquire::Select;
+use strum::IntoEnumIterator;
 
 pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{Package, cargo::CargoAction};
-use inquire::Select;
-use strum::IntoEnumIterator;
 mod build;
 mod check_changelog;
 mod release;
@@ -19,7 +19,7 @@ mod run;
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
-    pub example: String,
+    pub example: Option<String>,
     /// Chip to target.
     #[arg(value_enum, long)]
     pub chip: Option<Chip>,
@@ -58,7 +58,9 @@ pub struct TestsArgs {
     /// Repeat the tests for a specific number of times.
     #[arg(long, default_value_t = 1)]
     pub repeat: usize,
-    /// Optional test to act on (all tests used if omitted)
+    /// Optional test to act on (all tests used if omitted).
+    ///
+    /// The `test_suite::test_name` syntax allows running a single specific test.
     #[arg(long, short = 't')]
     pub test: Option<String>,
 
@@ -124,17 +126,74 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
         .filter(|example| example.supports_chip(chip))
         .collect::<Vec<_>>();
 
+    // At this point, chip can never be `None`, so we can safely unwrap it.
+    let chip = args.chip.unwrap();
+
+    // Filter the examples down to only the binaries supported by the given chip
+    examples.retain(|ex| ex.supports_chip(chip));
+
     // Sort all examples by name:
     examples.sort_by_key(|a| a.binary_name());
 
+    let mut filtered = vec![];
+
+    if let Some(example) = args.example.as_deref() {
+        filtered.clone_from(&examples);
+        if !example.eq_ignore_ascii_case("all") {
+            // Only keep the example the user wants
+            filtered.retain(|ex| ex.matches_name(example));
+
+            if filtered.is_empty() {
+                log::warn!(
+                    "Example '{example}' not found or unsupported for the given chip. Please select one of the existing examples in the desired package."
+                );
+
+                let example_name = inquire::Select::new(
+                    "Select the example:",
+                    examples.iter().map(|ex| ex.binary_name()).collect(),
+                )
+                .prompt()?;
+
+                if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name)
+                {
+                    filtered.push(selected.clone());
+                }
+            }
+        }
+    } else {
+        let example_name = inquire::Select::new(
+            "Select an example:",
+            examples.iter().map(|ex| ex.binary_name()).collect(),
+        )
+        .prompt()?;
+
+        if let Some(selected) = examples.iter().find(|ex| ex.binary_name() == example_name) {
+            filtered.push(selected.clone());
+        }
+    }
+
     // Execute the specified action:
     match action {
-        CargoAction::Build(out_path) => build_examples(args, examples, &package_path, &out_path),
-        CargoAction::Run => run_examples(args, examples, &package_path),
+        CargoAction::Build(out_path) => build_examples(
+            args,
+            filtered,
+            &package_path,
+            out_path.as_ref().map(|p| p.as_path()),
+        ),
+        CargoAction::Run => run_examples(args, filtered, &package_path),
     }
 }
 
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
+    let (test_arg, filter) = if let Some(test_arg) = args.test.as_deref() {
+        match test_arg.split_once("::") {
+            Some((test, filter)) => (Some(test), Some(filter)),
+            None => (Some(test_arg), None),
+        }
+    } else {
+        (None, None)
+    };
+
     // Absolute path of the 'hil-test' package's root:
     let package_path = crate::windows_safe_path(&workspace.join("hil-test"));
 
@@ -150,9 +209,17 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     // Sort all tests by name:
     tests.sort_by_key(|a| a.binary_name());
 
+    let run_test_extra_args = (action == CargoAction::Run)
+        .then(|| filter.as_ref().map(|f| std::slice::from_ref(f)))
+        .flatten()
+        .unwrap_or(&[]);
+
     // Execute the specified action:
-    if tests.iter().any(|test| test.matches(&args.test)) {
-        for test in tests.iter().filter(|test| test.matches(&args.test)) {
+    if tests.iter().any(|test| test.matches(test_arg.as_deref())) {
+        for test in tests
+            .iter()
+            .filter(|test| test.matches(test_arg.as_deref()))
+        {
             crate::execute_app(
                 &package_path,
                 args.chip,
@@ -163,10 +230,11 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 false,
                 args.toolchain.as_deref(),
                 args.timings,
+                run_test_extra_args,
             )?;
         }
         Ok(())
-    } else if args.test.is_some() {
+    } else if test_arg.is_some() {
         bail!("Test not found or unsupported for the given chip")
     } else {
         let mut failed = Vec::new();
@@ -181,6 +249,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
                 false,
                 args.toolchain.as_deref(),
                 args.timings,
+                run_test_extra_args,
             )
             .is_err()
             {
