@@ -127,6 +127,11 @@ pub(crate) fn new_task_context(
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
 pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) {
+    debug_assert!(
+        _NEXT_CTX_PTR
+            .load(portable_atomic::Ordering::SeqCst)
+            .is_null()
+    );
     _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
     _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 

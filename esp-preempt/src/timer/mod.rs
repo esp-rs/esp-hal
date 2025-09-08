@@ -139,6 +139,7 @@ impl TimeDriver {
         unsafe { current_task.as_mut().state = TaskState::Sleeping };
 
         if at == Instant::EPOCH + Duration::MAX {
+            debug!("Suspending task: {:?}", current_task);
             return;
         }
 

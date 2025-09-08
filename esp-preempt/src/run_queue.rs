@@ -1,4 +1,4 @@
-use crate::task::{TaskPtr, TaskQueue, TaskReadyQueueElement};
+use crate::task::{TaskPtr, TaskQueue, TaskReadyQueueElement, TaskState};
 
 pub(crate) struct RunQueue {
     // TODO: one queue per priority level
@@ -18,8 +18,9 @@ impl RunQueue {
         self.mark_task_ready(ready_task);
     }
 
-    pub(crate) fn mark_task_ready(&mut self, ready_task: TaskPtr) {
+    pub(crate) fn mark_task_ready(&mut self, mut ready_task: TaskPtr) {
         // TODO: this will need to track max ready priority.
+        unsafe { ready_task.as_mut().state = TaskState::Ready };
         self.ready_tasks.push(ready_task);
     }
 

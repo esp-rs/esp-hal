@@ -137,7 +137,8 @@ impl SchedulerState {
         if event.is_timer_event() {
             unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
                 debug_assert_eq!(ready_task.state, task::TaskState::Sleeping);
-                ready_task.state = crate::task::TaskState::Ready;
+
+                debug!("Task {:?} is ready", ready_task as *const _);
 
                 self.run_queue.mark_task_ready(NonNull::from(ready_task));
             });
@@ -145,6 +146,9 @@ impl SchedulerState {
 
         if let Some(next_task) = self.select_next_task(current_task) {
             debug_assert_eq!(unsafe { next_task.as_ref().state }, task::TaskState::Ready);
+
+            trace!("Switching task {:?} -> {:?}", current_task, next_task);
+
             task_switch(current_task, next_task);
             self.current_task = Some(next_task);
         }
@@ -193,6 +197,16 @@ impl SchedulerState {
         self.event.set_blocked();
         task::yield_task();
     }
+
+    pub(crate) fn resume_task(&mut self, task: TaskPtr) {
+        let timer_queue = unwrap!(self.time_driver.as_mut());
+        timer_queue.timer_queue.remove(task);
+
+        self.run_queue.mark_task_ready(task);
+
+        // if task.priority > current_task.priority
+        task::yield_task();
+    }
 }
 
 pub(crate) struct Scheduler {
@@ -225,6 +239,8 @@ impl Scheduler {
             state.all_tasks.push(task_ptr);
             state.run_queue.mark_task_ready(task_ptr);
         });
+
+        debug!("Task created: {:?}", task_ptr);
 
         task_ptr
     }

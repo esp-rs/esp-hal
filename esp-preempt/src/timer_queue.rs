@@ -5,6 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
+use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     Scheduler,
     register_timer_implementation,
@@ -12,7 +13,10 @@ use esp_radio_preempt_driver::{
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::{SCHEDULER, task::TaskPtr};
+use crate::{
+    SCHEDULER,
+    task::{TaskExt, TaskPtr},
+};
 
 static TIMER_QUEUE: TimerQueue = TimerQueue::new();
 
@@ -48,6 +52,7 @@ impl TimerQueueInner {
 
         if due < self.next_wakeup {
             self.next_wakeup = due;
+            unwrap!(self.task).resume();
         }
     }
 
@@ -160,9 +165,11 @@ impl TimerQueue {
             });
         }
 
-        while SCHEDULER.now() < self.inner.with(|q| q.next_wakeup) {
-            SCHEDULER.yield_task();
-        }
+        self.inner.with(|q| {
+            let next_wakeup = q.next_wakeup;
+            debug!("next_wakeup: {}", next_wakeup);
+            unwrap!(q.task).sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
+        });
     }
 }
 

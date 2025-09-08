@@ -58,11 +58,17 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
     fn sleep_until(self, wakeup_time: Instant);
+
+    fn resume(self);
 }
 
 impl TaskExt for TaskPtr {
     fn sleep_until(self, wakeup_time: Instant) {
         SCHEDULER.with(|scheduler| scheduler.sleep_until(self, wakeup_time))
+    }
+
+    fn resume(self) {
+        SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }
 }
 
@@ -255,6 +261,7 @@ pub(super) fn allocate_main_task() {
         InternalMemory,
     );
     let main_task_ptr = NonNull::from(Box::leak(task));
+    debug!("Main task created: {:?}", main_task_ptr);
 
     SCHEDULER.with(|state| {
         debug_assert!(
