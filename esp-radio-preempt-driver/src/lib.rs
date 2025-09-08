@@ -12,26 +12,11 @@
 //! This crate abstracts the capabilities of FreeRTOS. The scheduler must implement the following
 //! capabilities:
 //!
-//! - A preemptive task scheduler
-//! - Mutexes
-//! - Semaphores
-//! - Queues
-//! - Timers (functions that are executed at a specific time)
-//!
-//! In order to hook up a scheduler, implement the `Scheduler` trait for a struct, and register it
-//! using the `scheduler_impl!()` macro. Only one scheduler can be registered in a firmware.
-//!
-//! Example:
-//!
-//! ```rust,ignore
-//! struct MyScheduler {}
-//!
-//! impl esp_preempt::Scheduler for MyScheduler {
-//!     // impl goes here
-//! }
-//!
-//! esp_preempt::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
-//! ```
+//! - A preemptive task scheduler: [`Scheduler`]
+//! - Mutexes: [`mutex::MutexImplementation`]
+//! - Semaphores: [`semaphore::SemaphoreImplementation`]
+//! - Queues: [`queue::QueueImplementation`]
+//! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
 //!
 //! [`esp-preempt`]: https://crates.io/crates/esp-preempt
 
@@ -170,6 +155,73 @@ macro_rules! scheduler_impl {
 ///
 /// This trait needs to be implemented by a driver crate to integrate esp-radio with a software
 /// platform.
+///
+/// The following snippet demonstrates the boilerplate necessary to implement a scheduler using the
+/// `Scheduler` trait:
+///
+/// ```rust,no_run
+/// struct MyScheduler {}
+///
+/// impl esp_radio_preempt_driver::Scheduler for MyScheduler {
+///
+///     fn initialized(&self) -> bool {
+///         unimplemented!()
+///     }
+///
+///     fn enable(&self) {
+///         unimplemented!()
+///     }
+///
+///     fn disable(&self) {
+///         unimplemented!()
+///     }
+///
+///     fn yield_task(&self) {
+///         unimplemented!()
+///     }
+///
+///     fn yield_task_from_isr(&self) {
+///         unimplemented!()
+///     }
+///
+///     fn max_task_priority(&self) -> u32 {
+///         unimplemented!()
+///     }
+///
+///     fn task_create(
+///        &self,
+///        task: extern "C" fn(*mut c_void),
+///        param: *mut c_void,
+///        priority: u32,
+///        pin_to_core: Option<u32>,
+///        task_stack_size: usize,
+///     ) -> *mut c_void {
+///         unimplemented!()
+///     }
+///
+///     fn current_task(&self) -> *mut c_void {
+///         unimplemented!()
+///     }
+///
+///     fn schedule_task_deletion(&self, task_handle: *mut c_void) {
+///         unimplemented!()
+///     }
+///
+///     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
+///         unimplemented!()
+///     }
+///
+///     fn usleep(&self, us: u32) {
+///         unimplemented!()
+///     }
+///
+///     fn now(&self) -> u64 {
+///         unimplemented!()
+///     }
+/// }
+///
+/// esp_radio_preempt_driver::scheduler_impl!(static SCHEDULER: MyScheduler = MyScheduler {});
+/// ```
 pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
     /// up.
