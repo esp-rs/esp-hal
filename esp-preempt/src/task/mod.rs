@@ -8,15 +8,18 @@ use allocator_api2::boxed::Box;
 #[cfg(riscv)]
 use arch_specific::Registers;
 pub(crate) use arch_specific::*;
+use esp_hal::time::Instant;
 #[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
 use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum TaskState {
     Ready,
+    Sleeping,
 }
 
 pub(crate) type TaskPtr = NonNull<Context>;
@@ -50,6 +53,18 @@ task_list_item!(TaskAllocListElement, alloc_list_item);
 task_list_item!(TaskReadyQueueElement, ready_quue_item);
 task_list_item!(TaskDeleteListElement, delete_list_item);
 task_list_item!(TaskTimerQueueElement, timer_queue_item);
+
+/// Extension trait for common task operations. These should be inherent methods but we can't
+/// implement stuff for NonNull.
+pub(crate) trait TaskExt {
+    fn sleep_until(self, wakeup_time: Instant);
+}
+
+impl TaskExt for TaskPtr {
+    fn sleep_until(self, wakeup_time: Instant) {
+        SCHEDULER.with(|scheduler| scheduler.sleep_until(self, wakeup_time))
+    }
+}
 
 /// A singly linked list of tasks.
 ///

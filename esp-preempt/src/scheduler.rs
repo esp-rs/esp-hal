@@ -7,10 +7,17 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     InternalMemory,
-    TICK_RATE,
     run_queue::RunQueue,
     semaphore::Semaphore,
-    task::{self, Context, TaskAllocListElement, TaskDeleteListElement, TaskList, TaskPtr},
+    task::{
+        self,
+        Context,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskExt,
+        TaskList,
+        TaskPtr,
+    },
     timer::TimeDriver,
     timer_queue,
 };
@@ -35,7 +42,6 @@ impl SchedulerEvent {
         self.0 |= bit;
     }
 
-    #[expect(dead_code)]
     pub(crate) fn set_blocked(&mut self) {
         self.set(Self::TASK_BLOCKED)
     }
@@ -130,15 +136,20 @@ impl SchedulerState {
 
         if event.is_timer_event() {
             unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
+                debug_assert_eq!(ready_task.state, task::TaskState::Sleeping);
+                ready_task.state = crate::task::TaskState::Ready;
+
                 self.run_queue.mark_task_ready(NonNull::from(ready_task));
             });
         }
 
         if let Some(next_task) = self.select_next_task(current_task) {
+            debug_assert_eq!(unsafe { next_task.as_ref().state }, task::TaskState::Ready);
             task_switch(current_task, next_task);
             self.current_task = Some(next_task);
         }
 
+        // TODO maybe we don't need to do this every time?
         self.arm_time_slice_alarm();
     }
 
@@ -173,6 +184,14 @@ impl SchedulerState {
         self.to_delete.push(task_to_delete);
 
         is_current
+    }
+
+    pub(crate) fn sleep_until(&mut self, current_task: TaskPtr, at: Instant) {
+        let timer_queue = unwrap!(self.time_driver.as_mut());
+        timer_queue.schedule_wakeup(current_task, at);
+
+        self.event.set_blocked();
+        task::yield_task();
     }
 }
 
@@ -268,38 +287,8 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn usleep(&self, us: u32) {
-        trace!("usleep");
-        unsafe extern "C" {
-            fn esp_rom_delay_us(us: u32);
-        }
-
-        const MIN_YIELD_TIME: u32 = 1_000_000 / TICK_RATE;
-        if us < MIN_YIELD_TIME {
-            // Short wait, just sleep
-            unsafe { esp_rom_delay_us(us) };
-        } else {
-            const MIN_YIELD_DURATION: Duration = Duration::from_micros(MIN_YIELD_TIME as u64);
-            let sleep_for = Duration::from_micros(us as u64);
-            let start = Instant::now();
-            loop {
-                // Yield to other tasks
-                self.yield_task();
-
-                let elapsed = start.elapsed();
-                if elapsed.as_micros() > us as u64 {
-                    break;
-                }
-
-                let remaining = sleep_for - elapsed;
-
-                if remaining < MIN_YIELD_DURATION {
-                    // If the remaining time is less than the minimum yield time, we can just sleep
-                    // for the remaining time.
-                    unsafe { esp_rom_delay_us(remaining.as_micros() as u32) };
-                    break;
-                }
-            }
-        }
+        self.current_task()
+            .sleep_until(Instant::now() + Duration::from_micros(us as u64));
     }
 
     fn now(&self) -> u64 {

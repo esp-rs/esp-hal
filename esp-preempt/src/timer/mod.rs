@@ -7,7 +7,7 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
-    task::{Context, TaskPtr, TaskQueue, TaskTimerQueueElement},
+    task::{Context, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
 const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
@@ -102,7 +102,7 @@ impl TimeDriver {
             let task = unsafe { task_ptr.as_mut() };
 
             let wakeup_at = task.wakeup_at;
-            let ready = wakeup_at >= now;
+            let ready = wakeup_at <= now;
 
             if ready {
                 on_task_ready(task);
@@ -113,16 +113,17 @@ impl TimeDriver {
     }
 
     pub(crate) fn arm_next_wakeup(&mut self, with_time_slice: bool) {
-        let now = Instant::now().duration_since_epoch().as_micros();
         let wakeup_at = self.timer_queue.next_wakeup;
 
         if wakeup_at != u64::MAX {
+            let now = Instant::now().duration_since_epoch().as_micros();
             let sleep_duration = wakeup_at.saturating_sub(now);
 
             let timeout = if with_time_slice {
                 sleep_duration.min(TIMESLICE_DURATION.as_micros())
             } else {
-                sleep_duration
+                // assume 52-bit underlying timer. it's not a big deal to sleep for a shorter time
+                sleep_duration & ((1 << 52) - 1)
             };
 
             unwrap!(self.timer.schedule(Duration::from_micros(timeout)));
@@ -131,6 +132,20 @@ impl TimeDriver {
         } else {
             self.timer.stop();
         }
+    }
+
+    pub(crate) fn schedule_wakeup(&mut self, mut current_task: TaskPtr, at: Instant) {
+        unsafe { debug_assert_eq!(current_task.as_mut().state, TaskState::Ready) };
+        unsafe { current_task.as_mut().state = TaskState::Sleeping };
+
+        if at == Instant::EPOCH + Duration::MAX {
+            return;
+        }
+
+        let timestamp = at.duration_since_epoch().as_micros();
+        self.timer_queue.push(current_task, timestamp);
+
+        unsafe { current_task.as_mut().wakeup_at = timestamp };
     }
 }
 
