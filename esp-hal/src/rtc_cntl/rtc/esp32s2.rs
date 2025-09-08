@@ -1,9 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcFastClock, RtcSlowClock},
+    clock::{RtcClock, RtcFastClock, RtcSlowClock},
     peripherals::LPWR,
-    rtc_cntl::{RtcCalSel, RtcClock},
+    rtc_cntl::RtcCalSel,
 };
 
 pub(crate) fn init() {

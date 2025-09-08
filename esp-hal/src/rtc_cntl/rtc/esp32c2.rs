@@ -1,9 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcFastClock, RtcSlowClock},
+    clock::{RtcClock, RtcFastClock, RtcSlowClock},
     peripherals::{APB_CTRL, EXTMEM, LPWR, SPI0, SPI1, SYSTEM},
-    rtc_cntl::{RtcCalSel, RtcClock},
+    rtc_cntl::RtcCalSel,
     soc::regi2c,
 };
 

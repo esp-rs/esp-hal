@@ -1,9 +1,9 @@
 use strum::FromRepr;
 
 use crate::{
-    clock::{RtcFastClock, RtcSlowClock, clocks_ll::regi2c_write_mask},
+    clock::{RtcClock, RtcFastClock, RtcSlowClock, clocks_ll::regi2c_write_mask},
     peripherals::{LP_AON, PMU},
-    rtc_cntl::{RtcCalSel, RtcClock},
+    rtc_cntl::RtcCalSel,
 };
 
 const I2C_PMU: u8 = 0x6d;

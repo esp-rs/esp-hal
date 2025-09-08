@@ -168,7 +168,7 @@ unsafe extern "C" fn __esp_radio_phy_exit_critical(level: u32) {
 unsafe extern "C" fn __esp_radio_rtc_get_xtal() -> u32 {
     use esp_hal::clock::Clock;
 
-    let xtal = crate::hal::rtc_cntl::RtcClock::xtal_freq();
+    let xtal = crate::hal::clock::RtcClock::xtal_freq();
     xtal.mhz()
 }
 

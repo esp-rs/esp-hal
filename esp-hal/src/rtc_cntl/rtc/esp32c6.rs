@@ -7,6 +7,7 @@ use strum::FromRepr;
 use crate::{
     clock::{
         Clock,
+        RtcClock,
         RtcFastClock,
         RtcSlowClock,
         clocks_ll::{
@@ -20,7 +21,7 @@ use crate::{
         },
     },
     peripherals::{LP_AON, LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::{RtcCalSel, RtcClock},
+    rtc_cntl::RtcCalSel,
     soc::regi2c,
 };
 
