@@ -13,7 +13,7 @@ use crate::{
         HciOutCollector,
         btdm::ble_os_adapter_chip_specific::{G_OSI_FUNCS, osi_funcs_s},
     },
-    compat::common::{self, ConcurrentQueue, str_from_c},
+    compat::common::str_from_c,
     hal::ram,
 };
 
@@ -143,55 +143,6 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
     todo!();
 }
 
-unsafe extern "C" fn queue_create(len: u32, item_size: u32) -> *const () {
-    let ptr = common::create_queue(len as i32, item_size as i32);
-    ptr.cast()
-}
-
-unsafe extern "C" fn queue_delete(queue: *const ()) {
-    common::delete_queue(queue as *mut ConcurrentQueue)
-}
-
-#[ram]
-unsafe extern "C" fn queue_send(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    common::send_queued(
-        queue as *mut ConcurrentQueue,
-        item as *mut c_void,
-        block_time_ms,
-    )
-}
-
-#[ram]
-unsafe extern "C" fn queue_send_from_isr(
-    _queue: *const (),
-    _item: *const (),
-    _hptw: *const (),
-) -> i32 {
-    trace!("queue_send_from_isr {:?} {:?} {:?}", _queue, _item, _hptw);
-    // Force to set the value to be false
-    unsafe {
-        *(_hptw as *mut bool) = false;
-    }
-    unsafe { queue_send(_queue, _item, 0) }
-}
-
-unsafe extern "C" fn queue_recv(queue: *const (), item: *const (), block_time_ms: u32) -> i32 {
-    common::receive_queued(
-        queue as *mut ConcurrentQueue,
-        item as *mut c_void,
-        block_time_ms,
-    )
-}
-
-#[ram]
-unsafe extern "C" fn queue_recv_from_isr(
-    _queue: *const (),
-    _item: *const (),
-    _hptw: *const (),
-) -> i32 {
-    todo!();
-}
-
 unsafe extern "C" fn task_create(
     func: *mut crate::binary::c_types::c_void,
     name: *const c_char,
@@ -215,7 +166,13 @@ unsafe extern "C" fn task_create(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(handle as *mut usize) = task as usize;
     }
 

@@ -3,7 +3,11 @@
 pub mod common;
 pub mod malloc;
 pub mod misc;
+pub mod mutex;
+pub mod queue;
 pub mod semaphore;
+
+#[cfg(any(feature = "wifi", all(feature = "ble", npl)))]
 pub mod timer_compat;
 
 pub(crate) const OSI_FUNCS_TIME_BLOCKING: u32 = u32::MAX;

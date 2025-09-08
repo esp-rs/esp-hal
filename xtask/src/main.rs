@@ -117,7 +117,10 @@ struct UpdateMetadataArgs {
 // Application
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    let mut builder =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    builder.target(env_logger::Target::Stdout);
+    builder.init();
 
     let workspace = std::env::current_dir()?;
     let target_path = Path::new("target");
@@ -309,61 +312,90 @@ fn lint_package(
     Ok(())
 }
 
-fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
-    fn write_summary(message: &str) {
-        if let Some(summary_file) = std::env::var_os("GITHUB_STEP_SUMMARY") {
-            std::fs::write(summary_file, message).unwrap();
+struct Runner {
+    failed: Vec<&'static str>,
+    started_at: Instant,
+}
+
+impl Runner {
+    fn new() -> Self {
+        Self {
+            failed: Vec::new(),
+            started_at: Instant::now(),
         }
     }
 
+    fn run(&mut self, group: &'static str, op: impl FnOnce() -> Result<()>) {
+        // Output grouped logs
+        // https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#grouping-log-lines
+        println!("::group::{group}");
+        if op().is_err() {
+            self.failed.push(group);
+        }
+        println!("::endgroup::");
+    }
+
+    fn finish(self) -> Result<()> {
+        fn write_summary(message: &str) {
+            if let Some(summary_file) = std::env::var_os("GITHUB_STEP_SUMMARY") {
+                std::fs::write(summary_file, message).unwrap();
+            }
+        }
+
+        log::info!("CI checks completed in {:?}", self.started_at.elapsed());
+
+        if !self.failed.is_empty() {
+            let mut summary = String::new();
+            summary.push_str("# Summary of failed CI checks\n");
+            for failed_check in self.failed {
+                summary.push_str(&format!("* {failed_check}\n"));
+            }
+            println!("{summary}");
+            write_summary(&summary);
+            bail!("CI checks failed");
+        }
+
+        Ok(())
+    }
+}
+
+fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     println!("::add-matcher::.github/rust-matchers.json");
 
-    let mut failed = Vec::new();
-    let started_at = Instant::now();
+    let mut runner = Runner::new();
 
-    // Clippy and docs checks
+    runner.run("Lint", || {
+        lint_packages(
+            workspace,
+            LintPackagesArgs {
+                packages: Package::iter().collect(),
+                chips: vec![args.chip],
+                fix: false,
+                toolchain: args.toolchain.clone(),
+            },
+        )
+    });
 
-    // Clippy
-    println!("::group::Lint");
-    lint_packages(
-        workspace,
-        LintPackagesArgs {
-            packages: Package::iter().collect(),
-            chips: vec![args.chip],
-            fix: false,
-            toolchain: args.toolchain.clone(),
-        },
-    )
-    .inspect_err(|_| failed.push("Lint"))
-    .ok();
-    println!("::endgroup");
+    runner.run("Run Doc Test", || {
+        run_doc_tests(
+            workspace,
+            DocTestArgs {
+                package: Package::EspHal,
+                chip: args.chip,
+            },
+        )
+    });
 
-    // Check doc-tests
-    println!("::group::Doc Test");
-    run_doc_tests(
-        workspace,
-        DocTestArgs {
-            package: Package::EspHal,
-            chip: args.chip,
-        },
-    )
-    .inspect_err(|_| failed.push("Doc Test"))
-    .ok();
-    println!("::endgroup");
-
-    // Check documentation
-    println!("::group::Build Docs");
-    build_documentation(
-        workspace,
-        BuildDocumentationArgs {
-            packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
-            chips: vec![args.chip],
-            ..Default::default()
-        },
-    )
-    .inspect_err(|_| failed.push("Build Docs"))
-    .ok();
-    println!("::endgroup");
+    runner.run("Build Docs", || {
+        build_documentation(
+            workspace,
+            BuildDocumentationArgs {
+                packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
+                chips: vec![args.chip],
+                ..Default::default()
+            },
+        )
+    });
 
     // for chips with esp-lp-hal: Build all supported examples for the low-power
     // core first
@@ -372,137 +404,112 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // `examples` copies the examples to a folder with the chip name as the last
         // path element then we copy it to the place where the HP core example
         // expects it
-        println!("::group::Build LP-HAL Examples");
-        examples(
-            workspace,
-            ExamplesArgs {
-                package: Package::EspLpHal,
-                chip: Some(args.chip),
-                example: Some("all".to_string()),
-                debug: false,
-                toolchain: args.toolchain.clone(),
-                timings: false,
-            },
-            CargoAction::Build(Some(PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
-                args.chip.target()
-            )))),
-        )
-        .inspect_err(|_| failed.push("Build LP-HAL Examples"))
-        .and_then(|_| {
-            let from_dir = PathBuf::from(format!(
+        runner.run("Build LP-HAL Examples", || {
+            let result = examples(
+                workspace,
+                ExamplesArgs {
+                    package: Package::EspLpHal,
+                    chip: Some(args.chip),
+                    example: Some("all".to_string()),
+                    debug: false,
+                    toolchain: args.toolchain.clone(),
+                    timings: false,
+                },
+                CargoAction::Build(Some(PathBuf::from(format!(
+                    "./esp-lp-hal/target/{}/release/examples",
+                    args.chip.target()
+                )))),
+            )
+            .and_then(|_| {
+                let from_dir = PathBuf::from(format!(
+                    "./esp-lp-hal/target/{}/release/examples/{}",
+                    args.chip.target(),
+                    args.chip
+                ));
+                let to_dir = PathBuf::from(format!(
+                    "./esp-lp-hal/target/{}/release/examples",
+                    args.chip.target()
+                ));
+                from_dir.read_dir()?.for_each(|entry| {
+                    let entry = entry.unwrap();
+                    let path = entry.path();
+                    let to = to_dir.join(entry.file_name());
+                    fs::copy(path, to).expect("Failed to copy file");
+                });
+                Ok(())
+            });
+
+            // remove the (now) obsolete duplicates
+            std::fs::remove_dir_all(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
                 args.chip.target(),
                 args.chip
-            ));
-            let to_dir = PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples",
-                args.chip.target()
-            ));
-            from_dir.read_dir()?.for_each(|entry| {
-                let entry = entry.unwrap();
-                let path = entry.path();
-                let to = to_dir.join(entry.file_name());
-                fs::copy(path, to).expect("Failed to copy file");
-            });
-            Ok(())
-        })
-        .ok();
+            )))?;
 
-        // remove the (now) obsolete duplicates
-        std::fs::remove_dir_all(PathBuf::from(format!(
-            "./esp-lp-hal/target/{}/release/examples/{}",
-            args.chip.target(),
-            args.chip
-        )))?;
-        println!("::endgroup");
+            result
+        });
 
         // Check documentation
-        println!("::group::Build LP-HAL docs");
-        build_documentation(
-            workspace,
-            BuildDocumentationArgs {
-                packages: vec![Package::EspLpHal],
-                chips: vec![args.chip],
-                ..Default::default()
-            },
-        )
-        .inspect_err(|_| failed.push("Build LP-HAL docs"))
-        .ok();
-        println!("::endgroup");
+        runner.run("Build LP-HAL docs", || {
+            build_documentation(
+                workspace,
+                BuildDocumentationArgs {
+                    packages: vec![Package::EspLpHal],
+                    chips: vec![args.chip],
+                    ..Default::default()
+                },
+            )
+        });
     }
 
     // Make sure we're able to build the HAL without the default features enabled
-    println!("::group::Build HAL");
-    build_package(
-        workspace,
-        BuildPackageArgs {
-            package: Package::EspHal,
-            target: Some(args.chip.target().to_string()),
-            features: vec![args.chip.to_string()],
-            no_default_features: true,
-            toolchain: args.toolchain.clone(),
-        },
-    )
-    .inspect_err(|_| failed.push("Build HAL"))
-    .ok();
-    println!("::endgroup");
+    runner.run("Build HAL", || {
+        build_package(
+            workspace,
+            BuildPackageArgs {
+                package: Package::EspHal,
+                target: Some(args.chip.target().to_string()),
+                features: vec![args.chip.to_string()],
+                no_default_features: true,
+                toolchain: args.toolchain.clone(),
+            },
+        )
+    });
 
-    // Build (examples)
-    println!("::group::Build examples");
+    runner.run("Build examples", || {
+        // The `ota_example` expects a file named `examples/target/ota_image` - it
+        // doesn't care about the contents however
+        std::fs::create_dir_all("./examples/target")?;
+        std::fs::write("./examples/target/ota_image", "DUMMY")?;
 
-    // The `ota_example` expects a file named `examples/target/ota_image` - it
-    // doesn't care about the contents however
-    std::fs::create_dir_all("./examples/target")?;
-    std::fs::write("./examples/target/ota_image", "DUMMY")?;
+        examples(
+            workspace,
+            ExamplesArgs {
+                package: Package::Examples,
+                chip: Some(args.chip),
+                example: Some("all".to_string()),
+                debug: true,
+                toolchain: args.toolchain.clone(),
+                timings: false,
+            },
+            CargoAction::Build(None),
+        )
+    });
 
-    examples(
-        workspace,
-        ExamplesArgs {
-            package: Package::Examples,
-            chip: Some(args.chip),
-            example: Some("all".to_string()),
-            debug: true,
-            toolchain: args.toolchain.clone(),
-            timings: false,
-        },
-        CargoAction::Build(None),
-    )
-    .inspect_err(|_| failed.push("Build examples"))
-    .ok();
-    println!("::endgroup");
+    runner.run("Build qa-test", || {
+        examples(
+            workspace,
+            ExamplesArgs {
+                package: Package::QaTest,
+                chip: Some(args.chip),
+                example: Some("all".to_string()),
+                debug: true,
+                toolchain: args.toolchain.clone(),
+                timings: false,
+            },
+            CargoAction::Build(None),
+        )
+    });
 
-    // Build (qa-test)
-    println!("::group::Build qa-test");
-    examples(
-        workspace,
-        ExamplesArgs {
-            package: Package::QaTest,
-            chip: Some(args.chip),
-            example: Some("all".to_string()),
-            debug: true,
-            toolchain: args.toolchain.clone(),
-            timings: false,
-        },
-        CargoAction::Build(None),
-    )
-    .inspect_err(|_| failed.push("Build qa-test"))
-    .ok();
-    println!("::endgroup");
-
-    let completed_at = Instant::now();
-    log::info!("CI checks completed in {:?}", completed_at - started_at);
-
-    if !failed.is_empty() {
-        let mut summary = String::new();
-        summary.push_str("# Summary of failed CI checks\n");
-        for failed_check in failed {
-            summary.push_str(&format!("* {failed_check}\n"));
-        }
-        println!("{summary}");
-        write_summary(&summary);
-        bail!("CI checks failed");
-    }
-
-    Ok(())
+    runner.finish()
 }

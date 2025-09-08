@@ -32,7 +32,7 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
     Controller,
-    wifi::{AccessPointConfig, Config, WifiController, WifiDevice, WifiEvent, WifiState},
+    wifi::{AccessPointConfig, Config, WifiApState, WifiController, WifiDevice, WifiEvent},
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -240,8 +240,8 @@ async fn connection(mut controller: WifiController<'static>) {
     println!("start connection task");
     println!("Device capabilities: {:?}", controller.capabilities());
     loop {
-        match esp_radio::wifi::wifi_state() {
-            WifiState::ApStarted => {
+        match esp_radio::wifi::ap_state() {
+            WifiApState::Started => {
                 // wait until we're no longer connected
                 controller.wait_for_event(WifiEvent::ApStop).await;
                 Timer::after(Duration::from_millis(5000)).await

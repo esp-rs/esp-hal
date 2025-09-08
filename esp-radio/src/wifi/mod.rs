@@ -10,7 +10,6 @@ use alloc::{collections::vec_deque::VecDeque, string::String};
 use core::{
     fmt::Debug,
     marker::PhantomData,
-    mem,
     mem::MaybeUninit,
     ptr::addr_of,
     task::Poll,
@@ -18,6 +17,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
+use esp_config::{esp_config_int, esp_config_str};
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
@@ -75,13 +75,12 @@ pub use state::*;
 use crate::{
     Controller,
     common_adapter::*,
-    config::PowerSaveMode,
     esp_wifi_result,
     hal::ram,
     wifi::private::PacketBuffer,
 };
 
-const MTU: usize = crate::CONFIG.mtu;
+const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU");
 
 #[cfg(all(feature = "csi", esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
@@ -212,10 +211,9 @@ pub enum Protocol {
 }
 
 /// Secondary Wi-Fi channels.
-#[derive(Clone, Debug, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(Default)]
 pub enum SecondaryChannel {
     // TODO: Need to extend that for 5GHz
     /// No secondary channel (default).
@@ -305,7 +303,6 @@ pub struct AccessPointInfo {
 /// Configuration for a Wi-Fi access point.
 #[derive(BuilderLite, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[non_exhaustive]
 pub struct AccessPointConfig {
     /// The SSID of the access point.
     #[builder_lite(reference)]
@@ -332,6 +329,8 @@ pub struct AccessPointConfig {
 
     /// The maximum number of connections allowed on the access point.
     max_connections: u16,
+    /// Dtim period of the access point (Range: 1 ~ 10).
+    dtim_period: u8,
 }
 
 impl AccessPointConfig {
@@ -341,6 +340,10 @@ impl AccessPointConfig {
         }
 
         if self.password.len() > 64 {
+            return Err(WifiError::InvalidArguments);
+        }
+
+        if !(1..=10).contains(&self.dtim_period) {
             return Err(WifiError::InvalidArguments);
         }
 
@@ -359,6 +362,7 @@ impl Default for AccessPointConfig {
             auth_method: AuthMethod::None,
             password: String::new(),
             max_connections: 255,
+            dtim_period: 2,
         }
     }
 }
@@ -425,7 +429,6 @@ impl defmt::Format for AccessPointConfig {
 /// Client configuration for a Wi-Fi connection.
 #[derive(BuilderLite, Clone, Default, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[non_exhaustive]
 pub struct ClientConfig {
     /// The SSID of the Wi-Fi network.
     #[builder_lite(reference)]
@@ -434,7 +437,6 @@ pub struct ClientConfig {
     /// The BSSID (MAC address) of the client.
     bssid: Option<[u8; 6]>,
 
-    // pub protocol: Protocol,
     /// The authentication method for the Wi-Fi connection.
     auth_method: AuthMethod,
 
@@ -733,7 +735,7 @@ pub enum Capability {
 
     /// The device can operate in both client and access point modes
     /// simultaneously.
-    Mixed,
+    ApSta,
 }
 
 /// Configuration of Wi-Fi operation mode.
@@ -754,7 +756,7 @@ pub enum Config {
     AccessPoint(AccessPointConfig),
 
     /// Simultaneous client and access point configuration.
-    Mixed(ClientConfig, AccessPointConfig),
+    ApSta(ClientConfig, AccessPointConfig),
 
     /// EAP client configuration for enterprise Wi-Fi.
     #[cfg(feature = "wifi-eap")]
@@ -770,106 +772,12 @@ impl Config {
             Config::AccessPoint(access_point_configuration) => {
                 access_point_configuration.validate()
             }
-            Config::Mixed(client_configuration, access_point_configuration) => {
+            Config::ApSta(client_configuration, access_point_configuration) => {
                 client_configuration.validate()?;
                 access_point_configuration.validate()
             }
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(eap_client_configuration) => eap_client_configuration.validate(),
-        }
-    }
-
-    /// Returns a reference to the client configuration if available.
-    pub fn as_client_conf_ref(&self) -> Option<&ClientConfig> {
-        match self {
-            Self::Client(client_conf) => Some(client_conf),
-            Self::Mixed(client_conf, _) => Some(client_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a reference to the access point configuration if available.
-    pub fn as_ap_conf_ref(&self) -> Option<&AccessPointConfig> {
-        match self {
-            Self::AccessPoint(ap_conf) => Some(ap_conf),
-            Self::Mixed(_, ap_conf) => Some(ap_conf),
-            _ => None,
-        }
-    }
-
-    /// Returns a mutable reference to the client configuration, creating it if
-    /// necessary.
-    pub fn as_client_conf_mut(&mut self) -> &mut ClientConfig {
-        match self {
-            Self::Client(client_conf) => client_conf,
-            Self::Mixed(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Mixed(client_conf, _) => {
-                        *self = Self::Client(client_conf);
-                        self.as_client_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::Client(Default::default());
-                self.as_client_conf_mut()
-            }
-        }
-    }
-
-    /// Returns a mutable reference to the access point configuration, creating
-    /// it if necessary.
-    pub fn as_ap_conf_mut(&mut self) -> &mut AccessPointConfig {
-        match self {
-            Self::AccessPoint(ap_conf) => ap_conf,
-            Self::Mixed(_, _) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Mixed(_, ap_conf) => {
-                        *self = Self::AccessPoint(ap_conf);
-                        self.as_ap_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::AccessPoint(Default::default());
-                self.as_ap_conf_mut()
-            }
-        }
-    }
-
-    /// Retrieves mutable references to both the `ClientConfig`
-    /// and `AccessPointConfig`.
-    pub fn as_mixed_conf_mut(&mut self) -> (&mut ClientConfig, &mut AccessPointConfig) {
-        match self {
-            Self::Mixed(client_conf, ap_conf) => (client_conf, ap_conf),
-            Self::AccessPoint(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::AccessPoint(ap_conf) => {
-                        *self = Self::Mixed(Default::default(), ap_conf);
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            Self::Client(_) => {
-                let prev = mem::replace(self, Self::None);
-                match prev {
-                    Self::Client(client_conf) => {
-                        *self = Self::Mixed(client_conf, Default::default());
-                        self.as_mixed_conf_mut()
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => {
-                *self = Self::Mixed(Default::default(), Default::default());
-                self.as_mixed_conf_mut()
-            }
         }
     }
 }
@@ -958,7 +866,7 @@ impl TryFrom<&Config> for WifiMode {
             Config::None => return Err(WifiError::UnknownWifiMode),
             Config::AccessPoint(_) => Self::Ap,
             Config::Client(_) => Self::Sta,
-            Config::Mixed(_, _) => Self::ApSta,
+            Config::ApSta(_, _) => Self::ApSta,
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(_) => Self::Sta,
         };
@@ -1179,8 +1087,8 @@ impl CsiConfig {
     }
 }
 
-const RX_QUEUE_SIZE: usize = crate::CONFIG.rx_queue_size;
-const TX_QUEUE_SIZE: usize = crate::CONFIG.tx_queue_size;
+const RX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE");
+const TX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE");
 
 pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
@@ -1599,13 +1507,13 @@ pub(crate) fn wifi_start() -> Result<(), WifiError> {
         if mode.is_ap() {
             esp_wifi_result!(include::esp_wifi_set_inactive_time(
                 wifi_interface_t_WIFI_IF_AP,
-                crate::CONFIG.ap_beacon_timeout
+                esp_config_int!(u16, "ESP_RADIO_CONFIG_AP_BEACON_TIMEOUT")
             ))?;
         }
         if mode.is_sta() {
             esp_wifi_result!(include::esp_wifi_set_inactive_time(
                 wifi_interface_t_WIFI_IF_STA,
-                crate::CONFIG.beacon_timeout
+                esp_config_int!(u16, "ESP_RADIO_CONFIG_BEACON_TIMEOUT")
             ))?;
         };
     }
@@ -1678,25 +1586,25 @@ pub struct ScanConfig<'a> {
     /// If [`None`] is passed, all SSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given SSID will be
     /// returned.
-    pub ssid: Option<&'a str>,
+    ssid: Option<&'a str>,
     /// BSSID to filter for.
     /// If [`None`] is passed, all BSSIDs will be returned.
     /// If [`Some`] is passed, only the APs matching the given BSSID will be
     /// returned.
-    pub bssid: Option<[u8; 6]>,
+    bssid: Option<[u8; 6]>,
     /// Channel to filter for.
     /// If [`None`] is passed, all channels will be returned.
     /// If [`Some`] is passed, only the APs on the given channel will be
     /// returned.
-    pub channel: Option<u8>,
+    channel: Option<u8>,
     /// Whether to show hidden networks.
-    pub show_hidden: bool,
+    show_hidden: bool,
     /// Scan type, active or passive.
-    pub scan_type: ScanTypeConfig,
+    scan_type: ScanTypeConfig,
     /// The maximum number of networks to return when scanning.
     /// If [`None`] is passed, all networks will be returned.
     /// If [`Some`] is passed, the specified number of networks will be returned.
-    pub max: Option<usize>,
+    max: Option<usize>,
 }
 
 pub(crate) fn wifi_start_scan(
@@ -1831,6 +1739,7 @@ impl WifiDeviceMode {
 
     fn tx_token(&self) -> Option<WifiTxToken> {
         if !self.can_send() {
+            // TODO: perhaps we can use a counting semaphore with a short blocking timeout
             crate::preempt::yield_task();
         }
 
@@ -1844,6 +1753,7 @@ impl WifiDeviceMode {
     fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
         let is_empty = self.data_queue_rx().with(|q| q.is_empty());
         if is_empty || !self.can_send() {
+            // TODO: use an OS queue with a short timeout
             crate::preempt::yield_task();
         }
 
@@ -1884,14 +1794,14 @@ impl WifiDeviceMode {
     fn link_state(&self) -> embassy_net_driver::LinkState {
         match self {
             WifiDeviceMode::Sta => {
-                if matches!(sta_state(), WifiState::StaConnected) {
+                if matches!(sta_state(), WifiStaState::Connected) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
                 }
             }
             WifiDeviceMode::Ap => {
-                if matches!(ap_state(), WifiState::ApStarted) {
+                if matches!(ap_state(), WifiApState::Started) {
                     embassy_net_driver::LinkState::Up
                 } else {
                     embassy_net_driver::LinkState::Down
@@ -2254,10 +2164,10 @@ impl Device for WifiDevice<'_> {
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
+        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0 {
             None
         } else {
-            Some(crate::CONFIG.max_burst_size)
+            Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
         };
         caps
     }
@@ -2388,7 +2298,7 @@ fn apply_ap_config(config: &AccessPointConfig) -> Result<(), WifiError> {
             },
             sae_pwe_h2e: 0,
             csa_count: 3,
-            dtim_period: 2,
+            dtim_period: config.dtim_period,
         },
     };
 
@@ -2410,11 +2320,11 @@ fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
         sta: wifi_sta_config_t {
             ssid: [0; 32],
             password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
+            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
             bssid_set: config.bssid.is_some(),
             bssid: config.bssid.unwrap_or_default(),
             channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
+            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
             sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
@@ -2427,7 +2337,7 @@ fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
             sae_pwe_h2e: 3,
             _bitfield_align_1: [0; 0],
             _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
+            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
             _bitfield_align_2: [0; 0],
             _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
             sae_pk_mode: 0, // ??
@@ -2453,11 +2363,11 @@ fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
         sta: wifi_sta_config_t {
             ssid: [0; 32],
             password: [0; 64],
-            scan_method: crate::CONFIG.scan_method,
+            scan_method: esp_config_int!(u32, "ESP_RADIO_CONFIG_SCAN_METHOD"),
             bssid_set: config.bssid.is_some(),
             bssid: config.bssid.unwrap_or_default(),
             channel: config.channel.unwrap_or(0),
-            listen_interval: crate::CONFIG.listen_interval,
+            listen_interval: esp_config_int!(u16, "ESP_RADIO_CONFIG_LISTEN_INTERVAL"),
             sort_method: wifi_sort_method_t_WIFI_CONNECT_AP_BY_SIGNAL,
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
@@ -2470,7 +2380,7 @@ fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
             sae_pwe_h2e: 3,
             _bitfield_align_1: [0; 0],
             _bitfield_1: __BindgenBitfieldUnit::new([0; 4]),
-            failure_retry_cnt: crate::CONFIG.failure_retry_cnt,
+            failure_retry_cnt: esp_config_int!(u8, "ESP_RADIO_CONFIG_FAILURE_RETRY_CNT"),
             _bitfield_align_2: [0; 0],
             _bitfield_2: __BindgenBitfieldUnit::new([0; 4]),
             sae_pk_mode: 0, // ??
@@ -2675,10 +2585,11 @@ pub(crate) mod embassy {
         fn capabilities(&self) -> Capabilities {
             let mut caps = Capabilities::default();
             caps.max_transmission_unit = MTU;
-            caps.max_burst_size = if crate::CONFIG.max_burst_size == 0 {
+            caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0
+            {
                 None
             } else {
-                Some(crate::CONFIG.max_burst_size)
+                Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
             };
             caps
         }
@@ -2689,8 +2600,28 @@ pub(crate) mod embassy {
     }
 }
 
+/// Power saving mode settings for the modem.
+#[non_exhaustive]
+#[derive(Default)]
+pub enum PowerSaveMode {
+    /// No power saving.
+    #[default]
+    None,
+    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM period.
+    Minimum,
+    /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
+    /// `ESP_RADIO_CONFIG_LISTEN_INTERVAL` config option.
+    Maximum,
+}
+
 pub(crate) fn apply_power_saving(ps: PowerSaveMode) -> Result<(), WifiError> {
-    esp_wifi_result!(unsafe { esp_wifi_sys::include::esp_wifi_set_ps(ps.into()) })?;
+    esp_wifi_result!(unsafe {
+        esp_wifi_sys::include::esp_wifi_set_ps(match ps {
+            PowerSaveMode::None => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_NONE,
+            PowerSaveMode::Minimum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MIN_MODEM,
+            PowerSaveMode::Maximum => esp_wifi_sys::include::wifi_ps_type_t_WIFI_PS_MAX_MODEM,
+        })
+    })?;
     Ok(())
 }
 
@@ -2740,17 +2671,12 @@ pub fn new<'d>(
         return Err(WifiError::Unsupported);
     }
 
-    let mut controller = WifiController {
-        _phantom: Default::default(),
-    };
-
     crate::wifi::wifi_init()?;
 
     let mut cntry_code = [0u8; 3];
-    cntry_code[..crate::CONFIG.country_code.len()]
-        .copy_from_slice(crate::CONFIG.country_code.as_bytes());
-    cntry_code[2] = crate::CONFIG.country_code_operating_class;
-
+    cntry_code[..esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").len()]
+        .copy_from_slice(esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").as_bytes());
+    cntry_code[2] = esp_config_int!(u8, "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS");
     unsafe {
         let country = wifi_country_t {
             cc: cntry_code,
@@ -2764,6 +2690,12 @@ pub fn new<'d>(
 
     // At some point the "High-speed ADC" entropy source became available.
     unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+
+    // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
+    // function will cause panic because WifiController::drop tries to disable the TRNG.
+    let mut controller = WifiController {
+        _phantom: Default::default(),
+    };
 
     controller.set_power_saving(PowerSaveMode::default())?;
 
@@ -2957,7 +2889,7 @@ impl WifiController<'_> {
     /// Get the supported capabilities of the controller.
     pub fn capabilities(&self) -> Result<EnumSet<crate::wifi::Capability>, WifiError> {
         let caps =
-            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::Mixed };
+            enumset::enum_set! { Capability::Client | Capability::AccessPoint | Capability::ApSta };
 
         Ok(caps)
     }
@@ -2978,7 +2910,7 @@ impl WifiController<'_> {
             Config::None => wifi_mode_t_WIFI_MODE_NULL,
             Config::Client(_) => wifi_mode_t_WIFI_MODE_STA,
             Config::AccessPoint(_) => wifi_mode_t_WIFI_MODE_AP,
-            Config::Mixed(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
+            Config::ApSta(_, _) => wifi_mode_t_WIFI_MODE_APSTA,
             #[cfg(feature = "wifi-eap")]
             Config::EapClient(_) => wifi_mode_t_WIFI_MODE_STA,
         };
@@ -2989,7 +2921,7 @@ impl WifiController<'_> {
             Config::None => Ok::<(), WifiError>(()),
             Config::Client(config) => apply_sta_config(config),
             Config::AccessPoint(config) => apply_ap_config(config),
-            Config::Mixed(sta_config, ap_config) => {
+            Config::ApSta(sta_config, ap_config) => {
                 apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
             }
             #[cfg(feature = "wifi-eap")]
@@ -3025,18 +2957,18 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_disconnect() })
     }
 
-    /// Checks if the Wi-Fi controller has started.
+    /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.
     ///
     /// This function should be called after the `start` method to verify if the
     /// Wi-Fi has started successfully.
     pub fn is_started(&self) -> Result<bool, WifiError> {
         if matches!(
             crate::wifi::sta_state(),
-            WifiState::StaStarted | WifiState::StaConnected | WifiState::StaDisconnected
+            WifiStaState::Started | WifiStaState::Connected | WifiStaState::Disconnected
         ) {
             return Ok(true);
         }
-        if matches!(crate::wifi::ap_state(), WifiState::ApStarted) {
+        if matches!(crate::wifi::ap_state(), WifiApState::Started) {
             return Ok(true);
         }
         Ok(false)
@@ -3048,8 +2980,8 @@ impl WifiController<'_> {
     /// the connection was successful.
     pub fn is_connected(&self) -> Result<bool, WifiError> {
         match crate::wifi::sta_state() {
-            crate::wifi::WifiState::StaConnected => Ok(true),
-            crate::wifi::WifiState::StaDisconnected => Err(WifiError::Disconnected),
+            crate::wifi::WifiStaState::Connected => Ok(true),
+            crate::wifi::WifiStaState::Disconnected => Err(WifiError::Disconnected),
             // FIXME: Should any other enum value trigger an error instead of returning false?
             _ => Ok(false),
         }

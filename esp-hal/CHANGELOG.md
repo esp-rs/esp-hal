@@ -25,7 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
 - ESP32-S3: Expose more `Camera` config options (#3996)
+- ESP32-S3: Add RtcI2c driver (#0000)
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
+- I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
 
 ### Changed
 
@@ -52,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcSlowClock::RtcFastClock8m` has been renamed to `RtcFastClock::RtcFastClockRcFast` (#3993)
 - `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
 - The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
+- ESP32-S2: `i2s::master::DataFormat` now includes 8-bit and 24-bit data widths (#3985)
+- Bump `embassy-embedded-hal` to v0.5.0 (#4075)
 
 ### Fixed
 
@@ -72,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AesFlavour` trait and `AesX` structs have been removed. (#3880)
 - `Xtal::Other` has been removed (#3983)
 - ESP32-C3/S3: removed the UHCI1 peripheral singleton (#4007)
+- `i2s::master::Standard` has been removed (#3985)
 
 ## [v1.0.0-rc.0] - 2025-07-16
 

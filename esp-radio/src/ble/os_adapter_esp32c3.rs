@@ -33,12 +33,12 @@ pub(super) struct osi_funcs_s {
     mutex_delete: Option<unsafe extern "C" fn(*const ())>,
     mutex_lock: Option<unsafe extern "C" fn(*const ()) -> i32>,
     mutex_unlock: Option<unsafe extern "C" fn(*const ()) -> i32>,
-    queue_create: Option<unsafe extern "C" fn(u32, u32) -> *const ()>,
-    queue_delete: Option<unsafe extern "C" fn(*const ())>,
-    queue_send: Option<unsafe extern "C" fn(*const (), *const (), u32) -> i32>,
-    queue_send_from_isr: Option<unsafe extern "C" fn(*const (), *const (), *const ()) -> i32>,
-    queue_recv: Option<unsafe extern "C" fn(*const (), *const (), u32) -> i32>,
-    queue_recv_from_isr: Option<unsafe extern "C" fn(*const (), *const (), *const ()) -> i32>,
+    queue_create: Option<unsafe extern "C" fn(u32, u32) -> *mut c_void>,
+    queue_delete: Option<unsafe extern "C" fn(*mut c_void)>,
+    queue_send: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, u32) -> i32>,
+    queue_send_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> i32>,
+    queue_recv: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, u32) -> i32>,
+    queue_recv_from_isr: Option<unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void) -> i32>,
     task_create: Option<
         unsafe extern "C" fn(
             *mut c_void,

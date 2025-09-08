@@ -7,28 +7,17 @@
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
-use core::ptr::addr_of_mut;
-
+use allocator_api2::boxed::Box;
 use enumset::EnumSet;
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 use super::WifiEvent;
 use crate::{
+    binary::c_types::*,
     compat::{
-        common::{
-            ConcurrentQueue,
-            create_queue,
-            create_recursive_mutex,
-            delete_queue,
-            lock_mutex,
-            number_of_messages_in_queue,
-            receive_queued,
-            send_queued,
-            str_from_c,
-            thread_sem_get,
-            unlock_mutex,
-        },
-        malloc::calloc_internal,
+        OSI_FUNCS_TIME_BLOCKING,
+        common::{str_from_c, thread_sem_get},
+        malloc::{InternalMemory, calloc_internal},
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
@@ -36,8 +25,6 @@ use crate::{
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
-
-static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
@@ -101,10 +88,8 @@ pub unsafe extern "C" fn clear_intr(intr_source: u32, intr_num: u32) {
     trace!("clear_intr called {} {}", intr_source, intr_num);
 }
 
-pub static mut ISR_INTERRUPT_1: (
-    *mut crate::binary::c_types::c_void,
-    *mut crate::binary::c_types::c_void,
-) = (core::ptr::null_mut(), core::ptr::null_mut());
+pub static mut ISR_INTERRUPT_1: (*mut c_void, *mut c_void) =
+    (core::ptr::null_mut(), core::ptr::null_mut());
 
 /// **************************************************************************
 /// Name: esp32c3_ints_on
@@ -174,11 +159,11 @@ pub unsafe extern "C" fn is_from_isr() -> bool {
 ///   Spin lock data pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn spin_lock_create() -> *mut c_void {
     let ptr = crate::compat::semaphore::sem_create(1, 1);
 
     trace!("spin_lock_create {:?}", ptr);
-    ptr as *mut crate::binary::c_types::c_void
+    ptr as *mut c_void
 }
 
 /// **************************************************************************
@@ -194,7 +179,7 @@ pub unsafe extern "C" fn spin_lock_create() -> *mut crate::binary::c_types::c_vo
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn spin_lock_delete(lock: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn spin_lock_delete(lock: *mut c_void) {
     trace!("spin_lock_delete {:?}", lock);
 
     crate::compat::semaphore::sem_delete(lock);
@@ -214,9 +199,7 @@ pub unsafe extern "C" fn spin_lock_delete(lock: *mut crate::binary::c_types::c_v
 ///   CPU PS value.
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_int_disable(
-    _wifi_int_mux: *mut crate::binary::c_types::c_void,
-) -> u32 {
+pub unsafe extern "C" fn wifi_int_disable(_wifi_int_mux: *mut c_void) -> u32 {
     trace!("wifi_int_disable");
     // TODO: can we use wifi_int_mux?
     let token = unsafe { WIFI_LOCK.acquire() };
@@ -238,10 +221,7 @@ pub unsafe extern "C" fn wifi_int_disable(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_int_restore(
-    _wifi_int_mux: *mut crate::binary::c_types::c_void,
-    tmp: u32,
-) {
+pub unsafe extern "C" fn wifi_int_restore(_wifi_int_mux: *mut c_void, tmp: u32) {
     trace!("wifi_int_restore");
     let token = unsafe { core::mem::transmute::<u32, esp_sync::RestoreState>(tmp) };
     unsafe { WIFI_LOCK.release(token) }
@@ -279,7 +259,7 @@ pub unsafe extern "C" fn task_yield_from_isr() {
 ///   Semaphore data pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_thread_semphr_get() -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_thread_semphr_get() -> *mut c_void {
     thread_sem_get()
 }
 
@@ -296,8 +276,8 @@ pub unsafe extern "C" fn wifi_thread_semphr_get() -> *mut crate::binary::c_types
 ///   Mutex data pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn mutex_create() -> *mut crate::binary::c_types::c_void {
-    todo!("mutex_create")
+pub unsafe extern "C" fn mutex_create() -> *mut c_void {
+    crate::compat::mutex::mutex_create(false)
 }
 
 /// **************************************************************************
@@ -313,8 +293,8 @@ pub unsafe extern "C" fn mutex_create() -> *mut crate::binary::c_types::c_void {
 ///   Recursive mutex data pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn recursive_mutex_create() -> *mut crate::binary::c_types::c_void {
-    create_recursive_mutex()
+pub unsafe extern "C" fn recursive_mutex_create() -> *mut c_void {
+    crate::compat::mutex::mutex_create(true)
 }
 
 /// **************************************************************************
@@ -330,8 +310,8 @@ pub unsafe extern "C" fn recursive_mutex_create() -> *mut crate::binary::c_types
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn mutex_delete(mutex: *mut crate::binary::c_types::c_void) {
-    crate::compat::common::mutex_delete(mutex);
+pub unsafe extern "C" fn mutex_delete(mutex: *mut c_void) {
+    crate::compat::mutex::mutex_delete(mutex);
 }
 
 /// **************************************************************************
@@ -347,8 +327,8 @@ pub unsafe extern "C" fn mutex_delete(mutex: *mut crate::binary::c_types::c_void
 ///   True if success or false if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn mutex_lock(mutex: *mut crate::binary::c_types::c_void) -> i32 {
-    lock_mutex(mutex)
+pub unsafe extern "C" fn mutex_lock(mutex: *mut c_void) -> i32 {
+    crate::compat::mutex::mutex_lock(mutex, OSI_FUNCS_TIME_BLOCKING)
 }
 
 /// **************************************************************************
@@ -364,192 +344,8 @@ pub unsafe extern "C" fn mutex_lock(mutex: *mut crate::binary::c_types::c_void) 
 ///   True if success or false if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn mutex_unlock(mutex: *mut crate::binary::c_types::c_void) -> i32 {
-    unlock_mutex(mutex)
-}
-
-/// **************************************************************************
-/// Name: esp_queue_create
-///
-/// Description:
-///   Create message queue
-///
-/// Input Parameters:
-///   queue_len - queue message number
-///   item_size - message size
-///
-/// Returned Value:
-///   Message queue data pointer
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_create(
-    queue_len: u32,
-    item_size: u32,
-) -> *mut crate::binary::c_types::c_void {
-    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
-    // version - JIRA: WIFI-6676
-    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
-        (queue_len, item_size)
-    } else {
-        warn!("Fixing queue item_size");
-        (3, 8)
-    };
-
-    create_queue(queue_len as i32, item_size as i32).cast()
-}
-
-/// **************************************************************************
-/// Name: esp_queue_delete
-///
-/// Description:
-///   Delete message queue
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///
-/// Returned Value:
-///   None
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_delete(queue: *mut crate::binary::c_types::c_void) {
-    delete_queue(queue.cast());
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send
-///
-/// Description:
-///   Send message of low priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send(
-    queue: *mut crate::binary::c_types::c_void,
-    item: *mut crate::binary::c_types::c_void,
-    block_time_tick: u32,
-) -> i32 {
-    send_queued(queue.cast(), item, block_time_tick)
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_from_isr
-///
-/// Description:
-///   Send message of low priority to queue in ISR within
-///   a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   hptw  - No mean
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_from_isr(
-    queue: *mut crate::binary::c_types::c_void,
-    item: *mut crate::binary::c_types::c_void,
-    _hptw: *mut crate::binary::c_types::c_void,
-) -> i32 {
-    trace!("queue_send_from_isr");
-    unsafe {
-        *(_hptw as *mut u32) = 1;
-        queue_send(queue, item, 1000)
-    }
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_to_back
-///
-/// Description:
-///   Send message of low priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_to_back(
-    _queue: *mut crate::binary::c_types::c_void,
-    _item: *mut crate::binary::c_types::c_void,
-    _block_time_tick: u32,
-) -> i32 {
-    todo!("queue_send_to_back")
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_from_to_front
-///
-/// Description:
-///   Send message of high priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_to_front(
-    _queue: *mut crate::binary::c_types::c_void,
-    _item: *mut crate::binary::c_types::c_void,
-    _block_time_tick: u32,
-) -> i32 {
-    todo!("queue_send_to_front")
-}
-
-/// **************************************************************************
-/// Name: esp_queue_recv
-///
-/// Description:
-///   Receive message from queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_recv(
-    queue: *mut crate::binary::c_types::c_void,
-    item: *mut crate::binary::c_types::c_void,
-    block_time_tick: u32,
-) -> i32 {
-    receive_queued(queue.cast(), item, block_time_tick)
-}
-
-/// **************************************************************************
-/// Name: esp_queue_msg_waiting
-///
-/// Description:
-///   Get message number in the message queue
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///
-/// Returned Value:
-///   Message number
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_msg_waiting(queue: *mut crate::binary::c_types::c_void) -> u32 {
-    number_of_messages_in_queue(queue.cast())
+pub unsafe extern "C" fn mutex_unlock(mutex: *mut c_void) -> i32 {
+    crate::compat::mutex::mutex_unlock(mutex)
 }
 
 /// **************************************************************************
@@ -559,7 +355,7 @@ pub unsafe extern "C" fn queue_msg_waiting(queue: *mut crate::binary::c_types::c
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn event_group_create() -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn event_group_create() -> *mut c_void {
     todo!("event_group_create")
 }
 
@@ -570,7 +366,7 @@ pub unsafe extern "C" fn event_group_create() -> *mut crate::binary::c_types::c_
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn event_group_delete(_event: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn event_group_delete(_event: *mut c_void) {
     todo!("event_group_delete")
 }
 
@@ -581,10 +377,7 @@ pub unsafe extern "C" fn event_group_delete(_event: *mut crate::binary::c_types:
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn event_group_set_bits(
-    _event: *mut crate::binary::c_types::c_void,
-    _bits: u32,
-) -> u32 {
+pub unsafe extern "C" fn event_group_set_bits(_event: *mut c_void, _bits: u32) -> u32 {
     todo!("event_group_set_bits")
 }
 
@@ -595,10 +388,7 @@ pub unsafe extern "C" fn event_group_set_bits(
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn event_group_clear_bits(
-    _event: *mut crate::binary::c_types::c_void,
-    _bits: u32,
-) -> u32 {
+pub unsafe extern "C" fn event_group_clear_bits(_event: *mut c_void, _bits: u32) -> u32 {
     todo!("event_group_clear_bits")
 }
 
@@ -610,10 +400,10 @@ pub unsafe extern "C" fn event_group_clear_bits(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn event_group_wait_bits(
-    _event: *mut crate::binary::c_types::c_void,
+    _event: *mut c_void,
     _bits_to_wait_for: u32,
-    _clear_on_exit: crate::binary::c_types::c_int,
-    _wait_for_all_bits: crate::binary::c_types::c_int,
+    _clear_on_exit: c_int,
+    _wait_for_all_bits: c_int,
     _block_time_tick: u32,
 ) -> u32 {
     todo!("event_group_wait_bits")
@@ -641,12 +431,12 @@ pub unsafe extern "C" fn event_group_wait_bits(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_create_pinned_to_core(
-    task_func: *mut crate::binary::c_types::c_void,
-    name: *const crate::binary::c_types::c_char,
+    task_func: *mut c_void,
+    name: *const c_char,
     stack_depth: u32,
-    param: *mut crate::binary::c_types::c_void,
+    param: *mut c_void,
     prio: u32,
-    task_handle: *mut crate::binary::c_types::c_void,
+    task_handle: *mut c_void,
     core_id: u32,
 ) -> i32 {
     trace!(
@@ -662,11 +452,17 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 
     unsafe {
         let task_func = core::mem::transmute::<
-            *mut crate::binary::c_types::c_void,
+            *mut c_void,
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(task_func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(task_handle as *mut usize) = task as usize;
 
         1
@@ -693,12 +489,12 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_create(
-    task_func: *mut crate::binary::c_types::c_void,
-    name: *const crate::binary::c_types::c_char,
+    task_func: *mut c_void,
+    name: *const c_char,
     stack_depth: u32,
-    param: *mut crate::binary::c_types::c_void,
+    param: *mut c_void,
     prio: u32,
-    task_handle: *mut crate::binary::c_types::c_void,
+    task_handle: *mut c_void,
 ) -> i32 {
     unsafe { task_create_pinned_to_core(task_func, name, stack_depth, param, prio, task_handle, 0) }
 }
@@ -717,7 +513,7 @@ pub unsafe extern "C" fn task_create(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
     trace!("task delete called for {:?}", task_handle);
 
     unsafe {
@@ -740,10 +536,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut crate::binary::c_types::c
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::time::systimer_count();
-    while crate::time::elapsed_time_since(start_time) < tick as u64 {
-        yield_task();
-    }
+    crate::preempt::usleep(tick)
 }
 
 /// **************************************************************************
@@ -774,8 +567,8 @@ pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
 ///   A pointer to the current task
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn task_get_current_task() -> *mut crate::binary::c_types::c_void {
-    let res = crate::preempt::current_task() as *mut crate::binary::c_types::c_void;
+pub unsafe extern "C" fn task_get_current_task() -> *mut c_void {
+    let res = crate::preempt::current_task() as *mut c_void;
     trace!("task get current task - return {:?}", res);
 
     res
@@ -796,7 +589,7 @@ pub unsafe extern "C" fn task_get_current_task() -> *mut crate::binary::c_types:
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_max_priority() -> i32 {
     trace!("task_get_max_priority");
-    255
+    crate::preempt::max_task_priority() as i32
 }
 
 /// **************************************************************************
@@ -812,7 +605,7 @@ pub unsafe extern "C" fn task_get_max_priority() -> i32 {
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn malloc(size: usize) -> *mut c_void {
     unsafe { crate::compat::malloc::malloc(size).cast() }
 }
 
@@ -829,7 +622,7 @@ pub unsafe extern "C" fn malloc(size: usize) -> *mut crate::binary::c_types::c_v
 ///   No
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn free(p: *mut crate::binary::c_types::c_void) {
+pub unsafe extern "C" fn free(p: *mut c_void) {
     unsafe {
         crate::compat::malloc::free(p.cast());
     }
@@ -853,9 +646,9 @@ pub unsafe extern "C" fn free(p: *mut crate::binary::c_types::c_void) {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn event_post(
-    event_base: *const crate::binary::c_types::c_char,
+    event_base: *const c_char,
     event_id: i32,
-    event_data: *mut crate::binary::c_types::c_void,
+    event_data: *mut c_void,
     event_data_size: usize,
     ticks_to_wait: u32,
 ) -> i32 {
@@ -1016,9 +809,7 @@ pub unsafe extern "C" fn phy_enable() {
 ///
 /// *************************************************************************
 #[allow(clippy::unnecessary_cast)]
-pub unsafe extern "C" fn phy_update_country_info(
-    country: *const crate::binary::c_types::c_char,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn phy_update_country_info(country: *const c_char) -> c_int {
     unsafe {
         // not implemented in original code
         trace!("phy_update_country_info {}", str_from_c(country.cast()));
@@ -1123,11 +914,7 @@ pub unsafe extern "C" fn wifi_rtc_disable_iso() {
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn nvs_set_i8(
-    _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-    _value: i8,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn nvs_set_i8(_handle: u32, _key: *const c_char, _value: i8) -> c_int {
     debug!("nvs_set_i8");
     -1
 }
@@ -1149,9 +936,9 @@ pub unsafe extern "C" fn nvs_set_i8(
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_get_i8(
     _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
+    _key: *const c_char,
     _out_value: *mut i8,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_get_i8")
 }
 
@@ -1170,11 +957,7 @@ pub unsafe extern "C" fn nvs_get_i8(
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn nvs_set_u8(
-    _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-    _value: u8,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn nvs_set_u8(_handle: u32, _key: *const c_char, _value: u8) -> c_int {
     todo!("nvs_set_u8")
 }
 
@@ -1195,9 +978,9 @@ pub unsafe extern "C" fn nvs_set_u8(
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_get_u8(
     _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
+    _key: *const c_char,
     _out_value: *mut u8,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_get_u8")
 }
 
@@ -1216,11 +999,7 @@ pub unsafe extern "C" fn nvs_get_u8(
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn nvs_set_u16(
-    _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-    _value: u16,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn nvs_set_u16(_handle: u32, _key: *const c_char, _value: u16) -> c_int {
     todo!("nvs_set_u16")
 }
 
@@ -1241,9 +1020,9 @@ pub unsafe extern "C" fn nvs_set_u16(
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_get_u16(
     _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
+    _key: *const c_char,
     _out_value: *mut u16,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_get_u16")
 }
 
@@ -1263,10 +1042,10 @@ pub unsafe extern "C" fn nvs_get_u16(
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_open(
-    _name: *const crate::binary::c_types::c_char,
+    _name: *const c_char,
     _open_mode: u32,
     _out_handle: *mut u32,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_open")
 }
 
@@ -1294,7 +1073,7 @@ pub unsafe extern "C" fn nvs_close(_handle: u32) {
 ///   This function has no practical effect
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn nvs_commit(_handle: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn nvs_commit(_handle: u32) -> c_int {
     todo!("nvs_commit")
 }
 
@@ -1316,10 +1095,10 @@ pub unsafe extern "C" fn nvs_commit(_handle: u32) -> crate::binary::c_types::c_i
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_set_blob(
     _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-    _value: *const crate::binary::c_types::c_void,
+    _key: *const c_char,
+    _value: *const c_void,
     _length: usize,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_set_blob")
 }
 
@@ -1341,10 +1120,10 @@ pub unsafe extern "C" fn nvs_set_blob(
 /// *************************************************************************
 pub unsafe extern "C" fn nvs_get_blob(
     _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-    _out_value: *mut crate::binary::c_types::c_void,
+    _key: *const c_char,
+    _out_value: *mut c_void,
     _length: *mut usize,
-) -> crate::binary::c_types::c_int {
+) -> c_int {
     todo!("nvs_get_blob")
 }
 
@@ -1362,10 +1141,7 @@ pub unsafe extern "C" fn nvs_get_blob(
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn nvs_erase_key(
-    _handle: u32,
-    _key: *const crate::binary::c_types::c_char,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn nvs_erase_key(_handle: u32, _key: *const c_char) -> c_int {
     todo!("nvs_erase_key")
 }
 
@@ -1383,7 +1159,7 @@ pub unsafe extern "C" fn nvs_erase_key(
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> c_int {
     trace!("get_random");
     unsafe {
         crate::common_adapter::__esp_radio_esp_fill_random(buf, len as u32);
@@ -1404,9 +1180,7 @@ pub unsafe extern "C" fn get_random(buf: *mut u8, len: usize) -> crate::binary::
 ///   0 if success or -1 if fail
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn get_time(
-    _t: *mut crate::binary::c_types::c_void,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn get_time(_t: *mut c_void) -> c_int {
     todo!("get_time")
 }
 
@@ -1428,8 +1202,8 @@ pub unsafe extern "C" fn get_time(
 #[cfg(feature = "sys-logs")]
 pub unsafe extern "C" fn log_write(
     level: u32,
-    _tag: *const crate::binary::c_types::c_char,
-    format: *const crate::binary::c_types::c_char,
+    _tag: *const c_char,
+    format: *const c_char,
     args: ...
 ) {
     crate::binary::log::syslog(level, format as _, args);
@@ -1455,8 +1229,8 @@ pub unsafe extern "C" fn log_write(
 #[allow(improper_ctypes_definitions)]
 pub unsafe extern "C" fn log_writev(
     level: u32,
-    _tag: *const crate::binary::c_types::c_char,
-    format: *const crate::binary::c_types::c_char,
+    _tag: *const c_char,
+    format: *const c_char,
     args: crate::binary::include::va_list,
 ) {
     unsafe {
@@ -1502,7 +1276,7 @@ pub unsafe extern "C" fn log_timestamp() -> u32 {
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut c_void {
     unsafe { crate::compat::malloc::malloc_internal(size).cast() }
 }
 
@@ -1520,10 +1294,7 @@ pub unsafe extern "C" fn malloc_internal(size: usize) -> *mut crate::binary::c_t
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn realloc_internal(
-    ptr: *mut crate::binary::c_types::c_void,
-    size: usize,
-) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn realloc_internal(ptr: *mut c_void, size: usize) -> *mut c_void {
     unsafe { crate::compat::malloc::realloc_internal(ptr.cast(), size).cast() }
 }
 
@@ -1541,11 +1312,8 @@ pub unsafe extern "C" fn realloc_internal(
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn calloc_internal_wrapper(
-    n: usize,
-    size: usize,
-) -> *mut crate::binary::c_types::c_void {
-    unsafe { calloc_internal(n as u32, size) as *mut crate::binary::c_types::c_void }
+pub unsafe extern "C" fn calloc_internal_wrapper(n: usize, size: usize) -> *mut c_void {
+    unsafe { calloc_internal(n as u32, size) as *mut c_void }
 }
 
 /// **************************************************************************
@@ -1561,8 +1329,8 @@ pub unsafe extern "C" fn calloc_internal_wrapper(
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_types::c_void {
-    unsafe { calloc_internal(size as u32, 1usize) as *mut crate::binary::c_types::c_void }
+pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut c_void {
+    unsafe { calloc_internal(size as u32, 1usize) as *mut c_void }
 }
 
 /// **************************************************************************
@@ -1578,7 +1346,7 @@ pub unsafe extern "C" fn zalloc_internal(size: usize) -> *mut crate::binary::c_t
 ///   Memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut c_void {
     unsafe { malloc_internal(size) }
 }
 
@@ -1596,10 +1364,7 @@ pub unsafe extern "C" fn wifi_malloc(size: usize) -> *mut crate::binary::c_types
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_realloc(
-    ptr: *mut crate::binary::c_types::c_void,
-    size: usize,
-) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_realloc(ptr: *mut c_void, size: usize) -> *mut c_void {
     unsafe { realloc_internal(ptr, size) }
 }
 
@@ -1617,9 +1382,9 @@ pub unsafe extern "C" fn wifi_realloc(
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut c_void {
     trace!("wifi_calloc {} {}", n, size);
-    unsafe { calloc_internal(n as u32, size) as *mut crate::binary::c_types::c_void }
+    unsafe { calloc_internal(n as u32, size) as *mut c_void }
 }
 
 /// **************************************************************************
@@ -1635,7 +1400,7 @@ pub unsafe extern "C" fn wifi_calloc(n: usize, size: usize) -> *mut crate::binar
 ///   New memory pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut c_void {
     unsafe { wifi_calloc(size, 1) }
 }
 
@@ -1653,16 +1418,12 @@ pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut crate::binary::c_types
 ///   Wi-Fi static message queue data pointer
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_create_queue(
-    queue_len: crate::binary::c_types::c_int,
-    item_size: crate::binary::c_types::c_int,
-) -> *mut crate::binary::c_types::c_void {
-    unsafe {
-        let queue = create_queue(queue_len, item_size);
-        QUEUE_HANDLE = queue;
+pub unsafe extern "C" fn wifi_create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
+    let queue = crate::compat::queue::queue_create(queue_len, item_size);
 
-        addr_of_mut!(QUEUE_HANDLE).cast()
-    }
+    let queue_ptr: *mut *mut c_void = Box::leak(Box::new_in(queue, InternalMemory));
+
+    queue_ptr.cast()
 }
 
 /// **************************************************************************
@@ -1678,15 +1439,12 @@ pub unsafe extern "C" fn wifi_create_queue(
 ///   None
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn wifi_delete_queue(queue: *mut crate::binary::c_types::c_void) {
-    trace!("wifi_delete_queue {:?}", queue);
-    unsafe {
-        if core::ptr::eq(queue, addr_of_mut!(QUEUE_HANDLE).cast()) {
-            delete_queue(QUEUE_HANDLE);
-        } else {
-            warn!("unknown queue when trying to delete WIFI queue");
-        }
-    }
+pub unsafe extern "C" fn wifi_delete_queue(queue: *mut c_void) {
+    let queue_ptr: *mut *mut c_void = queue.cast();
+
+    let boxed = unsafe { Box::from_raw_in(queue_ptr, InternalMemory) };
+
+    crate::compat::queue::queue_delete(*boxed)
 }
 
 /// **************************************************************************
@@ -1712,7 +1470,7 @@ pub unsafe extern "C" fn coex_deinit() {
 ///   Don't support
 ///
 /// *************************************************************************
-pub unsafe extern "C" fn coex_enable() -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_enable() -> c_int {
     trace!("coex_enable");
 
     #[cfg(coex)]
@@ -1763,11 +1521,7 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
 ///
 /// *************************************************************************
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_request(
-    event: u32,
-    latency: u32,
-    duration: u32,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_wifi_request(event: u32, latency: u32, duration: u32) -> c_int {
     trace!("coex_wifi_request");
 
     #[cfg(coex)]
@@ -1785,7 +1539,7 @@ pub unsafe extern "C" fn coex_wifi_request(
 ///
 /// *************************************************************************
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_wifi_release(event: u32) -> c_int {
     trace!("coex_wifi_release");
 
     #[cfg(coex)]
@@ -1803,10 +1557,7 @@ pub unsafe extern "C" fn coex_wifi_release(event: u32) -> crate::binary::c_types
 ///
 /// *************************************************************************
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_wifi_channel_set(
-    primary: u8,
-    secondary: u8,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_wifi_channel_set(primary: u8, secondary: u8) -> c_int {
     trace!("coex_wifi_channel_set");
 
     #[cfg(coex)]
@@ -1824,10 +1575,7 @@ pub unsafe extern "C" fn coex_wifi_channel_set(
 ///
 /// *************************************************************************
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_event_duration_get(
-    event: u32,
-    duration: *mut u32,
-) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_event_duration_get(event: u32, duration: *mut u32) -> c_int {
     trace!("coex_event_duration_get");
 
     #[cfg(coex)]
@@ -1846,7 +1594,7 @@ pub unsafe extern "C" fn coex_event_duration_get(
 /// *************************************************************************
 #[cfg(any(esp32c3, esp32c2, esp32c6, esp32s3))]
 #[cfg_attr(not(coex), allow(unused_variables))]
-pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> c_int {
     trace!("coex_pti_get");
 
     #[cfg(coex)]
@@ -1857,7 +1605,7 @@ pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary
 }
 
 #[cfg(any(esp32, esp32s2))]
-pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_pti_get(event: u32, pti: *mut u8) -> c_int {
     trace!("coex_pti_get {} {:?}", event, pti);
     0
 }
@@ -1904,7 +1652,7 @@ pub unsafe extern "C" fn coex_schm_status_bit_set(type_: u32, status: u32) {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> crate::binary::c_types::c_int {
+pub unsafe extern "C" fn coex_schm_interval_set(interval: u32) -> c_int {
     trace!("coex_schm_interval_set");
 
     #[cfg(coex)]
@@ -1958,7 +1706,7 @@ pub unsafe extern "C" fn coex_schm_curr_period_get() -> u8 {
 ///
 /// *************************************************************************
 #[allow(unused_variables)]
-pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut crate::binary::c_types::c_void {
+pub unsafe extern "C" fn coex_schm_curr_phase_get() -> *mut c_void {
     trace!("coex_schm_curr_phase_get");
 
     #[cfg(coex)]
