@@ -279,8 +279,8 @@ pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Context) -> R) -> R {
     SCHEDULER.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
 }
 
-pub(super) fn current_task() -> *mut Context {
-    with_current_task(|task| task as *mut Context)
+pub(super) fn current_task() -> TaskPtr {
+    with_current_task(|task| NonNull::from(task))
 }
 
 pub(super) fn schedule_task_deletion(task: *mut Context) {

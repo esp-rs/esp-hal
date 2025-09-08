@@ -188,6 +188,10 @@ impl Scheduler {
     pub(crate) fn yield_task(&self) {
         task::yield_task();
     }
+
+    pub(crate) fn current_task(&self) -> TaskPtr {
+        task::current_task()
+    }
 }
 
 esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
@@ -246,7 +250,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn current_task(&self) -> *mut c_void {
-        task::current_task() as *mut c_void
+        self.current_task().as_ptr().cast()
     }
 
     fn schedule_task_deletion(&self, task_handle: *mut c_void) {
