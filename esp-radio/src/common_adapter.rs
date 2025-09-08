@@ -338,14 +338,45 @@ pub(crate) fn enable_wifi_power_domain() {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lpwr)] {
                 let rtc_cntl = esp_hal::peripherals::LPWR::regs();
+                let syscon = esp_hal::peripherals::APB_CTRL::regs();
             } else {
                 let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
+                let syscon = esp_hal::peripherals::SYSCON::regs();
             }
         }
 
         rtc_cntl
             .dig_pwc()
             .modify(|_, w| w.wifi_force_pd().clear_bit());
+
+        #[cfg(not(esp32))]
+        unsafe {
+            const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
+            const FE_RST: u32 = 1 << 1; // RF Frontend RST
+            const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC 
+
+            const BTBB_RST: u32 = 1 << 3; // Bluetooth Baseband
+            const BTMAC_RST: u32 = 1 << 4; // deprecated
+            const RW_BTMAC_RST: u32 = 1 << 9; // Bluetooth MAC
+            const RW_BTMAC_REG_RST: u32 = 1 << 11; // Bluetooth MAC Regsiters
+            const BTBB_REG_RST: u32 = 1 << 13; // Bluetooth Baseband Registers
+
+            const MODEM_RESET_FIELD_WHEN_PU: u32 = WIFIBB_RST
+                | FE_RST
+                | WIFIMAC_RST
+                | if cfg!(soc_has_bt) {
+                    BTBB_RST | BTMAC_RST | RW_BTMAC_RST | RW_BTMAC_REG_RST | BTBB_RST
+                } else {
+                    0
+                };
+
+            syscon
+                .wifi_rst_en()
+                .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
+            syscon
+                .wifi_rst_en()
+                .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
+        }
 
         rtc_cntl
             .dig_iso()
