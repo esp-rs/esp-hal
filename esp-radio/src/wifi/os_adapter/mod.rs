@@ -7,8 +7,7 @@
 #[cfg_attr(esp32s3, path = "esp32s3.rs")]
 pub(crate) mod os_adapter_chip_specific;
 
-use core::ptr::addr_of_mut;
-
+use allocator_api2::boxed::Box;
 use enumset::EnumSet;
 use esp_sync::{NonReentrantMutex, RawMutex};
 
@@ -17,17 +16,8 @@ use crate::{
     binary::c_types::*,
     compat::{
         OSI_FUNCS_TIME_BLOCKING,
-        common::{
-            ConcurrentQueue,
-            create_queue,
-            delete_queue,
-            number_of_messages_in_queue,
-            receive_queued,
-            send_queued,
-            str_from_c,
-            thread_sem_get,
-        },
-        malloc::calloc_internal,
+        common::{str_from_c, thread_sem_get},
+        malloc::{InternalMemory, calloc_internal},
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
@@ -35,8 +25,6 @@ use crate::{
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
-
-static mut QUEUE_HANDLE: *mut ConcurrentQueue = core::ptr::null_mut();
 
 // useful for waiting for events - clear and wait for the event bit to be set
 // again
@@ -361,187 +349,6 @@ pub unsafe extern "C" fn mutex_unlock(mutex: *mut c_void) -> i32 {
 }
 
 /// **************************************************************************
-/// Name: esp_queue_create
-///
-/// Description:
-///   Create message queue
-///
-/// Input Parameters:
-///   queue_len - queue message number
-///   item_size - message size
-///
-/// Returned Value:
-///   Message queue data pointer
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_create(queue_len: u32, item_size: u32) -> *mut c_void {
-    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
-    // version - JIRA: WIFI-6676
-    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
-        (queue_len, item_size)
-    } else {
-        warn!("Fixing queue item_size");
-        (3, 8)
-    };
-
-    create_queue(queue_len as i32, item_size as i32).cast()
-}
-
-/// **************************************************************************
-/// Name: esp_queue_delete
-///
-/// Description:
-///   Delete message queue
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///
-/// Returned Value:
-///   None
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_delete(queue: *mut c_void) {
-    delete_queue(queue.cast());
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send
-///
-/// Description:
-///   Send message of low priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send(
-    queue: *mut c_void,
-    item: *mut c_void,
-    block_time_tick: u32,
-) -> i32 {
-    send_queued(queue.cast(), item, block_time_tick)
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_from_isr
-///
-/// Description:
-///   Send message of low priority to queue in ISR within
-///   a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   hptw  - No mean
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_from_isr(
-    queue: *mut c_void,
-    item: *mut c_void,
-    _hptw: *mut c_void,
-) -> i32 {
-    trace!("queue_send_from_isr");
-    unsafe {
-        *(_hptw as *mut u32) = 1;
-        queue_send(queue, item, 1000)
-    }
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_to_back
-///
-/// Description:
-///   Send message of low priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_to_back(
-    _queue: *mut c_void,
-    _item: *mut c_void,
-    _block_time_tick: u32,
-) -> i32 {
-    todo!("queue_send_to_back")
-}
-
-/// **************************************************************************
-/// Name: esp_queue_send_from_to_front
-///
-/// Description:
-///   Send message of high priority to queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_send_to_front(
-    _queue: *mut c_void,
-    _item: *mut c_void,
-    _block_time_tick: u32,
-) -> i32 {
-    todo!("queue_send_to_front")
-}
-
-/// **************************************************************************
-/// Name: esp_queue_recv
-///
-/// Description:
-///   Receive message from queue within a certain period of time
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///   item  - Message data pointer
-///   ticks - Wait ticks
-///
-/// Returned Value:
-///   True if success or false if fail
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_recv(
-    queue: *mut c_void,
-    item: *mut c_void,
-    block_time_tick: u32,
-) -> i32 {
-    receive_queued(queue.cast(), item, block_time_tick)
-}
-
-/// **************************************************************************
-/// Name: esp_queue_msg_waiting
-///
-/// Description:
-///   Get message number in the message queue
-///
-/// Input Parameters:
-///   queue - Message queue data pointer
-///
-/// Returned Value:
-///   Message number
-///
-/// *************************************************************************
-pub unsafe extern "C" fn queue_msg_waiting(queue: *mut c_void) -> u32 {
-    number_of_messages_in_queue(queue.cast())
-}
-
-/// **************************************************************************
 /// Name: esp_event_group_create
 ///
 /// Description:
@@ -649,7 +456,13 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(task_func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(task_handle as *mut usize) = task as usize;
 
         1
@@ -723,10 +536,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::time::systimer_count();
-    while crate::time::elapsed_time_since(start_time) < tick as u64 {
-        yield_task();
-    }
+    crate::preempt::usleep(tick)
 }
 
 /// **************************************************************************
@@ -779,7 +589,7 @@ pub unsafe extern "C" fn task_get_current_task() -> *mut c_void {
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_max_priority() -> i32 {
     trace!("task_get_max_priority");
-    255
+    crate::preempt::max_task_priority() as i32
 }
 
 /// **************************************************************************
@@ -1609,12 +1419,11 @@ pub unsafe extern "C" fn wifi_zalloc(size: usize) -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_create_queue(queue_len: c_int, item_size: c_int) -> *mut c_void {
-    unsafe {
-        let queue = create_queue(queue_len, item_size);
-        QUEUE_HANDLE = queue;
+    let queue = crate::compat::queue::queue_create(queue_len, item_size);
 
-        addr_of_mut!(QUEUE_HANDLE).cast()
-    }
+    let queue_ptr: *mut *mut c_void = Box::leak(Box::new_in(queue, InternalMemory));
+
+    queue_ptr.cast()
 }
 
 /// **************************************************************************
@@ -1631,14 +1440,11 @@ pub unsafe extern "C" fn wifi_create_queue(queue_len: c_int, item_size: c_int) -
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn wifi_delete_queue(queue: *mut c_void) {
-    trace!("wifi_delete_queue {:?}", queue);
-    unsafe {
-        if core::ptr::eq(queue, addr_of_mut!(QUEUE_HANDLE).cast()) {
-            delete_queue(QUEUE_HANDLE);
-        } else {
-            warn!("unknown queue when trying to delete WIFI queue");
-        }
-    }
+    let queue_ptr: *mut *mut c_void = queue.cast();
+
+    let boxed = unsafe { Box::from_raw_in(queue_ptr, InternalMemory) };
+
+    crate::compat::queue::queue_delete(*boxed)
 }
 
 /// **************************************************************************

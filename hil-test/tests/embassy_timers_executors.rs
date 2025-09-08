@@ -230,7 +230,7 @@ mod test {
         let spawner_int = executor.start(Priority::Priority3);
         spawner_int.must_spawn(test_interrupt_executor_invoker());
 
-        let spawner = embassy_executor::Spawner::for_current_executor().await;
+        let spawner = embassy_executor::SendSpawner::for_current_executor().await;
         spawner.must_spawn(e_task30ms());
 
         // The test ends once the interrupt executor's task has finished

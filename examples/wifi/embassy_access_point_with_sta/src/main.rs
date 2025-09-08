@@ -42,10 +42,10 @@ use esp_radio::{
         AccessPointConfig,
         ClientConfig,
         Config,
+        WifiApState,
         WifiController,
         WifiDevice,
         WifiEvent,
-        WifiState,
     },
 };
 
@@ -118,7 +118,7 @@ async fn main(spawner: Spawner) -> ! {
         seed,
     );
 
-    let client_config = Config::Mixed(
+    let client_config = Config::ApSta(
         ClientConfig::default()
             .with_ssid(SSID.into())
             .with_password(PASSWORD.into()),
@@ -328,7 +328,7 @@ async fn connection(mut controller: WifiController<'static>) {
 
     loop {
         match esp_radio::wifi::ap_state() {
-            WifiState::ApStarted => {
+            WifiApState::Started => {
                 println!("About to connect...");
 
                 match controller.connect_async().await {
