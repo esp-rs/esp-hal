@@ -121,11 +121,19 @@ impl TimerQueue {
                 timers = props.next.take();
 
                 if !props.is_active || props.drop {
+                    debug!(
+                        "Timer {:x} is inactive or dropped",
+                        current_timer as *const _ as usize
+                    );
                     return false;
                 }
 
                 if props.next_due > SCHEDULER.now() {
                     // Not our time yet.
+                    debug!(
+                        "Timer {:x} is not due yet",
+                        current_timer as *const _ as usize
+                    );
                     return false;
                 }
 
@@ -231,17 +239,12 @@ impl Timer {
         props.next_due = next_due;
         props.period = timeout;
         props.periodic = periodic;
-        debug!(
-            "Arming timer: {:x} @ {} ({})",
-            self as *const _ as usize, next_due, timeout
-        );
 
         q.enqueue(self);
     }
 
     fn disarm(&self, q: &mut TimerQueueInner) {
         self.properties(q).is_active = false;
-        debug!("Disarming timer: {:x}", self as *const _ as usize);
 
         // We don't dequeue the timer - processing the queue will just skip it. If we re-arm,
         // the timer may already be in the queue.
@@ -270,7 +273,9 @@ impl TimerImplementation for Timer {
         let mut callback = CCallback { func, data };
 
         let timer = Box::new(Timer::new(Box::new(move || unsafe { callback.call() })));
-        NonNull::from(Box::leak(timer)).cast()
+        let ptr = NonNull::from(Box::leak(timer)).cast();
+        debug!("Created timer: {:x}", ptr.addr());
+        ptr
     }
 
     unsafe fn delete(timer: TimerPtr) {
@@ -294,11 +299,16 @@ impl TimerImplementation for Timer {
     }
 
     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) {
+        debug!(
+            "Arming {:?} for {} us, periodic = {:?}",
+            timer, timeout, periodic
+        );
         let timer = unsafe { Timer::from_ptr(timer) };
         TIMER_QUEUE.inner.with(|q| timer.arm(q, timeout, periodic))
     }
 
     unsafe fn disarm(timer: TimerPtr) {
+        debug!("Disarming {:?}", timer);
         let timer = unsafe { Timer::from_ptr(timer) };
         TIMER_QUEUE.inner.with(|q| timer.disarm(q))
     }
