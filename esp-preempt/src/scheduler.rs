@@ -9,15 +9,7 @@ use crate::{
     InternalMemory,
     run_queue::RunQueue,
     semaphore::Semaphore,
-    task::{
-        self,
-        Context,
-        TaskAllocListElement,
-        TaskDeleteListElement,
-        TaskExt,
-        TaskList,
-        TaskPtr,
-    },
+    task::{self, Context, TaskAllocListElement, TaskDeleteListElement, TaskList, TaskPtr},
     timer::TimeDriver,
     timer_queue,
 };
@@ -190,7 +182,8 @@ impl SchedulerState {
         is_current
     }
 
-    pub(crate) fn sleep_until(&mut self, current_task: TaskPtr, at: Instant) {
+    pub(crate) fn sleep_until(&mut self, at: Instant) {
+        let current_task = unwrap!(self.current_task);
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.schedule_wakeup(current_task, at);
 
@@ -243,6 +236,10 @@ impl Scheduler {
         debug!("Task created: {:?}", task_ptr);
 
         task_ptr
+    }
+
+    pub(crate) fn sleep_until(&self, wake_at: Instant) {
+        SCHEDULER.with(|scheduler| scheduler.sleep_until(wake_at))
     }
 }
 
@@ -314,8 +311,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn usleep(&self, us: u32) {
-        self.current_task()
-            .sleep_until(Instant::now() + Duration::from_micros(us as u64));
+        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64))
     }
 
     fn now(&self) -> u64 {

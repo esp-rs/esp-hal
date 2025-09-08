@@ -8,7 +8,6 @@ use allocator_api2::boxed::Box;
 #[cfg(riscv)]
 use arch_specific::Registers;
 pub(crate) use arch_specific::*;
-use esp_hal::time::Instant;
 #[cfg(xtensa)]
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
@@ -57,16 +56,10 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 /// Extension trait for common task operations. These should be inherent methods but we can't
 /// implement stuff for NonNull.
 pub(crate) trait TaskExt {
-    fn sleep_until(self, wakeup_time: Instant);
-
     fn resume(self);
 }
 
 impl TaskExt for TaskPtr {
-    fn sleep_until(self, wakeup_time: Instant) {
-        SCHEDULER.with(|scheduler| scheduler.sleep_until(self, wakeup_time))
-    }
-
     fn resume(self) {
         SCHEDULER.with(|scheduler| scheduler.resume_task(self))
     }

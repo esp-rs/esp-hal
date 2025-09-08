@@ -168,7 +168,7 @@ impl TimerQueue {
         self.inner.with(|q| {
             let next_wakeup = q.next_wakeup;
             debug!("next_wakeup: {}", next_wakeup);
-            unwrap!(q.task).sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
+            SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
         });
     }
 }
