@@ -136,7 +136,9 @@ impl TimeDriver {
 
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
-    SCHEDULER.with(|_scheduler| {
+    SCHEDULER.with(|scheduler| {
+        scheduler.event.set_timer_event();
+
         // `Scheduler::switch_task` must be called on a single interrupt priority level only.
         // To ensure this, we call yield_task to pend the software interrupt.
         //

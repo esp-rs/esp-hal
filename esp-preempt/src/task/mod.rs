@@ -12,7 +12,7 @@ pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER};
+use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue};
 
 #[derive(Clone, Copy)]
 pub(crate) enum TaskState {
@@ -258,7 +258,7 @@ pub(super) fn delete_all_tasks() {
         // Since we delete all tasks, we walk through the allocation list - we just need to clear
         // the lists.
         state.to_delete = TaskList::new();
-        state.ready_tasks = TaskQueue::new();
+        state.run_queue = RunQueue::new();
 
         // Clear the current task.
         state.current_task = None;

@@ -8,20 +8,50 @@ use esp_sync::NonReentrantMutex;
 use crate::{
     InternalMemory,
     TICK_RATE,
+    run_queue::RunQueue,
     semaphore::Semaphore,
-    task::{
-        self,
-        Context,
-        TaskAllocListElement,
-        TaskDeleteListElement,
-        TaskList,
-        TaskPtr,
-        TaskQueue,
-        TaskReadyQueueElement,
-    },
+    task::{self, Context, TaskAllocListElement, TaskDeleteListElement, TaskList, TaskPtr},
     timer::TimeDriver,
     timer_queue,
 };
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+// Due to how our interrupts work, we may have a timer event and a yield at the same time. Their
+// order of processing is an implementation detail in esp-hal. We need to be able to store multiple
+// events to not miss any.
+pub(crate) struct SchedulerEvent(usize);
+
+impl SchedulerEvent {
+    // If this is NOT set, the event is a cooperative yield of some sort (time slicing, self-yield).
+    const TASK_BLOCKED: usize = 1 << 0;
+
+    // If this is set, the timer queue should be processed.
+    const TIMER_EVENT: usize = 1 << 1;
+
+    fn contains(self, bit: usize) -> bool {
+        self.0 & bit != 0
+    }
+    fn set(&mut self, bit: usize) {
+        self.0 |= bit;
+    }
+
+    #[expect(dead_code)]
+    pub(crate) fn set_blocked(&mut self) {
+        self.set(Self::TASK_BLOCKED)
+    }
+
+    pub(crate) fn set_timer_event(&mut self) {
+        self.set(Self::TIMER_EVENT)
+    }
+
+    pub(crate) fn is_cooperative_yield(self) -> bool {
+        !self.contains(Self::TASK_BLOCKED)
+    }
+
+    pub(crate) fn is_timer_event(self) -> bool {
+        self.contains(Self::TIMER_EVENT)
+    }
+}
 
 pub(crate) struct SchedulerState {
     /// Pointer to the current task.
@@ -31,12 +61,14 @@ pub(crate) struct SchedulerState {
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
 
     /// A list of tasks ready to run
-    pub(crate) ready_tasks: TaskQueue<TaskReadyQueueElement>,
+    pub(crate) run_queue: RunQueue,
 
     /// Pointer to the task that is scheduled for deletion.
     pub(crate) to_delete: TaskList<TaskDeleteListElement>,
 
     pub(crate) time_driver: Option<TimeDriver>,
+
+    pub(crate) event: SchedulerEvent,
 }
 
 unsafe impl Send for SchedulerState {}
@@ -46,10 +78,11 @@ impl SchedulerState {
         Self {
             current_task: None,
             all_tasks: TaskList::new(),
-            ready_tasks: TaskQueue::new(),
+            run_queue: RunQueue::new(),
             to_delete: TaskList::new(),
 
             time_driver: None,
+            event: SchedulerEvent(0),
         }
     }
 
@@ -60,7 +93,7 @@ impl SchedulerState {
     fn delete_marked_tasks(&mut self) {
         while let Some(to_delete) = self.to_delete.pop() {
             self.all_tasks.remove(to_delete);
-            self.ready_tasks.remove(to_delete);
+            self.run_queue.remove(to_delete);
             unwrap!(self.time_driver.as_mut())
                 .timer_queue
                 .remove(to_delete);
@@ -76,10 +109,7 @@ impl SchedulerState {
         // At least one task must be ready to run. If there are none, we can't do anything - we
         // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
         // and can be replaced with auto light sleep.
-        let next = unwrap!(self.ready_tasks.pop(), "There are no tasks ready to run.");
-
-        // TODO: do not mark current task immediately ready to run
-        self.ready_tasks.push(currently_active_task);
+        let next = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
 
         if next == currently_active_task {
             return None;
@@ -89,12 +119,20 @@ impl SchedulerState {
     }
 
     fn run_scheduler(&mut self, task_switch: impl FnOnce(TaskPtr, TaskPtr)) {
-        unwrap!(self.time_driver.as_mut()).handle_alarm(|_ready_task| {
-            // TODO implement waking up sleeping tasks
-        });
-
         self.delete_marked_tasks();
         let current_task = unwrap!(self.current_task);
+
+        let event = core::mem::take(&mut self.event);
+        if event.is_cooperative_yield() {
+            // Current task is still ready, mark it as such.
+            self.run_queue.mark_same_priority_task_ready(current_task);
+        }
+
+        if event.is_timer_event() {
+            unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
+                self.run_queue.mark_task_ready(NonNull::from(ready_task));
+            });
+        }
 
         if let Some(next_task) = self.select_next_task(current_task) {
             task_switch(current_task, next_task);
@@ -123,7 +161,7 @@ impl SchedulerState {
     }
 
     fn arm_time_slice_alarm(&mut self) {
-        let ready_tasks = !self.ready_tasks.is_empty();
+        let ready_tasks = !self.run_queue.is_empty();
         unwrap!(self.time_driver.as_mut()).arm_next_wakeup(ready_tasks);
     }
 
@@ -185,7 +223,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn max_task_priority(&self) -> u32 {
-        255
+        RunQueue::PRIORITY_LEVELS as u32 - 1
     }
 
     fn task_create(
@@ -201,7 +239,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
 
         SCHEDULER.with(|state| {
             state.all_tasks.push(task_ptr);
-            state.ready_tasks.push(task_ptr);
+            state.run_queue.mark_task_ready(task_ptr);
         });
 
         task_ptr.as_ptr().cast()

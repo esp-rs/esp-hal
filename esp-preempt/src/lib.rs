@@ -25,6 +25,7 @@ mod fmt;
 
 mod mutex;
 mod queue;
+mod run_queue;
 mod scheduler;
 mod semaphore;
 mod task;
