@@ -1,4 +1,20 @@
-//! Mutexes
+//! # Mutexes (mutual exclusion)
+//!
+//! Mutexes are a synchronization primitive used to protect shared data from concurrent access.
+//! They allow only one thread at a time to access a critical section of code or data.
+//!
+//! ## Implementation
+//!
+//! Implement the `MutexImplementation` trait for an object, and use the
+//! `register_mutex_implementation` to register that implementation for esp-radio.
+//!
+//! See the [`MutexImplementation`] documentation for more information.
+//!
+//! ## Usage
+//!
+//! Users should use [`MutexHandle`] to interact with mutexes created by the driver implementation.
+//!
+//! > Note that the only expected user of this crate is esp-radio.
 
 use core::ptr::NonNull;
 
@@ -13,8 +29,48 @@ unsafe extern "Rust" {
     fn esp_preempt_mutex_unlock(mutex: MutexPtr) -> bool;
 }
 
+/// A mutex (mutual exclusion) primitive.
+///
+/// The following snippet demonstrates the boilerplate necessary to implement a mutex using the
+/// `MutexImplementation` trait:
+///
+/// ```rust,no_run
+/// use esp_radio_preempt_driver::{
+///     mutex::{MutexImplementation, MutexPtr},
+///     register_mutex_implementation,
+/// };
+///
+/// struct MyMutex {
+///     // Mutex implementation details
+/// }
+///
+/// impl MutexImplementation for MyMutex {
+///     fn create(recursive: bool) -> MutexPtr {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn delete(mutex: MutexPtr) {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn lock(mutex: MutexPtr, timeout_us: Option<u32>) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn unlock(mutex: MutexPtr) -> bool {
+///         unimplemented!()
+///     }
+/// }
+///
+/// register_mutex_implementation!(MyMutex);
+/// ```
 pub trait MutexImplementation {
     /// Creates a new mutex instance.
+    ///
+    /// The mutex should start in the unlocked state.
+    ///
+    /// If `recursive` is `true`, the mutex should support recursive locking (i.e. the mutex owner
+    /// can lock the mutex multiple times).
     fn create(recursive: bool) -> MutexPtr;
 
     /// Deletes a mutex instance.
@@ -34,7 +90,7 @@ pub trait MutexImplementation {
     ///
     /// This function returns `true` if the mutex was locked, `false` if the timeout was reached.
     ///
-    /// Recursive mutexes can be re-locked by the mutex owner.
+    /// Recursive mutexes can be re-locked by the mutex owner without blocking.
     ///
     /// # Safety
     ///
@@ -44,7 +100,8 @@ pub trait MutexImplementation {
     /// Unlocks a mutex.
     ///
     /// This function returns `true` if the mutex was unlocked, `false` if the mutex wasn't locked,
-    /// or the unlocking task was not the mutex owner.
+    /// or the unlocking task was not the mutex owner. Unlocking a recursive mutex also returns
+    /// `true` if the mutex's lock counter is successfully decremented.
     ///
     /// Recursive mutexes are released only when `unlock` has been called for each preceding `lock`.
     ///
@@ -83,6 +140,9 @@ macro_rules! register_mutex_implementation {
     };
 }
 
+/// Mutex handle.
+///
+/// This handle is used to interact with mutexes created by the driver implementation.
 #[repr(transparent)]
 pub struct MutexHandle(MutexPtr);
 impl MutexHandle {

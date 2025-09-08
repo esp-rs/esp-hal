@@ -1,4 +1,17 @@
-//! Timers
+//! Timers (callbacks scheduled to run in the future)
+//!
+//! ## Implementation
+//!
+//! Implement the `TimerImplementation` trait for an object, and use the
+//! `register_timer_implementation` to register that implementation for esp-radio.
+//!
+//! See the [`TimerImplementation`] documentation for more information.
+//!
+//! ## Usage
+//!
+//! Users should use [`TimerHandle`] to interact with timers created by the driver implementation.
+//!
+//! > Note that the only expected user of this crate is esp-radio.
 
 use core::{ffi::c_void, ptr::NonNull};
 
@@ -16,6 +29,41 @@ unsafe extern "Rust" {
     fn esp_preempt_timer_disarm(timer: TimerPtr);
 }
 
+/// A timer implementation.
+///
+/// The following snippet demonstrates the boilerplate necessary to implement a timer using the
+/// `TimerImplementation` trait:
+///
+/// ```rust,no_run
+/// use esp_radio_preempt_driver::{
+///     register_timer_implementation,
+///     timer::{TimerImplementation, TimerPtr},
+/// };
+///
+/// struct MyTimer {
+///     // Timer implementation details
+/// }
+///
+/// impl TimerImplementation for MyTimer {
+///     fn create(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> TimerPtr {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn delete(mutex: MutexPtr) {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn disarm(timer: TimerPtr) -> bool {
+///         unimplemented!()
+///     }
+/// }
+///
+/// register_timer_implementation!(MyTimer);
+/// ```
 pub trait TimerImplementation {
     /// Creates a new timer instance from the given callback.
     fn create(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> TimerPtr;
@@ -77,6 +125,9 @@ macro_rules! register_timer_implementation {
     };
 }
 
+/// A timer handle.
+///
+/// This handle is used to interact with timers created by the driver implementation.
 #[repr(transparent)]
 pub struct TimerHandle(TimerPtr);
 impl TimerHandle {

@@ -1,4 +1,20 @@
-//! Queues
+//! # Queues
+//!
+//! Queues are a synchronization primitive used to communicate between tasks.
+//! They allow tasks to send and receive data in a first-in-first-out (FIFO) manner.
+//!
+//! ## Implementation
+//!
+//! Implement the `QueueImplementation` trait for an object, and use the
+//! `register_queue_implementation` to register that implementation for esp-radio.
+//!
+//! See the [`QueueImplementation`] documentation for more information.
+//!
+//! ## Usage
+//!
+//! Users should use [`QueueHandle`] to interact with queues created by the driver implementation.
+//!
+//! > Note that the only expected user of this crate is esp-radio.
 
 use core::ptr::NonNull;
 
@@ -34,8 +50,73 @@ unsafe extern "Rust" {
     fn esp_preempt_queue_messages_waiting(queue: QueuePtr) -> usize;
 }
 
+/// A queue primitive.
+///
+/// The following snippet demonstrates the boilerplate necessary to implement a queue using the
+/// `QueueImplementation` trait:
+///
+/// ```rust,no_run
+/// use esp_radio_preempt_driver::{
+///     queue::{QueueImplementation, QueuePtr},
+///     register_queue_implementation,
+/// };
+///
+/// struct MyQueue {
+///     // Queue implementation details
+/// }
+///
+/// impl QueueImplementation for MyQueue {
+///     fn create(capacity: usize, item_size: usize) -> QueuePtr {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn delete(queue: QueuePtr) {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn send_to_front(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn send_to_back(queue: QueuePtr, item: *const u8, timeout_us: Option<u32>) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn try_send_to_back_from_isr(
+///         queue: QueuePtr,
+///         item: *const u8,
+///         higher_prio_task_waken: Option<&mut bool>,
+///     ) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn try_receive_from_isr(
+///         queue: QueuePtr,
+///         item: *mut u8,
+///         higher_prio_task_waken: Option<&mut bool>,
+///     ) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn remove(queue: QueuePtr, item: *const u8) {
+///         unimplemented!()
+///     }
+///
+///     fn messages_waiting(queue: QueuePtr) -> usize {
+///         unimplemented!()
+///     }
+/// }
+///
+/// register_queue_implementation!(MyQueue);
+/// ```
 pub trait QueueImplementation {
-    /// Creates a new queue instance.
+    /// Creates a new, empty queue instance.
+    ///
+    /// The queue must have a capacity for `capacity` number of `item_size` byte items.
     fn create(capacity: usize, item_size: usize) -> QueuePtr;
 
     /// Deletes a queue instance.
@@ -227,6 +308,9 @@ macro_rules! register_queue_implementation {
     };
 }
 
+/// Queue handle.
+///
+/// This handle is used to interact with queues created by the driver implementation.
 #[repr(transparent)]
 pub struct QueueHandle(QueuePtr);
 impl QueueHandle {

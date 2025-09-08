@@ -1,4 +1,22 @@
-//! Semaphores
+//! Counting Semaphores
+//!
+//! Semaphores are synchronization primitives that allow threads to coordinate their execution.
+//! They are used to control access to a shared resource by limiting the number of threads that can
+//! access it simultaneously.
+//!
+//! ## Implementation
+//!
+//! Implement the `SemaphoreImplementation` trait for an object, and use the
+//! `register_semaphore_implementation` to register that implementation for esp-radio.
+//!
+//! See the [`SemaphoreImplementation`] documentation for more information.
+//!
+//! ## Usage
+//!
+//! Users should use [`SemaphoreHandle`] to interact with semaphores created by the driver
+//! implementation.
+//!
+//! > Note that the only expected user of this crate is esp-radio.
 
 use core::ptr::NonNull;
 
@@ -24,6 +42,63 @@ unsafe extern "Rust" {
     ) -> bool;
 }
 
+/// A counting semaphore primitive.
+///
+/// The following snippet demonstrates the boilerplate necessary to implement a semaphore using the
+/// `SemaphoreImplementation` trait:
+///
+/// ```rust,no_run
+/// use esp_radio_preempt_driver::{
+///     register_semaphore_implementation,
+///     semaphore::{SemaphoreImplementation, SemaphorePtr},
+/// };
+///
+/// struct MySemaphore {
+///     // Semaphore implementation details
+/// }
+///
+/// impl SemaphoreImplementation for MySemaphore {
+///     fn create(max: u32, initial: u32) -> SemaphorePtr {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn delete(semaphore: SemaphorePtr) {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn give(semaphore: SemaphorePtr) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn try_give_from_isr(
+///         semaphore: SemaphorePtr,
+///         higher_prio_task_waken: Option<&mut bool>,
+///     ) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn current_count(semaphore: SemaphorePtr) -> u32 {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn try_take(semaphore: SemaphorePtr) -> bool {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn try_take_from_isr(
+///         semaphore: SemaphorePtr,
+///         higher_prio_task_waken: Option<&mut bool>,
+///     ) -> bool {
+///         unimplemented!()
+///     }
+/// }
+///
+/// register_semaphore_implementation!(MySemaphore);
+/// ```
 pub trait SemaphoreImplementation {
     /// Creates a new semaphore instance.
     fn create(max: u32, initial: u32) -> SemaphorePtr;
@@ -182,10 +257,15 @@ macro_rules! register_semaphore_implementation {
     };
 }
 
+/// Semaphore handle.
+///
+/// This handle is used to interact with semaphores created by the driver implementation.
 #[repr(transparent)]
 pub struct SemaphoreHandle(SemaphorePtr);
 impl SemaphoreHandle {
     /// Creates a new semaphore instance.
+    ///
+    /// The semaphore will have the specified initial and maximum values.
     pub fn new(initial: u32, max: u32) -> Self {
         let ptr = unsafe { esp_preempt_semaphore_create(initial, max) };
         Self(ptr)
