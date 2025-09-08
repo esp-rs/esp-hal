@@ -47,8 +47,9 @@ macro_rules! task_list_item {
 }
 
 task_list_item!(TaskAllocListElement, alloc_list_item);
-task_list_item!(TaskReadyListElement, ready_list_item);
+task_list_item!(TaskReadyQueueElement, ready_quue_item);
 task_list_item!(TaskDeleteListElement, delete_list_item);
+task_list_item!(TaskTimerQueueElement, timer_queue_item);
 
 /// A singly linked list of tasks.
 ///
@@ -164,12 +165,17 @@ pub(crate) struct Context {
     pub state: TaskState,
     pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
 
+    pub wakeup_at: u64,
+
     // Lists a task can be in:
     /// The list of all allocated tasks
     pub alloc_list_item: TaskListItem,
 
     /// The list of ready tasks
-    pub ready_list_item: TaskListItem,
+    pub ready_quue_item: TaskListItem,
+
+    /// The timer queue
+    pub timer_queue_item: TaskListItem,
 
     /// The list of tasks scheduled for deletion
     pub delete_list_item: TaskListItem,
@@ -193,8 +199,11 @@ impl Context {
             state: TaskState::Ready,
             _allocated_stack: stack,
 
+            wakeup_at: 0,
+
             alloc_list_item: TaskListItem::None,
-            ready_list_item: TaskListItem::None,
+            ready_quue_item: TaskListItem::None,
+            timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         }
     }
@@ -221,8 +230,11 @@ pub(super) fn allocate_main_task() {
             state: TaskState::Ready,
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
 
+            wakeup_at: 0,
+
             alloc_list_item: TaskListItem::None,
-            ready_list_item: TaskListItem::None,
+            ready_quue_item: TaskListItem::None,
+            timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         },
         InternalMemory,

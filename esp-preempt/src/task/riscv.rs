@@ -126,7 +126,7 @@ pub(crate) fn new_task_context(
 /// We save MEPC as the current task's PC and change MEPC to an assembly function
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
-pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
+pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) {
     _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
     _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 
@@ -149,8 +149,6 @@ pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
         // load address of sys_switch into MEPC - will run after all registers are restored
         register::mepc::write(sys_switch as usize);
     }
-
-    true
 }
 
 core::arch::global_asm!(

@@ -17,7 +17,7 @@ use crate::{
         TaskList,
         TaskPtr,
         TaskQueue,
-        TaskReadyListElement,
+        TaskReadyQueueElement,
     },
     timer::TimeDriver,
     timer_queue,
@@ -31,7 +31,7 @@ pub(crate) struct SchedulerState {
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
 
     /// A list of tasks ready to run
-    pub(crate) ready_tasks: TaskQueue<TaskReadyListElement>,
+    pub(crate) ready_tasks: TaskQueue<TaskReadyQueueElement>,
 
     /// Pointer to the task that is scheduled for deletion.
     pub(crate) to_delete: TaskList<TaskDeleteListElement>,
@@ -61,6 +61,9 @@ impl SchedulerState {
         while let Some(to_delete) = self.to_delete.pop() {
             self.all_tasks.remove(to_delete);
             self.ready_tasks.remove(to_delete);
+            unwrap!(self.time_driver.as_mut())
+                .timer_queue
+                .remove(to_delete);
 
             unsafe {
                 let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
@@ -70,8 +73,10 @@ impl SchedulerState {
     }
 
     fn select_next_task(&mut self, currently_active_task: TaskPtr) -> Option<TaskPtr> {
-        // At least one task must be ready to run. If there are none, we don't switch tasks.
-        let next = self.ready_tasks.pop()?;
+        // At least one task must be ready to run. If there are none, we can't do anything - we
+        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
+        // and can be replaced with auto light sleep.
+        let next = unwrap!(self.ready_tasks.pop(), "There are no tasks ready to run.");
 
         // TODO: do not mark current task immediately ready to run
         self.ready_tasks.push(currently_active_task);
@@ -83,36 +88,38 @@ impl SchedulerState {
         Some(next)
     }
 
-    #[cfg(xtensa)]
-    pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
+    fn run_scheduler(&mut self, task_switch: impl FnOnce(TaskPtr, TaskPtr)) {
+        unwrap!(self.time_driver.as_mut()).handle_alarm(|_ready_task| {
+            // TODO implement waking up sleeping tasks
+        });
+
         self.delete_marked_tasks();
-        let mut current_task = unwrap!(self.current_task);
+        let current_task = unwrap!(self.current_task);
 
-        if let Some(mut next_task) = self.select_next_task(current_task) {
-            task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
-            task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
-
+        if let Some(next_task) = self.select_next_task(current_task) {
+            task_switch(current_task, next_task);
             self.current_task = Some(next_task);
         }
 
         self.arm_time_slice_alarm();
     }
 
+    #[cfg(xtensa)]
+    pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
+        self.run_scheduler(|mut current_task, mut next_task| {
+            task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
+            task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
+        });
+    }
+
     #[cfg(riscv)]
     pub(crate) fn switch_task(&mut self) {
-        self.delete_marked_tasks();
-        let mut current = unwrap!(self.current_task);
+        self.run_scheduler(|mut current_task, mut next_task| {
+            let old_ctx = unsafe { &raw mut current_task.as_mut().trap_frame };
+            let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
 
-        if let Some(mut next) = self.select_next_task(current) {
-            let old_ctx = unsafe { &raw mut current.as_mut().trap_frame };
-            let new_ctx = unsafe { &raw mut next.as_mut().trap_frame };
-
-            if crate::task::arch_specific::task_switch(old_ctx, new_ctx) {
-                self.current_task = Some(next);
-            }
-        }
-
-        self.arm_time_slice_alarm();
+            crate::task::arch_specific::task_switch(old_ctx, new_ctx);
+        });
     }
 
     fn arm_time_slice_alarm(&mut self) {

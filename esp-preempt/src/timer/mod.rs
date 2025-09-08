@@ -1,14 +1,59 @@
 use esp_hal::{
     interrupt::{InterruptHandler, Priority},
-    time::{Duration, Rate},
+    time::{Duration, Instant, Rate},
 };
 
-use crate::{SCHEDULER, TICK_RATE, TimeBase};
+use crate::{
+    SCHEDULER,
+    TICK_RATE,
+    TimeBase,
+    task::{Context, TaskPtr, TaskQueue, TaskTimerQueueElement},
+};
 
 const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
 
+pub(crate) struct TimerQueue {
+    queue: TaskQueue<TaskTimerQueueElement>,
+    next_wakeup: u64,
+}
+
+impl Default for TimerQueue {
+    fn default() -> Self {
+        // Can't derive Default, the default implementation must start with no wakeup timestamp
+        Self::new()
+    }
+}
+
+impl TimerQueue {
+    pub const fn new() -> Self {
+        Self {
+            queue: TaskQueue::new(),
+            next_wakeup: u64::MAX,
+        }
+    }
+
+    pub fn push(&mut self, task: TaskPtr, wakeup_at: u64) {
+        self.queue.push(task);
+
+        self.next_wakeup = self.next_wakeup.min(wakeup_at);
+    }
+
+    pub fn pop(&mut self) -> Option<TaskPtr> {
+        // We can allow waking up sooner than necessary, so this function doesn't need to
+        // re-calculate the next wakeup time.
+        self.queue.pop()
+    }
+
+    pub fn remove(&mut self, task: TaskPtr) {
+        // We can allow waking up sooner than necessary, so this function doesn't need to
+        // re-calculate the next wakeup time.
+        self.queue.remove(task);
+    }
+}
+
 pub(crate) struct TimeDriver {
     timer: TimeBase,
+    pub(crate) timer_queue: TimerQueue,
 }
 
 impl TimeDriver {
@@ -31,7 +76,10 @@ impl TimeDriver {
 
         timer.set_interrupt_handler(handler);
 
-        Self { timer }
+        Self {
+            timer,
+            timer_queue: TimerQueue::new(),
+        }
     }
 
     pub(crate) fn start(&mut self) {
@@ -43,16 +91,43 @@ impl TimeDriver {
         self.timer.stop();
     }
 
-    pub(crate) fn handle_alarm(&mut self) {
+    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(&mut Context)) {
         self.timer.clear_interrupt();
-        // TODO: we should run through the timer queue here, handle expired timers and calculate
-        // next timer wakeup.
+
+        let mut timer_queue = core::mem::take(&mut self.timer_queue);
+
+        let now = Instant::now().duration_since_epoch().as_micros();
+
+        while let Some(mut task_ptr) = timer_queue.pop() {
+            let task = unsafe { task_ptr.as_mut() };
+
+            let wakeup_at = task.wakeup_at;
+            let ready = wakeup_at >= now;
+
+            if ready {
+                on_task_ready(task);
+            } else {
+                self.timer_queue.push(task_ptr, wakeup_at);
+            }
+        }
     }
 
     pub(crate) fn arm_next_wakeup(&mut self, with_time_slice: bool) {
-        if with_time_slice {
-            let timeout = TIMESLICE_DURATION;
-            unwrap!(self.timer.schedule(timeout));
+        let now = Instant::now().duration_since_epoch().as_micros();
+        let wakeup_at = self.timer_queue.next_wakeup;
+
+        if wakeup_at != u64::MAX {
+            let sleep_duration = wakeup_at.saturating_sub(now);
+
+            let timeout = if with_time_slice {
+                sleep_duration.min(TIMESLICE_DURATION.as_micros())
+            } else {
+                sleep_duration
+            };
+
+            unwrap!(self.timer.schedule(Duration::from_micros(timeout)));
+        } else if with_time_slice {
+            unwrap!(self.timer.schedule(TIMESLICE_DURATION));
         } else {
             self.timer.stop();
         }
@@ -61,9 +136,7 @@ impl TimeDriver {
 
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
-    SCHEDULER.with(|scheduler| {
-        unwrap!(scheduler.time_driver.as_mut()).handle_alarm();
-
+    SCHEDULER.with(|_scheduler| {
         // `Scheduler::switch_task` must be called on a single interrupt priority level only.
         // To ensure this, we call yield_task to pend the software interrupt.
         //
@@ -79,7 +152,7 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
             if #[cfg(any(riscv, esp32))] {
                 SCHEDULER.yield_task();
             } else {
-                scheduler.switch_task(_context)
+                _scheduler.switch_task(_context)
             }
         }
     });
