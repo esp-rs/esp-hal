@@ -75,6 +75,16 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
+// Most of the time, the codes received in tests match exactly, but every once in a while, a test
+// fails with pulse lengths off by one. Allow for that here, there is no hardware synchronization
+// between rx/tx that would guarantee them to be identical.
+fn pulse_code_matches(left: PulseCode, right: PulseCode) -> bool {
+    left.level1() == right.level1()
+        && left.level2() == right.level2()
+        && left.length1().abs_diff(right.length1()) <= 1
+        && left.length2().abs_diff(right.length2()) <= 1
+}
+
 // Run tests with a large buffer like `DEFMT_RTT_BUFFER_SIZE=32768 xtask run ...` to avoid
 // truncated output when running this with defmt!
 // Note that probe-rs reading the buffer might mess up timing-sensitive tests.
@@ -98,7 +108,7 @@ fn check_data_eq(
     };
 
     let mut errors: usize = 0;
-    for (idx, (code_tx, code_rx)) in core::iter::zip(tx, rx).enumerate() {
+    for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
         let mut _msg = "";
 
         if idx < expected_rx_len {
@@ -109,7 +119,7 @@ fn check_data_eq(
                     _msg = "rx code not a stop code!";
                     errors += 1;
                 }
-            } else if code_tx != code_rx {
+            } else if !pulse_code_matches(code_tx, code_rx) {
                 _msg = "rx/tx code mismatch!";
                 errors += 1;
             }
