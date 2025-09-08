@@ -211,6 +211,23 @@ impl Scheduler {
     pub(crate) fn current_task(&self) -> TaskPtr {
         task::current_task()
     }
+
+    pub(crate) fn create_task(
+        &self,
+        task: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+    ) -> TaskPtr {
+        let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
+        let task_ptr = NonNull::from(Box::leak(task));
+
+        SCHEDULER.with(|state| {
+            state.all_tasks.push(task_ptr);
+            state.run_queue.mark_task_ready(task_ptr);
+        });
+
+        task_ptr
+    }
 }
 
 esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler = Scheduler {
@@ -257,15 +274,9 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         _pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void {
-        let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
-        let task_ptr = NonNull::from(Box::leak(task));
-
-        SCHEDULER.with(|state| {
-            state.all_tasks.push(task_ptr);
-            state.run_queue.mark_task_ready(task_ptr);
-        });
-
-        task_ptr.as_ptr().cast()
+        self.create_task(task, param, task_stack_size)
+            .as_ptr()
+            .cast()
     }
 
     fn current_task(&self) -> *mut c_void {

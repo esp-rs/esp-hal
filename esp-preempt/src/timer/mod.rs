@@ -143,6 +143,10 @@ impl TimeDriver {
         }
 
         let timestamp = at.duration_since_epoch().as_micros();
+        debug!(
+            "Scheduling wakeup for task {:?} at timestamp {}",
+            current_task, timestamp
+        );
         self.timer_queue.push(current_task, timestamp);
 
         unsafe { current_task.as_mut().wakeup_at = timestamp };

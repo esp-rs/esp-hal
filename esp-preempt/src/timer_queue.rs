@@ -12,7 +12,7 @@ use esp_radio_preempt_driver::{
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::SCHEDULER;
+use crate::{SCHEDULER, task::TaskPtr};
 
 static TIMER_QUEUE: TimerQueue = TimerQueue::new();
 
@@ -20,6 +20,7 @@ struct TimerQueueInner {
     // A linked list of active timers
     head: Option<NonNull<Timer>>,
     next_wakeup: u64,
+    task: Option<TaskPtr>,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -29,6 +30,7 @@ impl TimerQueueInner {
         Self {
             head: None,
             next_wakeup: 0,
+            task: None,
         }
     }
 
@@ -97,6 +99,7 @@ impl TimerQueue {
     /// The timer queue needs to be re-processed when a new timer is armed, because the new timer
     /// may need to be triggered before the next scheduled wakeup.
     fn process(&self) {
+        debug!("Processing timers");
         let mut timers = self.inner.with(|q| {
             q.next_wakeup = u64::MAX;
             q.head.take()
@@ -156,10 +159,10 @@ impl TimerQueue {
                 }
             });
         }
-    }
 
-    fn next_wakeup(&self) -> u64 {
-        self.inner.with(|q| q.next_wakeup)
+        while SCHEDULER.now() < self.inner.with(|q| q.next_wakeup) {
+            SCHEDULER.yield_task();
+        }
     }
 }
 
@@ -298,18 +301,17 @@ register_timer_implementation!(Timer);
 
 /// Initializes the `timer` task for the Wi-Fi driver.
 pub(crate) fn create_timer_task() {
-    // schedule the timer task
-    SCHEDULER.task_create(timer_task, core::ptr::null_mut(), 1, None, 8192);
+    // create the timer task
+    TIMER_QUEUE.inner.with(|q| {
+        let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192);
+        q.task = Some(task_ptr);
+    });
 }
 
 /// Entry point for the timer task responsible for handling scheduled timer
 /// events.
 pub(crate) extern "C" fn timer_task(_: *mut c_void) {
     loop {
-        debug!("Timer task");
         TIMER_QUEUE.process();
-        while SCHEDULER.now() < TIMER_QUEUE.next_wakeup() {
-            SCHEDULER.yield_task();
-        }
     }
 }
