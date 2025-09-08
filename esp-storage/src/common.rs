@@ -1,7 +1,6 @@
 use core::mem::MaybeUninit;
 
 use crate::chip_specific;
-
 #[cfg(multi_core)]
 use crate::multi_core::MultiCoreStrategy;
 

@@ -1,20 +1,37 @@
-use esp_hal::{
-    peripherals::LPWR,
-    system::Cpu,
-};
-
 use crate::{FlashStorage, common::FlashStorageError};
 
-/// Strategy to use on a multi core system where writing to the flash needs exclusive access from one core
+#[cfg(feature = "esp32")]
+mod registers {
+    pub(crate) const OPTIONS0: u32 = 0x3ff4_8000;
+    pub(crate) const SW_CPU_STALL: u32 = 0x3ff4_80ac;
+    pub(crate) const APPCPU_CTRL_B: u32 = 0x3FF0_002C;
+    pub(crate) const APPCPU_CTRL_C: u32 = 0x3FF0_0034;
+}
+
+#[cfg(feature = "esp32s3")]
+mod registers {
+    pub(crate) const OPTIONS0: u32 = 0x6000_8000;
+    pub(crate) const SW_CPU_STALL: u32 = 0x6000_80bc;
+    pub(crate) const CORE_1_CONTROL_0: u32 = 0x600c_0000;
+}
+
+const C0_VALUE_PRO: u32 = 0x02 << 2;
+const C1_VALUE_PRO: u32 = 0x21 << 26;
+const C0_VALUE_APP: u32 = 0x02;
+const C1_VALUE_APP: u32 = 0x21 << 20;
+
+/// Strategy to use on a multi core system where writing to the flash needs exclusive access from
+/// one core
 #[derive(Debug)]
 pub(crate) enum MultiCoreStrategy {
-    /// Flash writes simply fail if the second core is active while attempting a write (default behavior)
+    /// Flash writes simply fail if the second core is active while attempting a write (default
+    /// behavior)
     Error,
     /// Auto park the other core before writing. Un-park it when writing is complete
     AutoPark,
     /// Ignore that the other core is active.
-    /// This is useful if the second core is known to not fetch instructions from the flash for the duration of the write.
-    /// This is unsafe to use.
+    /// This is useful if the second core is known to not fetch instructions from the flash for the
+    /// duration of the write. This is unsafe to use.
     Ignore,
 }
 
@@ -26,8 +43,10 @@ impl FlashStorage {
     }
 
     /// Do not check if the second core is active before writing to flash.
-    /// This is unsafe to use.
-    /// Only enable this if you are sure that the second core is not fetching instructions from the flash during the write
+    ///
+    /// # Safety
+    /// Only enable this if you are sure that the second core is not fetching instructions from the
+    /// flash during the write
     pub unsafe fn multicore_ignore(mut self) -> FlashStorage {
         self.multi_core_strategy = MultiCoreStrategy::Ignore;
         self
@@ -48,75 +67,124 @@ fn raw_core() -> usize {
     }
 }
 
-#[inline(always)]
-fn other_core() -> Cpu {
-    // This works for both RISCV and Xtensa because both
-    // get_raw_core functions return zero, _or_ something
-    // greater than zero; 1 in the case of RISCV and 0x2000
-    // in the case of Xtensa.
-    match raw_core() {
-        0 => Cpu::AppCpu,
-        #[cfg(all(multi_core, riscv))]
-        1 => Cpu::ProCpu,
-        #[cfg(all(multi_core, xtensa))]
-        0x2000 => Cpu::ProCpu,
-        _ => unreachable!(),
-    }
+#[derive(Debug)]
+pub enum Cpu {
+    /// The first core
+    ProCpu = 0,
+    /// The second core
+    AppCpu = 1,
 }
 
-unsafe fn park_core(core: Cpu, park: bool) {
-    let c1_value = if park { 0x21 } else { 0 };
-    let c0_value = if park { 0x02 } else { 0 };
-    match core {
-        Cpu::ProCpu => {
-            LPWR::regs()
-                .sw_cpu_stall()
-                .modify(|_, w| unsafe { w.sw_stall_procpu_c1().bits(c1_value) });
-            LPWR::regs()
-                .options0()
-                .modify(|_, w| unsafe { w.sw_stall_procpu_c0().bits(c0_value) });
-        }
-        Cpu::AppCpu => {
-            LPWR::regs()
-                .sw_cpu_stall()
-                .modify(|_, w| unsafe { w.sw_stall_appcpu_c1().bits(c1_value) });
-            LPWR::regs()
-                .options0()
-                .modify(|_, w| unsafe { w.sw_stall_appcpu_c0().bits(c0_value) });
+impl Cpu {
+    /// Returns the core other than the one which this function is called on
+    #[inline(always)]
+    fn other() -> Cpu {
+        // This works for both RISCV and Xtensa because both
+        // get_raw_core functions return zero, _or_ something
+        // greater than zero; 1 in the case of RISCV and 0x2000
+        // in the case of Xtensa.
+        match raw_core() {
+            0 => Cpu::AppCpu,
+            #[cfg(all(multi_core, riscv))]
+            1 => Cpu::ProCpu,
+            #[cfg(all(multi_core, xtensa))]
+            0x2000 => Cpu::ProCpu,
+            _ => unreachable!(),
         }
     }
-}
 
-fn is_cpu_running(core: Cpu) -> bool {
-    match core {
-        Cpu::ProCpu => {
-            // ?
-        }
-        Cpu::AppCpu => {
-            // ?
+    #[inline(always)]
+    fn get_c0_c1_bits(&self) -> (u32, u32) {
+        match self {
+            Cpu::ProCpu => (C0_VALUE_PRO, C1_VALUE_PRO),
+            Cpu::AppCpu => (C0_VALUE_APP, C1_VALUE_APP),
         }
     }
-    true
+
+    #[inline(always)]
+    fn park_core(&self, park: bool) {
+        let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
+        let options0 = registers::OPTIONS0 as *mut u32;
+
+        // Write 0x2 to options0 to stall a particular core
+        // offset for app cpu: 0
+        // offset for pro cpu: 2
+
+        // Write 0x21 to sw_cpu_stall to allow stalling of a particular core
+        // offset for app cpu: 20
+        // offset for pro cpu: 26
+
+        let (c0_bits, c1_bits) = self.get_c0_c1_bits();
+        unsafe {
+            let mut c0 = options0.read_volatile() & !(c0_bits);
+            let mut c1 = sw_cpu_stall.read_volatile() & !(c1_bits);
+            if park {
+                c0 |= c0_bits;
+                c1 |= c1_bits;
+            }
+            sw_cpu_stall.write_volatile(c1);
+            options0.write_volatile(c0);
+        }
+    }
+
+    #[inline(always)]
+    fn is_running(&self) -> bool {
+        // If the core is the app cpu we need to check first if it was even enabled
+        if let Cpu::AppCpu = *self {
+            cfg_if::cfg_if! {
+                if #[cfg(feature = "esp32s3")] {
+                    // CORE_1_RUNSTALL in bit 0 -> needs to be 0 to not stall
+                    // CORE_1_CLKGATE_EN in bit 1 -> needs to be 1 to even be enabled
+                    let core_1_control_0 = registers::CORE_1_CONTROL_0 as *mut u32;
+                    if unsafe { core_1_control_0.read_volatile() } & 0x03 != 0x02 {
+                        // If the core is not enabled we can take this shortcut
+                        return false;
+                    }
+                } else if #[cfg(feature = "esp32")] {
+                    // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
+                    // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
+                    let appcpu_ctrl_b = registers::APPCPU_CTRL_B as *mut u32;
+                    if unsafe { appcpu_ctrl_b.read_volatile() } & 0x01 != 0x01 {
+                        // If the core is not enabled we can take this shortcut
+                        return false;
+                    }
+                    let appcpu_ctrl_c = registers::APPCPU_CTRL_C as *mut u32;
+                    if unsafe { appcpu_ctrl_c.read_volatile() } & 0x01 != 0x01 {
+                        // If the core is stalled we can take this shortcut
+                        return false;
+                    }
+                }
+            }
+        }
+
+        let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
+        let options0 = registers::OPTIONS0 as *mut u32;
+
+        let (c0_bits, c1_bits) = self.get_c0_c1_bits();
+        let (c0, c1) = unsafe {
+            (
+                options0.read_volatile() & c0_bits,
+                sw_cpu_stall.read_volatile() & c1_bits,
+            )
+        };
+        !(c0 == c0_bits && c1 == c1_bits)
+    }
 }
 
 impl MultiCoreStrategy {
     fn pre_write(&self) -> Result<bool, FlashStorageError> {
         match self {
             MultiCoreStrategy::Error => {
-                let other_cpu = other_core();
-                if is_cpu_running(other_cpu) {
+                if Cpu::other().is_running() {
                     Err(FlashStorageError::SecondCoreRunning)
                 } else {
                     Ok(false)
                 }
             }
             MultiCoreStrategy::AutoPark => {
-                let other_cpu = other_core();
-
-                if is_cpu_running(other_cpu) {
-                    unsafe {
-                        park_core(other_cpu, true);
-                    }
+                let other_cpu = Cpu::other();
+                if other_cpu.is_running() {
+                    other_cpu.park_core(true);
                     Ok(true)
                 } else {
                     Ok(false)
@@ -127,15 +195,10 @@ impl MultiCoreStrategy {
     }
 
     fn post_write(&self, unpark: bool) {
-        match self {
-            MultiCoreStrategy::AutoPark => {
-                if unpark {
-                    unsafe {
-                        park_core(other_core(), false);
-                    }
-                }
+        if let MultiCoreStrategy::AutoPark = self {
+            if unpark {
+                Cpu::other().park_core(false);
             }
-            _ => {}
         }
     }
 
