@@ -9,6 +9,15 @@
 //!
 //! ## Implementing a scheduler driver
 //!
+//! This crate abstracts the capabilities of FreeRTOS. The scheduler must implement the following
+//! capabilities:
+//!
+//! - A preemptive task scheduler
+//! - Mutexes
+//! - Semaphores
+//! - Queues
+//! - Timers (functions that are executed at a specific time)
+//!
 //! In order to hook up a scheduler, implement the `Scheduler` trait for a struct, and register it
 //! using the `scheduler_impl!()` macro. Only one scheduler can be registered in a firmware.
 //!
@@ -45,6 +54,7 @@ unsafe extern "Rust" {
     fn esp_preempt_enable();
     fn esp_preempt_disable();
     fn esp_preempt_yield_task();
+    fn esp_preempt_yield_task_from_isr();
     fn esp_preempt_current_task() -> *mut c_void;
     fn esp_preempt_max_task_priority() -> u32;
     fn esp_preempt_task_create(
@@ -91,6 +101,12 @@ macro_rules! scheduler_impl {
         #[inline]
         fn esp_preempt_yield_task() {
             <$t as $crate::Scheduler>::yield_task(&$name)
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_yield_task_from_isr() {
+            <$t as $crate::Scheduler>::yield_task_from_isr(&$name)
         }
 
         #[unsafe(no_mangle)]
@@ -165,8 +181,11 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp-radio` to stop the task scheduler.
     fn disable(&self);
 
-    /// This function is called by `esp_radio::init` to yield control to another task.
+    /// This function is called by `esp_radio` to yield control to another task.
     fn yield_task(&self);
+
+    /// This function is called by `esp_radio` to yield control to another task.
+    fn yield_task_from_isr(&self);
 
     /// This function is called by `esp_radio::init` to retrieve a pointer to the current task.
     fn current_task(&self) -> *mut c_void;
@@ -234,6 +253,12 @@ pub fn disable() {
 #[inline]
 pub fn yield_task() {
     unsafe { esp_preempt_yield_task() }
+}
+
+/// Yields control to another task for an interrupt.
+#[inline]
+pub fn yield_task_from_isr() {
+    unsafe { esp_preempt_yield_task_from_isr() }
 }
 
 /// Returns a pointer to the current task.

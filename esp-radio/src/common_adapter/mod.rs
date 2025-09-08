@@ -131,7 +131,7 @@ pub unsafe extern "C" fn semphr_take_from_isr(
     higher_priority_task_waken: *mut bool,
 ) -> i32 {
     trace!(">>>> semphr_take_from_isr {:?}", semphr);
-    sem_take_from_isr(semphr, higher_priority_task_waken)
+    sem_try_take_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -159,7 +159,7 @@ pub unsafe extern "C" fn semphr_give_from_isr(
     higher_priority_task_waken: *mut bool,
 ) -> i32 {
     trace!(">>>> semphr_give_from_isr {:?}", semphr);
-    sem_give_from_isr(semphr, higher_priority_task_waken)
+    sem_try_give_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -521,9 +521,13 @@ pub unsafe extern "C" fn queue_send(
 pub unsafe extern "C" fn queue_send_from_isr(
     queue: *mut c_void,
     item: *mut c_void,
-    _higher_priority_task_waken: *mut c_void,
+    higher_priority_task_waken: *mut c_void,
 ) -> i32 {
-    crate::compat::queue::queue_try_send_to_back(queue.cast(), item.cast_const())
+    crate::compat::queue::queue_try_send_to_back_from_isr(
+        queue.cast(),
+        item.cast_const(),
+        higher_priority_task_waken.cast(),
+    )
 }
 
 /// **************************************************************************
@@ -606,9 +610,13 @@ pub unsafe extern "C" fn queue_recv(
 pub unsafe extern "C" fn queue_recv_from_isr(
     queue: *mut c_void,
     item: *mut c_void,
-    _higher_priority_task_waken: *mut c_void,
+    higher_priority_task_waken: *mut c_void,
 ) -> i32 {
-    crate::compat::queue::queue_try_receive(queue.cast(), item)
+    crate::compat::queue::queue_try_receive_from_isr(
+        queue.cast(),
+        item,
+        higher_priority_task_waken.cast(),
+    )
 }
 
 /// **************************************************************************

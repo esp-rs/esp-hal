@@ -19,9 +19,17 @@ unsafe extern "Rust" {
         item: *const u8,
         timeout_us: Option<u32>,
     ) -> bool;
-    fn esp_preempt_queue_try_send_to_back(queue: QueuePtr, item: *const u8) -> bool;
+    fn esp_preempt_queue_try_send_to_back_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
     fn esp_preempt_queue_receive(queue: QueuePtr, item: *mut u8, timeout_us: Option<u32>) -> bool;
-    fn esp_preempt_queue_try_receive(queue: QueuePtr, item: *mut u8) -> bool;
+    fn esp_preempt_queue_try_receive_from_isr(
+        queue: QueuePtr,
+        item: *mut u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
     fn esp_preempt_queue_remove(queue: QueuePtr, item: *const u8);
     fn esp_preempt_queue_messages_waiting(queue: QueuePtr) -> usize;
 }
@@ -67,11 +75,18 @@ pub trait QueueImplementation {
     ///
     /// If the queue is full, this function will immediately return `false`.
     ///
+    /// The `higher_prio_task_waken` parameter is an optional mutable reference to a boolean flag.
+    /// If the flag is `Some`, the implementation may set it to `true` to request a context switch.
+    ///
     /// # Safety
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
-    unsafe fn try_send_to_back(queue: QueuePtr, item: *const u8) -> bool;
+    unsafe fn try_send_to_back_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
 
     /// Dequeues an item from the queue.
     ///
@@ -90,13 +105,20 @@ pub trait QueueImplementation {
     ///
     /// If the queue is empty, this function will return `false` immediately.
     ///
+    /// The `higher_prio_task_waken` parameter is an optional mutable reference to a boolean flag.
+    /// If the flag is `Some`, the implementation may set it to `true` to request a context switch.
+    ///
     /// This function returns `true` if the item was successfully dequeued, `false` otherwise.
     ///
     /// # Safety
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
-    unsafe fn try_receive(queue: QueuePtr, item: *mut u8) -> bool;
+    unsafe fn try_receive_from_isr(
+        queue: QueuePtr,
+        item: *mut u8,
+        higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool;
 
     /// Removes an item from the queue.
     ///
@@ -151,8 +173,18 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_try_send_to_back(queue: QueuePtr, item: *const u8) -> bool {
-            unsafe { <$t as $crate::queue::QueueImplementation>::try_send_to_back(queue, item) }
+        fn esp_preempt_queue_try_send_to_back_from_isr(
+            queue: QueuePtr,
+            item: *const u8,
+            higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::try_send_to_back_from_isr(
+                    queue,
+                    item,
+                    higher_prio_task_waken,
+                )
+            }
         }
 
         #[unsafe(no_mangle)]
@@ -167,8 +199,18 @@ macro_rules! register_queue_implementation {
 
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_queue_try_receive(queue: QueuePtr, item: *mut u8) -> bool {
-            unsafe { <$t as $crate::queue::QueueImplementation>::try_receive(queue, item) }
+        fn esp_preempt_queue_try_receive_from_isr(
+            queue: QueuePtr,
+            item: *mut u8,
+            higher_prio_task_waken: Option<&mut bool>,
+        ) -> bool {
+            unsafe {
+                <$t as $crate::queue::QueueImplementation>::try_receive_from_isr(
+                    queue,
+                    item,
+                    higher_prio_task_waken,
+                )
+            }
         }
 
         #[unsafe(no_mangle)]
@@ -256,12 +298,21 @@ impl QueueHandle {
     ///
     /// If the queue is full, this function will immediately return `false`.
     ///
+    /// If a higher priority task is woken up by this operation, the `higher_prio_task_waken` flag
+    /// is set to `true`.
+    ///
     /// # Safety
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
-    pub unsafe fn try_send_to_back(&self, item: *const u8) -> bool {
-        unsafe { esp_preempt_queue_try_send_to_back(self.0, item) }
+    pub unsafe fn try_send_to_back_from_isr(
+        &self,
+        item: *const u8,
+        higher_priority_task_waken: Option<&mut bool>,
+    ) -> bool {
+        unsafe {
+            esp_preempt_queue_try_send_to_back_from_isr(self.0, item, higher_priority_task_waken)
+        }
     }
 
     /// Dequeues an item from the queue.
@@ -285,12 +336,19 @@ impl QueueHandle {
     ///
     /// This function returns `true` if the item was successfully dequeued, `false` otherwise.
     ///
+    /// If a higher priority task is woken up by this operation, the `higher_prio_task_waken` flag
+    /// is set to `true`.
+    ///
     /// # Safety
     ///
     /// The caller must ensure that `item` can be dereferenced and points to an allocation of
     /// a size equal to the queue's item size.
-    pub unsafe fn try_receive(&self, item: *mut u8) -> bool {
-        unsafe { esp_preempt_queue_try_receive(self.0, item) }
+    pub unsafe fn try_receive_from_isr(
+        &self,
+        item: *mut u8,
+        higher_priority_task_waken: Option<&mut bool>,
+    ) -> bool {
+        unsafe { esp_preempt_queue_try_receive_from_isr(self.0, item, higher_priority_task_waken) }
     }
 
     /// Removes an item from the queue.

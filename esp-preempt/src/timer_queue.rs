@@ -243,8 +243,23 @@ impl Timer {
 }
 
 impl TimerImplementation for Timer {
-    fn create(callback: Box<dyn FnMut() + Send>) -> TimerPtr {
-        let timer = Box::new(Timer::new(callback));
+    fn create(func: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> TimerPtr {
+        // TODO: get rid of the inner box (or its heap allocation) somehow
+        struct CCallback {
+            func: unsafe extern "C" fn(*mut c_void),
+            data: *mut c_void,
+        }
+        unsafe impl Send for CCallback {}
+
+        impl CCallback {
+            unsafe fn call(&mut self) {
+                unsafe { (self.func)(self.data) }
+            }
+        }
+
+        let mut callback = CCallback { func, data };
+
+        let timer = Box::new(Timer::new(Box::new(move || unsafe { callback.call() })));
         NonNull::from(Box::leak(timer)).cast()
     }
 

@@ -187,7 +187,11 @@ impl QueueImplementation for Queue {
         unsafe { queue.send_to_back(item, timeout_us) }
     }
 
-    unsafe fn try_send_to_back(queue: QueuePtr, item: *const u8) -> bool {
+    unsafe fn try_send_to_back_from_isr(
+        queue: QueuePtr,
+        item: *const u8,
+        _higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool {
         let queue = unsafe { Queue::from_ptr(queue) };
 
         unsafe { queue.try_send_to_back(item) }
@@ -199,7 +203,11 @@ impl QueueImplementation for Queue {
         unsafe { queue.receive(item, timeout_us) }
     }
 
-    unsafe fn try_receive(queue: QueuePtr, item: *mut u8) -> bool {
+    unsafe fn try_receive_from_isr(
+        queue: QueuePtr,
+        item: *mut u8,
+        _higher_prio_task_waken: Option<&mut bool>,
+    ) -> bool {
         let queue = unsafe { Queue::from_ptr(queue) };
 
         unsafe { queue.try_receive(item) }

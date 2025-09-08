@@ -124,7 +124,7 @@ unsafe extern "C" fn task_yield() {
 unsafe extern "C" fn task_yield_from_isr() {
     // This is not called because we never set xHigherPriorityTaskWoken = true in the `_from_isr`
     // functions. This should be revisited if a scheduler needs it.
-    todo!();
+    crate::preempt::yield_task_from_isr();
 }
 
 unsafe extern "C" fn mutex_create() -> *const () {

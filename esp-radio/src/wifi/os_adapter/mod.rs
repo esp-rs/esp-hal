@@ -20,7 +20,6 @@ use crate::{
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
-    preempt::yield_task,
     time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
 
@@ -242,7 +241,7 @@ pub unsafe extern "C" fn wifi_int_restore(_wifi_int_mux: *mut c_void, tmp: u32) 
 /// *************************************************************************
 pub unsafe extern "C" fn task_yield_from_isr() {
     trace!("task_yield_from_isr");
-    yield_task();
+    crate::preempt::yield_task_from_isr();
 }
 
 /// **************************************************************************
