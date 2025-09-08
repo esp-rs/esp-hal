@@ -1209,7 +1209,7 @@ pub(crate) fn ble_init() {
 
         // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
         // we wait a bit to make sure the ble task initialized everything
-        crate::compat::common::sleep(10);
+        crate::preempt::usleep(10_000);
     }
 
     // At some point the "High-speed ADC" entropy source became available.
@@ -1227,7 +1227,7 @@ pub(crate) fn ble_deinit() {
         // Prevent ASSERT r_ble_ll_reset:1069 ... ...
         // TODO: the cause of the issue is that the BLE controller can be dropped while the driver
         // is in the process of handling a HCI command.
-        crate::compat::common::sleep(10);
+        crate::preempt::usleep(10_000);
         // HCI deinit
         npl::r_ble_hci_trans_cfg_hs(None, core::ptr::null(), None, core::ptr::null());
 
