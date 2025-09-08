@@ -92,8 +92,6 @@ impl TimeDriver {
     }
 
     pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(&mut Context)) {
-        self.timer.clear_interrupt();
-
         let mut timer_queue = core::mem::take(&mut self.timer_queue);
 
         let now = Instant::now().duration_since_epoch().as_micros();
@@ -126,10 +124,13 @@ impl TimeDriver {
                 sleep_duration & ((1 << 52) - 1)
             };
 
+            trace!("Arming timer for {:?}", timeout);
             unwrap!(self.timer.schedule(Duration::from_micros(timeout)));
         } else if with_time_slice {
+            trace!("Arming timer for {:?}", TIMESLICE_DURATION);
             unwrap!(self.timer.schedule(TIMESLICE_DURATION));
         } else {
+            trace!("Stopping timer");
             self.timer.stop();
         }
     }
@@ -157,6 +158,10 @@ impl TimeDriver {
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
     SCHEDULER.with(|scheduler| {
+        unwrap!(scheduler.time_driver.as_mut())
+            .timer
+            .clear_interrupt();
+
         scheduler.event.set_timer_event();
 
         // `Scheduler::switch_task` must be called on a single interrupt priority level only.
@@ -174,7 +179,7 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
             if #[cfg(any(riscv, esp32))] {
                 SCHEDULER.yield_task();
             } else {
-                _scheduler.switch_task(_context)
+                scheduler.switch_task(_context)
             }
         }
     });
