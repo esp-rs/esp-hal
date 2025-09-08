@@ -279,6 +279,79 @@ impl Clock for ApbClock {
     }
 }
 
+/// RTC FAST_CLK frequency values
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum RtcFastClock {
+    /// Main XTAL, divided by 4
+    #[cfg(not(any(esp32c6, esp32h2)))]
+    #[expect(unused)]
+    XtalD4,
+
+    /// Select XTAL_D2_CLK as RTC_FAST_CLK source
+    #[cfg(any(esp32c6, esp32h2))]
+    XtalD2,
+
+    /// Internal fast RC oscillator
+    RcFast,
+}
+
+impl Clock for RtcFastClock {
+    fn frequency(&self) -> Rate {
+        match self {
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            RtcFastClock::XtalD4 => Rate::from_hz(40_000_000 / 4),
+            #[cfg(any(esp32c6, esp32h2))]
+            RtcFastClock::XtalD2 => Rate::from_hz(property!("soc.xtal_frequency") / 2),
+            RtcFastClock::RcFast => Rate::from_hz(property!("soc.rc_fast_clk_default")),
+        }
+    }
+}
+
+/// RTC SLOW_CLK frequency values
+#[cfg(not(any(esp32c6, esp32h2)))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RtcSlowClock {
+    /// Internal slow RC oscillator
+    RcSlow   = 0,
+    /// External 32 KHz XTAL
+    _32kXtal = 1,
+    /// Internal fast RC oscillator, divided by 256
+    _8mD256  = 2,
+}
+
+/// RTC SLOW_CLK frequency values
+#[cfg(any(esp32c6, esp32h2))]
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum RtcSlowClock {
+    /// Select RC_SLOW_CLK as RTC_SLOW_CLK source
+    RcSlow   = 0,
+    /// Select XTAL32K_CLK as RTC_SLOW_CLK source
+    _32kXtal = 1,
+    /// Select RC32K_CLK as RTC_SLOW_CLK source
+    _32kRc   = 2,
+    /// Select OSC_SLOW_CLK (external slow clock) as RTC_SLOW_CLK source
+    OscSlow  = 3,
+}
+
+impl Clock for RtcSlowClock {
+    fn frequency(&self) -> Rate {
+        match self {
+            RtcSlowClock::RcSlow => Rate::from_hz(property!("soc.rc_slow_clock")),
+            RtcSlowClock::_32kXtal => Rate::from_hz(32_768),
+            #[cfg(any(esp32c6, esp32h2))]
+            RtcSlowClock::_32kRc => Rate::from_hz(32_768),
+            #[cfg(not(any(esp32c6, esp32h2)))]
+            RtcSlowClock::_8mD256 => RtcFastClock::RcFast.frequency() / 256,
+            #[cfg(any(esp32c6, esp32h2))]
+            RtcSlowClock::OscSlow => Rate::from_hz(32_768),
+        }
+    }
+}
+
 /// Clock frequencies.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

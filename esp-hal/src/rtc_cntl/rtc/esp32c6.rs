@@ -7,6 +7,8 @@ use strum::FromRepr;
 use crate::{
     clock::{
         Clock,
+        RtcFastClock,
+        RtcSlowClock,
         clocks_ll::{
             esp32c6_bbpll_get_freq_mhz,
             esp32c6_cpu_get_hs_divider,
@@ -18,7 +20,7 @@ use crate::{
         },
     },
     peripherals::{LP_AON, LP_CLKRST, MODEM_LPCON, MODEM_SYSCON, PCR, PMU},
-    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+    rtc_cntl::{RtcCalSel, RtcClock},
     soc::regi2c,
 };
 
@@ -1055,13 +1057,13 @@ pub(crate) fn init() {
 
     modem_clock_select_lp_clock_source_wifi(modem_lpclk_src, 0);
 
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
-    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
+    RtcClock::set_fast_freq(RtcFastClock::RcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RcSlow);
 }
 
 pub(crate) fn configure_clock() {
     let cal_val = loop {
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
         if res != 0 {
             break res;
         }

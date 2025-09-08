@@ -1,18 +1,19 @@
 use strum::FromRepr;
 
 use crate::{
+    clock::{RtcFastClock, RtcSlowClock},
     peripherals::LPWR,
-    rtc_cntl::{RtcCalSel, RtcClock, RtcFastClock, RtcSlowClock},
+    rtc_cntl::{RtcCalSel, RtcClock},
 };
 
 pub(crate) fn init() {
-    RtcClock::set_fast_freq(RtcFastClock::RtcFastClockRcFast);
-    RtcClock::set_slow_freq(RtcSlowClock::RtcSlowClockRcSlow);
+    RtcClock::set_fast_freq(RtcFastClock::RcFast);
+    RtcClock::set_slow_freq(RtcSlowClock::RcSlow);
 }
 
 pub(crate) fn configure_clock() {
     let cal_val = loop {
-        let res = RtcClock::calibrate(RtcCalSel::RtcCalRtcMux, 1024);
+        let res = RtcClock::calibrate(RtcCalSel::RtcMux, 1024);
         if res != 0 {
             break res;
         }
