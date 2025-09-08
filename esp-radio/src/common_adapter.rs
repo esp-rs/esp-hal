@@ -341,9 +341,14 @@ pub(crate) fn enable_wifi_power_domain() {
         cfg_if::cfg_if! {
             if #[cfg(soc_has_lpwr)] {
                 let rtc_cntl = esp_hal::peripherals::LPWR::regs();
-                let syscon = esp_hal::peripherals::APB_CTRL::regs();
             } else {
                 let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
+            }
+        }
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_apb_ctrl)] {
+                let syscon = esp_hal::peripherals::APB_CTRL::regs();
+            } else {
                 let syscon = esp_hal::peripherals::SYSCON::regs();
             }
         }
