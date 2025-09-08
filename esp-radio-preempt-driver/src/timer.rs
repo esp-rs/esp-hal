@@ -1,13 +1,15 @@
 //! Timers
 
-use alloc::boxed::Box;
-use core::ptr::NonNull;
+use core::{ffi::c_void, ptr::NonNull};
 
 /// Pointer to an opaque timer created by the driver implementation.
 pub type TimerPtr = NonNull<()>;
 
 unsafe extern "Rust" {
-    fn esp_preempt_timer_create(callback: Box<dyn FnMut() + Send>) -> TimerPtr;
+    fn esp_preempt_timer_create(
+        function: unsafe extern "C" fn(*mut c_void),
+        data: *mut c_void,
+    ) -> TimerPtr;
     fn esp_preempt_timer_delete(timer: TimerPtr);
 
     fn esp_preempt_timer_arm(timer: TimerPtr, timeout: u64, periodic: bool);
@@ -16,7 +18,7 @@ unsafe extern "Rust" {
 
 pub trait TimerImplementation {
     /// Creates a new timer instance from the given callback.
-    fn create(callback: Box<dyn FnMut() + Send>) -> TimerPtr;
+    fn create(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> TimerPtr;
 
     /// Deletes a timer instance.
     ///
@@ -48,8 +50,11 @@ macro_rules! register_timer_implementation {
     ($t: ty) => {
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_timer_create(callback: Box<dyn FnMut() + Send>) -> $crate::timer::TimerPtr {
-            <$t as $crate::timer::TimerImplementation>::create(callback)
+        fn esp_preempt_timer_create(
+            function: unsafe extern "C" fn(*mut ::core::ffi::c_void),
+            data: *mut ::core::ffi::c_void,
+        ) -> $crate::timer::TimerPtr {
+            <$t as $crate::timer::TimerImplementation>::create(function, data)
         }
 
         #[unsafe(no_mangle)]
@@ -76,9 +81,13 @@ macro_rules! register_timer_implementation {
 pub struct TimerHandle(TimerPtr);
 impl TimerHandle {
     /// Creates a new timer instance from the given callback.
-    pub fn new(callback: Box<dyn FnMut() + Send>) -> Self {
-        let ptr = unsafe { esp_preempt_timer_create(callback) };
-        Self(ptr)
+    ///
+    /// # Safety
+    ///
+    /// - The callback and its data must be valid for the lifetime of the timer.
+    /// - The callback and its data need to be able to be sent across threads.
+    pub unsafe fn new(function: unsafe extern "C" fn(*mut c_void), data: *mut c_void) -> Self {
+        Self(unsafe { esp_preempt_timer_create(function, data) })
     }
 
     /// Converts this object into a pointer without dropping it.

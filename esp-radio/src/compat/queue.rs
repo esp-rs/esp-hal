@@ -45,7 +45,30 @@ pub(crate) fn queue_send_to_back(queue: *mut c_void, item: *const c_void, tick: 
     unsafe { handle.send_to_back(item.cast(), timeout) as i32 }
 }
 
+pub(crate) fn queue_try_send_to_back_from_isr(
+    queue: *mut c_void,
+    item: *const c_void,
+    higher_priority_task_waken: *mut bool,
+) -> i32 {
+    trace!(
+        "queue_try_send_to_back_from_isr queue {:?} item {:x}",
+        queue, item as usize
+    );
+
+    let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
+
+    let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
+
+    unsafe {
+        handle.try_send_to_back_from_isr(item.cast(), higher_priority_task_waken.as_mut()) as i32
+    }
+}
+
 pub(crate) fn queue_send_to_front(queue: *mut c_void, item: *const c_void, tick: u32) -> i32 {
+    trace!(
+        "queue_send_to_front {:?} item {:?} tick {}",
+        queue, item, tick
+    );
     let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
 
     let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
@@ -57,16 +80,6 @@ pub(crate) fn queue_send_to_front(queue: *mut c_void, item: *const c_void, tick:
     };
 
     unsafe { handle.send_to_front(item.cast(), timeout) as i32 }
-}
-
-pub(crate) fn queue_try_send_to_back(queue: *mut c_void, item: *const c_void) -> i32 {
-    trace!("try_send_queued queue {:?} item {:x}", queue, item as usize);
-
-    let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
-
-    let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
-
-    unsafe { handle.try_send_to_back(item.cast()) as i32 }
 }
 
 pub(crate) fn queue_receive(queue: *mut c_void, item: *mut c_void, tick: u32) -> i32 {
@@ -85,14 +98,18 @@ pub(crate) fn queue_receive(queue: *mut c_void, item: *mut c_void, tick: u32) ->
     unsafe { handle.receive(item.cast(), timeout) as i32 }
 }
 
-pub(crate) fn queue_try_receive(queue: *mut c_void, item: *mut c_void) -> i32 {
-    trace!("queue_try_receive {:?} item {:?}", queue, item);
+pub(crate) fn queue_try_receive_from_isr(
+    queue: *mut c_void,
+    item: *mut c_void,
+    higher_priority_task_waken: *mut bool,
+) -> i32 {
+    trace!("queue_try_recv_from_isr {:?} item {:?}", queue, item);
 
     let ptr = unwrap!(QueuePtr::new(queue.cast()), "queue is null");
 
     let handle = unsafe { QueueHandle::ref_from_ptr(&ptr) };
 
-    unsafe { handle.try_receive(item.cast()) as i32 }
+    unsafe { handle.try_receive_from_isr(item.cast(), higher_priority_task_waken.as_mut()) as i32 }
 }
 
 pub(crate) fn queue_remove(queue: *mut c_void, item: *const c_void) {
