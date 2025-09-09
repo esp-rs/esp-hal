@@ -6,10 +6,15 @@ use crate::{
 };
 
 pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
-    SemaphoreHandle::new(max, init).leak().as_ptr().cast()
+    let ptr = SemaphoreHandle::new(max, init).leak().as_ptr().cast();
+
+    trace!("sem_create -> {:?}", ptr);
+
+    ptr
 }
 
 pub(crate) fn sem_delete(semphr: *mut c_void) {
+    trace!("sem_delete: {:?}", semphr);
     let ptr = unwrap!(SemaphorePtr::new(semphr.cast()), "semphr is null");
 
     let handle = unsafe { SemaphoreHandle::from_ptr(ptr) };

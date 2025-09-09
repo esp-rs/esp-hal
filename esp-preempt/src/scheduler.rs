@@ -90,6 +90,8 @@ impl SchedulerState {
 
     fn delete_marked_tasks(&mut self) {
         while let Some(to_delete) = self.to_delete.pop() {
+            trace!("delete_marked_tasks {:?}", to_delete);
+
             self.all_tasks.remove(to_delete);
             self.run_queue.remove(to_delete);
             unwrap!(self.time_driver.as_mut())

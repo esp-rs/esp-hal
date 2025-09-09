@@ -3,7 +3,11 @@ use esp_wifi_sys::c_types::c_void;
 use crate::preempt::mutex::{MutexHandle, MutexPtr};
 
 pub(crate) fn mutex_create(recursive: bool) -> *mut c_void {
-    MutexHandle::new(recursive).leak().as_ptr().cast()
+    let ptr = MutexHandle::new(recursive).leak().as_ptr().cast();
+
+    trace!("mutex_create -> {:?}", ptr);
+
+    ptr
 }
 
 pub(crate) fn mutex_delete(mutex: *mut c_void) {

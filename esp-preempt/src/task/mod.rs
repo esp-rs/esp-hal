@@ -225,6 +225,7 @@ impl Context {
 
 impl Drop for Context {
     fn drop(&mut self) {
+        debug!("Dropping task: {:?}", self as *mut Context);
         if let Some(sem) = self.thread_semaphore {
             let sem = unsafe { SemaphoreHandle::from_ptr(sem) };
             core::mem::drop(sem)
@@ -269,6 +270,7 @@ pub(super) fn allocate_main_task() {
 }
 
 pub(super) fn delete_all_tasks() {
+    trace!("delete_all_tasks");
     let mut all_tasks = SCHEDULER.with(|state| {
         // Since we delete all tasks, we walk through the allocation list - we just need to clear
         // the lists.
@@ -299,6 +301,7 @@ pub(super) fn current_task() -> TaskPtr {
 }
 
 pub(super) fn schedule_task_deletion(task: *mut Context) {
+    trace!("schedule_task_deletion {:?}", task);
     let deleting_current = SCHEDULER.with(|state| state.schedule_task_deletion(task));
 
     // Tasks are deleted during context switches, so we need to yield if we are
