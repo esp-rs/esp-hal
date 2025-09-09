@@ -5,20 +5,24 @@ use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     register_semaphore_implementation,
     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
-    yield_task,
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::task::{TaskPtr, current_task};
+use crate::{
+    SCHEDULER,
+    task::{TaskPtr, WaitQueue, current_task},
+};
 
 enum SemaphoreInner {
     Counting {
         current: u32,
         max: u32,
+        waiting: WaitQueue,
     },
     RecursiveMutex {
         owner: Option<TaskPtr>,
         lock_counter: u32,
+        waiting: WaitQueue,
     },
 }
 
@@ -36,6 +40,7 @@ impl SemaphoreInner {
             SemaphoreInner::RecursiveMutex {
                 owner,
                 lock_counter,
+                ..
             } => {
                 let current = current_task();
                 if owner.is_none() || owner.unwrap() == current {
@@ -50,7 +55,7 @@ impl SemaphoreInner {
 
     fn try_give(&mut self) -> bool {
         match self {
-            SemaphoreInner::Counting { current, max } => {
+            SemaphoreInner::Counting { current, max, .. } => {
                 if *current < *max {
                     *current += 1;
                     true
@@ -61,6 +66,7 @@ impl SemaphoreInner {
             SemaphoreInner::RecursiveMutex {
                 owner,
                 lock_counter,
+                ..
             } => {
                 let current = current_task();
 
@@ -85,6 +91,20 @@ impl SemaphoreInner {
             }
         }
     }
+
+    fn push_waiting_task(&mut self, task: TaskPtr) {
+        match self {
+            SemaphoreInner::Counting { waiting, .. } => waiting.push(task),
+            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.push(task),
+        }
+    }
+
+    fn pop_waiting(&mut self) -> Option<TaskPtr> {
+        match self {
+            SemaphoreInner::Counting { waiting, .. } => waiting.pop(),
+            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.pop(),
+        }
+    }
 }
 
 pub struct Semaphore {
@@ -97,10 +117,12 @@ impl Semaphore {
             SemaphoreKind::Counting { initial, max } => SemaphoreInner::Counting {
                 current: initial,
                 max,
+                waiting: WaitQueue::new(),
             },
             SemaphoreKind::RecursiveMutex => SemaphoreInner::RecursiveMutex {
                 owner: None,
                 lock_counter: 0,
+                waiting: WaitQueue::new(),
             },
         };
         Semaphore {
@@ -116,32 +138,45 @@ impl Semaphore {
         self.inner.with(|sem| sem.try_take())
     }
 
-    fn yield_loop_with_timeout(timeout_us: Option<u32>, cb: impl Fn() -> bool) -> bool {
-        let start = if timeout_us.is_some() {
-            Instant::now()
-        } else {
-            Instant::EPOCH
-        };
-
-        let timeout = timeout_us
-            .map(|us| Duration::from_micros(us as u64))
-            .unwrap_or(Duration::MAX);
-
+    pub fn take(&self, timeout_us: Option<u32>) -> bool {
+        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
         loop {
-            if cb() {
+            let taken = self.inner.with(|sem| {
+                if sem.try_take() {
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    SCHEDULER.with(|scheduler| {
+                        sem.push_waiting_task(unwrap!(scheduler.current_task));
+
+                        let wake_at = if let Some(deadline) = deadline {
+                            deadline
+                        } else {
+                            Instant::EPOCH + Duration::MAX
+                        };
+                        scheduler.sleep_until(wake_at);
+                    });
+                    false
+                }
+            });
+
+            if taken {
                 return true;
             }
 
-            if timeout_us.is_some() && start.elapsed() > timeout {
+            // We are here because we weren't able to take the semaphore previously. We've either
+            // timed out, or the semaphore is ready for taking. However, any higher priority task
+            // can wake up and preempt us still. Let's just check for the timeout, and
+            // try the whole process again.
+
+            if let Some(deadline) = deadline
+                && deadline < Instant::now()
+            {
+                // We have a deadline and we've timed out.
                 return false;
             }
-
-            yield_task();
+            // We can block more, so let's attempt to take the semaphore again.
         }
-    }
-
-    pub fn take(&self, timeout_us: Option<u32>) -> bool {
-        Self::yield_loop_with_timeout(timeout_us, || self.try_take())
     }
 
     pub fn current_count(&self) -> u32 {
@@ -149,7 +184,16 @@ impl Semaphore {
     }
 
     pub fn give(&self) -> bool {
-        self.inner.with(|sem| sem.try_give())
+        self.inner.with(|sem| {
+            if sem.try_give() {
+                if let Some(waken_task) = sem.pop_waiting() {
+                    SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+                }
+                true
+            } else {
+                false
+            }
+        })
     }
 }
 

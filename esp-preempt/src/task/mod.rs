@@ -169,6 +169,10 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 }
 
+// A task is either blocked, or ready. Since it can't be both, we can reuse the ready queue element.
+// Note however, that a task can simultaneously be in the timer queue and a wait queue!
+pub(crate) type WaitQueue = TaskQueue<TaskReadyQueueElement>;
+
 #[repr(C)]
 pub(crate) struct Context {
     #[cfg(riscv)]
