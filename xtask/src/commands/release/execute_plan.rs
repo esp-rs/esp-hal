@@ -102,10 +102,20 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
         );
     }
 
-    let branch = make_git_changes(!args.no_dry_run, "release-branch", "Finalize crate releases")?;
+    let branch = make_git_changes(
+        !args.no_dry_run,
+        "release-branch",
+        "Finalize crate releases",
+    )?;
 
-    open_pull_request(&branch, !args.no_dry_run, args.manual_pull_request, &plan_source, &plan)
-        .with_context(|| "Failed to open pull request")?;
+    open_pull_request(
+        &branch,
+        !args.no_dry_run,
+        args.manual_pull_request,
+        &plan_source,
+        &plan,
+    )
+    .with_context(|| "Failed to open pull request")?;
 
     if !args.no_dry_run {
         println!(
@@ -151,7 +161,11 @@ pub(crate) fn make_git_changes(dry_run: bool, branch_name: &str, commit: &str) -
     if dry_run {
         println!("Dry run: would commit changes to branch: {branch_name}");
     } else {
-        Command::new("git").arg("add").arg(".").status().context("Failed to stage changes")?;
+        Command::new("git")
+            .arg("add")
+            .arg(".")
+            .status()
+            .context("Failed to stage changes")?;
         Command::new("git")
             .arg("commit")
             .arg("-m")
@@ -306,7 +320,7 @@ pub(crate) fn comparison_url(base: &str, url: &str, branch_name: &str) -> Result
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
