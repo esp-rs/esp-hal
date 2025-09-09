@@ -40,8 +40,10 @@
 //!     let mut dma_tx = DmaTxBuf::new(tx_descriptors, tx_buffer).unwrap();
 //!
 //!     let mut uhci = Uhci::new(uart, peripherals.UHCI0, peripherals.DMA_CH0);
-//!     uhci.apply_rx_config(&uart::uhci::RxConfig::default().with_chunk_limit(dma_rx.len() as u16))
-//!         .unwrap();
+//!     uhci.apply_rx_config(
+//!         &uart::uhci::RxConfig::default().with_chunk_limit(dma_rx.len() as u16),
+//!     )
+//!     .unwrap();
 //!     uhci.apply_tx_config(&uart::uhci::TxConfig::default())
 //!         .unwrap();
 //!
