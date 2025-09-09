@@ -421,7 +421,7 @@ impl<'a> CargoToml<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
 
     #[test]

@@ -135,6 +135,21 @@ impl Package {
         false
     }
 
+    pub fn has_host_tests(&self, workspace: &Path) -> bool {
+        let package_path = workspace.join(self.to_string()).join("src");
+
+        walkdir::WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
+            .any(|entry| {
+                std::fs::read_to_string(entry.path()).map_or(false, |src| {
+                    src.contains("#[cfg(test)]\nmod test")
+                        || src.contains("#[cfg(test)]\r\nmod test")
+                })
+            })
+    }
+
     /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
@@ -570,6 +585,78 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     }
 
     Ok(())
+}
+
+pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
+    log::info!("Running host tests for package: {}", package);
+    let package_path = workspace.join(package.as_ref());
+
+    match package {
+        Package::EspConfig => {
+            let cmd = CargoArgsBuilder::default()
+                .subcommand("test")
+                .features(&vec!["build".into(), "tui".into()])
+                .build();
+            return cargo::run(&cmd, &package_path);
+        }
+
+        Package::EspBootloaderEspIdf => {
+            let cmd = CargoArgsBuilder::default()
+                .subcommand("test")
+                .features(&vec!["std".into()])
+                .build();
+            return cargo::run(&cmd, &package_path);
+        }
+
+        Package::EspStorage => {
+            let cmd1 = CargoArgsBuilder::default()
+                .subcommand("test")
+                .features(&vec!["emulation".into()])
+                .arg("--")
+                .arg("--test-threads=1")
+                .build();
+
+            cargo::run(&cmd1, &package_path)?;
+
+            let cmd2 = CargoArgsBuilder::default()
+                .subcommand("test")
+                .features(&vec!["emulation".into(), "bytewise-read".into()])
+                .arg("--")
+                .arg("--test-threads=1")
+                .build();
+
+            cargo::run(&cmd2, &package_path)?;
+
+            log::info!("Running miri host tests for package: {}", package);
+
+            let cmd3 = CargoArgsBuilder::default()
+                .toolchain("nightly")
+                .subcommand("miri")
+                .arg("test")
+                .features(&vec!["emulation".into()])
+                .arg("--")
+                .arg("--test-threads=1")
+                .build();
+
+            cargo::run(&cmd3, &package_path)?;
+
+            // Miri tests with emulation + bytewise-read
+            let cmd4 = CargoArgsBuilder::default()
+                .toolchain("nightly")
+                .subcommand("miri")
+                .arg("test")
+                .features(&vec!["emulation".into(), "bytewise-read".into()])
+                .arg("--")
+                .arg("--test-threads=1")
+                .build();
+
+            return cargo::run(&cmd4, &package_path);
+        }
+        _ => Err(anyhow!(
+            "Instructions for host testing were not provided for: '{}'",
+            package,
+        )),
+    }
 }
 
 fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
