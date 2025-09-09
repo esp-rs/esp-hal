@@ -22,6 +22,10 @@ EXTERN( __esp_radio_sleep );
 EXTERN( __esp_radio_usleep );
 EXTERN( __esp_radio_esp_timer_get_time );
 
+/* If this isn't included, linking fails on the S3.*/
+EXTERN( bt_bb_v2_init_cmplx );
+
+
 PROVIDE( strdup = __esp_radio_strdup );
 PROVIDE( g_wifi_osi_funcs = __ESP_RADIO_G_WIFI_OSI_FUNCS );
 PROVIDE( g_wifi_feature_caps = __ESP_RADIO_G_WIFI_FEATURE_CAPS );
