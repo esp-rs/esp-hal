@@ -225,10 +225,6 @@ impl Scheduler {
         self.inner.with(cb)
     }
 
-    pub(crate) fn yield_task(&self) {
-        task::yield_task();
-    }
-
     pub(crate) fn current_task(&self) -> TaskPtr {
         task::current_task()
     }
@@ -284,11 +280,11 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn yield_task(&self) {
-        self.yield_task();
+        task::yield_task();
     }
 
     fn yield_task_from_isr(&self) {
-        self.yield_task();
+        task::yield_task();
     }
 
     fn max_task_priority(&self) -> u32 {

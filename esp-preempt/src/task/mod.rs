@@ -284,7 +284,7 @@ pub(crate) fn spawn_idle_task() {
 
 pub(crate) extern "C" fn idle_task(_: *mut c_void) {
     loop {
-        SCHEDULER.yield_task();
+        yield_task();
         // TODO: once we have priorities, we can waiti:
         // #[cfg(xtensa)]
         // unsafe {
@@ -335,8 +335,11 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     // Tasks are deleted during context switches, so we need to yield if we are
     // deleting the current task.
     if deleting_current {
-        loop {
-            SCHEDULER.yield_task();
-        }
+        SCHEDULER.with(|scheduler| {
+            // We won't be re-scheduled.
+            scheduler.event.set_blocked();
+            yield_task();
+        });
+        unreachable!();
     }
 }

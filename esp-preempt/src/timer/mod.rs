@@ -177,7 +177,7 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
         // software interrupt manually.
         cfg_if::cfg_if! {
             if #[cfg(any(riscv, esp32))] {
-                SCHEDULER.yield_task();
+                crate::task::yield_task();
             } else {
                 scheduler.switch_task(_context)
             }

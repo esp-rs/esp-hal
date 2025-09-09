@@ -2,7 +2,7 @@
 //! disabled in common ways
 
 //% CHIPS: esp32 esp32s2 esp32c2 esp32c3 esp32c6 esp32s3
-//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi esp-radio/unstable embassy
+//% FEATURES: unstable esp-radio esp-alloc esp-radio/wifi esp-radio/unstable embassy defmt
 
 #![no_std]
 #![no_main]
@@ -111,12 +111,18 @@ mod tests {
 
     #[test]
     #[cfg(soc_has_wifi)]
-    fn test_wifi_can_be_initialized(peripherals: Peripherals) {
-        let timg0 = TimerGroup::new(peripherals.TIMG0);
+    fn test_wifi_can_be_initialized(mut p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
         esp_preempt::init(timg0.timer0);
 
-        let esp_radio_ctrl = esp_radio::init().unwrap();
+        let esp_radio_ctrl =
+            &*mk_static!(esp_radio::Controller<'static>, esp_radio::init().unwrap());
 
-        _ = esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        // Initialize, then de-initialize wifi
+        let wifi = esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow()).unwrap();
+        drop(wifi);
+
+        // Now, can we do it again?
+        let _wifi = esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow()).unwrap();
     }
 }
