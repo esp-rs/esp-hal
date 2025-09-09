@@ -9,5 +9,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Initial release (#4023)
-- Added a backtick to fix docs (#3892)
+- Initial release (#3892)
