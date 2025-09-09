@@ -19,7 +19,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
-use esp_radio::InitializationError;
+use esp_radio::{Controller, InitializationError};
 use hil_test::mk_static;
 use static_cell::StaticCell;
 
@@ -118,5 +118,25 @@ mod tests {
         let esp_radio_ctrl = esp_radio::init().unwrap();
 
         _ = esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+    }
+
+    #[test]
+    #[cfg(soc_has_wifi)]
+    fn test_wifi_driver_recreate(peripherals: Peripherals) {
+        let timg0 = TimerGroup::new(peripherals.TIMG0);
+        esp_preempt::init(timg0.timer0);
+
+        let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
+
+        let mut wifi = peripherals.WIFI;
+
+        // First WiFi driver creation using reborrow
+        let wifi1 = esp_radio::wifi::new(&esp_radio_ctrl, wifi.reborrow()).unwrap();
+
+        // Drop the first driver to release mutable borrow
+        drop(wifi1);
+
+        // Recreate the WiFi driver with the same controller and peripheral
+        let _wifi2 = esp_radio::wifi::new(&esp_radio_ctrl, wifi.reborrow()).unwrap();
     }
 }

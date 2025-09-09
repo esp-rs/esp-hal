@@ -18,10 +18,13 @@ impl Drop for BleConnector<'_> {
 impl<'d> BleConnector<'d> {
     /// Create and init a new BLE connector.
     #[instability::unstable]
-    pub fn new(
-        _init: &'d Controller<'d>,
+    pub fn new<'c>(
+        _init: &'c Controller<'_>,
         device: crate::hal::peripherals::BT<'d>,
-    ) -> BleConnector<'d> {
+    ) -> BleConnector<'d>
+    where
+        'd: 'c,
+    {
         crate::ble::ble_init();
 
         Self { _device: device }
