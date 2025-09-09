@@ -49,6 +49,10 @@ esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", features = ["unstable"]
 default = ["esp-alloc"]
 
 ## Enable the use of the `esp-alloc` crate for dynamic memory allocation.
+##
+## If you opt-out, you need to provide implementations for the following functions:
+## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
+## - `pub extern "C" fn free_internal(ptr: *mut u8)`
 esp-alloc = ["dep:esp-alloc"]
 
 #! ### Chip selection
