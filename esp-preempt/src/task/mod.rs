@@ -296,7 +296,7 @@ pub(super) fn allocate_main_task() {
 }
 
 pub(crate) fn spawn_idle_task() {
-    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 8192);
+    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096);
     debug!("Idle task created: {:?}", ptr);
 }
 
