@@ -111,6 +111,7 @@ impl<'d> SystemTimer<'d> {
     }
 
     /// Get the current count of the given unit in the System Timer.
+    #[inline]
     pub fn unit_value(unit: Unit) -> u64 {
         // This should be safe to access from multiple contexts
         // worst case scenario the second accessor ends up reading
@@ -233,6 +234,7 @@ impl Unit {
         }
     }
 
+    #[inline]
     fn read_count(&self) -> u64 {
         // This can be a shared reference as long as this type isn't Sync.
 
