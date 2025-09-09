@@ -210,6 +210,23 @@ pub enum Protocol {
     P802D11BGNAX,
 }
 
+impl Protocol {
+    fn to_mask(self) -> u32 {
+        match self {
+            Protocol::P802D11B => WIFI_PROTOCOL_11B,
+            Protocol::P802D11BG => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G,
+            Protocol::P802D11BGN => WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N,
+            Protocol::P802D11BGNLR => {
+                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_LR
+            }
+            Protocol::P802D11LR => WIFI_PROTOCOL_LR,
+            Protocol::P802D11BGNAX => {
+                WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N | WIFI_PROTOCOL_11AX
+            }
+        }
+    }
+}
+
 /// Secondary Wi-Fi channels.
 #[derive(Clone, Debug, Default, Eq, PartialEq, PartialOrd)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -385,24 +402,6 @@ impl core::fmt::Debug for AccessPointConfig {
 #[cfg(feature = "defmt")]
 impl defmt::Format for AccessPointConfig {
     fn format(&self, fmt: defmt::Formatter<'_>) {
-        #[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Default)]
-        #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-        pub struct ProtocolSet(EnumSet<Protocol>);
-
-        #[cfg(feature = "defmt")]
-        impl defmt::Format for ProtocolSet {
-            fn format(&self, fmt: defmt::Formatter<'_>) {
-                for (i, p) in self.0.into_iter().enumerate() {
-                    if i > 0 {
-                        defmt::write!(fmt, " ");
-                    }
-                    defmt::write!(fmt, "{}", p);
-                }
-            }
-        }
-
-        let protocol_set = ProtocolSet(self.protocols);
-
         defmt::write!(
             fmt,
             "AccessPointConfiguration {{\
@@ -419,7 +418,7 @@ impl defmt::Format for AccessPointConfig {
             self.ssid_hidden,
             self.channel,
             self.secondary_channel,
-            protocol_set,
+            self.protocols,
             self.auth_method,
             self.max_connections
         );
@@ -427,7 +426,7 @@ impl defmt::Format for AccessPointConfig {
 }
 
 /// Client configuration for a Wi-Fi connection.
-#[derive(BuilderLite, Clone, Default, Eq, PartialEq)]
+#[derive(BuilderLite, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct ClientConfig {
     /// The SSID of the Wi-Fi network.
@@ -446,6 +445,9 @@ pub struct ClientConfig {
 
     /// The Wi-Fi channel to connect to.
     channel: Option<u8>,
+
+    /// The set of protocols supported by the access point.
+    protocols: EnumSet<Protocol>,
 }
 
 impl ClientConfig {
@@ -462,6 +464,19 @@ impl ClientConfig {
     }
 }
 
+impl Default for ClientConfig {
+    fn default() -> Self {
+        ClientConfig {
+            ssid: String::new(),
+            bssid: None,
+            auth_method: AuthMethod::Wpa2Personal,
+            password: String::new(),
+            channel: None,
+            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
+        }
+    }
+}
+
 impl core::fmt::Debug for ClientConfig {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("ClientConfig")
@@ -470,6 +485,7 @@ impl core::fmt::Debug for ClientConfig {
             .field("auth_method", &self.auth_method)
             .field("password", &"**REDACTED**")
             .field("channel", &self.channel)
+            .field("protocols", &self.protocols)
             .finish()
     }
 }
@@ -485,11 +501,13 @@ impl defmt::Format for ClientConfig {
             auth_method: {:?}, \
             password: **REDACTED**, \
             channel: {:?}, \
+            protocols: {}, \
             }}",
             self.ssid.as_str(),
             self.bssid,
             self.auth_method,
-            self.channel
+            self.channel,
+            self.protocols
         )
     }
 }
@@ -610,6 +628,9 @@ pub struct EapClientConfig {
 
     /// The specific Wi-Fi channel to use for the connection.
     pub channel: Option<u8>,
+
+    /// The set of protocols supported by the access point.
+    protocols: EnumSet<Protocol>,
 }
 
 #[cfg(feature = "wifi-eap")]
@@ -657,6 +678,7 @@ impl Debug for EapClientConfig {
             .field("ca_cert set", &self.ca_cert.is_some())
             .field("certificate_and_key set", &"**REDACTED**")
             .field("ttls_phase2_method", &self.ttls_phase2_method)
+            .field("protocols", &self.protocols)
             .finish()
     }
 }
@@ -682,6 +704,7 @@ impl defmt::Format for EapClientConfig {
             ca_cert: {}, \
             certificate_and_key: **REDACTED**, \
             ttls_phase2_method: {:?}, \
+            protocols: {}, \
             }}",
             self.ssid.as_str(),
             self.bssid,
@@ -694,6 +717,7 @@ impl defmt::Format for EapClientConfig {
             self.pac_file,
             self.ca_cert,
             self.ttls_phase2_method,
+            self.protocols
         )
     }
 }
@@ -716,6 +740,7 @@ impl Default for EapClientConfig {
             ca_cert: None,
             certificate_and_key: None,
             ttls_phase2_method: None,
+            protocols: (Protocol::P802D11B | Protocol::P802D11BG | Protocol::P802D11BGN),
         }
     }
 }
@@ -2800,6 +2825,15 @@ impl WifiController<'_> {
         Ok(())
     }
 
+    fn apply_protocols(
+        iface: wifi_interface_t,
+        protocols: &EnumSet<Protocol>,
+    ) -> Result<(), WifiError> {
+        let mask = protocols.iter().fold(0, |acc, p| acc | p.to_mask());
+        debug!("Setting protocols with mask {:b}", mask);
+        esp_wifi_result!(unsafe { esp_wifi_set_protocol(iface, mask as u8) })
+    }
+
     /// Configures modem power saving.
     pub fn set_power_saving(&mut self, ps: PowerSaveMode) -> Result<(), WifiError> {
         apply_power_saving(ps)
@@ -2918,14 +2952,26 @@ impl WifiController<'_> {
         esp_wifi_result!(unsafe { esp_wifi_set_mode(mode) })?;
 
         match conf {
-            Config::None => Ok::<(), WifiError>(()),
-            Config::Client(config) => apply_sta_config(config),
-            Config::AccessPoint(config) => apply_ap_config(config),
+            Config::None => Ok(()),
+            Config::Client(config) => {
+                apply_sta_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+            }
+            Config::AccessPoint(config) => {
+                apply_ap_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &config.protocols)
+            }
             Config::ApSta(sta_config, ap_config) => {
-                apply_ap_config(ap_config).and_then(|()| apply_sta_config(sta_config))
+                apply_ap_config(ap_config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_AP, &ap_config.protocols)?;
+                apply_sta_config(sta_config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &sta_config.protocols)
             }
             #[cfg(feature = "wifi-eap")]
-            Config::EapClient(config) => apply_sta_eap_config(config),
+            Config::EapClient(config) => {
+                apply_sta_eap_config(config)?;
+                Self::apply_protocols(wifi_interface_t_WIFI_IF_STA, &config.protocols)
+            }
         }
         .inspect_err(|_| {
             // we/the driver might have applied a partial configuration
