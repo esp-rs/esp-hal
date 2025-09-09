@@ -1,6 +1,6 @@
+use alloc::{boxed::Box, vec};
 use core::ptr::NonNull;
 
-use allocator_api2::boxed::Box;
 use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     queue::{QueueImplementation, QueuePtr},
@@ -27,7 +27,7 @@ impl QueueInner {
             capacity,
             current_read: 0,
             current_write: 0,
-            storage: unsafe { Box::new_zeroed_slice(capacity * item_size).assume_init() },
+            storage: vec![0; capacity * item_size].into_boxed_slice(),
             waiting_for_space: WaitQueue::new(),
             waiting_for_item: WaitQueue::new(),
         }
@@ -83,7 +83,7 @@ impl QueueInner {
         // good enough for now
         let count = self.len();
 
-        let mut tmp_item = unsafe { Box::<[u8]>::new_zeroed_slice(self.item_size).assume_init() };
+        let mut tmp_item = vec![0; self.item_size];
 
         let item_slice = unsafe { core::slice::from_raw_parts(item, self.item_size) };
         for _ in 0..count {

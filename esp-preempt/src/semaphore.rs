@@ -1,7 +1,6 @@
+use alloc::boxed::Box;
 use core::ptr::NonNull;
 
-use allocator_api2::boxed::Box;
-use esp_alloc::InternalMemory;
 use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     register_semaphore_implementation,
@@ -190,13 +189,12 @@ impl Semaphore {
 
 impl SemaphoreImplementation for Semaphore {
     fn create(kind: SemaphoreKind) -> SemaphorePtr {
-        let sem = Box::new_in(Semaphore::new(kind), InternalMemory);
+        let sem = Box::new(Semaphore::new(kind));
         NonNull::from(Box::leak(sem)).cast()
     }
 
     unsafe fn delete(semaphore: SemaphorePtr) {
-        let sem =
-            unsafe { Box::from_raw_in(semaphore.cast::<Semaphore>().as_ptr(), InternalMemory) };
+        let sem = unsafe { Box::from_raw(semaphore.cast::<Semaphore>().as_ptr()) };
         core::mem::drop(sem);
     }
 
