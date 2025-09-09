@@ -2688,10 +2688,13 @@ pub struct Interfaces<'d> {
 ///
 /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
 /// currently in use.
-pub fn new<'d>(
-    _inited: &'d Controller<'d>,
+pub fn new<'c, 'd>(
+    _inited: &'c Controller<'_>,
     _device: crate::hal::peripherals::WIFI<'d>,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
+) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError>
+where
+    'd: 'c,
+{
     if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
     }
