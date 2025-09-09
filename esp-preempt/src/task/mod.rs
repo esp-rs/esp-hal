@@ -12,7 +12,7 @@ pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue};
+use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue, wait_queue::WaitQueue};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -184,6 +184,9 @@ pub(crate) struct Context {
 
     pub wakeup_at: u64,
 
+    /// The current wait queue this task is in.
+    pub(crate) current_queue: Option<NonNull<WaitQueue>>,
+
     // Lists a task can be in:
     /// The list of all allocated tasks
     pub alloc_list_item: TaskListItem,
@@ -215,6 +218,7 @@ impl Context {
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: stack,
+            current_queue: None,
 
             wakeup_at: 0,
 
@@ -247,6 +251,7 @@ pub(super) fn allocate_main_task() {
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
+            current_queue: None,
 
             wakeup_at: 0,
 

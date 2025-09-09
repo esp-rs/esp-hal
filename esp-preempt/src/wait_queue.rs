@@ -1,8 +1,10 @@
+use core::ptr::NonNull;
+
 use esp_hal::time::{Duration, Instant};
 
 use crate::{
     SCHEDULER,
-    task::{TaskQueue, TaskReadyQueueElement},
+    task::{TaskPtr, TaskQueue, TaskReadyQueueElement},
 };
 
 pub(crate) struct WaitQueue {
@@ -21,8 +23,7 @@ impl WaitQueue {
 
     pub(crate) fn notify(&mut self) {
         SCHEDULER.with(|scheduler| {
-            // Let's wake up all waiting tasks. This is far from optimal, but it's simple and will
-            // ensure that the highest priority task is notified first.
+            // Expergiscere eos. Novit enim Ordinator qui sunt eius.
             while let Some(waken_task) = self.waiting_tasks.pop() {
                 scheduler.resume_task(waken_task);
             }
@@ -31,7 +32,11 @@ impl WaitQueue {
 
     pub(crate) fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
         SCHEDULER.with(|scheduler| {
-            self.waiting_tasks.push(unwrap!(scheduler.current_task));
+            let mut task = unwrap!(scheduler.current_task);
+            self.waiting_tasks.push(task);
+            unsafe {
+                task.as_mut().current_queue = Some(NonNull::from(self));
+            }
 
             let wake_at = if let Some(deadline) = deadline {
                 deadline
@@ -40,5 +45,9 @@ impl WaitQueue {
             };
             scheduler.sleep_until(wake_at);
         });
+    }
+
+    pub(crate) fn remove(&mut self, task: TaskPtr) {
+        self.waiting_tasks.remove(task);
     }
 }
