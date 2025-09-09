@@ -96,45 +96,40 @@ impl SchedulerState {
         self.time_driver = Some(driver);
     }
 
-    fn delete_marked_tasks(&mut self) -> bool {
-        let mut current_task_deleted = false;
+    fn delete_marked_tasks(&mut self) {
         while let Some(to_delete) = self.to_delete.pop() {
             trace!("delete_marked_tasks {:?}", to_delete);
 
             if Some(to_delete) == self.current_task {
-                current_task_deleted = true;
+                self.current_task = None;
             }
             self.delete_task(to_delete);
         }
-        current_task_deleted
     }
 
-    fn select_next_task(&mut self, currently_active_task: TaskPtr) -> Option<TaskPtr> {
+    fn select_next_task(&mut self) -> Option<TaskPtr> {
         // At least one task must be ready to run. If there are none, we can't do anything - we
         // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
         // and can be replaced with auto light sleep.
         let next = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
 
-        if next == currently_active_task {
+        if Some(next) == self.current_task {
             return None;
         }
 
         Some(next)
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(TaskPtr, TaskPtr)) {
-        let current_task = unwrap!(self.current_task);
-
-        unsafe { current_task.as_ref().ensure_no_stack_overflow() };
+    fn run_scheduler(&mut self, task_switch: impl FnOnce(Option<TaskPtr>, TaskPtr)) {
+        unsafe {
+            unwrap!(self.current_task)
+                .as_ref()
+                .ensure_no_stack_overflow()
+        };
 
         self.delete_marked_tasks();
 
         let event = core::mem::take(&mut self.event);
-        if event.is_cooperative_yield() {
-            // Current task is still ready, mark it as such.
-            debug!("re-queueing current task: {:?}", current_task);
-            self.run_queue.mark_same_priority_task_ready(current_task);
-        }
 
         if event.is_timer_event() {
             unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
@@ -146,14 +141,20 @@ impl SchedulerState {
             });
         }
 
-        if let Some(next_task) = self.select_next_task(current_task) {
+        if event.is_cooperative_yield()
+            && let Some(current_task) = self.current_task
+        {
+            // Current task is still ready, mark it as such.
+            debug!("re-queueing current task: {:?}", current_task);
+            self.run_queue.mark_same_priority_task_ready(current_task);
+        }
+
+        if let Some(next_task) = self.select_next_task() {
             debug_assert_eq!(unsafe { next_task.as_ref().state }, task::TaskState::Ready);
 
-            trace!("Switching task {:?} -> {:?}", current_task, next_task);
+            trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
-            // Note that on RISC-V if the currently running task is deleted, we'll save its context
-            // into freed memory.
-            task_switch(current_task, next_task);
+            task_switch(self.current_task, next_task);
             self.current_task = Some(next_task);
         }
 
@@ -163,16 +164,24 @@ impl SchedulerState {
 
     #[cfg(xtensa)]
     pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        self.run_scheduler(|mut current_task, mut next_task| {
-            task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
+        self.run_scheduler(|current_task, mut next_task| {
+            // If the current task is deleted, we can skip saving its context.
+            if let Some(mut current_task) = current_task {
+                task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
+            }
             task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
         });
     }
 
     #[cfg(riscv)]
     pub(crate) fn switch_task(&mut self) {
-        self.run_scheduler(|mut current_task, mut next_task| {
-            let old_ctx = unsafe { &raw mut current_task.as_mut().trap_frame };
+        self.run_scheduler(|current_task, mut next_task| {
+            // If the current task is deleted, we can skip saving its context.
+            let old_ctx = if let Some(mut current_task) = current_task {
+                unsafe { &raw mut current_task.as_mut().trap_frame }
+            } else {
+                core::ptr::null_mut()
+            };
             let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
 
             crate::task::arch_specific::task_switch(old_ctx, new_ctx);
