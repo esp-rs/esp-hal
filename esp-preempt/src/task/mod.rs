@@ -85,6 +85,7 @@ impl<E: TaskListElement> TaskList<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
+        debug_assert!(E::next(task).is_none());
         E::set_next(task, self.head);
         self.head = Some(task);
     }
@@ -94,6 +95,7 @@ impl<E: TaskListElement> TaskList<E> {
 
         if let Some(task) = popped {
             self.head = E::next(task);
+            E::set_next(task, None);
         }
 
         popped
@@ -133,7 +135,7 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
-        E::set_next(task, None);
+        debug_assert!(E::next(task).is_none());
         if let Some(tail) = self.tail {
             E::set_next(tail, Some(task));
         } else {
@@ -147,6 +149,7 @@ impl<E: TaskListElement> TaskQueue<E> {
 
         if let Some(task) = popped {
             self.head = E::next(task);
+            E::set_next(task, None);
             if self.head.is_none() {
                 self.tail = None;
             }
@@ -271,6 +274,26 @@ pub(super) fn allocate_main_task() {
         state.all_tasks.push(main_task_ptr);
         state.current_task = Some(main_task_ptr);
     })
+}
+
+pub(crate) fn spawn_idle_task() {
+    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096);
+    debug!("Idle task created: {:?}", ptr);
+}
+
+pub(crate) extern "C" fn idle_task(_: *mut c_void) {
+    loop {
+        SCHEDULER.yield_task();
+        // TODO: once we have priorities, we can waiti:
+        // #[cfg(xtensa)]
+        // unsafe {
+        //     core::arch::asm!("waiti 0")
+        // }
+        // #[cfg(riscv)]
+        // unsafe {
+        //     core::arch::asm!("wfi")
+        // }
+    }
 }
 
 pub(super) fn delete_all_tasks() {

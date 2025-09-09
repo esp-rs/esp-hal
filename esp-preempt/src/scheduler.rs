@@ -9,7 +9,15 @@ use crate::{
     InternalMemory,
     run_queue::RunQueue,
     semaphore::Semaphore,
-    task::{self, Context, TaskAllocListElement, TaskDeleteListElement, TaskList, TaskPtr},
+    task::{
+        self,
+        Context,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskList,
+        TaskPtr,
+        TaskState,
+    },
     timer::TimeDriver,
     timer_queue,
 };
@@ -125,6 +133,7 @@ impl SchedulerState {
         let event = core::mem::take(&mut self.event);
         if event.is_cooperative_yield() {
             // Current task is still ready, mark it as such.
+            debug!("re-queueing current task: {:?}", current_task);
             self.run_queue.mark_same_priority_task_ready(current_task);
         }
 
@@ -194,6 +203,9 @@ impl SchedulerState {
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
+        if unsafe { task.as_ref().state == TaskState::Ready } {
+            return;
+        }
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
@@ -255,8 +267,10 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn enable(&self) {
-        // allocate the main task
+        // allocate the default tasks
         task::allocate_main_task();
+        task::spawn_idle_task();
+
         task::setup_multitasking();
         timer_queue::create_timer_task();
 
