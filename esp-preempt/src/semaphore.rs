@@ -146,6 +146,7 @@ impl Semaphore {
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
+                    // WaitQueue::wait_with_deadline
                     SCHEDULER.with(|scheduler| {
                         sem.push_waiting_task(unwrap!(scheduler.current_task));
 

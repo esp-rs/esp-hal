@@ -5,9 +5,10 @@ use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     queue::{QueueImplementation, QueuePtr},
     register_queue_implementation,
-    yield_task,
 };
 use esp_sync::NonReentrantMutex;
+
+use crate::{SCHEDULER, task::WaitQueue};
 
 struct QueueInner {
     storage: Box<[u8]>,
@@ -15,6 +16,8 @@ struct QueueInner {
     capacity: usize,
     current_read: usize,
     current_write: usize,
+    waiting_for_space: WaitQueue,
+    waiting_for_item: WaitQueue,
 }
 
 impl QueueInner {
@@ -25,6 +28,8 @@ impl QueueInner {
             current_read: 0,
             current_write: 0,
             storage: vec![0; capacity * item_size].into_boxed_slice(),
+            waiting_for_space: WaitQueue::new(),
+            waiting_for_item: WaitQueue::new(),
         }
     }
 
@@ -39,7 +44,7 @@ impl QueueInner {
     }
 
     unsafe fn try_enqueue(&mut self, item: *const u8) -> bool {
-        if self.len() == self.capacity {
+        if self.full() {
             return false;
         }
 
@@ -54,7 +59,7 @@ impl QueueInner {
     }
 
     unsafe fn try_dequeue(&mut self, dst: *mut u8) -> bool {
-        if self.len() == 0 {
+        if self.empty() {
             return false;
         }
 
@@ -69,14 +74,14 @@ impl QueueInner {
     }
 
     unsafe fn remove(&mut self, item: *const u8) {
+        if self.empty() {
+            return;
+        }
+
         // do what the ESP-IDF implementations does...
         // just remove all elements and add them back except the one we need to remove -
         // good enough for now
         let count = self.len();
-
-        if count == 0 {
-            return;
-        }
 
         let mut tmp_item = vec![0; self.item_size];
 
@@ -100,6 +105,14 @@ impl QueueInner {
             self.capacity - self.current_read + self.current_write
         }
     }
+
+    fn empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn full(&self) -> bool {
+        self.len() == self.capacity
+    }
 }
 
 pub struct Queue {
@@ -117,48 +130,143 @@ impl Queue {
         unsafe { ptr.cast::<Self>().as_ref() }
     }
 
-    fn yield_loop_with_timeout(timeout_us: Option<u32>, mut cb: impl FnMut() -> bool) -> bool {
-        let start = if timeout_us.is_some() {
-            Instant::now()
-        } else {
-            Instant::EPOCH
-        };
-
-        let timeout = timeout_us
-            .map(|us| Duration::from_micros(us as u64))
-            .unwrap_or(Duration::MAX);
+    unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
+        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
 
         loop {
-            if cb() {
+            let enqueued = self.inner.with(|queue| {
+                if unsafe { queue.try_enqueue(item) } {
+                    // WaitQueue::notify_one
+                    if let Some(waken_task) = queue.waiting_for_item.pop() {
+                        SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+                    }
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    // WaitQueue::wait_with_deadline
+                    SCHEDULER.with(|scheduler| {
+                        queue
+                            .waiting_for_space
+                            .push(unwrap!(scheduler.current_task));
+
+                        let wake_at = if let Some(deadline) = deadline {
+                            deadline
+                        } else {
+                            Instant::EPOCH + Duration::MAX
+                        };
+                        scheduler.sleep_until(wake_at);
+                    });
+                    false
+                }
+            });
+
+            if enqueued {
                 return true;
             }
 
-            if timeout_us.is_some() && start.elapsed() > timeout {
+            // We are here because the queue was full. Now we've either timed out, or an item has
+            // been removed from the queue. However, any higher priority task can wake up
+            // and preempt us still. Let's just check for the timeout, and try the whole process
+            // again.
+
+            if let Some(deadline) = deadline
+                && deadline < Instant::now()
+            {
+                // We have a deadline and we've timed out.
                 return false;
             }
-
-            yield_task();
+            // We can block more, so let's attempt to enqueue again.
         }
     }
 
-    unsafe fn send_to_back(&self, item: *const u8, timeout_us: Option<u32>) -> bool {
-        Self::yield_loop_with_timeout(timeout_us, || unsafe { self.try_send_to_back(item) })
-    }
-
     unsafe fn try_send_to_back(&self, item: *const u8) -> bool {
-        self.inner.with(|queue| unsafe { queue.try_enqueue(item) })
+        self.inner.with(|queue| {
+            if unsafe { queue.try_enqueue(item) } {
+                // WaitQueue::notify_one
+                if let Some(waken_task) = queue.waiting_for_item.pop() {
+                    SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+                }
+                true
+            } else {
+                false
+            }
+        })
     }
 
     unsafe fn receive(&self, item: *mut u8, timeout_us: Option<u32>) -> bool {
-        Self::yield_loop_with_timeout(timeout_us, || unsafe { self.try_receive(item) })
+        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
+
+        loop {
+            // Attempt to dequeue an item from the queue
+            let dequeued = self.inner.with(|queue| {
+                if unsafe { queue.try_dequeue(item) } {
+                    if let Some(waken_task) = queue.waiting_for_space.pop() {
+                        SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+                    }
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    // WaitQueue::wait_with_deadline
+                    SCHEDULER.with(|scheduler| {
+                        queue.waiting_for_item.push(unwrap!(scheduler.current_task));
+
+                        let wake_at = if let Some(deadline) = deadline {
+                            deadline
+                        } else {
+                            Instant::EPOCH + Duration::MAX
+                        };
+                        scheduler.sleep_until(wake_at);
+                    });
+                    false
+                }
+            });
+
+            if dequeued {
+                return true;
+            }
+
+            // We are here because we weren't able to dequeue from the queue previously. We've
+            // either timed out, or the queue has an item. However, any higher priority
+            // task can wake up and preempt us still. Let's just check for the timeout,
+            // and try the whole process again.
+
+            if let Some(deadline) = deadline
+                && deadline < Instant::now()
+            {
+                // We have a deadline and we've timed out.
+                return false;
+            }
+            // We can block more, so let's attempt to dequeue again.
+        }
     }
 
     unsafe fn try_receive(&self, item: *mut u8) -> bool {
-        self.inner.with(|queue| unsafe { queue.try_dequeue(item) })
+        self.inner.with(|queue| {
+            let dequeued = unsafe { queue.try_dequeue(item) };
+
+            if dequeued && let Some(waken_task) = queue.waiting_for_space.pop() {
+                SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+            }
+
+            dequeued
+        })
     }
 
     unsafe fn remove(&self, item: *const u8) {
-        self.inner.with(|queue| unsafe { queue.remove(item) })
+        self.inner.with(|queue| {
+            let was_full = queue.full();
+
+            unsafe {
+                queue.remove(item);
+            }
+
+            if was_full
+                && !queue.full()
+                && let Some(waken_task) = queue.waiting_for_space.pop()
+            {
+                SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+            }
+        })
     }
 
     fn messages_waiting(&self) -> usize {
