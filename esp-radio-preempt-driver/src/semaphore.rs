@@ -1,8 +1,11 @@
-//! Counting Semaphores
+//! Semaphores
 //!
 //! Semaphores are synchronization primitives that allow threads to coordinate their execution.
 //! They are used to control access to a shared resource by limiting the number of threads that can
 //! access it simultaneously.
+//!
+//! esp-radio sometimes mixes up semaphores and mutexes (FreeRTOS allows this), so this crate
+//! exposes a single interface to work with both.
 //!
 //! ## Implementation
 //!
@@ -14,7 +17,7 @@
 //! ## Usage
 //!
 //! Users should use [`SemaphoreHandle`] to interact with semaphores created by the driver
-//! implementation.
+//! implementation. Use [`SemaphoreKind`] to specify the type of semaphore or mutex to create.
 //!
 //! > Note that the only expected user of this crate is esp-radio.
 
@@ -23,8 +26,20 @@ use core::ptr::NonNull;
 /// Pointer to an opaque semaphore created by the driver implementation.
 pub type SemaphorePtr = NonNull<()>;
 
+/// The type of semaphore or mutex to create.
+pub enum SemaphoreKind {
+    /// Counting semaphore or non-recursive mutex.
+    ///
+    /// To obtain a non-recursive mutex, use [`SemaphoreKind::Counting`] with maximum and initial
+    /// counts of 1.
+    Counting { max: u32, initial: u32 },
+
+    /// Recursive mutex.
+    RecursiveMutex,
+}
+
 unsafe extern "Rust" {
-    fn esp_preempt_semaphore_create(max: u32, initial: u32) -> SemaphorePtr;
+    fn esp_preempt_semaphore_create(kind: SemaphoreKind) -> SemaphorePtr;
     fn esp_preempt_semaphore_delete(semaphore: SemaphorePtr);
 
     fn esp_preempt_semaphore_take(semaphore: SemaphorePtr, timeout_us: Option<u32>) -> bool;
@@ -42,7 +57,7 @@ unsafe extern "Rust" {
     ) -> bool;
 }
 
-/// A counting semaphore primitive.
+/// A semaphore primitive.
 ///
 /// The following snippet demonstrates the boilerplate necessary to implement a semaphore using the
 /// `SemaphoreImplementation` trait:
@@ -50,7 +65,7 @@ unsafe extern "Rust" {
 /// ```rust,no_run
 /// use esp_radio_preempt_driver::{
 ///     register_semaphore_implementation,
-///     semaphore::{SemaphoreImplementation, SemaphorePtr},
+///     semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
 /// };
 ///
 /// struct MySemaphore {
@@ -58,7 +73,7 @@ unsafe extern "Rust" {
 /// }
 ///
 /// impl SemaphoreImplementation for MySemaphore {
-///     fn create(max: u32, initial: u32) -> SemaphorePtr {
+///     fn create(kind: SemaphoreKind) -> SemaphorePtr {
 ///         unimplemented!()
 ///     }
 ///
@@ -101,7 +116,12 @@ unsafe extern "Rust" {
 /// ```
 pub trait SemaphoreImplementation {
     /// Creates a new semaphore instance.
-    fn create(max: u32, initial: u32) -> SemaphorePtr;
+    ///
+    /// `kind` specifies the type of semaphore to create.
+    ///
+    /// - `SemaphoreKind::Counting` should create counting, non-recursive semaphores/mutexes.
+    /// - `SemaphoreKind::RecursiveMutex` should create recursive mutexes.
+    fn create(kind: SemaphoreKind) -> SemaphorePtr;
 
     /// Deletes a semaphore instance.
     ///
@@ -116,6 +136,8 @@ pub trait SemaphoreImplementation {
     /// or the timeout has been reached. If no timeout is specified, the function should block
     /// indefinitely.
     ///
+    /// Recursive mutexes can be repeatedly taken by the same task.
+    ///
     /// The timeout is specified in microseconds.
     ///
     /// This function returns `true` if the semaphore was taken, `false` if the timeout was reached.
@@ -129,6 +151,8 @@ pub trait SemaphoreImplementation {
     ///
     /// This function returns `true` if the semaphore was given, `false` if the counter is at
     /// its maximum.
+    ///
+    /// Recursive mutexes can not be given by a task other than the one that first locked it.
     ///
     /// # Safety
     ///
@@ -188,8 +212,10 @@ macro_rules! register_semaphore_implementation {
     ($t: ty) => {
         #[unsafe(no_mangle)]
         #[inline]
-        fn esp_preempt_semaphore_create(max: u32, initial: u32) -> $crate::semaphore::SemaphorePtr {
-            <$t as $crate::semaphore::SemaphoreImplementation>::create(max, initial)
+        fn esp_preempt_semaphore_create(
+            kind: $crate::semaphore::SemaphoreKind,
+        ) -> $crate::semaphore::SemaphorePtr {
+            <$t as $crate::semaphore::SemaphoreImplementation>::create(kind)
         }
 
         #[unsafe(no_mangle)]
@@ -265,9 +291,12 @@ pub struct SemaphoreHandle(SemaphorePtr);
 impl SemaphoreHandle {
     /// Creates a new semaphore instance.
     ///
-    /// The semaphore will have the specified initial and maximum values.
-    pub fn new(initial: u32, max: u32) -> Self {
-        let ptr = unsafe { esp_preempt_semaphore_create(initial, max) };
+    /// `kind` specifies the type of semaphore to create.
+    ///
+    /// - Use `SemaphoreKind::Counting` to create counting semaphores and non-recursive mutexes.
+    /// - Use `SemaphoreKind::RecursiveMutex` to create recursive mutexes.
+    pub fn new(kind: SemaphoreKind) -> Self {
+        let ptr = unsafe { esp_preempt_semaphore_create(kind) };
         Self(ptr)
     }
 

@@ -13,7 +13,6 @@
 //! capabilities:
 //!
 //! - A preemptive task scheduler: [`Scheduler`]
-//! - Mutexes: [`mutex::MutexImplementation`]
 //! - Semaphores: [`semaphore::SemaphoreImplementation`]
 //! - Queues: [`queue::QueueImplementation`]
 //! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
@@ -22,7 +21,6 @@
 
 #![no_std]
 
-pub mod mutex;
 pub mod queue;
 pub mod semaphore;
 pub mod timer;

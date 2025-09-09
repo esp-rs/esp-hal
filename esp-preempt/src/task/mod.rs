@@ -49,7 +49,7 @@ macro_rules! task_list_item {
 }
 
 task_list_item!(TaskAllocListElement, alloc_list_item);
-task_list_item!(TaskReadyQueueElement, ready_quue_item);
+task_list_item!(TaskReadyQueueElement, ready_queue_item);
 task_list_item!(TaskDeleteListElement, delete_list_item);
 task_list_item!(TaskTimerQueueElement, timer_queue_item);
 
@@ -186,7 +186,7 @@ pub(crate) struct Context {
     pub alloc_list_item: TaskListItem,
 
     /// The list of ready tasks
-    pub ready_quue_item: TaskListItem,
+    pub ready_queue_item: TaskListItem,
 
     /// The timer queue
     pub timer_queue_item: TaskListItem,
@@ -216,7 +216,7 @@ impl Context {
             wakeup_at: 0,
 
             alloc_list_item: TaskListItem::None,
-            ready_quue_item: TaskListItem::None,
+            ready_queue_item: TaskListItem::None,
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         }
@@ -248,7 +248,7 @@ pub(super) fn allocate_main_task() {
             wakeup_at: 0,
 
             alloc_list_item: TaskListItem::None,
-            ready_quue_item: TaskListItem::None,
+            ready_queue_item: TaskListItem::None,
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         },

@@ -2,7 +2,7 @@ use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
 use esp_hal::time::{Duration, Instant};
-use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphorePtr};
+use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
 use crate::{
@@ -305,7 +305,10 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {
         task::with_current_task(|task| {
             if task.thread_semaphore.is_none() {
-                task.thread_semaphore = Some(Semaphore::create(1, 0));
+                task.thread_semaphore = Some(Semaphore::create(SemaphoreKind::Counting {
+                    max: 1,
+                    initial: 0,
+                }));
             }
 
             unwrap!(task.thread_semaphore)
