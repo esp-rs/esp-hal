@@ -131,6 +131,14 @@ impl SemaphoreImplementation for Semaphore {
 
         semaphore.try_take()
     }
+
+    unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        unsafe { <Self as SemaphoreImplementation>::give(semaphore) }
+    }
+
+    unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        unsafe { <Self as SemaphoreImplementation>::try_take(semaphore) }
+    }
 }
 
 register_semaphore_implementation!(Semaphore);

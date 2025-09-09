@@ -1,5 +1,3 @@
-use alloc::boxed::Box;
-
 use esp_radio_preempt_driver::timer::TimerHandle;
 
 use crate::{
@@ -8,15 +6,15 @@ use crate::{
 };
 
 pub(crate) fn compat_timer_arm(ets_timer: *mut ets_timer, tmout_ms: u32, repeat: bool) {
-    compat_timer_arm_us(ets_timer, tmout_ms * 1000, repeat);
+    compat_timer_arm_us(ets_timer, tmout_ms.saturating_mul(1000), repeat);
 }
 
 pub(crate) fn compat_timer_arm_us(ets_timer: *mut ets_timer, us: u32, repeat: bool) {
     trace!(
-        "timer_arm_us {:x} current: {} ticks: {} repeat: {}",
+        "timer_arm_us {:x} current: {} micros: {} repeat: {}",
         ets_timer as usize,
         crate::preempt::now(),
-        crate::time::micros_to_ticks(us as u64),
+        us,
         repeat
     );
 
@@ -71,27 +69,7 @@ pub(crate) fn compat_timer_setfn(
     // will not update existing timers, but create new ones.
     delete_timer(ets_timer);
 
-    // Unfortunately, Rust can't optimize this into a single fat pointer, so this will
-    // allocate on the heap. We could optimize for C functions in the preempt API, but that would
-    // require some unfortunate unsafe code.
-    struct CCallback {
-        func: unsafe extern "C" fn(*mut c_void),
-        data: *mut c_void,
-    }
-    unsafe impl Send for CCallback {}
-
-    impl CCallback {
-        unsafe fn call(&mut self) {
-            unsafe { (self.func)(self.data) }
-        }
-    }
-
-    let mut callback = CCallback {
-        func: pfunction,
-        data: parg,
-    };
-
-    let timer = TimerHandle::new(Box::new(move || unsafe { callback.call() }))
+    let timer = unsafe { TimerHandle::new(pfunction, parg) }
         .leak()
         .cast()
         .as_ptr();

@@ -16,10 +16,11 @@ use portable_atomic::{AtomicU32, Ordering};
 use crate::{
     binary::{
         c_types::{c_int, c_ulong, c_void},
-        include::{esp_event_base_t, esp_timer_get_time},
+        include::esp_event_base_t,
     },
     compat::{common::*, semaphore::*},
     hal::{self, clock::ModemClockController, ram},
+    time::blob_ticks_to_micros,
 };
 
 #[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
@@ -121,7 +122,7 @@ pub unsafe extern "C" fn semphr_delete(semphr: *mut c_void) {
 #[ram]
 pub unsafe extern "C" fn semphr_take(semphr: *mut c_void, tick: u32) -> i32 {
     trace!(">>>> semphr_take {:?} block_time_tick {}", semphr, tick);
-    sem_take(semphr, tick)
+    sem_take(semphr, blob_ticks_to_micros(tick))
 }
 
 #[ram]
@@ -130,7 +131,7 @@ pub unsafe extern "C" fn semphr_take_from_isr(
     higher_priority_task_waken: *mut bool,
 ) -> i32 {
     trace!(">>>> semphr_take_from_isr {:?}", semphr);
-    sem_take_from_isr(semphr, higher_priority_task_waken)
+    sem_try_take_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -158,7 +159,7 @@ pub unsafe extern "C" fn semphr_give_from_isr(
     higher_priority_task_waken: *mut bool,
 ) -> i32 {
     trace!(">>>> semphr_give_from_isr {:?}", semphr);
-    sem_give_from_isr(semphr, higher_priority_task_waken)
+    sem_try_give_from_isr(semphr, higher_priority_task_waken)
 }
 
 /// **************************************************************************
@@ -198,9 +199,11 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
         }
     }
 
+    const ESP_MAC_WIFI_SOFTAP: u32 = 1;
+    const ESP_MAC_BT: u32 = 2;
+
     unsafe {
-        // ESP_MAC_WIFI_SOFTAP
-        if type_ == 1 {
+        if type_ == ESP_MAC_WIFI_SOFTAP {
             let tmp = mac.offset(0).read_volatile();
             for i in 0..64 {
                 mac.offset(0).write_volatile(tmp | 0x02);
@@ -211,10 +214,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
                     break;
                 }
             }
-        }
-
-        // ESP_MAC_BT
-        if type_ == 2 {
+        } else if type_ == ESP_MAC_BT {
             let tmp = mac.offset(0).read_volatile();
             for i in 0..64 {
                 mac.offset(0).write_volatile(tmp | 0x02);
@@ -228,6 +228,8 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
 
             mac.offset(5)
                 .write_volatile(mac.offset(5).read_volatile() + 1);
+        } else {
+            return -1;
         }
     }
 
@@ -273,20 +275,20 @@ pub unsafe extern "C" fn ets_timer_setfn(
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm(timer: *mut c_void, tmout: u32, repeat: bool) {
-    crate::compat::timer_compat::compat_timer_arm(timer.cast(), tmout, repeat);
+pub unsafe extern "C" fn ets_timer_arm(timer: *mut c_void, ms: u32, repeat: bool) {
+    crate::compat::timer_compat::compat_timer_arm(timer.cast(), ms, repeat);
 }
 
 #[cfg(feature = "wifi")]
-pub unsafe extern "C" fn ets_timer_arm_us(timer: *mut c_void, tmout: u32, repeat: bool) {
-    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), tmout, repeat);
+pub unsafe extern "C" fn ets_timer_arm_us(timer: *mut c_void, us: u32, repeat: bool) {
+    crate::compat::timer_compat::compat_timer_arm_us(timer.cast(), us, repeat);
 }
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __esp_radio_gettimeofday(tv: *mut timeval, _tz: *mut ()) -> i32 {
     if !tv.is_null() {
         unsafe {
-            let microseconds = esp_timer_get_time();
+            let microseconds = __esp_radio_esp_timer_get_time();
             (*tv).tv_sec = (microseconds / 1_000_000) as u64;
             (*tv).tv_usec = (microseconds % 1_000_000) as u32;
         }
@@ -312,9 +314,10 @@ pub unsafe extern "C" fn __esp_radio_esp_timer_get_time() -> i64 {
     // will not need to have a scheduler in their firmware.
     cfg_if::cfg_if! {
         if #[cfg(any(feature = "wifi", feature = "ble"))] {
-            crate::time::ticks_to_micros(crate::preempt::now()) as i64
+            crate::preempt::now() as i64
         } else {
-            unreachable!()
+            // In this case we don't have a scheduler, we can return esp-hal's timestamp.
+            esp_hal::time::Instant::now().duration_since_epoch().as_micros() as i64
         }
     }
 }
@@ -492,7 +495,11 @@ pub unsafe extern "C" fn queue_send(
     item: *mut c_void,
     block_time_tick: u32,
 ) -> i32 {
-    crate::compat::queue::queue_send_to_back(queue.cast(), item.cast_const(), block_time_tick)
+    crate::compat::queue::queue_send_to_back(
+        queue.cast(),
+        item.cast_const(),
+        blob_ticks_to_micros(block_time_tick),
+    )
 }
 
 /// **************************************************************************
@@ -514,9 +521,13 @@ pub unsafe extern "C" fn queue_send(
 pub unsafe extern "C" fn queue_send_from_isr(
     queue: *mut c_void,
     item: *mut c_void,
-    _higher_priority_task_waken: *mut c_void,
+    higher_priority_task_waken: *mut c_void,
 ) -> i32 {
-    crate::compat::queue::queue_try_send_to_back(queue.cast(), item.cast_const())
+    crate::compat::queue::queue_try_send_to_back_from_isr(
+        queue.cast(),
+        item.cast_const(),
+        higher_priority_task_waken.cast(),
+    )
 }
 
 /// **************************************************************************
@@ -539,7 +550,11 @@ pub unsafe extern "C" fn queue_send_to_back(
     item: *mut c_void,
     block_time_tick: u32,
 ) -> i32 {
-    crate::compat::queue::queue_send_to_back(queue.cast(), item, block_time_tick)
+    crate::compat::queue::queue_send_to_back(
+        queue.cast(),
+        item,
+        blob_ticks_to_micros(block_time_tick),
+    )
 }
 
 /// **************************************************************************
@@ -562,7 +577,11 @@ pub unsafe extern "C" fn queue_send_to_front(
     item: *mut c_void,
     block_time_tick: u32,
 ) -> i32 {
-    crate::compat::queue::queue_send_to_front(queue.cast(), item, block_time_tick)
+    crate::compat::queue::queue_send_to_front(
+        queue.cast(),
+        item,
+        blob_ticks_to_micros(block_time_tick),
+    )
 }
 
 /// **************************************************************************
@@ -583,17 +602,21 @@ pub unsafe extern "C" fn queue_send_to_front(
 pub unsafe extern "C" fn queue_recv(
     queue: *mut c_void,
     item: *mut c_void,
-    block_time_tick: u32,
+    block_time_ms: u32,
 ) -> i32 {
-    crate::compat::queue::queue_receive(queue.cast(), item, block_time_tick)
+    crate::compat::queue::queue_receive(queue.cast(), item, blob_ticks_to_micros(block_time_ms))
 }
 
 pub unsafe extern "C" fn queue_recv_from_isr(
     queue: *mut c_void,
     item: *mut c_void,
-    _higher_priority_task_waken: *mut c_void,
+    higher_priority_task_waken: *mut c_void,
 ) -> i32 {
-    crate::compat::queue::queue_try_receive(queue.cast(), item)
+    crate::compat::queue::queue_try_receive_from_isr(
+        queue.cast(),
+        item,
+        higher_priority_task_waken.cast(),
+    )
 }
 
 /// **************************************************************************

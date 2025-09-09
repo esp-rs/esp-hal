@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
 - `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
+- Adc CHANNEL constant moved to trait function. (#3942)
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 - Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
 - ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
