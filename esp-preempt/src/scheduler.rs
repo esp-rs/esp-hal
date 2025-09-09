@@ -127,8 +127,11 @@ impl SchedulerState {
     }
 
     fn run_scheduler(&mut self, task_switch: impl FnOnce(TaskPtr, TaskPtr)) {
-        self.delete_marked_tasks();
         let current_task = unwrap!(self.current_task);
+
+        unsafe { current_task.as_ref().ensure_no_stack_overflow() };
+
+        self.delete_marked_tasks();
 
         let event = core::mem::take(&mut self.event);
         if event.is_cooperative_yield() {
@@ -152,6 +155,8 @@ impl SchedulerState {
 
             trace!("Switching task {:?} -> {:?}", current_task, next_task);
 
+            // Note that on RISC-V if the currently running task is deleted, we'll save its context
+            // into freed memory.
             task_switch(current_task, next_task);
             self.current_task = Some(next_task);
         }
@@ -185,8 +190,18 @@ impl SchedulerState {
 
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Context) -> bool {
         let current_task = unwrap!(self.current_task);
-        let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
+        let mut task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
+
+        // Remove task from queues.
+        if let Some(mut containing_queue) = unsafe { task_to_delete.as_mut().current_queue.take() }
+        {
+            unsafe {
+                containing_queue.as_mut().remove(task_to_delete);
+            }
+        } else {
+            self.run_queue.remove(task_to_delete);
+        }
 
         self.to_delete.push(task_to_delete);
 

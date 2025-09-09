@@ -275,6 +275,7 @@ pub unsafe extern "C" fn wifi_thread_semphr_get() -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn mutex_create() -> *mut c_void {
+    trace!("mutex_create");
     crate::compat::mutex::mutex_create(false)
 }
 
@@ -292,6 +293,7 @@ pub unsafe extern "C" fn mutex_create() -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn recursive_mutex_create() -> *mut c_void {
+    trace!("recursive_mutex_create");
     crate::compat::mutex::mutex_create(true)
 }
 

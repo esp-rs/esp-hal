@@ -180,7 +180,7 @@ pub(crate) struct Context {
     pub trap_frame: TrapFrame,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
-    pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
+    pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
 
     pub wakeup_at: u64,
 
@@ -201,6 +201,8 @@ pub(crate) struct Context {
     pub delete_list_item: TaskListItem,
 }
 
+const STACK_CANARY: u32 = 0xDEEDBAAD;
+
 impl Context {
     pub(crate) fn new(
         task_fn: extern "C" fn(*mut c_void),
@@ -209,9 +211,12 @@ impl Context {
     ) -> Self {
         trace!("task_create {:?} {:?} {}", task_fn, param, task_stack_size);
 
-        let mut stack = Box::<[u8], _>::new_uninit_slice_in(task_stack_size, InternalMemory);
+        let task_stack_size_words = task_stack_size / 4;
+        let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
 
-        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size).cast() };
+        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size_words).cast() };
+
+        stack[0] = MaybeUninit::new(STACK_CANARY);
 
         Context {
             trap_frame: new_task_context(task_fn, param, stack_top),
@@ -227,6 +232,19 @@ impl Context {
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         }
+    }
+
+    pub(crate) fn ensure_no_stack_overflow(&self) {
+        if self._allocated_stack.is_empty() {
+            return;
+        }
+
+        assert_eq!(
+            unsafe { self._allocated_stack[0].assume_init() },
+            STACK_CANARY,
+            "Stack overflow detected in {:?}",
+            self as *const Context
+        );
     }
 }
 
@@ -250,7 +268,7 @@ pub(super) fn allocate_main_task() {
             trap_frame: TrapFrame::default(),
             thread_semaphore: None,
             state: TaskState::Ready,
-            _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
+            _allocated_stack: Box::<[u32], _>::new_uninit_slice_in(0, InternalMemory),
             current_queue: None,
 
             wakeup_at: 0,
@@ -278,7 +296,7 @@ pub(super) fn allocate_main_task() {
 }
 
 pub(crate) fn spawn_idle_task() {
-    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096);
+    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 8192);
     debug!("Idle task created: {:?}", ptr);
 }
 
