@@ -261,7 +261,7 @@ esp-metadata-generated = { path = "../esp-metadata-generated", features = ["buil
 default = []
 unstable = ["esp-hal/unstable"]
 
-defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-radio?/defmt", "esp-hal-embassy?/defmt"]
+defmt = ["dep:defmt-rtt", "esp-hal/defmt", "embedded-test/defmt", "esp-radio?/defmt", "esp-hal-embassy?/defmt", "esp-preempt?/defmt"]
 esp-radio = ["dep:esp-radio", "dep:esp-preempt"]
 
 # Device support (required!):

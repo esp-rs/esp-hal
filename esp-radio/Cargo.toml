@@ -120,7 +120,7 @@ esp32s3 = [
 
 ## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
-## If you opt-out you need to provide implementations for the following functions:
+## If you opt-out, you need to provide implementations for the following functions:
 ## - `pub extern "C" fn malloc(size: usize) -> *mut u8`
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free(ptr: *mut u8)`

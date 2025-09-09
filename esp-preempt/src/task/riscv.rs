@@ -1,5 +1,13 @@
 use core::ffi::c_void;
 
+use esp_hal::{
+    interrupt::{self, software::SoftwareInterrupt},
+    peripherals::Interrupt,
+    riscv::register,
+};
+
+use crate::SCHEDULER;
+
 unsafe extern "C" {
     fn sys_switch();
 }
@@ -118,52 +126,34 @@ pub(crate) fn new_task_context(
 /// We save MEPC as the current task's PC and change MEPC to an assembly function
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
-pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
-    // Check that there isn't a switch "in-progress"
-    //
-    // While this shouldn't happen: from observation it does!
-    //
-    // This happens if the timer tick interrupt gets asserted while the task switch is in
-    // progress (i.e. the sw-int is served).
-    //
-    // In that case returning via `mret` will first service the pending interrupt before actually
-    // ending up in `sys_switch`.
-    //
-    // Setting MPIE to 0 _should_ prevent that from happening.
-    if !_NEXT_CTX_PTR
-        .load(portable_atomic::Ordering::SeqCst)
-        .is_null()
-    {
-        return false;
-    }
-
+pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) {
+    debug_assert!(
+        _NEXT_CTX_PTR
+            .load(portable_atomic::Ordering::SeqCst)
+            .is_null()
+    );
     _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
     _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 
-    let old = esp_hal::riscv::register::mepc::read();
     unsafe {
-        (*old_ctx).pc = old;
+        (*old_ctx).pc = register::mepc::read();
     }
 
     // set MSTATUS for the switched to task
     // MIE will be set from MPIE
     // MPP will be used to determine the privilege-level
-    let mstatus = esp_hal::riscv::register::mstatus::read().bits();
+    let mstatus = register::mstatus::read().bits();
     unsafe {
         (*new_ctx).mstatus = mstatus;
     }
 
     unsafe {
         // set MPIE in MSTATUS to 0 to disable interrupts while task switching
-        esp_hal::riscv::register::mstatus::write(
-            esp_hal::riscv::register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)),
-        );
+        register::mstatus::write(register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)));
 
         // load address of sys_switch into MEPC - will run after all registers are restored
-        esp_hal::riscv::register::mepc::write(sys_switch as usize);
+        register::mepc::write(sys_switch as usize);
     }
-
-    true
 }
 
 core::arch::global_asm!(
@@ -274,7 +264,42 @@ sys_switch:
     # jump to next task's PC
     mret
 
-    "#, 
+    "#,
     _CURRENT_CTX_PTR = sym _CURRENT_CTX_PTR,
     _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
+
+pub(crate) fn setup_multitasking() {
+    // Register the interrupt handler without nesting to satisfy the requirements of the task
+    // switching code
+    let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint2_handler as *const ()) },
+        esp_hal::interrupt::Priority::Priority1,
+    );
+
+    unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
+}
+
+pub(crate) fn disable_multitasking() {
+    interrupt::disable(esp_hal::system::Cpu::ProCpu, Interrupt::FROM_CPU_INTR2);
+}
+
+#[esp_hal::ram]
+extern "C" fn swint2_handler() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.reset();
+
+    SCHEDULER.with(|scheduler| scheduler.switch_task());
+}
+
+#[inline]
+pub(crate) fn yield_task() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.raise();
+
+    // It takes a bit for the software interrupt to be serviced.
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+}

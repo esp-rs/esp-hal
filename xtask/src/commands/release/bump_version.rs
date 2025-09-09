@@ -345,7 +345,7 @@ fn finalize_placeholders(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use toml_edit::DocumentMut;
 
     use super::*;

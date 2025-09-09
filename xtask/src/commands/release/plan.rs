@@ -335,15 +335,18 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    // Dependencies in this test do not always reflect real dependencies, it is only a test of correct function operation. 
+    // Dependencies in this test do not always reflect real dependencies, it is only a test of correct function operation.
     fn test_topological_sort() {
         let mut dep_graph = HashMap::new();
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
-        dep_graph.insert(Package::EspHalEmbassy, vec![Package::EspHal, Package::EspRadio]);
+        dep_graph.insert(
+            Package::EspHalEmbassy,
+            vec![Package::EspHal, Package::EspRadio],
+        );
         dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
         dep_graph.insert(Package::EspAlloc, vec![]);
 

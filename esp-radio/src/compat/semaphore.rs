@@ -1,3 +1,4 @@
+use esp_radio_preempt_driver::semaphore::SemaphoreKind;
 use esp_wifi_sys::c_types::c_void;
 
 use crate::{
@@ -5,11 +6,19 @@ use crate::{
     preempt::semaphore::{SemaphoreHandle, SemaphorePtr},
 };
 
-pub(crate) fn sem_create(max: u32, init: u32) -> *mut c_void {
-    SemaphoreHandle::new(max, init).leak().as_ptr().cast()
+pub(crate) fn sem_create(max: u32, initial: u32) -> *mut c_void {
+    let ptr = SemaphoreHandle::new(SemaphoreKind::Counting { max, initial })
+        .leak()
+        .as_ptr()
+        .cast();
+
+    trace!("sem_create -> {:?}", ptr);
+
+    ptr
 }
 
 pub(crate) fn sem_delete(semphr: *mut c_void) {
+    trace!("sem_delete: {:?}", semphr);
     let ptr = unwrap!(SemaphorePtr::new(semphr.cast()), "semphr is null");
 
     let handle = unsafe { SemaphoreHandle::from_ptr(ptr) };

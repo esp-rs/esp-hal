@@ -188,16 +188,5 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
-      # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build,tui
-
-      # Run tests in esp-bootloader-esp-idf
-      - run: cd esp-bootloader-esp-idf && cargo test --features=std
-
-      # Run tests in esp-storage
-      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
-
-      # Miri tests in esp-storage
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1
+      # Run host tests for all applicable packages: 
+      - run: cargo xtask host-tests
