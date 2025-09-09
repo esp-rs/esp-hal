@@ -9,8 +9,8 @@ use esp_radio_preempt_driver::{
 use esp_sync::NonReentrantMutex;
 
 use crate::{
-    SCHEDULER,
-    task::{TaskPtr, WaitQueue, current_task},
+    task::{TaskPtr, current_task},
+    wait_queue::WaitQueue,
 };
 
 enum SemaphoreInner {
@@ -42,6 +42,7 @@ impl SemaphoreInner {
                 lock_counter,
                 ..
             } => {
+                // TODO: priority inheritance
                 let current = current_task();
                 if owner.is_none() || owner.unwrap() == current {
                     *lock_counter += 1;
@@ -92,17 +93,17 @@ impl SemaphoreInner {
         }
     }
 
-    fn push_waiting_task(&mut self, task: TaskPtr) {
+    fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
         match self {
-            SemaphoreInner::Counting { waiting, .. } => waiting.push(task),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.push(task),
+            SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
+            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.wait_with_deadline(deadline),
         }
     }
 
-    fn pop_waiting(&mut self) -> Option<TaskPtr> {
+    fn notify_one(&mut self) {
         match self {
-            SemaphoreInner::Counting { waiting, .. } => waiting.pop(),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.pop(),
+            SemaphoreInner::Counting { waiting, .. } => waiting.notify(),
+            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.notify(),
         }
     }
 }
@@ -146,17 +147,7 @@ impl Semaphore {
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
-                    // WaitQueue::wait_with_deadline
-                    SCHEDULER.with(|scheduler| {
-                        sem.push_waiting_task(unwrap!(scheduler.current_task));
-
-                        let wake_at = if let Some(deadline) = deadline {
-                            deadline
-                        } else {
-                            Instant::EPOCH + Duration::MAX
-                        };
-                        scheduler.sleep_until(wake_at);
-                    });
+                    sem.wait_with_deadline(deadline);
                     false
                 }
             });
@@ -187,9 +178,7 @@ impl Semaphore {
     pub fn give(&self) -> bool {
         self.inner.with(|sem| {
             if sem.try_give() {
-                if let Some(waken_task) = sem.pop_waiting() {
-                    SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
-                }
+                sem.notify_one();
                 true
             } else {
                 false

@@ -8,7 +8,7 @@ use esp_radio_preempt_driver::{
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::{SCHEDULER, task::WaitQueue};
+use crate::wait_queue::WaitQueue;
 
 struct QueueInner {
     storage: Box<[u8]>,
@@ -136,26 +136,11 @@ impl Queue {
         loop {
             let enqueued = self.inner.with(|queue| {
                 if unsafe { queue.try_enqueue(item) } {
-                    // WaitQueue::notify_one
-                    if let Some(waken_task) = queue.waiting_for_item.pop() {
-                        SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
-                    }
+                    queue.waiting_for_item.notify();
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
-                    // WaitQueue::wait_with_deadline
-                    SCHEDULER.with(|scheduler| {
-                        queue
-                            .waiting_for_space
-                            .push(unwrap!(scheduler.current_task));
-
-                        let wake_at = if let Some(deadline) = deadline {
-                            deadline
-                        } else {
-                            Instant::EPOCH + Duration::MAX
-                        };
-                        scheduler.sleep_until(wake_at);
-                    });
+                    queue.waiting_for_space.wait_with_deadline(deadline);
                     false
                 }
             });
@@ -182,10 +167,7 @@ impl Queue {
     unsafe fn try_send_to_back(&self, item: *const u8) -> bool {
         self.inner.with(|queue| {
             if unsafe { queue.try_enqueue(item) } {
-                // WaitQueue::notify_one
-                if let Some(waken_task) = queue.waiting_for_item.pop() {
-                    SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
-                }
+                queue.waiting_for_item.notify();
                 true
             } else {
                 false
@@ -200,23 +182,11 @@ impl Queue {
             // Attempt to dequeue an item from the queue
             let dequeued = self.inner.with(|queue| {
                 if unsafe { queue.try_dequeue(item) } {
-                    if let Some(waken_task) = queue.waiting_for_space.pop() {
-                        SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
-                    }
+                    queue.waiting_for_space.notify();
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
-                    // WaitQueue::wait_with_deadline
-                    SCHEDULER.with(|scheduler| {
-                        queue.waiting_for_item.push(unwrap!(scheduler.current_task));
-
-                        let wake_at = if let Some(deadline) = deadline {
-                            deadline
-                        } else {
-                            Instant::EPOCH + Duration::MAX
-                        };
-                        scheduler.sleep_until(wake_at);
-                    });
+                    queue.waiting_for_item.wait_with_deadline(deadline);
                     false
                 }
             });
@@ -242,13 +212,12 @@ impl Queue {
 
     unsafe fn try_receive(&self, item: *mut u8) -> bool {
         self.inner.with(|queue| {
-            let dequeued = unsafe { queue.try_dequeue(item) };
-
-            if dequeued && let Some(waken_task) = queue.waiting_for_space.pop() {
-                SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+            if unsafe { queue.try_dequeue(item) } {
+                queue.waiting_for_space.notify();
+                true
+            } else {
+                false
             }
-
-            dequeued
         })
     }
 
@@ -260,11 +229,8 @@ impl Queue {
                 queue.remove(item);
             }
 
-            if was_full
-                && !queue.full()
-                && let Some(waken_task) = queue.waiting_for_space.pop()
-            {
-                SCHEDULER.with(|scheduler| scheduler.resume_task(waken_task));
+            if was_full && !queue.full() {
+                queue.waiting_for_space.notify();
             }
         })
     }
