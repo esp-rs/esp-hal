@@ -41,6 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
 - `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
 - The memory allocation functions expected by `esp_radio` have been renamed and extended (#3890, #4043)
+- `wifi::new` constructor takes second `lifetime` for the controller reference (#4084)
 
 ### Fixed
 
