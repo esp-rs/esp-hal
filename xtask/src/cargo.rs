@@ -107,7 +107,7 @@ fn get_cargo() -> String {
     cargo
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct CargoArgsBuilder {
     toolchain: Option<String>,
     subcommand: String,
