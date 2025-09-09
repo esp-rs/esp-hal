@@ -33,17 +33,19 @@ impl WaitQueue {
     pub(crate) fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
         SCHEDULER.with(|scheduler| {
             let mut task = unwrap!(scheduler.current_task);
-            self.waiting_tasks.push(task);
-            unsafe {
-                task.as_mut().current_queue = Some(NonNull::from(self));
-            }
 
             let wake_at = if let Some(deadline) = deadline {
                 deadline
             } else {
                 Instant::EPOCH + Duration::MAX
             };
-            scheduler.sleep_until(wake_at);
+
+            if scheduler.sleep_until(wake_at) {
+                self.waiting_tasks.push(task);
+                unsafe {
+                    task.as_mut().current_queue = Some(NonNull::from(self));
+                }
+            }
         });
     }
 

@@ -203,13 +203,18 @@ impl SchedulerState {
         is_current
     }
 
-    pub(crate) fn sleep_until(&mut self, at: Instant) {
+    pub(crate) fn sleep_until(&mut self, at: Instant) -> bool {
         let current_task = unwrap!(self.current_task);
         let timer_queue = unwrap!(self.time_driver.as_mut());
-        timer_queue.schedule_wakeup(current_task, at);
-
-        self.event.set_blocked();
-        task::yield_task();
+        if timer_queue.schedule_wakeup(current_task, at) {
+            // The task has been scheduled for wakeup.
+            self.event.set_blocked();
+            task::yield_task();
+            true
+        } else {
+            // The task refuses to sleep.
+            false
+        }
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
@@ -280,7 +285,7 @@ impl Scheduler {
         task_ptr
     }
 
-    pub(crate) fn sleep_until(&self, wake_at: Instant) {
+    pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
         SCHEDULER.with(|scheduler| scheduler.sleep_until(wake_at))
     }
 }
@@ -358,7 +363,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn usleep(&self, us: u32) {
-        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64))
+        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
     }
 
     fn now(&self) -> u64 {
