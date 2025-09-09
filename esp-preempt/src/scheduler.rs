@@ -96,21 +96,17 @@ impl SchedulerState {
         self.time_driver = Some(driver);
     }
 
-    fn delete_marked_tasks(&mut self) {
+    fn delete_marked_tasks(&mut self) -> bool {
+        let mut current_task_deleted = false;
         while let Some(to_delete) = self.to_delete.pop() {
             trace!("delete_marked_tasks {:?}", to_delete);
 
-            self.all_tasks.remove(to_delete);
-            self.run_queue.remove(to_delete);
-            unwrap!(self.time_driver.as_mut())
-                .timer_queue
-                .remove(to_delete);
-
-            unsafe {
-                let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
-                core::mem::drop(task);
+            if Some(to_delete) == self.current_task {
+                current_task_deleted = true;
             }
+            self.delete_task(to_delete);
         }
+        current_task_deleted
     }
 
     fn select_next_task(&mut self, currently_active_task: TaskPtr) -> Option<TaskPtr> {
@@ -190,18 +186,8 @@ impl SchedulerState {
 
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Context) -> bool {
         let current_task = unwrap!(self.current_task);
-        let mut task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
+        let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
-
-        // Remove task from queues.
-        if let Some(mut containing_queue) = unsafe { task_to_delete.as_mut().current_queue.take() }
-        {
-            unsafe {
-                containing_queue.as_mut().remove(task_to_delete);
-            }
-        } else {
-            self.run_queue.remove(task_to_delete);
-        }
 
         self.to_delete.push(task_to_delete);
 
@@ -228,6 +214,28 @@ impl SchedulerState {
 
         // if task.priority > current_task.priority
         task::yield_task();
+    }
+
+    fn delete_task(&mut self, to_delete: TaskPtr) {
+        self.remove_from_all_queues(to_delete);
+
+        unsafe {
+            let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
+            core::mem::drop(task);
+        }
+    }
+
+    fn remove_from_all_queues(&mut self, mut task: TaskPtr) {
+        self.all_tasks.remove(task);
+        unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
+
+        if let Some(mut containing_queue) = unsafe { task.as_mut().current_queue.take() } {
+            unsafe {
+                containing_queue.as_mut().remove(task);
+            }
+        } else {
+            self.run_queue.remove(task);
+        }
     }
 }
 
