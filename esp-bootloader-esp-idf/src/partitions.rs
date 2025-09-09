@@ -681,7 +681,7 @@ impl<F> embedded_storage::nor_flash::MultiwriteNorFlash for FlashRegion<'_, F> w
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     static SIMPLE: &[u8] = include_bytes!("../testdata/single_factory_no_ota.bin");

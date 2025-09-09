@@ -320,7 +320,7 @@ pub(crate) fn comparison_url(base: &str, url: &str, branch_name: &str) -> Result
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

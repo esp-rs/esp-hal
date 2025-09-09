@@ -335,7 +335,7 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

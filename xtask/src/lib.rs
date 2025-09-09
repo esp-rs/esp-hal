@@ -144,8 +144,8 @@ impl Package {
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
             .any(|entry| {
                 std::fs::read_to_string(entry.path()).map_or(false, |src| {
-                    src.contains("#[cfg(test)]\nmod test")
-                        || src.contains("#[cfg(test)]\r\nmod test")
+                    src.contains("#[cfg(test)]\nmod tests")
+                        || src.contains("#[cfg(test)]\r\nmod tests")
                 })
             })
     }
@@ -632,7 +632,7 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
             let cmd3 = CargoArgsBuilder::default()
                 .toolchain("nightly")
                 .subcommand("miri")
-                .arg("test")
+                .subcommand("test")
                 .features(&vec!["emulation".into()])
                 .arg("--")
                 .arg("--test-threads=1")
@@ -640,11 +640,10 @@ pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
 
             cargo::run(&cmd3, &package_path)?;
 
-            // Miri tests with emulation + bytewise-read
             let cmd4 = CargoArgsBuilder::default()
                 .toolchain("nightly")
                 .subcommand("miri")
-                .arg("test")
+                .subcommand("test")
                 .features(&vec!["emulation".into(), "bytewise-read".into()])
                 .arg("--")
                 .arg("--test-threads=1")
