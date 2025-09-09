@@ -4,8 +4,8 @@ use core::{
     ptr::{addr_of, addr_of_mut},
 };
 
-use esp_phy::{PhyController, PhyInitGuard};
 use esp_hal::time::Instant;
+use esp_phy::{PhyController, PhyInitGuard};
 
 use super::*;
 use crate::{
