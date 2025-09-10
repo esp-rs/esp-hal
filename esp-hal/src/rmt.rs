@@ -2447,8 +2447,7 @@ mod chip_specific {
 
             rmt.int_clr().write(|w| {
                 w.ch_rx_end(ch).set_bit();
-                w.ch_err(ch).set_bit();
-                w.ch_tx_thr_event(ch).set_bit()
+                w.ch_err(ch).set_bit()
             });
         }
 
