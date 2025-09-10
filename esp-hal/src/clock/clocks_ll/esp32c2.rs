@@ -1,5 +1,5 @@
 use crate::{
-    clock::{ApbClock, Clock, CpuClock, PllClock, XtalClock},
+    clock::{ApbClock, Clock, CpuClock, PllClock, RtcClock, XtalClock},
     peripherals::{APB_CTRL, I2C_ANA_MST, LPWR, MODEM_CLKRST, SYSTEM},
     soc::regi2c,
 };
@@ -188,7 +188,7 @@ pub(super) fn ble_rtc_clk_init() {
         w.lp_timer_sel_rtc_slow().clear_bit()
     });
 
-    let divider = match crate::rtc_cntl::RtcClock::xtal_freq() {
+    let divider = match RtcClock::xtal_freq() {
         XtalClock::_26M => 129,
         XtalClock::_40M => 249,
     };
