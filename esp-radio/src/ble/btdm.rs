@@ -312,7 +312,7 @@ pub(crate) fn ble_init() {
         #[allow(static_mut_refs)]
         #[cfg(feature = "sys-logs")]
         {
-            extern "C" {
+            unsafe extern "C" {
                 static mut g_bt_plf_log_level: u32;
             }
 

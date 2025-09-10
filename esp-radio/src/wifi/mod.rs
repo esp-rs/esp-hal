@@ -28,6 +28,8 @@ use esp_wifi_sys::include::{
     WIFI_PROTOCOL_11G,
     WIFI_PROTOCOL_11N,
     WIFI_PROTOCOL_LR,
+    esp_wifi_connect_internal,
+    esp_wifi_disconnect_internal,
     wifi_scan_channel_bitmap_t,
 };
 #[cfg(feature = "wifi-eap")]
@@ -105,9 +107,7 @@ use crate::binary::{
         esp_interface_t_ESP_IF_WIFI_STA,
         esp_supplicant_deinit,
         esp_supplicant_init,
-        esp_wifi_connect,
         esp_wifi_deinit_internal,
-        esp_wifi_disconnect,
         esp_wifi_get_mode,
         esp_wifi_init_internal,
         esp_wifi_internal_free_rx_buffer,
@@ -1698,6 +1698,7 @@ pub(crate) fn wifi_start_scan(
             ghz_2_channels: 0,
             ghz_5_channels: 0,
         },
+        coex_background_scan: false,
     };
 
     unsafe { esp_wifi_scan_start(&scan_config, block) }
@@ -2331,6 +2332,13 @@ fn apply_ap_config(config: &AccessPointConfig) -> Result<(), WifiError> {
             sae_pwe_h2e: 0,
             csa_count: 3,
             dtim_period: config.dtim_period,
+            transition_disable: 0,
+            sae_ext: 0,
+            bss_max_idle_cfg: include::wifi_bss_max_idle_config_t {
+                period: 0,
+                protected_keep_alive: false,
+            },
+            gtk_rekey_interval: 0,
         },
     };
 
@@ -2361,6 +2369,7 @@ fn apply_sta_config(config: &ClientConfig) -> Result<(), WifiError> {
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
                 authmode: config.auth_method.to_raw(),
+                rssi_5g_adjustment: 0,
             },
             pmf_cfg: wifi_pmf_config_t {
                 capable: true,
@@ -2404,6 +2413,7 @@ fn apply_sta_eap_config(config: &EapClientConfig) -> Result<(), WifiError> {
             threshold: wifi_scan_threshold_t {
                 rssi: -99,
                 authmode: config.auth_method.to_raw(),
+                rssi_5g_adjustment: 0,
             },
             pmf_cfg: wifi_pmf_config_t {
                 capable: true,
@@ -2639,7 +2649,8 @@ pub enum PowerSaveMode {
     /// No power saving.
     #[default]
     None,
-    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM period.
+    /// Minimum power save mode. In this mode, station wakes up to receive beacon every DTIM
+    /// period.
     Minimum,
     /// Maximum power save mode. In this mode, interval to receive beacons is determined by the
     /// `ESP_RADIO_CONFIG_LISTEN_INTERVAL` config option.
@@ -3003,11 +3014,13 @@ impl WifiController<'_> {
     }
 
     fn connect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_connect() })
+        // TODO: implement ROAMING
+        esp_wifi_result!(unsafe { esp_wifi_connect_internal() })
     }
 
     fn disconnect_impl(&mut self) -> Result<(), WifiError> {
-        esp_wifi_result!(unsafe { esp_wifi_disconnect() })
+        // TODO: implement ROAMING
+        esp_wifi_result!(unsafe { esp_wifi_disconnect_internal() })
     }
 
     /// Checks if the Wi-Fi controller has started. Returns true if STA and/or AP are started.

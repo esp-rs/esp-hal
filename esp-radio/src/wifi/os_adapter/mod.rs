@@ -662,6 +662,7 @@ pub unsafe extern "C" fn event_post(
     trace!("EVENT: {:?}", event);
 
     WIFI_EVENTS.with(|events| events.insert(event));
+
     let handled =
         unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
 
@@ -1206,7 +1207,7 @@ pub unsafe extern "C" fn log_write(
     format: *const c_char,
     args: ...
 ) {
-    crate::binary::log::syslog(level, format as _, args);
+    unsafe { crate::binary::log::syslog(level, format as _, args); }
 }
 
 /// **************************************************************************
@@ -1507,7 +1508,7 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
     trace!("coex_status_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_status_get() };
+    return unsafe { crate::binary::include::coex_status_get(0b1) }; // COEX_STATUS_GET_WIFI_BITMAP
 
     #[cfg(not(coex))]
     0
@@ -1790,6 +1791,16 @@ pub unsafe extern "C" fn coex_register_start_cb(
 
     #[cfg(not(coex))]
     0
+}
+
+pub unsafe extern "C" fn coex_schm_get_phase_by_idx(
+    _phase_idx: i32,
+) -> *mut esp_wifi_sys::c_types::c_void {
+    #[cfg(coex)]
+    return unsafe { crate::binary::include::coex_schm_get_phase_by_idx(_phase_idx) };
+
+    #[cfg(not(coex))]
+    core::ptr::null_mut()
 }
 
 /// **************************************************************************

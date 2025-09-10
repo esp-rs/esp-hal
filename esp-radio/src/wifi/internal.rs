@@ -46,7 +46,25 @@ pub(super) static mut G_COEX_ADAPTER_FUNCS: crate::binary::include::coex_adapter
 
         #[cfg(esp32c2)]
         _slowclk_cal_get: Some(slowclk_cal_get),
+
+        _debug_matrix_init: Some(esp_coexist_debug_matrix_init_wrapper),
+        _xtal_freq_get: Some(xtal_freq_get_wrapper),
     };
+
+#[cfg(coex)]
+#[ram]
+unsafe extern "C" fn xtal_freq_get_wrapper() -> i32 {
+    use esp_hal::clock::Clock;
+
+    let xtal = crate::hal::clock::RtcClock::xtal_freq();
+    xtal.mhz() as i32
+}
+
+#[cfg(coex)]
+unsafe extern "C" fn esp_coexist_debug_matrix_init_wrapper(_evt: i32, _sig: i32, _rev: bool) -> i32 {
+    // CONFIG_ESP_COEX_GPIO_DEBUG not supported
+    esp_wifi_sys::include::ESP_ERR_NOT_SUPPORTED as i32
+}
 
 #[cfg(coex)]
 #[ram]
@@ -204,10 +222,11 @@ static __ESP_RADIO_G_WIFI_OSI_FUNCS: wifi_osi_funcs_t = wifi_osi_funcs_t {
     _coex_schm_process_restart: Some(coex_schm_process_restart_wrapper),
     _coex_schm_register_cb: Some(coex_schm_register_cb_wrapper),
 
-    _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
-
     _coex_schm_flexible_period_set: Some(coex_schm_flexible_period_set),
     _coex_schm_flexible_period_get: Some(coex_schm_flexible_period_get),
+    _coex_schm_get_phase_by_idx: Some(coex_schm_get_phase_by_idx),
+
+    _magic: ESP_WIFI_OS_ADAPTER_MAGIC as i32,
 };
 
 const WIFI_ENABLE_WPA3_SAE: u64 = 1 << 0;
@@ -230,25 +249,8 @@ pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     wpa_crypto_funcs: wpa_crypto_funcs_t {
         size: 0,
         version: 1,
-        aes_wrap: None,
-        aes_unwrap: None,
         hmac_sha256_vector: None,
-        sha256_prf: None,
-        hmac_md5: None,
-        hamc_md5_vector: None,
-        hmac_sha1: None,
-        hmac_sha1_vector: None,
-        sha1_prf: None,
-        sha1_vector: None,
         pbkdf2_sha1: None,
-        rc4_skip: None,
-        md5_vector: None,
-        aes_encrypt: None,
-        aes_encrypt_init: None,
-        aes_encrypt_deinit: None,
-        aes_decrypt: None,
-        aes_decrypt_init: None,
-        aes_decrypt_deinit: None,
         aes_128_encrypt: None,
         aes_128_decrypt: None,
         omac1_aes_128: None,
@@ -256,7 +258,6 @@ pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
         ccmp_encrypt: None,
         aes_gmac: None,
         sha256_vector: None,
-        crc32: None,
     },
     static_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
     dynamic_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
@@ -279,8 +280,8 @@ pub(super) static mut G_CONFIG: wifi_init_config_t = wifi_init_config_t {
     feature_caps: WIFI_FEATURE_CAPS,
     sta_disconnected_pm: false,
     espnow_max_encrypt_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM as i32,
-    magic: WIFI_INIT_CONFIG_MAGIC as i32,
-
     tx_hetb_queue_num: 3,
     dump_hesigb_enable: false,
+
+    magic: WIFI_INIT_CONFIG_MAGIC as i32,
 };

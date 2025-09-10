@@ -85,11 +85,13 @@ pub(super) struct osi_funcs_s {
     btdm_rom_table_ready: Option<unsafe extern "C" fn()>,
     coex_bt_wakeup_request: Option<unsafe extern "C" fn()>,
     coex_bt_wakeup_request_end: Option<unsafe extern "C" fn()>,
+    get_time_us: Option<unsafe extern "C" fn() -> u64>,
+    assert: Option<unsafe extern "C" fn()>,
 }
 
 pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     magic: 0xfadebead,
-    version: 0x00010009,
+    version: 0x0001000A,
     interrupt_alloc: Some(ble_os_adapter_chip_specific::interrupt_set),
     interrupt_free: Some(ble_os_adapter_chip_specific::interrupt_clear),
     interrupt_handler_set: Some(ble_os_adapter_chip_specific::interrupt_handler_set),
@@ -150,7 +152,18 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     btdm_rom_table_ready: Some(btdm_rom_table_ready_wrapper),
     coex_bt_wakeup_request: Some(coex_bt_wakeup_request),
     coex_bt_wakeup_request_end: Some(coex_bt_wakeup_request_end),
+    get_time_us: Some(get_time_us_wrapper),
+    assert: Some(assert_wrapper),
 };
+
+extern "C" fn get_time_us_wrapper() -> u64 {
+    // Get time in microseconds since boot
+    todo!()
+}
+
+extern "C" fn assert_wrapper() {
+    todo!()
+}
 
 extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
     trace!("coex_schm_register_btdm_callback");
@@ -236,11 +249,32 @@ extern "C" fn ets_delay_us_wrapper(us: u32) {
 }
 
 extern "C" fn btdm_rom_table_ready_wrapper() {
-    trace!("btdm_rom_table_ready_wrapper is NOT implemented");
+    trace!("btdm_rom_table_ready_wrapper");
 
-    // #if BT_BLE_CCA_MODE == 2
-    // btdm_cca_feature_enable();
-    // #endif
+    unsafe extern "C" {
+        // fn ble_cca_funcs_reset();
+        fn ble_dtm_funcs_reset();
+        fn ble_42_adv_funcs_reset();
+        fn ble_init_funcs_reset();
+        fn ble_con_funcs_reset();
+        fn ble_scan_funcs_reset();
+        fn ble_ext_adv_funcs_reset();
+        fn ble_ext_scan_funcs_reset();
+        fn ble_base_funcs_reset();
+        fn ble_enc_funcs_reset();
+    }
+
+    unsafe {
+        ble_base_funcs_reset();
+        ble_42_adv_funcs_reset();
+        ble_ext_adv_funcs_reset();
+        ble_dtm_funcs_reset();
+        ble_scan_funcs_reset();
+        ble_ext_scan_funcs_reset();
+        ble_enc_funcs_reset();
+        ble_init_funcs_reset();
+        ble_con_funcs_reset();
+    }
 }
 
 unsafe extern "C" {
@@ -251,8 +285,7 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
     // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
     // ideally _some_ of these values should be configurable
     esp_bt_controller_config_t {
-        magic: 0x5a5aa5a5,
-        version: 0x02404010,
+        version: 0x02505080,
         controller_task_stack_size: 8192,
         controller_task_prio: 200,
         controller_task_run_cpu: 0,
@@ -285,10 +318,29 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         scan_backoff_upperlimitmax: 0,
         ble_50_feat_supp: true, // BT_CTRL_50_FEATURE_SUPPORT
         ble_cca_mode: 0,
-
         ble_chan_ass_en: 0,
         ble_data_lenth_zero_aux: 0,
         ble_ping_en: 0,
+        ble_llcp_disc_flag: 0b111, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE |
+                                    * BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE
+                                    * |BT_CTRL_BLE_LLCP_PHY_UPDATE) */
+        run_in_flash: false,
+        dtm_en: true,
+        enc_en: true,
+        qa_test: false,
+        connect_en: true,
+        scan_en: true,
+        ble_aa_check: true,
+        #[cfg(feature = "sys-logs")]
+        ble_log_mode_en: 4095,
+        #[cfg(feature = "sys-logs")]
+        ble_log_level: 5,
+        #[cfg(not(feature = "sys-logs"))]
+        ble_log_mode_en: 0,
+        #[cfg(not(feature = "sys-logs"))]
+        ble_log_level: 0,
+        adv_en: true,
+        magic: 0x5a5aa5a5,
     }
 }
 

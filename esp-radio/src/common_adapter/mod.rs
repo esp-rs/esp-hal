@@ -238,7 +238,7 @@ pub unsafe extern "C" fn read_mac(mac: *mut u8, type_: u32) -> c_int {
 
 // other functions
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn puts(s: *const c_char) {
+pub unsafe extern "C" fn __esp_radio_puts(s: *const c_char) {
     unsafe {
         let cstr = str_from_c(s);
         info!("{}", cstr);
@@ -446,15 +446,6 @@ pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibra
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn queue_create(queue_len: u32, item_size: u32) -> *mut c_void {
-    // TODO remove this once fixed in esp_supplicant AND we updated to the fixed
-    // version - JIRA: WIFI-6676
-    let (queue_len, item_size) = if queue_len != 3 && item_size != 4 {
-        (queue_len, item_size)
-    } else {
-        warn!("Fixing queue item_size");
-        (3, 8)
-    };
-
     crate::compat::queue::queue_create(queue_len as i32, item_size as i32).cast()
 }
 
@@ -634,4 +625,35 @@ pub unsafe extern "C" fn queue_recv_from_isr(
 /// *************************************************************************
 pub unsafe extern "C" fn queue_msg_waiting(queue: *mut c_void) -> u32 {
     crate::compat::queue::queue_messages_waiting(queue.cast())
+}
+
+#[allow(unused)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __esp_radio_esp_event_post(
+    event_base: *const c_char,
+    event_id: i32,
+    event_data: *mut c_void,
+    event_data_size: usize,
+    ticks_to_wait: u32,
+) -> i32 {
+    #[cfg(feature = "wifi")]
+    return unsafe {
+        crate::wifi::event_post(
+            event_base,
+            event_id,
+            event_data,
+            event_data_size,
+            ticks_to_wait,
+        )
+    };
+
+    #[cfg(not(feature = "wifi"))]
+    return -1;
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __esp_radio_vTaskDelay(ticks: u32) {
+    unsafe {
+        crate::compat::common::__esp_radio_usleep(crate::time::blob_ticks_to_micros(ticks));
+    }
 }
