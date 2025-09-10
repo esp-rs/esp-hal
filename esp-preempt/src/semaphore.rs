@@ -4,37 +4,86 @@ use core::ptr::NonNull;
 use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     register_semaphore_implementation,
-    semaphore::{SemaphoreImplementation, SemaphorePtr},
+    semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
     yield_task,
 };
 use esp_sync::NonReentrantMutex;
 
-struct SemaphoreInner {
-    current: u32,
-    max: u32,
+use crate::task::{TaskPtr, current_task};
+
+enum SemaphoreInner {
+    Counting {
+        current: u32,
+        max: u32,
+    },
+    RecursiveMutex {
+        owner: Option<TaskPtr>,
+        lock_counter: u32,
+    },
 }
 
 impl SemaphoreInner {
     fn try_take(&mut self) -> bool {
-        if self.current > 0 {
-            self.current -= 1;
-            true
-        } else {
-            false
+        match self {
+            SemaphoreInner::Counting { current, .. } => {
+                if *current > 0 {
+                    *current -= 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            SemaphoreInner::RecursiveMutex {
+                owner,
+                lock_counter,
+            } => {
+                let current = current_task();
+                if owner.is_none() || owner.unwrap() == current {
+                    *lock_counter += 1;
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 
     fn try_give(&mut self) -> bool {
-        if self.current < self.max {
-            self.current += 1;
-            true
-        } else {
-            false
+        match self {
+            SemaphoreInner::Counting { current, max } => {
+                if *current < *max {
+                    *current += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            SemaphoreInner::RecursiveMutex {
+                owner,
+                lock_counter,
+            } => {
+                let current = current_task();
+
+                if *owner == Some(current) && *lock_counter > 0 {
+                    *lock_counter -= 1;
+                    if *lock_counter == 0 {
+                        *owner = None;
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 
     fn current_count(&mut self) -> u32 {
-        self.current
+        match self {
+            SemaphoreInner::Counting { current, .. } => *current,
+            SemaphoreInner::RecursiveMutex { .. } => {
+                panic!("RecursiveMutex does not support current_count")
+            }
+        }
     }
 }
 
@@ -43,12 +92,19 @@ pub struct Semaphore {
 }
 
 impl Semaphore {
-    pub fn new(max: u32, initial: u32) -> Self {
-        Semaphore {
-            inner: NonReentrantMutex::new(SemaphoreInner {
+    pub fn new(kind: SemaphoreKind) -> Self {
+        let inner = match kind {
+            SemaphoreKind::Counting { initial, max } => SemaphoreInner::Counting {
                 current: initial,
                 max,
-            }),
+            },
+            SemaphoreKind::RecursiveMutex => SemaphoreInner::RecursiveMutex {
+                owner: None,
+                lock_counter: 0,
+            },
+        };
+        Semaphore {
+            inner: NonReentrantMutex::new(inner),
         }
     }
 
@@ -98,8 +154,8 @@ impl Semaphore {
 }
 
 impl SemaphoreImplementation for Semaphore {
-    fn create(max: u32, initial: u32) -> SemaphorePtr {
-        let sem = Box::new(Semaphore::new(max, initial));
+    fn create(kind: SemaphoreKind) -> SemaphorePtr {
+        let sem = Box::new(Semaphore::new(kind));
         NonNull::from(Box::leak(sem)).cast()
     }
 

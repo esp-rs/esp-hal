@@ -342,7 +342,7 @@ fn parse_tag_link(line: &str) -> Result<(&str, &str)> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]

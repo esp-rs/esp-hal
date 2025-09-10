@@ -13,7 +13,6 @@
 //! capabilities:
 //!
 //! - A preemptive task scheduler: [`Scheduler`]
-//! - Mutexes: [`mutex::MutexImplementation`]
 //! - Semaphores: [`semaphore::SemaphoreImplementation`]
 //! - Queues: [`queue::QueueImplementation`]
 //! - Timers (functions that are executed at a specific time): [`timer::TimerImplementation`]
@@ -22,7 +21,6 @@
 
 #![no_std]
 
-pub mod mutex;
 pub mod queue;
 pub mod semaphore;
 pub mod timer;
@@ -61,8 +59,8 @@ unsafe extern "Rust" {
 /// See the [module documentation][crate] for an example.
 #[macro_export]
 macro_rules! scheduler_impl {
-    (static $name:ident: $t: ty = $val:expr) => {
-        static $name: $t = $val;
+    ($vis:vis static $name:ident: $t: ty = $val:expr) => {
+        $vis static $name: $t = $val;
 
         #[unsafe(no_mangle)]
         #[inline]

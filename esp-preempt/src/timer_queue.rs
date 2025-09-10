@@ -5,6 +5,7 @@ use core::{
     ptr::NonNull,
 };
 
+use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     Scheduler,
     register_timer_implementation,
@@ -12,7 +13,10 @@ use esp_radio_preempt_driver::{
 };
 use esp_sync::NonReentrantMutex;
 
-use crate::{SCHEDULER, timer::yield_task};
+use crate::{
+    SCHEDULER,
+    task::{TaskExt, TaskPtr},
+};
 
 static TIMER_QUEUE: TimerQueue = TimerQueue::new();
 
@@ -20,6 +24,7 @@ struct TimerQueueInner {
     // A linked list of active timers
     head: Option<NonNull<Timer>>,
     next_wakeup: u64,
+    task: Option<TaskPtr>,
 }
 
 unsafe impl Send for TimerQueueInner {}
@@ -29,6 +34,7 @@ impl TimerQueueInner {
         Self {
             head: None,
             next_wakeup: 0,
+            task: None,
         }
     }
 
@@ -46,6 +52,7 @@ impl TimerQueueInner {
 
         if due < self.next_wakeup {
             self.next_wakeup = due;
+            unwrap!(self.task).resume();
         }
     }
 
@@ -97,6 +104,7 @@ impl TimerQueue {
     /// The timer queue needs to be re-processed when a new timer is armed, because the new timer
     /// may need to be triggered before the next scheduled wakeup.
     fn process(&self) {
+        debug!("Processing timers");
         let mut timers = self.inner.with(|q| {
             q.next_wakeup = u64::MAX;
             q.head.take()
@@ -113,11 +121,19 @@ impl TimerQueue {
                 timers = props.next.take();
 
                 if !props.is_active || props.drop {
+                    debug!(
+                        "Timer {:x} is inactive or dropped",
+                        current_timer as *const _ as usize
+                    );
                     return false;
                 }
 
                 if props.next_due > SCHEDULER.now() {
                     // Not our time yet.
+                    debug!(
+                        "Timer {:x} is not due yet",
+                        current_timer as *const _ as usize
+                    );
                     return false;
                 }
 
@@ -156,10 +172,12 @@ impl TimerQueue {
                 }
             });
         }
-    }
 
-    fn next_wakeup(&self) -> u64 {
-        self.inner.with(|q| q.next_wakeup)
+        self.inner.with(|q| {
+            let next_wakeup = q.next_wakeup;
+            debug!("next_wakeup: {}", next_wakeup);
+            SCHEDULER.sleep_until(Instant::EPOCH + Duration::from_micros(next_wakeup));
+        });
     }
 }
 
@@ -221,17 +239,12 @@ impl Timer {
         props.next_due = next_due;
         props.period = timeout;
         props.periodic = periodic;
-        debug!(
-            "Arming timer: {:x} @ {} ({})",
-            self as *const _ as usize, next_due, timeout
-        );
 
         q.enqueue(self);
     }
 
     fn disarm(&self, q: &mut TimerQueueInner) {
         self.properties(q).is_active = false;
-        debug!("Disarming timer: {:x}", self as *const _ as usize);
 
         // We don't dequeue the timer - processing the queue will just skip it. If we re-arm,
         // the timer may already be in the queue.
@@ -260,7 +273,9 @@ impl TimerImplementation for Timer {
         let mut callback = CCallback { func, data };
 
         let timer = Box::new(Timer::new(Box::new(move || unsafe { callback.call() })));
-        NonNull::from(Box::leak(timer)).cast()
+        let ptr = NonNull::from(Box::leak(timer)).cast();
+        debug!("Created timer: {:x}", ptr.addr());
+        ptr
     }
 
     unsafe fn delete(timer: TimerPtr) {
@@ -284,11 +299,16 @@ impl TimerImplementation for Timer {
     }
 
     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) {
+        debug!(
+            "Arming {:?} for {} us, periodic = {:?}",
+            timer, timeout, periodic
+        );
         let timer = unsafe { Timer::from_ptr(timer) };
         TIMER_QUEUE.inner.with(|q| timer.arm(q, timeout, periodic))
     }
 
     unsafe fn disarm(timer: TimerPtr) {
+        debug!("Disarming {:?}", timer);
         let timer = unsafe { Timer::from_ptr(timer) };
         TIMER_QUEUE.inner.with(|q| timer.disarm(q))
     }
@@ -298,18 +318,17 @@ register_timer_implementation!(Timer);
 
 /// Initializes the `timer` task for the Wi-Fi driver.
 pub(crate) fn create_timer_task() {
-    // schedule the timer task
-    SCHEDULER.task_create(timer_task, core::ptr::null_mut(), 1, None, 8192);
+    // create the timer task
+    TIMER_QUEUE.inner.with(|q| {
+        let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192);
+        q.task = Some(task_ptr);
+    });
 }
 
 /// Entry point for the timer task responsible for handling scheduled timer
 /// events.
 pub(crate) extern "C" fn timer_task(_: *mut c_void) {
     loop {
-        debug!("Timer task");
         TIMER_QUEUE.process();
-        while SCHEDULER.now() < TIMER_QUEUE.next_wakeup() {
-            yield_task();
-        }
     }
 }

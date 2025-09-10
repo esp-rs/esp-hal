@@ -45,6 +45,8 @@ enum Cli {
     CheckChangelog(CheckChangelogArgs),
     /// Re-generate metadata and the chip support table in the esp-hal README.
     UpdateMetadata(UpdateMetadataArgs),
+    /// Run host-tests in the workspace with `cargo test`
+    HostTests(HostTestsArgs),
 }
 
 #[derive(Debug, Args)]
@@ -71,6 +73,13 @@ struct FmtPackagesArgs {
 
 #[derive(Debug, Args)]
 struct CleanArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct HostTestsArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
@@ -176,6 +185,7 @@ fn main() -> Result<()> {
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
         Cli::UpdateMetadata(args) => update_metadata(&workspace, args.check),
+        Cli::HostTests(args) => host_tests(&workspace, args),
     }
 }
 
@@ -512,4 +522,17 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     });
 
     runner.finish()
+}
+
+fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
+    let mut packages = args.packages;
+    packages.sort();
+
+    for package in packages {
+        if package.has_host_tests(workspace) {
+            xtask::run_host_tests(workspace, package)?;
+        }
+    }
+
+    Ok(())
 }
