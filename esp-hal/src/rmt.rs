@@ -2346,9 +2346,10 @@ mod chip_specific {
             rmt.ch_rx_conf1(ch_idx.into()).modify(|_, w| {
                 w.mem_owner().set_bit();
                 w.mem_wr_rst().set_bit();
-                w.apb_mem_rst().set_bit();
-                w.rx_en().set_bit()
+                w.apb_mem_rst().set_bit()
             });
+            rmt.ch_rx_conf1(ch_idx.into())
+                .modify(|_, w| w.rx_en().set_bit());
         }
 
         // Return the first flag that is set of, in order of decreasing priority,
