@@ -3,7 +3,7 @@ use core::ffi::c_void;
 pub(crate) use esp_hal::trapframe::TrapFrame;
 use esp_hal::{xtensa_lx, xtensa_lx_rt};
 
-use crate::{SCHEDULER, task::Context};
+use crate::{SCHEDULER, task::Task};
 
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
@@ -34,11 +34,11 @@ pub(crate) fn new_task_context(
     }
 }
 
-pub(crate) fn restore_task_context(ctx: &mut Context, trap_frame: &mut TrapFrame) {
+pub(crate) fn restore_task_context(ctx: &mut Task, trap_frame: &mut TrapFrame) {
     *trap_frame = ctx.trap_frame;
 }
 
-pub(crate) fn save_task_context(ctx: &mut Context, trap_frame: &TrapFrame) {
+pub(crate) fn save_task_context(ctx: &mut Task, trap_frame: &TrapFrame) {
     ctx.trap_frame = *trap_frame;
 }
 

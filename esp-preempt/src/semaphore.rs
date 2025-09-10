@@ -94,13 +94,15 @@ impl SemaphoreInner {
     }
 
     fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
+        trace!("Semaphore wait_with_deadline - {:?}", deadline);
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
             SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.wait_with_deadline(deadline),
         }
     }
 
-    fn notify_one(&mut self) {
+    fn notify(&mut self) {
+        trace!("Semaphore notify");
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.notify(),
             SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.notify(),
@@ -165,6 +167,7 @@ impl Semaphore {
                 && deadline < Instant::now()
             {
                 // We have a deadline and we've timed out.
+                trace!("Semaphore - take - timed out");
                 return false;
             }
             // We can block more, so let's attempt to take the semaphore again.
@@ -178,7 +181,7 @@ impl Semaphore {
     pub fn give(&self) -> bool {
         self.inner.with(|sem| {
             if sem.try_give() {
-                sem.notify_one();
+                sem.notify();
                 true
             } else {
                 false

@@ -320,7 +320,7 @@ register_timer_implementation!(Timer);
 pub(crate) fn create_timer_task() {
     // create the timer task
     TIMER_QUEUE.inner.with(|q| {
-        let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192);
+        let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192, 2);
         q.task = Some(task_ptr);
     });
 }
