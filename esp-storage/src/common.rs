@@ -12,8 +12,12 @@ pub enum FlashStorageError {
     CantUnlock,
     NotAligned,
     OutOfBounds,
+    /// Cannot write to flash as more than one core is running.
+    /// Either manually suspend the other core, or use one of the available strategies:
+    /// * [`FlashStorage::multicore_auto_park`]
+    /// * [`FlashStorage::multicore_ignore`]
     #[cfg(multi_core)]
-    SecondCoreRunning,
+    OtherCoreRunning,
     Other(i32),
 }
 
@@ -120,16 +124,16 @@ impl FlashStorage {
     }
 
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
-        self.unlock_once()?;
-        let operation = || check_rc(chip_specific::spiflash_erase_sector(sector));
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
 
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
-                self.multi_core_strategy.with_checks(operation)
-            } else {
-                operation()
-            }
-        }
+        self.unlock_once()?;
+        check_rc(chip_specific::spiflash_erase_sector(sector))?;
+
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
+
+        Ok(())
     }
 
     pub(crate) fn internal_write(
@@ -137,22 +141,19 @@ impl FlashStorage {
         offset: u32,
         bytes: &[u8],
     ) -> Result<(), FlashStorageError> {
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
+
         self.unlock_once()?;
+        check_rc(chip_specific::spiflash_write(
+            offset,
+            bytes.as_ptr() as *const u32,
+            bytes.len() as u32,
+        ))?;
 
-        let operation = || {
-            check_rc(chip_specific::spiflash_write(
-                offset,
-                bytes.as_ptr() as *const u32,
-                bytes.len() as u32,
-            ))
-        };
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
 
-        cfg_if::cfg_if! {
-            if #[cfg(multi_core)] {
-                self.multi_core_strategy.with_checks(operation)
-            } else {
-                operation()
-            }
-        }
+        Ok(())
     }
 }

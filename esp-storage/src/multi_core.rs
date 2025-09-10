@@ -1,3 +1,5 @@
+//! Only available/needed on multi-core systems like the ESP32-S3 and ESP32
+
 use crate::{FlashStorage, common::FlashStorageError};
 
 #[cfg(feature = "esp32")]
@@ -37,6 +39,7 @@ pub(crate) enum MultiCoreStrategy {
 
 impl FlashStorage {
     /// Enable auto parking of the second core before writing to flash
+    /// The other core will be automatically un-parked when the write is complete
     pub fn multicore_auto_park(mut self) -> FlashStorage {
         self.multi_core_strategy = MultiCoreStrategy::AutoPark;
         self
@@ -101,6 +104,7 @@ impl Cpu {
         }
     }
 
+    /// Park or un-park the core
     #[inline(always)]
     fn park_core(&self, park: bool) {
         let sw_cpu_stall = registers::SW_CPU_STALL as *mut u32;
@@ -127,6 +131,7 @@ impl Cpu {
         }
     }
 
+    /// Returns true if the core is running
     #[inline(always)]
     fn is_running(&self) -> bool {
         // If the core is the app cpu we need to check first if it was even enabled
@@ -172,11 +177,16 @@ impl Cpu {
 }
 
 impl MultiCoreStrategy {
-    fn pre_write(&self) -> Result<bool, FlashStorageError> {
+    /// Perform checks/Prepare for a flash write according to the current strategy
+    ///
+    /// # Returns
+    /// * `True` if the other core needs to be un-parked by post_write
+    /// * `False` otherwise
+    pub(crate) fn pre_write(&self) -> Result<bool, FlashStorageError> {
         match self {
             MultiCoreStrategy::Error => {
                 if Cpu::other().is_running() {
-                    Err(FlashStorageError::SecondCoreRunning)
+                    Err(FlashStorageError::OtherCoreRunning)
                 } else {
                     Ok(false)
                 }
@@ -194,21 +204,16 @@ impl MultiCoreStrategy {
         }
     }
 
-    fn post_write(&self, unpark: bool) {
+    /// Perform post-write actions
+    ///
+    /// # Returns
+    /// * `True` if the other core needs to be un-parked by post_write
+    /// * `False` otherwise
+    pub(crate) fn post_write(&self, unpark: bool) {
         if let MultiCoreStrategy::AutoPark = self {
             if unpark {
                 Cpu::other().park_core(false);
             }
         }
-    }
-
-    pub(crate) fn with_checks(
-        &self,
-        operation: impl FnOnce() -> Result<(), FlashStorageError>,
-    ) -> Result<(), FlashStorageError> {
-        let res = self.pre_write()?;
-        operation()?;
-        self.post_write(res);
-        Ok(())
     }
 }
