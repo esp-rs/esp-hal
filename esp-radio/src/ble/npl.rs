@@ -1068,7 +1068,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
         {
             use esp_hal::clock::Clock;
 
-            let xtal = crate::hal::rtc_cntl::RtcClock::xtal_freq();
+            let xtal = crate::hal::clock::RtcClock::xtal_freq();
             let mhz = xtal.mhz() as u8;
 
             cfg.main_xtal_freq = mhz;

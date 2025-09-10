@@ -72,6 +72,6 @@ unsafe extern "C" fn __esp_phy_esp_dport_access_reg_read(reg: u32) -> u32 {
 unsafe extern "C" fn __esp_phy_rtc_get_xtal() -> u32 {
     use esp_hal::clock::Clock;
 
-    let xtal = esp_hal::rtc_cntl::RtcClock::xtal_freq();
+    let xtal = esp_hal::clock::RtcClock::xtal_freq();
     xtal.mhz()
 }

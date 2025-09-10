@@ -5,8 +5,8 @@
 Random number generator objects can now be created anywhere. The `RNG` peripheral singleton
 is only necessary to enable the cryptographically secure random number generator.
 
- - `Rng` can be constructed without any constraints.
- - `Trng` can only be constructed when it can be ensured to generate true random numbers.
+- `Rng` can be constructed without any constraints.
+- `Trng` can only be constructed when it can be ensured to generate true random numbers.
 
 A new `TrngSource` object has been added. Users can use `TrngSource::new` to create the object,
 and as long as it is alive, `Trng::try_new` will return `Ok` and will provide a true random number
@@ -166,6 +166,7 @@ DMA buffer implementations.
 If the `Final` type is not `Self`, `fn from_view()` will need to be updated to return `Self::Final`.
 
 ## Timer interrupts
+
 ```diff
 - pub fn enable_interrupt(&mut self, enable: bool) { ... }
 + pub fn listen(&mut self) { ... }
@@ -239,3 +240,15 @@ to the constructor, have to be assigned to `Config` instead.
 +         .with_sample_rate(Rate::from_hz(44100)),
   );
 ```
+
+## RTC Clocks
+
+All RTC clock enums/structs have been moved from `rtc_cntl` to the `clock` module. This affects:
+
+- `RtcClock`
+- `RtcFastClock`
+- `RtcSlowClock`
+
+Imports will need to be updated accordingly.
+
+Additionally, enum variant naming violations have been resolved, so the `RtcFastClock` and `RtcSlowClock` prefixes will need to be removed from any variants from these enums.
