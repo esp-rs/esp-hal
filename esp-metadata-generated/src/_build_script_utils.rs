@@ -502,6 +502,7 @@ impl Chip {
                     "soc_has_mem2mem8",
                     "gdma",
                     "phy",
+                    "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_mbedtls",
@@ -619,6 +620,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_mem2mem8",
                     "cargo:rustc-cfg=gdma",
                     "cargo:rustc-cfg=phy",
+                    "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_mbedtls",
@@ -748,6 +750,7 @@ impl Chip {
                     "soc_has_wifi",
                     "gdma",
                     "phy",
+                    "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -894,6 +897,7 @@ impl Chip {
                     "cargo:rustc-cfg=soc_has_wifi",
                     "cargo:rustc-cfg=gdma",
                     "cargo:rustc-cfg=phy",
+                    "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -1084,6 +1088,7 @@ impl Chip {
                     "plic",
                     "phy",
                     "lp_core",
+                    "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -1287,6 +1292,7 @@ impl Chip {
                     "cargo:rustc-cfg=plic",
                     "cargo:rustc-cfg=phy",
                     "cargo:rustc-cfg=lp_core",
+                    "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -1481,6 +1487,7 @@ impl Chip {
                     "gdma",
                     "plic",
                     "phy",
+                    "swd",
                     "rom_crc_le",
                     "rom_crc_be",
                     "rom_md5_bsd",
@@ -1658,6 +1665,7 @@ impl Chip {
                     "cargo:rustc-cfg=gdma",
                     "cargo:rustc-cfg=plic",
                     "cargo:rustc-cfg=phy",
+                    "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
                     "cargo:rustc-cfg=rom_md5_bsd",
@@ -2172,6 +2180,7 @@ impl Chip {
                     "psram",
                     "psram_dma",
                     "octal_psram",
+                    "swd",
                     "ulp_riscv_core",
                     "rom_crc_le",
                     "rom_crc_be",
@@ -2354,6 +2363,7 @@ impl Chip {
                     "cargo:rustc-cfg=psram",
                     "cargo:rustc-cfg=psram_dma",
                     "cargo:rustc-cfg=octal_psram",
+                    "cargo:rustc-cfg=swd",
                     "cargo:rustc-cfg=ulp_riscv_core",
                     "cargo:rustc-cfg=rom_crc_le",
                     "cargo:rustc-cfg=rom_crc_be",
@@ -2630,6 +2640,7 @@ impl Config {
         println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem7)");
         println!("cargo:rustc-check-cfg=cfg(soc_has_mem2mem8)");
         println!("cargo:rustc-check-cfg=cfg(gdma)");
+        println!("cargo:rustc-check-cfg=cfg(swd)");
         println!("cargo:rustc-check-cfg=cfg(rom_md5_mbedtls)");
         println!("cargo:rustc-check-cfg=cfg(pm_support_wifi_wakeup)");
         println!("cargo:rustc-check-cfg=cfg(pm_support_bt_wakeup)");

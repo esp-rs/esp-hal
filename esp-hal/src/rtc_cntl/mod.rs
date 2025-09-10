@@ -229,8 +229,8 @@ pub struct Rtc<'d> {
     _inner: LPWR<'d>,
     /// Reset Watchdog Timer.
     pub rwdt: Rwdt,
-    #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
     /// Super Watchdog
+    #[cfg(swd)]
     pub swd: Swd,
 }
 
@@ -242,7 +242,7 @@ impl<'d> Rtc<'d> {
         Self {
             _inner: rtc_cntl,
             rwdt: Rwdt::new(),
-            #[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
+            #[cfg(swd)]
             swd: Swd::new(),
         }
     }
@@ -682,12 +682,12 @@ impl Rwdt {
     }
 }
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 /// Super Watchdog
+#[cfg(swd)]
 pub struct Swd;
 
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
 /// Super Watchdog driver
+#[cfg(swd)]
 impl Swd {
     /// Create a new super watchdog timer instance
     pub fn new() -> Self {
