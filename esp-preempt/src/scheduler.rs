@@ -326,7 +326,6 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         task::spawn_idle_task();
 
         task::setup_multitasking();
-        timer_queue::create_timer_task();
 
         self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
         task::yield_task();
@@ -335,7 +334,12 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn disable(&self) {
         self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).stop());
         task::disable_multitasking();
+
+        // Note that deleting tasks leaks resources, because we don't know how to free memory
+        // allocated by the deleted tasks.
         task::delete_all_tasks();
+
+        timer_queue::reset();
     }
 
     fn yield_task(&self) {
