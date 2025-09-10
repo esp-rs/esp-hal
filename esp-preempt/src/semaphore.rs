@@ -57,7 +57,7 @@ impl SemaphoreInner {
                         // priority to avoid priority inversion.
                         SCHEDULER.with(|scheduler| {
                             let current_priority = current.priority(&mut scheduler.run_queue);
-                            if *original_priority < current_priority {
+                            if owner.priority(&mut scheduler.run_queue) < current_priority {
                                 owner.set_priority(&mut scheduler.run_queue, current_priority);
                                 scheduler.resume_task(*owner);
                             }
