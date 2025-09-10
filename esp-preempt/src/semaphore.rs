@@ -54,7 +54,7 @@ impl SemaphoreInner {
                         true
                     } else {
                         // We can't lock the mutex. Make sure the mutex holder has a high enough
-                        // priority to not deadlock.
+                        // priority to avoid priority inversion.
                         SCHEDULER.with(|scheduler| {
                             let current_priority = current.priority(&mut scheduler.run_queue);
                             if *original_priority < current_priority {
@@ -65,6 +65,7 @@ impl SemaphoreInner {
                         })
                     }
                 } else {
+                    *owner = Some(current);
                     *lock_counter += 1;
                     *original_priority =
                         SCHEDULER.with(|scheduler| current.priority(&mut scheduler.run_queue));
@@ -182,6 +183,7 @@ impl Semaphore {
             });
 
             if taken {
+                debug!("Semaphore - take - success");
                 return true;
             }
 

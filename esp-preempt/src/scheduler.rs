@@ -9,16 +9,7 @@ use crate::{
     InternalMemory,
     run_queue::{MaxPriority, RunQueue},
     semaphore::Semaphore,
-    task::{
-        self,
-        Task,
-        TaskAllocListElement,
-        TaskDeleteListElement,
-        TaskExt,
-        TaskList,
-        TaskPtr,
-        TaskState,
-    },
+    task::{self, Task, TaskAllocListElement, TaskDeleteListElement, TaskExt, TaskList, TaskPtr},
     timer::TimeDriver,
     timer_queue,
 };
@@ -233,9 +224,6 @@ impl SchedulerState {
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
-        if task.state() == TaskState::Ready {
-            return;
-        }
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
@@ -295,7 +283,9 @@ impl Scheduler {
 
         SCHEDULER.with(|state| {
             state.all_tasks.push(task_ptr);
-            state.run_queue.mark_task_ready(task_ptr);
+            if state.run_queue.mark_task_ready(task_ptr) {
+                task::yield_task();
+            }
         });
 
         debug!("Task created: {:?}", task_ptr);
@@ -326,6 +316,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer_queue::create_timer_task();
 
         self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
+        task::yield_task();
     }
 
     fn disable(&self) {

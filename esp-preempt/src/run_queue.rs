@@ -69,6 +69,7 @@ impl RunQueue {
 
     pub(crate) fn pop(&mut self) -> Option<TaskPtr> {
         let current_prio = self.ready_priority.ready();
+        debug!("pop - from level: {}", current_prio);
 
         let popped = self.ready_tasks[current_prio].pop();
 

@@ -141,12 +141,9 @@ use hal::{
     time::Rate,
 };
 
+use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
-use crate::{
-    preempt::yield_task,
-    radio::{setup_radio_isr, shutdown_radio_isr},
-};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -272,8 +269,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
 
     // This initializes the task switcher
     preempt::enable();
-
-    yield_task();
 
     wifi_set_log_verbose();
     init_radio_clocks();
