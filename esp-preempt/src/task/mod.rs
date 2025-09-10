@@ -8,7 +8,13 @@ use allocator_api2::boxed::Box;
 pub(crate) use arch_specific::*;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue, wait_queue::WaitQueue};
+use crate::{
+    InternalMemory,
+    SCHEDULER,
+    run_queue::RunQueue,
+    scheduler::SchedulerState,
+    wait_queue::WaitQueue,
+};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -279,7 +285,7 @@ impl Drop for Task {
     }
 }
 
-pub(super) fn allocate_main_task() {
+pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
     // This context will be filled out by the first context switch.
     let task = Box::new_in(
         Task {
@@ -302,21 +308,19 @@ pub(super) fn allocate_main_task() {
     let main_task_ptr = NonNull::from(Box::leak(task));
     debug!("Main task created: {:?}", main_task_ptr);
 
-    SCHEDULER.with(|state| {
-        debug_assert!(
-            state.current_task.is_none(),
-            "Tried to allocate main task multiple times"
-        );
+    debug_assert!(
+        scheduler.current_task.is_none(),
+        "Tried to allocate main task multiple times"
+    );
 
-        // The main task is already running, no need to add it to the ready queue.
-        state.all_tasks.push(main_task_ptr);
-        state.current_task = Some(main_task_ptr);
-        state.run_queue.mark_task_ready(main_task_ptr);
-    })
+    // The main task is already running, no need to add it to the ready queue.
+    scheduler.all_tasks.push(main_task_ptr);
+    scheduler.current_task = Some(main_task_ptr);
+    scheduler.run_queue.mark_task_ready(main_task_ptr);
 }
 
-pub(crate) fn spawn_idle_task() {
-    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096, 0);
+pub(crate) fn spawn_idle_task(scheduler: &mut SchedulerState) {
+    let ptr = scheduler.create_task(idle_task, core::ptr::null_mut(), 4096, 0);
     debug!("Idle task created: {:?}", ptr);
 }
 
@@ -330,29 +334,6 @@ pub(crate) extern "C" fn idle_task(_: *mut c_void) {
         #[cfg(riscv)]
         unsafe {
             core::arch::asm!("wfi");
-        }
-    }
-}
-
-pub(super) fn delete_all_tasks() {
-    trace!("delete_all_tasks");
-    let mut all_tasks = SCHEDULER.with(|state| {
-        // Since we delete all tasks, we walk through the allocation list - we just need to clear
-        // the lists.
-        state.to_delete = TaskList::new();
-        state.run_queue = RunQueue::new();
-
-        // Clear the current task.
-        state.current_task = None;
-
-        // Take the allocation list
-        core::mem::take(&mut state.all_tasks)
-    });
-
-    while let Some(task) = all_tasks.pop() {
-        unsafe {
-            let task = Box::from_raw_in(task.as_ptr(), InternalMemory);
-            core::mem::drop(task);
         }
     }
 }

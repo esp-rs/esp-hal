@@ -25,7 +25,7 @@ use static_cell::StaticCell;
 
 #[allow(unused)] // compile test
 fn baremetal_preempt_can_be_initialized_with_any_timer(timer: esp_hal::timer::AnyTimer<'static>) {
-    esp_preempt::init(timer);
+    esp_preempt::start(timer);
 }
 
 #[embassy_executor::task]
@@ -34,7 +34,7 @@ async fn try_init(
     timer: TIMG0<'static>,
 ) {
     let timg0 = TimerGroup::new(timer);
-    esp_preempt::init(timg0.timer0);
+    esp_preempt::start(timg0.timer0);
 
     match esp_radio::init() {
         Ok(_) => signal.signal(None),
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn test_init_fails_cs(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
 
         let init = critical_section::with(|_| esp_radio::init());
 
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     fn test_init_fails_interrupt_free(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
 
         let init = interrupt_free(|| esp_radio::init());
 
@@ -115,7 +115,7 @@ mod tests {
     #[cfg(soc_has_wifi)]
     fn test_wifi_can_be_initialized(mut p: Peripherals) {
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
 
         let esp_radio_ctrl =
             &*mk_static!(esp_radio::Controller<'static>, esp_radio::init().unwrap());
@@ -137,8 +137,7 @@ mod tests {
         use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
 
         let timg0 = TimerGroup::new(p.TIMG0);
-        esp_preempt::init(timg0.timer0);
-        preempt::enable();
+        esp_preempt::start(timg0.timer0);
 
         // We need three tasks to test priority inheritance:
         // - A high priority task that will attempt to acquire the mutex.
@@ -235,6 +234,5 @@ mod tests {
 
         info!("Low: wait for tasks to finish");
         test_context.ready_semaphore.take(None);
-        preempt::disable();
     }
 }

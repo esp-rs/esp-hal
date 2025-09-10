@@ -23,7 +23,6 @@ use crate::{
         TaskPtr,
     },
     timer::TimeDriver,
-    timer_queue,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +97,29 @@ impl SchedulerState {
             time_driver: None,
             event: SchedulerEvent(0),
         }
+    }
+
+    pub(crate) fn create_task(
+        &mut self,
+        task: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+        priority: usize,
+    ) -> TaskPtr {
+        let task = Box::new_in(
+            Task::new(task, param, task_stack_size, priority),
+            InternalMemory,
+        );
+        let task_ptr = NonNull::from(Box::leak(task));
+
+        self.all_tasks.push(task_ptr);
+        if self.run_queue.mark_task_ready(task_ptr) {
+            task::yield_task();
+        }
+
+        debug!("Task created: {:?}", task_ptr);
+
+        task_ptr
     }
 
     fn delete_marked_tasks(&mut self) {
@@ -272,26 +294,11 @@ impl Scheduler {
         task_stack_size: usize,
         priority: u32,
     ) -> TaskPtr {
-        let task = Box::new_in(
-            Task::new(task, param, task_stack_size, priority as usize),
-            InternalMemory,
-        );
-        let task_ptr = NonNull::from(Box::leak(task));
-
-        SCHEDULER.with(|state| {
-            state.all_tasks.push(task_ptr);
-            if state.run_queue.mark_task_ready(task_ptr) {
-                task::yield_task();
-            }
-        });
-
-        debug!("Task created: {:?}", task_ptr);
-
-        task_ptr
+        self.with(|state| state.create_task(task, param, task_stack_size, priority as usize))
     }
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
-        SCHEDULER.with(|scheduler| scheduler.sleep_until(wake_at))
+        self.with(|scheduler| scheduler.sleep_until(wake_at))
     }
 }
 
@@ -318,28 +325,6 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
 
             true
         })
-    }
-
-    fn enable(&self) {
-        // allocate the default tasks
-        task::allocate_main_task();
-        task::spawn_idle_task();
-
-        task::setup_multitasking();
-
-        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
-        task::yield_task();
-    }
-
-    fn disable(&self) {
-        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).stop());
-        task::disable_multitasking();
-
-        // Note that deleting tasks leaks resources, because we don't know how to free memory
-        // allocated by the deleted tasks.
-        task::delete_all_tasks();
-
-        timer_queue::reset();
     }
 
     fn yield_task(&self) {

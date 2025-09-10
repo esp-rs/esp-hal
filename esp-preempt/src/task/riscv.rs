@@ -1,10 +1,6 @@
 use core::ffi::c_void;
 
-use esp_hal::{
-    interrupt::{self, software::SoftwareInterrupt},
-    peripherals::Interrupt,
-    riscv::register,
-};
+use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register};
 
 use crate::SCHEDULER;
 
@@ -284,10 +280,6 @@ pub(crate) fn setup_multitasking() {
     );
 
     unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
-}
-
-pub(crate) fn disable_multitasking() {
-    interrupt::disable(esp_hal::system::Cpu::ProCpu, Interrupt::FROM_CPU_INTR2);
 }
 
 #[esp_hal::ram]

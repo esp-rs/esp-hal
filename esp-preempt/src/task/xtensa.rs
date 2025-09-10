@@ -61,10 +61,6 @@ pub(crate) fn setup_multitasking() {
     }
 }
 
-pub(crate) fn disable_multitasking() {
-    xtensa_lx::interrupt::disable_mask(SW_INTERRUPT);
-}
-
 #[allow(non_snake_case)]
 #[esp_hal::ram]
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
