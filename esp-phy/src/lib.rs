@@ -1,3 +1,29 @@
+//! PHY initialization handling for chips with a radio.
+//!
+//! # Usage
+//! ## Enabling and Disabling the PHY
+//! The [PhyController] trait is implemented for all modem peripherals (`WIFI`, `BT` and `IEEE802154`),
+//! that are present for a particular chip. See its documentation for further usage instructions.
+//!
+//! ## Backing Up and Restoring PHY Calibration Data
+//! If the PHY has already been calibrated, you can use [backup_phy_calibration_data] to persist
+//! calibration data elsewhere (e.g. in flash). Using [set_phy_calibration_data] you can restore
+//! previously persisted calibration data.
+//!
+#![cfg_attr(esp32, doc = "
+## Updating Wi-Fi MAC Time
+**NOTE**: This section is specific to the ESP32 and does not apply to any other chip.
+
+Due to how the Wi-Fi MAC on the ESP32 works, the MAC timer will stop counting, once the entire RF \
+block gets clock gated (such as in modem sleep), and resume accordingly. This causes the delta between \
+system timer and MAC timer to increase. 
+
+Using [MacTimeExt::set_mac_time_update_cb] on the [WIFI](esp_hal::peripherals::WIFI) peripheral, you can \
+set a [MacTimeUpdateCb]. See its documentation for an explanation on how to use it.
+")]
+//! ## Config Options
+#![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
+
 #![no_std]
 use core::cell::RefCell;
 
@@ -63,6 +89,7 @@ struct PhyState {
     mac_time_update_cb: Option<MacTimeUpdateCb>,
 }
 impl PhyState {
+    /// Initialize the PHY state.
     pub const fn new() -> Self {
         Self {
             ref_count: 0,
@@ -114,7 +141,8 @@ impl PhyState {
         let calibration_data_available = self.calibration_data.is_some();
         let calibration_mode = if calibration_data_available {
             // If the SOC just woke up from deep sleep and
-            // `phy_skip_calibration_after_deep_sleep` is enabled.
+            // `phy_skip_calibration_after_deep_sleep` is enabled, no calibration will be
+            // performed.
             cfg_if::cfg_if! {
                 if #[cfg(phy_skip_calibration_after_deep_sleep)] {
                     use esp_hal::{rtc_cntl::SocResetReason, system::reset_reason};
@@ -222,7 +250,7 @@ impl PhyState {
             {
                 self.phy_clock_state_transition_timestamp = Instant::now();
             }
-            // The PHY clock guard will get released in the drop code of the PHYInitGuard. Note
+            // The PHY clock guard will get released in the drop code of the PhyInitGuard. Note
             // that this accepts a slight skewing of the delta, since the clock will be disabled
             // after we record the value. This shouldn't be too bad though.
         }
@@ -318,10 +346,6 @@ pub struct CalibrationDataAlreadySetError;
 pub struct NoCalibrationDataError;
 
 /// Load previously backed up PHY calibration data.
-///
-/// If `no_calibration` is `false`, a partial calibration will be performed. Otherwise no extra
-/// calibration will be performed. See the ESP-IDF documentation on [RF Calibration](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/RF_calibration.html)
-/// for further details.
 pub fn set_phy_calibration_data(
     calibration_data: &PhyCalibrationData,
 ) -> Result<(), CalibrationDataAlreadySetError> {

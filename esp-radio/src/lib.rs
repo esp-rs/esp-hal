@@ -55,7 +55,7 @@
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 #![cfg_attr(
     feature = "wifi",
-    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default."
+    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_PHY_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
