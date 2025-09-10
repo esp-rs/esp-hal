@@ -302,7 +302,6 @@ impl Clock for ApbClock {
 pub enum RtcFastClock {
     /// Main XTAL, divided by 4
     #[cfg(not(any(esp32c6, esp32h2)))]
-    #[expect(unused)]
     XtalD4,
 
     /// Select XTAL_D2_CLK as RTC_FAST_CLK source
