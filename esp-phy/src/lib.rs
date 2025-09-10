@@ -198,7 +198,6 @@ impl PhyState {
     ///
     /// If the ref count was zero, the PHY will be initialized.
     pub fn increase_ref_count(&mut self) {
-        self.ref_count += 1;
         if self.ref_count == 0 {
             #[cfg(esp32)]
             {
@@ -223,6 +222,7 @@ impl PhyState {
             (cb)(self.mac_clock_delta_since_last_call);
             self.mac_clock_delta_since_last_call = Duration::ZERO;
         }
+        self.ref_count += 1;
     }
     /// Decrease the number of reference to the PHY.
     ///
