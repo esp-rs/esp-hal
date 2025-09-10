@@ -2,15 +2,17 @@
 //!
 //! # Usage
 //! ## Enabling and Disabling the PHY
-//! The [PhyController] trait is implemented for all modem peripherals (`WIFI`, `BT` and `IEEE802154`),
-//! that are present for a particular chip. See its documentation for further usage instructions.
+//! The [PhyController] trait is implemented for all modem peripherals (`WIFI`, `BT` and
+//! `IEEE802154`), that are present for a particular chip. See its documentation for further usage
+//! instructions.
 //!
 //! ## Backing Up and Restoring PHY Calibration Data
 //! If the PHY has already been calibrated, you can use [backup_phy_calibration_data] to persist
 //! calibration data elsewhere (e.g. in flash). Using [set_phy_calibration_data] you can restore
 //! previously persisted calibration data.
-//!
-#![cfg_attr(esp32, doc = "
+#![cfg_attr(
+    esp32,
+    doc = "
 ## Updating Wi-Fi MAC Time
 **NOTE**: This section is specific to the ESP32 and does not apply to any other chip.
 
@@ -20,10 +22,10 @@ system timer and MAC timer to increase.
 
 Using [MacTimeExt::set_mac_time_update_cb] on the [WIFI](esp_hal::peripherals::WIFI) peripheral, you can \
 set a [MacTimeUpdateCb]. See its documentation for an explanation on how to use it.
-")]
+"
+)]
 //! ## Config Options
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
-
 #![no_std]
 use core::cell::RefCell;
 

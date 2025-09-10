@@ -1361,10 +1361,24 @@ pub fn sta_mac() -> [u8; 6] {
     mac
 }
 
+#[cfg(esp32)]
+fn set_mac_time_update_cb() {
+    use esp_phy::MacTimeExt;
+    use esp_wifi_sys::include::esp_wifi_internal_update_mac_time;
+    unsafe {
+        esp_hal::peripherals::WIFI::steal().set_mac_time_update_cb(|duration| {
+            esp_wifi_internal_update_mac_time(duration.as_micros() as u32);
+        });
+    }
+}
+
 pub(crate) fn wifi_init() -> Result<(), WifiError> {
     unsafe {
         internal::G_CONFIG.wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs;
         internal::G_CONFIG.feature_caps = internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS;
+
+        #[cfg(esp32)]
+        set_mac_time_update_cb();
 
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
