@@ -7,7 +7,7 @@ pub(crate) fn mutex_create(recursive: bool) -> *mut c_void {
     let ptr = SemaphoreHandle::new(if recursive {
         SemaphoreKind::RecursiveMutex
     } else {
-        SemaphoreKind::Counting { max: 1, initial: 1 }
+        SemaphoreKind::Mutex
     })
     .leak()
     .as_ptr()

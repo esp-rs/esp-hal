@@ -19,7 +19,8 @@ enum SemaphoreInner {
         max: u32,
         waiting: WaitQueue,
     },
-    RecursiveMutex {
+    Mutex {
+        recursive: bool,
         owner: Option<TaskPtr>,
         lock_counter: u32,
         waiting: WaitQueue,
@@ -37,14 +38,15 @@ impl SemaphoreInner {
                     false
                 }
             }
-            SemaphoreInner::RecursiveMutex {
+            SemaphoreInner::Mutex {
+                recursive,
                 owner,
                 lock_counter,
                 ..
             } => {
                 // TODO: priority inheritance
                 let current = current_task();
-                if owner.is_none() || owner.unwrap() == current {
+                if owner.is_none() || (owner.unwrap() == current && *recursive) {
                     *lock_counter += 1;
                     true
                 } else {
@@ -64,7 +66,7 @@ impl SemaphoreInner {
                     false
                 }
             }
-            SemaphoreInner::RecursiveMutex {
+            SemaphoreInner::Mutex {
                 owner,
                 lock_counter,
                 ..
@@ -75,6 +77,7 @@ impl SemaphoreInner {
                     *lock_counter -= 1;
                     if *lock_counter == 0 {
                         *owner = None;
+                        // TODO: priority inheritance
                     }
                     true
                 } else {
@@ -87,7 +90,7 @@ impl SemaphoreInner {
     fn current_count(&mut self) -> u32 {
         match self {
             SemaphoreInner::Counting { current, .. } => *current,
-            SemaphoreInner::RecursiveMutex { .. } => {
+            SemaphoreInner::Mutex { .. } => {
                 panic!("RecursiveMutex does not support current_count")
             }
         }
@@ -97,7 +100,7 @@ impl SemaphoreInner {
         trace!("Semaphore wait_with_deadline - {:?}", deadline);
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.wait_with_deadline(deadline),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.wait_with_deadline(deadline),
         }
     }
 
@@ -105,7 +108,7 @@ impl SemaphoreInner {
         trace!("Semaphore notify");
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.notify(),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.notify(),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.notify(),
         }
     }
 }
@@ -122,7 +125,14 @@ impl Semaphore {
                 max,
                 waiting: WaitQueue::new(),
             },
-            SemaphoreKind::RecursiveMutex => SemaphoreInner::RecursiveMutex {
+            SemaphoreKind::Mutex => SemaphoreInner::Mutex {
+                recursive: false,
+                owner: None,
+                lock_counter: 0,
+                waiting: WaitQueue::new(),
+            },
+            SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
+                recursive: true,
                 owner: None,
                 lock_counter: 0,
                 waiting: WaitQueue::new(),
