@@ -56,7 +56,7 @@ fn main() {
     match args.extcap.run().unwrap() {
         ExtcapStep::Interfaces(interfaces_step) => {
             let metadata = Metadata {
-                help_url: "http://github.com/esp-rs/esp-radio".into(),
+                help_url: "https://github.com/esp-rs/esp-hal/tree/main/esp-radio".into(),
                 display_description: "esp-radio".into(),
                 ..r_extcap::cargo_metadata!()
             };

@@ -30,7 +30,7 @@
 //! ## Examples
 //! Visit the [HMAC] example to learn how to use the HMAC accelerator
 //!
-//! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/hmac.rs
+//! [HMAC]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/hmac/src/main.rs
 
 use core::convert::Infallible;
 

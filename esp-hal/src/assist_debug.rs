@@ -17,7 +17,7 @@
 //! Visit the [Debug Assist] example for an example of using the Debug
 //! Assistant.
 //!
-//! [Debug Assist]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/debug_assist.rs
+//! [Debug Assist]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/debug_assist/src/main.rs
 //!
 //! ## Implementation State
 //! - Bus write access logging is not available via this API
