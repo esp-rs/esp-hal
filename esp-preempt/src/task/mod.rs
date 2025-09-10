@@ -58,6 +58,7 @@ task_list_item!(TaskTimerQueueElement, timer_queue_item);
 pub(crate) trait TaskExt {
     fn resume(self);
     fn priority(self, _: &mut RunQueue) -> usize;
+    fn set_priority(self, _: &mut RunQueue, new_pro: usize);
     fn state(self) -> TaskState;
     fn set_state(self, state: TaskState);
 }
@@ -69,6 +70,11 @@ impl TaskExt for TaskPtr {
 
     fn priority(self, _: &mut RunQueue) -> usize {
         unsafe { self.as_ref().priority as usize }
+    }
+
+    fn set_priority(mut self, run_queue: &mut RunQueue, new_pro: usize) {
+        run_queue.remove(self);
+        unsafe { self.as_mut().priority = new_pro as u32 };
     }
 
     fn state(self) -> TaskState {

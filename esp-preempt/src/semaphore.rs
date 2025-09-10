@@ -9,7 +9,8 @@ use esp_radio_preempt_driver::{
 use esp_sync::NonReentrantMutex;
 
 use crate::{
-    task::{TaskPtr, current_task},
+    SCHEDULER,
+    task::{TaskExt, TaskPtr, current_task},
     wait_queue::WaitQueue,
 };
 
@@ -22,6 +23,7 @@ enum SemaphoreInner {
     Mutex {
         recursive: bool,
         owner: Option<TaskPtr>,
+        original_priority: usize,
         lock_counter: u32,
         waiting: WaitQueue,
     },
@@ -42,15 +44,31 @@ impl SemaphoreInner {
                 recursive,
                 owner,
                 lock_counter,
+                original_priority,
                 ..
             } => {
-                // TODO: priority inheritance
                 let current = current_task();
-                if owner.is_none() || (owner.unwrap() == current && *recursive) {
-                    *lock_counter += 1;
-                    true
+                if let Some(owner) = owner {
+                    if *owner == current && *recursive {
+                        *lock_counter += 1;
+                        true
+                    } else {
+                        // We can't lock the mutex. Make sure the mutex holder has a high enough
+                        // priority to not deadlock.
+                        SCHEDULER.with(|scheduler| {
+                            let current_priority = current.priority(&mut scheduler.run_queue);
+                            if *original_priority < current_priority {
+                                owner.set_priority(&mut scheduler.run_queue, current_priority);
+                                scheduler.resume_task(*owner);
+                            }
+                            false
+                        })
+                    }
                 } else {
-                    false
+                    *lock_counter += 1;
+                    *original_priority =
+                        SCHEDULER.with(|scheduler| current.priority(&mut scheduler.run_queue));
+                    true
                 }
             }
         }
@@ -69,6 +87,7 @@ impl SemaphoreInner {
             SemaphoreInner::Mutex {
                 owner,
                 lock_counter,
+                original_priority,
                 ..
             } => {
                 let current = current_task();
@@ -76,8 +95,11 @@ impl SemaphoreInner {
                 if *owner == Some(current) && *lock_counter > 0 {
                     *lock_counter -= 1;
                     if *lock_counter == 0 {
-                        *owner = None;
-                        // TODO: priority inheritance
+                        if let Some(owner) = owner.take() {
+                            SCHEDULER.with(|scheduler| {
+                                owner.set_priority(&mut scheduler.run_queue, *original_priority);
+                            });
+                        }
                     }
                     true
                 } else {
@@ -125,16 +147,11 @@ impl Semaphore {
                 max,
                 waiting: WaitQueue::new(),
             },
-            SemaphoreKind::Mutex => SemaphoreInner::Mutex {
-                recursive: false,
+            SemaphoreKind::Mutex | SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
+                recursive: matches!(kind, SemaphoreKind::RecursiveMutex),
                 owner: None,
                 lock_counter: 0,
-                waiting: WaitQueue::new(),
-            },
-            SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
-                recursive: true,
-                owner: None,
-                lock_counter: 0,
+                original_priority: 0,
                 waiting: WaitQueue::new(),
             },
         };
