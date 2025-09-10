@@ -346,7 +346,7 @@ pub(crate) fn enable_wifi_power_domain() {
             }
         }
         cfg_if::cfg_if! {
-            if #[cfg(soc_has_apb_ctrl)] {
+            if #[cfg(all(soc_has_apb_ctrl, not(esp32)))] {
                 let syscon = esp_hal::peripherals::APB_CTRL::regs();
             } else {
                 let syscon = esp_hal::peripherals::SYSCON::regs();
