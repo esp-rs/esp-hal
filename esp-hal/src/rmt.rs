@@ -1904,6 +1904,104 @@ enum Event {
     End,
 }
 
+// Debug helper that prints the entire hardware buffer with some extra info.
+#[doc(hidden)]
+pub unsafe fn dump_rmt_ram(msg: &'static str) {
+    #[cfg(not(feature = "defmt"))]
+    let _ = msg;
+
+    #[cfg(feature = "defmt")]
+    {
+        let mut tx_ptrs = [0usize; CHANNEL_INDEX_COUNT as usize];
+        let mut rx_ptrs = [0usize; CHANNEL_INDEX_COUNT as usize];
+        let mut memsizes = [MemSize::from_blocks(0); NUM_CHANNELS];
+
+        for ch_idx in 0..CHANNEL_INDEX_COUNT {
+            let ch_idx_enum = unsafe { ChannelIndex::from_u8_unchecked(ch_idx) };
+            let raw_tx = unsafe { DynChannelAccess::<Tx>::conjure(ch_idx_enum) };
+            tx_ptrs[ch_idx as usize] =
+                raw_tx.hw_offset() + raw_tx.channel() as usize * property!("rmt.channel_ram_size");
+            memsizes[raw_tx.channel() as usize] = raw_tx.memsize();
+
+            let raw_rx = unsafe { DynChannelAccess::<Rx>::conjure(ch_idx_enum) };
+            rx_ptrs[ch_idx as usize] =
+                raw_rx.hw_offset() + raw_rx.channel() as usize * property!("rmt.channel_ram_size");
+            memsizes[raw_rx.channel() as usize] = raw_rx.memsize();
+        }
+
+        let mut tx_ptrs = tx_ptrs.as_slice();
+        let mut rx_ptrs = rx_ptrs.as_slice();
+
+        for ch in 0..NUM_CHANNELS {
+            unsafe {
+                let offset = ch * property!("rmt.channel_ram_size");
+                let start = (property!("rmt.ram_start") as *mut PulseCode).add(offset);
+
+                defmt::info!(
+                    "CHANNEL {} (memsize = {} blocks/{} codes) @ {} =================",
+                    ch,
+                    memsizes[ch].blocks(),
+                    memsizes[ch].codes(),
+                    msg
+                );
+                for i in 0..property!("rmt.channel_ram_size") {
+                    let tx = if let Some(&ptr) = tx_ptrs.first()
+                        && ptr == offset + i
+                    {
+                        tx_ptrs = &tx_ptrs[1..];
+                        true
+                    } else {
+                        false
+                    };
+                    let rx = if let Some(&ptr) = rx_ptrs.first()
+                        && ptr == offset + i
+                    {
+                        rx_ptrs = &rx_ptrs[1..];
+                        true
+                    } else {
+                        false
+                    };
+
+                    let mark = match (tx, rx) {
+                        (false, false) => defmt::intern!("     "),
+                        (true, false) => defmt::intern!(" <TX "),
+                        (false, true) => defmt::intern!(" <RX "),
+                        (true, true) => defmt::intern!(" <RT "),
+                    };
+
+                    let code = start.add(i).read_volatile();
+                    defmt::println!(
+                        "\t[{:02}] {} {:04} {} {:04}{}",
+                        i,
+                        code.symbol1(),
+                        code.length1(),
+                        code.symbol2(),
+                        code.length2(),
+                        mark
+                    );
+                }
+                // let slc = core::slice::from_raw_parts(start, property!("rmt.channel_ram_size"));
+                // defmt::println!("\t{=[?]}", slc);
+            }
+        }
+    }
+}
+
+// Debug helper that fills the hardware buffer to a constant value
+#[doc(hidden)]
+pub unsafe fn fill_rmt_ram(value: PulseCode) {
+    for ch in 0..NUM_CHANNELS {
+        unsafe {
+            let offset = ch * property!("rmt.channel_ram_size");
+            let start = (property!("rmt.ram_start") as *mut PulseCode).add(offset);
+
+            for i in 0..property!("rmt.channel_ram_size") {
+                start.add(i).write_volatile(value);
+            }
+        }
+    }
+}
+
 impl<Dir: Direction> DynChannelAccess<Dir> {
     #[inline]
     fn channel_ram_start_offset(&self) -> usize {
