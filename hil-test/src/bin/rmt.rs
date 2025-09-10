@@ -517,4 +517,66 @@ mod tests {
             ch0.transmit(&tx_data).await.unwrap();
         }
     }
+
+    // Test that dropping rx/tx transactions returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    fn rmt_loopback_after_drop_blocking() {
+        const TX_LEN: usize = 40;
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+        Delay::new().delay_millis(2);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_done = rx_transaction.poll();
+        let tx_done = tx_transaction.poll();
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(!rx_done);
+        assert!(!tx_done);
+
+        // Removing these lines should fail to compile!
+        core::mem::drop(rx_transaction);
+        core::mem::drop(tx_transaction);
+
+        rcv_data.fill(PulseCode::default());
+        let mut rx_transaction = rx_channel.reborrow().receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.reborrow().transmit(&tx_data).unwrap();
+
+        loop {
+            let tx_done = tx_transaction.poll();
+            let rx_done = rx_transaction.poll();
+            if tx_done && rx_done {
+                break;
+            }
+        }
+
+        tx_transaction.wait().unwrap();
+        rx_transaction.wait().unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    }
 }
