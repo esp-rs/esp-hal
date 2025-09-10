@@ -717,9 +717,7 @@ macro_rules! declare_tx_channels {
                     where
                         Self: Sized,
                     {
-                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
-                        configure_tx_channel(raw, pin.into(), config)?;
-                        Ok(Channel::new(raw))
+                        unsafe { Channel::configure_tx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
                     }
                 }
             )+
@@ -749,9 +747,7 @@ macro_rules! declare_rx_channels {
                     where
                         Self: Sized,
                     {
-                        let raw = unsafe { DynChannelAccess::conjure(ChannelIndex::[<Ch $idx>]) };
-                        configure_rx_channel(raw, pin.into(), config)?;
-                        Ok(Channel::new(raw))
+                        unsafe { Channel::configure_rx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
                     }
                 }
             )+
@@ -926,69 +922,6 @@ fn reserve_channel(channel: u8, state: RmtState, memsize: MemSize) -> Result<(),
     Ok(())
 }
 
-fn configure_rx_channel<'d>(
-    raw: DynChannelAccess<Rx>,
-    pin: gpio::interconnect::InputSignal<'d>,
-    config: RxChannelConfig,
-) -> Result<(), Error> {
-    let threshold = if cfg!(any(esp32, esp32s2)) {
-        0b111_1111_1111_1111
-    } else {
-        0b11_1111_1111_1111
-    };
-
-    if config.idle_threshold > threshold {
-        return Err(Error::InvalidArgument);
-    }
-
-    let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Rx, memsize)?;
-
-    pin.apply_input_config(&InputConfig::default());
-    pin.set_input_enable(true);
-
-    raw.input_signal().connect_to(&pin);
-
-    raw.set_divider(config.clk_divider);
-    raw.set_rx_carrier(
-        config.carrier_modulation,
-        config.carrier_high,
-        config.carrier_low,
-        config.carrier_level,
-    );
-    raw.set_rx_filter_threshold(config.filter_threshold);
-    raw.set_rx_idle_threshold(config.idle_threshold);
-    raw.set_memsize(memsize);
-
-    Ok(())
-}
-
-fn configure_tx_channel<'d>(
-    raw: DynChannelAccess<Tx>,
-    pin: gpio::interconnect::OutputSignal<'d>,
-    config: TxChannelConfig,
-) -> Result<(), Error> {
-    let memsize = MemSize::from_blocks(config.memsize);
-    reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
-
-    pin.apply_output_config(&OutputConfig::default());
-    pin.set_output_enable(true);
-
-    raw.output_signal().connect_to(&pin);
-
-    raw.set_divider(config.clk_divider);
-    raw.set_tx_carrier(
-        config.carrier_modulation,
-        config.carrier_high,
-        config.carrier_low,
-        config.carrier_level,
-    );
-    raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
-    raw.set_memsize(memsize);
-
-    Ok(())
-}
-
 // We store values of type `RmtState` in the global `STATE`. However, we also need atomic access,
 // thus the enum needs to be represented as AtomicU8. Thus, we end up with unsafe conversions
 // between `RmtState` and `u8` to avoid constant range checks.
@@ -1109,17 +1042,92 @@ where
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm, Dir> Channel<Dm, Dir>
+impl<Dm> Channel<Dm, Tx>
 where
     Dm: crate::DriverMode,
-    Dir: Direction,
 {
-    fn new(raw: DynChannelAccess<Dir>) -> Self {
-        Self {
+    unsafe fn configure_tx<'d>(
+        ch_idx: ChannelIndex,
+        pin: gpio::interconnect::OutputSignal<'d>,
+        config: TxChannelConfig,
+    ) -> Result<Self, Error> {
+        let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
+
+        let _guard = GenericPeripheralGuard::new();
+
+        let memsize = MemSize::from_blocks(config.memsize);
+        reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
+
+        pin.apply_output_config(&OutputConfig::default());
+        pin.set_output_enable(true);
+
+        raw.output_signal().connect_to(&pin);
+
+        raw.set_divider(config.clk_divider);
+        raw.set_tx_carrier(
+            config.carrier_modulation,
+            config.carrier_high,
+            config.carrier_low,
+            config.carrier_level,
+        );
+        raw.set_tx_idle_output(config.idle_output, config.idle_output_level);
+        raw.set_memsize(memsize);
+
+        Ok(Self {
             raw,
             _mode: core::marker::PhantomData,
-            _guard: GenericPeripheralGuard::new(),
+            _guard,
+        })
+    }
+}
+
+impl<Dm> Channel<Dm, Rx>
+where
+    Dm: crate::DriverMode,
+{
+    unsafe fn configure_rx<'d>(
+        ch_idx: ChannelIndex,
+        pin: gpio::interconnect::InputSignal<'d>,
+        config: RxChannelConfig,
+    ) -> Result<Self, Error> {
+        let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
+
+        let _guard = GenericPeripheralGuard::new();
+
+        let threshold = if cfg!(any(esp32, esp32s2)) {
+            0b111_1111_1111_1111
+        } else {
+            0b11_1111_1111_1111
+        };
+
+        if config.idle_threshold > threshold {
+            return Err(Error::InvalidArgument);
         }
+
+        let memsize = MemSize::from_blocks(config.memsize);
+        reserve_channel(raw.channel(), RmtState::Rx, memsize)?;
+
+        pin.apply_input_config(&InputConfig::default());
+        pin.set_input_enable(true);
+
+        raw.input_signal().connect_to(&pin);
+
+        raw.set_divider(config.clk_divider);
+        raw.set_rx_carrier(
+            config.carrier_modulation,
+            config.carrier_high,
+            config.carrier_low,
+            config.carrier_level,
+        );
+        raw.set_rx_filter_threshold(config.filter_threshold);
+        raw.set_rx_idle_threshold(config.idle_threshold);
+        raw.set_memsize(memsize);
+
+        Ok(Self {
+            raw,
+            _mode: core::marker::PhantomData,
+            _guard,
+        })
     }
 }
 
