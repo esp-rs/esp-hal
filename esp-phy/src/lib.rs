@@ -96,7 +96,7 @@ impl PhyState {
         Self {
             ref_count: 0,
             calibration_data: None,
-            calibrated: true,
+            calibrated: false,
 
             #[cfg(phy_backed_up_digital_register_count_is_set)]
             phy_digital_register_backup: None,
