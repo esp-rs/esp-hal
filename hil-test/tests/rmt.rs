@@ -9,6 +9,7 @@
 use esp_hal::{
     Blocking,
     DriverMode,
+    delay::Delay,
     gpio::{InputPin, Level, NoPin, OutputPin},
     rmt::{
         Channel,
@@ -37,8 +38,8 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup<Dm: DriverMode>(
-    rmt: Rmt<'static, Dm>,
+fn setup<'a, Dm: DriverMode>(
+    rmt: Rmt<'a, Dm>,
     rx: impl InputPin,
     tx: impl OutputPin,
     tx_config: TxChannelConfig,
@@ -494,6 +495,60 @@ mod tests {
             test_channel_pair!(p, tx, rx, channel0, channel2);
             test_channel_pair!(p, tx, rx, channel1, channel3);
         }
+    }
+
+    // Test that dropping rx/tx transactions returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    // FIXME: This test is currently quite different from the async test: It drops transactions,
+    // channels and Rmt, thus disabling the peripheral clock and then restarting it. Eventually,
+    // when rx/tx methods that don't take channel ownership are added, this test should be changed
+    // to use those and re-use the channels without fully resetting the peripheral.
+    #[test]
+    fn rmt_loopback_after_drop() {
+        const TX_LEN: usize = 20;
+
+        let mut peripherals = esp_hal::init(esp_hal::Config::default());
+        let (mut rx, mut tx) = hil_test::common_test_pins!(peripherals);
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high afte
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (tx_channel, rx_channel) =
+            setup(rmt, rx.reborrow(), tx.reborrow(), tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let mut rx_transaction = rx_channel.receive(&mut rcv_data).unwrap();
+        let mut tx_transaction = tx_channel.transmit(&tx_data).unwrap();
+
+        Delay::new().delay_millis(2);
+
+        // ...poll them for a while, but then drop them...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_done = rx_transaction.poll();
+        let tx_done = tx_transaction.poll();
+
+        assert!(!rx_done);
+        assert!(!tx_done);
+
+        core::mem::drop(rx_transaction);
+        core::mem::drop(tx_transaction);
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+
+        let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ).unwrap();
+        let (tx_channel, rx_channel) =
+            setup(rmt, rx.reborrow(), tx.reborrow(), tx_config, rx_config);
+
+        do_rmt_loopback_inner::<TX_LEN>(tx_channel, rx_channel);
     }
 
     // Test that dropping rx/tx futures returns the hardware to a predictable state from which
