@@ -12,7 +12,7 @@ pub(crate) use arch_specific::*;
 use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue};
+use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue, wait_queue::WaitQueue};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -85,6 +85,7 @@ impl<E: TaskListElement> TaskList<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
+        debug_assert!(E::next(task).is_none());
         E::set_next(task, self.head);
         self.head = Some(task);
     }
@@ -94,6 +95,7 @@ impl<E: TaskListElement> TaskList<E> {
 
         if let Some(task) = popped {
             self.head = E::next(task);
+            E::set_next(task, None);
         }
 
         popped
@@ -133,7 +135,7 @@ impl<E: TaskListElement> TaskQueue<E> {
     }
 
     pub fn push(&mut self, task: TaskPtr) {
-        E::set_next(task, None);
+        debug_assert!(E::next(task).is_none());
         if let Some(tail) = self.tail {
             E::set_next(tail, Some(task));
         } else {
@@ -147,6 +149,7 @@ impl<E: TaskListElement> TaskQueue<E> {
 
         if let Some(task) = popped {
             self.head = E::next(task);
+            E::set_next(task, None);
             if self.head.is_none() {
                 self.tail = None;
             }
@@ -177,15 +180,18 @@ pub(crate) struct Context {
     pub trap_frame: TrapFrame,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
-    pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
+    pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
 
     pub wakeup_at: u64,
+
+    /// The current wait queue this task is in.
+    pub(crate) current_queue: Option<NonNull<WaitQueue>>,
 
     // Lists a task can be in:
     /// The list of all allocated tasks
     pub alloc_list_item: TaskListItem,
 
-    /// The list of ready tasks
+    /// Either the RunQueue or the WaitQueue
     pub ready_queue_item: TaskListItem,
 
     /// The timer queue
@@ -195,6 +201,8 @@ pub(crate) struct Context {
     pub delete_list_item: TaskListItem,
 }
 
+const STACK_CANARY: u32 = 0xDEEDBAAD;
+
 impl Context {
     pub(crate) fn new(
         task_fn: extern "C" fn(*mut c_void),
@@ -203,15 +211,19 @@ impl Context {
     ) -> Self {
         trace!("task_create {:?} {:?} {}", task_fn, param, task_stack_size);
 
-        let mut stack = Box::<[u8], _>::new_uninit_slice_in(task_stack_size, InternalMemory);
+        let task_stack_size_words = task_stack_size / 4;
+        let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
 
-        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size).cast() };
+        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size_words).cast() };
+
+        stack[0] = MaybeUninit::new(STACK_CANARY);
 
         Context {
             trap_frame: new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: stack,
+            current_queue: None,
 
             wakeup_at: 0,
 
@@ -220,6 +232,19 @@ impl Context {
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
         }
+    }
+
+    pub(crate) fn ensure_no_stack_overflow(&self) {
+        if self._allocated_stack.is_empty() {
+            return;
+        }
+
+        assert_eq!(
+            unsafe { self._allocated_stack[0].assume_init() },
+            STACK_CANARY,
+            "Stack overflow detected in {:?}",
+            self as *const Context
+        );
     }
 }
 
@@ -243,7 +268,8 @@ pub(super) fn allocate_main_task() {
             trap_frame: TrapFrame::default(),
             thread_semaphore: None,
             state: TaskState::Ready,
-            _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
+            _allocated_stack: Box::<[u32], _>::new_uninit_slice_in(0, InternalMemory),
+            current_queue: None,
 
             wakeup_at: 0,
 
@@ -267,6 +293,26 @@ pub(super) fn allocate_main_task() {
         state.all_tasks.push(main_task_ptr);
         state.current_task = Some(main_task_ptr);
     })
+}
+
+pub(crate) fn spawn_idle_task() {
+    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096);
+    debug!("Idle task created: {:?}", ptr);
+}
+
+pub(crate) extern "C" fn idle_task(_: *mut c_void) {
+    loop {
+        yield_task();
+        // TODO: once we have priorities, we can waiti:
+        // #[cfg(xtensa)]
+        // unsafe {
+        //     core::arch::asm!("waiti 0")
+        // }
+        // #[cfg(riscv)]
+        // unsafe {
+        //     core::arch::asm!("wfi")
+        // }
+    }
 }
 
 pub(super) fn delete_all_tasks() {
@@ -307,8 +353,11 @@ pub(super) fn schedule_task_deletion(task: *mut Context) {
     // Tasks are deleted during context switches, so we need to yield if we are
     // deleting the current task.
     if deleting_current {
-        loop {
-            SCHEDULER.yield_task();
-        }
+        SCHEDULER.with(|scheduler| {
+            // We won't be re-scheduled.
+            scheduler.event.set_blocked();
+            yield_task();
+        });
+        unreachable!();
     }
 }
