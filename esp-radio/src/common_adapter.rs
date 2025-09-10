@@ -346,10 +346,10 @@ pub(crate) fn enable_wifi_power_domain() {
             }
         }
         cfg_if::cfg_if! {
-            if #[cfg(soc_has_apb_ctrl)] {
-                let syscon = esp_hal::peripherals::APB_CTRL::regs();
-            } else if #[cfg(esp32)] {
+            if #[cfg(esp32)] {
                 // The ESP32 doesn't require this.
+            } else if #[cfg(soc_has_apb_ctrl)] {
+                let syscon = esp_hal::peripherals::APB_CTRL::regs();
             } else {
                 let syscon = esp_hal::peripherals::SYSCON::regs();
             }
