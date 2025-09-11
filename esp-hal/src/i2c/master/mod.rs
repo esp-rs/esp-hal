@@ -2935,15 +2935,23 @@ mod bus_clear {
     impl<'a> ClearBusFuture<'a> {
         // Number of SCL pulses to clear the bus
         const BUS_CLEAR_BITS: u8 = 9;
+        const DELAY_US: u32 = 5; // 5us -> 100kHz
 
         pub fn new(driver: Driver<'a>, reset_fsm: bool) -> Self {
             // If we have a HW implementation, reset FSM to make sure it's not trying to transmit
             // while we clear the bus.
             if reset_fsm {
+                // Resetting the FSM may still generate a short SCL pulse, but I don't know how to
+                // work around it - just waiting doesn't solve anything if the hardware is running.
                 driver.do_fsm_reset();
             }
 
             let mut this = Self { driver };
+
+            // Prevent SCL from going low immediately after FSM reset/previous operation has set
+            // it high
+            ets_delay_us(Self::DELAY_US);
+
             this.configure(Self::BUS_CLEAR_BITS);
             this
         }
@@ -2996,18 +3004,26 @@ mod bus_clear {
                 .map(|n| unsafe { AnyPin::steal(n) });
 
             if let (Some(sda), Some(scl)) = (sda, scl) {
+                // Prevent short SCL pulse right after HW clearing completes
+                ets_delay_us(Self::DELAY_US);
+
                 sda.set_output_high(true);
                 scl.set_output_high(false);
 
                 self.driver.info.scl_output.disconnect_from(&scl);
                 self.driver.info.sda_output.disconnect_from(&sda);
 
-                ets_delay_us(5);
+                // Set SDA low - whatever state it was in, we need a low -> high transition.
                 sda.set_output_high(false);
-                ets_delay_us(5);
+                ets_delay_us(Self::DELAY_US);
+
+                // Set SCL high to prepare for STOP condition
                 scl.set_output_high(true);
-                ets_delay_us(5);
+                ets_delay_us(Self::DELAY_US);
+
+                // STOP
                 sda.set_output_high(true);
+                ets_delay_us(Self::DELAY_US);
 
                 self.driver.info.sda_output.connect_to(&sda);
                 self.driver.info.scl_output.connect_to(&scl);
