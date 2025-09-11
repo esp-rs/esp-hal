@@ -633,8 +633,7 @@ impl SleepTimeConfig {
             slowclk_cycles /= 32;
         }
 
-        let xtal_cycles =
-            RtcClock::calibrate_internal(RtcCalSel::RtcCalRcFast, slowclk_cycles) as u64;
+        let xtal_cycles = RtcClock::calibrate_internal(RtcCalSel::RcFast, slowclk_cycles) as u64;
 
         let divider: u64 = xtal_freq as u64 * slowclk_cycles as u64;
         let period_64: u64 = ((xtal_cycles << Self::RTC_CLK_CAL_FRACT) + divider / 2 - 1) / divider;

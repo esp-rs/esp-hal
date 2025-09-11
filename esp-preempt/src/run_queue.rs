@@ -21,6 +21,11 @@ impl RunQueue {
     pub(crate) fn mark_task_ready(&mut self, mut ready_task: TaskPtr) {
         // TODO: this will need to track max ready priority.
         unsafe { ready_task.as_mut().state = TaskState::Ready };
+        if let Some(mut containing_queue) = unsafe { ready_task.as_mut().current_queue.take() } {
+            unsafe {
+                containing_queue.as_mut().remove(ready_task);
+            }
+        }
         self.ready_tasks.push(ready_task);
     }
 

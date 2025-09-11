@@ -135,13 +135,20 @@ impl TimeDriver {
         }
     }
 
-    pub(crate) fn schedule_wakeup(&mut self, mut current_task: TaskPtr, at: Instant) {
+    pub(crate) fn schedule_wakeup(&mut self, mut current_task: TaskPtr, at: Instant) -> bool {
         unsafe { debug_assert_eq!(current_task.as_mut().state, TaskState::Ready) };
+
+        // Target time is in the past, don't sleep.
+        if at <= Instant::now() {
+            return false;
+        }
+
         unsafe { current_task.as_mut().state = TaskState::Sleeping };
 
+        // Target time is infinite, suspend task without waking up via timer.
         if at == Instant::EPOCH + Duration::MAX {
             debug!("Suspending task: {:?}", current_task);
-            return;
+            return true;
         }
 
         let timestamp = at.duration_since_epoch().as_micros();
@@ -152,6 +159,8 @@ impl TimeDriver {
         self.timer_queue.push(current_task, timestamp);
 
         unsafe { current_task.as_mut().wakeup_at = timestamp };
+
+        true
     }
 }
 
@@ -177,7 +186,7 @@ extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapfram
         // software interrupt manually.
         cfg_if::cfg_if! {
             if #[cfg(any(riscv, esp32))] {
-                SCHEDULER.yield_task();
+                crate::task::yield_task();
             } else {
                 scheduler.switch_task(_context)
             }

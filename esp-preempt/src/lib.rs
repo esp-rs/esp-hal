@@ -30,6 +30,7 @@ mod semaphore;
 mod task;
 mod timer;
 mod timer_queue;
+mod wait_queue;
 
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{

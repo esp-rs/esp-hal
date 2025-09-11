@@ -9,7 +9,15 @@ use crate::{
     InternalMemory,
     run_queue::RunQueue,
     semaphore::Semaphore,
-    task::{self, Context, TaskAllocListElement, TaskDeleteListElement, TaskList, TaskPtr},
+    task::{
+        self,
+        Context,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskList,
+        TaskPtr,
+        TaskState,
+    },
     timer::TimeDriver,
     timer_queue,
 };
@@ -92,41 +100,36 @@ impl SchedulerState {
         while let Some(to_delete) = self.to_delete.pop() {
             trace!("delete_marked_tasks {:?}", to_delete);
 
-            self.all_tasks.remove(to_delete);
-            self.run_queue.remove(to_delete);
-            unwrap!(self.time_driver.as_mut())
-                .timer_queue
-                .remove(to_delete);
-
-            unsafe {
-                let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
-                core::mem::drop(task);
+            if Some(to_delete) == self.current_task {
+                self.current_task = None;
             }
+            self.delete_task(to_delete);
         }
     }
 
-    fn select_next_task(&mut self, currently_active_task: TaskPtr) -> Option<TaskPtr> {
+    fn select_next_task(&mut self) -> Option<TaskPtr> {
         // At least one task must be ready to run. If there are none, we can't do anything - we
         // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
         // and can be replaced with auto light sleep.
         let next = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
 
-        if next == currently_active_task {
+        if Some(next) == self.current_task {
             return None;
         }
 
         Some(next)
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(TaskPtr, TaskPtr)) {
+    fn run_scheduler(&mut self, task_switch: impl FnOnce(Option<TaskPtr>, TaskPtr)) {
+        unsafe {
+            unwrap!(self.current_task)
+                .as_ref()
+                .ensure_no_stack_overflow()
+        };
+
         self.delete_marked_tasks();
-        let current_task = unwrap!(self.current_task);
 
         let event = core::mem::take(&mut self.event);
-        if event.is_cooperative_yield() {
-            // Current task is still ready, mark it as such.
-            self.run_queue.mark_same_priority_task_ready(current_task);
-        }
 
         if event.is_timer_event() {
             unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
@@ -138,12 +141,20 @@ impl SchedulerState {
             });
         }
 
-        if let Some(next_task) = self.select_next_task(current_task) {
+        if event.is_cooperative_yield()
+            && let Some(current_task) = self.current_task
+        {
+            // Current task is still ready, mark it as such.
+            debug!("re-queueing current task: {:?}", current_task);
+            self.run_queue.mark_same_priority_task_ready(current_task);
+        }
+
+        if let Some(next_task) = self.select_next_task() {
             debug_assert_eq!(unsafe { next_task.as_ref().state }, task::TaskState::Ready);
 
-            trace!("Switching task {:?} -> {:?}", current_task, next_task);
+            trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
-            task_switch(current_task, next_task);
+            task_switch(self.current_task, next_task);
             self.current_task = Some(next_task);
         }
 
@@ -153,16 +164,24 @@ impl SchedulerState {
 
     #[cfg(xtensa)]
     pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        self.run_scheduler(|mut current_task, mut next_task| {
-            task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
+        self.run_scheduler(|current_task, mut next_task| {
+            // If the current task is deleted, we can skip saving its context.
+            if let Some(mut current_task) = current_task {
+                task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
+            }
             task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
         });
     }
 
     #[cfg(riscv)]
     pub(crate) fn switch_task(&mut self) {
-        self.run_scheduler(|mut current_task, mut next_task| {
-            let old_ctx = unsafe { &raw mut current_task.as_mut().trap_frame };
+        self.run_scheduler(|current_task, mut next_task| {
+            // If the current task is deleted, we can skip saving its context.
+            let old_ctx = if let Some(mut current_task) = current_task {
+                unsafe { &raw mut current_task.as_mut().trap_frame }
+            } else {
+                core::ptr::null_mut()
+            };
             let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
 
             crate::task::arch_specific::task_switch(old_ctx, new_ctx);
@@ -184,16 +203,24 @@ impl SchedulerState {
         is_current
     }
 
-    pub(crate) fn sleep_until(&mut self, at: Instant) {
+    pub(crate) fn sleep_until(&mut self, at: Instant) -> bool {
         let current_task = unwrap!(self.current_task);
         let timer_queue = unwrap!(self.time_driver.as_mut());
-        timer_queue.schedule_wakeup(current_task, at);
-
-        self.event.set_blocked();
-        task::yield_task();
+        if timer_queue.schedule_wakeup(current_task, at) {
+            // The task has been scheduled for wakeup.
+            self.event.set_blocked();
+            task::yield_task();
+            true
+        } else {
+            // The task refuses to sleep.
+            false
+        }
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
+        if unsafe { task.as_ref().state == TaskState::Ready } {
+            return;
+        }
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
@@ -201,6 +228,28 @@ impl SchedulerState {
 
         // if task.priority > current_task.priority
         task::yield_task();
+    }
+
+    fn delete_task(&mut self, to_delete: TaskPtr) {
+        self.remove_from_all_queues(to_delete);
+
+        unsafe {
+            let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
+            core::mem::drop(task);
+        }
+    }
+
+    fn remove_from_all_queues(&mut self, mut task: TaskPtr) {
+        self.all_tasks.remove(task);
+        unwrap!(self.time_driver.as_mut()).timer_queue.remove(task);
+
+        if let Some(mut containing_queue) = unsafe { task.as_mut().current_queue.take() } {
+            unsafe {
+                containing_queue.as_mut().remove(task);
+            }
+        } else {
+            self.run_queue.remove(task);
+        }
     }
 }
 
@@ -211,10 +260,6 @@ pub(crate) struct Scheduler {
 impl Scheduler {
     pub(crate) fn with<R>(&self, cb: impl FnOnce(&mut SchedulerState) -> R) -> R {
         self.inner.with(cb)
-    }
-
-    pub(crate) fn yield_task(&self) {
-        task::yield_task();
     }
 
     pub(crate) fn current_task(&self) -> TaskPtr {
@@ -240,7 +285,7 @@ impl Scheduler {
         task_ptr
     }
 
-    pub(crate) fn sleep_until(&self, wake_at: Instant) {
+    pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
         SCHEDULER.with(|scheduler| scheduler.sleep_until(wake_at))
     }
 }
@@ -255,8 +300,10 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn enable(&self) {
-        // allocate the main task
+        // allocate the default tasks
         task::allocate_main_task();
+        task::spawn_idle_task();
+
         task::setup_multitasking();
         timer_queue::create_timer_task();
 
@@ -270,11 +317,11 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn yield_task(&self) {
-        self.yield_task();
+        task::yield_task();
     }
 
     fn yield_task_from_isr(&self) {
-        self.yield_task();
+        task::yield_task();
     }
 
     fn max_task_priority(&self) -> u32 {
@@ -316,7 +363,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn usleep(&self, us: u32) {
-        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64))
+        SCHEDULER.sleep_until(Instant::now() + Duration::from_micros(us as u64));
     }
 
     fn now(&self) -> u64 {

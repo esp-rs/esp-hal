@@ -135,8 +135,10 @@ pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) {
     _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
     _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 
-    unsafe {
-        (*old_ctx).pc = register::mepc::read();
+    if !old_ctx.is_null() {
+        unsafe {
+            (*old_ctx).pc = register::mepc::read();
+        }
     }
 
     // set MSTATUS for the switched to task
@@ -171,6 +173,9 @@ sys_switch:
     # t0 => current context
     la t0, {_CURRENT_CTX_PTR}
     lw t0, 0(t0)
+
+    # skip storing context if current task is null (deleted)
+    beqz t0, _restore_context
 
     # store registers to old context - PC needs to be set by the "caller"
     sw ra, 0*4(t0)
@@ -212,6 +217,7 @@ sys_switch:
     addi t1, sp, 16
     sw t1, 30*4(t0)
 
+_restore_context:
     # t0 => next context
     la t1, {_NEXT_CTX_PTR}
     lw t0, 0(t1)
