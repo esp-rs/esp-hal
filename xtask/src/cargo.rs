@@ -1,6 +1,7 @@
 //! Tools for working with Cargo.
 
 use std::{
+    collections::HashMap,
     ffi::OsStr,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -109,14 +110,25 @@ fn get_cargo() -> String {
 
 #[derive(Clone, Debug, Default)]
 pub struct CargoArgsBuilder {
+    artifact_name: String,
     toolchain: Option<String>,
+    cwd: PathBuf,
     subcommand: String,
     target: Option<String>,
     features: Vec<String>,
     args: Vec<String>,
+    configs: Vec<String>,
+    env_vars: HashMap<String, String>,
 }
 
 impl CargoArgsBuilder {
+    pub fn new(artifact_name: String) -> Self {
+        Self {
+            artifact_name,
+            ..Default::default()
+        }
+    }
+
     #[must_use]
     pub fn toolchain<S>(mut self, toolchain: S) -> Self
     where
@@ -178,6 +190,32 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Adds a raw configuration argument (--config, -Z, ...)
+    #[must_use]
+    pub fn config<S>(mut self, arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        self.add_config(arg);
+        self
+    }
+
+    pub fn add_config<S>(&mut self, arg: S) -> &mut Self
+    where
+        S: Into<String>,
+    {
+        self.configs.push(arg.into());
+        self
+    }
+
+    pub fn add_env_var<S>(&mut self, key: S, value: S) -> &mut Self
+    where
+        S: Into<String>,
+    {
+        self.env_vars.insert(key.into(), value.into());
+        self
+    }
+
     #[must_use]
     pub fn build(&self) -> Vec<String> {
         let mut args = vec![];
@@ -192,6 +230,10 @@ impl CargoArgsBuilder {
             args.push(format!("--target={target}"));
         }
 
+        for config in self.configs.iter() {
+            args.push(config.clone());
+        }
+
         if !self.features.is_empty() {
             args.push(format!("--features={}", self.features.join(",")));
         }
@@ -202,6 +244,180 @@ impl CargoArgsBuilder {
 
         args
     }
+
+    pub(crate) fn cwd(mut self, cwd: PathBuf) -> Self {
+        self.cwd = cwd;
+        self
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct BatchKey {
+    cwd: PathBuf,
+    toolchain: Option<String>,
+    config: Vec<String>,
+    env_vars: Vec<(String, String)>,
+}
+
+impl BatchKey {
+    fn from_command(command: &CargoArgsBuilder) -> Self {
+        Self {
+            cwd: command.cwd.clone(),
+            toolchain: command.toolchain.clone(),
+            config: command.configs.clone(),
+            env_vars: {
+                let mut env_vars = command
+                    .env_vars
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>();
+
+                env_vars.sort();
+                env_vars
+            },
+        }
+    }
+}
+
+pub struct CargoCommandBadger {
+    commands: HashMap<BatchKey, Vec<CargoArgsBuilder>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BuiltCommand {
+    pub artifact_name: String,
+    pub cwd: PathBuf,
+    pub command: Vec<String>,
+    pub env_vars: Vec<(String, String)>,
+}
+
+impl BuiltCommand {
+    pub fn run(&self, capture: bool) -> Result<String> {
+        let env_vars = self.env_vars.clone();
+        run_with_env(&self.command, &self.cwd, env_vars, capture)
+    }
+}
+
+impl CargoCommandBadger {
+    pub fn new() -> Self {
+        Self {
+            commands: HashMap::new(),
+        }
+    }
+
+    pub fn push(&mut self, command: CargoArgsBuilder) {
+        let key = BatchKey::from_command(&command);
+        self.commands.entry(key).or_default().push(command);
+    }
+
+    fn build_for_cargo_batch(&self) -> Vec<BuiltCommand> {
+        let mut all = Vec::new();
+
+        for (key, group) in self.commands.iter() {
+            // No need to batch if there's only one command
+            if group.len() == 1 {
+                all.push(Self::build_one_for_cargo(&group[0]));
+                continue;
+            }
+
+            let mut command = Vec::new();
+
+            if let Some(tc) = key.toolchain.as_ref() {
+                command.push(format!("+{tc}"));
+            }
+
+            let mut commands_in_batch = 0;
+
+            command.push("batch".to_string());
+            command.extend_from_slice(&key.config);
+            for item in group.iter() {
+                // Only build and doc can be batched
+                if item.subcommand != "build" && item.subcommand != "doc" {
+                    all.push(Self::build_one_for_cargo(item));
+                    continue;
+                }
+
+                let mut c = item.clone();
+
+                c.toolchain = None;
+                c.configs = Vec::new();
+
+                command.push("---".to_string());
+                command.extend_from_slice(&c.build());
+
+                commands_in_batch += 1;
+            }
+
+            if commands_in_batch > 0 {
+                all.push(BuiltCommand {
+                    artifact_name: String::from("batch"),
+                    cwd: key.cwd.clone(),
+                    command,
+                    env_vars: key.env_vars.clone(),
+                });
+            }
+        }
+
+        all
+    }
+
+    fn build_for_cargo(&self) -> Vec<BuiltCommand> {
+        let mut all = Vec::new();
+
+        for group in self.commands.values() {
+            for item in group.iter() {
+                all.push(Self::build_one_for_cargo(item));
+            }
+        }
+
+        all
+    }
+
+    fn build_one_for_cargo(item: &CargoArgsBuilder) -> BuiltCommand {
+        BuiltCommand {
+            artifact_name: item.artifact_name.clone(),
+            cwd: item.cwd.clone(),
+            command: {
+                let mut args = item.build();
+
+                if item.args.iter().any(|arg| arg == "--artifact-dir") {
+                    args.push("-Zunstable-options".to_string());
+                }
+
+                args
+            },
+            env_vars: item
+                .env_vars
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        }
+    }
+
+    pub fn build(&self, no_batch: bool) -> Vec<BuiltCommand> {
+        let cargo_batch_available = Command::new("cargo")
+            .arg("batch")
+            .arg("-h")
+            .output()
+            .is_ok();
+
+        if cargo_batch_available && !no_batch {
+            self.build_for_cargo_batch()
+        } else {
+            if !no_batch {
+                log::warn!("You don't have cargo batch installed. Falling back to cargo.");
+                log::warn!("You should really install cargo-batch.");
+                log::warn!(
+                    "cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked"
+                );
+            }
+            self.build_for_cargo()
+        }
+    }
+}
+
+impl Drop for CargoCommandBadger {
+    fn drop(&mut self) {}
 }
 
 pub struct CargoToml<'a> {

@@ -132,7 +132,7 @@ fn main() -> Result<()> {
     builder.init();
 
     let workspace = std::env::current_dir()?;
-    let target_path = Path::new("target");
+    let target_path = workspace.join("target");
 
     match Cli::parse() {
         // Build-related subcommands:
