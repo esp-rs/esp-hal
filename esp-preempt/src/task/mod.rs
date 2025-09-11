@@ -68,9 +68,9 @@ impl TaskExt for TaskPtr {
         unsafe { self.as_ref().priority as usize }
     }
 
-    fn set_priority(mut self, run_queue: &mut RunQueue, new_pro: usize) {
+    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: usize) {
         run_queue.remove(self);
-        unsafe { self.as_mut().priority = new_pro as u32 };
+        unsafe { self.as_mut().priority = new_priority };
     }
 
     fn state(self) -> TaskState {
@@ -196,7 +196,7 @@ pub(crate) struct Task {
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
     pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
-    pub priority: u32,
+    pub priority: usize,
 
     pub wakeup_at: u64,
 
@@ -224,7 +224,7 @@ impl Task {
         task_fn: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
-        priority: u32,
+        priority: usize,
     ) -> Self {
         trace!(
             "task_create {:?}({:?}) stack_size = {} priority = {}",

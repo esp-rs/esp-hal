@@ -108,32 +108,20 @@ impl SchedulerState {
         }
     }
 
-    fn select_next_task(&mut self) -> Option<TaskPtr> {
-        // At least one task must be ready to run. If there are none, we can't do anything - we
-        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
-        // and can be replaced with auto light sleep.
-        let next = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
-
-        if Some(next) == self.current_task {
-            return None;
-        }
-
-        Some(next)
-    }
-
     fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
-        unsafe {
-            unwrap!(self.current_task)
-                .as_ref()
-                .ensure_no_stack_overflow()
+        let mut priority = {
+            let current_task = unsafe { unwrap!(self.current_task).as_ref() };
+            current_task.ensure_no_stack_overflow();
+            current_task.priority
         };
 
         self.delete_marked_tasks();
 
         let event = core::mem::take(&mut self.event);
+        let time_driver = unwrap!(self.time_driver.as_mut());
 
         if event.is_timer_event() {
-            unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
+            time_driver.handle_alarm(|ready_task| {
                 debug_assert_eq!(
                     ready_task.state,
                     task::TaskState::Sleeping,
@@ -155,7 +143,13 @@ impl SchedulerState {
             self.run_queue.mark_task_ready(current_task);
         }
 
-        if let Some(mut next_task) = self.select_next_task() {
+        // At least one task must be ready to run. If there are none, we can't do anything - we
+        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
+        // and can be replaced with auto light sleep.
+        let mut next_task = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
+
+        // Were we able to select a new task?
+        if Some(next_task) != self.current_task {
             debug_assert_eq!(
                 next_task.state(),
                 task::TaskState::Ready,
@@ -175,11 +169,17 @@ impl SchedulerState {
             let next_context = unsafe { &raw mut next_task.as_mut().cpu_context };
 
             task_switch(current_context, next_context);
+
             self.current_task = Some(next_task);
+            priority = next_task.priority(&mut self.run_queue);
         }
 
         // TODO maybe we don't need to do this every time?
-        self.arm_time_slice_alarm();
+        // The current task is not in the run queue. If the run queue on the current priority level
+        // is empty, the current task is the only one running at its priority level. In this
+        // case, we don't need time slicing.
+        let arm_next_timeslice_tick = !self.run_queue.is_level_empty(priority);
+        time_driver.arm_next_wakeup(arm_next_timeslice_tick);
     }
 
     pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
@@ -191,15 +191,6 @@ impl SchedulerState {
                 trap_frame,
             )
         });
-    }
-
-    fn arm_time_slice_alarm(&mut self) {
-        // The current task is not in the run queue. If the run queue on the current priority level
-        // is empty, the current task is the only one running at its priority level. In this
-        // case, we don't need time slicing.
-        let current_priority = unwrap!(self.current_task).priority(&mut self.run_queue);
-        let ready_tasks = !self.run_queue.is_level_empty(current_priority);
-        unwrap!(self.time_driver.as_mut()).arm_next_wakeup(ready_tasks);
     }
 
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
@@ -279,7 +270,7 @@ impl Scheduler {
         priority: u32,
     ) -> TaskPtr {
         let task = Box::new_in(
-            Task::new(task, param, task_stack_size, priority),
+            Task::new(task, param, task_stack_size, priority as usize),
             InternalMemory,
         );
         let task_ptr = NonNull::from(Box::leak(task));
