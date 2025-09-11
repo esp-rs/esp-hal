@@ -361,7 +361,9 @@ impl core::fmt::Display for InitializationError {
         match self {
             InitializationError::General(e) => write!(f, "A general error {e} occurred"),
             #[cfg(feature = "wifi")]
-            InitializationError::WifiError(e) => write!(f, "Wi-Fi driver related error occured: {e}"),
+            InitializationError::WifiError(e) => {
+                write!(f, "Wi-Fi driver related error occured: {e}")
+            }
             InitializationError::WrongClockConfig => {
                 write!(f, "The current CPU clock frequency is too low")
             }
