@@ -302,7 +302,21 @@ esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler
 impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
         self.with(|scheduler| {
-            scheduler.time_driver.is_some() && scheduler.runs_on == Cpu::current()
+            if scheduler.time_driver.is_none() {
+                warn!("Trying to initialize esp-radio before starting esp-preempt");
+                return false;
+            }
+
+            if scheduler.runs_on != Cpu::current() {
+                warn!(
+                    "Trying to initialize esp-radio on {:?} but esp-preempt is running on {:?}",
+                    Cpu::current(),
+                    scheduler.runs_on
+                );
+                return false;
+            }
+
+            true
         })
     }
 
