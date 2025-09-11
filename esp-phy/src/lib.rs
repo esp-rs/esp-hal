@@ -123,10 +123,11 @@ impl PhyState {
             use esp_hal::efuse::Efuse;
             phy_eco_version_sel(Efuse::major_chip_version());
         }
-        #[cfg(phy_combo_module)]
-        unsafe {
-            phy_init_param_set(1);
-        }
+        // Causes headaches for some reason.
+        // #[cfg(phy_combo_module)]
+        // unsafe {
+        // phy_init_param_set(1);
+        // }
 
         #[cfg(all(
             phy_enable_usb,
