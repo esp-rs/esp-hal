@@ -256,35 +256,33 @@ impl<'d> Rtc<'d> {
     fn time_since_boot_raw(&self) -> u64 {
         let rtc_cntl = LP_TIMER::regs();
 
-        #[cfg(esp32)]
-        let (l, h) = {
-            rtc_cntl.time_update().write(|w| w.time_update().set_bit());
-            while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
-                // might take 1 RTC slowclk period, don't flood RTC bus
-                crate::rom::ets_delay_us(1);
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+                while rtc_cntl.time_update().read().time_valid().bit_is_clear() {
+                    // Might take 1 RTC slowclk period, don't flood RTC bus
+                    crate::rom::ets_delay_us(1);
+                }
+
+                let h = rtc_cntl.time1().read().time_hi().bits();
+                let l = rtc_cntl.time0().read().time_lo().bits();
+            } else if #[cfg(any(esp32c6, esp32h2))] {
+                rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
+
+                let h = rtc_cntl
+                    .main_buf0_high()
+                    .read()
+                    .main_timer_buf0_high()
+                    .bits();
+                let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
+            } else {
+                rtc_cntl.time_update().write(|w| w.time_update().set_bit());
+
+                let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
+                let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
             }
-            let h = rtc_cntl.time1().read().time_hi().bits();
-            let l = rtc_cntl.time0().read().time_lo().bits();
-            (l, h)
-        };
-        #[cfg(any(esp32c2, esp32c3, esp32s2, esp32s3))]
-        let (l, h) = {
-            rtc_cntl.time_update().write(|w| w.time_update().set_bit());
-            let h = rtc_cntl.time_high0().read().timer_value0_high().bits();
-            let l = rtc_cntl.time_low0().read().timer_value0_low().bits();
-            (l, h)
-        };
-        #[cfg(any(esp32c6, esp32h2))]
-        let (l, h) = {
-            rtc_cntl.update().write(|w| w.main_timer_update().set_bit());
-            let h = rtc_cntl
-                .main_buf0_high()
-                .read()
-                .main_timer_buf0_high()
-                .bits();
-            let l = rtc_cntl.main_buf0_low().read().main_timer_buf0_low().bits();
-            (l, h)
-        };
+        }
+
         ((h as u64) << 32) | (l as u64)
     }
 
@@ -749,22 +747,21 @@ pub fn wakeup_cause() -> SleepSource {
         return SleepSource::Undefined;
     }
 
-    #[cfg(any(esp32c6, esp32h2))]
-    let wakeup_cause = WakeupReason::from_bits_retain(
-        crate::peripherals::PMU::regs()
-            .slp_wakeup_status0()
-            .read()
-            .wakeup_cause()
-            .bits(),
-    );
-    #[cfg(not(any(esp32, esp32c6, esp32h2)))]
-    let wakeup_cause = WakeupReason::from_bits_retain(
-        LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits(),
-    );
-    #[cfg(esp32)]
-    let wakeup_cause = WakeupReason::from_bits_retain(
-        LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32,
-    );
+    cfg_if::cfg_if! {
+        if #[cfg(esp32)] {
+            let wakeup_cause_bits = LPWR::regs().wakeup_state().read().wakeup_cause().bits() as u32;
+        } else if #[cfg(any(esp32c6, esp32h2))] {
+            let wakeup_cause_bits = crate::peripherals::PMU::regs()
+                .slp_wakeup_status0()
+                .read()
+                .wakeup_cause()
+                .bits();
+        } else {
+            let wakeup_cause_bits = LPWR::regs().slp_wakeup_cause().read().wakeup_cause().bits();
+        }
+    }
+
+    let wakeup_cause = WakeupReason::from_bits_retain(wakeup_cause_bits);
 
     if wakeup_cause.contains(WakeupReason::TimerTrigEn) {
         return SleepSource::Timer;
