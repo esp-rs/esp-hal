@@ -91,6 +91,15 @@ jobs:
           prefix-key: "ci-${{ matrix.device.soc }}"
           cache-all-crates: true
 
+      - name: Setup cargo-batch
+        run: |
+          # Note this is linux-only, but the macOS runner has cargo batch installed
+          if ! command -v cargo-batch &> /dev/null; then
+              mkdir -p $HOME/.cargo/bin
+              curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
+              chmod +x $HOME/.cargo/bin/cargo-batch
+          fi
+
       - name: Build and Check
         shell: bash
         run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
@@ -149,6 +158,12 @@ jobs:
       - name: esp toolchain checks
         run: rustc +esp --version --verbose
 
+      - name: Setup cargo-batch
+        run: |
+          if ! command -v cargo-batch &> /dev/null; then
+            cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked
+          fi
+
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
         run: |
@@ -165,7 +180,7 @@ jobs:
     with:
       primary-runner: macos-m1-self-hosted
       fallback-runner: ubuntu-latest
-    
+
   host-tests:
     needs: detect-host-tests-runner
     runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
@@ -188,7 +203,7 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
-      # Run host tests for all applicable packages: 
+      # Run host tests for all applicable packages:
       - run: cargo xtask host-tests
 
   # --------------------------------------------------------------------------
@@ -211,4 +226,3 @@ jobs:
             './**/*.rs'
             './**/*.md'
             './**/*.toml'
-

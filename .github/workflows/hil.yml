@@ -126,6 +126,16 @@ jobs:
           default: true
           version: 1.89.0.0
 
+      # Install cargo-batch
+      - name: Install cargo-batch
+        run: |
+          # Note this is linux-only, but the macOS runner has cargo batch installed
+          if ! command -v cargo-batch &> /dev/null; then
+              mkdir -p $HOME/.cargo/bin
+              curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
+              chmod +x $HOME/.cargo/bin/cargo-batch
+          fi
+
       - name: Build tests
         run: cargo xtask build tests ${{ matrix.target.soc }}
 

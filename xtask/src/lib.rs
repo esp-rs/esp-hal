@@ -137,6 +137,9 @@ impl Package {
 
     /// Does the package have any host tests?
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
+        if *self == Package::HilTest {
+            return false;
+        }
         let package_path = workspace.join(self.to_string()).join("src");
 
         walkdir::WalkDir::new(package_path)
@@ -529,6 +532,117 @@ pub fn execute_app(
     }
 
     Ok(())
+}
+
+pub fn generate_build_command(
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    app: &Metadata,
+    action: CargoAction,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
+    extra_args: &[&str],
+) -> Result<CargoArgsBuilder> {
+    let package = app.example_path().strip_prefix(package_path)?;
+    // log::info!("Building example '{}' for '{}'", package.display(), chip);
+
+    let mut features = app.feature_set().to_vec();
+    if !features.is_empty() {
+        log::info!("  Features:      {}", features.join(", "));
+    }
+    features.push(chip.to_string());
+
+    let cwd = if package_path.ends_with("examples") {
+        package_path.join(package).to_path_buf()
+    } else {
+        package_path.to_path_buf()
+    };
+
+    let mut builder = CargoArgsBuilder::new(app.output_file_name())
+        .manifest_path(cwd.join("Cargo.toml"))
+        .config_path(cwd.join(".cargo").join("config.toml"))
+        .target(target)
+        .features(&features)
+        .args(extra_args);
+
+    let subcommand = if matches!(action, CargoAction::Build(_)) {
+        "build"
+    } else if package.starts_with("tests") {
+        "test"
+    } else {
+        "run"
+    };
+    builder = builder.subcommand(subcommand);
+
+    let bin_arg = if package.starts_with("src/bin") {
+        Some(format!("--bin={}", app.binary_name()))
+    } else if package.starts_with("tests") {
+        Some(format!("--test={}", app.binary_name()))
+    } else if !package_path.ends_with("examples") {
+        Some(format!("--example={}", app.binary_name()))
+    } else {
+        None
+    };
+
+    if let Some(arg) = bin_arg {
+        builder.add_arg(arg);
+    }
+
+    if !app.configuration().is_empty() {
+        log::info!("  Configuration: {}", app.configuration());
+    }
+
+    for config in app.cargo_config() {
+        log::info!(" Cargo --config: {config}");
+        builder.add_config("--config").add_config(config);
+        // Some configuration requires nightly rust, so let's just assume it. May be
+        // overwritten by the esp toolchain on xtensa.
+        builder = builder.toolchain("nightly");
+    }
+
+    let env_vars = app.env_vars();
+    for (key, value) in env_vars {
+        log::info!("  esp-config:    {} = {}", key, value);
+        builder.add_env_var(key, value);
+    }
+
+    if !debug {
+        builder.add_arg("--release");
+    }
+    if timings {
+        builder.add_arg("--timings");
+    }
+
+    let toolchain = match toolchain {
+        // Preserve user choice
+        Some(tc) => Some(tc),
+        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
+        _ if target.starts_with("xtensa") => Some("esp"),
+        _ => None,
+    };
+    if let Some(toolchain) = toolchain {
+        // if toolchain.starts_with("esp") {
+        //     builder.add_config("-Zbuild-std=core,alloc");
+        // }
+        builder = builder.toolchain(toolchain);
+    }
+
+    if let CargoAction::Build(Some(out_dir)) = action {
+        // We have to place the binary into a directory named after the app, because
+        // we can't set the binary name.
+        builder.add_arg("--artifact-dir");
+        builder.add_arg(
+            out_dir
+                .join("tmp") // This will be deleted in one go
+                .join(app.output_file_name()) // This sets the name of the binary
+                .display()
+                .to_string(),
+        );
+    }
+
+    Ok(builder)
 }
 
 // ----------------------------------------------------------------------------
