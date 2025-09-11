@@ -312,10 +312,8 @@ impl<'d> Rtc<'d> {
 
         let rtc_cntl = LP_AON::regs();
 
-        let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
-
-        let l = l.read().bits() as u64;
-        let h = h.read().bits() as u64;
+        let l = rtc_cntl.store2().read().bits() as u64;
+        let h = rtc_cntl.store3().read().bits() as u64;
 
         // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L115
         l + (h << 32)
@@ -328,11 +326,13 @@ impl<'d> Rtc<'d> {
 
         let rtc_cntl = LP_AON::regs();
 
-        let (l, h) = (rtc_cntl.store2(), rtc_cntl.store3());
-
-        // https://github.com/espressif/esp-idf/blob/23e4823f17a8349b5e03536ff7653e3e584c9351/components/newlib/port/esp_time_impl.c#L102-L103
-        l.write(|w| unsafe { w.bits((boot_time_us & 0xffffffff) as u32) });
-        h.write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
+        // https://github.com/espressif/esp-idf/blob/23e4823/components/newlib/port/esp_time_impl.c#L102-L103
+        rtc_cntl
+            .store2() // Low bits
+            .write(|w| unsafe { w.bits((boot_time_us & 0xffff_ffff) as u32) });
+        rtc_cntl
+            .store3() // High bits
+            .write(|w| unsafe { w.bits((boot_time_us >> 32) as u32) });
     }
 
     #[procmacros::doc_replace]
@@ -444,8 +444,7 @@ impl<'d> Rtc<'d> {
         // ESP32-S3: TRM v1.5 chapter 8.3
         // ESP32-H2: TRM v0.5 chapter 8.2.3
 
-        let rtc_cntl = LP_AON::regs();
-        rtc_cntl
+        LP_AON::regs()
             .store4()
             .modify(|r, w| unsafe { w.bits(r.bits() | Self::RTC_DISABLE_ROM_LOG) });
     }
@@ -574,37 +573,33 @@ impl Rwdt {
 
     /// Clear interrupt.
     pub fn clear_interrupt(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
-
         self.set_write_protection(false);
 
-        rtc_cntl.int_clr().write(|w| w.wdt().clear_bit_by_one());
+        LP_WDT::regs()
+            .int_clr()
+            .write(|w| w.wdt().clear_bit_by_one());
 
         self.set_write_protection(true);
     }
 
     /// Check if the interrupt is set.
     pub fn is_interrupt_set(&self) -> bool {
-        let rtc_cntl = LP_WDT::regs();
-
-        rtc_cntl.int_st().read().wdt().bit_is_set()
+        LP_WDT::regs().int_st().read().wdt().bit_is_set()
     }
 
     /// Feed the watchdog timer.
     pub fn feed(&mut self) {
-        let rtc_cntl = LP_WDT::regs();
-
         self.set_write_protection(false);
-        rtc_cntl.wdtfeed().write(|w| w.wdt_feed().set_bit());
+        LP_WDT::regs().wdtfeed().write(|w| w.wdt_feed().set_bit());
         self.set_write_protection(true);
     }
 
     fn set_write_protection(&mut self, enable: bool) {
-        let rtc_cntl = LP_WDT::regs();
-
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
-        rtc_cntl.wdtwprotect().write(|w| unsafe { w.bits(wkey) });
+        LP_WDT::regs()
+            .wdtwprotect()
+            .write(|w| unsafe { w.bits(wkey) });
     }
 
     fn set_enabled(&mut self, enable: bool) {
@@ -664,10 +659,9 @@ impl Rwdt {
 
     /// Set the action for a specific stage.
     pub fn set_stage_action(&mut self, stage: RwdtStage, action: RwdtStageAction) {
-        let rtc_cntl = LP_WDT::regs();
-
         self.set_write_protection(false);
-        rtc_cntl.wdtconfig0().modify(|_, w| unsafe {
+
+        LP_WDT::regs().wdtconfig0().modify(|_, w| unsafe {
             match stage {
                 RwdtStage::Stage0 => w.wdt_stg0().bits(action as u8),
                 RwdtStage::Stage1 => w.wdt_stg1().bits(action as u8),
@@ -704,25 +698,23 @@ impl Swd {
 
     /// Enable/disable write protection for WDT registers
     fn set_write_protection(&mut self, enable: bool) {
-        let rtc_cntl = LP_WDT::regs();
-
         #[cfg(not(any(esp32c6, esp32h2)))]
         let wkey = if enable { 0u32 } else { 0x8F1D_312A };
         #[cfg(any(esp32c6, esp32h2))]
         let wkey = if enable { 0u32 } else { 0x50D8_3AA1 };
 
-        rtc_cntl
+        LP_WDT::regs()
             .swd_wprotect()
             .write(|w| unsafe { w.swd_wkey().bits(wkey) });
     }
 
     fn set_enabled(&mut self, enable: bool) {
-        let rtc_cntl = LP_WDT::regs();
-
         self.set_write_protection(false);
-        rtc_cntl
+
+        LP_WDT::regs()
             .swd_conf()
             .write(|w| w.swd_auto_feed_en().bit(!enable));
+
         self.set_write_protection(true);
     }
 }
