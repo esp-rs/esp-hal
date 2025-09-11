@@ -21,7 +21,7 @@ releases/tag/$
 # Shield.io badges
 img\.shields\.io/badge/MSRV-
 
-# Espressif docs with 500 errors
+# TODO: remove once released
 docs\.espressif\.com/projects/rust/esp-preempt/latest/
 docs\.espressif\.com/projects/rust/esp-radio-preempt-driver/latest/
 docs\.espressif\.com/projects/rust/esp-radio/latest/
