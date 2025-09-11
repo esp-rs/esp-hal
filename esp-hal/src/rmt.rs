@@ -645,23 +645,23 @@ for_each_rmt_channel!(
     (all $(($num:literal)),+) => {
         paste::paste! {
             /// RMT Instance
-            pub struct Rmt<'d, Dm>
+            pub struct Rmt<'rmt, Dm>
             where
                 Dm: crate::DriverMode,
             {
-                pub(super) peripheral: RMT<'d>,
+                pub(super) peripheral: RMT<'rmt>,
                 $(
                     #[doc = concat!("RMT Channel ", $num)]
-                    pub [<channel $num>]: ChannelCreator<Dm, $num>,
+                    pub [<channel $num>]: ChannelCreator<'rmt, Dm, $num>,
                 )+
                 _mode: PhantomData<Dm>,
             }
 
-            impl<'d, Dm> Rmt<'d, Dm>
+            impl<'rmt, Dm> Rmt<'rmt, Dm>
             where
                 Dm: crate::DriverMode,
             {
-                fn create(peripheral: RMT<'d>) -> Self {
+                fn create(peripheral: RMT<'rmt>) -> Self {
                     Self {
                         peripheral,
                         $(
@@ -710,19 +710,24 @@ for_each_rmt_channel!(
             ];
 
             $(
-                impl<'d, Dm> TxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                impl<'ch, Dm> TxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_tx(
+                    fn configure_tx<'pin>(
                         self,
-                        pin: impl PeripheralOutput<'d>,
+                        pin: impl PeripheralOutput<'pin>,
                         config: TxChannelConfig,
-                    ) -> Result<Channel<Dm, Tx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Tx>, Error>
                     where
+                        'pin: 'ch,
                         Self: Sized,
                     {
-                        unsafe { Channel::configure_tx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
+                        unsafe { Channel::configure_tx(
+                            ChannelIndex::[<Ch $idx>],
+                            pin.into(),
+                            config
+                        ) }
                     }
                 }
             )+
@@ -738,19 +743,24 @@ for_each_rmt_channel!(
             ];
 
             $(
-                impl<'d, Dm> RxChannelCreator<'d, Dm> for ChannelCreator<Dm, $num>
+                impl<'ch, Dm> RxChannelCreator<'ch, Dm> for ChannelCreator<'ch, Dm, $num>
                 where
                     Dm: crate::DriverMode,
                 {
-                    fn configure_rx(
+                    fn configure_rx<'pin>(
                         self,
-                        pin: impl PeripheralInput<'d>,
+                        pin: impl PeripheralInput<'pin>,
                         config: RxChannelConfig,
-                    ) -> Result<Channel<Dm, Rx>, Error>
+                    ) -> Result<Channel<'ch, Dm, Rx>, Error>
                     where
+                        'pin: 'ch,
                         Self: Sized,
                     {
-                        unsafe { Channel::configure_rx(ChannelIndex::[<Ch $idx>], pin.into(), config) }
+                        unsafe { Channel::configure_rx(
+                            ChannelIndex::[<Ch $idx>],
+                            pin.into(),
+                            config
+                        ) }
                     }
                 }
             )+
@@ -785,16 +795,16 @@ impl ChannelIndex {
     }
 }
 
-impl<'d> Rmt<'d, Blocking> {
+impl<'rmt> Rmt<'rmt, Blocking> {
     /// Create a new RMT instance
-    pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
+    pub fn new(peripheral: RMT<'rmt>, frequency: Rate) -> Result<Self, Error> {
         let this = Rmt::create(peripheral);
         self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
     }
 
     /// Reconfigures the driver for asynchronous operation.
-    pub fn into_async(mut self) -> Rmt<'d, Async> {
+    pub fn into_async(mut self) -> Rmt<'rmt, Async> {
         self.set_interrupt_handler(async_interrupt_handler);
         Rmt::create(self.peripheral)
     }
@@ -971,25 +981,32 @@ use state::RmtState;
 /// RMT Channel
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct Channel<Dm, Dir>
+pub struct Channel<'ch, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
 {
     raw: DynChannelAccess<Dir>,
-    _mode: PhantomData<Dm>,
+
+    // Holds the lifetime for which have unique access to both the channel and the pin its
+    // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
+
     _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm> Channel<Dm, Tx>
+impl<'ch, Dm> Channel<'ch, Dm, Tx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_tx<'d>(
+    unsafe fn configure_tx<'pin>(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::OutputSignal<'d>,
+        pin: gpio::interconnect::OutputSignal<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        'pin: 'ch,
+    {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
         let _guard = GenericPeripheralGuard::new();
@@ -1014,21 +1031,24 @@ where
 
         Ok(Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard,
         })
     }
 }
 
-impl<Dm> Channel<Dm, Rx>
+impl<'ch, Dm> Channel<'ch, Dm, Rx>
 where
     Dm: crate::DriverMode,
 {
-    unsafe fn configure_rx<'d>(
+    unsafe fn configure_rx<'pin>(
         ch_idx: ChannelIndex,
-        pin: gpio::interconnect::InputSignal<'d>,
+        pin: gpio::interconnect::InputSignal<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        'pin: 'ch,
+    {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
 
         let _guard = GenericPeripheralGuard::new();
@@ -1058,13 +1078,28 @@ where
 
         Ok(Self {
             raw,
-            _mode: core::marker::PhantomData,
+            _rmt: core::marker::PhantomData,
             _guard,
         })
     }
 }
 
-impl<Dm, Dir> Drop for Channel<Dm, Dir>
+impl<Dm, Dir> Channel<'_, Dm, Dir>
+where
+    Dm: crate::DriverMode,
+    Dir: Direction,
+{
+    /// Reborrow this channel for a shorter lifetime `'a`.
+    pub fn reborrow<'a>(&'a mut self) -> Channel<'a, Dm, Dir> {
+        Channel {
+            raw: self.raw,
+            _rmt: self._rmt,
+            _guard: self._guard.clone(),
+        }
+    }
+}
+
+impl<Dm, Dir> Drop for Channel<'_, Dm, Dir>
 where
     Dm: crate::DriverMode,
     Dir: Direction,
@@ -1088,32 +1123,34 @@ where
 }
 
 /// Creates a TX channel
-pub trait TxChannelCreator<'d, Dm>
+pub trait TxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
     /// Configure the TX channel
-    fn configure_tx(
+    fn configure_tx<'pin>(
         self,
-        pin: impl PeripheralOutput<'d>,
+        pin: impl PeripheralOutput<'pin>,
         config: TxChannelConfig,
-    ) -> Result<Channel<Dm, Tx>, Error>
+    ) -> Result<Channel<'ch, Dm, Tx>, Error>
     where
+        'pin: 'ch,
         Self: Sized;
 }
 
 /// Creates a RX channel
-pub trait RxChannelCreator<'d, Dm>
+pub trait RxChannelCreator<'ch, Dm>
 where
     Dm: crate::DriverMode,
 {
     /// Configure the RX channel
-    fn configure_rx(
+    fn configure_rx<'pin>(
         self,
-        pin: impl PeripheralInput<'d>,
+        pin: impl PeripheralInput<'pin>,
         config: RxChannelConfig,
-    ) -> Result<Channel<Dm, Rx>, Error>
+    ) -> Result<Channel<'ch, Dm, Rx>, Error>
     where
+        'pin: 'ch,
         Self: Sized;
 }
 
@@ -1122,19 +1159,19 @@ where
 /// If the data size exceeds the size of the internal buffer, `.poll()` or
 /// `.wait()` needs to be called before the entire buffer has been sent to avoid
 /// underruns.
-pub struct SingleShotTxTransaction<'a, T>
+pub struct SingleShotTxTransaction<'ch, 'data, T>
 where
     T: Into<PulseCode> + Copy,
 {
-    channel: Channel<Blocking, Tx>,
+    channel: Channel<'ch, Blocking, Tx>,
 
     writer: RmtWriter,
 
     // Remaining data that has not yet been written to channel RAM. May be empty.
-    remaining_data: &'a [T],
+    remaining_data: &'data [T],
 }
 
-impl<T> SingleShotTxTransaction<'_, T>
+impl<'ch, T> SingleShotTxTransaction<'ch, '_, T>
 where
     T: Into<PulseCode> + Copy,
 {
@@ -1169,7 +1206,9 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn wait(
+        mut self,
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         // Not sure that all the error cases below can happen. However, it's best to
         // handle them to be sure that we don't lock up here in case they can happen.
         loop {
@@ -1191,20 +1230,22 @@ where
 }
 
 /// An in-progress continuous TX transaction
-pub struct ContinuousTxTransaction {
-    channel: Channel<Blocking, Tx>,
+pub struct ContinuousTxTransaction<'ch> {
+    channel: Channel<'ch, Blocking, Tx>,
 }
 
-impl ContinuousTxTransaction {
+impl<'ch> ContinuousTxTransaction<'ch> {
     /// Stop transaction when the current iteration ends.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop_next(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn stop_next(
+        self,
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(false)
     }
 
     /// Stop transaction as soon as possible.
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn stop(self) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    pub fn stop(self) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         self.stop_impl(true)
     }
 
@@ -1212,7 +1253,7 @@ impl ContinuousTxTransaction {
     fn stop_impl(
         self,
         immediate: bool,
-    ) -> Result<Channel<Blocking, Tx>, (Error, Channel<Blocking, Tx>)> {
+    ) -> Result<Channel<'ch, Blocking, Tx>, (Error, Channel<'ch, Blocking, Tx>)> {
         let raw = self.channel.raw;
 
         raw.set_tx_continuous(false);
@@ -1239,19 +1280,47 @@ impl ContinuousTxTransaction {
 }
 
 /// RMT Channel Creator
-pub struct ChannelCreator<Dm, const CHANNEL: u8>
+pub struct ChannelCreator<'ch, Dm, const CHANNEL: u8>
 where
     Dm: crate::DriverMode,
 {
-    _mode: PhantomData<Dm>,
+    // Conceptually, this retains a reference to the main driver struct, even when the
+    // `ChannelCreator` is taken out of it and the `Rmt` dropped. This prevents re-inititalizing
+    // the `Rmt` and obtaining a duplicate `ChannelCreator`.
+    _rmt: PhantomData<Rmt<'ch, Dm>>,
+
+    // We need to keep the peripheral clocked since the following sequence of events is possible:
+    //
+    // ```
+    // let cc = {
+    //     let rmt = Rmt::new(peripheral, freq);  // 1
+    //     rmt.channel0  // 2
+    // };  // 3 (drop other ChannelCreators and Rmt.peripheral)
+    // let ch0 = cc.configure_tx(pin, config).unwrap();  // 4 (create Channel._guard)
+    // ch0.transmit(...);  // 5
+    // ```
+    //
+    // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
+    // re-enabled in step 4, losing the clock configuration that was set in step 1.
     _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
 }
 
-impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
-    fn conjure() -> ChannelCreator<Dm, CHANNEL> {
-        ChannelCreator {
-            _mode: PhantomData,
+impl<Dm, const CHANNEL: u8> ChannelCreator<'_, Dm, CHANNEL>
+where
+    Dm: crate::DriverMode,
+{
+    fn conjure() -> Self {
+        Self {
+            _rmt: PhantomData,
             _guard: GenericPeripheralGuard::new(),
+        }
+    }
+
+    /// Reborrow this channel creator for a shorter lifetime `'a`.
+    pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
+        Self {
+            _rmt: PhantomData,
+            _guard: self._guard.clone(),
         }
     }
 
@@ -1262,9 +1331,9 @@ impl<Dm: crate::DriverMode, const CHANNEL: u8> ChannelCreator<Dm, CHANNEL> {
     /// Circumvents HAL ownership and safety guarantees and allows creating
     /// multiple handles to the same peripheral structure.
     #[inline]
-    pub unsafe fn steal() -> ChannelCreator<Dm, CHANNEL> {
-        ChannelCreator {
-            _mode: PhantomData,
+    pub unsafe fn steal() -> Self {
+        Self {
+            _rmt: PhantomData,
             _guard: GenericPeripheralGuard::new(),
         }
     }
@@ -1289,13 +1358,16 @@ const _: () = if core::mem::size_of::<LoopCount>() != 2 {
 };
 
 /// Channel in TX mode
-impl Channel<Blocking, Tx> {
+impl<'ch> Channel<'ch, Blocking, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// This returns a [`SingleShotTxTransaction`] which can be used to wait for
     /// the transaction to complete and get back the channel for further
     /// use.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn transmit<T>(self, mut data: &[T]) -> Result<SingleShotTxTransaction<'_, T>, Error>
+    pub fn transmit<'data, T>(
+        self,
+        mut data: &'data [T],
+    ) -> Result<SingleShotTxTransaction<'ch, 'data, T>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1333,7 +1405,7 @@ impl Channel<Blocking, Tx> {
         self,
         mut data: &[T],
         loopcount: LoopCount,
-    ) -> Result<ContinuousTxTransaction, Error>
+    ) -> Result<ContinuousTxTransaction<'ch>, Error>
     where
         T: Into<PulseCode> + Copy,
     {
@@ -1356,18 +1428,18 @@ impl Channel<Blocking, Tx> {
 }
 
 /// RX transaction instance
-pub struct RxTransaction<'a, T>
+pub struct RxTransaction<'ch, 'data, T>
 where
     T: From<PulseCode>,
 {
-    channel: Channel<Blocking, Rx>,
+    channel: Channel<'ch, Blocking, Rx>,
 
     reader: RmtReader,
 
-    data: &'a mut [T],
+    data: &'data mut [T],
 }
 
-impl<T> RxTransaction<'_, T>
+impl<'ch, T> RxTransaction<'ch, '_, T>
 where
     T: From<PulseCode>,
 {
@@ -1405,7 +1477,9 @@ where
 
     /// Wait for the transaction to complete
     #[cfg_attr(place_rmt_driver_in_ram, inline(always))]
-    pub fn wait(mut self) -> Result<Channel<Blocking, Rx>, (Error, Channel<Blocking, Rx>)> {
+    pub fn wait(
+        mut self,
+    ) -> Result<Channel<'ch, Blocking, Rx>, (Error, Channel<'ch, Blocking, Rx>)> {
         let raw = self.channel.raw;
 
         let result = loop {
@@ -1423,13 +1497,16 @@ where
 }
 
 /// Channel is RX mode
-impl Channel<Blocking, Rx> {
+impl<'ch> Channel<'ch, Blocking, Rx> {
     /// Start receiving pulse codes into the given buffer.
     /// This returns a [RxTransaction] which can be used to wait for receive to
     /// complete and get back the channel for further use.
     /// The length of the received data cannot exceed the allocated RMT RAM.
     #[cfg_attr(place_rmt_driver_in_ram, ram)]
-    pub fn receive<T>(self, data: &mut [T]) -> Result<RxTransaction<'_, T>, Error>
+    pub fn receive<'data, T>(
+        self,
+        data: &'data mut [T],
+    ) -> Result<RxTransaction<'ch, 'data, T>, Error>
     where
         Self: Sized,
         T: From<PulseCode>,
@@ -1475,7 +1552,7 @@ impl core::future::Future for RmtTxFuture {
 }
 
 /// TX channel in async mode
-impl Channel<Async, Tx> {
+impl Channel<'_, Async, Tx> {
     /// Start transmitting the given pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.
@@ -1530,7 +1607,7 @@ impl core::future::Future for RmtRxFuture {
 }
 
 /// RX channel in async mode
-impl Channel<Async, Rx> {
+impl Channel<'_, Async, Rx> {
     /// Start receiving a pulse code sequence.
     /// The length of sequence cannot exceed the size of the allocated RMT
     /// RAM.

@@ -12,7 +12,6 @@ use esp_hal::{
     delay::Delay,
     gpio::{
         Flex,
-        Input,
         InputConfig,
         Level,
         NoPin,
@@ -48,12 +47,12 @@ cfg_if::cfg_if! {
 }
 
 fn setup<'a, Dm: DriverMode>(
-    rmt: Rmt<'static, Dm>,
+    rmt: Rmt<'a, Dm>,
     rx: impl PeripheralInput<'a>,
     tx: impl PeripheralOutput<'a>,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
-) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
+) -> (Channel<'a, Dm, Tx>, Channel<'a, Dm, Rx>) {
     let tx_channel = rmt
         .channel0
         .configure_tx(tx, tx_config.with_clk_divider(DIV))
@@ -496,51 +495,24 @@ mod tests {
         check_data_eq(&expected, &rx_data, 6, 25);
     }
 
-    // Use Rmt with a non-static lifetime, keep channel0 around, and the create another reference
-    // to the same channel!
-    // This shouldn't compile, but it does (it does result in a `MemoryBlockNotAvailable` error at
-    // runtime when configuring the channel again).
-    #[test]
-    async fn rmt_pin_reconfigure() {
+    // Compile-only test to verify that reborrowing channel creators works.
+    async fn _rmt_reborrow_channel_creator() {
         let mut peripherals = esp_hal::init(esp_hal::Config::default());
 
-        let (_rx, mut tx) = hil_test::common_test_pins!(peripherals);
+        let mut rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
+            .unwrap()
+            .into_async();
 
-        let mut ch0 = {
-            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
-                .unwrap()
-                .into_async();
-
+        for _ in 0..2 {
             let mut ch0 = rmt
                 .channel0
-                .configure_tx(tx.reborrow(), TxChannelConfig::default())
-                .unwrap();
-
-            let tx_data: [_; 10] = generate_tx_data(true);
-
-            ch0.transmit(&tx_data).await.unwrap();
-
-            ch0
-        };
-
-        let _input = Input::new(tx.reborrow(), Default::default());
-
-        {
-            let rmt = Rmt::new(peripherals.RMT.reborrow(), FREQ)
-                .unwrap()
-                .into_async();
-
-            let mut ch0 = rmt
-                .channel0
-                .configure_tx(tx.reborrow(), TxChannelConfig::default())
+                .reborrow()
+                .configure_tx(NoPin, TxChannelConfig::default())
                 .unwrap();
 
             let tx_data: [_; 10] = generate_tx_data(true);
 
             ch0.transmit(&tx_data).await.unwrap();
         }
-
-        let tx_data: [_; 10] = generate_tx_data(true);
-        ch0.transmit(&tx_data).await.unwrap();
     }
 }

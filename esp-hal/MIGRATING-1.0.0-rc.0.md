@@ -166,6 +166,21 @@ The `rmt::Channel::transmit_continuously` and
 +let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
 ```
 
+## RMT lifetime changes
+
+The RMT driver didn't use to properly tie together lifetimes of its types and
+therefore didn't statically prevent all kinds of concurrent and conflicting
+channel re-use. 
+`rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed:
+
+```diff
+  let rmt: Rmt<Blocking> = Rmt::new(peripherals.RMT, freq)?;
+- let cc: ChannelCreator<Blocking, 0> = rmt.channel0;
+- let ch: Channel<Blocking, Tx> = rmt.channel0.configure_tx(pin, config)?;
++ let cc: ChannelCreator<'static, Blocking, 0> = rmt.channel0;
++ let ch: Channel<'static, Blocking, Tx> = rmt.channel0.configure_tx(pin, config)?;
+```
+
 ## DMA changes
 
 DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
