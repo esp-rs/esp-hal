@@ -12,16 +12,16 @@ unsafe extern "C" {
     fn sys_switch();
 }
 
-static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
     portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
-static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
     portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
 #[repr(C)]
-pub struct Registers {
+pub struct CpuContext {
     /// Return address, stores the address to return to after a function call or
     /// interrupt.
     pub ra: usize,
@@ -106,11 +106,11 @@ pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,
     stack_top: *mut (),
-) -> Registers {
+) -> CpuContext {
     let stack_top = stack_top as usize;
     let stack_top = stack_top - (stack_top % 16);
 
-    Registers {
+    CpuContext {
         pc: task as usize,
         a0: param as usize,
         sp: stack_top,
@@ -126,7 +126,7 @@ pub(crate) fn new_task_context(
 /// We save MEPC as the current task's PC and change MEPC to an assembly function
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
-pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) {
+pub fn task_switch(old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
     debug_assert!(
         _NEXT_CTX_PTR
             .load(portable_atomic::Ordering::SeqCst)

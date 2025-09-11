@@ -9,7 +9,16 @@ use crate::{
     InternalMemory,
     run_queue::{MaxPriority, RunQueue},
     semaphore::Semaphore,
-    task::{self, Task, TaskAllocListElement, TaskDeleteListElement, TaskExt, TaskList, TaskPtr},
+    task::{
+        self,
+        CpuContext,
+        Task,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskExt,
+        TaskList,
+        TaskPtr,
+    },
     timer::TimeDriver,
     timer_queue,
 };
@@ -112,7 +121,7 @@ impl SchedulerState {
         Some(next)
     }
 
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(Option<TaskPtr>, TaskPtr)) {
+    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
         unsafe {
             unwrap!(self.current_task)
                 .as_ref()
@@ -146,7 +155,7 @@ impl SchedulerState {
             self.run_queue.mark_task_ready(current_task);
         }
 
-        if let Some(next_task) = self.select_next_task() {
+        if let Some(mut next_task) = self.select_next_task() {
             debug_assert_eq!(
                 next_task.state(),
                 task::TaskState::Ready,
@@ -156,7 +165,16 @@ impl SchedulerState {
 
             trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
-            task_switch(self.current_task, next_task);
+            // If the current task is deleted, we can skip saving its context. We signal this by
+            // using a null pointer.
+            let current_context = if let Some(mut current) = self.current_task {
+                unsafe { &raw mut current.as_mut().cpu_context }
+            } else {
+                core::ptr::null_mut()
+            };
+            let next_context = unsafe { &raw mut next_task.as_mut().cpu_context };
+
+            task_switch(current_context, next_context);
             self.current_task = Some(next_task);
         }
 
@@ -164,29 +182,14 @@ impl SchedulerState {
         self.arm_time_slice_alarm();
     }
 
-    #[cfg(xtensa)]
-    pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        self.run_scheduler(|current_task, mut next_task| {
-            // If the current task is deleted, we can skip saving its context.
-            if let Some(mut current_task) = current_task {
-                task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
-            }
-            task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
-        });
-    }
-
-    #[cfg(riscv)]
-    pub(crate) fn switch_task(&mut self) {
-        self.run_scheduler(|current_task, mut next_task| {
-            // If the current task is deleted, we can skip saving its context.
-            let old_ctx = if let Some(mut current_task) = current_task {
-                unsafe { &raw mut current_task.as_mut().trap_frame }
-            } else {
-                core::ptr::null_mut()
-            };
-            let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
-
-            crate::task::arch_specific::task_switch(old_ctx, new_ctx);
+    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
+        self.run_scheduler(|current_context, next_context| {
+            task::task_switch(
+                current_context,
+                next_context,
+                #[cfg(xtensa)]
+                trap_frame,
+            )
         });
     }
 

@@ -5,11 +5,7 @@ pub(crate) mod arch_specific;
 use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-#[cfg(riscv)]
-use arch_specific::Registers;
 pub(crate) use arch_specific::*;
-#[cfg(xtensa)]
-use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
 use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue, wait_queue::WaitQueue};
@@ -196,10 +192,7 @@ impl<E: TaskListElement> TaskQueue<E> {
 
 #[repr(C)]
 pub(crate) struct Task {
-    #[cfg(riscv)]
-    pub trap_frame: Registers,
-    #[cfg(xtensa)]
-    pub trap_frame: TrapFrame,
+    pub cpu_context: CpuContext,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
     pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
@@ -246,7 +239,7 @@ impl Task {
         stack[0] = MaybeUninit::new(STACK_CANARY);
 
         Task {
-            trap_frame: new_task_context(task_fn, param, stack_top),
+            cpu_context: new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: stack,
@@ -290,10 +283,7 @@ pub(super) fn allocate_main_task() {
     // This context will be filled out by the first context switch.
     let task = Box::new_in(
         Task {
-            #[cfg(riscv)]
-            trap_frame: Registers::default(),
-            #[cfg(xtensa)]
-            trap_frame: TrapFrame::default(),
+            cpu_context: CpuContext::default(),
             thread_semaphore: None,
             state: TaskState::Ready,
             _allocated_stack: Box::<[u32], _>::new_uninit_slice_in(0, InternalMemory),
