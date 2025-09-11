@@ -123,15 +123,15 @@ impl SchedulerState {
         if event.is_timer_event() {
             time_driver.handle_alarm(|ready_task| {
                 debug_assert_eq!(
-                    ready_task.state,
+                    ready_task.state(),
                     task::TaskState::Sleeping,
                     "task: {:?}",
-                    ready_task as *const Task
+                    ready_task
                 );
 
-                debug!("Task {:?} is ready", ready_task as *const _);
+                debug!("Task {:?} is ready", ready_task);
 
-                self.run_queue.mark_task_ready(NonNull::from(ready_task));
+                self.run_queue.mark_task_ready(ready_task);
             });
         }
 

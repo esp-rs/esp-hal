@@ -7,7 +7,7 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
-    task::{Task, TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
+    task::{TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
 const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
@@ -91,7 +91,7 @@ impl TimeDriver {
         self.timer.stop();
     }
 
-    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(&mut Task)) {
+    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(TaskPtr)) {
         let mut timer_queue = core::mem::take(&mut self.timer_queue);
 
         let now = Instant::now().duration_since_epoch().as_micros();
@@ -103,7 +103,7 @@ impl TimeDriver {
             let ready = wakeup_at <= now;
 
             if ready {
-                on_task_ready(task);
+                on_task_ready(task_ptr);
             } else {
                 self.timer_queue.push(task_ptr, wakeup_at);
             }
