@@ -49,7 +49,7 @@ mod tests {
     #[test]
     #[cfg(timergroup_timg0)]
     fn test_wdt0_uses_prescaler() {
-        esp_hal::init(
+        let p = esp_hal::init(
             Config::default().with_watchdog(
                 WatchdogConfig::default()
                     .with_timg0(WatchdogStatus::Enabled(Duration::from_micros(53_687_092))), // multiplied by 80 (for the default clock source), then taking the 32 lower bits this is 0x40
@@ -58,6 +58,12 @@ mod tests {
 
         let delay = Delay::new();
         delay.delay(Duration::from_millis(250));
+
+        // Disable the watchdog, to prevent accidentally resetting the MCU while the host is setting
+        // up the next test.
+        let timg0 = TimerGroup::new(p.TIMG0);
+        let mut wdt0 = timg0.wdt;
+        wdt0.disable();
     }
 
     #[test]
