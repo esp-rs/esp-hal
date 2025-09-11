@@ -206,7 +206,7 @@ jobs:
             --format detailed
             --timeout 7
             --max-concurrency 6
-            --exclude "localhost|127\.0\.0\.1|0\.0\.0\.0|.*\.local|192\.168\..*|10\..*|172\.(1[6-9]|2[0-9]|3[0-1])\..*|%7B.*%7D|\{.*\}|releases/tag/$|compare/.*\.\.\..*|img.shields.io/badge/MSRV-|compare/.*\.\.\..*:foo|rustacean.net/more-crabby-things/dancing-ferris.gif/|docs.espressif.com/projects/rust/esp-preempt/latest/|docs.espressif.com/projects/rust/esp-radio-preempt-driver/latest/|docs.espressif.com/projects/rust/esp-radio/latest/|docs.espressif.com/projects/rust/esp-sync/latest/"            --accept "200,301,302"
+            --accept "200,301,302"
             --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
             './**/*.rs'
             './**/*.md'

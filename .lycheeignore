@@ -1,0 +1,27 @@
+# .lycheeignore
+# Local/private network addresses
+localhost
+127\.0\.0\.1
+0\.0\.0\.0
+.*\.local
+192\.168\..*
+10\..*
+172\.(1[6-9]|2[0-9]|3[0-1])\..*
+
+# Template placeholders
+%7B.*%7D
+\{.*\}
+
+# GitHub patterns
+releases/tag/$
+compare/.*\.\.\..*
+compare/.*\.\.\..*:foo
+
+# Shield.io badges
+img\.shields\.io/badge/MSRV-
+
+# Espressif docs with 500 errors
+docs\.espressif\.com/projects/rust/esp-preempt/latest/
+docs\.espressif\.com/projects/rust/esp-radio-preempt-driver/latest/
+docs\.espressif\.com/projects/rust/esp-radio/latest/
+docs\.espressif\.com/projects/rust/esp-sync/latest/
