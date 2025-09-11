@@ -1,4 +1,5 @@
 use super::Timing;
+pub use crate::spi::Mode as SpiMode;
 
 /// Represents SDIO configuration parameters.
 #[repr(C)]
@@ -6,6 +7,7 @@ use super::Timing;
 pub struct Config {
     hs: bool,
     timing: Timing,
+    spi_mode: SpiMode,
 }
 
 impl Config {
@@ -14,6 +16,7 @@ impl Config {
         Self {
             hs: false,
             timing: Timing::new(),
+            spi_mode: SpiMode::_0,
         }
     }
 
@@ -45,6 +48,21 @@ impl Config {
     /// Builder funciton that sets the timing setting.
     pub fn with_timing(self, timing: Timing) -> Self {
         Self { timing, ..self }
+    }
+
+    /// Gets the SPI mode setting.
+    pub const fn spi_mode(&self) -> SpiMode {
+        self.spi_mode
+    }
+
+    /// Sets the SPI mode seting.
+    pub fn set_spi_mode(&mut self, spi_mode: SpiMode) {
+        self.spi_mode = spi_mode;
+    }
+
+    /// Builder funciton that sets the SPI mode setting.
+    pub fn with_spi_mode(self, spi_mode: SpiMode) -> Self {
+        Self { spi_mode, ..self }
     }
 }
 
