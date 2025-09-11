@@ -30,6 +30,3 @@ rtc-ram = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]
-
-# This feature is intended for testing; you probably don't want to enable it:
-ci = ["rtc-ram"]
