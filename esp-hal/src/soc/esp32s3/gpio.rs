@@ -55,6 +55,10 @@ macro_rules! rtcio_analog {
                         .pad_hold()
                         .modify(|_, w| w.$hold().bit(enable));
                 }
+
+                fn functions(&self, _: crate::private::Internal) -> &'static [$crate::gpio::RtcFunction] {
+                    &[$crate::gpio::RtcFunction::_0, $crate::gpio::RtcFunction::_1, /* macros hard :'( */]
+                }
             }
 
             #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]

@@ -353,13 +353,24 @@ impl TryFrom<usize> for AlternateFunction {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(not(esp32h2))]
 pub enum RtcFunction {
+    /// Rtc function 0.
+    _0 = 0,
+    /// Rtc function 1.
+    _1 = 1,
+    /// Rtc function 2.
+    _2 = 2,
+    /// Rtc function 3.
+    _3 = 3,
+}
+
+#[cfg(not(esp32h2))]
+impl RtcFunction {
     /// RTC mode.
-    Rtc     = 0,
+    pub const RTC: Self = Self::_0;
+
+    #[allow(unused)]
     /// Digital mode.
-    Digital = 1,
-    /// RTC_I2C mode.
-    #[cfg(soc_has_rtc_i2c)]
-    I2c     = 3,
+    pub const DIGITAL: Self = Self::_1;
 }
 
 /// Trait implemented by RTC pins
@@ -378,6 +389,10 @@ pub trait RtcPin: Pin {
     /// Enable or disable PAD_HOLD
     #[doc(hidden)]
     fn rtcio_pad_hold(&self, enable: bool);
+
+    #[cfg(any(xtensa, esp32c6))]
+    #[doc(hidden)]
+    fn functions(&self, _: private::Internal) -> &'static [RtcFunction];
 
     /// # Safety
     ///
@@ -2280,6 +2295,13 @@ impl RtcPin for AnyPin<'_> {
     fn rtcio_pad_hold(&self, enable: bool) {
         for_each_rtcio_pin! {
             (self, target) => { RtcPin::rtcio_pad_hold(&target, enable) };
+        }
+    }
+
+    #[cfg(any(xtensa, esp32c6))]
+    fn functions(&self, i: private::Internal) -> &'static [RtcFunction] {
+        for_each_rtcio_pin! {
+            (self, target) => { RtcPin::functions(&target, i) };
         }
     }
 

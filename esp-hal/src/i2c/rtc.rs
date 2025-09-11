@@ -88,12 +88,18 @@ const RC_FAST_CLK: u32 = property!("soc.rc_fast_clk_default");
 pub trait Sda: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn selector(&self) -> u8;
+
+    #[doc(hidden)]
+    fn function(&self) -> RtcFunction;
 }
 
 /// Trait representing the RTC_I2C SCL pin.
 pub trait Scl: RtcPin + OutputPin + InputPin {
     #[doc(hidden)]
     fn selector(&self) -> u8;
+
+    #[doc(hidden)]
+    fn function(&self) -> RtcFunction;
 }
 
 for_each_lp_function! {
@@ -102,12 +108,20 @@ for_each_lp_function! {
             fn selector(&self) -> u8 {
                 $n
             }
+
+            fn function(&self) -> RtcFunction {
+                RtcFunction::_3
+            }
         }
     };
     (($_func:ident, SAR_I2C_SDA_n, $n:literal), $gpio:ident) => {
         impl Sda for crate::peripherals::$gpio<'_> {
             fn selector(&self) -> u8 {
                 $n
+            }
+
+            fn function(&self) -> RtcFunction {
+                RtcFunction::_3
             }
         }
     };
@@ -182,7 +196,7 @@ impl<'d> I2c<'d> {
             rtc_io
                 .rtc_gpio_enable_w1ts()
                 .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << scl.number()) });
-            scl.rtc_set_config(true, true, RtcFunction::I2c);
+            scl.rtc_set_config(true, true, scl.function());
         }
 
         {
@@ -194,7 +208,7 @@ impl<'d> I2c<'d> {
             rtc_io
                 .rtc_gpio_enable_w1ts()
                 .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << sda.number()) });
-            sda.rtc_set_config(true, true, RtcFunction::I2c);
+            sda.rtc_set_config(true, true, sda.function());
         }
 
         rtc_io.sar_i2c_io().write(|w| unsafe {
