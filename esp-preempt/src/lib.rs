@@ -35,6 +35,7 @@ mod wait_queue;
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
+    system::Cpu,
     timer::{AnyTimer, OneShotTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
@@ -113,8 +114,15 @@ where
 /// - An `AnyTimer` instance
 ///
 /// For an example, see the [crate-level documentation][self].
+#[cfg_attr(
+    multi_core,
+    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::init()`."
+)]
 pub fn init(timer: impl TimerSource) {
-    SCHEDULER.with(move |scheduler| scheduler.set_time_driver(TimeDriver::new(timer.timer())))
+    SCHEDULER.with(move |scheduler| {
+        scheduler.time_driver = Some(TimeDriver::new(timer.timer()));
+        scheduler.runs_on = Cpu::current();
+    })
 }
 
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");

@@ -1,7 +1,10 @@
 use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
+};
 use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
@@ -61,6 +64,9 @@ impl SchedulerEvent {
 }
 
 pub(crate) struct SchedulerState {
+    /// The CPU on which the scheduler is running.
+    pub(crate) runs_on: Cpu,
+
     /// Pointer to the current task.
     pub(crate) current_task: Option<TaskPtr>,
 
@@ -83,6 +89,7 @@ unsafe impl Send for SchedulerState {}
 impl SchedulerState {
     const fn new() -> Self {
         Self {
+            runs_on: Cpu::ProCpu,
             current_task: None,
             all_tasks: TaskList::new(),
             run_queue: RunQueue::new(),
@@ -91,10 +98,6 @@ impl SchedulerState {
             time_driver: None,
             event: SchedulerEvent(0),
         }
-    }
-
-    pub(crate) fn set_time_driver(&mut self, driver: TimeDriver) {
-        self.time_driver = Some(driver);
     }
 
     fn delete_marked_tasks(&mut self) {
@@ -298,7 +301,9 @@ esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler
 
 impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
-        self.with(|scheduler| scheduler.time_driver.is_some())
+        self.with(|scheduler| {
+            scheduler.time_driver.is_some() && scheduler.runs_on == Cpu::current()
+        })
     }
 
     fn enable(&self) {
