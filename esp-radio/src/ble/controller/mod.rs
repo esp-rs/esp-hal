@@ -48,6 +48,16 @@ impl Error for BleConnectorError {
     }
 }
 
+impl core::error::Error for BleConnectorError {}
+
+impl core::fmt::Display for BleConnectorError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            BleConnectorError::Unknown => write!(f, "Unknown BLE error occured"),
+        }
+    }
+}
+
 impl ErrorType for BleConnector<'_> {
     type Error = BleConnectorError;
 }

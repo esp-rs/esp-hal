@@ -1,7 +1,10 @@
 use core::{ffi::c_void, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
+};
 use esp_radio_preempt_driver::semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr};
 use esp_sync::NonReentrantMutex;
 
@@ -9,7 +12,16 @@ use crate::{
     InternalMemory,
     run_queue::{MaxPriority, RunQueue},
     semaphore::Semaphore,
-    task::{self, Task, TaskAllocListElement, TaskDeleteListElement, TaskExt, TaskList, TaskPtr},
+    task::{
+        self,
+        CpuContext,
+        Task,
+        TaskAllocListElement,
+        TaskDeleteListElement,
+        TaskExt,
+        TaskList,
+        TaskPtr,
+    },
     timer::TimeDriver,
     timer_queue,
 };
@@ -52,6 +64,9 @@ impl SchedulerEvent {
 }
 
 pub(crate) struct SchedulerState {
+    /// The CPU on which the scheduler is running.
+    pub(crate) runs_on: Cpu,
+
     /// Pointer to the current task.
     pub(crate) current_task: Option<TaskPtr>,
 
@@ -74,6 +89,7 @@ unsafe impl Send for SchedulerState {}
 impl SchedulerState {
     const fn new() -> Self {
         Self {
+            runs_on: Cpu::ProCpu,
             current_task: None,
             all_tasks: TaskList::new(),
             run_queue: RunQueue::new(),
@@ -82,10 +98,6 @@ impl SchedulerState {
             time_driver: None,
             event: SchedulerEvent(0),
         }
-    }
-
-    pub(crate) fn set_time_driver(&mut self, driver: TimeDriver) {
-        self.time_driver = Some(driver);
     }
 
     fn delete_marked_tasks(&mut self) {
@@ -99,42 +111,30 @@ impl SchedulerState {
         }
     }
 
-    fn select_next_task(&mut self) -> Option<TaskPtr> {
-        // At least one task must be ready to run. If there are none, we can't do anything - we
-        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
-        // and can be replaced with auto light sleep.
-        let next = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
-
-        if Some(next) == self.current_task {
-            return None;
-        }
-
-        Some(next)
-    }
-
-    fn run_scheduler(&mut self, task_switch: impl FnOnce(Option<TaskPtr>, TaskPtr)) {
-        unsafe {
-            unwrap!(self.current_task)
-                .as_ref()
-                .ensure_no_stack_overflow()
+    fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
+        let mut priority = {
+            let current_task = unsafe { unwrap!(self.current_task).as_ref() };
+            current_task.ensure_no_stack_overflow();
+            current_task.priority
         };
 
         self.delete_marked_tasks();
 
         let event = core::mem::take(&mut self.event);
+        let time_driver = unwrap!(self.time_driver.as_mut());
 
         if event.is_timer_event() {
-            unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
+            time_driver.handle_alarm(|ready_task| {
                 debug_assert_eq!(
-                    ready_task.state,
+                    ready_task.state(),
                     task::TaskState::Sleeping,
                     "task: {:?}",
-                    ready_task as *const Task
+                    ready_task
                 );
 
-                debug!("Task {:?} is ready", ready_task as *const _);
+                debug!("Task {:?} is ready", ready_task);
 
-                self.run_queue.mark_task_ready(NonNull::from(ready_task));
+                self.run_queue.mark_task_ready(ready_task);
             });
         }
 
@@ -146,7 +146,13 @@ impl SchedulerState {
             self.run_queue.mark_task_ready(current_task);
         }
 
-        if let Some(next_task) = self.select_next_task() {
+        // At least one task must be ready to run. If there are none, we can't do anything - we
+        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
+        // and can be replaced with auto light sleep.
+        let mut next_task = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
+
+        // Were we able to select a new task?
+        if Some(next_task) != self.current_task {
             debug_assert_eq!(
                 next_task.state(),
                 task::TaskState::Ready,
@@ -156,47 +162,38 @@ impl SchedulerState {
 
             trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
-            task_switch(self.current_task, next_task);
-            self.current_task = Some(next_task);
-        }
-
-        // TODO maybe we don't need to do this every time?
-        self.arm_time_slice_alarm();
-    }
-
-    #[cfg(xtensa)]
-    pub(crate) fn switch_task(&mut self, trap_frame: &mut esp_hal::trapframe::TrapFrame) {
-        self.run_scheduler(|current_task, mut next_task| {
-            // If the current task is deleted, we can skip saving its context.
-            if let Some(mut current_task) = current_task {
-                task::save_task_context(unsafe { current_task.as_mut() }, trap_frame);
-            }
-            task::restore_task_context(unsafe { next_task.as_mut() }, trap_frame);
-        });
-    }
-
-    #[cfg(riscv)]
-    pub(crate) fn switch_task(&mut self) {
-        self.run_scheduler(|current_task, mut next_task| {
-            // If the current task is deleted, we can skip saving its context.
-            let old_ctx = if let Some(mut current_task) = current_task {
-                unsafe { &raw mut current_task.as_mut().trap_frame }
+            // If the current task is deleted, we can skip saving its context. We signal this by
+            // using a null pointer.
+            let current_context = if let Some(mut current) = self.current_task {
+                unsafe { &raw mut current.as_mut().cpu_context }
             } else {
                 core::ptr::null_mut()
             };
-            let new_ctx = unsafe { &raw mut next_task.as_mut().trap_frame };
+            let next_context = unsafe { &raw mut next_task.as_mut().cpu_context };
 
-            crate::task::arch_specific::task_switch(old_ctx, new_ctx);
-        });
-    }
+            task_switch(current_context, next_context);
 
-    fn arm_time_slice_alarm(&mut self) {
+            self.current_task = Some(next_task);
+            priority = next_task.priority(&mut self.run_queue);
+        }
+
+        // TODO maybe we don't need to do this every time?
         // The current task is not in the run queue. If the run queue on the current priority level
         // is empty, the current task is the only one running at its priority level. In this
         // case, we don't need time slicing.
-        let current_priority = unwrap!(self.current_task).priority(&mut self.run_queue);
-        let ready_tasks = !self.run_queue.is_level_empty(current_priority);
-        unwrap!(self.time_driver.as_mut()).arm_next_wakeup(ready_tasks);
+        let arm_next_timeslice_tick = !self.run_queue.is_level_empty(priority);
+        time_driver.arm_next_wakeup(arm_next_timeslice_tick);
+    }
+
+    pub(crate) fn switch_task(&mut self, #[cfg(xtensa)] trap_frame: &mut CpuContext) {
+        self.run_scheduler(|current_context, next_context| {
+            task::task_switch(
+                current_context,
+                next_context,
+                #[cfg(xtensa)]
+                trap_frame,
+            )
+        });
     }
 
     pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
@@ -276,7 +273,7 @@ impl Scheduler {
         priority: u32,
     ) -> TaskPtr {
         let task = Box::new_in(
-            Task::new(task, param, task_stack_size, priority),
+            Task::new(task, param, task_stack_size, priority as usize),
             InternalMemory,
         );
         let task_ptr = NonNull::from(Box::leak(task));
@@ -304,7 +301,23 @@ esp_radio_preempt_driver::scheduler_impl!(pub(crate) static SCHEDULER: Scheduler
 
 impl esp_radio_preempt_driver::Scheduler for Scheduler {
     fn initialized(&self) -> bool {
-        self.with(|scheduler| scheduler.time_driver.is_some())
+        self.with(|scheduler| {
+            if scheduler.time_driver.is_none() {
+                warn!("Trying to initialize esp-radio before starting esp-preempt");
+                return false;
+            }
+
+            if scheduler.runs_on != Cpu::current() {
+                warn!(
+                    "Trying to initialize esp-radio on {:?} but esp-preempt is running on {:?}",
+                    Cpu::current(),
+                    scheduler.runs_on
+                );
+                return false;
+            }
+
+            true
+        })
     }
 
     fn enable(&self) {
