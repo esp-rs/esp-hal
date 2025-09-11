@@ -286,6 +286,7 @@ impl Package {
             Package::EspMetadataGenerated => {}
             Package::EspPhy => features.push("esp-hal/unstable".to_owned()),
             Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
+            Package::EspRiscvRt => features.push("rtc-ram".to_owned()),
             _ => {}
         }
 

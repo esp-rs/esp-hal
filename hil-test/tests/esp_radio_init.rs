@@ -45,6 +45,8 @@ async fn try_init(
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
+    use defmt::info;
+
     use super::*;
 
     #[init]
@@ -124,5 +126,115 @@ mod tests {
 
         // Now, can we do it again?
         let _wifi = esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow()).unwrap();
+    }
+
+    #[test]
+    fn test_esp_preempt_priority_inheritance(p: Peripherals) {
+        use core::ffi::c_void;
+
+        use esp_radio_preempt_driver as preempt;
+        use portable_atomic::{AtomicBool, Ordering};
+        use preempt::semaphore::{SemaphoreHandle, SemaphoreKind};
+
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_preempt::init(timg0.timer0);
+        preempt::enable();
+
+        // We need three tasks to test priority inheritance:
+        // - A high priority task that will attempt to acquire the mutex.
+        // - A medium priority task that will do some unrelated work.
+        // - A low priority task that will hold the mutex before the high priority task could
+        //   acquire it.
+        //
+        // Priority inversion is a situation where the higher priority task is being blocked, and a
+        // medium priority task is ready to run while the low priority task holds the mutex. The
+        // issue is that in this case the medium priority task is effectively prioritized over the
+        // high priority task.
+        //
+        // The test will be successful if the high priority task is able to acquire the mutex
+        // before the medium priority task runs.
+
+        // The main task serves as the low priority task.
+        // The main task will spawn the high and medium priority tasks after obtaining the mutex.
+        // The medium priority task will assert that the high priority task has finished.
+
+        struct TestContext {
+            ready_semaphore: SemaphoreHandle,
+            mutex: SemaphoreHandle,
+            high_priority_task_finished: AtomicBool,
+        }
+        let test_context = TestContext {
+            // This semaphore signals the end of the test
+            ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }),
+            // We'll use this mutex to test priority inheritance
+            mutex: SemaphoreHandle::new(SemaphoreKind::Mutex),
+            high_priority_task_finished: AtomicBool::new(false),
+        };
+
+        test_context.mutex.take(None);
+        info!("Low: mutex obtained");
+
+        // Spawn tasks
+        extern "C" fn high_priority_task(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            info!("High: acquiring mutex");
+            context.mutex.take(None);
+
+            info!("High: acquired mutex, mark finished");
+
+            context
+                .high_priority_task_finished
+                .store(true, Ordering::SeqCst);
+
+            info!("High: released mutex");
+            context.mutex.give();
+
+            // TODO: support one-shot tasks in esp-preempt
+            unsafe {
+                preempt::schedule_task_deletion(core::ptr::null_mut());
+            }
+        }
+        extern "C" fn medium_priority_task(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            info!("Medium: asserting high-priority task finished");
+            assert!(context.high_priority_task_finished.load(Ordering::SeqCst));
+
+            info!("Medium: marking test finished");
+            context.ready_semaphore.give();
+
+            // TODO: support one-shot tasks in esp-preempt
+            unsafe {
+                preempt::schedule_task_deletion(core::ptr::null_mut());
+            }
+        }
+
+        unsafe {
+            info!("Low: spawning high priority task");
+            preempt::task_create(
+                high_priority_task,
+                (&raw const test_context).cast::<c_void>().cast_mut(),
+                3,
+                None,
+                4096,
+            );
+            info!("Low: spawning medium priority task");
+            preempt::task_create(
+                medium_priority_task,
+                (&raw const test_context).cast::<c_void>().cast_mut(),
+                2,
+                None,
+                4096,
+            );
+        }
+
+        // Priority inheritance means this runs before the medium priority task
+        info!("Low: tasks spawned, returning mutex");
+        test_context.mutex.give();
+
+        info!("Low: wait for tasks to finish");
+        test_context.ready_semaphore.take(None);
+        preempt::disable();
     }
 }

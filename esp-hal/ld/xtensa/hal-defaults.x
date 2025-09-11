@@ -7,3 +7,6 @@ PROVIDE(level4_interrupt = DefaultHandler);
 PROVIDE(level5_interrupt = DefaultHandler);
 PROVIDE(level6_interrupt = DefaultHandler);
 PROVIDE(level7_interrupt = DefaultHandler);
+
+/* external interrupts (from PAC) */
+INCLUDE "device.x"

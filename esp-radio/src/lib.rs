@@ -140,12 +140,9 @@ use hal::{
     time::Rate,
 };
 
+use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
-use crate::{
-    preempt::yield_task,
-    radio::{setup_radio_isr, shutdown_radio_isr},
-};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -242,7 +239,43 @@ impl Drop for Controller<'_> {
 
 /// Initialize for using Wi-Fi and or BLE.
 ///
+/// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
+/// can't operate. The scheduler must implement the interfaces in the `esp-radio-preempt-driver`
+/// crate. If you are using an embedded RTOS like Ariel OS, it needs to provide an appropriate
+/// implementation.
+///
+/// If you are not using an embedded RTOS, use the `esp-preempt` crate which provides the
+/// necessary functionality.
+///
 /// Make sure to **not** call this function while interrupts are disabled.
+///
+/// ## Errors
+///
+/// - The function may return an error if the scheduler is not initialized.
+#[cfg_attr(
+    esp32,
+    doc = " - The function may return an error if ADC2 is already in use."
+)]
+/// - The function may return an error if interrupts are disabled.
+/// - The function may return an error if initializing the underlying driver fails.
+///
+/// ## Example
+///
+/// For examples of the necessary setup, see your RTOS's documentation. If you are
+/// using the `esp-preempt` crate, you will need to initialize the scheduler before calling this
+/// function:
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::timer::timg::TimerGroup;
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// esp_preempt::init(timg0.timer0);
+///
+/// // You can now start esp-radio:
+/// let esp_radio_controller = esp_radio::init().unwrap();
+/// # }
+/// ```
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
@@ -270,8 +303,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
 
     // This initializes the task switcher
     preempt::enable();
-
-    yield_task();
 
     wifi_set_log_verbose();
     init_radio_clocks();
@@ -317,7 +348,7 @@ pub enum InitializationError {
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
     #[cfg(esp32)]
-    // ADC2 cannot be used with `radio` functionality on `esp32`.
+    /// ADC2 is required by esp-radio, but it is in use by esp-hal.
     Adc2IsUsed,
 }
 

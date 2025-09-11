@@ -8,7 +8,7 @@
 
 Minimal runtime / startup for RISC-V devices from Espressif.
 
-Much of the code in this package originated in the [rust-embedded/riscv] repository.
+This is using [rust-embedded/riscv] under the hood as much as possible and uses custom code where needed.
 
 [rust-embedded/riscv]: https://github.com/rust-embedded/riscv
 
