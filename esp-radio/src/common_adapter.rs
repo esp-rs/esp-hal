@@ -294,7 +294,9 @@ pub unsafe extern "C" fn __esp_radio_strrchr(_s: *const (), _c: u32) -> *const u
 static mut __ESP_RADIO_G_LOG_LEVEL: i32 = 0;
 
 #[unsafe(no_mangle)]
-pub static mut __ESP_RADIO_G_MISC_NVS: u32 = 0;
+pub static mut __ESP_RADIO_G_MISC_NVS: &u32 = unsafe { &*core::ptr::addr_of!(NVS) };
+
+pub static mut NVS: u32 = 0;
 
 // For some reason these are only necessary on Xtensa chips.
 #[cfg(xtensa)]
