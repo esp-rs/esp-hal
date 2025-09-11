@@ -5,6 +5,8 @@
 //! The peripheral can be used to transfer data over the SDIO bus in `Slave`
 //! mode.
 
+#![allow(clippy::identity_op)]
+
 use embedded_hal_sdmmc::{
     CardMode,
     CardType,
@@ -18,7 +20,7 @@ use embedded_hal_sdmmc::{
     tuning::{TuningMode, TuningWidth},
 };
 
-use crate::pac;
+use crate::{gpio::Flex, pac};
 
 pub mod command;
 mod config;
@@ -28,6 +30,7 @@ mod hinf;
 mod interrupt;
 mod io_ocr;
 mod pins;
+pub mod response;
 mod slc;
 mod slchost;
 mod state;
