@@ -354,6 +354,35 @@ pub enum InitializationError {
     Adc2IsUsed,
 }
 
+impl core::error::Error for InitializationError {}
+
+impl core::fmt::Display for InitializationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            InitializationError::General(e) => write!(f, "A general error {e} occurred"),
+            #[cfg(feature = "wifi")]
+            InitializationError::WifiError(e) => {
+                write!(f, "Wi-Fi driver related error occured: {e}")
+            }
+            InitializationError::WrongClockConfig => {
+                write!(f, "The current CPU clock frequency is too low")
+            }
+            InitializationError::InterruptsDisabled => write!(
+                f,
+                "Attempted to initialize while interrupts are disabled (Unsupported)"
+            ),
+            InitializationError::SchedulerNotInitialized => {
+                write!(f, "The scheduler is not initialized")
+            }
+            #[cfg(esp32)]
+            InitializationError::Adc2IsUsed => write!(
+                f,
+                "ADC2 cannot be used with `radio` functionality on `esp32`"
+            ),
+        }
+    }
+}
+
 #[cfg(feature = "wifi")]
 impl From<WifiError> for InitializationError {
     fn from(value: WifiError) -> Self {

@@ -140,6 +140,8 @@ impl core::fmt::Display for TxError {
     }
 }
 
+impl core::error::Error for TxError {}
+
 #[instability::unstable]
 impl embedded_io::Error for TxError {
     fn kind(&self) -> embedded_io::ErrorKind {
