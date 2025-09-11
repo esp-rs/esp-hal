@@ -80,6 +80,59 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
+// When running this with defmt:
+// - use `DEFMT_RTT_BUFFER_SIZE=32768 xtask run ...` to avoid truncated output
+// - increase embedded_test's default_timeout below to avoid timeouts while printing
+// Note that probe-rs reading the buffer might mess up timing-sensitive tests!
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize) {
+    let mut errors: usize = 0;
+
+    for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        let _msg = if idx == tx_len - 1 {
+            // The last pulse code is the stop code, which can't be received.
+            ""
+        } else if idx == tx_len - 2 {
+            // The second-to-last pulse-code is the one which exceeds the idle threshold and
+            // should be received as stop code.
+            if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
+                errors += 1;
+                "rx code not a stop code!"
+            } else {
+                ""
+            }
+        } else if code_tx != code_rx {
+            errors += 1;
+            "rx/tx code mismatch!"
+        } else {
+            ""
+        };
+
+        #[cfg(feature = "defmt")]
+        if _msg.len() > 0 {
+            defmt::error!(
+                "loopback @ idx {}: {:?} (tx) -> {:?} (rx): {}",
+                idx,
+                code_tx,
+                code_rx,
+                _msg
+            );
+        } else {
+            defmt::info!(
+                "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
+                idx,
+                code_tx,
+                code_rx,
+            );
+        }
+    }
+
+    assert_eq!(
+        errors, 0,
+        "rx/tx code mismatch at {}/{} indices",
+        errors, tx_len
+    );
+}
+
 fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_channel: Channel<Blocking, Tx>,
     rx_channel: Channel<Blocking, Rx>,
@@ -101,9 +154,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_transaction.wait().unwrap();
     rx_transaction.wait().unwrap();
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data, TX_LEN);
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -151,9 +202,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     tx_res.unwrap();
     rx_res.unwrap();
 
-    // the last two pulse-codes are the ones which wait for the timeout so
-    // they can't be equal
-    assert_eq!(&tx_data[..TX_LEN - 2], &rcv_data[..TX_LEN - 2]);
+    check_data_eq(&tx_data, &rcv_data, TX_LEN);
 }
 
 // Run a test that just sends some data, without trying to recive it.
