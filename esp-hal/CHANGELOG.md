@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32-S3: Add RtcI2c driver (#0000)
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
+- RMT: Wrapping the hardware buffer is now supported for rx/tx and blocking/async channels (#4049)
+- RMT: add `Channel::buffer_size` and `Channel::supports_wrap` methods (#4049)
 
 ### Changed
 
@@ -59,6 +61,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump `embassy-embedded-hal` to v0.5.0 (#4075)
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
+- RMT: Receive operations read only received codes instead of the entire buffer and return the number of codes read (#4049)
+- RMT: Dropping async futures and blocking transactions always stops them and returns the channel to an idle state. Transactions are `#[must_use]` (#4049)
 
 ### Fixed
 
