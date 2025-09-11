@@ -65,7 +65,7 @@ impl TaskExt for TaskPtr {
     }
 
     fn priority(self, _: &mut RunQueue) -> usize {
-        unsafe { self.as_ref().priority as usize }
+        unsafe { self.as_ref().priority }
     }
 
     fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: usize) {
