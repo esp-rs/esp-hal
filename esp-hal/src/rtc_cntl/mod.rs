@@ -188,7 +188,7 @@ bitflags::bitflags! {
     }
 }
 
-/// Clock source to be calibrated using rtc_clk_cal function
+/// Clock source to be calibrated using `rtc_clk_cal` function
 #[allow(unused)]
 #[cfg(not(any(esp32c6, esp32h2)))]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -205,9 +205,10 @@ pub(crate) enum RtcCalSel {
     InternalOsc = 3,
 }
 
-/// Clock source to be calibrated using rtc_clk_cal function
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// Clock source to be calibrated using `rtc_clk_cal` function
 #[cfg(any(esp32c6, esp32h2))]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum RtcCalSel {
     /// Currently selected RTC SLOW_CLK
     RtcMux      = -1,
