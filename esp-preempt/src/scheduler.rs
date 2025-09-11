@@ -7,17 +7,9 @@ use esp_sync::NonReentrantMutex;
 
 use crate::{
     InternalMemory,
-    run_queue::RunQueue,
+    run_queue::{MaxPriority, RunQueue},
     semaphore::Semaphore,
-    task::{
-        self,
-        Context,
-        TaskAllocListElement,
-        TaskDeleteListElement,
-        TaskList,
-        TaskPtr,
-        TaskState,
-    },
+    task::{self, Task, TaskAllocListElement, TaskDeleteListElement, TaskExt, TaskList, TaskPtr},
     timer::TimeDriver,
     timer_queue,
 };
@@ -133,7 +125,12 @@ impl SchedulerState {
 
         if event.is_timer_event() {
             unwrap!(self.time_driver.as_mut()).handle_alarm(|ready_task| {
-                debug_assert_eq!(ready_task.state, task::TaskState::Sleeping);
+                debug_assert_eq!(
+                    ready_task.state,
+                    task::TaskState::Sleeping,
+                    "task: {:?}",
+                    ready_task as *const Task
+                );
 
                 debug!("Task {:?} is ready", ready_task as *const _);
 
@@ -146,11 +143,16 @@ impl SchedulerState {
         {
             // Current task is still ready, mark it as such.
             debug!("re-queueing current task: {:?}", current_task);
-            self.run_queue.mark_same_priority_task_ready(current_task);
+            self.run_queue.mark_task_ready(current_task);
         }
 
         if let Some(next_task) = self.select_next_task() {
-            debug_assert_eq!(unsafe { next_task.as_ref().state }, task::TaskState::Ready);
+            debug_assert_eq!(
+                next_task.state(),
+                task::TaskState::Ready,
+                "task: {:?}",
+                next_task
+            );
 
             trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
@@ -189,11 +191,15 @@ impl SchedulerState {
     }
 
     fn arm_time_slice_alarm(&mut self) {
-        let ready_tasks = !self.run_queue.is_empty();
+        // The current task is not in the run queue. If the run queue on the current priority level
+        // is empty, the current task is the only one running at its priority level. In this
+        // case, we don't need time slicing.
+        let current_priority = unwrap!(self.current_task).priority(&mut self.run_queue);
+        let ready_tasks = !self.run_queue.is_level_empty(current_priority);
         unwrap!(self.time_driver.as_mut()).arm_next_wakeup(ready_tasks);
     }
 
-    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Context) -> bool {
+    pub(crate) fn schedule_task_deletion(&mut self, task_to_delete: *mut Task) -> bool {
         let current_task = unwrap!(self.current_task);
         let task_to_delete = NonNull::new(task_to_delete).unwrap_or(current_task);
         let is_current = task_to_delete == current_task;
@@ -218,16 +224,12 @@ impl SchedulerState {
     }
 
     pub(crate) fn resume_task(&mut self, task: TaskPtr) {
-        if unsafe { task.as_ref().state == TaskState::Ready } {
-            return;
-        }
         let timer_queue = unwrap!(self.time_driver.as_mut());
         timer_queue.timer_queue.remove(task);
 
-        self.run_queue.mark_task_ready(task);
-
-        // if task.priority > current_task.priority
-        task::yield_task();
+        if self.run_queue.mark_task_ready(task) {
+            task::yield_task();
+        }
     }
 
     fn delete_task(&mut self, to_delete: TaskPtr) {
@@ -271,13 +273,19 @@ impl Scheduler {
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
+        priority: u32,
     ) -> TaskPtr {
-        let task = Box::new_in(Context::new(task, param, task_stack_size), InternalMemory);
+        let task = Box::new_in(
+            Task::new(task, param, task_stack_size, priority),
+            InternalMemory,
+        );
         let task_ptr = NonNull::from(Box::leak(task));
 
         SCHEDULER.with(|state| {
             state.all_tasks.push(task_ptr);
-            state.run_queue.mark_task_ready(task_ptr);
+            if state.run_queue.mark_task_ready(task_ptr) {
+                task::yield_task();
+            }
         });
 
         debug!("Task created: {:?}", task_ptr);
@@ -308,6 +316,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         timer_queue::create_timer_task();
 
         self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
+        task::yield_task();
     }
 
     fn disable(&self) {
@@ -325,20 +334,25 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn max_task_priority(&self) -> u32 {
-        RunQueue::PRIORITY_LEVELS as u32 - 1
+        MaxPriority::MAX_PRIORITY as u32
     }
 
     fn task_create(
         &self,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
-        _priority: u32,
+        priority: u32,
         _pin_to_core: Option<u32>,
         task_stack_size: usize,
     ) -> *mut c_void {
-        self.create_task(task, param, task_stack_size)
-            .as_ptr()
-            .cast()
+        self.create_task(
+            task,
+            param,
+            task_stack_size,
+            priority.min(self.max_task_priority()),
+        )
+        .as_ptr()
+        .cast()
     }
 
     fn current_task(&self) -> *mut c_void {
@@ -346,7 +360,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
     }
 
     fn schedule_task_deletion(&self, task_handle: *mut c_void) {
-        task::schedule_task_deletion(task_handle as *mut Context)
+        task::schedule_task_deletion(task_handle as *mut Task)
     }
 
     fn current_task_thread_semaphore(&self) -> SemaphorePtr {

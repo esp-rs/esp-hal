@@ -28,11 +28,11 @@ pub type SemaphorePtr = NonNull<()>;
 
 /// The type of semaphore or mutex to create.
 pub enum SemaphoreKind {
-    /// Counting semaphore or non-recursive mutex.
-    ///
-    /// To obtain a non-recursive mutex, use [`SemaphoreKind::Counting`] with maximum and initial
-    /// counts of 1.
+    /// Counting semaphore.
     Counting { max: u32, initial: u32 },
+
+    /// Non-recursive mutex.
+    Mutex,
 
     /// Recursive mutex.
     RecursiveMutex,

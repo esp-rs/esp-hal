@@ -136,10 +136,12 @@ impl Queue {
         loop {
             let enqueued = self.inner.with(|queue| {
                 if unsafe { queue.try_enqueue(item) } {
+                    trace!("Queue - notify with item");
                     queue.waiting_for_item.notify();
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
+                    trace!("Queue - wait for space - {:?}", deadline);
                     queue.waiting_for_space.wait_with_deadline(deadline);
                     false
                 }
@@ -157,6 +159,7 @@ impl Queue {
             if let Some(deadline) = deadline
                 && deadline < Instant::now()
             {
+                debug!("Queue - send to back - timed out");
                 // We have a deadline and we've timed out.
                 return false;
             }
@@ -182,10 +185,12 @@ impl Queue {
             // Attempt to dequeue an item from the queue
             let dequeued = self.inner.with(|queue| {
                 if unsafe { queue.try_dequeue(item) } {
+                    trace!("Queue - notify with space");
                     queue.waiting_for_space.notify();
                     true
                 } else {
                     // The task will go to sleep when the above critical section is released.
+                    trace!("Queue - wait for item - {:?}", deadline);
                     queue.waiting_for_item.wait_with_deadline(deadline);
                     false
                 }
@@ -204,6 +209,7 @@ impl Queue {
                 && deadline < Instant::now()
             {
                 // We have a deadline and we've timed out.
+                debug!("Queue - timed out waiting for item");
                 return false;
             }
             // We can block more, so let's attempt to dequeue again.
@@ -213,6 +219,7 @@ impl Queue {
     unsafe fn try_receive(&self, item: *mut u8) -> bool {
         self.inner.with(|queue| {
             if unsafe { queue.try_dequeue(item) } {
+                trace!("Queue - notify with space");
                 queue.waiting_for_space.notify();
                 true
             } else {
@@ -230,6 +237,7 @@ impl Queue {
             }
 
             if was_full && !queue.full() {
+                trace!("Queue - notify with space");
                 queue.waiting_for_space.notify();
             }
         })
