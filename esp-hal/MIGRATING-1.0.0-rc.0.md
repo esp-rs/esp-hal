@@ -149,6 +149,21 @@ API as well.
 +let rx_transaction: RxTransaction<'_, PulseCode> = rx.transmit(&data);
 ```
 
+## RMT method changes
+
+The `rmt::Channel::transmit_continuously` and
+`rmt::Channel::transmit_continuously_with_loopcount` methods have been merged:
+
+```diff
+-let tx_trans0 = tx_channel0.transmit_continuously(&data);
+-let tx_trans1 = tx_channel1.transmit_continuously_with_loopcount(&data, count);
++use core::num::NonZeroU16;
++use esp_hal::rmt::LoopCount;
++let tx_trans0 = tx_channel0.transmit_continuously(&data, LoopCount::Infinite);
++let count = NonZeroU16::new(count).unwrap();
++let tx_trans1 = tx_channel1.transmit_continuously(&data, LoopCount::Finite(count));
+```
+
 ## DMA changes
 
 DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
