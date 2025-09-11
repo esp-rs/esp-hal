@@ -1,21 +1,22 @@
-# .lycheeignore
 # Local/private network addresses
-localhost
-127\.0\.0\.1
-0\.0\.0\.0
+# Local/private network addresses (protocol-aware)
+^https?://localhost
+^https?://127\.0\.0\.1
+^https?://0\.0\.0\.0
 .*\.local
-192\.168\..*
-10\..*
-172\.(1[6-9]|2[0-9]|3[0-1])\..*
+^https?://192\.168\..*
+^https?://10\..*
+^https?://172\.(1[6-9]|2[0-9]|3[0-1])\..*
 
 # Template placeholders
-%7B.*%7D
-\{.*\}
+%7B[^%]+%7D
+\{[^}]+\}
+
+# GitHub compare links (ignore only these)
+^https://github\.com/.*/compare/.*\.\.\..*
 
 # GitHub patterns
 releases/tag/$
-compare/.*\.\.\..*
-compare/.*\.\.\..*:foo
 
 # Shield.io badges
 img\.shields\.io/badge/MSRV-
