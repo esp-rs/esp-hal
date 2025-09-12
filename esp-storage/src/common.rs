@@ -1,6 +1,8 @@
 use core::mem::MaybeUninit;
 
 use crate::chip_specific;
+#[cfg(multi_core)]
+use crate::multi_core::MultiCoreStrategy;
 
 #[derive(Debug)]
 #[non_exhaustive]
@@ -10,6 +12,12 @@ pub enum FlashStorageError {
     CantUnlock,
     NotAligned,
     OutOfBounds,
+    /// Cannot write to flash as more than one core is running.
+    /// Either manually suspend the other core, or use one of the available strategies:
+    /// * [`FlashStorage::multicore_auto_park`]
+    /// * [`FlashStorage::multicore_ignore`]
+    #[cfg(multi_core)]
+    OtherCoreRunning,
     Other(i32),
 }
 
@@ -27,6 +35,8 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
 pub struct FlashStorage {
     pub(crate) capacity: usize,
     unlocked: bool,
+    #[cfg(multi_core)]
+    pub(crate) multi_core_strategy: MultiCoreStrategy,
 }
 
 impl Default for FlashStorage {
@@ -43,6 +53,8 @@ impl FlashStorage {
         let mut storage = FlashStorage {
             capacity: 0,
             unlocked: false,
+            #[cfg(multi_core)]
+            multi_core_strategy: MultiCoreStrategy::Error,
         };
 
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
@@ -112,9 +124,16 @@ impl FlashStorage {
     }
 
     pub(crate) fn internal_erase(&mut self, sector: u32) -> Result<(), FlashStorageError> {
-        self.unlock_once()?;
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
 
-        check_rc(chip_specific::spiflash_erase_sector(sector))
+        self.unlock_once()?;
+        check_rc(chip_specific::spiflash_erase_sector(sector))?;
+
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
+
+        Ok(())
     }
 
     pub(crate) fn internal_write(
@@ -122,12 +141,19 @@ impl FlashStorage {
         offset: u32,
         bytes: &[u8],
     ) -> Result<(), FlashStorageError> {
-        self.unlock_once()?;
+        #[cfg(multi_core)]
+        let unpark = self.multi_core_strategy.pre_write()?;
 
+        self.unlock_once()?;
         check_rc(chip_specific::spiflash_write(
             offset,
             bytes.as_ptr() as *const u32,
             bytes.len() as u32,
-        ))
+        ))?;
+
+        #[cfg(multi_core)]
+        self.multi_core_strategy.post_write(unpark);
+
+        Ok(())
     }
 }
