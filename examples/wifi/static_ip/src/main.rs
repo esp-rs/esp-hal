@@ -30,6 +30,7 @@ const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 const STATIC_IP: &str = env!("STATIC_IP");
 const GATEWAY_IP: &str = env!("GATEWAY_IP");
+const FERRIS_GIF: &str = "https://rustacean.net/more-crabby-things/dancing-ferris.gif";
 
 #[main]
 fn main() -> ! {
@@ -158,16 +159,20 @@ fn main() -> ! {
             }
 
             if !time_out {
-                socket.write_all(
-                    b"HTTP/1.0 200 OK\r\n\r\n\
-                    <html>\
-                        <body>\
-                            <h1>Hello Rust! Hello esp-radio!</h1>\
-                            <img src=\"https://rustacean.net/more-crabby-things/dancing-ferris.gif\"/>
-                        </body>\
-                    </html>\r\n\
-                    "
-                ).unwrap();
+                if !time_out {
+                    write!(
+                        socket,
+                        "HTTP/1.0 200 OK\r\n\r\n\
+                        <html>\
+                            <body>\
+                                <h1>Hello Rust! Hello esp-radio!</h1>\
+                                <img src=\"{}\"/>\
+                            </body>\
+                        </html>\r\n",
+                        FERRIS_GIF
+                    )
+                    .unwrap();
+                }
 
                 socket.flush().unwrap();
             }

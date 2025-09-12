@@ -54,7 +54,7 @@ When browsing the examples, we recommend viewing the tag for the `esp-hal` relea
 - [The Embedded Rust Book](https://docs.rust-embedded.org/book/index.html)
 - [The Embedonomicon](https://docs.rust-embedded.org/embedonomicon/)
 - [The Rust on ESP Book](https://docs.espressif.com/projects/rust/esp-hal/latest/)
-- [Embedded Rust (no_std) on Espressif](https://esp-rs.github.io/no_std-training/)
+- [Embedded Rust (no_std) on Espressif](https://docs.espressif.com/projects/rust/no_std-training/)
 
 ## Contributing
 

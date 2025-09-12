@@ -97,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         let message = format!(
             "esp-radio should be built with optimization level 2, 3 or s - yours is {level}.
-                See https://github.com/esp-rs/esp-radio",
+                See https://github.com/esp-rs/esp-hal/tree/main/esp-radio",
         );
         print_warning(message);
     }
