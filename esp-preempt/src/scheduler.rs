@@ -23,7 +23,6 @@ use crate::{
         TaskPtr,
     },
     timer::TimeDriver,
-    timer_queue,
 };
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +68,7 @@ pub(crate) struct SchedulerState {
 
     /// Pointer to the current task.
     pub(crate) current_task: Option<TaskPtr>,
+    idle_context: CpuContext,
 
     /// A list of all allocated tasks
     pub(crate) all_tasks: TaskList<TaskAllocListElement>,
@@ -91,6 +91,7 @@ impl SchedulerState {
         Self {
             runs_on: Cpu::ProCpu,
             current_task: None,
+            idle_context: CpuContext::new(),
             all_tasks: TaskList::new(),
             run_queue: RunQueue::new(),
             to_delete: TaskList::new(),
@@ -98,6 +99,36 @@ impl SchedulerState {
             time_driver: None,
             event: SchedulerEvent(0),
         }
+    }
+
+    pub(crate) fn setup(&mut self, time_driver: TimeDriver) {
+        self.time_driver = Some(time_driver);
+        self.runs_on = Cpu::current();
+        task::set_idle_hook_entry(&mut self.idle_context);
+    }
+
+    pub(crate) fn create_task(
+        &mut self,
+        task: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+        priority: usize,
+    ) -> TaskPtr {
+        let mut task = Box::new_in(
+            Task::new(task, param, task_stack_size, priority),
+            InternalMemory,
+        );
+        task.heap_allocated = true;
+        let task_ptr = NonNull::from(Box::leak(task));
+
+        self.all_tasks.push(task_ptr);
+        if self.run_queue.mark_task_ready(task_ptr) {
+            task::yield_task();
+        }
+
+        debug!("Task created: {:?}", task_ptr);
+
+        task_ptr
     }
 
     fn delete_marked_tasks(&mut self) {
@@ -112,10 +143,12 @@ impl SchedulerState {
     }
 
     fn run_scheduler(&mut self, task_switch: impl FnOnce(*mut CpuContext, *mut CpuContext)) {
-        let mut priority = {
-            let current_task = unsafe { unwrap!(self.current_task).as_ref() };
+        let mut priority = if let Some(current_task) = self.current_task {
+            let current_task = unsafe { current_task.as_ref() };
             current_task.ensure_no_stack_overflow();
-            current_task.priority
+            Some(current_task.priority)
+        } else {
+            None
         };
 
         self.delete_marked_tasks();
@@ -146,20 +179,8 @@ impl SchedulerState {
             self.run_queue.mark_task_ready(current_task);
         }
 
-        // At least one task must be ready to run. If there are none, we can't do anything - we
-        // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
-        // and can be replaced with auto light sleep.
-        let mut next_task = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
-
-        // Were we able to select a new task?
-        if Some(next_task) != self.current_task {
-            debug_assert_eq!(
-                next_task.state(),
-                task::TaskState::Ready,
-                "task: {:?}",
-                next_task
-            );
-
+        let next_task = self.run_queue.pop();
+        if next_task != self.current_task {
             trace!("Switching task {:?} -> {:?}", self.current_task, next_task);
 
             // If the current task is deleted, we can skip saving its context. We signal this by
@@ -169,19 +190,48 @@ impl SchedulerState {
             } else {
                 core::ptr::null_mut()
             };
-            let next_context = unsafe { &raw mut next_task.as_mut().cpu_context };
+
+            let next_context = if let Some(mut next) = next_task {
+                priority = Some(next.priority(&mut self.run_queue));
+                unsafe { &raw mut next.as_mut().cpu_context }
+            } else if current_context.is_null() {
+                // The current task has been deleted, we can't use its stack. Let's assume the main
+                // task's context has a valid stack pointer for us.
+                cfg_if::cfg_if! {
+                    if #[cfg(xtensa)] {
+                        self.idle_context.A1 = unsafe { task::MAIN_TASK.cpu_context.A1 };
+                    } else {
+                        self.idle_context.sp = unsafe { task::MAIN_TASK.cpu_context.sp };
+                    }
+                }
+                &raw mut self.idle_context
+            } else {
+                // As the stack pointer, let's just use the current value.
+                cfg_if::cfg_if! {
+                    if #[cfg(xtensa)] {
+                        self.idle_context.A1 = esp_hal::xtensa_lx::get_stack_pointer() as u32;
+                    } else {
+                        let current_sp;
+                        unsafe { core::arch::asm!("mv {0}, sp", out(reg) current_sp); }
+                        self.idle_context.sp = current_sp;
+                    }
+                }
+                &raw mut self.idle_context
+            };
 
             task_switch(current_context, next_context);
 
-            self.current_task = Some(next_task);
-            priority = next_task.priority(&mut self.run_queue);
+            // If we went to idle, this will be None and we won't mess up the main task's stack.
+            self.current_task = next_task;
         }
 
         // TODO maybe we don't need to do this every time?
         // The current task is not in the run queue. If the run queue on the current priority level
         // is empty, the current task is the only one running at its priority level. In this
         // case, we don't need time slicing.
-        let arm_next_timeslice_tick = !self.run_queue.is_level_empty(priority);
+        let arm_next_timeslice_tick = priority
+            .map(|p| !self.run_queue.is_level_empty(p))
+            .unwrap_or(false);
         time_driver.arm_next_wakeup(arm_next_timeslice_tick);
     }
 
@@ -229,12 +279,16 @@ impl SchedulerState {
         }
     }
 
-    fn delete_task(&mut self, to_delete: TaskPtr) {
+    fn delete_task(&mut self, mut to_delete: TaskPtr) {
         self.remove_from_all_queues(to_delete);
 
         unsafe {
-            let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
-            core::mem::drop(task);
+            if to_delete.as_ref().heap_allocated {
+                let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
+                core::mem::drop(task);
+            } else {
+                to_delete.as_mut().thread_semaphore = None;
+            }
         }
     }
 
@@ -272,26 +326,11 @@ impl Scheduler {
         task_stack_size: usize,
         priority: u32,
     ) -> TaskPtr {
-        let task = Box::new_in(
-            Task::new(task, param, task_stack_size, priority as usize),
-            InternalMemory,
-        );
-        let task_ptr = NonNull::from(Box::leak(task));
-
-        SCHEDULER.with(|state| {
-            state.all_tasks.push(task_ptr);
-            if state.run_queue.mark_task_ready(task_ptr) {
-                task::yield_task();
-            }
-        });
-
-        debug!("Task created: {:?}", task_ptr);
-
-        task_ptr
+        self.with(|state| state.create_task(task, param, task_stack_size, priority as usize))
     }
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
-        SCHEDULER.with(|scheduler| scheduler.sleep_until(wake_at))
+        self.with(|scheduler| scheduler.sleep_until(wake_at))
     }
 }
 
@@ -318,28 +357,6 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
 
             true
         })
-    }
-
-    fn enable(&self) {
-        // allocate the default tasks
-        task::allocate_main_task();
-        task::spawn_idle_task();
-
-        task::setup_multitasking();
-
-        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).start());
-        task::yield_task();
-    }
-
-    fn disable(&self) {
-        self.with(|scheduler| unwrap!(scheduler.time_driver.as_mut()).stop());
-        task::disable_multitasking();
-
-        // Note that deleting tasks leaks resources, because we don't know how to free memory
-        // allocated by the deleted tasks.
-        task::delete_all_tasks();
-
-        timer_queue::reset();
     }
 
     fn yield_task(&self) {

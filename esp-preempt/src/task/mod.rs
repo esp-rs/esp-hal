@@ -8,7 +8,13 @@ use allocator_api2::boxed::Box;
 pub(crate) use arch_specific::*;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER, run_queue::RunQueue, wait_queue::WaitQueue};
+use crate::{
+    InternalMemory,
+    SCHEDULER,
+    run_queue::RunQueue,
+    scheduler::SchedulerState,
+    wait_queue::WaitQueue,
+};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -195,7 +201,7 @@ pub(crate) struct Task {
     pub cpu_context: CpuContext,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
-    pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
+    pub _allocated_stack: *mut [MaybeUninit<u32>],
     pub priority: usize,
 
     pub wakeup_at: u64,
@@ -215,6 +221,9 @@ pub(crate) struct Task {
 
     /// The list of tasks scheduled for deletion
     pub delete_list_item: TaskListItem,
+
+    /// Whether the task was allocated on the heap.
+    pub(crate) heap_allocated: bool,
 }
 
 const STACK_CANARY: u32 = 0xDEEDBAAD;
@@ -233,10 +242,10 @@ impl Task {
 
         let task_stack_size_words = task_stack_size / 4;
         let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
-
-        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size_words).cast() };
-
         stack[0] = MaybeUninit::new(STACK_CANARY);
+
+        let stack = Box::leak(stack) as *mut [MaybeUninit<u32>];
+        let stack_top = unsafe { stack.cast::<u32>().add(task_stack_size_words).cast() };
 
         Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
@@ -252,16 +261,21 @@ impl Task {
             ready_queue_item: TaskListItem::None,
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
+
+            heap_allocated: false,
         }
     }
 
     pub(crate) fn ensure_no_stack_overflow(&self) {
+        // TODO: fix this for main task
         if self._allocated_stack.is_empty() {
             return;
         }
 
         assert_eq!(
-            unsafe { self._allocated_stack[0].assume_init() },
+            // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
+            // during initialization.
+            unsafe { self._allocated_stack.cast::<u32>().read() },
             STACK_CANARY,
             "Stack overflow detected in {:?}",
             self as *const Task
@@ -279,82 +293,48 @@ impl Drop for Task {
     }
 }
 
-pub(super) fn allocate_main_task() {
-    // This context will be filled out by the first context switch.
-    let task = Box::new_in(
-        Task {
-            cpu_context: CpuContext::default(),
-            thread_semaphore: None,
-            state: TaskState::Ready,
-            _allocated_stack: Box::<[u32], _>::new_uninit_slice_in(0, InternalMemory),
-            current_queue: None,
-            priority: 1,
+// This context will be filled out by the first context switch.
+// We allocate the main task statically, because there is always a main task. If deleted, we simply
+// don't deallocate this.
+pub(crate) static mut MAIN_TASK: Task = Task {
+    cpu_context: CpuContext::new(),
+    thread_semaphore: None,
+    state: TaskState::Ready,
+    _allocated_stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+    current_queue: None,
+    priority: 0,
 
-            wakeup_at: 0,
+    wakeup_at: 0,
 
-            alloc_list_item: TaskListItem::None,
-            ready_queue_item: TaskListItem::None,
-            timer_queue_item: TaskListItem::None,
-            delete_list_item: TaskListItem::None,
-        },
-        InternalMemory,
-    );
-    let main_task_ptr = NonNull::from(Box::leak(task));
+    alloc_list_item: TaskListItem::None,
+    ready_queue_item: TaskListItem::None,
+    timer_queue_item: TaskListItem::None,
+    delete_list_item: TaskListItem::None,
+
+    heap_allocated: false,
+};
+
+pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
+    let mut main_task_ptr = unwrap!(NonNull::new(&raw mut MAIN_TASK));
     debug!("Main task created: {:?}", main_task_ptr);
 
-    SCHEDULER.with(|state| {
-        debug_assert!(
-            state.current_task.is_none(),
-            "Tried to allocate main task multiple times"
-        );
+    unsafe {
+        let main_task = main_task_ptr.as_mut();
 
-        // The main task is already running, no need to add it to the ready queue.
-        state.all_tasks.push(main_task_ptr);
-        state.current_task = Some(main_task_ptr);
-        state.run_queue.mark_task_ready(main_task_ptr);
-    })
-}
-
-pub(crate) fn spawn_idle_task() {
-    let ptr = SCHEDULER.create_task(idle_task, core::ptr::null_mut(), 4096, 0);
-    debug!("Idle task created: {:?}", ptr);
-}
-
-pub(crate) extern "C" fn idle_task(_: *mut c_void) {
-    loop {
-        // TODO: make this configurable.
-        #[cfg(xtensa)]
-        unsafe {
-            core::arch::asm!("waiti 0");
-        }
-        #[cfg(riscv)]
-        unsafe {
-            core::arch::asm!("wfi");
-        }
+        // Reset main task properties. The rest should be cleared when the task is deleted.
+        main_task.priority = 0;
+        main_task.state = TaskState::Ready;
     }
-}
 
-pub(super) fn delete_all_tasks() {
-    trace!("delete_all_tasks");
-    let mut all_tasks = SCHEDULER.with(|state| {
-        // Since we delete all tasks, we walk through the allocation list - we just need to clear
-        // the lists.
-        state.to_delete = TaskList::new();
-        state.run_queue = RunQueue::new();
+    debug_assert!(
+        scheduler.current_task.is_none(),
+        "Tried to allocate main task multiple times"
+    );
 
-        // Clear the current task.
-        state.current_task = None;
-
-        // Take the allocation list
-        core::mem::take(&mut state.all_tasks)
-    });
-
-    while let Some(task) = all_tasks.pop() {
-        unsafe {
-            let task = Box::from_raw_in(task.as_ptr(), InternalMemory);
-            core::mem::drop(task);
-        }
-    }
+    // The main task is already running, no need to add it to the ready queue.
+    scheduler.all_tasks.push(main_task_ptr);
+    scheduler.current_task = Some(main_task_ptr);
+    scheduler.run_queue.mark_task_ready(main_task_ptr);
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {

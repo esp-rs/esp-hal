@@ -34,8 +34,6 @@ use crate::semaphore::SemaphorePtr;
 
 unsafe extern "Rust" {
     fn esp_preempt_initialized() -> bool;
-    fn esp_preempt_enable();
-    fn esp_preempt_disable();
     fn esp_preempt_yield_task();
     fn esp_preempt_yield_task_from_isr();
     fn esp_preempt_current_task() -> *mut c_void;
@@ -66,18 +64,6 @@ macro_rules! scheduler_impl {
         #[inline]
         fn esp_preempt_initialized() -> bool {
             <$t as $crate::Scheduler>::initialized(&$name)
-        }
-
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_enable() {
-            <$t as $crate::Scheduler>::enable(&$name)
-        }
-
-        #[unsafe(no_mangle)]
-        #[inline]
-        fn esp_preempt_disable() {
-            <$t as $crate::Scheduler>::disable(&$name)
         }
 
         #[unsafe(no_mangle)]
@@ -166,14 +152,6 @@ macro_rules! scheduler_impl {
 ///         unimplemented!()
 ///     }
 ///
-///     fn enable(&self) {
-///         unimplemented!()
-///     }
-///
-///     fn disable(&self) {
-///         unimplemented!()
-///     }
-///
 ///     fn yield_task(&self) {
 ///         unimplemented!()
 ///     }
@@ -224,12 +202,6 @@ pub trait Scheduler: Send + Sync + 'static {
     /// This function is called by `esp_radio::init` to verify that the scheduler is properly set
     /// up.
     fn initialized(&self) -> bool;
-
-    /// This function is called by `esp-radio` to start the task scheduler.
-    fn enable(&self);
-
-    /// This function is called by `esp-radio` to stop the task scheduler.
-    fn disable(&self);
 
     /// This function is called by `esp_radio` to yield control to another task.
     fn yield_task(&self);
@@ -285,18 +257,6 @@ pub trait Scheduler: Send + Sync + 'static {
 #[inline]
 pub fn initialized() -> bool {
     unsafe { esp_preempt_initialized() }
-}
-
-/// Starts the task scheduler.
-#[inline]
-pub fn enable() {
-    unsafe { esp_preempt_enable() }
-}
-
-/// Stops the task scheduler.
-#[inline]
-pub fn disable() {
-    unsafe { esp_preempt_disable() }
 }
 
 /// Yields control to another task.

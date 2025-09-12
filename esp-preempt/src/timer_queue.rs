@@ -323,12 +323,6 @@ impl TimerImplementation for Timer {
 
 register_timer_implementation!(Timer);
 
-pub(crate) fn reset() {
-    TIMER_QUEUE.inner.with(|q| {
-        *q = TimerQueueInner::new();
-    });
-}
-
 /// Entry point for the timer task responsible for handling scheduled timer
 /// events.
 ///

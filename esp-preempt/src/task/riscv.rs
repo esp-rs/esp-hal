@@ -1,10 +1,6 @@
 use core::ffi::c_void;
 
-use esp_hal::{
-    interrupt::{self, software::SoftwareInterrupt},
-    peripherals::Interrupt,
-    riscv::register,
-};
+use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register};
 
 use crate::SCHEDULER;
 
@@ -100,6 +96,25 @@ pub struct CpuContext {
 
     /// The mstatus which will be loaded before MRET
     pub mstatus: usize,
+}
+
+impl CpuContext {
+    /// Creates a new, zeroed out context.
+    pub const fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+
+extern "C" fn idle_hook() -> ! {
+    loop {
+        unsafe { core::arch::asm!("wfi") };
+    }
+}
+
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+    // Point idle context PC at the assembly that calls the idle hook. We need a new stack
+    // frame for the idle task on the main stack.
+    idle_context.pc = idle_hook as usize;
 }
 
 pub(crate) fn new_task_context(
@@ -284,10 +299,6 @@ pub(crate) fn setup_multitasking() {
     );
 
     unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
-}
-
-pub(crate) fn disable_multitasking() {
-    interrupt::disable(esp_hal::system::Cpu::ProCpu, Interrupt::FROM_CPU_INTR2);
 }
 
 #[esp_hal::ram]
