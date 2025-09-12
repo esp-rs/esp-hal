@@ -116,7 +116,7 @@ where
 /// For an example, see the [crate-level documentation][self].
 #[cfg_attr(
     multi_core,
-    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::init()`."
+    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::start()`."
 )]
 pub fn start(timer: impl TimerSource) {
     SCHEDULER.with(move |scheduler| {

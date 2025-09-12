@@ -98,6 +98,13 @@ pub struct CpuContext {
     pub mstatus: usize,
 }
 
+impl CpuContext {
+    /// Creates a new, zeroed out context.
+    pub const fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+
 pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,

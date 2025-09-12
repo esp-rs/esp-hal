@@ -201,7 +201,7 @@ pub(crate) struct Task {
     pub cpu_context: CpuContext,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
-    pub _allocated_stack: Box<[MaybeUninit<u32>], InternalMemory>,
+    pub _allocated_stack: *mut [MaybeUninit<u32>],
     pub priority: usize,
 
     pub wakeup_at: u64,
@@ -221,6 +221,9 @@ pub(crate) struct Task {
 
     /// The list of tasks scheduled for deletion
     pub delete_list_item: TaskListItem,
+
+    /// Whether the task was allocated on the heap.
+    pub(crate) heap_allocated: bool,
 }
 
 const STACK_CANARY: u32 = 0xDEEDBAAD;
@@ -239,10 +242,10 @@ impl Task {
 
         let task_stack_size_words = task_stack_size / 4;
         let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
-
-        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size_words).cast() };
-
         stack[0] = MaybeUninit::new(STACK_CANARY);
+
+        let stack = Box::leak(stack) as *mut [MaybeUninit<u32>];
+        let stack_top = unsafe { stack.cast::<u32>().add(task_stack_size_words).cast() };
 
         Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
@@ -258,16 +261,21 @@ impl Task {
             ready_queue_item: TaskListItem::None,
             timer_queue_item: TaskListItem::None,
             delete_list_item: TaskListItem::None,
+
+            heap_allocated: false,
         }
     }
 
     pub(crate) fn ensure_no_stack_overflow(&self) {
+        // TODO: fix this for main task
         if self._allocated_stack.is_empty() {
             return;
         }
 
         assert_eq!(
-            unsafe { self._allocated_stack[0].assume_init() },
+            // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
+            // during initialization.
+            unsafe { self._allocated_stack.cast::<u32>().read() },
             STACK_CANARY,
             "Stack overflow detected in {:?}",
             self as *const Task
@@ -285,28 +293,38 @@ impl Drop for Task {
     }
 }
 
+// This context will be filled out by the first context switch.
+// We allocate the main task statically, because there is always a main task. If deleted, we simply
+// don't deallocate this.
+static mut MAIN_TASK: Task = Task {
+    cpu_context: CpuContext::new(),
+    thread_semaphore: None,
+    state: TaskState::Ready,
+    _allocated_stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+    current_queue: None,
+    priority: 0,
+
+    wakeup_at: 0,
+
+    alloc_list_item: TaskListItem::None,
+    ready_queue_item: TaskListItem::None,
+    timer_queue_item: TaskListItem::None,
+    delete_list_item: TaskListItem::None,
+
+    heap_allocated: false,
+};
+
 pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
-    // This context will be filled out by the first context switch.
-    let task = Box::new_in(
-        Task {
-            cpu_context: CpuContext::default(),
-            thread_semaphore: None,
-            state: TaskState::Ready,
-            _allocated_stack: Box::<[u32], _>::new_uninit_slice_in(0, InternalMemory),
-            current_queue: None,
-            priority: 1,
-
-            wakeup_at: 0,
-
-            alloc_list_item: TaskListItem::None,
-            ready_queue_item: TaskListItem::None,
-            timer_queue_item: TaskListItem::None,
-            delete_list_item: TaskListItem::None,
-        },
-        InternalMemory,
-    );
-    let main_task_ptr = NonNull::from(Box::leak(task));
+    let mut main_task_ptr = unwrap!(NonNull::new(&raw mut MAIN_TASK));
     debug!("Main task created: {:?}", main_task_ptr);
+
+    unsafe {
+        let main_task = main_task_ptr.as_mut();
+
+        // Reset main task properties. The rest should be cleared when the task is deleted.
+        main_task.priority = 1;
+        main_task.state = TaskState::Ready;
+    }
 
     debug_assert!(
         scheduler.current_task.is_none(),

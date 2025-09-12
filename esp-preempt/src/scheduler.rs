@@ -106,10 +106,11 @@ impl SchedulerState {
         task_stack_size: usize,
         priority: usize,
     ) -> TaskPtr {
-        let task = Box::new_in(
+        let mut task = Box::new_in(
             Task::new(task, param, task_stack_size, priority),
             InternalMemory,
         );
+        task.heap_allocated = true;
         let task_ptr = NonNull::from(Box::leak(task));
 
         self.all_tasks.push(task_ptr);
@@ -251,12 +252,16 @@ impl SchedulerState {
         }
     }
 
-    fn delete_task(&mut self, to_delete: TaskPtr) {
+    fn delete_task(&mut self, mut to_delete: TaskPtr) {
         self.remove_from_all_queues(to_delete);
 
         unsafe {
-            let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
-            core::mem::drop(task);
+            if to_delete.as_ref().heap_allocated {
+                let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
+                core::mem::drop(task);
+            } else {
+                to_delete.as_mut().thread_semaphore = None;
+            }
         }
     }
 
