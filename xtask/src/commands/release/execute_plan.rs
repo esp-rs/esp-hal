@@ -11,6 +11,7 @@ use crate::{
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
+/// Arguments for executing the release plan.
 #[derive(Debug, Args)]
 pub struct ApplyPlanArgs {
     /// Actually make git changes. Without this flag, the command will only
@@ -23,6 +24,7 @@ pub struct ApplyPlanArgs {
     manual_pull_request: bool,
 }
 
+/// Execute the release plan by making code changes, committing them to a new
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
     ensure_workspace_clean(workspace)?;
 

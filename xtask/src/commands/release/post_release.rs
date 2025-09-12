@@ -1,12 +1,12 @@
 use std::fs;
 
-use super::PLACEHOLDER;
-use super::Plan;
-use super::execute_plan::make_git_changes;
-use crate::commands::comparison_url;
 use anyhow::{Context, Result};
 use semver::Version;
 
+use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
+use crate::commands::comparison_url;
+
+/// Perform post-release tasks such as creating migration guides for packages that have them.
 pub fn post_release(workspace: &std::path::Path) -> Result<()> {
     // Read the release plan
     let plan_path = workspace.join("release_plan.jsonc");

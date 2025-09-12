@@ -22,12 +22,14 @@ struct Manifest {
     versions: HashSet<semver::Version>,
 }
 
+/// Build the documentation for the specified packages and chips.
 pub fn build_documentation(
     workspace: &Path,
     packages: &mut [Package],
     chips: &mut [Chip],
     base_url: Option<String>,
 ) -> Result<()> {
+    log::info!("Building documentation for packages: {packages:?} on chips: {chips:?}");
     let output_path = workspace.join("docs");
 
     fs::create_dir_all(&output_path)
@@ -185,6 +187,8 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
         "nightly"
     };
 
+    log::debug!("Using toolchain '{toolchain}'");
+
     // Determine the appropriate build target for the given package and chip,
     // if we're able to:
     let target = if let Some(ref chip) = chip {
@@ -303,6 +307,7 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
+/// Build the documentation index for all packages.
 pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
     let docs_path = workspace.join("docs");
     let resources_path = workspace.join("resources");
@@ -310,6 +315,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     packages.sort();
 
     for package in packages {
+        log::debug!("Building documentation index for package '{package}'");
         // Not all packages have documentation built:
         if !package.is_published(workspace) {
             continue;
@@ -433,6 +439,8 @@ fn generate_documentation_meta_for_package(
         });
     }
 
+    log::debug!("Generated metadata for package '{package}': {metadata:#?}");
+
     Ok(metadata)
 }
 
@@ -460,6 +468,8 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
             url => url,
         });
     }
+
+    log::debug!("Generated metadata for documentation index: {metadata:#?}");
 
     Ok(metadata)
 }

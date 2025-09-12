@@ -33,6 +33,7 @@ pub const PLACEHOLDER: &str = "{{currentVersion}}";
 // ----------------------------------------------------------------------------
 // Subcommands
 
+/// Release subcommands and their arguments.
 #[derive(Debug, Subcommand)]
 pub enum Release {
     /// Create a release plan. This is the first step in the release process.
@@ -62,14 +63,12 @@ pub enum Release {
     /// Bump the version of the specified package(s).
     ///
     /// This command will, for each specified package:
-    /// - Verify that the crate can be released (e.g. it doesn't refer to git
-    ///   dependencies)
+    /// - Verify that the crate can be released (e.g. it doesn't refer to git dependencies)
     /// - Update the version in `Cargo.toml` files
     /// - Update the version in dependencies' `Cargo.toml` files
     /// - Check if the changelog can be finalized
     /// - Update the version in the changelog
-    /// - Replaces `{{currentVersion}}` markers in source files and the
-    ///   migration guide.
+    /// - Replaces `{{currentVersion}}` markers in source files and the migration guide.
     BumpVersion(BumpVersionArgs),
     /// Attempt to publish the specified package.
     Publish(PublishArgs),
