@@ -172,6 +172,11 @@ impl SchedulerState {
         // At least one task must be ready to run. If there are none, we can't do anything - we
         // can't just WFI from an interrupt handler. We should create an idle task that WFIs for us,
         // and can be replaced with auto light sleep.
+        // TODO: the main task's stack should always be available. We can restore the main task's
+        // context, and point PC at the idle function. The idle function should be no-return. Its
+        // code should be in a critical section - if it's interrupted, its state is lost. The
+        // modified main task context must not be saved when the scheduler has something to do
+        // again.
         let mut next_task = unwrap!(self.run_queue.pop(), "There are no tasks ready to run.");
 
         // Were we able to select a new task?
