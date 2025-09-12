@@ -6,6 +6,7 @@ use esp_hal::{
     interrupt::Priority,
     peripherals::IEEE802154,
 };
+use esp_phy::{PhyController, PhyInitGuard};
 use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::include::{
     ieee802154_coex_event_t,
@@ -80,19 +81,20 @@ pub struct RawReceived {
     pub channel: u8,
 }
 
-pub(crate) fn esp_ieee802154_enable(mut radio: IEEE802154<'_>) -> PhyClockGuard<'_> {
+pub(crate) fn esp_ieee802154_enable(
+    mut radio: IEEE802154<'_>,
+) -> (PhyClockGuard<'_>, PhyInitGuard<'_>) {
     init_radio_clocks();
     let phy_clock_guard = radio.enable_phy_clock();
     radio.enable_modem_clock(true);
 
-    unsafe {
-        crate::common_adapter::phy_enable();
-    }
+    let phy_init_guard = radio.enable_phy();
+
     esp_btbb_enable();
     ieee802154_mac_init();
 
     info!("date={:x}", mac_date());
-    phy_clock_guard
+    (phy_clock_guard, phy_init_guard)
 }
 
 fn esp_btbb_enable() {
