@@ -6,6 +6,7 @@ use strum::IntoEnumIterator;
 
 use crate::{Package, package_version};
 
+/// Tag the releases for the specified packages.
 #[derive(Debug, Args)]
 pub struct TagReleasesArgs {
     /// Package(s) to tag.
@@ -17,6 +18,7 @@ pub struct TagReleasesArgs {
     no_dry_run: bool,
 }
 
+/// Tag the releases for the specified packages.
 pub fn tag_releases(workspace: &Path, mut args: TagReleasesArgs) -> Result<()> {
     args.packages.sort();
 

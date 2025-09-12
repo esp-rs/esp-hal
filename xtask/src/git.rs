@@ -2,6 +2,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
+/// Get the current git branch name.
 pub fn current_branch() -> Result<String> {
     let status = Command::new("git")
         .arg("rev-parse")
@@ -14,6 +15,7 @@ pub fn current_branch() -> Result<String> {
 }
 
 #[cfg(feature = "release")]
+/// Ensure that the git workspace is clean (no uncommitted changes).
 pub fn ensure_workspace_clean(workspace: &std::path::Path) -> Result<()> {
     std::env::set_current_dir(workspace)
         .with_context(|| format!("Failed to change directory to {}", workspace.display()))?;
@@ -33,6 +35,7 @@ pub fn ensure_workspace_clean(workspace: &std::path::Path) -> Result<()> {
 }
 
 #[cfg(feature = "release")]
+/// Get the remote name for the given repository URL.
 pub fn get_remote_name_for(repo: &str) -> Result<String> {
     let remotes = Command::new("git")
         .arg("remote")

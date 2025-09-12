@@ -197,6 +197,7 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
+        log::info!("Formatting package: {}", package);
         xtask::format_package(workspace, package, args.check)?;
     }
 
@@ -220,6 +221,7 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
 }
 
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+    log::debug!("Linting packages: {:?}", args.packages);
     let mut packages = args.packages;
     packages.sort();
 
@@ -228,6 +230,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // building, so we need to handle each individually (though there
         // is *some* overlap)
         for chip in &args.chips {
+            log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
             if package.validate_package_chip(chip).is_err() {
@@ -370,6 +373,7 @@ impl Runner {
 }
 
 fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    log::info!("Running CI checks for chip: {}", args.chip);
     println!("::add-matcher::.github/rust-matchers.json");
 
     let mut runner = Runner::new();
@@ -450,6 +454,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             });
 
             // remove the (now) obsolete duplicates
+            log::debug!("Removing obsolete LP-HAL example duplicates");
             std::fs::remove_dir_all(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
                 args.chip.target(),
@@ -529,6 +534,7 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
+        log::debug!("Running host-tests for package: {}", package);
         if package.has_host_tests(workspace) {
             xtask::run_host_tests(workspace, package)?;
         }
