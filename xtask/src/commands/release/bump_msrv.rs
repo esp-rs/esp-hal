@@ -8,6 +8,7 @@ use toml_edit::value;
 
 use crate::{Package, cargo::CargoToml};
 
+/// Arguments for bumping the MSRV.
 #[derive(Debug, Args)]
 pub struct BumpMsrvArgs {
     /// The MSRV to be used
@@ -36,6 +37,7 @@ pub struct BumpMsrvArgs {
 /// If it detects a package which other packages in the repo depend on it will
 /// also apply the changes there. (Can be disabled)
 pub fn bump_msrv(workspace: &Path, args: BumpMsrvArgs) -> Result<()> {
+    log::debug!("Bumping MSRV...");
     let new_msrv = semver::Version::parse(&args.msrv)?;
     if !new_msrv.pre.is_empty() || !new_msrv.build.is_empty() {
         bail!("Invalid MSRV: {}", args.msrv);

@@ -16,6 +16,7 @@ mod run;
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments common to commands which act on examples.
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
@@ -39,6 +40,7 @@ pub struct ExamplesArgs {
     pub timings: bool,
 }
 
+/// Arguments common to commands which act on doctests.
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
     /// Package where we wish to run doc tests.
@@ -49,6 +51,7 @@ pub struct DocTestArgs {
     pub chip: Chip,
 }
 
+/// Arguments common to commands which act on tests.
 #[derive(Debug, Args)]
 pub struct TestsArgs {
     /// Chip to target.
@@ -76,7 +79,13 @@ pub struct TestsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Execute the given action on the specified examples.
 pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
+    log::debug!(
+        "Running examples for '{}' on '{:?}'",
+        args.package,
+        args.chip
+    );
     if args.chip.is_none() {
         let chip_variants = Chip::iter().collect::<Vec<_>>();
 
@@ -184,6 +193,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     }
 }
 
+/// Execute the given action on the specified doctests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
     let (test_arg, filter) = if let Some(test_arg) = args.test.as_deref() {
         match test_arg.split_once("::") {

@@ -135,6 +135,7 @@ impl Package {
         false
     }
 
+    /// Does the package have any host tests?
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
         let package_path = workspace.join(self.to_string()).join("src");
 
@@ -287,6 +288,7 @@ impl Package {
             _ => {}
         }
 
+        log::debug!("Features for package '{}': {:?}", self, features);
         features
     }
 
@@ -333,6 +335,7 @@ impl Package {
             _ => {}
         }
 
+        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
         cases
     }
 
@@ -369,6 +372,11 @@ impl Package {
 
     /// Creates a tag string for this [`Package`] combined with a semantic version.
     pub fn tag(&self, version: &semver::Version) -> String {
+        log::debug!(
+            "Creating tag for package '{}' with version '{}'",
+            self,
+            version
+        );
         format!("{self}-v{version}")
     }
 
@@ -523,9 +531,14 @@ pub fn execute_app(
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-// Copy an entire directory recursively.
+/// Copy an entire directory recursively.
 // https://stackoverflow.com/a/65192210
 pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
+    log::debug!(
+        "Copying directory '{}' to '{}'",
+        src.as_ref().display(),
+        dst.as_ref().display()
+    );
     fs::create_dir_all(&dst)?;
 
     for entry in fs::read_dir(src)? {
@@ -554,6 +567,12 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     }
 
     paths.sort();
+
+    log::debug!(
+        "Found {} packages in workspace '{}':",
+        paths.len(),
+        workspace.display()
+    );
 
     Ok(paths)
 }
@@ -586,6 +605,7 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     Ok(())
 }
 
+/// Run the host tests for the specified package.
 pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
     log::info!("Running host tests for package: {}", package);
     let package_path = workspace.join(package.as_ref());
@@ -698,11 +718,14 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     ));
     cargo_args.extend(source_files);
 
+    log::debug!("{cargo_args:#?}");
+
     cargo::run(&cargo_args, &package_path)
 }
 
 /// Update the metadata and chip support table in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
+    log::info!("Updating esp-metadata and chip support table...");
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
 
@@ -763,6 +786,7 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
 }
 
 fn update_chip_support_table(workspace: &Path) -> Result<()> {
+    log::debug!("Updating chip support table in README.md...");
     let mut output = String::new();
     let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
 
@@ -800,6 +824,7 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 
     for result in fs::read_dir(path)? {
+        log::debug!("Inspecting path: {}", path.display());
         let entry = result?;
         if entry.path().is_file() {
             continue;
@@ -812,6 +837,12 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
             packages.extend(find_packages(&entry.path())?);
         }
     }
+
+    log::debug!(
+        "Found {} packages in path '{}':",
+        packages.len(),
+        path.display()
+    );
 
     Ok(packages)
 }

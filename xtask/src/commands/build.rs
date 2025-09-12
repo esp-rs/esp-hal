@@ -15,6 +15,7 @@ use crate::{
 // ----------------------------------------------------------------------------
 // Subcommands
 
+/// Build subcommands and their arguments.
 #[derive(Debug, Subcommand)]
 pub enum Build {
     /// Build documentation for the specified chip.
@@ -33,6 +34,7 @@ pub enum Build {
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments for building documentation.
 #[derive(Debug, Default, Args)]
 pub struct BuildDocumentationArgs {
     /// Package(s) to document.
@@ -49,6 +51,7 @@ pub struct BuildDocumentationArgs {
     pub serve: bool,
 }
 
+/// Arguments for building a package.
 #[derive(Debug, Args)]
 pub struct BuildPackageArgs {
     /// Package to build.
@@ -71,7 +74,13 @@ pub struct BuildPackageArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Build documentation for the specified packages and chips.
 pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -> Result<()> {
+    log::debug!(
+        "Building documentation for packages {:?} on chips {:?}",
+        args.packages,
+        args.chips
+    );
     crate::documentation::build_documentation(
         workspace,
         &mut args.packages,
@@ -112,6 +121,7 @@ pub fn build_documentation(workspace: &Path, mut args: BuildDocumentationArgs) -
     Ok(())
 }
 
+/// Build the documentation index for all packages.
 #[cfg(feature = "deploy-docs")]
 pub fn build_documentation_index(workspace: &Path) -> Result<()> {
     let mut packages = Package::iter().collect::<Vec<_>>();
@@ -120,6 +130,7 @@ pub fn build_documentation_index(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Build all examples for the specified package and chip.
 pub fn build_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,
@@ -148,7 +159,14 @@ pub fn build_examples(
     })
 }
 
+/// Build the specified package with the given options.
 pub fn build_package(workspace: &Path, args: BuildPackageArgs) -> Result<()> {
+    log::debug!(
+        "Building package '{}' with target '{:?}' and features {:?}",
+        args.package,
+        args.target,
+        args.features
+    );
     // Absolute path of the package's root:
     let package_path = crate::windows_safe_path(&workspace.join(args.package.to_string()));
 

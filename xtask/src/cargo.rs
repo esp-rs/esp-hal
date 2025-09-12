@@ -13,12 +13,14 @@ use toml_edit::{DocumentMut, Formatted, Item, Value};
 
 use crate::{Package, windows_safe_path};
 
+/// Actions that can be performed with Cargo.
 #[derive(Clone, Debug, PartialEq)]
 pub enum CargoAction {
     Build(Option<PathBuf>),
     Run,
 }
 
+/// Information about a built artifact.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Artifact {
     pub executable: PathBuf,
@@ -26,6 +28,7 @@ pub struct Artifact {
 
 /// Execute cargo with the given arguments and from the specified directory.
 pub fn run(args: &[String], cwd: &Path) -> Result<()> {
+    log::debug!("Running cargo with args: {:?} in {:?}", args, cwd);
     run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], false)?;
     Ok(())
 }
@@ -107,6 +110,7 @@ fn get_cargo() -> String {
     cargo
 }
 
+/// A builder for constructing cargo command line arguments.
 #[derive(Clone, Debug, Default)]
 pub struct CargoArgsBuilder {
     toolchain: Option<String>,
@@ -117,6 +121,7 @@ pub struct CargoArgsBuilder {
 }
 
 impl CargoArgsBuilder {
+    /// Set the Rust toolchain to use.
     #[must_use]
     pub fn toolchain<S>(mut self, toolchain: S) -> Self
     where
@@ -126,6 +131,7 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Set the cargo subcommand to use.
     #[must_use]
     pub fn subcommand<S>(mut self, subcommand: S) -> Self
     where
@@ -135,6 +141,7 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Set the compilation target to use.
     #[must_use]
     pub fn target<S>(mut self, target: S) -> Self
     where
@@ -144,12 +151,14 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Set the cargo features to use.
     #[must_use]
     pub fn features(mut self, features: &[String]) -> Self {
         self.features = features.to_vec();
         self
     }
 
+    /// Add a single argument to the cargo command line.
     #[must_use]
     pub fn arg<S>(mut self, arg: S) -> Self
     where
@@ -159,6 +168,7 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Add multiple arguments to the cargo command line.
     #[must_use]
     pub fn args<S>(mut self, args: &[S]) -> Self
     where
@@ -170,6 +180,7 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Add a single argument to the cargo command line.
     pub fn add_arg<S>(&mut self, arg: S) -> &mut Self
     where
         S: Into<String>,
@@ -178,6 +189,7 @@ impl CargoArgsBuilder {
         self
     }
 
+    /// Build the final list of cargo command line arguments.
     #[must_use]
     pub fn build(&self) -> Vec<String> {
         let mut args = vec![];
@@ -200,13 +212,18 @@ impl CargoArgsBuilder {
             args.push(arg.clone());
         }
 
+        log::debug!("Built cargo args: {:?}", args);
         args
     }
 }
 
+/// A representation of a Cargo.toml file for a specific package.
 pub struct CargoToml<'a> {
+    /// The workspace path where the Cargo.toml is located.
     pub workspace: &'a Path,
+    /// The package this Cargo.toml belongs to.
     pub package: Package,
+    /// The parsed Cargo.toml manifest.
     pub manifest: toml_edit::DocumentMut,
 }
 
@@ -214,6 +231,7 @@ const DEPENDENCY_KINDS: [&'static str; 3] =
     ["dependencies", "dev-dependencies", "build-dependencies"];
 
 impl<'a> CargoToml<'a> {
+    /// Load and parse the Cargo.toml for the specified package in the given workspace.
     pub fn new(workspace: &'a Path, package: Package) -> Result<Self> {
         let package_path = workspace.join(package.to_string());
         let manifest_path = package_path.join("Cargo.toml");
@@ -230,6 +248,7 @@ impl<'a> CargoToml<'a> {
         Self::from_str(workspace, package, &manifest)
     }
 
+    /// Create a `CargoToml` instance from a manifest string.
     pub fn from_str(workspace: &'a Path, package: Package, manifest: &str) -> Result<Self> {
         // Parse the manifest string into a mutable TOML document.
         Ok(Self {
@@ -239,6 +258,7 @@ impl<'a> CargoToml<'a> {
         })
     }
 
+    /// Check if the package is published to crates.io.
     pub fn is_published(&self) -> bool {
         // Check if the package is published by looking for the `publish` key
         // in the manifest.
@@ -253,14 +273,17 @@ impl<'a> CargoToml<'a> {
         publish.as_bool().unwrap_or(true)
     }
 
+    /// Get the absolute path to the package directory.
     pub fn package_path(&self) -> PathBuf {
         self.workspace.join(self.package.to_string())
     }
 
+    /// Get the absolute path to the Cargo.toml file of the package.
     pub fn manifest_path(&self) -> PathBuf {
         self.package_path().join("Cargo.toml")
     }
 
+    /// Get the current version of the package.
     pub fn version(&self) -> &str {
         self.manifest["package"]["version"]
             .as_str()
@@ -269,10 +292,12 @@ impl<'a> CargoToml<'a> {
             .trim_matches('"')
     }
 
+    /// Get the current version of the package as a `semver::Version`.
     pub fn package_version(&self) -> semver::Version {
         semver::Version::parse(self.version()).expect("Failed to parse version")
     }
 
+    /// Set the version of the package to the specified version.
     pub fn set_version(&mut self, version: &semver::Version) {
         log::info!(
             "Bumping version for package: {} ({} -> {version})",
@@ -282,6 +307,7 @@ impl<'a> CargoToml<'a> {
         self.manifest["package"]["version"] = toml_edit::value(version.to_string());
     }
 
+    /// Save the modified Cargo.toml back to disk.
     pub fn save(&self) -> Result<()> {
         let manifest_path = self.manifest_path();
         std::fs::write(&manifest_path, self.manifest.to_string())
@@ -332,6 +358,7 @@ impl<'a> CargoToml<'a> {
         );
     }
 
+    /// Returns the package this Cargo.toml belongs to.
     pub fn package(&self) -> Package {
         self.package
     }
