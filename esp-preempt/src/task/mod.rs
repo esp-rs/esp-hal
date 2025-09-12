@@ -296,7 +296,7 @@ impl Drop for Task {
 // This context will be filled out by the first context switch.
 // We allocate the main task statically, because there is always a main task. If deleted, we simply
 // don't deallocate this.
-static mut MAIN_TASK: Task = Task {
+pub(crate) static mut MAIN_TASK: Task = Task {
     cpu_context: CpuContext::new(),
     thread_semaphore: None,
     state: TaskState::Ready,
@@ -322,7 +322,7 @@ pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
         let main_task = main_task_ptr.as_mut();
 
         // Reset main task properties. The rest should be cleared when the task is deleted.
-        main_task.priority = 1;
+        main_task.priority = 0;
         main_task.state = TaskState::Ready;
     }
 
@@ -335,25 +335,6 @@ pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
     scheduler.all_tasks.push(main_task_ptr);
     scheduler.current_task = Some(main_task_ptr);
     scheduler.run_queue.mark_task_ready(main_task_ptr);
-}
-
-pub(crate) fn spawn_idle_task(scheduler: &mut SchedulerState) {
-    let ptr = scheduler.create_task(idle_task, core::ptr::null_mut(), 4096, 0);
-    debug!("Idle task created: {:?}", ptr);
-}
-
-pub(crate) extern "C" fn idle_task(_: *mut c_void) {
-    loop {
-        // TODO: make this configurable.
-        #[cfg(xtensa)]
-        unsafe {
-            core::arch::asm!("waiti 0");
-        }
-        #[cfg(riscv)]
-        unsafe {
-            core::arch::asm!("wfi");
-        }
-    }
 }
 
 pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {

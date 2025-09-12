@@ -7,6 +7,7 @@
 #![no_std]
 #![no_main]
 
+use defmt::info;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(target_arch = "riscv32")]
 use esp_hal::riscv::interrupt::free as interrupt_free;
@@ -16,6 +17,7 @@ use esp_hal::{
     clock::CpuClock,
     interrupt::{Priority, software::SoftwareInterruptControl},
     peripherals::{Peripherals, TIMG0},
+    time::{Duration, Instant},
     timer::timg::TimerGroup,
 };
 use esp_hal_embassy::InterruptExecutor;
@@ -45,8 +47,6 @@ async fn try_init(
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 3, executor = esp_hal_embassy::Executor::new())]
 mod tests {
-    use defmt::info;
-
     use super::*;
 
     #[init]
@@ -126,6 +126,19 @@ mod tests {
 
         // Now, can we do it again?
         let _wifi = esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow()).unwrap();
+    }
+
+    #[test]
+    fn test_esp_preempt_sleep_wakes_up(p: Peripherals) {
+        use esp_radio_preempt_driver as preempt;
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_preempt::start(timg0.timer0);
+
+        let now = Instant::now();
+
+        preempt::usleep(10_000);
+
+        assert!(now.elapsed() >= Duration::from_millis(10));
     }
 
     #[test]

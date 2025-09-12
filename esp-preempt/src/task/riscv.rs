@@ -105,6 +105,18 @@ impl CpuContext {
     }
 }
 
+extern "C" fn idle_hook() -> ! {
+    loop {
+        unsafe { core::arch::asm!("wfi") };
+    }
+}
+
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+    // Point idle context PC at the assembly that calls the idle hook. We need a new stack
+    // frame for the idle task on the main stack.
+    idle_context.pc = idle_hook as usize;
+}
+
 pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,

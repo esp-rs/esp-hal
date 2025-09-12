@@ -35,7 +35,6 @@ mod wait_queue;
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
-    system::Cpu,
     timer::{AnyTimer, OneShotTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
@@ -120,12 +119,10 @@ where
 )]
 pub fn start(timer: impl TimerSource) {
     SCHEDULER.with(move |scheduler| {
-        scheduler.time_driver = Some(TimeDriver::new(timer.timer()));
-        scheduler.runs_on = Cpu::current();
+        scheduler.setup(TimeDriver::new(timer.timer()));
 
         // allocate the default tasks
         task::allocate_main_task(scheduler);
-        task::spawn_idle_task(scheduler);
 
         task::setup_multitasking();
 
