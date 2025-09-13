@@ -88,13 +88,14 @@ jobs:
       - name: Build and Check
         shell: bash
         run: |
-          cargo xcheck ci esp32 --toolchain esp
-          cargo xcheck ci esp32s2 --toolchain esp
-          cargo xcheck ci esp32s3 --toolchain esp
-          cargo xcheck ci esp32c2 --toolchain stable
-          cargo xcheck ci esp32c3 --toolchain stable
-          cargo xcheck ci esp32c6 --toolchain stable
-          cargo xcheck ci esp32h2 --toolchain stable
+          # lints and docs are checked separately
+          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
 
       - name: Semver-Check
         shell: bash
@@ -139,10 +140,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-          components: rust-src
 
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
@@ -154,6 +151,12 @@ jobs:
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
+          components: rust-src
+      # Install the Rust nightly toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
           components: rust-src
 
       - name: Build docs
