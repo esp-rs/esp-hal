@@ -151,11 +151,7 @@ fn main() -> Result<()> {
             Build::Documentation(args) => build_documentation(&workspace, args),
             #[cfg(feature = "deploy-docs")]
             Build::DocumentationIndex => build_documentation_index(&workspace),
-            Build::Examples(args) => examples(
-                &workspace,
-                args,
-                CargoAction::Build(Some(target_path.join("examples"))),
-            ),
+            Build::Examples(args) => examples(&workspace, args, CargoAction::Build(None)),
             Build::Package(args) => build_package(&workspace, args),
             Build::Tests(args) => tests(
                 &workspace,
