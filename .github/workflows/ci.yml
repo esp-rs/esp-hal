@@ -4,7 +4,7 @@
 # updates which must be made to the CI workflow in order to reflect this; the
 # changes are:
 #
-# 1.) In the 'esp-hal' job, add the name of the chip to the `matrix.soc` array.
+# 1.) In the 'esp-hal' job, add the appropriate build and semver-check command.
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv' job, add checks as needed for the new chip.
@@ -41,7 +41,7 @@ jobs:
 
   esp-hal:
     name: esp-hal (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
@@ -51,20 +51,6 @@ jobs:
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
 
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", toolchain: "stable" },
-            { soc: "esp32c3", toolchain: "stable" },
-            { soc: "esp32c6", toolchain: "stable" },
-            { soc: "esp32h2", toolchain: "stable" },
-            # Xtensa devices:
-            { soc: "esp32", toolchain: "esp" },
-            { soc: "esp32s2", toolchain: "esp" },
-            { soc: "esp32s3", toolchain: "esp" },
-          ]
     steps:
       - uses: actions/checkout@v4
 
@@ -102,12 +88,26 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
+        run: |
+          cargo xcheck ci esp32 --toolchain esp
+          cargo xcheck ci esp32s2 --toolchain esp
+          cargo xcheck ci esp32s3 --toolchain esp
+          cargo xcheck ci esp32c2 --toolchain stable
+          cargo xcheck ci esp32c3 --toolchain stable
+          cargo xcheck ci esp32c6 --toolchain stable
+          cargo xcheck ci esp32h2 --toolchain stable
 
       - name: Semver-Check
         shell: bash
         # always invokes +esp internally
-        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
+        run: |
+          cargo xcheck semver-check --chips esp32 check
+          cargo xcheck semver-check --chips esp32s2 check
+          cargo xcheck semver-check --chips esp32s3 check
+          cargo xcheck semver-check --chips esp32c2 check
+          cargo xcheck semver-check --chips esp32c3 check
+          cargo xcheck semver-check --chips esp32c6 check
+          cargo xcheck semver-check --chips esp32h2 check
 
   detect-extras-runner:
     uses: ./.github/workflows/check_runner.yml
@@ -140,7 +140,7 @@ jobs:
   # MSRV
 
   msrv:
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
