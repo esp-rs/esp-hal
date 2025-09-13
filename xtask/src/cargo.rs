@@ -451,8 +451,11 @@ impl CargoCommandBadger {
         let cargo_batch_available = Command::new("cargo")
             .arg("batch")
             .arg("-h")
-            .output()
-            .is_ok();
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
 
         if cargo_batch_available && !no_batch {
             self.build_for_cargo_batch()

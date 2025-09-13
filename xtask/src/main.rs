@@ -62,6 +62,10 @@ struct CiArgs {
     /// Whether to run lints
     #[arg(long)]
     lint: bool,
+
+    /// Whether to build documentation
+    #[arg(long)]
+    docs: bool,
 }
 
 #[derive(Debug, Args)]
@@ -423,16 +427,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    runner.run("Build Docs", || {
-        build_documentation(
-            workspace,
-            BuildDocumentationArgs {
-                packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
-                chips: vec![args.chip],
-                ..Default::default()
-            },
-        )
-    });
+    if args.docs {
+        runner.run("Build Docs", || {
+            build_documentation(
+                workspace,
+                BuildDocumentationArgs {
+                    packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
+                    chips: vec![args.chip],
+                    ..Default::default()
+                },
+            )
+        });
+    }
 
     // for chips with esp-lp-hal: Build all supported examples for the low-power
     // core first
@@ -500,17 +506,19 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             result
         });
 
-        // Check documentation
-        runner.run("Build LP-HAL docs", || {
-            build_documentation(
-                workspace,
-                BuildDocumentationArgs {
-                    packages: vec![Package::EspLpHal],
-                    chips: vec![args.chip],
-                    ..Default::default()
-                },
-            )
-        });
+        if args.docs {
+            // Check documentation
+            runner.run("Build LP-HAL docs", || {
+                build_documentation(
+                    workspace,
+                    BuildDocumentationArgs {
+                        packages: vec![Package::EspLpHal],
+                        chips: vec![args.chip],
+                        ..Default::default()
+                    },
+                )
+            });
+        }
     }
 
     // Make sure we're able to build the HAL without the default features enabled
