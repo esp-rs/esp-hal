@@ -407,7 +407,15 @@ impl CargoCommandBadger {
                 all.push(BuiltCommand {
                     artifact_name: String::from("batch"),
                     command,
-                    env_vars: key.env_vars.clone(),
+                    env_vars: {
+                        let mut env_vars = key.env_vars.clone();
+                        // cargo-batch will set -Zunstable-options if the config file contains
+                        // `[unstable]`. Stable cargo does not do this. To resolve the difference,
+                        // let's trick rust into thinking it's nightly. The MSRV checks will make
+                        // sure we can build esp-hal on stable.
+                        env_vars.push(("RUSTC_BOOTSTRAP".to_string(), "1".to_string()));
+                        env_vars
+                    },
                 });
             }
         }
