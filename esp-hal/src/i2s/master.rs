@@ -1958,7 +1958,7 @@ mod private {
                 w.rx_tdm_chan_bits()
                     .bits(config.data_format.channel_bits() - 1);
                 w.rx_half_sample_bits()
-                    .bits((config.data_format.data_bits() * config.channels.count) / 2)
+                    .bits((config.data_format.data_bits() * config.channels.count) / 2 - 1)
             });
 
             self.regs().rx_conf().modify(|_, w| unsafe {
