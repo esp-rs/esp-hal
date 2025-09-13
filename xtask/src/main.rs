@@ -58,6 +58,10 @@ struct CiArgs {
     /// The toolchain used to run the lints
     #[arg(long)]
     toolchain: Option<String>,
+
+    /// Whether to run lints
+    #[arg(long)]
+    lint: bool,
 }
 
 #[derive(Debug, Args)]
@@ -395,17 +399,19 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
     let mut runner = Runner::new();
 
-    runner.run("Lint", || {
-        lint_packages(
-            workspace,
-            LintPackagesArgs {
-                packages: Package::iter().collect(),
-                chips: vec![args.chip],
-                fix: false,
-                toolchain: args.toolchain.clone(),
-            },
-        )
-    });
+    if args.lint {
+        runner.run("Lint", || {
+            lint_packages(
+                workspace,
+                LintPackagesArgs {
+                    packages: Package::iter().collect(),
+                    chips: vec![args.chip],
+                    fix: false,
+                    toolchain: args.toolchain.clone(),
+                },
+            )
+        });
+    }
 
     runner.run("Run Doc Test", || {
         run_doc_tests(

@@ -48,7 +48,7 @@ jobs:
 
       - name: Build and Check
         shell: bash
-        run: cargo xtask ci ${{ matrix.device }} --toolchain nightly
+        run: cargo xtask ci ${{ matrix.device }} --toolchain nightly --lint
 
       - if: failure()
         name: Create or Update GitHub Issue
