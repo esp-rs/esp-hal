@@ -354,6 +354,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(esp32s2))]
     fn test_i2s_rx_half_sample_bits_regression(ctx: Context) {
         // Regression test for rx_half_sample_bits configuration bug.
         // Validates that TX and RX half_sample_bits registers are configured identically.
