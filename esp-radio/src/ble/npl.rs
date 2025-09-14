@@ -271,6 +271,8 @@ unsafe extern "C" {
     pub(crate) fn r_ble_hci_trans_buf_alloc(typ: i32) -> *const u8;
 
     pub(crate) fn r_ble_hci_trans_buf_free(buf: *const u8);
+
+    pub(crate) fn coex_pti_v2();
 }
 
 #[repr(C)]
@@ -1150,6 +1152,10 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
 
         // init bb
         bt_bb_v2_init_cmplx(1);
+
+        unsafe {
+            coex_pti_v2();
+        }
 
         #[cfg(coex)]
         {

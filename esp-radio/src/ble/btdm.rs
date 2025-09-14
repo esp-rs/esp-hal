@@ -54,6 +54,7 @@ unsafe extern "C" {
     fn API_vhci_host_check_send_available() -> bool;
     fn API_vhci_host_send_packet(data: *const u8, len: u16);
     fn API_vhci_host_register_callback(vhci_host_callbac: *const VhciHostCallbacks) -> i32;
+    fn coex_pti_v2();
 }
 
 static VHCI_HOST_CALLBACK: VhciHostCallbacks = VhciHostCallbacks {
@@ -377,6 +378,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
             btdm_rf_bb_init_phase2();
             coex_bt_high_prio();
         }
+        coex_pti_v2();
 
         #[cfg(coex)]
         coex_enable();

@@ -225,6 +225,7 @@ impl PhyState {
             (cb)(self.mac_clock_delta_since_last_call);
             self.mac_clock_delta_since_last_call = Duration::ZERO;
         }
+
         self.ref_count += 1;
     }
     /// Decrease the number of reference to the PHY.
