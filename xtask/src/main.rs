@@ -450,7 +450,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // path element then we copy it to the place where the HP core example
         // expects it
         runner.run("Build LP-HAL Examples", || {
-            let result = examples(
+            examples(
                 workspace,
                 ExamplesArgs {
                     package: Package::EspLpHal,
@@ -488,24 +488,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                         );
                     });
                 Ok(())
-            });
-
-            // remove the (now) obsolete duplicates
-            log::debug!("Removing obsolete LP-HAL example duplicates");
-            std::fs::remove_dir_all(PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples/{}",
-                args.chip.target(),
-                args.chip
-            )))
-            .with_context(|| {
-                format!(
-                    "Failed to remove duplicates in ./esp-lp-hal/target/{}/release/examples/{}",
-                    args.chip.target(),
-                    args.chip
-                )
-            })?;
-
-            result
+            })
         });
 
         if !args.no_docs {
