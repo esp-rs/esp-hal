@@ -143,7 +143,9 @@ fn main() -> Result<()> {
         std::env::current_dir().with_context(|| format!("Failed to get the current dir!"))?;
     let target_path = workspace.join("target");
 
-    unsafe { std::env::set_var("CARGO_TARGET_DIR", target_path.to_str().unwrap()) };
+    if std::env::var("CARGO_TARGET_DIR").is_err() {
+        unsafe { std::env::set_var("CARGO_TARGET_DIR", target_path.to_str().unwrap()) };
+    }
 
     match Cli::parse() {
         // Build-related subcommands:

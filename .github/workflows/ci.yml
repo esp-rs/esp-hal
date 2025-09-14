@@ -42,7 +42,7 @@ jobs:
   esp-hal:
     runs-on: macos-m1-self-hosted
     env:
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_TARGET_DIR: ~/esp-hal-target-dir
       CI: 1
       SSID: SSID
       PASSWORD: PASSWORD
@@ -67,20 +67,15 @@ jobs:
           toolchain: nightly
           components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "ci-${{ matrix.device.soc }}"
-          cache-all-crates: true
-
       - name: Setup cargo-batch
         run: |
           # Note the prebuilt is linux-only, the macOS runner should have cargo batch installed, but it needs to build it itself.
-          # if ! command -v cargo-batch &> /dev/null; then
+          if ! command -v cargo-batch &> /dev/null; then
               # mkdir -p $HOME/.cargo/bin
               # curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
               # chmod +x $HOME/.cargo/bin/cargo-batch
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
-          # fi
+          fi
 
       - name: Build and Check
         shell: bash
