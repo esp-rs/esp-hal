@@ -409,11 +409,25 @@ impl CargoCommandBadger {
                     command,
                     env_vars: {
                         let mut env_vars = key.env_vars.clone();
-                        // cargo-batch will set -Zunstable-options if the config file contains
-                        // `[unstable]`. Stable cargo does not do this. To resolve the difference,
-                        // let's trick rust into thinking it's nightly. The MSRV checks will make
-                        // sure we can build esp-hal on stable.
-                        env_vars.push(("RUSTC_BOOTSTRAP".to_string(), "1".to_string()));
+                        // cargo-batch is treated as a "dev" channel cargo build. This causes it to
+                        // set -Zunstable-options if the config file contains `[unstable]`. Stable
+                        // cargo does not do this. To resolve the difference, let's trick
+                        // cargo-batch into thinking it's stable when we use a stable-looking
+                        // toolchain.
+                        if let Some(tc) = key.toolchain.as_ref()
+                            && is_stable(tc)
+                        {
+                            env_vars.push((
+                                "__CARGO_TEST_CHANNEL_OVERRIDE_DO_NOT_USE_THIS".to_string(),
+                                "stable".to_string(),
+                            ));
+                        }
+
+                        fn is_stable(toolchain: &str) -> bool {
+                            toolchain.starts_with("stable")
+                                || toolchain.replace(".", "").parse::<u32>().is_ok() // 1.xx.yy
+                        }
+
                         env_vars
                     },
                 });
