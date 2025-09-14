@@ -1153,9 +1153,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
         // init bb
         bt_bb_v2_init_cmplx(1);
 
-        unsafe {
-            coex_pti_v2();
-        }
+        coex_pti_v2();
 
         #[cfg(coex)]
         {

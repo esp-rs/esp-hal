@@ -54,6 +54,8 @@ unsafe extern "C" {
     fn API_vhci_host_check_send_available() -> bool;
     fn API_vhci_host_send_packet(data: *const u8, len: u16);
     fn API_vhci_host_register_callback(vhci_host_callbac: *const VhciHostCallbacks) -> i32;
+
+    #[cfg(not(esp32))]
     fn coex_pti_v2();
 }
 
@@ -369,16 +371,18 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
 
         phy_init_guard = esp_hal::peripherals::BT::steal().enable_phy();
 
-        #[cfg(esp32)]
-        {
-            unsafe extern "C" {
-                fn btdm_rf_bb_init_phase2();
-            }
+        cfg_if::cfg_if! {
+            if #[cfg(esp32)] {
+                unsafe extern "C" {
+                    fn btdm_rf_bb_init_phase2();
+                }
 
-            btdm_rf_bb_init_phase2();
-            coex_bt_high_prio();
+                btdm_rf_bb_init_phase2();
+                coex_bt_high_prio();
+            } else {
+                coex_pti_v2();
+            }
         }
-        coex_pti_v2();
 
         #[cfg(coex)]
         coex_enable();
