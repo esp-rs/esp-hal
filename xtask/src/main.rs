@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::{path::Path, time::Instant};
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
@@ -450,7 +446,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // path element then we copy it to the place where the HP core example
         // expects it
         runner.run("Build LP-HAL Examples", || {
-            examples(
+            // The LP examples aren't really that demanding, but they need to be at a certain place.
+            // Instead of trying to figure out where the results are, let's just make sure the
+            // target folder is set up as expected.
+            let original_target_dir = std::env::var("CARGO_TARGET_DIR");
+
+            unsafe {
+                std::env::set_var(
+                    "CARGO_TARGET_DIR",
+                    workspace.join("esp-lp-hal").join("target"),
+                );
+            }
+            let result = examples(
                 workspace,
                 ExamplesArgs {
                     package: Package::EspLpHal,
@@ -460,35 +467,62 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     toolchain: args.toolchain.clone(),
                     timings: false,
                 },
-                CargoAction::Build(Some(PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples",
-                    args.chip.target()
-                )))),
-            )
-            .and_then(|_| {
-                let from_dir = PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples/{}",
-                    args.chip.target(),
-                    args.chip
-                ));
-                let to_dir = PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples",
-                    args.chip.target()
-                ));
-                from_dir
-                    .read_dir()
-                    .with_context(|| format!("Failed to read from {}", from_dir.display()))?
-                    .for_each(|entry| {
-                        let entry = entry.unwrap();
-                        let path = entry.path();
-                        let to = to_dir.join(entry.file_name());
-                        fs::copy(&path, &to).expect(
-                            format!("Failed to copy {} to {}", path.display(), to.display())
-                                .as_str(),
-                        );
-                    });
-                Ok(())
-            })
+                CargoAction::Build(None),
+            );
+
+            // Still need to rename examples to remove the fingerprint off of their names:
+            let dir = workspace
+                .join("esp-lp-hal")
+                .join("target")
+                .join(Package::EspLpHal.target_triple(&args.chip)?)
+                .join("release")
+                .join("examples");
+            let examples = dir
+                .read_dir()
+                .with_context(|| format!("Failed to read examples directory: {}", dir.display()))?;
+            for example in examples {
+                let example = example.with_context(|| {
+                    format!("Failed to read example: {}", example.path().display())
+                })?;
+                if example
+                    .file_type()
+                    .with_context(|| {
+                        format!(
+                            "Failed to get file type for example: {}",
+                            example.path().display()
+                        )
+                    })?
+                    .is_file()
+                    && example.path().extension().is_none()
+                {
+                    let example_name = example.file_name().to_string_lossy().to_string();
+                    let without_fingerprint = example_name
+                        .rsplit_once('-')
+                        .map(|(a, _)| a)
+                        .unwrap_or(&example_name);
+                    // Copy so we don't trigger a rebuild unnecessarily by deleting the original
+                    std::fs::copy(example.path(), dir.join(without_fingerprint)).with_context(
+                        || {
+                            format!(
+                                "Failed to copy example: {} to {}",
+                                example.path().display(),
+                                dir.join(without_fingerprint).display()
+                            )
+                        },
+                    )?;
+                }
+            }
+
+            // Restore the original target directory
+            unsafe {
+                if let Ok(target) = original_target_dir {
+                    std::env::set_var("CARGO_TARGET_DIR", target);
+                } else {
+                    std::env::remove_var("CARGO_TARGET_DIR");
+                }
+            }
+
+            result
         });
 
         if !args.no_docs {
