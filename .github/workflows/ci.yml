@@ -42,7 +42,7 @@ jobs:
   esp-hal:
     runs-on: macos-m1-self-hosted
     env:
-      CARGO_TARGET_DIR: ~/esp-hal-target-dir
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
       SSID: SSID
       PASSWORD: PASSWORD
