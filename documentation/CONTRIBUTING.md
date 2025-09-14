@@ -126,7 +126,7 @@ This will use `rustfmt` to ensure that all source code is formatted correctly pr
 *   Resolve merge conflicts if they arise, using resources like [this git tutorial] for help.
 
 [Link your PR]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
-[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-forkmember
+[Allow edits from maintainers]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/allowing-changes-to-a-pull-request-branch-created-from-a-fork#enabling-repository-maintainer-permissions-on-existing-pull-requests
 [Changelog]: esp-hal/CHANGELOG.md
 [migration guide]: esp-hal/MIGRATING-0.20.md
 [suggested changes]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/incorporating-feedback-in-your-pull-request

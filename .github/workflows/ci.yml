@@ -190,3 +190,25 @@ jobs:
 
       # Run host tests for all applicable packages: 
       - run: cargo xtask host-tests
+
+  # --------------------------------------------------------------------------
+  # Check links in .rs, .md, and .toml files
+
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: |
+            --verbose
+            --no-progress
+            --format detailed
+            --timeout 7
+            --max-concurrency 6
+            --accept "200,301,302"
+            --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
+            './**/*.rs'
+            './**/*.md'
+            './**/*.toml'
+

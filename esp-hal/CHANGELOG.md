@@ -60,6 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump `embassy-embedded-hal` to v0.5.0 (#4075)
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
+- The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
 
 ### Fixed
 

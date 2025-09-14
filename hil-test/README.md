@@ -15,12 +15,12 @@ We use [embedded-test] as our testing framework. This allows us to write unit an
 
 ### Running Tests Locally
 
-We use [probe-rs] for flashing and running the tests on a target device, however, this **MUST** be installed from the correct revision:
+We use [probe-rs] for flashing and running the tests on a target device.
 
 ```text
 cargo install probe-rs-tools \
   --git https://github.com/probe-rs/probe-rs \
-  --rev 9bde591 --force --locked
+  --force --locked
 ```
 
 Target device **MUST** connected via its USB-Serial-JTAG port, or if unavailable (eg. ESP32, ESP32-C2, ESP32-S2) then you must connect a compatible debug probe such as an [ESP-Prog].
@@ -109,7 +109,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- --default-t
 # Install dependencies
 sudo apt install -y pkg-config libudev-dev uhubctl
 # Install probe-rs
-cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --rev 9bde591 --force
+cargo install probe-rs-tools --git https://github.com/probe-rs/probe-rs --force
 # Add the udev rules
 wget -O - https://probe.rs/files/69-probe-rs.rules | sudo tee /etc/udev/rules.d/69-probe-rs.rules > /dev/null
 # Add the user to plugdev group

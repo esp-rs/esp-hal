@@ -50,9 +50,16 @@ impl TimerQueueInner {
             self.head = Some(NonNull::from(timer));
         }
 
-        if due < self.next_wakeup {
+        if let Some(task) = self.task {
+            if due < self.next_wakeup {
+                self.next_wakeup = due;
+                task.resume();
+            }
+        } else {
+            // create the timer task
+            let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192, 2);
+            self.task = Some(task_ptr);
             self.next_wakeup = due;
-            unwrap!(self.task).resume();
         }
     }
 
@@ -316,17 +323,16 @@ impl TimerImplementation for Timer {
 
 register_timer_implementation!(Timer);
 
-/// Initializes the `timer` task for the Wi-Fi driver.
-pub(crate) fn create_timer_task() {
-    // create the timer task
+pub(crate) fn reset() {
     TIMER_QUEUE.inner.with(|q| {
-        let task_ptr = SCHEDULER.create_task(timer_task, core::ptr::null_mut(), 8192, 2);
-        q.task = Some(task_ptr);
+        *q = TimerQueueInner::new();
     });
 }
 
 /// Entry point for the timer task responsible for handling scheduled timer
 /// events.
+///
+/// The timer task is created when the first timer is armed.
 pub(crate) extern "C" fn timer_task(_: *mut c_void) {
     loop {
         TIMER_QUEUE.process();
