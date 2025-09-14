@@ -58,13 +58,9 @@ jobs:
         with:
           version: 1.89.0.0
 
-      # Install the Rust stable toolchain for RISC-V devices:
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: stable
-          components: rust-src
-      # Install the Rust nightly toolchain for RISC-V devices, because of `-Zdoctest-xcompile`
+      # Install the Rust nightly toolchain for RISC-V devices.
+      # We build with nightly just because sometimes we need --artifact-dir, which is currently unstable.
+      # MSRV tests should ensure esp-hal builds with stable rustc.
       - uses: dtolnay/rust-toolchain@v1
         with:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
@@ -78,12 +74,13 @@ jobs:
 
       - name: Setup cargo-batch
         run: |
-          # Note this is linux-only, but the macOS runner has cargo batch installed
-          if ! command -v cargo-batch &> /dev/null; then
-              mkdir -p $HOME/.cargo/bin
-              curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
-              chmod +x $HOME/.cargo/bin/cargo-batch
-          fi
+          # Note the prebuilt is linux-only, the macOS runner should have cargo batch installed, but it needs to build it itself.
+          # if ! command -v cargo-batch &> /dev/null; then
+              # mkdir -p $HOME/.cargo/bin
+              # curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
+              # chmod +x $HOME/.cargo/bin/cargo-batch
+              cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
+          # fi
 
       - name: Build and Check
         shell: bash
@@ -92,10 +89,10 @@ jobs:
           cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
           cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
-          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
-          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c2 --toolchain nightly --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain nightly --no-lint --no-docs
+          cargo xcheck ci esp32c6 --toolchain nightly --no-lint --no-docs
+          cargo xcheck ci esp32h2 --toolchain nightly --no-lint --no-docs
 
       - name: Semver-Check
         shell: bash
