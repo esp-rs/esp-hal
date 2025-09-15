@@ -242,9 +242,9 @@ impl<'d> Rtc<'d> {
     pub fn new(rtc_cntl: LPWR<'d>) -> Self {
         Self {
             _inner: rtc_cntl,
-            rwdt: Rwdt::new(),
+            rwdt: Rwdt(()),
             #[cfg(swd)]
-            swd: Swd::new(),
+            swd: Swd(()),
         }
     }
 
@@ -470,6 +470,7 @@ impl<'d> Rtc<'d> {
         unwrap!(interrupt::enable(interrupt, handler.priority()));
     }
 }
+
 impl crate::private::Sealed for Rtc<'_> {}
 
 #[instability::unstable]
@@ -513,21 +514,10 @@ pub enum RwdtStage {
 }
 
 /// RTC Watchdog Timer.
-pub struct Rwdt;
-
-impl Default for Rwdt {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub struct Rwdt(());
 
 /// RTC Watchdog Timer driver.
 impl Rwdt {
-    /// Create a new RTC watchdog timer instance
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Enable the watchdog timer instance.
     /// Watchdog starts with default settings (`stage 0` resets the system, the
     /// others are deactivated)
@@ -677,16 +667,11 @@ impl Rwdt {
 
 /// Super Watchdog
 #[cfg(swd)]
-pub struct Swd;
+pub struct Swd(());
 
 /// Super Watchdog driver
 #[cfg(swd)]
 impl Swd {
-    /// Create a new super watchdog timer instance
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Enable the watchdog timer instance
     pub fn enable(&mut self) {
         self.set_enabled(true);
@@ -717,13 +702,6 @@ impl Swd {
             .write(|w| w.swd_auto_feed_en().bit(!enable));
 
         self.set_write_protection(true);
-    }
-}
-
-#[cfg(any(esp32c2, esp32c3, esp32c6, esp32h2, esp32s3))]
-impl Default for Swd {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
