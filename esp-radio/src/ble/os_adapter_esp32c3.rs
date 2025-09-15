@@ -330,14 +330,8 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         connect_en: true,
         scan_en: true,
         ble_aa_check: true,
-        #[cfg(feature = "sys-logs")]
-        ble_log_mode_en: 4095,
-        #[cfg(feature = "sys-logs")]
-        ble_log_level: 5,
-        #[cfg(not(feature = "sys-logs"))]
-        ble_log_mode_en: 0,
-        #[cfg(not(feature = "sys-logs"))]
-        ble_log_level: 0,
+        ble_log_mode_en: if cfg!(feature = "sys-logs") { 4095 } else { 0 },
+        ble_log_level: if cfg!(feature = "sys-logs") { 5 } else { 0 },
         adv_en: true,
         magic: 0x5a5aa5a5,
     }
