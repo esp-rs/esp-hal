@@ -86,11 +86,6 @@ impl TimeDriver {
         self.timer.listen();
     }
 
-    pub(crate) fn stop(&mut self) {
-        self.timer.unlisten();
-        self.timer.stop();
-    }
-
     pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(TaskPtr)) {
         let mut timer_queue = core::mem::take(&mut self.timer_queue);
 
