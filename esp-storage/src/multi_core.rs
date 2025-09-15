@@ -6,6 +6,8 @@ use crate::{FlashStorage, common::FlashStorageError};
 mod registers {
     pub(crate) const OPTIONS0: u32 = 0x3ff4_8000;
     pub(crate) const SW_CPU_STALL: u32 = 0x3ff4_80ac;
+    pub(crate) const APPCPU_CTRL_B: u32 = 0x3FF0_0030;
+    pub(crate) const APPCPU_CTRL_C: u32 = 0x3FF0_0034;
 }
 
 #[cfg(esp32s3)]
@@ -141,6 +143,19 @@ impl Cpu {
                     let core_1_control_0 = registers::CORE_1_CONTROL_0 as *mut u32;
                     if unsafe { core_1_control_0.read_volatile() } & 0x03 != 0x02 {
                         // If the core is not enabled we can take this shortcut
+                        return false;
+                    }
+                } else if #[cfg(esp32)] {
+                    // DPORT_APPCPU_CLKGATE_EN in APPCPU_CTRL_B bit 0 -> needs to be 1 to even be enabled
+                    // DPORT_APPCPU_RUNSTALL in APPCPU_CTRL_C bit 0 -> needs to be 0 to not stall
+                    let appcpu_ctrl_b = registers::APPCPU_CTRL_B as *mut u32;
+                    if unsafe { appcpu_ctrl_b.read_volatile() } & 0x01 != 0x01 {
+                        // If the core is not enabled we can take this shortcut
+                        return false;
+                    }
+                    let appcpu_ctrl_c = registers::APPCPU_CTRL_C as *mut u32;
+                    if unsafe { appcpu_ctrl_c.read_volatile() } & 0x01 != 0x01 {
+                        // If the core is stalled we can take this shortcut
                         return false;
                     }
                 }
