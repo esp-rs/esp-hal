@@ -61,7 +61,11 @@ unsafe extern "C" fn xtal_freq_get_wrapper() -> i32 {
 }
 
 #[cfg(coex)]
-unsafe extern "C" fn esp_coexist_debug_matrix_init_wrapper(_evt: i32, _sig: i32, _rev: bool) -> i32 {
+unsafe extern "C" fn esp_coexist_debug_matrix_init_wrapper(
+    _evt: i32,
+    _sig: i32,
+    _rev: bool,
+) -> i32 {
     // CONFIG_ESP_COEX_GPIO_DEBUG not supported
     esp_wifi_sys::include::ESP_ERR_NOT_SUPPORTED as i32
 }

@@ -1207,7 +1207,9 @@ pub unsafe extern "C" fn log_write(
     format: *const c_char,
     args: ...
 ) {
-    unsafe { crate::binary::log::syslog(level, format as _, args); }
+    unsafe {
+        crate::binary::log::syslog(level, format as _, args);
+    }
 }
 
 /// **************************************************************************
