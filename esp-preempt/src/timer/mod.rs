@@ -7,7 +7,7 @@ use crate::{
     SCHEDULER,
     TICK_RATE,
     TimeBase,
-    task::{Context, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
+    task::{TaskExt, TaskPtr, TaskQueue, TaskState, TaskTimerQueueElement},
 };
 
 const TIMESLICE_DURATION: Duration = Rate::from_hz(TICK_RATE).as_duration();
@@ -91,7 +91,7 @@ impl TimeDriver {
         self.timer.stop();
     }
 
-    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(&mut Context)) {
+    pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(TaskPtr)) {
         let mut timer_queue = core::mem::take(&mut self.timer_queue);
 
         let now = Instant::now().duration_since_epoch().as_micros();
@@ -103,7 +103,7 @@ impl TimeDriver {
             let ready = wakeup_at <= now;
 
             if ready {
-                on_task_ready(task);
+                on_task_ready(task_ptr);
             } else {
                 self.timer_queue.push(task_ptr, wakeup_at);
             }
@@ -136,20 +136,27 @@ impl TimeDriver {
     }
 
     pub(crate) fn schedule_wakeup(&mut self, mut current_task: TaskPtr, at: Instant) -> bool {
-        unsafe { debug_assert_eq!(current_task.as_mut().state, TaskState::Ready) };
-
-        // Target time is in the past, don't sleep.
-        if at <= Instant::now() {
-            return false;
-        }
-
-        unsafe { current_task.as_mut().state = TaskState::Sleeping };
+        debug_assert_eq!(
+            current_task.state(),
+            TaskState::Ready,
+            "task: {:?}",
+            current_task
+        );
 
         // Target time is infinite, suspend task without waking up via timer.
         if at == Instant::EPOCH + Duration::MAX {
+            current_task.set_state(TaskState::Sleeping);
             debug!("Suspending task: {:?}", current_task);
             return true;
         }
+
+        // Target time is in the past, don't sleep.
+        if at <= Instant::now() {
+            debug!("Target time is in the past");
+            return false;
+        }
+
+        current_task.set_state(TaskState::Sleeping);
 
         let timestamp = at.duration_since_epoch().as_micros();
         debug!(

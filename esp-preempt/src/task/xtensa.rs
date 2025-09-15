@@ -1,15 +1,15 @@
 use core::ffi::c_void;
 
-pub(crate) use esp_hal::trapframe::TrapFrame;
+pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 use esp_hal::{xtensa_lx, xtensa_lx_rt};
 
-use crate::{SCHEDULER, task::Context};
+use crate::SCHEDULER;
 
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,
     stack_top: *mut (),
-) -> TrapFrame {
+) -> CpuContext {
     // stack must be aligned by 16
     let stack_top = stack_top as u32;
     let stack_top = stack_top - (stack_top % 16);
@@ -21,7 +21,7 @@ pub(crate) fn new_task_context(
         *((stack_top - 16) as *mut u32) = 0;
     }
 
-    TrapFrame {
+    CpuContext {
         PC: task_fn as usize as u32,
         A0: 0,
         A1: stack_top,
@@ -34,12 +34,15 @@ pub(crate) fn new_task_context(
     }
 }
 
-pub(crate) fn restore_task_context(ctx: &mut Context, trap_frame: &mut TrapFrame) {
-    *trap_frame = ctx.trap_frame;
-}
-
-pub(crate) fn save_task_context(ctx: &mut Context, trap_frame: &TrapFrame) {
-    ctx.trap_frame = *trap_frame;
+pub(crate) fn task_switch(
+    current_context: *mut CpuContext,
+    next_context: *mut CpuContext,
+    trap_frame: &mut CpuContext,
+) {
+    if !current_context.is_null() {
+        unsafe { core::ptr::copy_nonoverlapping(trap_frame, current_context, 1) };
+    }
+    unsafe { core::ptr::copy_nonoverlapping(next_context, trap_frame, 1) };
 }
 
 // ESP32 uses Software1 (priority 3) for task switching, because it reserves
@@ -66,7 +69,7 @@ pub(crate) fn disable_multitasking() {
 #[esp_hal::ram]
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
 #[cfg_attr(esp32, unsafe(export_name = "Software1"))]
-fn task_switch_interrupt(context: &mut TrapFrame) {
+fn task_switch_interrupt(context: &mut CpuContext) {
     let intr = SW_INTERRUPT;
     unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };
 

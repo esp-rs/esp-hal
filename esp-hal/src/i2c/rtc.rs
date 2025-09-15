@@ -79,7 +79,7 @@ use core::time::Duration;
 
 use crate::{
     gpio::{InputPin, OutputPin, RtcFunction, RtcPin},
-    peripherals::RTC_I2C,
+    peripherals::{GPIO, RTC_I2C, RTC_IO, SENS},
 };
 
 const RC_FAST_CLK: u32 = property!("soc.rc_fast_clk_default");
@@ -135,6 +135,8 @@ for_each_lp_function! {
 /// ```
 pub struct I2c<'d> {
     i2c: RTC_I2C<'d>,
+    sda: u8,
+    scl: u8,
 }
 
 impl<'d> I2c<'d> {
@@ -165,45 +167,34 @@ impl<'d> I2c<'d> {
         sda: impl Sda + 'd,
         scl: impl Scl + 'd,
     ) -> Result<Self, ConfigError> {
-        let sens = unsafe { crate::pac::SENS::steal() };
-        let rtc_io = unsafe { crate::pac::RTC_IO::steal() };
-        let gpio = unsafe { crate::pac::GPIO::steal() };
-
         // Clear any stale config registers
         i2c.register_block().ctrl().reset();
-        sens.sar_i2c_ctrl().reset();
+        SENS::regs().sar_i2c_ctrl().reset();
 
-        {
-            gpio.pin(scl.number() as usize)
+        fn bind_pin(pin: &impl RtcPin) {
+            GPIO::regs()
+                .pin(pin.number() as usize)
                 .modify(|_, w| w.pad_driver().bit(true));
-            rtc_io
-                .touch_pad(scl.number() as usize)
+            RTC_IO::regs()
+                .touch_pad(pin.number() as usize)
                 .modify(|_, w| w.fun_ie().bit(true).rue().bit(true).rde().bit(false));
-            rtc_io
+            RTC_IO::regs()
                 .rtc_gpio_enable_w1ts()
-                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << scl.number()) });
-            scl.rtc_set_config(true, true, RtcFunction::I2c);
+                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << pin.number()) });
+            pin.rtc_set_config(true, true, RtcFunction::I2c);
         }
 
-        {
-            gpio.pin(sda.number() as usize)
-                .modify(|_, w| w.pad_driver().bit(true));
-            rtc_io
-                .touch_pad(sda.number() as usize)
-                .modify(|_, w| w.fun_ie().bit(true).rue().bit(true).rde().bit(false));
-            rtc_io
-                .rtc_gpio_enable_w1ts()
-                .write(|w| unsafe { w.rtc_gpio_enable_w1ts().bits(1 << sda.number()) });
-            sda.rtc_set_config(true, true, RtcFunction::I2c);
-        }
+        bind_pin(&sda);
+        bind_pin(&scl);
 
-        rtc_io.sar_i2c_io().write(|w| unsafe {
+        RTC_IO::regs().sar_i2c_io().write(|w| unsafe {
             w.sar_i2c_sda_sel().bits(sda.selector());
             w.sar_i2c_scl_sel().bits(scl.selector())
         });
 
         // Reset RTC I2C
-        sens.sar_peri_reset_conf()
+        SENS::regs()
+            .sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
         i2c.register_block()
             .ctrl()
@@ -211,7 +202,8 @@ impl<'d> I2c<'d> {
         i2c.register_block()
             .ctrl()
             .modify(|_, w| w.i2c_reset().clear_bit());
-        sens.sar_peri_reset_conf()
+        SENS::regs()
+            .sar_peri_reset_conf()
             .modify(|_, w| w.sar_rtc_i2c_reset().clear_bit());
 
         // Enable internal open-drain for SDA and SCL
@@ -221,7 +213,8 @@ impl<'d> I2c<'d> {
         });
 
         // Enable clock gate.
-        sens.sar_peri_clk_gate_conf()
+        SENS::regs()
+            .sar_peri_clk_gate_conf()
             .modify(|_, w| w.rtc_i2c_clk_en().set_bit());
 
         // Configure the RTC I2C controller into master mode.
@@ -232,7 +225,11 @@ impl<'d> I2c<'d> {
             .ctrl()
             .modify(|_, w| w.i2c_ctrl_clk_gate_en().set_bit());
 
-        let mut this = Self { i2c };
+        let mut this = Self {
+            i2c,
+            sda: sda.number(),
+            scl: scl.number(),
+        };
         this.apply_config(&config)?;
         Ok(this)
     }
@@ -595,6 +592,32 @@ impl<'d> I2c<'d> {
             .register_block()
             .cmd(idx)
             .write(|w| unsafe { w.command().bits(cmd) });
+    }
+}
+
+impl Drop for I2c<'_> {
+    fn drop(&mut self) {
+        fn release_pin(pin: u8) {
+            GPIO::regs().pin(pin as usize).reset();
+
+            RTC_IO::regs()
+                .enable_w1tc()
+                .write(|w| unsafe { w.enable_w1tc().bits(1 << pin) });
+
+            RTC_IO::regs().touch_pad(pin as usize).reset();
+        }
+
+        // Reset and disable RTC I2C clock
+        SENS::regs()
+            .sar_peri_reset_conf()
+            .modify(|_, w| w.sar_rtc_i2c_reset().set_bit());
+
+        SENS::regs()
+            .sar_peri_clk_gate_conf()
+            .modify(|_, w| w.rtc_i2c_clk_en().clear_bit());
+
+        release_pin(self.scl);
+        release_pin(self.sda);
     }
 }
 

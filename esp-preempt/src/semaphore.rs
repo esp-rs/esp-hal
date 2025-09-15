@@ -9,7 +9,8 @@ use esp_radio_preempt_driver::{
 use esp_sync::NonReentrantMutex;
 
 use crate::{
-    task::{TaskPtr, current_task},
+    SCHEDULER,
+    task::{TaskExt, TaskPtr, current_task},
     wait_queue::WaitQueue,
 };
 
@@ -19,8 +20,10 @@ enum SemaphoreInner {
         max: u32,
         waiting: WaitQueue,
     },
-    RecursiveMutex {
+    Mutex {
+        recursive: bool,
         owner: Option<TaskPtr>,
+        original_priority: usize,
         lock_counter: u32,
         waiting: WaitQueue,
     },
@@ -37,18 +40,36 @@ impl SemaphoreInner {
                     false
                 }
             }
-            SemaphoreInner::RecursiveMutex {
+            SemaphoreInner::Mutex {
+                recursive,
                 owner,
                 lock_counter,
+                original_priority,
                 ..
             } => {
-                // TODO: priority inheritance
                 let current = current_task();
-                if owner.is_none() || owner.unwrap() == current {
-                    *lock_counter += 1;
-                    true
+                if let Some(owner) = owner {
+                    if *owner == current && *recursive {
+                        *lock_counter += 1;
+                        true
+                    } else {
+                        // We can't lock the mutex. Make sure the mutex holder has a high enough
+                        // priority to avoid priority inversion.
+                        SCHEDULER.with(|scheduler| {
+                            let current_priority = current.priority(&mut scheduler.run_queue);
+                            if owner.priority(&mut scheduler.run_queue) < current_priority {
+                                owner.set_priority(&mut scheduler.run_queue, current_priority);
+                                scheduler.resume_task(*owner);
+                            }
+                            false
+                        })
+                    }
                 } else {
-                    false
+                    *owner = Some(current);
+                    *lock_counter += 1;
+                    *original_priority =
+                        SCHEDULER.with(|scheduler| current.priority(&mut scheduler.run_queue));
+                    true
                 }
             }
         }
@@ -64,9 +85,10 @@ impl SemaphoreInner {
                     false
                 }
             }
-            SemaphoreInner::RecursiveMutex {
+            SemaphoreInner::Mutex {
                 owner,
                 lock_counter,
+                original_priority,
                 ..
             } => {
                 let current = current_task();
@@ -74,7 +96,11 @@ impl SemaphoreInner {
                 if *owner == Some(current) && *lock_counter > 0 {
                     *lock_counter -= 1;
                     if *lock_counter == 0 {
-                        *owner = None;
+                        if let Some(owner) = owner.take() {
+                            SCHEDULER.with(|scheduler| {
+                                owner.set_priority(&mut scheduler.run_queue, *original_priority);
+                            });
+                        }
                     }
                     true
                 } else {
@@ -87,23 +113,25 @@ impl SemaphoreInner {
     fn current_count(&mut self) -> u32 {
         match self {
             SemaphoreInner::Counting { current, .. } => *current,
-            SemaphoreInner::RecursiveMutex { .. } => {
+            SemaphoreInner::Mutex { .. } => {
                 panic!("RecursiveMutex does not support current_count")
             }
         }
     }
 
     fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
+        trace!("Semaphore wait_with_deadline - {:?}", deadline);
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.wait_with_deadline(deadline),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.wait_with_deadline(deadline),
         }
     }
 
-    fn notify_one(&mut self) {
+    fn notify(&mut self) {
+        trace!("Semaphore notify");
         match self {
             SemaphoreInner::Counting { waiting, .. } => waiting.notify(),
-            SemaphoreInner::RecursiveMutex { waiting, .. } => waiting.notify(),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.notify(),
         }
     }
 }
@@ -120,9 +148,11 @@ impl Semaphore {
                 max,
                 waiting: WaitQueue::new(),
             },
-            SemaphoreKind::RecursiveMutex => SemaphoreInner::RecursiveMutex {
+            SemaphoreKind::Mutex | SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
+                recursive: matches!(kind, SemaphoreKind::RecursiveMutex),
                 owner: None,
                 lock_counter: 0,
+                original_priority: 0,
                 waiting: WaitQueue::new(),
             },
         };
@@ -153,6 +183,7 @@ impl Semaphore {
             });
 
             if taken {
+                debug!("Semaphore - take - success");
                 return true;
             }
 
@@ -165,6 +196,7 @@ impl Semaphore {
                 && deadline < Instant::now()
             {
                 // We have a deadline and we've timed out.
+                trace!("Semaphore - take - timed out");
                 return false;
             }
             // We can block more, so let's attempt to take the semaphore again.
@@ -178,7 +210,7 @@ impl Semaphore {
     pub fn give(&self) -> bool {
         self.inner.with(|sem| {
             if sem.try_give() {
-                sem.notify_one();
+                sem.notify();
                 true
             } else {
                 false

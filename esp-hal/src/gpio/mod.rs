@@ -699,7 +699,7 @@ impl crate::interrupt::InterruptConfigurable for Io<'_> {
 
 for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
-        #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
+        #[instability::unstable]
         impl $crate::gpio::AnalogPin for crate::peripherals::$gpio<'_> {
             #[cfg(riscv)]
             fn set_analog(&self, _: private::Internal) {
