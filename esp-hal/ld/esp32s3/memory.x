@@ -1,6 +1,3 @@
-/* override entry point */
-ENTRY(ESP32Reset)
-
 #IF ESP_HAL_CONFIG_INSTRUCTION_CACHE_SIZE_32KB
 /* reserved for ICACHE */
 RESERVE_ICACHE = 0x8000;
