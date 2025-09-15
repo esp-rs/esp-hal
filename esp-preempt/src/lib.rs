@@ -1,13 +1,13 @@
 //! This crate allows using esp-radio on top of esp-hal, without any other OS.
 //!
-//! This crate needs to be initialized with an esp-hal timer before the scheduler can be started.
+//! This crate requires an esp-hal timer to operate.
 //!
 //! ```rust, no_run
 #![doc = esp_hal::before_snippet!()]
 //! use esp_hal::timer::timg::TimerGroup;
 //!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! esp_preempt::init(timg0.timer0);
+//! esp_preempt::start(timg0.timer0);
 //!
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
@@ -35,7 +35,6 @@ mod wait_queue;
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
-    system::Cpu,
     timer::{AnyTimer, OneShotTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
@@ -102,7 +101,7 @@ where
     }
 }
 
-/// Initializes the scheduler.
+/// Starts the scheduler.
 ///
 /// # The `timer` argument
 ///
@@ -116,12 +115,19 @@ where
 /// For an example, see the [crate-level documentation][self].
 #[cfg_attr(
     multi_core,
-    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::init()`."
+    doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::start()`."
 )]
-pub fn init(timer: impl TimerSource) {
+pub fn start(timer: impl TimerSource) {
     SCHEDULER.with(move |scheduler| {
-        scheduler.time_driver = Some(TimeDriver::new(timer.timer()));
-        scheduler.runs_on = Cpu::current();
+        scheduler.setup(TimeDriver::new(timer.timer()));
+
+        // allocate the default tasks
+        task::allocate_main_task(scheduler);
+
+        task::setup_multitasking();
+
+        unwrap!(scheduler.time_driver.as_mut()).start();
+        task::yield_task();
     })
 }
 

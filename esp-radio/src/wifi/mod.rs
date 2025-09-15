@@ -574,60 +574,67 @@ impl TtlsPhase2Method {
     }
 }
 
+#[cfg(feature = "wifi-eap")]
+type CertificateAndKey = (&'static [u8], &'static [u8], Option<&'static [u8]>);
+
 /// Configuration for an EAP (Extensible Authentication Protocol) client.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(BuilderLite, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[cfg(feature = "wifi-eap")]
 #[instability::unstable]
 pub struct EapClientConfig {
     /// The SSID of the network the client is connecting to.
-    pub ssid: String,
+    #[builder_lite(reference)]
+    ssid: String,
 
     /// The BSSID (MAC Address) of the specific access point.
-    pub bssid: Option<[u8; 6]>,
+    bssid: Option<[u8; 6]>,
 
-    // pub protocol: Protocol,
     /// The authentication method used for EAP.
-    pub auth_method: AuthMethod,
+    auth_method: AuthMethod,
 
     /// The identity used during authentication.
-    pub identity: Option<String>,
+    #[builder_lite(reference)]
+    identity: Option<String>,
 
     /// The username used for inner authentication.
     /// Some EAP methods require a username for authentication.
-    pub username: Option<String>,
+    #[builder_lite(reference)]
+    username: Option<String>,
 
     /// The password used for inner authentication.
-    pub password: Option<String>,
+    #[builder_lite(reference)]
+    password: Option<String>,
 
     /// A new password to be set during the authentication process.
     /// Some methods support password changes during authentication.
-    pub new_password: Option<String>,
+    #[builder_lite(reference)]
+    new_password: Option<String>,
 
     /// Configuration for EAP-FAST.
-    pub eap_fast_config: Option<EapFastConfig>,
+    #[builder_lite(reference)]
+    eap_fast_config: Option<EapFastConfig>,
 
     /// A PAC (Protected Access Credential) file for EAP-FAST.
-    pub pac_file: Option<&'static [u8]>,
+    pac_file: Option<&'static [u8]>,
 
     /// A boolean flag indicating whether time checking is enforced during
     /// authentication.
-    pub time_check: bool,
+    time_check: bool,
 
     /// A CA (Certificate Authority) certificate for validating the
     /// authentication server's certificate.
-    pub ca_cert: Option<&'static [u8]>,
+    ca_cert: Option<&'static [u8]>,
 
     /// A tuple containing the client's certificate, private key, and an
     /// intermediate certificate.
-    #[allow(clippy::type_complexity)]
-    pub certificate_and_key: Option<(&'static [u8], &'static [u8], Option<&'static [u8]>)>,
-
+    certificate_and_key: Option<CertificateAndKey>,
     /// The Phase 2 authentication method used for EAP-TTLS.
-    pub ttls_phase2_method: Option<TtlsPhase2Method>,
+    #[builder_lite(reference)]
+    ttls_phase2_method: Option<TtlsPhase2Method>,
 
     /// The specific Wi-Fi channel to use for the connection.
-    pub channel: Option<u8>,
+    channel: Option<u8>,
 
     /// The set of protocols supported by the access point.
     protocols: EnumSet<Protocol>,

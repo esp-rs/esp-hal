@@ -228,9 +228,6 @@ impl Drop for Controller<'_> {
 
         shutdown_radio_isr();
 
-        // This shuts down the task switcher and timer tick interrupt.
-        preempt::disable();
-
         #[cfg(esp32)]
         // Allow using `ADC2` again
         release_adc2(unsafe { esp_hal::Internal::conjure() });
@@ -270,7 +267,7 @@ impl Drop for Controller<'_> {
 /// use esp_hal::timer::timg::TimerGroup;
 ///
 /// let timg0 = TimerGroup::new(peripherals.TIMG0);
-/// esp_preempt::init(timg0.timer0);
+/// esp_preempt::start(timg0.timer0);
 ///
 /// // You can now start esp-radio:
 /// let esp_radio_controller = esp_radio::init().unwrap();
@@ -300,9 +297,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     crate::common_adapter::enable_wifi_power_domain();
 
     setup_radio_isr();
-
-    // This initializes the task switcher
-    preempt::enable();
 
     wifi_set_log_verbose();
     init_radio_clocks();

@@ -26,7 +26,7 @@ fn _esp_radio_can_be_reinited() {
     let p = esp_hal::init(esp_hal::Config::default());
 
     let timg0: TimerGroup<'_, _> = TimerGroup::new(p.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    esp_preempt::start(timg0.timer0);
 
     {
         let _init = esp_radio::init().unwrap();
@@ -58,7 +58,7 @@ mod tests {
     #[test]
     fn test_controller_comms(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
         let init = esp_radio::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
@@ -108,7 +108,7 @@ mod tests {
     #[test]
     fn test_dropping_controller_during_reset(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
         let init = esp_radio::init().unwrap();
 
         let mut connector = BleConnector::new(&init, peripherals.BT);
