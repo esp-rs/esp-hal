@@ -27,6 +27,8 @@ xtensa-lx         = { version = "0.12.0", path = "../xtensa-lx" }
 [features]
 ## Save and restore float registers for exceptions
 float-save-restore = []
+## Indicate that the device has RTC RAM. esp-hal specific option.
+rtc-ram = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt"]

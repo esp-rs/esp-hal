@@ -13,7 +13,6 @@ use core::{
 };
 
 pub use macros::{entry, exception, interrupt, pre_init};
-pub use r0::{init_data, zero_bss};
 pub use xtensa_lx;
 
 pub mod exception;
@@ -37,7 +36,29 @@ pub unsafe extern "C" fn Reset() -> ! {
             static _sidata: u32;
 
             static mut _init_start: u32;
+        }
 
+        #[cfg(feature = "rtc-ram")]
+        unsafe extern "C" {
+            static mut _rtc_fast_bss_start: u32;
+            static mut _rtc_fast_bss_end: u32;
+
+            static mut _rtc_slow_bss_start: u32;
+            static mut _rtc_slow_bss_end: u32;
+
+            static mut _rtc_fast_persistent_start: u32;
+            static mut _rtc_fast_persistent_end: u32;
+
+            static mut _rtc_slow_persistent_start: u32;
+            static mut _rtc_slow_persistent_end: u32;
+
+            static mut _rtc_fast_data_start: u32;
+            static mut _rtc_fast_data_end: u32;
+            static _rtc_fast_sidata: u32;
+
+            static mut _rtc_slow_data_start: u32;
+            static mut _rtc_slow_data_end: u32;
+            static _rtc_slow_sidata: u32;
         }
 
         unsafe extern "Rust" {
@@ -50,18 +71,52 @@ pub unsafe extern "C" fn Reset() -> ! {
             fn __post_init();
 
             fn __zero_bss() -> bool;
-
             fn __init_data() -> bool;
+            fn __init_persistent() -> bool;
         }
 
         __pre_init();
 
         if __zero_bss() {
             r0::zero_bss(addr_of_mut!(_bss_start), addr_of_mut!(_bss_end));
+            #[cfg(feature = "rtc-ram")]
+            r0::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_fast_bss_start),
+                core::ptr::addr_of_mut!(_rtc_fast_bss_end),
+            );
+            #[cfg(feature = "rtc-ram")]
+            r0::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_slow_bss_start),
+                core::ptr::addr_of_mut!(_rtc_slow_bss_end),
+            );
         }
 
         if __init_data() {
             r0::init_data(addr_of_mut!(_data_start), addr_of_mut!(_data_end), &_sidata);
+            #[cfg(feature = "rtc-ram")]
+            r0::init_data(
+                addr_of_mut!(_rtc_fast_data_start),
+                addr_of_mut!(_rtc_fast_data_end),
+                &_rtc_fast_sidata,
+            );
+            #[cfg(feature = "rtc-ram")]
+            r0::init_data(
+                addr_of_mut!(_rtc_slow_data_start),
+                addr_of_mut!(_rtc_slow_data_end),
+                &_rtc_slow_sidata,
+            );
+        }
+
+        #[cfg(feature = "rtc-ram")]
+        if __init_persistent() {
+            r0::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_fast_persistent_start),
+                core::ptr::addr_of_mut!(_rtc_fast_persistent_end),
+            );
+            r0::zero_bss(
+                core::ptr::addr_of_mut!(_rtc_slow_persistent_start),
+                core::ptr::addr_of_mut!(_rtc_slow_persistent_end),
+            );
         }
 
         // Copy of data segment is done by bootloader
