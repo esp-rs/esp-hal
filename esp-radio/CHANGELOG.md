@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional `max` field in `ScanConfig` to allow limiting the number of returned results (#3963)
 - `set_phy_calibration_data` and `phy_calibration_data` (#4001)
 - common traits for `Protocol`, `Country`,  (#4017)
-- `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig` (#4017)
+- `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig`, and `EapClientConfig` (#4017, #4115)
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
 
