@@ -2814,11 +2814,14 @@ pub struct WifiConfig {
 
     /// Country code.
     #[builder_lite(into)]
+    #[builder_lite(unstable)]
     country_code: CountryInfo,
 
     /// Size of the RX queue in frames.
+    #[builder_lite(unstable)]
     rx_queue_size: usize,
     /// Size of the TX queue in frames.
+    #[builder_lite(unstable)]
     tx_queue_size: usize,
 
     /// Max number of WiFi static RX buffers.
@@ -2830,6 +2833,7 @@ pub struct WifiConfig {
     /// higher throughput but increases memory use. If [`Self::ampdu_rx_enable`] is enabled,
     /// this value is recommended to set equal or bigger than [`Self::rx_ba_win`] in order to
     /// achieve better throughput and compatibility with both stations and APs.
+    #[builder_lite(unstable)]
     static_rx_buf_num: u8,
 
     /// Max number of WiFi dynamic RX buffers
@@ -2848,6 +2852,7 @@ pub struct WifiConfig {
     ///
     /// If a dynamic RX buffer limit is set, it should be at least the number of
     /// static RX buffers.
+    #[builder_lite(unstable)]
     dynamic_rx_buf_num: u16,
 
     /// Set the number of WiFi static TX buffers.
@@ -2861,6 +2866,7 @@ pub struct WifiConfig {
     ///
     /// For some applications especially UDP applications, the upper layer can deliver frames
     /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    #[builder_lite(unstable)]
     static_tx_buf_num: u8,
 
     /// Set the number of WiFi dynamic TX buffers.
@@ -2873,15 +2879,19 @@ pub struct WifiConfig {
     ///
     /// For some applications, especially UDP applications, the upper layer can deliver frames
     /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    #[builder_lite(unstable)]
     dynamic_tx_buf_num: u16,
 
     /// Select this option to enable AMPDU RX feature.
+    #[builder_lite(unstable)]
     ampdu_rx_enable: bool,
 
     /// Select this option to enable AMPDU TX feature.
+    #[builder_lite(unstable)]
     ampdu_tx_enable: bool,
 
     /// Select this option to enable AMSDU TX feature.
+    #[builder_lite(unstable)]
     amsdu_tx_enable: bool,
 
     /// Set the size of WiFi Block Ack RX window.
@@ -2894,13 +2904,14 @@ pub struct WifiConfig {
     /// If PSRAM is used and WiFi memory is preferred to allocate in PSRAM first, the default and
     /// minimum value should be 16 to achieve better throughput and compatibility with both
     /// stations and APs.
+    #[builder_lite(unstable)]
     rx_ba_win: u8,
 }
 
 impl Default for WifiConfig {
     fn default() -> Self {
         Self {
-            power_save_mode: PowerSaveMode::None,
+            power_save_mode: PowerSaveMode::default(),
             country_code: CountryInfo::from(*b"CN"),
 
             rx_queue_size: 5,
