@@ -334,7 +334,7 @@ fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
         memory.fill(0);
         let buffer = &mut memory[shift..][..PLAINTEXT_BUF_SIZE];
         run_cipher_tests(buffer);
-        assert_eq!(
+        hil_test::assert_eq!(
             memory[..shift],
             zeros[..shift],
             "Out of bounds write with shift {}",
