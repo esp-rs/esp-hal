@@ -18,7 +18,7 @@ use core::{
 
 use enumset::{EnumSet, EnumSetType};
 use esp_config::esp_config_int;
-use esp_hal::asynch::AtomicWaker;
+use esp_hal::{asynch::AtomicWaker, system::Cpu};
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
 use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;
@@ -2969,7 +2969,7 @@ pub fn new<'d>(
             nvs_enable: 0,
             nano_enable: 0,
             rx_ba_win: config.rx_ba_win as _,
-            wifi_task_core_id: 0,
+            wifi_task_core_id: Cpu::current() as _,
             beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
             mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
             feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
