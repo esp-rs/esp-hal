@@ -326,6 +326,23 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 }
 
+fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
+    let zeros = [0; MAX_SHIFT];
+
+    // Different alignments in internal memory
+    for shift in 0..MAX_SHIFT {
+        memory.fill(0);
+        let buffer = &mut memory[shift..][..PLAINTEXT_BUF_SIZE];
+        run_cipher_tests(buffer);
+        assert_eq!(
+            memory[..shift],
+            zeros[..shift],
+            "Out of bounds write with shift {}",
+            shift
+        );
+    }
+}
+
 #[cfg(test)]
 #[embedded_test::tests(default_timeout = 10, executor = hil_test::Executor::new())] // defmt slows the tests down a bit
 mod tests {
@@ -474,15 +491,14 @@ mod tests {
         }
         let _backend = aes.start();
 
+        const MAX_SHIFT: usize = 15;
+
         let mut internal_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + 15, esp_alloc::InternalMemory);
-        internal_memory.resize(PLAINTEXT_BUF_SIZE + 15, 0);
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::InternalMemory);
+        internal_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
 
         // Different alignments in internal memory
-        for shift in 0..15 {
-            let buffer = &mut internal_memory[shift..][..PLAINTEXT_BUF_SIZE];
-            run_cipher_tests(buffer);
-        }
+        run_unaligned_dma_tests::<MAX_SHIFT>(&mut internal_memory);
     }
 
     #[test]
@@ -505,15 +521,14 @@ mod tests {
         let mut plaintext = [0; PLAINTEXT_BUF_SIZE];
         fill_with_plaintext(&mut plaintext);
 
-        // Different alignments in external memory
-        let mut external_memory =
-            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + 15, esp_alloc::ExternalMemory);
-        external_memory.resize(PLAINTEXT_BUF_SIZE + 15, 0);
+        const MAX_SHIFT: usize = 15;
 
-        for shift in 0..15 {
-            let buffer = &mut external_memory[shift..][..PLAINTEXT_BUF_SIZE];
-            run_cipher_tests(buffer);
-        }
+        let mut external_memory =
+            Vec::with_capacity_in(PLAINTEXT_BUF_SIZE + MAX_SHIFT, esp_alloc::ExternalMemory);
+        external_memory.resize(PLAINTEXT_BUF_SIZE + MAX_SHIFT, 0);
+
+        // Different alignments in external memory
+        run_unaligned_dma_tests::<MAX_SHIFT>(&mut external_memory);
     }
 
     #[test]
