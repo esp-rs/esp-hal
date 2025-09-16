@@ -1,0 +1,76 @@
+[package]
+name    = "embassy-hello-world"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+defmt = "1"
+
+embassy-executor = "0.9.0"
+embassy-time = "0.5.0"
+esp-backtrace = { path = "../../../esp-backtrace", features = [
+    "panic-handler",
+    "defmt",
+] }
+esp-bootloader-esp-idf = { path = "../../../esp-bootloader-esp-idf" }
+esp-hal = { path = "../../../esp-hal", features = ["defmt", "unstable"] }
+esp-hal-embassy = { path = "../../../esp-hal-embassy" }
+esp-println = { path = "../../../esp-println", features = ["defmt-espflash"] }
+
+[features]
+esp32 = [
+    "esp-backtrace/esp32",
+    "esp-println/esp32",
+    "esp-bootloader-esp-idf/esp32",
+    "esp-hal-embassy/esp32",
+    "esp-hal/esp32",
+]
+esp32c2 = [
+    "esp-backtrace/esp32c2",
+    "esp-println/esp32c2",
+    "esp-bootloader-esp-idf/esp32c2",
+    "esp-hal-embassy/esp32c2",
+    "esp-hal/esp32c2",
+]
+esp32c3 = [
+    "esp-backtrace/esp32c3",
+    "esp-println/esp32c3",
+    "esp-bootloader-esp-idf/esp32c3",
+    "esp-hal-embassy/esp32c3",
+    "esp-hal/esp32c3",
+]
+esp32c6 = [
+    "esp-backtrace/esp32c6",
+    "esp-println/esp32c6",
+    "esp-bootloader-esp-idf/esp32c6",
+    "esp-hal-embassy/esp32c6",
+    "esp-hal/esp32c6",
+]
+esp32h2 = [
+    "esp-backtrace/esp32h2",
+    "esp-println/esp32h2",
+    "esp-bootloader-esp-idf/esp32h2",
+    "esp-hal-embassy/esp32h2",
+    "esp-hal/esp32h2",
+]
+esp32s2 = [
+    "esp-backtrace/esp32s2",
+    "esp-println/esp32s2",
+    "esp-bootloader-esp-idf/esp32s2",
+    "esp-hal-embassy/esp32s2",
+    "esp-hal/esp32s2",
+]
+esp32s3 = [
+    "esp-backtrace/esp32s3",
+    "esp-println/esp32s3",
+    "esp-bootloader-esp-idf/esp32s3",
+    "esp-hal-embassy/esp32s3",
+    "esp-hal/esp32s3",
+]
+
+[profile.release]
+debug            = true
+debug-assertions = true
+lto              = "fat"
+codegen-units    = 1
