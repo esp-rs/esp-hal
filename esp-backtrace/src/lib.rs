@@ -82,10 +82,10 @@ macro_rules! println {
 }
 
 #[cfg(feature = "panic-handler")]
-fn set_color_code(code: &str) {
+fn set_color_code(_code: &str) {
     #[cfg(all(feature = "colors", feature = "println"))]
     {
-        println!("{}", code);
+        println!("{}", _code);
     }
 }
 
