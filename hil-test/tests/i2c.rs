@@ -251,6 +251,10 @@ mod tests {
             );
 
             defmt::info!("Transaction cancelled");
+
+            // Ping the sensor to ensure we don't randomly get an address failure in the next
+            // iteration.
+            _ = i2c.write_async(DUT_ADDRESS, &[]).await;
         }
 
         let mut read_data = [0u8; 22];
