@@ -26,6 +26,7 @@ unsafe extern "Rust" {
     fn esp_preempt_timer_delete(timer: TimerPtr);
 
     fn esp_preempt_timer_arm(timer: TimerPtr, timeout: u64, periodic: bool);
+    fn esp_preempt_timer_is_active(timer: TimerPtr) -> bool;
     fn esp_preempt_timer_disarm(timer: TimerPtr);
 }
 
@@ -53,7 +54,11 @@ unsafe extern "Rust" {
 ///         unimplemented!()
 ///     }
 ///
-///     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) -> bool {
+///     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool) {
+///         unimplemented!()
+///     }
+///
+///     unsafe fn is_active(timer: TimerPtr) -> bool {
 ///         unimplemented!()
 ///     }
 ///
@@ -85,6 +90,13 @@ pub trait TimerImplementation {
     /// `timer` must be a pointer returned from [`Self::create`].
     unsafe fn arm(timer: TimerPtr, timeout: u64, periodic: bool);
 
+    /// Checks if the timer is currently active.
+    ///
+    /// # Safety
+    ///
+    /// `timer` must be a pointer returned from [`Self::create`].
+    unsafe fn is_active(timer: TimerPtr) -> bool;
+
     /// Stops the timer.
     ///
     /// # Safety
@@ -115,6 +127,12 @@ macro_rules! register_timer_implementation {
         #[inline]
         fn esp_preempt_timer_arm(timer: $crate::timer::TimerPtr, timeout: u64, periodic: bool) {
             unsafe { <$t as $crate::timer::TimerImplementation>::arm(timer, timeout, periodic) }
+        }
+
+        #[unsafe(no_mangle)]
+        #[inline]
+        fn esp_preempt_timer_is_active(timer: $crate::timer::TimerPtr) -> bool {
+            unsafe { <$t as $crate::timer::TimerImplementation>::is_active(timer) }
         }
 
         #[unsafe(no_mangle)]
@@ -175,6 +193,11 @@ impl TimerHandle {
     /// the timer will be triggered with a constant frequency.
     pub fn arm(&self, timeout: u64, periodic: bool) {
         unsafe { esp_preempt_timer_arm(self.0, timeout, periodic) }
+    }
+
+    /// Checks if the timer is currently active.
+    pub fn is_active(&self) -> bool {
+        unsafe { esp_preempt_timer_is_active(self.0) }
     }
 
     /// Stops the timer.
