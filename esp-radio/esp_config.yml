@@ -124,18 +124,6 @@ options:
     default:
       - value: 1
 
-  - name: country_code
-    description: "Country code. See
-                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)"
-    default:
-      - value: '"CN"'
-
-  - name: country_code_operating_class
-    description: 'If not 0: Operating Class table number. See
-                 [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code)'
-    default:
-      - value: 0
-
   - name: mtu
     description: "MTU, see [smoltcp's documentation](https://docs.rs/smoltcp/0.10.0/smoltcp/phy/struct.DeviceCapabilities.html#structfield.max_transmission_unit)"
     default:

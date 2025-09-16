@@ -17,7 +17,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_config::{esp_config_int, esp_config_str};
+use esp_config::esp_config_int;
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
@@ -2644,7 +2644,8 @@ pub(crate) mod embassy {
 
 /// Power saving mode settings for the modem.
 #[non_exhaustive]
-#[derive(Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PowerSaveMode {
     /// No power saving.
     #[default]
@@ -2700,6 +2701,125 @@ pub struct Interfaces<'d> {
     pub sniffer: Sniffer<'d>,
 }
 
+/// Wi-Fi operating class.
+///
+/// Refer to Annex E of IEEE Std 802.11-2020.
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[instability::unstable]
+pub enum OperatingClass {
+    /// The regulations under which the station/AP is operating encompass all environments for the
+    /// current frequency band in the country.
+    AllEnvironments,
+
+    /// The regulations under which the station/AP is operating are for an outdoor environment only.
+    Outdoors,
+
+    /// The regulations under which the station/AP is operating are for an indoor environment only.
+    Indoors,
+
+    /// The station/AP is operating under a noncountry entity. The first two octets of the
+    /// noncountry entity is two ASCII ‘XX’ characters.
+    NonCountryEntity,
+
+    /// Binary representation of the Operating Class table number currently in use. Refer to Annex E
+    /// of IEEE Std 802.11-2020.
+    Repr(u8),
+}
+
+impl Default for OperatingClass {
+    fn default() -> Self {
+        OperatingClass::Repr(0) // TODO: is this valid?
+    }
+}
+
+impl OperatingClass {
+    fn into_code(self) -> u8 {
+        match self {
+            OperatingClass::AllEnvironments => b' ',
+            OperatingClass::Outdoors => b'O',
+            OperatingClass::Indoors => b'I',
+            OperatingClass::NonCountryEntity => b'X',
+            OperatingClass::Repr(code) => code,
+        }
+    }
+}
+
+/// Country information.
+///
+/// Defaults to China (CN) with Operating Class "0".
+///
+/// To create a [`CountryInfo`] instance, use the `from` method first, then set additional
+/// properties using the builder methods.
+///
+/// ## Example
+///
+/// ```rust,no_run
+/// use esp_radio::wifi::{CountryInfo, OperatingClass};
+///
+/// let country_info = CountryInfo::from(*b"CN").operating_class(OperatingClass::Indoors);
+/// ```
+///
+/// For more information, see the [Wi-Fi Country Code in the ESP-IDF documentation](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-country-code).
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, BuilderLite)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CountryInfo {
+    /// Country code.
+    #[builder_lite(skip)]
+    country: [u8; 2],
+
+    /// Operating class.
+    #[builder_lite(unstable)]
+    operating_class: OperatingClass,
+}
+
+impl From<[u8; 2]> for CountryInfo {
+    fn from(country: [u8; 2]) -> Self {
+        Self {
+            country,
+            operating_class: OperatingClass::default(),
+        }
+    }
+}
+
+impl CountryInfo {
+    fn into_blob(self) -> wifi_country_t {
+        wifi_country_t {
+            cc: [
+                self.country[0],
+                self.country[1],
+                self.operating_class.into_code(),
+            ],
+            // TODO: these may be valid defaults, but they should be configurable.
+            schan: 1,
+            nchan: 13,
+            max_tx_power: 20,
+            policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
+        }
+    }
+}
+
+/// Wi-Fi configuration.
+#[derive(Clone, Copy, BuilderLite, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct WifiConfig {
+    /// Power save mode.
+    power_save_mode: PowerSaveMode,
+
+    /// Country code.
+    #[builder_lite(into)]
+    country_code: CountryInfo,
+}
+
+impl Default for WifiConfig {
+    fn default() -> Self {
+        Self {
+            power_save_mode: PowerSaveMode::None,
+            country_code: CountryInfo::from(*b"CN"),
+        }
+    }
+}
+
 /// Create a Wi-Fi controller and it's associated interfaces.
 ///
 /// Dropping the controller will deinitialize / stop Wi-Fi.
@@ -2709,6 +2829,7 @@ pub struct Interfaces<'d> {
 pub fn new<'d>(
     _inited: &'d Controller<'d>,
     _device: crate::hal::peripherals::WIFI<'d>,
+    config: WifiConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
@@ -2716,18 +2837,8 @@ pub fn new<'d>(
 
     crate::wifi::wifi_init()?;
 
-    let mut cntry_code = [0u8; 3];
-    cntry_code[..esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").len()]
-        .copy_from_slice(esp_config_str!("ESP_RADIO_CONFIG_COUNTRY_CODE").as_bytes());
-    cntry_code[2] = esp_config_int!(u8, "ESP_RADIO_CONFIG_COUNTRY_CODE_OPERATING_CLASS");
     unsafe {
-        let country = wifi_country_t {
-            cc: cntry_code,
-            schan: 1,
-            nchan: 13,
-            max_tx_power: 20,
-            policy: wifi_country_policy_t_WIFI_COUNTRY_POLICY_MANUAL,
-        };
+        let country = config.country_code.into_blob();
         esp_wifi_result!(esp_wifi_set_country(&country))?;
     }
 
@@ -2740,7 +2851,7 @@ pub fn new<'d>(
         _phantom: Default::default(),
     };
 
-    controller.set_power_saving(PowerSaveMode::default())?;
+    controller.set_power_saving(config.power_save_mode)?;
 
     Ok((
         controller,

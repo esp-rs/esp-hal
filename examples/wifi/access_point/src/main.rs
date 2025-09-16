@@ -66,7 +66,7 @@ fn main() -> ! {
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.ap;
     let iface = create_interface(&mut device);
