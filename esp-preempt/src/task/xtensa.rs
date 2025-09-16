@@ -5,6 +5,27 @@ use esp_hal::{xtensa_lx, xtensa_lx_rt};
 
 use crate::SCHEDULER;
 
+extern "C" fn idle_hook() -> ! {
+    loop {
+        unsafe { core::arch::asm!("waiti 0") };
+    }
+}
+
+#[unsafe(naked)]
+extern "C" fn idle_entry() -> ! {
+    core::arch::naked_asm!("call4 {idle_hook}", idle_hook = sym idle_hook);
+}
+
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+    // Point idle context PC at the assembly that calls the idle hook. We need a new stack
+    // frame for the idle task on the main stack.
+    idle_context.PC = idle_entry as usize as u32;
+    // Set a valid processor status value
+    let current_ps;
+    unsafe { core::arch::asm!("rsr.ps {0}", out(reg) current_ps, options(nostack)) };
+    idle_context.PS = current_ps;
+}
+
 pub(crate) fn new_task_context(
     task_fn: extern "C" fn(*mut c_void),
     param: *mut c_void,
@@ -59,10 +80,6 @@ pub(crate) fn setup_multitasking() {
                 | enabled,
         );
     }
-}
-
-pub(crate) fn disable_multitasking() {
-    xtensa_lx::interrupt::disable_mask(SW_INTERRUPT);
 }
 
 #[allow(non_snake_case)]
