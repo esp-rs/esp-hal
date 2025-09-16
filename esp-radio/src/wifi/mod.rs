@@ -17,7 +17,7 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_config::{esp_config_bool, esp_config_int};
+use esp_config::esp_config_int;
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
@@ -84,7 +84,7 @@ use crate::{
     wifi::private::PacketBuffer,
 };
 
-const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_MTU");
+const MTU: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MTU");
 
 #[cfg(all(feature = "csi", esp32c6))]
 use crate::binary::include::wifi_csi_acquire_config_t;
@@ -1121,8 +1121,8 @@ impl CsiConfig {
     }
 }
 
-const RX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE");
-const TX_QUEUE_SIZE: usize = esp_config_int!(usize, "ESP_RADIO_CONFIG_TX_QUEUE_SIZE");
+static RX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
+static TX_QUEUE_SIZE: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) static DATA_QUEUE_RX_AP: NonReentrantMutex<VecDeque<PacketBuffer>> =
     NonReentrantMutex::new(VecDeque::new());
@@ -1455,7 +1455,7 @@ unsafe extern "C" fn recv_cb_sta(
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
     match DATA_QUEUE_RX_STA.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE {
+        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
             queue.push_back(packet);
             Ok(())
         } else {
@@ -1486,7 +1486,7 @@ unsafe extern "C" fn recv_cb_ap(
     // the function will try to trigger a context switch, which will fail if we
     // are in an interrupt-free context.
     match DATA_QUEUE_RX_AP.with(|queue| {
-        if queue.len() < RX_QUEUE_SIZE {
+        if queue.len() < RX_QUEUE_SIZE.load(Ordering::Relaxed) {
             queue.push_back(packet);
             Ok(())
         } else {
@@ -1762,7 +1762,7 @@ impl WifiDeviceMode {
     }
 
     fn can_send(&self) -> bool {
-        WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE
+        WIFI_TX_INFLIGHT.load(Ordering::SeqCst) < TX_QUEUE_SIZE.load(Ordering::Relaxed)
     }
 
     fn increase_in_flight_counter(&self) {
@@ -2196,10 +2196,14 @@ impl Device for WifiDevice<'_> {
     fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
         let mut caps = DeviceCapabilities::default();
         caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0 {
+        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0
+        {
             None
         } else {
-            Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
+            Some(esp_config_int!(
+                usize,
+                "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
+            ))
         };
         caps
     }
@@ -2626,12 +2630,15 @@ pub(crate) mod embassy {
         fn capabilities(&self) -> Capabilities {
             let mut caps = Capabilities::default();
             caps.max_transmission_unit = MTU;
-            caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE") == 0
-            {
-                None
-            } else {
-                Some(esp_config_int!(usize, "ESP_RADIO_CONFIG_MAX_BURST_SIZE"))
-            };
+            caps.max_burst_size =
+                if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0 {
+                    None
+                } else {
+                    Some(esp_config_int!(
+                        usize,
+                        "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
+                    ))
+                };
             caps
         }
 
@@ -2808,6 +2815,86 @@ pub struct WifiConfig {
     /// Country code.
     #[builder_lite(into)]
     country_code: CountryInfo,
+
+    /// Size of the RX queue in frames.
+    rx_queue_size: usize,
+    /// Size of the TX queue in frames.
+    tx_queue_size: usize,
+
+    /// Max number of WiFi static RX buffers.
+    ///
+    /// Each buffer takes approximately 1.6KB of RAM. The static rx buffers are allocated when
+    /// esp_wifi_init is called, they are not freed until esp_wifi_deinit is called.
+    ///
+    /// WiFi hardware use these buffers to receive all 802.11 frames. A higher number may allow
+    /// higher throughput but increases memory use. If [`Self::ampdu_rx_enable`] is enabled,
+    /// this value is recommended to set equal or bigger than [`Self::rx_ba_win`] in order to
+    /// achieve better throughput and compatibility with both stations and APs.
+    static_rx_buf_num: u8,
+
+    /// Max number of WiFi dynamic RX buffers
+    ///
+    /// Set the number of WiFi dynamic RX buffers, 0 means unlimited RX buffers will be allocated
+    /// (provided sufficient free RAM). The size of each dynamic RX buffer depends on the size of
+    /// the received data frame.
+    ///
+    /// For each received data frame, the WiFi driver makes a copy to an RX buffer and then
+    /// delivers it to the high layer TCP/IP stack. The dynamic RX buffer is freed after the
+    /// higher layer has successfully received the data frame.
+    ///
+    /// For some applications, WiFi data frames may be received faster than the application can
+    /// process them. In these cases we may run out of memory if RX buffer number is unlimited
+    /// (0).
+    ///
+    /// If a dynamic RX buffer limit is set, it should be at least the number of
+    /// static RX buffers.
+    dynamic_rx_buf_num: u16,
+
+    /// Set the number of WiFi static TX buffers.
+    ///
+    /// Each buffer takes approximately 1.6KB of RAM.
+    /// The static RX buffers are allocated when esp_wifi_init() is called, they are not released
+    /// until esp_wifi_deinit() is called.
+    ///
+    /// For each transmitted data frame from the higher layer TCP/IP stack, the WiFi driver makes a
+    /// copy of it in a TX buffer.
+    ///
+    /// For some applications especially UDP applications, the upper layer can deliver frames
+    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    static_tx_buf_num: u8,
+
+    /// Set the number of WiFi dynamic TX buffers.
+    ///
+    /// The size of each dynamic TX buffer is not fixed,
+    /// it depends on the size of each transmitted data frame.
+    ///
+    /// For each transmitted frame from the higher layer TCP/IP stack, the WiFi driver makes a copy
+    /// of it in a TX buffer.
+    ///
+    /// For some applications, especially UDP applications, the upper layer can deliver frames
+    /// faster than WiFi layer can transmit. In these cases, we may run out of TX buffers.
+    dynamic_tx_buf_num: u16,
+
+    /// Select this option to enable AMPDU RX feature.
+    ampdu_rx_enable: bool,
+
+    /// Select this option to enable AMPDU TX feature.
+    ampdu_tx_enable: bool,
+
+    /// Select this option to enable AMSDU TX feature.
+    amsdu_tx_enable: bool,
+
+    /// Set the size of WiFi Block Ack RX window.
+    ///
+    /// Generally a bigger value means higher throughput and better compatibility but more memory.
+    /// Most of time we should NOT change the default value unless special reason, e.g. test
+    /// the maximum UDP RX throughput with iperf etc. For iperf test in shieldbox, the
+    /// recommended value is 9~12.
+    ///
+    /// If PSRAM is used and WiFi memory is preferred to allocate in PSRAM first, the default and
+    /// minimum value should be 16 to achieve better throughput and compatibility with both
+    /// stations and APs.
+    rx_ba_win: u8,
 }
 
 impl Default for WifiConfig {
@@ -2815,6 +2902,32 @@ impl Default for WifiConfig {
         Self {
             power_save_mode: PowerSaveMode::None,
             country_code: CountryInfo::from(*b"CN"),
+
+            rx_queue_size: 5,
+            tx_queue_size: 3,
+
+            static_rx_buf_num: 10,
+            dynamic_rx_buf_num: 32,
+
+            static_tx_buf_num: 0,
+            dynamic_tx_buf_num: 32,
+
+            ampdu_rx_enable: true,
+            ampdu_tx_enable: true,
+            amsdu_tx_enable: false,
+
+            rx_ba_win: 6,
+        }
+    }
+}
+
+impl WifiConfig {
+    fn validate(&self) {
+        if self.rx_ba_win as u16 >= self.dynamic_rx_buf_num {
+            warn!("RX BA window size should be less than the number of dynamic RX buffers.");
+        }
+        if self.rx_ba_win as u16 >= 2 * (self.static_rx_buf_num as u16) {
+            warn!("RX BA window size should be less than twice the number of static RX buffers.");
         }
     }
 }
@@ -2834,27 +2947,28 @@ pub fn new<'d>(
         return Err(WifiError::Unsupported);
     }
 
+    config.validate();
+
     unsafe {
         internal::G_CONFIG = wifi_init_config_t {
             osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
 
-            // dummy for now - populated in init
             wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-            static_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
-            dynamic_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
+            static_rx_buf_num: config.static_rx_buf_num as _,
+            dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
             tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-            static_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
-            dynamic_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
+            static_tx_buf_num: config.static_tx_buf_num as _,
+            dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
             rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
             rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
             cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
             csi_enable: cfg!(feature = "csi") as i32,
-            ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE") as i32,
-            ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE") as i32,
-            amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE") as i32,
+            ampdu_rx_enable: config.ampdu_rx_enable as _,
+            ampdu_tx_enable: config.ampdu_tx_enable as _,
+            amsdu_tx_enable: config.amsdu_tx_enable as _,
             nvs_enable: 0,
             nano_enable: 0,
-            rx_ba_win: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_BA_WIN"),
+            rx_ba_win: config.rx_ba_win as _,
             wifi_task_core_id: 0,
             beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
             mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
@@ -2867,7 +2981,10 @@ pub fn new<'d>(
             dump_hesigb_enable: false,
 
             magic: WIFI_INIT_CONFIG_MAGIC as i32,
-        }
+        };
+
+        RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
+        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
     };
 
     crate::wifi::wifi_init()?;
