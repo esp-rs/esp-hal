@@ -17,12 +17,13 @@ use core::{
 };
 
 use enumset::{EnumSet, EnumSetType};
-use esp_config::esp_config_int;
+use esp_config::{esp_config_bool, esp_config_int};
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
 #[cfg(all(any(feature = "sniffer", feature = "esp-now"), feature = "unstable"))]
 use esp_wifi_sys::include::wifi_pkt_rx_ctrl_t;
 use esp_wifi_sys::include::{
+    WIFI_INIT_CONFIG_MAGIC,
     WIFI_PROTOCOL_11AX,
     WIFI_PROTOCOL_11B,
     WIFI_PROTOCOL_11G,
@@ -30,6 +31,7 @@ use esp_wifi_sys::include::{
     WIFI_PROTOCOL_LR,
     esp_wifi_connect_internal,
     esp_wifi_disconnect_internal,
+    wifi_init_config_t,
     wifi_scan_channel_bitmap_t,
 };
 #[cfg(feature = "wifi-eap")]
@@ -1370,9 +1372,6 @@ pub fn sta_mac() -> [u8; 6] {
 
 pub(crate) fn wifi_init() -> Result<(), WifiError> {
     unsafe {
-        internal::G_CONFIG.wpa_crypto_funcs = g_wifi_default_wpa_crypto_funcs;
-        internal::G_CONFIG.feature_caps = internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS;
-
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
 
@@ -2834,6 +2833,42 @@ pub fn new<'d>(
     if crate::is_interrupts_disabled() {
         return Err(WifiError::Unsupported);
     }
+
+    unsafe {
+        internal::G_CONFIG = wifi_init_config_t {
+            osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+            // dummy for now - populated in init
+            wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+            static_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_QUEUE_SIZE"),
+            dynamic_rx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_RX_BUF_NUM"),
+            tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+            static_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_STATIC_TX_BUF_NUM"),
+            dynamic_tx_buf_num: esp_config_int!(i32, "ESP_RADIO_CONFIG_DYNAMIC_TX_BUF_NUM"),
+            rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
+            rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
+            cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+            csi_enable: cfg!(feature = "csi") as i32,
+            ampdu_rx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_RX_ENABLE") as i32,
+            ampdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMPDU_TX_ENABLE") as i32,
+            amsdu_tx_enable: esp_config_bool!("ESP_RADIO_CONFIG_AMSDU_TX_ENABLE") as i32,
+            nvs_enable: 0,
+            nano_enable: 0,
+            rx_ba_win: esp_config_int!(i32, "ESP_RADIO_CONFIG_RX_BA_WIN"),
+            wifi_task_core_id: 0,
+            beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+            mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
+            feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+            sta_disconnected_pm: false,
+            espnow_max_encrypt_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
+                as i32,
+
+            tx_hetb_queue_num: 3,
+            dump_hesigb_enable: false,
+
+            magic: WIFI_INIT_CONFIG_MAGIC as i32,
+        }
+    };
 
     crate::wifi::wifi_init()?;
 
