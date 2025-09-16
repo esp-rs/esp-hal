@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 use inquire::Select;
@@ -97,7 +97,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     let chip = args.chip.unwrap();
 
     // Ensure that the package/chip combination provided are valid:
-    args.package.validate_package_chip(&chip)?;
+    args.package.validate_package_chip(&chip).with_context(|| {
+        format!(
+            "The package '{0}' does not support the chip '{chip:?}'",
+            args.package
+        )
+    })?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -119,7 +124,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
     let examples = if args.package == Package::Examples {
-        crate::firmware::load_cargo_toml(&package_path)?
+        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
+            format!(
+                "Failed to load specified examples from {}",
+                package_path.display()
+            )
+        })?
     } else {
         let example_path = match args.package {
             Package::QaTest => package_path.join("src").join("bin"),

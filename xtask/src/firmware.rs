@@ -187,7 +187,7 @@ fn parse_meta_line(line: &str) -> anyhow::Result<MetaLine> {
 pub fn load(path: &Path) -> Result<Vec<Metadata>> {
     let mut examples = Vec::new();
 
-    for entry in fs::read_dir(path)? {
+    for entry in fs::read_dir(path).context("Failed to read {path}")? {
         log::debug!("Loading example from path: {}", path.display());
         let path = windows_safe_path(&entry?.path());
         let text = fs::read_to_string(&path)

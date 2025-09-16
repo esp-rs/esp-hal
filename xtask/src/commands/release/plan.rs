@@ -228,9 +228,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 "#,
     );
 
-    let mut plan_file = std::fs::File::create(&plan_path)?;
-    plan_file.write_all(plan_header.as_bytes())?;
-    serde_json::to_writer_pretty(&mut plan_file, &plan)?;
+    let mut plan_file = std::fs::File::create(&plan_path)
+        .with_context(|| format!("Failed to create {plan_path:?}"))?;
+    plan_file
+        .write_all(plan_header.as_bytes())
+        .with_context(|| format!("Failed to write to {plan_file:?}"))?;
+    serde_json::to_writer_pretty(&mut plan_file, &plan)
+        .with_context(|| format!("Failed to serialize {plan:?} as pretty-printed JSON"))?;
     log::debug!("Release plan written to {}", plan_path.display());
 
     println!("Release plan written to {}.", plan_path.display());

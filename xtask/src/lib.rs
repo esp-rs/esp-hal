@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
@@ -539,9 +539,9 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
         src.as_ref().display(),
         dst.as_ref().display()
     );
-    fs::create_dir_all(&dst)?;
+    fs::create_dir_all(&dst).with_context(|| "Failed to create a {dst}")?;
 
-    for entry in fs::read_dir(src)? {
+    for entry in fs::read_dir(src).with_context(|| "Failed to read {src}")? {
         let entry = entry?;
         let ty = entry.file_type()?;
 
@@ -559,7 +559,7 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
 /// workspace.
 pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
-    for entry in fs::read_dir(workspace)? {
+    for entry in fs::read_dir(workspace).context("Failed to read {workspace}")? {
         let entry = entry?;
         if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
             paths.push(entry.path());
@@ -734,7 +734,8 @@ pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     if check {
         let res = std::process::Command::new("git")
             .args(["diff", "HEAD", "esp-metadata-generated"])
-            .output()?;
+            .output()
+            .context("Failed to run `git diff HEAD esp-metadata-generated`")?;
         if !res.stdout.is_empty() {
             return Err(anyhow::Error::msg(
                 "detected `esp-metadata-generated` changes. Run `cargo xtask update-metadata`, and commit the changes.",
@@ -788,7 +789,8 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
 fn update_chip_support_table(workspace: &Path) -> Result<()> {
     log::debug!("Updating chip support table in README.md...");
     let mut output = String::new();
-    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
+    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))
+        .context("Failed to read {workspace}")?;
 
     let mut in_support_table = false;
     let mut generate_support_table = true;
@@ -823,7 +825,9 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
 pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 
-    for result in fs::read_dir(path)? {
+    for result in
+        fs::read_dir(path).with_context(|| format!("Failed to read {}", path.display()))?
+    {
         log::debug!("Inspecting path: {}", path.display());
         let entry = result?;
         if entry.path().is_file() {

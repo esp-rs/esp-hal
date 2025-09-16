@@ -96,7 +96,9 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
 /// Run all ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-    for elf in fs::read_dir(&args.path)? {
+    for elf in fs::read_dir(&args.path)
+        .with_context(|| format!("Failed to read {}", args.path.display()))?
+    {
         let entry = elf?;
 
         let elf_path = entry.path();

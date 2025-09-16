@@ -91,7 +91,8 @@ pub fn publish_plan(workspace: &Path, args: PublishPlanArgs) -> Result<()> {
         log::debug!("{args:#?}");
 
         // Execute `cargo publish` command from the package root:
-        crate::cargo::run(&args, &toml.package_path())?;
+        crate::cargo::run(&args, &toml.package_path())
+            .with_context(|| format!("Failed to run `cargo publish` with {args:?} args"))?;
     }
 
     // Tag the releases

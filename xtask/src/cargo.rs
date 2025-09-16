@@ -28,8 +28,9 @@ pub struct Artifact {
 
 /// Execute cargo with the given arguments and from the specified directory.
 pub fn run(args: &[String], cwd: &Path) -> Result<()> {
-    log::debug!("Running cargo with args: {:?} in {:?}", args, cwd);
-    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], false)?;
+    run_with_env::<[(&str, &str); 0], _, _>(args, cwd, [], false).with_context(|| {
+        format!("Failed to execute cargo with given arguments {args:?} in cwd {cwd:?}",)
+    })?;
     Ok(())
 }
 
@@ -79,7 +80,10 @@ where
         command.env_remove("CARGO");
     }
 
-    let output = command.stdin(Stdio::inherit()).output()?;
+    let output = command
+        .stdin(Stdio::inherit())
+        .output()
+        .with_context(|| format!("Couldn't get output for command {command:?}"))?;
 
     // Make sure that we return an appropriate exit code here, as Github Actions
     // requires this in order to function correctly:
@@ -254,7 +258,9 @@ impl<'a> CargoToml<'a> {
         Ok(Self {
             workspace,
             package,
-            manifest: manifest.parse::<DocumentMut>()?,
+            manifest: manifest
+                .parse::<DocumentMut>()
+                .with_context(|| format!("Manifest {manifest} parsing failed!"))?,
         })
     }
 
