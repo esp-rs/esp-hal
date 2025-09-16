@@ -274,6 +274,7 @@ impl Package {
             Package::EspPrintln => {
                 features.push("auto".to_owned());
                 features.push("defmt-espflash".to_owned());
+                features.push("critical-section".to_owned());
             }
             Package::EspStorage => {}
             Package::EspBootloaderEspIdf => {

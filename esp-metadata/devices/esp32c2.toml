@@ -62,6 +62,7 @@ symbols = [
     # Additional peripherals defined by us (the developers):
     "gdma",
     "phy",
+    "swd",
 
     # ROM capabilities
     "rom_crc_le",

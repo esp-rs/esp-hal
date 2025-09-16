@@ -189,10 +189,10 @@ impl<'d> Camera<'d> {
         )
         .map_err(ConfigError::Clock)?;
 
-        if let Some(value) = config.line_interrupt {
-            if value > 0b0111_1111 {
-                return Err(ConfigError::LineInterrupt);
-            }
+        if let Some(value) = config.line_interrupt
+            && value > 0b0111_1111
+        {
+            return Err(ConfigError::LineInterrupt);
         }
 
         self.regs().cam_ctrl().write(|w| {

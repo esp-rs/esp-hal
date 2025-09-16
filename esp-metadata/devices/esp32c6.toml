@@ -110,6 +110,7 @@ symbols = [
     "plic",
     "phy",
     "lp_core",
+    "swd",
 
     # ROM capabilities
     "rom_crc_le",
