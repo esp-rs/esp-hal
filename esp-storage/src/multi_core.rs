@@ -154,7 +154,7 @@ impl Cpu {
                         return false;
                     }
                     let appcpu_ctrl_c = registers::APPCPU_CTRL_C as *mut u32;
-                    if unsafe { appcpu_ctrl_c.read_volatile() } & 0x01 != 0x01 {
+                    if unsafe { appcpu_ctrl_c.read_volatile() } & 0x01 == 0x01 {
                         // If the core is stalled we can take this shortcut
                         return false;
                     }
