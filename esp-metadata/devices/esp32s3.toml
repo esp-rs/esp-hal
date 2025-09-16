@@ -90,6 +90,7 @@ symbols = [
     "psram",
     "psram_dma",
     "octal_psram",
+    "swd",
     "ulp_riscv_core",
 
     # ROM capabilities
