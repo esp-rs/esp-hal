@@ -24,7 +24,8 @@ const C1_VALUE_APP: u32 = 0x21 << 20;
 
 /// Strategy to use on a multi core system where writing to the flash needs exclusive access from
 /// one core
-#[derive(Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum MultiCoreStrategy {
     /// Flash writes simply fail if the second core is active while attempting a write (default
     /// behavior)
