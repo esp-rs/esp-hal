@@ -635,8 +635,8 @@ impl Default for RxChannelConfig {
 // Channel specification
 
 // Looping all channels: Build up the Rmt struct and compute NUM_CHANNELS
-macro_rules! declare_channels {
-    ($($num:literal),+ $(,)?) => {
+for_each_rmt_channel!(
+    (all $(($num:literal)),+) => {
         paste::paste! {
             /// RMT Instance
             pub struct Rmt<'d, Dm>
@@ -670,12 +670,10 @@ macro_rules! declare_channels {
             const NUM_CHANNELS: usize = const { 0 $( + {$num; 1} )+ };
         }
     };
-}
 
-// Looping channel indices: Declare input/output signals and ChannelIndex
-// The number of Rx and Tx channels is identical for all chips.
-macro_rules! declare_tx_channels {
-    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+    // Looping channel indices: Declare input/output signals and ChannelIndex
+    // The number of Rx and Tx channels is identical for all chips.
+    (tx $(($num:literal, $idx:literal)),+) => {
         paste::paste! {
             // Enum of valid channel indices: For the given chip, tx/rx channels for all of these indices
             // exist. (Note that channel index == channel number for esp32 and esp32s2, but not for other
@@ -692,7 +690,7 @@ macro_rules! declare_tx_channels {
             #[allow(unused)]
             pub enum ChannelIndex {
                 $(
-                    [< Ch $idx>] = $idx,
+                    [<Ch $idx>] = $idx,
                 )+
             }
 
@@ -701,7 +699,7 @@ macro_rules! declare_tx_channels {
 
             const OUTPUT_SIGNALS: [gpio::OutputSignal; CHANNEL_INDEX_COUNT as usize] = [
                 $(
-                    gpio::OutputSignal::[< RMT_SIG_ $idx >],
+                    gpio::OutputSignal::[<RMT_SIG_ $idx>],
                 )+
             ];
 
@@ -724,14 +722,12 @@ macro_rules! declare_tx_channels {
             )+
         }
     };
-}
 
-macro_rules! declare_rx_channels {
-    ($([$num:literal, $idx:literal]),+ $(,)?) => {
+    (rx $(($num:literal, $idx:literal)),+) => {
         paste::paste! {
             const INPUT_SIGNALS: [gpio::InputSignal; CHANNEL_INDEX_COUNT as usize] = [
                 $(
-                    gpio::InputSignal::[< RMT_SIG_ $idx >],
+                    gpio::InputSignal::[<RMT_SIG_ $idx>],
                 )+
             ];
 
@@ -754,7 +750,7 @@ macro_rules! declare_rx_channels {
             )+
         }
     };
-}
+);
 
 struct ChannelIndexIter(u8);
 
@@ -780,70 +776,6 @@ impl ChannelIndex {
     unsafe fn from_u8_unchecked(ch_idx: u8) -> Self {
         debug_assert!(ch_idx < CHANNEL_INDEX_COUNT);
         unsafe { core::mem::transmute(ch_idx) }
-    }
-}
-
-cfg_if::cfg_if! {
-    if #[cfg(esp32)] {
-        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
-        declare_tx_channels!(
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 3],
-            [4, 4],
-            [5, 5],
-            [6, 6],
-            [7, 7],
-        );
-        declare_rx_channels!(
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 3],
-            [4, 4],
-            [5, 5],
-            [6, 6],
-            [7, 7],
-        );
-    } else if #[cfg(esp32s2)] {
-        declare_channels!(0, 1, 2, 3);
-        declare_tx_channels!(
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 3],
-        );
-        declare_rx_channels!(
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 3],
-        );
-    } else if #[cfg(esp32s3)] {
-        declare_channels!(0, 1, 2, 3, 4, 5, 6, 7);
-        declare_tx_channels!(
-            [0, 0],
-            [1, 1],
-            [2, 2],
-            [3, 3],
-        );
-        declare_rx_channels!(
-            [4, 0],
-            [5, 1],
-            [6, 2],
-            [7, 3],
-        );
-    } else {
-        declare_channels!(0, 1, 2, 3);
-        declare_tx_channels!(
-            [0, 0],
-            [1, 1],
-        );
-        declare_rx_channels!(
-            [2, 0],
-            [3, 1],
-        );
     }
 }
 

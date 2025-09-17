@@ -423,6 +423,7 @@ status_registers = 3
 support_status = "partial"
 ram_start = 0x3f416400
 channel_ram_size = 64
+channels = ["RxTx", "RxTx", "RxTx", "RxTx"]
 
 [device.rsa]
 support_status = "partial"

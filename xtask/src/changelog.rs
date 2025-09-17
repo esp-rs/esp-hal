@@ -10,6 +10,7 @@ pub(crate) struct Changelog {
 }
 
 impl Changelog {
+    /// Parse the changelog, normalizing it in the process.
     pub fn parse(changelog: &str) -> Result<Self> {
         let mut lines = changelog.lines().peekable();
 
@@ -44,6 +45,7 @@ impl Changelog {
         Ok(this)
     }
 
+    /// Finalize the changelog for a new release.
     pub fn finalize(
         &mut self,
         package: Package,

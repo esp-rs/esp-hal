@@ -306,6 +306,7 @@ status_registers = 2
 support_status = "partial"
 ram_start = 0x60016400
 channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
 
 [device.rsa]
 support_status = "partial"

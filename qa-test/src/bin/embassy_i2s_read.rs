@@ -6,7 +6,7 @@
 //! You can also inspect the MCLK, BCLK and WS with a logic analyzer.
 //!
 //! The following wiring is assumed:
-//! - MCLK =>  GPIO0 (not supported on ESP32)
+//! - MCLK =>  GPIO0
 //! - BCLK =>  GPIO2
 //! - WS   =>  GPIO4
 //! - DIN  =>  GPIO5
@@ -55,10 +55,8 @@ async fn main(_spawner: Spawner) {
             .with_channels(Channels::STEREO),
     )
     .unwrap()
+    .with_mclk(peripherals.GPIO0)
     .into_async();
-
-    #[cfg(not(feature = "esp32"))]
-    let i2s = i2s.with_mclk(peripherals.GPIO0);
 
     let i2s_rx = i2s
         .i2s_rx

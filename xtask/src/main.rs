@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
 use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
@@ -131,7 +131,8 @@ fn main() -> Result<()> {
     builder.target(env_logger::Target::Stdout);
     builder.init();
 
-    let workspace = std::env::current_dir()?;
+    let workspace =
+        std::env::current_dir().with_context(|| format!("Failed to get the current dir!"))?;
     let target_path = Path::new("target");
 
     match Cli::parse() {
@@ -197,6 +198,7 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
+        log::info!("Formatting package: {}", package);
         xtask::format_package(workspace, package, args.check)?;
     }
 
@@ -213,13 +215,19 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
 
         let cargo_args = CargoArgsBuilder::default().subcommand("clean").build();
 
-        xtask::cargo::run(&cargo_args, &path)?;
+        xtask::cargo::run(&cargo_args, &path).with_context(|| {
+            format!(
+                "Failed to run `cargo run` with {cargo_args:?} in {}",
+                path.display()
+            )
+        })?;
     }
 
     Ok(())
 }
 
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+    log::debug!("Linting packages: {:?}", args.packages);
     let mut packages = args.packages;
     packages.sort();
 
@@ -228,6 +236,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
         // building, so we need to handle each individually (though there
         // is *some* overlap)
         for chip in &args.chips {
+            log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
             if package.validate_package_chip(chip).is_err() {
@@ -317,7 +326,13 @@ fn lint_package(
         &path,
         [("CI", "1"), ("DEFMT_LOG", "trace")],
         false,
-    )?;
+    )
+    .with_context(|| {
+        format!(
+            "Failed to run `cargo run` with {args:?} `CI, `1`, `DEFMT_LOG`, and `trace` envs in {}",
+            path.display()
+        )
+    })?;
 
     Ok(())
 }
@@ -370,6 +385,7 @@ impl Runner {
 }
 
 fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
+    log::info!("Running CI checks for chip: {}", args.chip);
     println!("::add-matcher::.github/rust-matchers.json");
 
     let mut runner = Runner::new();
@@ -440,21 +456,35 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     "./esp-lp-hal/target/{}/release/examples",
                     args.chip.target()
                 ));
-                from_dir.read_dir()?.for_each(|entry| {
-                    let entry = entry.unwrap();
-                    let path = entry.path();
-                    let to = to_dir.join(entry.file_name());
-                    fs::copy(path, to).expect("Failed to copy file");
-                });
+                from_dir
+                    .read_dir()
+                    .with_context(|| format!("Failed to read from {}", from_dir.display()))?
+                    .for_each(|entry| {
+                        let entry = entry.unwrap();
+                        let path = entry.path();
+                        let to = to_dir.join(entry.file_name());
+                        fs::copy(&path, &to).expect(
+                            format!("Failed to copy {} to {}", path.display(), to.display())
+                                .as_str(),
+                        );
+                    });
                 Ok(())
             });
 
             // remove the (now) obsolete duplicates
+            log::debug!("Removing obsolete LP-HAL example duplicates");
             std::fs::remove_dir_all(PathBuf::from(format!(
                 "./esp-lp-hal/target/{}/release/examples/{}",
                 args.chip.target(),
                 args.chip
-            )))?;
+            )))
+            .with_context(|| {
+                format!(
+                    "Failed to remove duplicates in ./esp-lp-hal/target/{}/release/examples/{}",
+                    args.chip.target(),
+                    args.chip
+                )
+            })?;
 
             result
         });
@@ -489,8 +519,10 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
     runner.run("Build examples", || {
         // The `ota_example` expects a file named `examples/target/ota_image` - it
         // doesn't care about the contents however
-        std::fs::create_dir_all("./examples/target")?;
-        std::fs::write("./examples/target/ota_image", "DUMMY")?;
+        std::fs::create_dir_all("./examples/target")
+            .with_context(|| format!("Failed to create `./examples/target`"))?;
+        std::fs::write("./examples/target/ota_image", "DUMMY")
+            .with_context(|| format!("Failed to create a dummy file required by ota example!"))?;
 
         examples(
             workspace,
@@ -529,6 +561,7 @@ fn host_tests(workspace: &Path, args: HostTestsArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
+        log::debug!("Running host-tests for package: {}", package);
         if package.has_host_tests(workspace) {
             xtask::run_host_tests(workspace, package)?;
         }

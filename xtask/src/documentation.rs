@@ -22,12 +22,14 @@ struct Manifest {
     versions: HashSet<semver::Version>,
 }
 
+/// Build the documentation for the specified packages and chips.
 pub fn build_documentation(
     workspace: &Path,
     packages: &mut [Package],
     chips: &mut [Chip],
     base_url: Option<String>,
 ) -> Result<()> {
+    log::info!("Building documentation for packages: {packages:?} on chips: {chips:?}");
     let output_path = workspace.join("docs");
 
     fs::create_dir_all(&output_path)
@@ -77,8 +79,10 @@ pub fn build_documentation(
         // Write out the package manifest JSON file:
         fs::write(
             output_path.join(package.to_string()).join("manifest.json"),
-            serde_json::to_string(&manifest)?,
-        )?;
+            serde_json::to_string(&manifest)
+                .with_context(|| format!("Failed to parse {manifest:?}"))?,
+        )
+        .with_context(|| format!("Failed to write out {}", output_path.display()))?;
 
         // Patch the generated documentation to include a select box for the version:
         #[cfg(feature = "deploy-docs")]
@@ -152,18 +156,21 @@ fn build_documentation_for_package(
         output_path.parent().unwrap().join("latest")
     };
     log::info!("Creating latest version redirect at {:?}", latest_path);
-    create_dir_all(latest_path.clone())?;
-    std::fs::File::create(latest_path.clone().join("index.html"))?.write_all(
-        format!(
-            "<meta http-equiv=\"refresh\" content=\"0; url=../{}/\" />",
-            if package.chip_features_matter() {
-                version.to_string()
-            } else {
-                format!("{}/{}", version, package.to_string().replace('-', "_"))
-            }
+    create_dir_all(latest_path.clone())
+        .with_context(|| format!("Failed to create dir in {}", latest_path.display()))?;
+    std::fs::File::create(latest_path.clone().join("index.html"))?
+        .write_all(
+            format!(
+                "<meta http-equiv=\"refresh\" content=\"0; url=../{}/\" />",
+                if package.chip_features_matter() {
+                    version.to_string()
+                } else {
+                    format!("{}/{}", version, package.to_string().replace('-', "_"))
+                }
+            )
+            .as_bytes(),
         )
-        .as_bytes(),
-    )?;
+        .with_context(|| format!("Failed to create or write to {}", latest_path.display()))?;
 
     Ok(())
 }
@@ -184,6 +191,8 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     } else {
         "nightly"
     };
+
+    log::debug!("Using toolchain '{toolchain}'");
 
     // Determine the appropriate build target for the given package and chip,
     // if we're able to:
@@ -263,7 +272,9 @@ fn patch_documentation_index_for_package(
     let mut index_paths = Vec::new();
 
     if package.chip_features_matter() {
-        for chip_path in fs::read_dir(version_path)? {
+        for chip_path in fs::read_dir(&version_path)
+            .with_context(|| format!("Failed to read {}", version_path.display()))?
+        {
             let chip_path = chip_path?.path();
             if chip_path.is_dir() {
                 let path = chip_path.join(&package_name).join("index.html");
@@ -276,7 +287,8 @@ fn patch_documentation_index_for_package(
     }
 
     for (version, index_path) in index_paths {
-        let html = fs::read_to_string(&index_path)?;
+        let html = fs::read_to_string(&index_path)
+            .with_context(|| format!("Failed to read {}", index_path.display()))?;
         let document = kuchikiki::parse_html().one(html);
 
         let elem = document
@@ -294,7 +306,8 @@ fn patch_documentation_index_for_package(
         let node = elem.as_node();
         node.append(kuchikiki::parse_html().one(html));
 
-        fs::write(&index_path, document.to_string())?;
+        fs::write(&index_path, document.to_string())
+            .with_context(|| format!("Failed to write to {}", index_path.display()))?;
     }
 
     Ok(())
@@ -303,6 +316,7 @@ fn patch_documentation_index_for_package(
 // ----------------------------------------------------------------------------
 // Build Documentation Index
 
+/// Build the documentation index for all packages.
 pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> Result<()> {
     let docs_path = workspace.join("docs");
     let resources_path = workspace.join("resources");
@@ -310,6 +324,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     packages.sort();
 
     for package in packages {
+        log::debug!("Building documentation index for package '{package}'");
         // Not all packages have documentation built:
         if !package.is_published(workspace) {
             continue;
@@ -336,7 +351,9 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
             );
             continue;
         }
-        for version_path in fs::read_dir(package_docs_path)? {
+        for version_path in fs::read_dir(&package_docs_path)
+            .with_context(|| format!("Failed to read {}", &package_docs_path.display()))?
+        {
             let version_path = version_path?.path();
             if version_path.is_file() {
                 log::debug!(
@@ -350,7 +367,9 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
                 continue;
             }
 
-            for path in fs::read_dir(&version_path)? {
+            for path in fs::read_dir(&version_path)
+                .with_context(|| format!("Failed to read {}", version_path.display()))?
+            {
                 let path = path?.path();
                 if path.is_dir() {
                     device_doc_paths.push(path);
@@ -433,6 +452,8 @@ fn generate_documentation_meta_for_package(
         });
     }
 
+    log::debug!("Generated metadata for package '{package}': {metadata:#?}");
+
     Ok(metadata)
 }
 
@@ -460,6 +481,8 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
             url => url,
         });
     }
+
+    log::debug!("Generated metadata for documentation index: {metadata:#?}");
 
     Ok(metadata)
 }
