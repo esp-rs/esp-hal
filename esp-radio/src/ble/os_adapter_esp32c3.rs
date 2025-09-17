@@ -157,11 +157,11 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
 
 extern "C" fn get_time_us_wrapper() -> u64 {
     // Get time in microseconds since boot
-    todo!()
+    crate::preempt::now()
 }
 
 extern "C" fn assert_wrapper() {
-    todo!()
+    panic!("assert_wrapper called - inspect the logs");
 }
 
 extern "C" fn coex_schm_register_btdm_callback(_callback: *const ()) -> i32 {
