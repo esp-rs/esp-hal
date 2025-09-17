@@ -1,7 +1,7 @@
 //! RMT Loopback Test
 
 //% CHIPS: esp32 esp32c3 esp32c6 esp32h2 esp32s2 esp32s3
-//% FEATURES: unstable
+//% FEATURES: embassy unstable
 
 #![no_std]
 #![no_main]
@@ -576,6 +576,67 @@ mod tests {
 
         tx_transaction.wait().unwrap();
         rx_transaction.wait().unwrap();
+
+        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+    }
+
+    // Test that dropping rx/tx futures returns the hardware to a predictable state from which
+    // subsequent transactions are successful.
+    #[test]
+    async fn rmt_loopback_after_drop_async() {
+        use embassy_time::Delay;
+        use embedded_hal_async::delay::DelayNs;
+
+        const TX_LEN: usize = 40;
+
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        hil_test::init_embassy!(peripherals, 2);
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let pin = Flex::new(pin);
+        let (rx_pin, tx_pin) = pin.split();
+
+        let tx_config = TxChannelConfig::default()
+            // If not enabling a defined idle_output level, the output might remain high after
+            // dropping the tx future, which will lead to an extra edge being received.
+            .with_idle_output(true);
+        let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
+
+        let (mut tx_channel, mut rx_channel) = setup(rmt, rx_pin, tx_pin, tx_config, rx_config);
+
+        let tx_data: [_; TX_LEN] = generate_tx_data(true);
+        let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::end_marker(); TX_LEN];
+
+        // Start the transactions...
+        let rx_fut = rx_channel.receive(&mut rcv_data);
+        let tx_fut = tx_channel.transmit(&tx_data);
+
+        Delay.delay_ms(2).await;
+
+        // ...poll them, but then drop them before completion...
+        // (`poll_once` takes the future by value and drops it before returning)
+        let rx_poll = embassy_futures::poll_once(rx_fut);
+        let tx_poll = embassy_futures::poll_once(tx_fut);
+
+        // The test should fail here when the the delay above is increased, e.g. to 100ms.
+        assert!(rx_poll.is_pending());
+        assert!(tx_poll.is_pending());
+
+        // ...then start over and check that everything still works as expected (i.e. we
+        // didn't leave the hardware in an unexpected state or lock up when
+        // dropping the futures).
+        rcv_data.fill(PulseCode::default());
+        let (rx_res, tx_res) = embassy_futures::join::join(
+            rx_channel.receive(&mut rcv_data),
+            tx_channel.transmit(&tx_data),
+        )
+        .await;
+
+        tx_res.unwrap();
+        rx_res.unwrap();
 
         check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
     }

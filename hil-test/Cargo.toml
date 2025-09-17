@@ -143,6 +143,7 @@ harness = false
 [[bin]]
 name    = "rmt"
 harness = false
+required-features = ["embassy"]
 
 [[bin]]
 name    = "rsa"
