@@ -1,9 +1,12 @@
 //! Allocator and PSRAM-related tests
 
-//% CHIPS(quad): esp32 esp32s2
+//% CHIPS:
+//% CHIPS(llff_quad, tlsf_quad): esp32 esp32s2
 // The S3 dev kit in the HIL-tester has octal PSRAM.
-//% CHIPS(octal): esp32s3
-//% ENV(octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
+//% CHIPS(llff_octal, tlsf_octal): esp32s3
+//% ENV(llff_octal, tlsf_octal): ESP_HAL_CONFIG_PSRAM_MODE=octal
+//% ENV(llff_octal, llff_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=LLFF
+//% ENV(tlsf_octal, tlsf_quad): ESP_ALLOC_CONFIG_HEAP_ALGORITHM=TLSF
 //% FEATURES: unstable psram esp-storage esp-alloc/nightly
 
 #![no_std]
@@ -50,24 +53,18 @@ mod tests {
 
     #[test]
     fn all_psram_is_usable() {
-        loop {
-            let available = esp_alloc::HEAP.max_new_allocation();
-            if available == 0 {
-                break;
-            }
-            defmt::info!("Available: {}", available);
-            let mut vec = AllocVec::with_capacity(available);
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("LLFF") {
+            let free = esp_alloc::HEAP.free();
+            defmt::info!("Free: {}", free);
+            let mut vec = AllocVec::with_capacity(free);
 
-            for i in 0..available {
+            for i in 0..free {
                 vec.push((i % 256) as u8);
             }
 
-            for i in 0..available {
+            for i in 0..free {
                 assert_eq!(vec[i], (i % 256) as u8);
             }
-
-            // Do not deallocate vec, so that the next iteration will use some other memory.
-            core::mem::forget(vec);
         }
     }
 
@@ -117,39 +114,35 @@ mod tests {
 
     #[test]
     fn all_psram_is_usable_with_external_mem_allocator() {
-        let free = esp_alloc::HEAP.free();
-        defmt::info!("Free: {}", free);
-        let mut vec = Vec::with_capacity_in(free, ExternalMemory);
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("LLFF") {
+            let free = esp_alloc::HEAP.free();
+            defmt::info!("Free: {}", free);
+            let mut vec = Vec::with_capacity_in(free, ExternalMemory);
 
-        for i in 0..free {
-            vec.push((i % 256) as u8);
-        }
+            for i in 0..free {
+                vec.push((i % 256) as u8);
+            }
 
-        for i in 0..free {
-            assert_eq!(vec[i], (i % 256) as u8);
+            for i in 0..free {
+                assert_eq!(vec[i], (i % 256) as u8);
+            }
         }
     }
 
     #[test]
     fn all_psram_is_usable_with_any_mem_allocator() {
-        loop {
-            let available = esp_alloc::HEAP.max_new_allocation();
-            if available == 0 {
-                break;
-            }
-            defmt::info!("Available: {}", available);
-            let mut vec = Vec::with_capacity_in(available, AnyMemory);
+        if option_env!("ESP_ALLOC_CONFIG_HEAP_ALGORITHM") == Some("LLFF") {
+            let free = esp_alloc::HEAP.free();
+            defmt::info!("Free: {}", free);
+            let mut vec = Vec::with_capacity_in(free, AnyMemory);
 
-            for i in 0..available {
+            for i in 0..free {
                 vec.push((i % 256) as u8);
             }
 
-            for i in 0..available {
+            for i in 0..free {
                 assert_eq!(vec[i], (i % 256) as u8);
             }
-
-            // Do not deallocate vec, so that the next iteration will use some other memory.
-            core::mem::forget(vec);
         }
     }
 

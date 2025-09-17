@@ -25,10 +25,6 @@ impl LlffHeap {
         self.heap.free()
     }
 
-    pub fn max_new_allocation(&self) -> usize {
-        self.free()
-    }
-
     pub fn allocate(&mut self, layout: Layout) -> Option<NonNull<u8>> {
         self.heap.allocate_first_fit(layout).ok()
     }

@@ -53,18 +53,6 @@ impl TlsfHeap {
         free
     }
 
-    pub fn max_new_allocation(&self) -> usize {
-        let mut allocable = 0;
-        let pool =
-            unsafe { core::slice::from_raw_parts(self.pool_start as *const u8, self.size()) };
-        for block in unsafe { self.heap.iter_blocks(NonNull::from(pool)) } {
-            if !block.is_occupied() {
-                allocable = allocable.max(block.max_payload_size());
-            }
-        }
-        allocable
-    }
-
     pub fn allocate(&mut self, layout: Layout) -> Option<NonNull<u8>> {
         self.heap.allocate(layout)
     }

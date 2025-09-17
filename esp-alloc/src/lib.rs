@@ -623,27 +623,6 @@ impl EspHeap {
         self.inner.with(|heap| heap.free_caps(capabilities))
     }
 
-    /// Returns the largest size that can be allocated at once.
-    pub fn max_new_allocation(&self) -> usize {
-        self.max_new_allocation_caps(EnumSet::empty())
-    }
-
-    /// Returns the largest size that can be allocated at once with the given requirements.
-    pub fn max_new_allocation_caps(&self, capabilities: EnumSet<MemoryCapability>) -> usize {
-        self.inner.with(|heap| {
-            let mut max_new = 0;
-            for region in heap
-                .heap
-                .iter()
-                .filter_map(|region| region.as_ref())
-                .filter(|region| region.capabilities.is_superset(capabilities))
-            {
-                max_new = max_new.max(region.heap.max_new_allocation());
-            }
-            max_new
-        })
-    }
-
     /// Allocate memory in a region satisfying the given requirements.
     ///
     /// # Safety
