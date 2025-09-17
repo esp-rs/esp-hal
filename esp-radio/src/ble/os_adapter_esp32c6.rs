@@ -17,7 +17,7 @@ pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
 // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
 // ideally _some_ of these values should be configurable
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
-    config_version: 0x20240422,
+    config_version: 0x20250606,
     ble_ll_resolv_list_size: 4,
     ble_hci_evt_hi_buf_count: 30,
     ble_hci_evt_lo_buf_count: 8,
@@ -59,12 +59,25 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     cca_low_tx_pwr: 0, //???
     main_xtal_freq: 40,
     ignore_wl_for_direct_adv: 0,
-    config_magic: 0x5A5AA5A5,
-
     cpu_freq_mhz: 160,
     enable_pcl: 0, // CONFIG_BT_LE_POWER_CONTROL_ENABLED
     version_num: 0,
     csa2_select: 1,
+    enable_csr: 0,
+    ble_aa_check: 0,
+    ble_llcp_disc_flag: 0b111, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE | BT_CTRL_BLE_LLCP_PHY_UPDATE) */
+    scan_backoff_upperlimitmax: 256,
+    ble_chan_ass_en: 0,
+    ble_data_lenth_zero_aux: 0,
+    vhci_enabled: 0,
+    ptr_check_enabled: 0,
+    ble_adv_tx_options: 0,
+    skip_unnecessary_checks_en: 0,
+    fast_conn_data_tx_en: 0,
+    ch39_txpwr: 9,
+    adv_rsv_cnt: 1,
+    conn_rsv_cnt: 2,
+    config_magic: 0x5A5AA5A5,
 };
 
 pub(crate) fn bt_periph_module_enable() {

@@ -302,7 +302,12 @@ pub(crate) fn create_ble_config() -> esp_bt_controller_config_t {
         dup_list_refresh_period: 0,
         ble_scan_backoff: false,
         pcm_fsyncshp: 0,
-        magic: 0x20240722,
+        enc_key_sz_min: 7,
+        ble_llcp_disc_flag: 0,
+        ble_aa_check: false,
+        ble_chan_ass_en: 0,
+        ble_ping_en: 0,
+        magic: 0x20250318,
     }
 }
 

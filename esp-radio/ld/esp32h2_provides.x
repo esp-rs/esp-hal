@@ -17,6 +17,9 @@ EXTERN( __esp_radio_fopen );
 EXTERN( __esp_radio_fgets );
 EXTERN( __esp_radio_fclose );
 EXTERN( __esp_radio_esp_timer_get_time );
+EXTERN( __esp_radio_puts );
+EXTERN( __esp_radio_sleep );
+EXTERN( __esp_radio_usleep );
 
 PROVIDE( strdup = __esp_radio_strdup );
 PROVIDE( g_wifi_osi_funcs = __ESP_RADIO_G_WIFI_OSI_FUNCS );
@@ -37,3 +40,6 @@ PROVIDE( fopen = __esp_radio_fopen );
 PROVIDE( fgets = __esp_radio_fgets );
 PROVIDE( fclose = __esp_radio_fclose );
 PROVIDE( esp_timer_get_time = __esp_radio_esp_timer_get_time );
+PROVIDE( puts = __esp_radio_puts );
+PROVIDE( sleep = __esp_radio_sleep );
+PROVIDE( usleep = __esp_radio_usleep );
