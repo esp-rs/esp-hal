@@ -512,24 +512,11 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
-    // TODO: enable checking all crates once cargo-batch has check support
-    // runner.run("Check crates", || {
-    //     check_packages(
-    //         workspace,
-    //         LintPackagesArgs {
-    //             packages: Package::iter().collect(),
-    //             chips: vec![args.chip],
-    //             fix: false,
-    //             toolchain: args.toolchain.clone(),
-    //         },
-    //     )
-    // });
-
-    runner.run("Check esp-hal", || {
+    runner.run("Check crates", || {
         check_packages(
             workspace,
             CheckPackagesArgs {
-                packages: vec![Package::EspHal],
+                packages: Package::iter().collect(),
                 chips: vec![args.chip],
                 toolchain: args.toolchain.clone(),
             },
