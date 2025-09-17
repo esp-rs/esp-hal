@@ -64,12 +64,6 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
-      # Install the Rust nightly toolchain for RISC-V devices. TODO: with 1.89 doctest-xcompile became stable
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
 
       - name: Setup cargo-batch
         run: |

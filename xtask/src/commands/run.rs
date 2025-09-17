@@ -73,7 +73,6 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
         .toolchain(toolchain)
         .subcommand("test")
         .arg("--doc")
-        .arg("-Zdoctest-xcompile")
         .arg("-Zbuild-std=core,panic_abort")
         .target(target)
         .features(&features)
