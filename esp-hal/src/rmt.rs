@@ -726,7 +726,8 @@ for_each_rmt_channel!(
                         unsafe { Channel::configure_tx(
                             ChannelIndex::[<Ch $idx>],
                             pin.into(),
-                            config
+                            config,
+                            self._guard,
                         ) }
                     }
                 }
@@ -759,7 +760,8 @@ for_each_rmt_channel!(
                         unsafe { Channel::configure_rx(
                             ChannelIndex::[<Ch $idx>],
                             pin.into(),
-                            config
+                            config,
+                            self._guard,
                         ) }
                     }
                 }
@@ -992,7 +994,9 @@ where
     // configured for. Conceptually, for 'ch, we keep the Rmt peripheral alive.
     _rmt: PhantomData<Rmt<'ch, Dm>>,
 
-    _guard: GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>,
+    // Only the "outermost" Channel holds the GenericPeripheralGuard, which avoids constant inc/dec
+    // of the reference count on reborrow and drop.
+    _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
 }
 
 impl<'ch, Dm> Channel<'ch, Dm, Tx>
@@ -1003,13 +1007,12 @@ where
         ch_idx: ChannelIndex,
         pin: gpio::interconnect::OutputSignal<'pin>,
         config: TxChannelConfig,
+        _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error>
     where
         'pin: 'ch,
     {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        let _guard = GenericPeripheralGuard::new();
 
         let memsize = MemSize::from_blocks(config.memsize);
         reserve_channel(raw.channel(), RmtState::Tx, memsize)?;
@@ -1045,13 +1048,12 @@ where
         ch_idx: ChannelIndex,
         pin: gpio::interconnect::InputSignal<'pin>,
         config: RxChannelConfig,
+        _guard: Option<GenericPeripheralGuard<{ system::Peripheral::Rmt as u8 }>>,
     ) -> Result<Self, Error>
     where
         'pin: 'ch,
     {
         let raw = unsafe { DynChannelAccess::conjure(ch_idx) };
-
-        let _guard = GenericPeripheralGuard::new();
 
         if config.idle_threshold > property!("rmt.max_idle_threshold") {
             return Err(Error::InvalidArgument);
@@ -1094,7 +1096,7 @@ where
         Channel {
             raw: self.raw,
             _rmt: self._rmt,
-            _guard: self._guard.clone(),
+            _guard: None,
         }
     }
 }
@@ -1105,20 +1107,22 @@ where
     Dir: Direction,
 {
     fn drop(&mut self) {
-        let memsize = self.raw.memsize();
+        if self._guard.is_some() {
+            let memsize = self.raw.memsize();
 
-        // This isn't really necessary, but be extra sure that this channel can't
-        // interfere with others.
-        self.raw.set_memsize(MemSize::from_blocks(0));
+            // This isn't really necessary, but be extra sure that this channel can't
+            // interfere with others.
+            self.raw.set_memsize(MemSize::from_blocks(0));
 
-        // Existence of this `Channel` struct implies exclusive access to these hardware
-        // channels, thus simply store the new state.
-        RmtState::store_range_rev(
-            RmtState::Unconfigured,
-            self.raw.channel(),
-            self.raw.channel() + memsize.blocks(),
-            Ordering::Release,
-        );
+            // Existence of this `Channel` struct implies exclusive access to these hardware
+            // channels, thus simply store the new state.
+            RmtState::store_range_rev(
+                RmtState::Unconfigured,
+                self.raw.channel(),
+                self.raw.channel() + memsize.blocks(),
+                Ordering::Release,
+            );
+        }
     }
 }
 
@@ -1302,7 +1306,7 @@ where
     //
     // If there was no _guard in ChannelCreator, the peripheral would be disabled in step 3, and
     // re-enabled in step 4, losing the clock configuration that was set in step 1.
-    _guard: GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>,
+    _guard: Option<GenericPeripheralGuard<{ crate::system::Peripheral::Rmt as u8 }>>,
 }
 
 impl<Dm, const CHANNEL: u8> ChannelCreator<'_, Dm, CHANNEL>
@@ -1312,7 +1316,7 @@ where
     fn conjure() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: GenericPeripheralGuard::new(),
+            _guard: Some(GenericPeripheralGuard::new()),
         }
     }
 
@@ -1320,7 +1324,7 @@ where
     pub fn reborrow<'a>(&'a mut self) -> ChannelCreator<'a, Dm, CHANNEL> {
         Self {
             _rmt: PhantomData,
-            _guard: self._guard.clone(),
+            _guard: None,
         }
     }
 
@@ -1334,7 +1338,7 @@ where
     pub unsafe fn steal() -> Self {
         Self {
             _rmt: PhantomData,
-            _guard: GenericPeripheralGuard::new(),
+            _guard: Some(GenericPeripheralGuard::new()),
         }
     }
 }
