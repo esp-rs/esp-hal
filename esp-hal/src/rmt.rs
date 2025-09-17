@@ -1529,7 +1529,8 @@ where
         if status == Some(Event::End) {
             // Do not clear the interrupt flags here: Subsequent calls of wait() must
             // be able to observe them if this is currently called via poll()
-            raw.stop_rx();
+            // FIXME: rx should be stopped here, attempt removing this
+            raw.stop_rx(false);
             raw.update();
 
             // `RmtReader::read()` is safe to call even if `poll_internal` is called repeatedly
@@ -1590,9 +1591,7 @@ where
     fn drop(&mut self) {
         let raw = self.channel.raw;
 
-        // This is immediate and does not update state flags, so we must not poll on
-        // get_rx_status() afterwards!
-        raw.stop_rx();
+        raw.stop_rx(true);
         raw.update();
 
         raw.clear_rx_interrupts();
@@ -1775,12 +1774,8 @@ where
     fn drop(&mut self) {
         let raw = self.raw;
 
-        if !matches!(raw.get_rx_status(), Some(Event::Error | Event::End)) {
-            // This is immediate and does not update state flags, so we must not poll on
-            // get_rx_status() afterwards!
-            raw.stop_rx();
-            raw.update();
-        }
+        raw.stop_rx(true);
+        raw.update();
 
         raw.clear_rx_interrupts();
     }
@@ -2348,8 +2343,12 @@ mod chip_specific {
             }
         }
 
+        // This is immediate and does not update state flags; do not poll on get_rx_status()
+        // afterwards!
+        //
+        // Requires an update() call
         #[inline]
-        pub fn stop_rx(&self) {
+        pub fn stop_rx(&self, _force: bool) {
             let rmt = crate::peripherals::RMT::regs();
             let ch_idx = self.ch_idx as usize;
             rmt.ch_rx_conf1(ch_idx).modify(|_, w| w.rx_en().clear_bit());
@@ -2742,10 +2741,43 @@ mod chip_specific {
         }
 
         #[inline]
-        pub fn stop_rx(&self) {
+        pub fn stop_rx(&self, force: bool) {
             let rmt = crate::peripherals::RMT::regs();
+
             rmt.chconf1(self.ch_idx as usize)
                 .modify(|_, w| w.rx_en().clear_bit());
+
+            // Big fat hack to forcefully stop the receiver. There's no direct hardware support for
+            // stopping the receiver once it started; it will only stop when it runs into an error
+            // or when it detects that the data ended (buffer end or idle threshold). This code
+            // attempts to create an idle threshold condition by temporarily modifying settings.
+            // FIXME: This isn't 100% reliable/quick as long as we don't reconnect the pin to a
+            // constant level and set the divider as low as possible. Can that be done?
+            // FIXME: Would it also work and be simpler/fasteer to force a memory owner error here?
+            #[cfg(any(esp32, esp32s2))]
+            if force {
+                let old_thres = rmt.chconf0(self.ch_idx as usize).from_modify(|r, w| {
+                    let old = r.idle_thres().bits();
+                    unsafe {
+                        w.idle_thres().bits(1);
+                    }
+                    old
+                });
+
+                let old_filter_en = rmt.chconf1(self.ch_idx as usize).from_modify(|r, w| {
+                    let old = r.rx_filter_en().bit();
+                    w.rx_filter_en().bit(false);
+                    old
+                });
+
+                while !matches!(self.get_rx_status(), Some(Event::Error | Event::End)) {}
+
+                rmt.chconf0(self.ch_idx as usize)
+                    .modify(|_, w| unsafe { w.idle_thres().bits(old_thres) });
+
+                rmt.chconf1(self.ch_idx as usize)
+                    .modify(|_, w| w.rx_filter_en().bit(old_filter_en));
+            }
         }
 
         pub fn set_rx_filter_threshold(&self, value: u8) {
