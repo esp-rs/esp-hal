@@ -177,23 +177,23 @@ pub fn run_examples(
             }
         }
 
-        if !skip {
-            while !skip
-                && crate::execute_app(
-                    package_path,
-                    chip,
-                    &target,
-                    &example,
-                    CargoAction::Run,
-                    1,
-                    args.debug,
-                    args.toolchain.as_deref(),
-                    args.timings,
-                    &[],
-                )
-                .is_err()
-            {
-                log::info!("Failed to run example. Retry or skip? (r/s)");
+        while !skip {
+            let result = crate::execute_app(
+                package_path,
+                chip,
+                &target,
+                &example,
+                CargoAction::Run,
+                1,
+                args.debug,
+                args.toolchain.as_deref(),
+                args.timings,
+                &[],
+            );
+
+            if let Err(error) = result {
+                log::error!("Failed to run example: {}", error);
+                log::info!("Retry or skip? (r/s)");
                 loop {
                     let key = console.read_key();
 
@@ -206,6 +206,8 @@ pub fn run_examples(
                         _ => (),
                     }
                 }
+            } else {
+                break;
             }
         }
     }

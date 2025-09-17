@@ -118,16 +118,16 @@ fn get_cargo() -> String {
 /// A builder for constructing cargo command line arguments.
 #[derive(Clone, Debug, Default)]
 pub struct CargoArgsBuilder {
-    artifact_name: String,
-    config_path: Option<PathBuf>,
-    manifest_path: Option<PathBuf>,
-    toolchain: Option<String>,
-    subcommand: String,
-    target: Option<String>,
-    features: Vec<String>,
-    args: Vec<String>,
-    configs: Vec<String>,
-    env_vars: HashMap<String, String>,
+    pub(crate) artifact_name: String,
+    pub(crate) config_path: Option<PathBuf>,
+    pub(crate) manifest_path: Option<PathBuf>,
+    pub(crate) toolchain: Option<String>,
+    pub(crate) subcommand: String,
+    pub(crate) target: Option<String>,
+    pub(crate) features: Vec<String>,
+    pub(crate) args: Vec<String>,
+    pub(crate) configs: Vec<String>,
+    pub(crate) env_vars: HashMap<String, String>,
 }
 
 impl CargoArgsBuilder {
@@ -449,7 +449,7 @@ impl CargoCommandBadger {
         all
     }
 
-    fn build_one_for_cargo(item: &CargoArgsBuilder) -> BuiltCommand {
+    pub fn build_one_for_cargo(item: &CargoArgsBuilder) -> BuiltCommand {
         BuiltCommand {
             artifact_name: item.artifact_name.clone(),
             command: {

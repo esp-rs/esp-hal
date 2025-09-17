@@ -9,7 +9,7 @@ use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    cargo::{CargoArgsBuilder, CargoToml},
+    cargo::{CargoArgsBuilder, CargoCommandBadger, CargoToml},
     firmware::Metadata,
 };
 
@@ -417,114 +417,25 @@ pub fn execute_app(
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
 
-    if !app.configuration().is_empty() {
-        log::info!("  Configuration: {}", app.configuration());
-    }
+    let builder = generate_build_command(
+        package_path,
+        chip,
+        target,
+        app,
+        action,
+        debug,
+        toolchain,
+        timings,
+        extra_args,
+    )?;
 
-    let mut features = app.feature_set().to_vec();
-    if !features.is_empty() {
-        log::info!("  Features:      {}", features.join(", "));
-    }
-    features.push(chip.to_string());
+    let command = CargoCommandBadger::build_one_for_cargo(&builder);
 
-    let env_vars = app.env_vars();
-    for (key, value) in env_vars {
-        log::info!("  esp-config:    {} = {}", key, value);
-    }
-
-    let mut builder = CargoArgsBuilder::default()
-        .target(target)
-        .features(&features);
-
-    let bin_arg = if package.starts_with("src/bin") {
-        Some(format!("--bin={}", app.binary_name()))
-    } else if !package_path.ends_with("examples") {
-        Some(format!("--example={}", app.binary_name()))
-    } else {
-        None
-    };
-
-    if let Some(arg) = bin_arg {
-        builder.add_arg(arg);
-    }
-
-    let subcommand = if matches!(action, CargoAction::Build(_)) {
-        "build"
-    } else {
-        "run"
-    };
-    builder = builder.subcommand(subcommand);
-
-    for config in app.cargo_config() {
-        log::info!(" Cargo --config: {config}");
-        builder.add_arg("--config").add_arg(config);
-        // Some configuration requires nightly rust, so let's just assume it. May be
-        // overwritten by the esp toolchain on xtensa.
-        builder = builder.toolchain("nightly");
-    }
-
-    if !debug {
-        builder.add_arg("--release");
-    }
-    if timings {
-        builder.add_arg("--timings");
-    }
-
-    let toolchain = match toolchain {
-        // Preserve user choice
-        Some(tc) => Some(tc),
-        // If targeting an Xtensa device, we must use the '+esp' toolchain modifier:
-        _ if target.starts_with("xtensa") => Some("esp"),
-        _ => None,
-    };
-
-    if let Some(toolchain) = toolchain {
-        if toolchain.starts_with("esp") {
-            builder = builder.arg("-Zbuild-std=core,alloc");
+    for i in 0..repeat {
+        if repeat != 1 {
+            log::info!("Run {}/{}", i + 1, repeat);
         }
-        builder = builder.toolchain(toolchain);
-    }
-
-    builder = builder.args(extra_args);
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    let cwd = if package_path.ends_with("examples") {
-        package_path.join(package).to_path_buf()
-    } else {
-        package_path.to_path_buf()
-    };
-
-    if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, &cwd, env_vars, false)?;
-
-        if let Some(out_dir) = out_dir {
-            // Now that the build has succeeded and we printed the output, we can
-            // rerun the build again quickly enough to capture JSON. We'll use this to
-            // copy the binary to the output directory.
-            builder.add_arg("--message-format=json");
-            let args = builder.build();
-
-            let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
-            for line in output.lines() {
-                if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                    let out_dir = out_dir.join(chip.to_string());
-                    std::fs::create_dir_all(&out_dir)?;
-
-                    let output_file = out_dir.join(app.output_file_name());
-                    std::fs::copy(artifact.executable, &output_file)?;
-                    log::info!("Output ready: {}", output_file.display());
-                }
-            }
-        }
-    } else {
-        for i in 0..repeat {
-            if repeat != 1 {
-                log::info!("Run {}/{}", i + 1, repeat);
-            }
-            cargo::run_with_env(&args, &cwd, env_vars, false)?;
-        }
+        command.run(false)?;
     }
 
     Ok(())
@@ -542,7 +453,16 @@ pub fn generate_build_command(
     extra_args: &[&str],
 ) -> Result<CargoArgsBuilder> {
     let package = app.example_path().strip_prefix(package_path)?;
-    // log::info!("Building example '{}' for '{}'", package.display(), chip);
+    log::info!(
+        "Building command: {} '{}' for '{}'",
+        if matches!(action, CargoAction::Build(_)) {
+            "Build"
+        } else {
+            "Run"
+        },
+        package.display(),
+        chip
+    );
 
     let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
