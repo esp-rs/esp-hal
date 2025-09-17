@@ -1739,8 +1739,9 @@ pub(crate) unsafe fn prepare_for_rx(
                     data,
                 );
 
-                // Invalidate data written by the DMA
+                // Invalidate data written by the DMA. As this likely affects more data than we touched, write back first.
                 unsafe {
+                    crate::soc::cache_writeback_addr(data_addr as u32, consumed_bytes as u32);
                     crate::soc::cache_invalidate_addr(data_addr as u32, consumed_bytes as u32);
                 }
 
@@ -1935,7 +1936,7 @@ impl ManualWritebackBuffer {
         }
     }
 
-    pub fn write_back(self) {
+    pub fn write_back(&self) {
         unsafe {
             self.dst_address
                 .as_ptr()
