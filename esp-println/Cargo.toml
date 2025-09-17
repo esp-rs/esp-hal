@@ -21,6 +21,10 @@ check-configs = [
     { features = ["auto", "log-04", "timestamp"] },
     { features = ["auto", "defmt-espflash", "timestamp"] },
 ]
+clippy-configs = [
+    { features = ["auto", "log-04", "timestamp"] },
+    { features = ["auto", "defmt-espflash", "timestamp"] },
+]
 
 [package.metadata.docs.rs]
 cargo-args     = ["-Z", "build-std=core"]

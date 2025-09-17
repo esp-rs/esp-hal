@@ -13,6 +13,7 @@ check-configs = [
     { features = [] },
     { features = ["build-script"] },
 ]
+clippy-configs = [] # don't waste time on this
 
 [dependencies]
 

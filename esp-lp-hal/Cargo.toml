@@ -27,6 +27,9 @@ check-configs = [
     { features = ["embedded-io"] },
     { features = ["embedded-hal", "embedded-io"] },
 ]
+clippy-configs = [
+    { features = ["embedded-hal", "embedded-io"] },
+]
 
 [lib]
 bench = false

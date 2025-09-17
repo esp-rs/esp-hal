@@ -16,6 +16,9 @@ check-configs = [
     { features = [] },
     { features = ["defmt"] }
 ]
+clippy-configs = [
+    { features = ["defmt"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"

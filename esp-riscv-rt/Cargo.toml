@@ -20,6 +20,7 @@ check-configs = [
     { features = ["no-mie-mip"] },
     { features = ["rtc-ram", "no-mie-mip"] },
 ]
+clippy-configs = [{ features = ["rtc-ram"] }]
 
 [lib]
 bench = false

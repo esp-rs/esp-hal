@@ -27,6 +27,9 @@ check-configs = [
     { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
 ]
+clippy-configs = [
+    { features = ["unstable", "rt"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

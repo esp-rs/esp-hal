@@ -16,6 +16,9 @@ check-configs = [
     { features = ["println", "esp-println/auto"] },
     { features = ["defmt"] }
 ]
+clippy-configs = [
+    { features = ["panic-handler", "halt-cores", "defmt"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"

@@ -17,6 +17,9 @@ check-configs = [
     { features = ["log-04"] },
     { features = ["defmt", "validation"] },
 ]
+clippy-configs = [
+    { features = ["defmt", "validation"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

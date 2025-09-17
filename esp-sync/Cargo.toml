@@ -16,6 +16,7 @@ check-configs = [
     { features = ["log-04"] },
     { features = ["defmt"] },
 ]
+clippy-configs = [{ features = ["defmt"] }]
 
 [dependencies]
 cfg-if = "1"

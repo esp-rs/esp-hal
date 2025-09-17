@@ -329,66 +329,57 @@ impl Package {
 
     /// Additional feature rules to test subsets of features for a package.
     pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = Vec::new();
+        let mut cases = vec![];
 
-        // For now we run a lot of clippy checks, but that will change.
-        cases.push(self.doc_feature_rules(config));
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("clippy-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "clippy-configs must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
 
-        match self {
-            Package::EspHal => {
-                // This checks if the `esp-hal` crate compiles with the no features (other than the
-                // chip selection)
-
-                // This tests that disabling the `rt` feature works
-                cases.push(vec![]);
-                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
-                // enabled
-                cases.push(vec!["rt".to_owned()]);
-            }
-            Package::EspRadio => {
-                // Minimal set of features that when enabled _should_ still compile:
-                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                if config.contains("wifi") {
-                    // This tests if `wifi` feature works without `esp-radio/unstable`
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi".to_owned(),
-                    ]);
-                    // This tests `wifi-eap` feature
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi-eap".to_owned(),
-                        "unstable".to_owned(),
-                    ]);
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("clippy-configs must be an array of tables. {:?}", table);
+                };
+                // Filter based on conditions
+                if let Some(condition) = table.get("if") {
+                    if let Some(expr) = condition.as_str() {
+                        let mut eval_context = somni_expr::Context::new();
+                        eval_context.add_function("chip_has", |symbol: &str| {
+                            config.all().iter().any(|sym| sym == symbol)
+                        });
+                        if !eval_context
+                            .evaluate::<bool>(expr)
+                            .expect("Failed to evaluate expression")
+                        {
+                            continue;
+                        }
+                    } else {
+                        panic!("`if` condition must be a string.");
+                    };
                 }
-            }
-            Package::EspMetadataGenerated => {
-                cases.push(vec!["build-script".to_owned()]);
-            }
-            Package::EspPreempt => {
-                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
-            }
-            Package::EspStorage => {
-                // TODO: https://github.com/esp-rs/esp-hal/issues/4136
-                if config.name() == "esp32c2"
-                    || config.name() == "esp32c3"
-                    || config.name() == "esp32s2"
-                {
-                    // println!("kokot usho");
-                    cases.push(vec![
-                        "defmt".to_owned(),
-                        "portable-atomic/unsafe-assume-single-core".to_owned(),
-                    ]);
-                } else {
-                    cases.push(vec!["defmt".to_owned()]);
+
+                let mut features = Vec::new();
+                if let Some(config_features) = table.get("features") {
+                    let Value::Array(config_features) = config_features else {
+                        panic!("features must be an array.");
+                    };
+
+                    for feature in config_features {
+                        let feature = feature.as_str().expect("features must be strings.");
+                        features.push(feature.to_owned());
+                    }
                 }
+                cases.push(features);
             }
-            _ => {}
         }
 
-        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
+        log::debug!("Check features for package '{}': {:?}", self, cases);
         cases
     }
 

@@ -16,6 +16,9 @@ check-configs = [
     { features = ["esp-hal/unstable"] },
     { features = ["esp-hal/unstable", "esp-alloc"] },
 ]
+clippy-configs = [
+    { features = ["esp-hal/unstable", "esp-alloc", "defmt"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

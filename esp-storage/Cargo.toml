@@ -15,7 +15,9 @@ check-configs = [
     { features = [] },
     { features = ["critical-section"] },
     { features = ["bytewise-read"] },
+    { features = ["critical-section", "bytewise-read"] },
 ]
+clippy-configs = [{ features = ["critical-section", "bytewise-read"] }]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
