@@ -481,9 +481,7 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                 .read_dir()
                 .with_context(|| format!("Failed to read examples directory: {}", dir.display()))?;
             for example in examples {
-                let example = example.with_context(|| {
-                    format!("Failed to read example: {}", example.path().display())
-                })?;
+                let example = example.context("Failed to read example")?;
                 if example
                     .file_type()
                     .with_context(|| {
