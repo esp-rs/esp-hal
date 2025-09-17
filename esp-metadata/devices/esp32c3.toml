@@ -313,6 +313,8 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
+clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
+clock_sources.default = "Apb"
 
 [device.rsa]
 support_status = "partial"

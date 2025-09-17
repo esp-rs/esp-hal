@@ -387,6 +387,9 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_wrap = true
 has_rx_demodulation = true
+clock_sources.supported = ["Xtal", "RcFast" ]
+# Power-on value is RcFast!
+clock_sources.default = "Xtal"
 
 [device.rsa]
 support_status = "partial"

@@ -430,6 +430,9 @@ has_tx_carrier_data_only = true
 has_tx_sync = true
 has_rx_demodulation = true
 has_per_channel_clock = true
+clock_sources.supported = [ "RefTick", "Apb" ]
+# Power-on value is :RefTick
+clock_sources.default = "Apb"
 
 [device.rsa]
 support_status = "partial"

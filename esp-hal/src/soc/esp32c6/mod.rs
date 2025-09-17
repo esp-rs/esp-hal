@@ -21,17 +21,10 @@ pub(crate) use esp32c6 as pac;
 
 #[cfg_attr(not(feature = "unstable"), allow(unused))]
 pub(crate) mod constants {
-    use crate::time::Rate;
-
     /// The clock frequency for the I2S peripheral in Hertz.
     pub const I2S_SCLK: u32 = 160_000_000;
     /// The default clock source for the I2S peripheral.
     pub const I2S_DEFAULT_CLK_SRC: u8 = 2;
-
-    /// The default clock source for the RMT peripheral.
-    pub const RMT_CLOCK_SRC: u8 = 1;
-    /// The frequency of the RMT clock source in Hertz.
-    pub const RMT_CLOCK_SRC_FREQ: Rate = Rate::from_mhz(80);
 
     /// The clock frequency for the Parallel IO peripheral in Hertz.
     pub const PARL_IO_SCLK: u32 = 240_000_000;
