@@ -10,6 +10,16 @@ categories = ["embedded", "hardware-support", "no-std"]
 repository = "https://github.com/esp-rs/esp-hal"
 license = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = [
+    { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"] },
+    { features = ["wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"], append_if = 'chip_has("wifi")' },
+    { features = ["ble"], append_if = 'chip_has("bt")' },
+    { features = ["ieee802154", "__docs_build"], append_if = 'chip_has("ieee802154")' },
+    { features = ["coex"], append_if = 'chip_has("wifi") && chip_has("bt")' },
+    { features = ["unstable"], append_if = 'chip_has("wifi") || chip_has("bt") || chip_has("ieee802154")' },
+]
+
 [lib]
 bench = false
 test  = false

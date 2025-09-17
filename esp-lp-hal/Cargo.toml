@@ -17,6 +17,10 @@ rustdoc-args   = ["--cfg", "docsrs"]
 
 [package.metadata.espressif]
 targets_lp_core = true
+doc-config = [
+    { features = ["embedded-hal"] },
+    { features = ["embedded-io"], append_if = 'chip_has("lp_core")' },
+]
 
 [lib]
 bench = false

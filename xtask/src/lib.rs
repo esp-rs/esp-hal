@@ -9,7 +9,7 @@ use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
-use toml_edit::{Item, Table, Value};
+use toml_edit::{Item, Value};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -218,20 +218,40 @@ impl Package {
 
         let toml = self.toml();
         if let Some(metadata) = toml.espressif_metadata()
-            && let Some(features) = metadata.get("doc-config")
+            && let Some(config_meta) = metadata.get("doc-config")
         {
-            let Item::ArrayOfTables(tables) = features else {
-                panic!("doc-config must be an array of tables.");
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!("doc-config must be an array of tables. {:?}", config_meta);
             };
 
-            // Select first matching
             for table in tables {
-                let Some(features) = table.get("features") else {
+                let Value::InlineTable(table) = table else {
+                    panic!("doc-config must be an array of tables. {:?}", table);
+                };
+                // Filter features based on conditions
+                if let Some(condition) = table.get("append_if") {
+                    if let Some(expr) = condition.as_str() {
+                        let mut eval_context = somni_expr::Context::new();
+                        eval_context.add_function("chip_has", |symbol: &str| {
+                            config.all().iter().any(|sym| sym == symbol)
+                        });
+                        if !eval_context
+                            .evaluate::<bool>(expr)
+                            .expect("Failed to evaluate expression")
+                        {
+                            continue;
+                        }
+                    } else {
+                        panic!("`append_if` condition must be a string.");
+                    };
+                }
+
+                let Some(config_features) = table.get("features") else {
                     // Maybe some packages specify that they don't want to be built with
                     // features by default.
                     return vec![];
                 };
-                let Item::Value(Value::Array(config_features)) = features else {
+                let Value::Array(config_features) = config_features else {
                     panic!("features must be an array.");
                 };
 
@@ -241,65 +261,7 @@ impl Package {
                 }
             }
         } else {
-            match self {
-                Package::EspHal => {
-                    features.push("unstable".to_owned());
-                    features.push("rt".to_owned());
-                    if config.contains("psram") {
-                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                        // defaults to `quad`) as it would require a separate build
-                        features.push("psram".to_owned())
-                    }
-                    if config.contains("usb0") {
-                        features.push("__usb_otg".to_owned());
-                    }
-                    if config.contains("bt") {
-                        features.push("__bluetooth".to_owned());
-                    }
-                }
-                Package::EspRadio => {
-                    features.push("esp-hal/unstable".to_owned());
-                    features.push("esp-hal/rt".to_owned());
-                    features.push("defmt".to_owned());
-                    if config.contains("wifi") {
-                        features.push("wifi".to_owned());
-                        features.push("wifi-eap".to_owned());
-                        features.push("esp-now".to_owned());
-                        features.push("sniffer".to_owned());
-                        features.push("smoltcp/proto-ipv4".to_owned());
-                        features.push("smoltcp/proto-ipv6".to_owned());
-                    }
-                    if config.contains("bt") {
-                        features.push("ble".to_owned());
-                    }
-                    if config.contains("ieee802154") {
-                        features.push("ieee802154".to_owned());
-                        // allow wifi + 802.15.4
-                        features.push("__docs_build".to_owned());
-                    }
-                    if config.contains("wifi") && config.contains("bt") {
-                        features.push("coex".to_owned());
-                    }
-                    if features.iter().any(|f| {
-                        f == "csi"
-                            || f == "ble"
-                            || f == "esp-now"
-                            || f == "sniffer"
-                            || f == "coex"
-                            || f == "ieee802154"
-                    }) {
-                        features.push("unstable".to_owned());
-                    }
-                    s.push("executors".to_owned());
-                }
-                Package::EspLpHal => {
-                    if config.contains("lp_core") {
-                        features.push("embedded-io".to_owned());
-                    }
-                    features.push("embedded-hal".to_owned());
-                }
-                _ => {}
-            }
+            // Nothing
         }
 
         log::debug!("Features for package '{}': {:?}", self, features);

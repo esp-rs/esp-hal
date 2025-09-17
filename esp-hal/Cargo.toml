@@ -13,6 +13,12 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.espressif]
 semver_checked = true
+doc-config = [
+    { features = ["unstable", "rt"] },
+    { features = ["psram"], append_if = 'chip_has("psram")' },
+    { features = ["__usb_otg"], append_if = 'chip_has("usb0")' },
+    { features = ["__bluetooth"], append_if = 'chip_has("bt")' },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

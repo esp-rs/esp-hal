@@ -13,8 +13,6 @@ links         = "esp-riscv-rt"
 
 [package.metadata.espressif]
 doc-config = [{ features = ["rtc-ram"] }]
-
-[package.metadata.espressif]
 requires_target = ["riscv32imc-unknown-none-elf", "riscv32imac-unknown-none-elf"]
 
 [lib]
