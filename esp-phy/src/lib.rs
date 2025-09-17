@@ -10,31 +10,21 @@
 //! If the PHY has already been calibrated, you can use [backup_phy_calibration_data] to persist
 //! calibration data elsewhere (e.g. in flash). Using [set_phy_calibration_data] you can restore
 //! previously persisted calibration data.
-#![cfg_attr(
-    esp32,
-    doc = "
-## Updating Wi-Fi MAC Time
-**NOTE**: This section is specific to the ESP32 and does not apply to any other chip.
-
-Due to how the Wi-Fi MAC on the ESP32 works, the MAC timer will stop counting, once the entire RF \
-block gets clock gated (such as in modem sleep), and resume accordingly. This causes the delta between \
-system timer and MAC timer to increase. 
-
-Using [MacTimeExt::set_mac_time_update_cb] on the [WIFI](esp_hal::peripherals::WIFI) peripheral, you can \
-set a [MacTimeUpdateCb]. See its documentation for an explanation on how to use it.
-"
-)]
 //! ## Config Options
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
 #![no_std]
+
+// MUST be the first module 
+mod fmt;
+
 use core::cell::RefCell;
 
 use esp_hal::clock::{ModemClockController, PhyClockGuard};
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
+use esp_sync::RawMutex;
 use esp_wifi_sys::include::*;
 
-mod fmt;
 
 mod common_adapter;
 mod ffi;
@@ -63,6 +53,8 @@ type PhyDigRegsBackup =
 /// enabled and disabled, before this callback was set.
 pub type MacTimeUpdateCb = fn(Duration);
 
+static ESP_PHY_LOCK: RawMutex = RawMutex::new();
+
 /// PHY initialization state
 struct PhyState {
     /// Number of references to the PHY.
@@ -90,6 +82,7 @@ struct PhyState {
     /// Callback to update the MAC time.
     mac_time_update_cb: Option<MacTimeUpdateCb>,
 }
+
 impl PhyState {
     /// Initialize the PHY state.
     pub const fn new() -> Self {
@@ -109,6 +102,7 @@ impl PhyState {
             mac_time_update_cb: None,
         }
     }
+
     /// Get a reference to the calibration data.
     ///
     /// If no calibration data is available, it will be initialized to zero.
@@ -116,6 +110,7 @@ impl PhyState {
         self.calibration_data
             .get_or_insert([0u8; PHY_CALIBRATION_DATA_LENGTH])
     }
+
     /// Calibrate the PHY.
     fn calibrate(&mut self) {
         #[cfg(esp32s2)]
@@ -171,6 +166,7 @@ impl PhyState {
         }
         self.calibrated = true;
     }
+
     #[cfg(phy_backed_up_digital_register_count_is_set)]
     /// Backup the digital PHY register into memory.
     fn backup_digital_regs(&mut self) {
@@ -181,6 +177,7 @@ impl PhyState {
             );
         }
     }
+
     #[cfg(phy_backed_up_digital_register_count_is_set)]
     /// Restore the digital PHY registers from memory.
     ///
@@ -197,6 +194,7 @@ impl PhyState {
             self.phy_digital_register_backup = None;
         }
     }
+
     /// Increase the number of references to the PHY.
     ///
     /// If the ref count was zero, the PHY will be initialized.
@@ -228,6 +226,7 @@ impl PhyState {
 
         self.ref_count += 1;
     }
+
     /// Decrease the number of reference to the PHY.
     ///
     /// If the ref count hits zero, the PHY will be deinitialized.
@@ -274,6 +273,7 @@ static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
 pub struct PhyInitGuard<'d> {
     _phy_clock_guard: PhyClockGuard<'d>,
 }
+
 impl PhyInitGuard<'_> {
     #[inline]
     /// Release the init guard.
@@ -281,6 +281,7 @@ impl PhyInitGuard<'_> {
     /// The PHY will be disabled, if this is the last init guard.
     pub fn release(self) {}
 }
+
 impl Drop for PhyInitGuard<'_> {
     fn drop(&mut self) {
         critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
@@ -306,7 +307,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     /// This function panics if the PHY is inactive. If the ref count is
     /// lower than the number of alive [PhyInitGuard]s, dropping a guard can
     /// now panic.
-    fn decrease_phy_init_ref_count(&self) {
+    fn decrease_phy_ref_count(&self) {
         critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
         self.decrease_phy_clock_ref_count();
     }
