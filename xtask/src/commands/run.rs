@@ -62,7 +62,7 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     let target = args.package.target_triple(&chip)?;
     let mut features = args
         .package
-        .feature_rules(&esp_metadata::Config::for_chip(&chip));
+        .doc_feature_rules(&esp_metadata::Config::for_chip(&chip));
     features.push(chip.to_string());
 
     // We need `nightly` for building the doc tests, unfortunately:

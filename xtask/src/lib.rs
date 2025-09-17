@@ -9,7 +9,7 @@ use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
-use toml_edit::{Item, Value};
+use toml_edit::{Item, Table, Value};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -208,99 +208,98 @@ impl Package {
 
     /// Given a device config, return the features which should be enabled for
     /// this package.
-    pub fn feature_rules(&self, config: &Config) -> Vec<String> {
+    ///
+    /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
+    /// one feature set is supported.
+    // TODO: perhaps we should use the docs.rs metadata for doc features. Revisit when check/clippy
+    // feature sets no longer want this.
+    pub fn doc_feature_rules(&self, config: &Config) -> Vec<String> {
         let mut features = vec![];
-        match self {
-            Package::EspBacktrace => features.push("defmt".to_owned()),
-            Package::EspConfig => features.push("build".to_owned()),
-            Package::EspHal => {
-                features.push("unstable".to_owned());
-                features.push("rt".to_owned());
-                if config.contains("psram") {
-                    // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                    // defaults to `quad`) as it would require a separate build
-                    features.push("psram".to_owned())
-                }
-                if config.contains("usb0") {
-                    features.push("__usb_otg".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("__bluetooth".to_owned());
+
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(features) = metadata.get("doc-config")
+        {
+            let Item::ArrayOfTables(tables) = features else {
+                panic!("doc-config must be an array of tables.");
+            };
+
+            // Select first matching
+            for table in tables {
+                let Some(features) = table.get("features") else {
+                    // Maybe some packages specify that they don't want to be built with
+                    // features by default.
+                    return vec![];
+                };
+                let Item::Value(Value::Array(config_features)) = features else {
+                    panic!("features must be an array.");
+                };
+
+                for feature in config_features {
+                    let feature = feature.as_str().expect("features must be strings.");
+                    features.push(feature.to_owned());
                 }
             }
-            Package::EspRadio => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                if config.contains("wifi") {
-                    features.push("wifi".to_owned());
-                    features.push("wifi-eap".to_owned());
-                    features.push("esp-now".to_owned());
-                    features.push("sniffer".to_owned());
-                    features.push("smoltcp/proto-ipv4".to_owned());
-                    features.push("smoltcp/proto-ipv6".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("ble".to_owned());
-                }
-                if config.contains("ieee802154") {
-                    features.push("ieee802154".to_owned());
-                    // allow wifi + 802.15.4
-                    features.push("__docs_build".to_owned());
-                }
-                if config.contains("wifi") && config.contains("bt") {
-                    features.push("coex".to_owned());
-                }
-                if features.iter().any(|f| {
-                    f == "csi"
-                        || f == "ble"
-                        || f == "esp-now"
-                        || f == "sniffer"
-                        || f == "coex"
-                        || f == "ieee802154"
-                }) {
+        } else {
+            match self {
+                Package::EspHal => {
                     features.push("unstable".to_owned());
+                    features.push("rt".to_owned());
+                    if config.contains("psram") {
+                        // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
+                        // defaults to `quad`) as it would require a separate build
+                        features.push("psram".to_owned())
+                    }
+                    if config.contains("usb0") {
+                        features.push("__usb_otg".to_owned());
+                    }
+                    if config.contains("bt") {
+                        features.push("__bluetooth".to_owned());
+                    }
                 }
-            }
-            Package::EspHalProcmacros => {
-                features.push("embassy".to_owned());
-            }
-            Package::EspHalEmbassy => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                features.push("executors".to_owned());
-            }
-            Package::EspLpHal => {
-                if config.contains("lp_core") {
-                    features.push("embedded-io".to_owned());
+                Package::EspRadio => {
+                    features.push("esp-hal/unstable".to_owned());
+                    features.push("esp-hal/rt".to_owned());
+                    features.push("defmt".to_owned());
+                    if config.contains("wifi") {
+                        features.push("wifi".to_owned());
+                        features.push("wifi-eap".to_owned());
+                        features.push("esp-now".to_owned());
+                        features.push("sniffer".to_owned());
+                        features.push("smoltcp/proto-ipv4".to_owned());
+                        features.push("smoltcp/proto-ipv6".to_owned());
+                    }
+                    if config.contains("bt") {
+                        features.push("ble".to_owned());
+                    }
+                    if config.contains("ieee802154") {
+                        features.push("ieee802154".to_owned());
+                        // allow wifi + 802.15.4
+                        features.push("__docs_build".to_owned());
+                    }
+                    if config.contains("wifi") && config.contains("bt") {
+                        features.push("coex".to_owned());
+                    }
+                    if features.iter().any(|f| {
+                        f == "csi"
+                            || f == "ble"
+                            || f == "esp-now"
+                            || f == "sniffer"
+                            || f == "coex"
+                            || f == "ieee802154"
+                    }) {
+                        features.push("unstable".to_owned());
+                    }
+                    s.push("executors".to_owned());
                 }
-                features.push("embedded-hal".to_owned());
-            }
-            Package::EspPrintln => {
-                features.push("auto".to_owned());
-                features.push("defmt-espflash".to_owned());
-                features.push("critical-section".to_owned());
-            }
-            Package::EspStorage => {
-                if config.name() == "esp32c2"
-                    || config.name() == "esp32c3"
-                    || config.name() == "esp32s2"
-                {
-                    features.push("portable-atomic/unsafe-assume-single-core".to_owned());
+                Package::EspLpHal => {
+                    if config.contains("lp_core") {
+                        features.push("embedded-io".to_owned());
+                    }
+                    features.push("embedded-hal".to_owned());
                 }
+                _ => {}
             }
-            Package::EspBootloaderEspIdf => {
-                features.push("defmt".to_owned());
-                features.push("validation".to_owned());
-            }
-            Package::EspAlloc => {
-                features.push("defmt".to_owned());
-            }
-            Package::EspMetadataGenerated => {}
-            Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
-            Package::EspRiscvRt => features.push("rtc-ram".to_owned()),
-            _ => {}
         }
 
         log::debug!("Features for package '{}': {:?}", self, features);
@@ -312,7 +311,7 @@ impl Package {
         let mut cases = Vec::new();
 
         // For now we run a lot of checks, but that will change.
-        cases.push(self.feature_rules(config));
+        cases.push(self.doc_feature_rules(config));
 
         match self {
             Package::EspHal => {
@@ -362,7 +361,7 @@ impl Package {
         let mut cases = Vec::new();
 
         // For now we run a lot of clippy checks, but that will change.
-        cases.push(self.feature_rules(config));
+        cases.push(self.doc_feature_rules(config));
 
         match self {
             Package::EspHal => {

@@ -10,6 +10,9 @@ categories    = ["asynchronous", "embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = [{ features = ["esp-hal/unstable", "esp-hal/rt", "defmt", "executors"] }]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]

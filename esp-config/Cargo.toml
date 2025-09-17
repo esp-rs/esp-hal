@@ -8,6 +8,9 @@ documentation = "https://docs.espressif.com/projects/rust/esp-config/latest/"
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = [{ features = ["build"] }]
+
 [lib]
 bench = false
 test  = true
