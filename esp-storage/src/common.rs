@@ -32,7 +32,7 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
 pub struct FlashStorage {
