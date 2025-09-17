@@ -379,9 +379,7 @@ impl CargoCommandBatcher {
 
             for item in group.iter() {
                 // Only some commands can be batched
-                let batchable = [
-                    "build", "doc", "check", // soon(TM)
-                ];
+                let batchable = ["build", "doc", "check"];
                 if !batchable
                     .iter()
                     .any(|&subcommand| subcommand == item.subcommand)
