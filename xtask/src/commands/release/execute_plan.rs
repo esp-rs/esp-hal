@@ -11,6 +11,7 @@ use crate::{
     git::{current_branch, ensure_workspace_clean, get_remote_name_for},
 };
 
+/// Arguments for executing the release plan.
 #[derive(Debug, Args)]
 pub struct ApplyPlanArgs {
     /// Actually make git changes. Without this flag, the command will only
@@ -23,8 +24,10 @@ pub struct ApplyPlanArgs {
     manual_pull_request: bool,
 }
 
+/// Execute the release plan by making code changes, committing them to a new
 pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
-    ensure_workspace_clean(workspace)?;
+    ensure_workspace_clean(workspace)
+        .with_context(|| format!("Workspace {workspace:?} is not clean!"))?;
 
     let plan_path = workspace.join("release_plan.jsonc");
     let plan_path = crate::windows_safe_path(&plan_path);
@@ -41,7 +44,12 @@ pub fn execute_plan(workspace: &Path, args: ApplyPlanArgs) -> Result<()> {
 
     // Make code changes
     for step in plan.packages.iter_mut() {
-        let mut package = CargoToml::new(workspace, step.package)?;
+        let mut package = CargoToml::new(workspace, step.package).with_context(|| {
+            format!(
+                "Couldn't create Cargo.toml in workspace {workspace:?} for {:?}",
+                step.package
+            )
+        })?;
 
         if package.package_version() != step.current_version {
             if package.package_version() == step.new_version {
