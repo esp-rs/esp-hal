@@ -44,19 +44,19 @@ defmt = ["dep:defmt"]
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:
 
-## Target the ESP32-C2.
+##
 esp32c2   = ["esp-rom-sys/esp32c2", "esp-sync/esp32c2"]
-## Target the ESP32-C3.
+##
 esp32c3   = ["esp-rom-sys/esp32c3", "esp-sync/esp32c3"]
-## Target the ESP32-C6.
+##
 esp32c6   = ["esp-rom-sys/esp32c6", "esp-sync/esp32c6"]
-## Target the ESP32-H2.
+##
 esp32h2   = ["esp-rom-sys/esp32h2", "esp-sync/esp32h2"]
-## Target the ESP32.
+##
 esp32     = ["esp-rom-sys/esp32", "esp-sync/esp32"]
-## Target the ESP32-S2.
+##
 esp32s2   = ["esp-rom-sys/esp32s2", "esp-sync/esp32s2"]
-## Target the ESP32-S3.
+##
 esp32s3   = ["esp-rom-sys/esp32s3", "esp-sync/esp32s3"]
 ## Used for testing on a host.
 emulation = []

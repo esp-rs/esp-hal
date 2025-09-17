@@ -2,7 +2,7 @@ use core::mem::MaybeUninit;
 
 use crate::chip_specific;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage error.
@@ -32,7 +32,7 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Flash storage abstraction.
 pub struct FlashStorage {
