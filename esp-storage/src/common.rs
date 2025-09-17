@@ -2,18 +2,27 @@ use core::mem::MaybeUninit;
 
 use crate::chip_specific;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Flash storage error.
 pub enum FlashStorageError {
+    /// I/O error.
     IoError,
+    /// I/O operation timed out.
     IoTimeout,
+    /// Flash could not be unlocked for writing.
     CantUnlock,
+    /// Address or length not aligned to required boundary.
     NotAligned,
+    /// Address or length out of bounds.
     OutOfBounds,
+    /// Other error with the given error code.
     Other(i32),
 }
 
 #[inline(always)]
+/// Check return code from flash operations.
 pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     match rc {
         0 => Ok(()),
@@ -24,6 +33,8 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Flash storage abstraction.
 pub struct FlashStorage {
     pub(crate) capacity: usize,
     unlocked: bool,
@@ -36,9 +47,12 @@ impl Default for FlashStorage {
 }
 
 impl FlashStorage {
+    /// Flash word size in bytes.
     pub const WORD_SIZE: u32 = 4;
+    /// Flash sector size in bytes.
     pub const SECTOR_SIZE: u32 = 4096;
 
+    /// Create a new flash storage instance.
     pub fn new() -> FlashStorage {
         let mut storage = FlashStorage {
             capacity: 0,
