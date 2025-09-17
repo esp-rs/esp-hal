@@ -6,7 +6,7 @@ description = "PHY initialization"
 
 [dependencies]
 esp-hal = { version = "1.0.0-rc.0", path = "../esp-hal", default-features = false, features = ["requires-unstable"] }
-esp-wifi-sys = "0.7.1"
+esp-wifi-sys = "0.8.1"
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 
 cfg-if = "1.0.1"
