@@ -417,9 +417,13 @@ impl Package {
         cases
     }
 
+    fn targets_lp_core(&self) -> bool {
+        self == Package::EspLpHal
+    }
+
     /// Return the target triple for a given package/chip pair.
     pub fn target_triple(&self, chip: &Chip) -> Result<String> {
-        if *self == Package::EspLpHal {
+        if self.targets_lp_core() {
             chip.lp_target().map(ToString::to_string)
         } else {
             Ok(chip.target())
@@ -429,11 +433,11 @@ impl Package {
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
         let check = match self {
-            Package::EspLpHal => chip.has_lp_core(),
             Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
                 chip.is_xtensa()
             }
             Package::EspRiscvRt => chip.is_riscv(),
+            p if p.targets_lp_core() => chip.has_lp_core(),
             _ => true,
         };
 
