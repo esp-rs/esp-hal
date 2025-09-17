@@ -13,12 +13,11 @@ exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
 [package.metadata.espressif]
 semver_checked = true
-doc-config = [
-    { features = ["unstable", "rt"] },
-    { features = ["psram"], append_if = 'chip_has("psram")' },
-    { features = ["__usb_otg"], append_if = 'chip_has("soc_has_usb0")' },
-    { features = ["__bluetooth"], append_if = 'chip_has("bt")' },
-]
+doc-config = { features = ["unstable", "rt"], append = [
+    { if = 'chip_has("psram")', features = ["psram"] },
+    { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
+    { if = 'chip_has("bt")', features = ["__bluetooth"] },
+] }
 check-configs = [
     { features = [] },
     { features = ["rt"] },
@@ -27,8 +26,13 @@ check-configs = [
     { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
     { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
 ]
+# Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
 clippy-configs = [
-    { features = ["unstable", "rt"] },
+    { features = ["unstable", "rt"], append = [
+        { if = 'chip_has("psram")', features = ["psram"] },
+        { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
+        { if = 'chip_has("bt")', features = ["__bluetooth"] },
+    ] },
 ]
 
 [package.metadata.docs.rs]

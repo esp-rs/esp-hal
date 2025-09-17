@@ -9,7 +9,7 @@ use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
-use toml_edit::{Item, Value};
+use toml_edit::{InlineTable, Item, Value};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -206,13 +206,71 @@ impl Package {
         }
     }
 
+    fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        let mut eval_context = somni_expr::Context::new();
+        eval_context.add_function("chip_has", |symbol: &str| {
+            config.all().iter().any(|sym| sym == symbol)
+        });
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !eval_context
+                .evaluate::<bool>(expr)
+                .expect("Failed to evaluate expression")
+            {
+                return None;
+            }
+        }
+
+        let Some(config_features) = table.get("features") else {
+            panic!("Missing features array.");
+        };
+        let Value::Array(config_features) = config_features else {
+            panic!("features must be an array.");
+        };
+
+        let mut features = Vec::new();
+        for feature in config_features {
+            let feature = feature.as_str().expect("features must be strings.");
+            features.push(feature.to_owned());
+        }
+
+        Some(features)
+    }
+
+    fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        // Base features. If their condition is not met, the whole item is ignored.
+        let mut features = Self::parse_conditional_features(table, config)?;
+
+        if let Some(conditionals) = table.get("append") {
+            // Optional features. If their conditions are met, they are appended to the base
+            // features.
+            let Value::Array(conditionals) = conditionals else {
+                panic!("append must be an array.");
+            };
+            for cond in conditionals {
+                let Value::InlineTable(cond_table) = cond else {
+                    panic!("append items must be inline tables.");
+                };
+                if let Some(cond_features) = Self::parse_conditional_features(cond_table, config) {
+                    features.extend(cond_features);
+                }
+            }
+        };
+
+        Some(features)
+    }
+
     /// Given a device config, return the features which should be enabled for
     /// this package.
     ///
     /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
     /// one feature set is supported.
-    // TODO: perhaps we should use the docs.rs metadata for doc features. Revisit when check/clippy
-    // feature sets no longer want this.
+    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
+    // chip-specific features.
     pub fn doc_feature_rules(&self, config: &Config) -> Vec<String> {
         let mut features = vec![];
 
@@ -220,45 +278,12 @@ impl Package {
         if let Some(metadata) = toml.espressif_metadata()
             && let Some(config_meta) = metadata.get("doc-config")
         {
-            let Item::Value(Value::Array(tables)) = config_meta else {
-                panic!("doc-config must be an array of tables. {:?}", config_meta);
+            let Item::Value(Value::InlineTable(table)) = config_meta else {
+                panic!("doc-config must be inline tables.");
             };
 
-            for table in tables {
-                let Value::InlineTable(table) = table else {
-                    panic!("doc-config must be an array of tables. {:?}", table);
-                };
-                // Filter features based on conditions
-                if let Some(condition) = table.get("append_if") {
-                    if let Some(expr) = condition.as_str() {
-                        let mut eval_context = somni_expr::Context::new();
-                        eval_context.add_function("chip_has", |symbol: &str| {
-                            config.all().iter().any(|sym| sym == symbol)
-                        });
-                        if !eval_context
-                            .evaluate::<bool>(expr)
-                            .expect("Failed to evaluate expression")
-                        {
-                            continue;
-                        }
-                    } else {
-                        panic!("`append_if` condition must be a string.");
-                    };
-                }
-
-                let Some(config_features) = table.get("features") else {
-                    // Maybe some packages specify that they don't want to be built with
-                    // features by default.
-                    return vec![];
-                };
-                let Value::Array(config_features) = config_features else {
-                    panic!("features must be an array.");
-                };
-
-                for feature in config_features {
-                    let feature = feature.as_str().expect("features must be strings.");
-                    features.push(feature.to_owned());
-                }
+            if let Some(fs) = Self::parse_feature_set(table, config) {
+                features = fs;
             }
         } else {
             // Nothing
@@ -285,38 +310,11 @@ impl Package {
 
             for table in tables {
                 let Value::InlineTable(table) = table else {
-                    panic!("check-configs must be an array of tables. {:?}", table);
+                    panic!("check-configs items must be inline tables.");
                 };
-                // Filter based on conditions
-                if let Some(condition) = table.get("if") {
-                    if let Some(expr) = condition.as_str() {
-                        let mut eval_context = somni_expr::Context::new();
-                        eval_context.add_function("chip_has", |symbol: &str| {
-                            config.all().iter().any(|sym| sym == symbol)
-                        });
-                        if !eval_context
-                            .evaluate::<bool>(expr)
-                            .expect("Failed to evaluate expression")
-                        {
-                            continue;
-                        }
-                    } else {
-                        panic!("`if` condition must be a string.");
-                    };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
                 }
-
-                let mut features = Vec::new();
-                if let Some(config_features) = table.get("features") {
-                    let Value::Array(config_features) = config_features else {
-                        panic!("features must be an array.");
-                    };
-
-                    for feature in config_features {
-                        let feature = feature.as_str().expect("features must be strings.");
-                        features.push(feature.to_owned());
-                    }
-                }
-                cases.push(features);
             }
         } else {
             // Nothing specified, just test no features
@@ -344,38 +342,11 @@ impl Package {
 
             for table in tables {
                 let Value::InlineTable(table) = table else {
-                    panic!("clippy-configs must be an array of tables. {:?}", table);
+                    panic!("clippy-configs items must be inline tables.");
                 };
-                // Filter based on conditions
-                if let Some(condition) = table.get("if") {
-                    if let Some(expr) = condition.as_str() {
-                        let mut eval_context = somni_expr::Context::new();
-                        eval_context.add_function("chip_has", |symbol: &str| {
-                            config.all().iter().any(|sym| sym == symbol)
-                        });
-                        if !eval_context
-                            .evaluate::<bool>(expr)
-                            .expect("Failed to evaluate expression")
-                        {
-                            continue;
-                        }
-                    } else {
-                        panic!("`if` condition must be a string.");
-                    };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
                 }
-
-                let mut features = Vec::new();
-                if let Some(config_features) = table.get("features") {
-                    let Value::Array(config_features) = config_features else {
-                        panic!("features must be an array.");
-                    };
-
-                    for feature in config_features {
-                        let feature = feature.as_str().expect("features must be strings.");
-                        features.push(feature.to_owned());
-                    }
-                }
-                cases.push(features);
             }
         }
 
