@@ -1,8 +1,13 @@
-use core::mem::MaybeUninit;
+use core::{mem::MaybeUninit, sync::atomic::Ordering};
+
+use portable_atomic::AtomicBool;
 
 use crate::chip_specific;
 #[cfg(multi_core)]
 use crate::multi_core::MultiCoreStrategy;
+
+// This flag ensures the singleton can only be created once.
+static IS_TAKEN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -39,6 +44,34 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
         _ => Err(FlashStorageError::Other(rc)),
     }
 }
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// A zero-sized helper type that ensures only one instance of FlashStorage is created.
+pub struct FlashSingleton {
+    _private: (),
+}
+
+impl FlashSingleton {
+    /// Takes the unique singleton token.
+    ///
+    /// Returns `Some(token)` on the first call, and `None` on all subsequent calls.
+    pub fn take() -> Option<Self> {
+        let already_taken = IS_TAKEN.fetch_or(true, Ordering::Acquire);
+        if !already_taken {
+            // If the exchange succeeded, the original value was `false`.
+            // This is the first call, so we can safely return the token.
+            Some(Self { _private: () })
+        } else {
+            // The flag was already `true`. Someone else has the token.
+            None
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reset_for_test() {
+        IS_TAKEN.store(false, core::sync::atomic::Ordering::Relaxed);
+    }
+}
 
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -63,7 +96,7 @@ impl FlashStorage {
     pub const SECTOR_SIZE: u32 = 4096;
 
     /// Create a new flash storage instance.
-    pub fn new() -> FlashStorage {
+    pub fn new(singleton: FlashSingleton) -> FlashStorage {
         let mut storage = FlashStorage {
             capacity: 0,
             unlocked: false,
@@ -169,5 +202,33 @@ impl FlashStorage {
         self.multi_core_strategy.post_write(unpark);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::FlashSingleton;
+    #[test]
+    fn test_singleton_behavior() {
+        FlashSingleton::reset_for_test();
+
+        // First call should succeed
+        let token1 = FlashSingleton::take();
+        assert!(token1.is_some());
+
+        // Second call should fail
+        let token2 = FlashSingleton::take();
+        assert!(token2.is_none());
+
+        // Third call should also fail
+        let token3 = FlashSingleton::take();
+        assert!(token3.is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "This should panic")]
+    fn test_expect_panics() {
+        let _token1 = FlashSingleton::take().expect("First should work");
+        let _token2 = FlashSingleton::take().expect("This should panic");
     }
 }
