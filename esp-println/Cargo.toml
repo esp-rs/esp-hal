@@ -12,7 +12,7 @@ license       = "MIT OR Apache-2.0"
 links         = "esp-println"
 
 [package.metadata.espressif]
-doc-config = [{ features = ["auto", "defmt-espflash", "critical-section"] }]
+doc-config = { features = ["auto", "defmt-espflash", "critical-section"] }
 check-configs = [
     { features = ["auto"] },
     { features = ["jtag-serial"], if = 'chip_has("soc_has_usb_serial_jtag")' },

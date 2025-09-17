@@ -81,7 +81,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let mut packages_to_release = args
         .packages
         .iter()
-        .filter(|p| p.is_published(workspace))
+        .filter(|p| p.is_published())
         .flat_map(|p| related_crates(workspace, *p))
         .collect::<Vec<_>>();
 

@@ -405,7 +405,7 @@ mod tests {
         let mut doc = CargoToml {
             manifest: toml.parse::<DocumentMut>().unwrap(),
             package: Package::EspHal,
-            workspace: Path::new(""),
+            workspace: PathBuf::new(),
         };
         let errors = check_crate_before_bumping(&mut doc);
         pretty_assertions::assert_eq!(

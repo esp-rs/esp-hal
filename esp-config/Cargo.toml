@@ -9,7 +9,7 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
-doc-config = [{ features = ["build"] }]
+doc-config = { features = ["build"] }
 check-configs = [
     { features = [] },
     { features = ["build"] },

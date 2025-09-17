@@ -370,8 +370,11 @@ impl Package {
     }
 
     fn targets_lp_core(&self) -> bool {
-        let toml = self.toml();
+        if *self == Package::Examples {
+            return false;
+        }
 
+        let toml = self.toml();
         let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
@@ -396,6 +399,10 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
+        if *self == Package::Examples {
+            return Ok(());
+        }
+
         if self.targets_lp_core() && !chip.has_lp_core() {
             return Err(anyhow!(
                 "Package '{self}' requires an LP core, but '{chip}' does not have one",
@@ -429,7 +436,8 @@ impl Package {
 
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
-        let Some(metadata) = self.toml().espressif_metadata() else {
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
             return false;
         };
 
