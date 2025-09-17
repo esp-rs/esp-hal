@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `BuilderLite` pattern to `AccessPointConfig`, `ClientConfig`, and `EapClientConfig` (#4017, #4115)
 - lifetime to `Sniffer` (#4017)
 - `dtim_period` parameter for `PowerSaveMode` (#4040)
+- `WifiConfig`, `CountryInfo` and `OperatingClass` (#4121)
 
 ### Changed
 
@@ -42,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `WifiState` split into `WifiStaState` and `WifiApState` (#4046)
 - `Mixed` has been renamed to `ApSta` in `Config` and `Capability` (#4040)
 - The memory allocation functions expected by `esp_radio` have been renamed and extended (#3890, #4043)
+- Updated radio related drivers to ESP-IDF 5.5.1 (#4113)
+- Event handlers are now passed the event by reference (#4113)
+- Some build-time configuration options have been replaced by runtime options in `WifiConfig` (#4121)
 
 ### Fixed
 

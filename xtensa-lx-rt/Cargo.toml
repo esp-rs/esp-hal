@@ -19,7 +19,6 @@ test  = false
 document-features = "0.2.11"
 defmt             = {version = "1.0.1", optional = true}
 macros            = { version = "0.4.0", package = "xtensa-lx-rt-proc-macros", path = "../xtensa-lx-rt-proc-macros" }
-r0                = "1.0.0"
 xtensa-lx         = { version = "0.12.0", path = "../xtensa-lx" }
 
 [build-dependencies]

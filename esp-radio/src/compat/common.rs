@@ -44,17 +44,22 @@ pub(crate) fn thread_sem_get() -> *mut c_void {
 /// Implementation of sleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-pub(crate) unsafe extern "C" fn sleep(seconds: c_uint) -> c_uint {
+pub(crate) unsafe extern "C" fn __esp_radio_sleep(seconds: c_uint) -> c_uint {
     trace!("sleep");
 
-    unsafe { usleep(seconds * 1_000_000) };
+    unsafe { __esp_radio_usleep(seconds * 1_000_000) };
     0
 }
 
 /// Implementation of usleep() from newlib in esp-idf.
 /// components/newlib/time.c
 #[unsafe(no_mangle)]
-unsafe extern "C" fn usleep(us: u32) -> c_int {
+pub(crate) unsafe extern "C" fn __esp_radio_usleep(us: u32) -> c_int {
+    #[cfg(any(feature = "wifi", feature = "ble"))]
     crate::preempt::usleep(us);
+
+    #[cfg(not(any(feature = "wifi", feature = "ble")))]
+    crate::hal::delay::Delay::new().delay_micros(us);
+
     0
 }

@@ -5,9 +5,6 @@
    for details
    */
 
-/* override entry point */
-ENTRY(ESP32Reset)
-
 INCLUDE "memory_extras.x"
 
 /* Specify main memory areas */
@@ -59,4 +56,3 @@ MEMORY
   /* RTC slow memory (data accessible). Persists over deep sleep. */
   rtc_slow_seg(RW)       : ORIGIN = 0x50000000, len = 8k
 }
-

@@ -1,3 +1,6 @@
+/* force inclusion from libs */
+EXTERN( g_espnow_user_oui );
+
 EXTERN( __esp_radio_strdup );
 EXTERN( __esp_radio_esp_timer_get_time );
 EXTERN( __ESP_RADIO_G_WIFI_OSI_FUNCS );
@@ -22,7 +25,9 @@ EXTERN( __esp_radio_fclose );
 EXTERN( __esp_radio_sleep );
 EXTERN( __esp_radio_usleep );
 
-
+EXTERN( __esp_radio_esp_event_post );
+EXTERN( __esp_radio_vTaskDelay );
+EXTERN( __esp_radio_puts );
 
 PROVIDE( strdup = __esp_radio_strdup );
 PROVIDE( esp_timer_get_time = __esp_radio_esp_timer_get_time );
@@ -48,4 +53,6 @@ PROVIDE( fclose = __esp_radio_fclose );
 PROVIDE( sleep = __esp_radio_sleep );
 PROVIDE( usleep = __esp_radio_usleep );
 
-
+PROVIDE( esp_event_post = __esp_radio_esp_event_post );
+PROVIDE( vTaskDelay = __esp_radio_vTaskDelay );
+PROVIDE( puts = __esp_radio_puts );

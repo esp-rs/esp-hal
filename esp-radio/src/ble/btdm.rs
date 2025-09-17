@@ -317,7 +317,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
         #[allow(static_mut_refs)]
         #[cfg(feature = "sys-logs")]
         {
-            extern "C" {
+            unsafe extern "C" {
                 static mut g_bt_plf_log_level: u32;
             }
 
@@ -331,16 +331,12 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
         let mut cfg = ble_os_adapter_chip_specific::create_ble_config();
 
         let res = btdm_osi_funcs_register(addr_of!(G_OSI_FUNCS));
-        if res != 0 {
-            panic!("btdm_osi_funcs_register returned {}", res);
-        }
+        assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
 
         #[cfg(coex)]
         {
             let res = crate::wifi::coex_init();
-            if res != 0 {
-                panic!("got error");
-            }
+            assert!(res == 0, "coex_init failed");
         }
 
         let version = btdm_controller_get_compile_version();
@@ -360,9 +356,7 @@ pub(crate) fn ble_init() -> PhyInitGuard<'static> {
             &mut cfg as *mut esp_bt_controller_config_t,
         ); // see btdm_config_mask_load for mask
 
-        if res != 0 {
-            panic!("btdm_controller_init returned {}", res);
-        }
+        assert!(res == 0, "btdm_controller_init returned {}", res);
 
         debug!("The btdm_controller_init was initialized");
 

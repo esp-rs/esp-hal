@@ -845,7 +845,7 @@ impl<'d> EspNow<'d> {
     }
 }
 
-unsafe extern "C" fn send_cb(_mac_addr: *const u8, status: esp_now_send_status_t) {
+unsafe extern "C" fn send_cb(_tx_info: *const esp_now_send_info_t, status: esp_now_send_status_t) {
     let is_success = status == esp_now_send_status_t_ESP_NOW_SEND_SUCCESS;
     ESP_NOW_SEND_STATUS.store(is_success, Ordering::Relaxed);
 
