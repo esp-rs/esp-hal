@@ -329,6 +329,16 @@ macro_rules! for_each_rmt_channel {
 }
 #[macro_export]
 #[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_clock_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Apb, 1)); _for_each_inner!((RcFast, 2));
+        _for_each_inner!((Xtal, 3)); _for_each_inner!((Apb)); _for_each_inner!((all(Apb,
+        1), (RcFast, 2), (Xtal, 3))); _for_each_inner!((default(Apb)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
 macro_rules! for_each_rsa_exponentiation {
     ($($pattern:tt => $code:tt;)*) => {
         macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }

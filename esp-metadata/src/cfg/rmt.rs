@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{format_ident, quote};
 
 use crate::{cfg::GenericProperty, generate_for_each_macro, number};
 
@@ -91,5 +91,54 @@ impl GenericProperty for RmtChannelConfig {
             /// - `rx`: `(2, 0)`
             #for_each
         })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RmtClockSourcesConfig {
+    supported: Vec<String>,
+    default: String,
+}
+
+impl GenericProperty for RmtClockSourcesConfig {
+    fn cfgs(&self) -> Option<Vec<String>> {
+        let mut cfgs = Vec::new();
+
+        for value in &self.supported {
+            cfgs.push(format!("rmt_supports_{}_clock", value.to_lowercase()));
+        }
+
+        Some(cfgs)
+    }
+
+    fn for_each_macro(&self) -> Option<TokenStream> {
+        let clock_sources = self
+            .supported
+            .iter()
+            .enumerate()
+            .filter(|(_, name)| *name != "None")
+            .map(|(bits, name)| {
+                let src_name = format_ident!("{}", name);
+                let bits = number(bits);
+                quote! {
+                    #src_name, #bits
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let default = format_ident!("{}", self.default);
+        let default_clock_source = [quote!( #default )];
+
+        let branches: &[(&str, &[TokenStream])] = if self.supported.len() <= 2 {
+            &[
+                ("all", &clock_sources),
+                ("default", &default_clock_source),
+                ("is_boolean", &[]),
+            ]
+        } else {
+            &[("all", &clock_sources), ("default", &default_clock_source)]
+        };
+
+        Some(generate_for_each_macro("rmt_clock_source", branches))
     }
 }

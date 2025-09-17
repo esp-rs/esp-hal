@@ -495,6 +495,7 @@ driver_configs![
             has_dma: bool,
             #[serde(default)]
             has_per_channel_clock: bool,
+            clock_sources: RmtClockSourcesConfig,
         }
     },
     RngProperties {
