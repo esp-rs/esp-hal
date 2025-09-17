@@ -367,28 +367,20 @@ impl CargoCommandBatcher {
             }
 
             let mut command = Vec::new();
-
-            if let Some(tc) = key.toolchain.as_ref() {
-                command.push(format!("+{tc}"));
-            }
-
-            command.push("batch".to_string());
-            if !key.config_file.is_empty()
-                && let Some(config_path) = &group[0].config_path
-            {
-                // All grouped projects have the same config file content, pick one:
-                command.push("--config".to_string());
-                command.push(config_path.display().to_string());
-            }
-
+            let mut batch_len = 0;
             let mut commands_in_batch = 0;
 
-            command.extend_from_slice(&key.config);
+            // Windows be Windows, it has a command length limit.
+            let limit = if cfg!(target_os = "windows") {
+                Some(8191)
+            } else {
+                None
+            };
+
             for item in group.iter() {
-                // Only build and doc can be batched
+                // Only some commands can be batched
                 let batchable = [
-                    "build", "doc",
-                    // "check" // soon(TM)
+                    "build", "doc", "check", // soon(TM)
                 ];
                 if !batchable
                     .iter()
@@ -398,16 +390,56 @@ impl CargoCommandBatcher {
                     continue;
                 }
 
+                // Build the new command
                 let mut c = item.clone();
 
                 c.toolchain = None;
                 c.configs = Vec::new();
                 c.config_path = None;
 
+                let args = c.build();
+
+                let command_chars = 4 + args.iter().map(|arg| arg.len() + 1).sum::<usize>();
+
+                if !command.is_empty()
+                    && let Some(limit) = limit
+                    && batch_len + command_chars > limit
+                {
+                    // Command would be too long, cut here.
+                    all.push(BuiltCommand {
+                        artifact_name: String::from("batch"),
+                        command: std::mem::take(&mut command),
+                        env_vars: key.env_vars.clone(),
+                    });
+                }
+
+                // Set up head part if empty
+                if command.is_empty() {
+                    if let Some(tc) = key.toolchain.as_ref() {
+                        command.push(format!("+{tc}"));
+                    }
+
+                    command.push("batch".to_string());
+                    if !key.config_file.is_empty()
+                        && let Some(config_path) = &group[0].config_path
+                    {
+                        // All grouped projects have the same config file content, pick one:
+                        command.push("--config".to_string());
+                        command.push(config_path.display().to_string());
+                    }
+                    command.extend_from_slice(&key.config);
+
+                    commands_in_batch = 0;
+                    batch_len = command.iter().map(|s| s.len() + 1).sum::<usize>() - 1;
+                }
+
+                // Append the new command
+
                 command.push("---".to_string());
-                command.extend_from_slice(&c.build());
+                command.extend_from_slice(&args);
 
                 commands_in_batch += 1;
+                batch_len += command_chars;
             }
 
             if commands_in_batch > 0 {
