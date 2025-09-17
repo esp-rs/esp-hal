@@ -14,6 +14,7 @@ use crate::{
     git::current_branch,
 };
 
+/// Arguments for generating a release plan.
 #[derive(Debug, Args)]
 pub struct PlanArgs {
     /// Allow making a release from the current (non-main) branch. The
@@ -26,6 +27,7 @@ pub struct PlanArgs {
     packages: Vec<Package>,
 }
 
+/// A package in the release plan.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct PackagePlan {
     pub package: Package,
@@ -44,11 +46,14 @@ pub struct PackagePlan {
 /// order in which the packages are released.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Plan {
+    /// The branch the release is made from.
     pub base: String,
+    /// The packages to be released, in order.
     pub packages: Vec<PackagePlan>,
 }
 
 impl Plan {
+    /// Load a release plan from a file.
     pub fn from_path(plan_path: &Path) -> Result<Self> {
         let plan_source = std::fs::read_to_string(&plan_path)
             .with_context(|| format!("Failed to read release plan from {}. Run `cargo xrelease plan` to generate a release plan.", plan_path.display()))?;
@@ -67,6 +72,7 @@ impl Plan {
     }
 }
 
+/// Generate a release plan for the specified packages.
 pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     let current_branch = ensure_main_branch(args.allow_non_main)?;
 
@@ -222,9 +228,13 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
 "#,
     );
 
-    let mut plan_file = std::fs::File::create(&plan_path)?;
-    plan_file.write_all(plan_header.as_bytes())?;
-    serde_json::to_writer_pretty(&mut plan_file, &plan)?;
+    let mut plan_file = std::fs::File::create(&plan_path)
+        .with_context(|| format!("Failed to create {plan_path:?}"))?;
+    plan_file
+        .write_all(plan_header.as_bytes())
+        .with_context(|| format!("Failed to write to {plan_file:?}"))?;
+    serde_json::to_writer_pretty(&mut plan_file, &plan)
+        .with_context(|| format!("Failed to serialize {plan:?} as pretty-printed JSON"))?;
     log::debug!("Release plan written to {}", plan_path.display());
 
     println!("Release plan written to {}.", plan_path.display());
@@ -237,6 +247,7 @@ pub fn plan(workspace: &Path, args: PlanArgs) -> Result<()> {
     Ok(())
 }
 
+/// Ensure we are on the main branch, or allow non-main if specified.
 pub fn ensure_main_branch(allow_non_main: bool) -> Result<String> {
     let current_branch = current_branch()?;
 
@@ -335,15 +346,19 @@ fn topological_sort(dep_graph: &HashMap<Package, Vec<Package>>) -> Vec<Package> 
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
-    // Dependencies in this test do not always reflect real dependencies, it is only a test of correct function operation. 
+    // Dependencies in this test do not always reflect real dependencies, it is only a test of
+    // correct function operation.
     fn test_topological_sort() {
         let mut dep_graph = HashMap::new();
         dep_graph.insert(Package::EspHal, vec![Package::EspAlloc]);
-        dep_graph.insert(Package::EspHalEmbassy, vec![Package::EspHal, Package::EspRadio]);
+        dep_graph.insert(
+            Package::EspHalEmbassy,
+            vec![Package::EspHal, Package::EspRadio],
+        );
         dep_graph.insert(Package::EspRadio, vec![Package::EspHal]);
         dep_graph.insert(Package::EspAlloc, vec![]);
 

@@ -15,13 +15,12 @@ use super::WifiEvent;
 use crate::{
     binary::c_types::*,
     compat::{
-        OSI_FUNCS_TIME_BLOCKING,
         common::{str_from_c, thread_sem_get},
         malloc::{InternalMemory, calloc_internal},
     },
     hal::{clock::ModemClockController, peripherals::WIFI},
     memory_fence::memory_fence,
-    preempt::yield_task,
+    time::{blob_ticks_to_micros, millis_to_blob_ticks},
 };
 
 static WIFI_LOCK: RawMutex = RawMutex::new();
@@ -241,9 +240,8 @@ pub unsafe extern "C" fn wifi_int_restore(_wifi_int_mux: *mut c_void, tmp: u32) 
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn task_yield_from_isr() {
-    // original: /* Do nothing */
     trace!("task_yield_from_isr");
-    yield_task();
+    crate::preempt::yield_task_from_isr();
 }
 
 /// **************************************************************************
@@ -277,6 +275,7 @@ pub unsafe extern "C" fn wifi_thread_semphr_get() -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn mutex_create() -> *mut c_void {
+    trace!("mutex_create");
     crate::compat::mutex::mutex_create(false)
 }
 
@@ -294,6 +293,7 @@ pub unsafe extern "C" fn mutex_create() -> *mut c_void {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn recursive_mutex_create() -> *mut c_void {
+    trace!("recursive_mutex_create");
     crate::compat::mutex::mutex_create(true)
 }
 
@@ -328,7 +328,7 @@ pub unsafe extern "C" fn mutex_delete(mutex: *mut c_void) {
 ///
 /// *************************************************************************
 pub unsafe extern "C" fn mutex_lock(mutex: *mut c_void) -> i32 {
-    crate::compat::mutex::mutex_lock(mutex, OSI_FUNCS_TIME_BLOCKING)
+    crate::compat::mutex::mutex_lock(mutex)
 }
 
 /// **************************************************************************
@@ -456,7 +456,13 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(task_func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(task_handle as *mut usize) = task as usize;
 
         1
@@ -530,10 +536,7 @@ pub unsafe extern "C" fn task_delete(task_handle: *mut c_void) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_delay(tick: u32) {
     trace!("task_delay tick {}", tick);
-    let start_time = crate::time::systimer_count();
-    while crate::time::elapsed_time_since(start_time) < tick as u64 {
-        yield_task();
-    }
+    crate::preempt::usleep(blob_ticks_to_micros(tick))
 }
 
 /// **************************************************************************
@@ -551,7 +554,7 @@ pub unsafe extern "C" fn task_delay(tick: u32) {
 /// *************************************************************************
 pub unsafe extern "C" fn task_ms_to_tick(ms: u32) -> i32 {
     trace!("task_ms_to_tick ms {}", ms);
-    crate::time::millis_to_ticks(ms as u64) as i32
+    millis_to_blob_ticks(ms) as i32
 }
 
 /// **************************************************************************
@@ -586,7 +589,7 @@ pub unsafe extern "C" fn task_get_current_task() -> *mut c_void {
 /// *************************************************************************
 pub unsafe extern "C" fn task_get_max_priority() -> i32 {
     trace!("task_get_max_priority");
-    255
+    crate::preempt::max_task_priority() as i32
 }
 
 /// **************************************************************************
@@ -659,6 +662,7 @@ pub unsafe extern "C" fn event_post(
     trace!("EVENT: {:?}", event);
 
     WIFI_EVENTS.with(|events| events.insert(event));
+
     let handled =
         unsafe { super::event::dispatch_event_handler(event, event_data, event_data_size) };
 
@@ -1203,7 +1207,9 @@ pub unsafe extern "C" fn log_write(
     format: *const c_char,
     args: ...
 ) {
-    crate::binary::log::syslog(level, format as _, args);
+    unsafe {
+        crate::binary::log::syslog(level, format as _, args);
+    }
 }
 
 /// **************************************************************************
@@ -1504,7 +1510,7 @@ pub unsafe extern "C" fn coex_status_get() -> u32 {
     trace!("coex_status_get");
 
     #[cfg(coex)]
-    return unsafe { crate::binary::include::coex_status_get() };
+    return unsafe { crate::binary::include::coex_status_get(0b1) }; // COEX_STATUS_GET_WIFI_BITMAP
 
     #[cfg(not(coex))]
     0
@@ -1787,6 +1793,16 @@ pub unsafe extern "C" fn coex_register_start_cb(
 
     #[cfg(not(coex))]
     0
+}
+
+pub unsafe extern "C" fn coex_schm_get_phase_by_idx(
+    _phase_idx: i32,
+) -> *mut esp_wifi_sys::c_types::c_void {
+    #[cfg(coex)]
+    return unsafe { crate::binary::include::coex_schm_get_phase_by_idx(_phase_idx) };
+
+    #[cfg(not(coex))]
+    core::ptr::null_mut()
 }
 
 /// **************************************************************************

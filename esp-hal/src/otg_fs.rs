@@ -31,7 +31,7 @@
 //! Visit the [USB Serial] example for an example of using the USB OTG
 //! peripheral.
 //!
-//! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/src/bin/usb_serial.rs
+//! [USB Serial]: https://github.com/esp-rs/esp-hal/blob/main/examples/peripheral/usb_serial/src/main.rs
 //!
 //! ## Implementation State
 //! - Low-speed (LS) is not supported.

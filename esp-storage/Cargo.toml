@@ -25,6 +25,7 @@ cfg-if           = "1.0.0"
 # Optional dependencies
 esp-sync         = { version = "0.0.0", path = "../esp-sync", optional = true }
 esp-rom-sys      = { version = "0.1.1", path = "../esp-rom-sys", optional = true }
+defmt  = { version = "1.0.1", optional = true }
 
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2.11"
@@ -46,6 +47,9 @@ critical-section = []
 
 ## Bytewise read emulation
 bytewise-read = []
+
+## Implement `defmt::Format` on certain types.
+defmt = ["dep:defmt"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

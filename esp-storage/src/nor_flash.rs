@@ -189,7 +189,7 @@ impl MultiwriteNorFlash for FlashStorage {}
 
 // Run the tests with `--test-threads=1` - the emulation is not multithread safe
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     const WORD_SIZE: u32 = 4;

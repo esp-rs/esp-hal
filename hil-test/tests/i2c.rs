@@ -251,6 +251,10 @@ mod tests {
             );
 
             defmt::info!("Transaction cancelled");
+
+            // Ping the sensor to ensure we don't randomly get an address failure in the next
+            // iteration.
+            _ = i2c.write_async(DUT_ADDRESS, &[]).await;
         }
 
         let mut read_data = [0u8; 22];
@@ -357,5 +361,29 @@ mod tests {
 
             ticker.next().await;
         }
+    }
+
+    #[test]
+    #[cfg(esp32s3)]
+    fn test_read_cali_with_rtc_i2c() {
+        use core::time::Duration;
+
+        use esp_hal::i2c::rtc::{Config, I2c, Timing};
+
+        let peripherals = unsafe { esp_hal::peripherals::Peripherals::steal() };
+
+        let (sda, scl) = hil_test::i2c_pins!(peripherals);
+
+        let config = Config::default()
+            .with_timing(Timing::standard_mode())
+            .with_timeout(Duration::from_micros(100));
+        let mut i2c = I2c::new(peripherals.RTC_I2C, config, sda, scl).unwrap();
+
+        let mut data = [0; 22];
+
+        i2c.read(DUT_ADDRESS, READ_DATA_COMMAND[0], &mut data)
+            .unwrap();
+
+        assert_ne!(data, [0u8; 22]);
     }
 }

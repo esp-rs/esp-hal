@@ -9,7 +9,12 @@
 use esp_hal::{
     Blocking,
     DriverMode,
-    gpio::{InputPin, Level, NoPin, OutputPin},
+    gpio::{
+        Flex,
+        Level,
+        NoPin,
+        interconnect::{PeripheralInput, PeripheralOutput},
+    },
     rmt::{
         Channel,
         Error,
@@ -36,10 +41,10 @@ cfg_if::cfg_if! {
     }
 }
 
-fn setup<Dm: DriverMode>(
+fn setup<'a, Dm: DriverMode>(
     rmt: Rmt<'static, Dm>,
-    rx: impl InputPin,
-    tx: impl OutputPin,
+    rx: impl PeripheralInput<'a>,
+    tx: impl PeripheralOutput<'a>,
     tx_config: TxChannelConfig,
     rx_config: RxChannelConfig,
 ) -> (Channel<Dm, Tx>, Channel<Dm, Rx>) {
@@ -105,7 +110,8 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
 // another one for receive, and verify that the data matches.
 fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let (_, pin) = hil_test::common_test_pins!(peripherals);
+    let (rx, tx) = Flex::new(pin).split();
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
@@ -122,7 +128,8 @@ fn do_rmt_loopback<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
 // another one for receive, and verify that the data matches.
 async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: u8) {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let (_, pin) = hil_test::common_test_pins!(peripherals);
+    let (rx, tx) = Flex::new(pin).split();
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap().into_async();
 
     let tx_config = TxChannelConfig::default().with_memsize(tx_memsize);
@@ -141,8 +148,8 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     )
     .await;
 
-    assert!(tx_res.is_ok());
-    assert!(rx_res.is_ok());
+    tx_res.unwrap();
+    rx_res.unwrap();
 
     // the last two pulse-codes are the ones which wait for the timeout so
     // they can't be equal
@@ -156,7 +163,8 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
     write_end_marker: bool,
 ) -> Result<(), Error> {
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    let (rx, tx) = hil_test::common_test_pins!(peripherals);
+    let (_, pin) = hil_test::common_test_pins!(peripherals);
+    let (rx, tx) = Flex::new(pin).split();
     let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
 
     let tx_config = TxChannelConfig::default()
@@ -286,8 +294,7 @@ mod tests {
     macro_rules! test_channel_pair {
         (
             $peripherals:ident,
-            $tx_pin:ident,
-            $rx_pin:ident,
+            $pin:ident,
             $tx_channel:ident,
             $rx_channel:ident
         ) => {
@@ -298,15 +305,12 @@ mod tests {
             let tx_config = TxChannelConfig::default();
             let rx_config = RxChannelConfig::default().with_idle_threshold(1000);
 
-            let tx_channel = rmt
-                .$tx_channel
-                .configure_tx($tx_pin.reborrow(), tx_config)
-                .unwrap();
+            let pin = Flex::new($pin.reborrow());
+            let (rx_pin, tx_pin) = pin.split();
 
-            let rx_channel = rmt
-                .$rx_channel
-                .configure_rx($rx_pin.reborrow(), rx_config)
-                .unwrap();
+            let tx_channel = rmt.$tx_channel.configure_tx(tx_pin, tx_config).unwrap();
+
+            let rx_channel = rmt.$rx_channel.configure_rx(rx_pin, rx_config).unwrap();
 
             do_rmt_loopback_inner::<20>(tx_channel, rx_channel);
         };
@@ -318,7 +322,7 @@ mod tests {
     #[test]
     fn rmt_use_all_channels() {
         let mut p = esp_hal::init(esp_hal::Config::default());
-        let (mut rx, mut tx) = hil_test::common_test_pins!(p);
+        let (_, mut pin) = hil_test::common_test_pins!(p);
 
         // FIXME: Find a way to implement these with less boilerplate and without a macro.
         // Maybe use ChannelCreator::steal() (doesn't help right now because it uses a const
@@ -327,47 +331,47 @@ mod tests {
         // Chips with combined RxTx channels
         #[cfg(esp32)]
         {
-            test_channel_pair!(p, tx, rx, channel0, channel1);
-            test_channel_pair!(p, tx, rx, channel0, channel2);
-            test_channel_pair!(p, tx, rx, channel0, channel3);
-            test_channel_pair!(p, tx, rx, channel0, channel4);
-            test_channel_pair!(p, tx, rx, channel0, channel5);
-            test_channel_pair!(p, tx, rx, channel0, channel6);
-            test_channel_pair!(p, tx, rx, channel0, channel7);
+            test_channel_pair!(p, pin, channel0, channel1);
+            test_channel_pair!(p, pin, channel0, channel2);
+            test_channel_pair!(p, pin, channel0, channel3);
+            test_channel_pair!(p, pin, channel0, channel4);
+            test_channel_pair!(p, pin, channel0, channel5);
+            test_channel_pair!(p, pin, channel0, channel6);
+            test_channel_pair!(p, pin, channel0, channel7);
 
-            test_channel_pair!(p, tx, rx, channel1, channel0);
-            test_channel_pair!(p, tx, rx, channel2, channel0);
-            test_channel_pair!(p, tx, rx, channel3, channel0);
-            test_channel_pair!(p, tx, rx, channel4, channel0);
-            test_channel_pair!(p, tx, rx, channel5, channel0);
-            test_channel_pair!(p, tx, rx, channel6, channel0);
-            test_channel_pair!(p, tx, rx, channel7, channel0);
+            test_channel_pair!(p, pin, channel1, channel0);
+            test_channel_pair!(p, pin, channel2, channel0);
+            test_channel_pair!(p, pin, channel3, channel0);
+            test_channel_pair!(p, pin, channel4, channel0);
+            test_channel_pair!(p, pin, channel5, channel0);
+            test_channel_pair!(p, pin, channel6, channel0);
+            test_channel_pair!(p, pin, channel7, channel0);
         }
 
         #[cfg(esp32s2)]
         {
-            test_channel_pair!(p, tx, rx, channel0, channel1);
-            test_channel_pair!(p, tx, rx, channel0, channel2);
-            test_channel_pair!(p, tx, rx, channel0, channel3);
+            test_channel_pair!(p, pin, channel0, channel1);
+            test_channel_pair!(p, pin, channel0, channel2);
+            test_channel_pair!(p, pin, channel0, channel3);
 
-            test_channel_pair!(p, tx, rx, channel1, channel0);
-            test_channel_pair!(p, tx, rx, channel2, channel0);
-            test_channel_pair!(p, tx, rx, channel3, channel0);
+            test_channel_pair!(p, pin, channel1, channel0);
+            test_channel_pair!(p, pin, channel2, channel0);
+            test_channel_pair!(p, pin, channel3, channel0);
         }
 
         // Chips with separate Rx and Tx channels
         #[cfg(esp32s3)]
         {
-            test_channel_pair!(p, tx, rx, channel0, channel4);
-            test_channel_pair!(p, tx, rx, channel1, channel5);
-            test_channel_pair!(p, tx, rx, channel2, channel6);
-            test_channel_pair!(p, tx, rx, channel3, channel7);
+            test_channel_pair!(p, pin, channel0, channel4);
+            test_channel_pair!(p, pin, channel1, channel5);
+            test_channel_pair!(p, pin, channel2, channel6);
+            test_channel_pair!(p, pin, channel3, channel7);
         }
 
         #[cfg(not(any(esp32, esp32s2, esp32s3)))]
         {
-            test_channel_pair!(p, tx, rx, channel0, channel2);
-            test_channel_pair!(p, tx, rx, channel1, channel3);
+            test_channel_pair!(p, pin, channel0, channel2);
+            test_channel_pair!(p, pin, channel1, channel3);
         }
     }
 }

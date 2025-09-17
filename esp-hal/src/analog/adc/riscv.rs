@@ -39,7 +39,6 @@ mod calibration;
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c3/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32c6/include/soc/regi2c_saradc.h
 // https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h2/include/soc/regi2c_saradc.h
-// https://github.com/espressif/esp-idf/blob/903af13e8/components/soc/esp32h4/include/soc/regi2c_saradc.h
 cfg_if::cfg_if! {
     if #[cfg(adc_adc1)] {
         const ADC_VAL_MASK: u16 = 0xfff;
@@ -342,20 +341,23 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        if self.attenuations[PIN::CHANNEL as usize].is_none() {
-            panic!("Channel {} is not configured reading!", PIN::CHANNEL);
+        if self.attenuations[pin.pin.adc_channel() as usize].is_none() {
+            panic!(
+                "Channel {} is not configured reading!",
+                pin.pin.adc_channel()
+            );
         }
 
         if let Some(active_channel) = self.active_channel {
             // There is conversion in progress:
             // - if it's for a different channel try again later
             // - if it's for the given channel, go ahead and check progress
-            if active_channel != PIN::CHANNEL {
+            if active_channel != pin.pin.adc_channel() {
                 return Err(nb::Error::WouldBlock);
             }
         } else {
             // If no conversions are in progress, start a new one for given channel
-            self.active_channel = Some(PIN::CHANNEL);
+            self.active_channel = Some(pin.pin.adc_channel());
 
             // Set ADC unit calibration according used scheme for pin
             ADCI::set_init_code(pin.cal_scheme.adc_cal());
@@ -481,7 +483,7 @@ where
         PIN: super::AdcChannel,
         CS: super::AdcCalScheme<ADCI>,
     {
-        let channel = PIN::CHANNEL;
+        let channel = pin.pin.adc_channel();
         if self.attenuations[channel as usize].is_none() {
             panic!("Channel {} is not configured reading!", channel);
         }

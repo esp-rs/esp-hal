@@ -32,6 +32,7 @@ pub enum Run {
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments for running ELFs.
 #[derive(Debug, Args)]
 pub struct RunElfsArgs {
     /// Which chip to run the tests for.
@@ -44,7 +45,13 @@ pub struct RunElfsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Run doc tests for the specified package and chip.
 pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
+    log::debug!(
+        "Running doc tests for '{}' on '{}'",
+        args.package,
+        args.chip
+    );
     let chip = args.chip;
 
     let package_name = args.package.to_string();
@@ -86,9 +93,12 @@ pub fn run_doc_tests(workspace: &Path, args: DocTestArgs) -> Result<()> {
     Ok(())
 }
 
+/// Run all ELFs in the specified folder using `probe-rs`.
 pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     let mut failed: Vec<String> = Vec::new();
-    for elf in fs::read_dir(&args.path)? {
+    for elf in fs::read_dir(&args.path)
+        .with_context(|| format!("Failed to read {}", args.path.display()))?
+    {
         let entry = elf?;
 
         let elf_path = entry.path();
@@ -125,6 +135,7 @@ pub fn run_elfs(args: RunElfsArgs) -> Result<()> {
     Ok(())
 }
 
+/// Run the specified examples for the given chip.
 pub fn run_examples(
     args: ExamplesArgs,
     examples: Vec<Metadata>,

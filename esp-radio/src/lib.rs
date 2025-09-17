@@ -61,7 +61,24 @@
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
 //! - `ESP_RADIO_TX_QUEUE_SIZE`
 //! - `ESP_RADIO_MAX_BURST_SIZE`
-//!
+#![cfg_attr(
+    multi_core,
+    doc = concat!(
+        "### Running on the Second Core",
+        "\n\n",
+        "BLE and Wi-Fi can also be run on the second core.",
+        "\n\n",
+        "`esp_preempt::init` and `esp_radio::init` _must_ be called on the core on",
+        "which you intend to run the wireless code. This will correctly initialize",
+        "the radio peripheral to run on that core, and ensure that interrupts are",
+        "serviced by the correct core.",
+        "\n\n",
+        "It's also important to allocate adequate stack for the second core; in many",
+        "cases 8kB is not enough, and 16kB or more may be required depending on your",
+        "use case. Failing to allocate adequate stack may result in strange behaviour,",
+        "such as your application silently failing at some point during execution."
+    )
+)]
 //! # Features flags
 //!
 //! Note that not all features are available on every MCU. For example, `ble`
@@ -124,13 +141,9 @@ use hal::{
     time::Rate,
 };
 
+use crate::radio::{setup_radio_isr, shutdown_radio_isr};
 #[cfg(feature = "wifi")]
 use crate::wifi::WifiError;
-use crate::{
-    preempt::yield_task,
-    radio::{setup_radio_isr, shutdown_radio_isr},
-    tasks::init_tasks,
-};
 
 // can't use instability on inline module definitions, see https://github.com/rust-lang/rust/issues/54727
 #[doc(hidden)]
@@ -177,10 +190,6 @@ unstable_module! {
 }
 
 pub(crate) mod common_adapter;
-
-#[doc(hidden)]
-pub mod tasks;
-
 pub(crate) mod memory_fence;
 
 pub(crate) static ESP_RADIO_LOCK: RawMutex = RawMutex::new();
@@ -220,9 +229,6 @@ impl Drop for Controller<'_> {
 
         shutdown_radio_isr();
 
-        // This shuts down the task switcher and timer tick interrupt.
-        preempt::disable();
-
         #[cfg(esp32)]
         // Allow using `ADC2` again
         release_adc2(unsafe { esp_hal::Internal::conjure() });
@@ -231,7 +237,43 @@ impl Drop for Controller<'_> {
 
 /// Initialize for using Wi-Fi and or BLE.
 ///
+/// Wi-Fi and BLE require a preemptive scheduler to be present. Without one, the underlying firmware
+/// can't operate. The scheduler must implement the interfaces in the `esp-radio-preempt-driver`
+/// crate. If you are using an embedded RTOS like Ariel OS, it needs to provide an appropriate
+/// implementation.
+///
+/// If you are not using an embedded RTOS, use the `esp-preempt` crate which provides the
+/// necessary functionality.
+///
 /// Make sure to **not** call this function while interrupts are disabled.
+///
+/// ## Errors
+///
+/// - The function may return an error if the scheduler is not initialized.
+#[cfg_attr(
+    esp32,
+    doc = " - The function may return an error if ADC2 is already in use."
+)]
+/// - The function may return an error if interrupts are disabled.
+/// - The function may return an error if initializing the underlying driver fails.
+///
+/// ## Example
+///
+/// For examples of the necessary setup, see your RTOS's documentation. If you are
+/// using the `esp-preempt` crate, you will need to initialize the scheduler before calling this
+/// function:
+///
+/// ```rust, no_run
+#[doc = esp_hal::before_snippet!()]
+/// use esp_hal::timer::timg::TimerGroup;
+///
+/// let timg0 = TimerGroup::new(peripherals.TIMG0);
+/// esp_preempt::start(timg0.timer0);
+///
+/// // You can now start esp-radio:
+/// let esp_radio_controller = esp_radio::init().unwrap();
+/// # }
+/// ```
 pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     #[cfg(esp32)]
     if try_claim_adc2(unsafe { hal::Internal::conjure() }).is_err() {
@@ -257,12 +299,6 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
     phy_mem_init();
 
     setup_radio_isr();
-
-    // This initializes the task switcher
-    preempt::enable();
-
-    init_tasks();
-    yield_task();
 
     wifi_set_log_verbose();
     init_radio_clocks();
@@ -308,8 +344,37 @@ pub enum InitializationError {
     /// The scheduler is not initialized.
     SchedulerNotInitialized,
     #[cfg(esp32)]
-    // ADC2 cannot be used with `radio` functionality on `esp32`.
+    /// ADC2 is required by esp-radio, but it is in use by esp-hal.
     Adc2IsUsed,
+}
+
+impl core::error::Error for InitializationError {}
+
+impl core::fmt::Display for InitializationError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            InitializationError::General(e) => write!(f, "A general error {e} occurred"),
+            #[cfg(feature = "wifi")]
+            InitializationError::WifiError(e) => {
+                write!(f, "Wi-Fi driver related error occured: {e}")
+            }
+            InitializationError::WrongClockConfig => {
+                write!(f, "The current CPU clock frequency is too low")
+            }
+            InitializationError::InterruptsDisabled => write!(
+                f,
+                "Attempted to initialize while interrupts are disabled (Unsupported)"
+            ),
+            InitializationError::SchedulerNotInitialized => {
+                write!(f, "The scheduler is not initialized")
+            }
+            #[cfg(esp32)]
+            InitializationError::Adc2IsUsed => write!(
+                f,
+                "ADC2 cannot be used with `radio` functionality on `esp32`"
+            ),
+        }
+    }
 }
 
 #[cfg(feature = "wifi")]

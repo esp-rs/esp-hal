@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,19 @@ impl Package {
         false
     }
 
+    /// Does the package have any host tests?
+    pub fn has_host_tests(&self, workspace: &Path) -> bool {
+        let package_path = workspace.join(self.to_string()).join("src");
+
+        walkdir::WalkDir::new(package_path)
+            .into_iter()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "rs"))
+            .any(|entry| {
+                std::fs::read_to_string(entry.path()).map_or(false, |src| src.contains("#[test]"))
+            })
+    }
+
     /// Does the package need to be built with the standard library?
     pub fn needs_build_std(&self) -> bool {
         use Package::*;
@@ -259,6 +272,7 @@ impl Package {
             Package::EspPrintln => {
                 features.push("auto".to_owned());
                 features.push("defmt-espflash".to_owned());
+                features.push("critical-section".to_owned());
             }
             Package::EspStorage => {}
             Package::EspBootloaderEspIdf => {
@@ -270,9 +284,11 @@ impl Package {
             }
             Package::EspMetadataGenerated => {}
             Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
+            Package::EspRiscvRt => features.push("rtc-ram".to_owned()),
             _ => {}
         }
 
+        log::debug!("Features for package '{}': {:?}", self, features);
         features
     }
 
@@ -316,9 +332,13 @@ impl Package {
             Package::EspPreempt => {
                 cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
             }
+            Package::EspStorage => {
+                cases.push(vec!["defmt".to_owned()]);
+            }
             _ => {}
         }
 
+        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
         cases
     }
 
@@ -355,6 +375,11 @@ impl Package {
 
     /// Creates a tag string for this [`Package`] combined with a semantic version.
     pub fn tag(&self, version: &semver::Version) -> String {
+        log::debug!(
+            "Creating tag for package '{}' with version '{}'",
+            self,
+            version
+        );
         format!("{self}-v{version}")
     }
 
@@ -509,12 +534,17 @@ pub fn execute_app(
 // ----------------------------------------------------------------------------
 // Helper Functions
 
-// Copy an entire directory recursively.
+/// Copy an entire directory recursively.
 // https://stackoverflow.com/a/65192210
 pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> {
-    fs::create_dir_all(&dst)?;
+    log::debug!(
+        "Copying directory '{}' to '{}'",
+        src.as_ref().display(),
+        dst.as_ref().display()
+    );
+    fs::create_dir_all(&dst).with_context(|| "Failed to create a {dst}")?;
 
-    for entry in fs::read_dir(src)? {
+    for entry in fs::read_dir(src).with_context(|| "Failed to read {src}")? {
         let entry = entry?;
         let ty = entry.file_type()?;
 
@@ -532,7 +562,7 @@ pub fn copy_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> Result<()> 
 /// workspace.
 pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     let mut paths = Vec::new();
-    for entry in fs::read_dir(workspace)? {
+    for entry in fs::read_dir(workspace).context("Failed to read {workspace}")? {
         let entry = entry?;
         if entry.file_type()?.is_dir() && entry.path().join("Cargo.toml").exists() {
             paths.push(entry.path());
@@ -540,6 +570,12 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
     }
 
     paths.sort();
+
+    log::debug!(
+        "Found {} packages in workspace '{}':",
+        paths.len(),
+        workspace.display()
+    );
 
     Ok(paths)
 }
@@ -570,6 +606,88 @@ pub fn format_package(workspace: &Path, package: Package, check: bool) -> Result
     }
 
     Ok(())
+}
+
+/// Run the host tests for the specified package.
+pub fn run_host_tests(workspace: &Path, package: Package) -> Result<()> {
+    log::info!("Running host tests for package: {}", package);
+    let package_path = workspace.join(package.as_ref());
+
+    let cmd = CargoArgsBuilder::default();
+
+    match package {
+        Package::EspConfig => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["build".into(), "tui".into()])
+                    .build(),
+                &package_path,
+            );
+        }
+
+        Package::EspBootloaderEspIdf => {
+            return cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["std".into()])
+                    .build(),
+                &package_path,
+            );
+        }
+
+        Package::EspStorage => {
+            cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["emulation".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            cargo::run(
+                &cmd.clone()
+                    .subcommand("test")
+                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            log::info!("Running miri host tests for package: {}", package);
+
+            cargo::run(
+                &cmd.clone()
+                    .toolchain("nightly")
+                    .subcommand("miri")
+                    .subcommand("test")
+                    .features(&vec!["emulation".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            )?;
+
+            return cargo::run(
+                &cmd.clone()
+                    .toolchain("nightly")
+                    .subcommand("miri")
+                    .subcommand("test")
+                    .features(&vec!["emulation".into(), "bytewise-read".into()])
+                    .arg("--")
+                    .arg("--test-threads=1")
+                    .build(),
+                &package_path,
+            );
+        }
+        _ => Err(anyhow!(
+            "Instructions for host testing were not provided for: '{}'",
+            package,
+        )),
+    }
 }
 
 fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Result<()> {
@@ -603,11 +721,14 @@ fn format_package_path(workspace: &Path, package_path: &Path, check: bool) -> Re
     ));
     cargo_args.extend(source_files);
 
+    log::debug!("{cargo_args:#?}");
+
     cargo::run(&cargo_args, &package_path)
 }
 
 /// Update the metadata and chip support table in the esp-hal README.
 pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
+    log::info!("Updating esp-metadata and chip support table...");
     update_chip_support_table(workspace)?;
     generate_metadata(workspace, save)?;
 
@@ -616,7 +737,8 @@ pub fn update_metadata(workspace: &Path, check: bool) -> Result<()> {
     if check {
         let res = std::process::Command::new("git")
             .args(["diff", "HEAD", "esp-metadata-generated"])
-            .output()?;
+            .output()
+            .context("Failed to run `git diff HEAD esp-metadata-generated`")?;
         if !res.stdout.is_empty() {
             return Err(anyhow::Error::msg(
                 "detected `esp-metadata-generated` changes. Run `cargo xtask update-metadata`, and commit the changes.",
@@ -668,8 +790,10 @@ fn save(out_path: &Path, tokens: TokenStream) -> Result<()> {
 }
 
 fn update_chip_support_table(workspace: &Path) -> Result<()> {
+    log::debug!("Updating chip support table in README.md...");
     let mut output = String::new();
-    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))?;
+    let readme = std::fs::read_to_string(workspace.join("esp-hal").join("README.md"))
+        .context("Failed to read {workspace}")?;
 
     let mut in_support_table = false;
     let mut generate_support_table = true;
@@ -704,7 +828,10 @@ fn update_chip_support_table(workspace: &Path) -> Result<()> {
 pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
     let mut packages = Vec::new();
 
-    for result in fs::read_dir(path)? {
+    for result in
+        fs::read_dir(path).with_context(|| format!("Failed to read {}", path.display()))?
+    {
+        log::debug!("Inspecting path: {}", path.display());
         let entry = result?;
         if entry.path().is_file() {
             continue;
@@ -717,6 +844,12 @@ pub fn find_packages(path: &Path) -> Result<Vec<PathBuf>> {
             packages.extend(find_packages(&entry.path())?);
         }
     }
+
+    log::debug!(
+        "Found {} packages in path '{}':",
+        packages.len(),
+        path.display()
+    );
 
     Ok(packages)
 }

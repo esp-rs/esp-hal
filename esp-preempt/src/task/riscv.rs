@@ -1,19 +1,23 @@
 use core::ffi::c_void;
 
+use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register};
+
+use crate::SCHEDULER;
+
 unsafe extern "C" {
     fn sys_switch();
 }
 
-static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+static _CURRENT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
     portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
-static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<Registers> =
+static _NEXT_CTX_PTR: portable_atomic::AtomicPtr<CpuContext> =
     portable_atomic::AtomicPtr::new(core::ptr::null_mut());
 
 /// Registers saved / restored
 #[derive(Debug, Default, Clone)]
 #[repr(C)]
-pub struct Registers {
+pub struct CpuContext {
     /// Return address, stores the address to return to after a function call or
     /// interrupt.
     pub ra: usize,
@@ -94,15 +98,34 @@ pub struct Registers {
     pub mstatus: usize,
 }
 
+impl CpuContext {
+    /// Creates a new, zeroed out context.
+    pub const fn new() -> Self {
+        unsafe { core::mem::zeroed() }
+    }
+}
+
+extern "C" fn idle_hook() -> ! {
+    loop {
+        unsafe { core::arch::asm!("wfi") };
+    }
+}
+
+pub(crate) fn set_idle_hook_entry(idle_context: &mut CpuContext) {
+    // Point idle context PC at the assembly that calls the idle hook. We need a new stack
+    // frame for the idle task on the main stack.
+    idle_context.pc = idle_hook as usize;
+}
+
 pub(crate) fn new_task_context(
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,
     stack_top: *mut (),
-) -> Registers {
+) -> CpuContext {
     let stack_top = stack_top as usize;
     let stack_top = stack_top - (stack_top % 16);
 
-    Registers {
+    CpuContext {
         pc: task as usize,
         a0: param as usize,
         sp: stack_top,
@@ -118,52 +141,36 @@ pub(crate) fn new_task_context(
 /// We save MEPC as the current task's PC and change MEPC to an assembly function
 /// which will save the current CPU state for the current task (excluding PC) and
 /// restoring the CPU state from the next task.
-pub fn task_switch(old_ctx: *mut Registers, new_ctx: *mut Registers) -> bool {
-    // Check that there isn't a switch "in-progress"
-    //
-    // While this shouldn't happen: from observation it does!
-    //
-    // This happens if the timer tick interrupt gets asserted while the task switch is in
-    // progress (i.e. the sw-int is served).
-    //
-    // In that case returning via `mret` will first service the pending interrupt before actually
-    // ending up in `sys_switch`.
-    //
-    // Setting MPIE to 0 _should_ prevent that from happening.
-    if !_NEXT_CTX_PTR
-        .load(portable_atomic::Ordering::SeqCst)
-        .is_null()
-    {
-        return false;
-    }
-
+pub fn task_switch(old_ctx: *mut CpuContext, new_ctx: *mut CpuContext) {
+    debug_assert!(
+        _NEXT_CTX_PTR
+            .load(portable_atomic::Ordering::SeqCst)
+            .is_null()
+    );
     _CURRENT_CTX_PTR.store(old_ctx, portable_atomic::Ordering::SeqCst);
     _NEXT_CTX_PTR.store(new_ctx, portable_atomic::Ordering::SeqCst);
 
-    let old = esp_hal::riscv::register::mepc::read();
-    unsafe {
-        (*old_ctx).pc = old;
+    if !old_ctx.is_null() {
+        unsafe {
+            (*old_ctx).pc = register::mepc::read();
+        }
     }
 
     // set MSTATUS for the switched to task
     // MIE will be set from MPIE
     // MPP will be used to determine the privilege-level
-    let mstatus = esp_hal::riscv::register::mstatus::read().bits();
+    let mstatus = register::mstatus::read().bits();
     unsafe {
         (*new_ctx).mstatus = mstatus;
     }
 
     unsafe {
         // set MPIE in MSTATUS to 0 to disable interrupts while task switching
-        esp_hal::riscv::register::mstatus::write(
-            esp_hal::riscv::register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)),
-        );
+        register::mstatus::write(register::mstatus::Mstatus::from_bits(mstatus & !(1 << 7)));
 
         // load address of sys_switch into MEPC - will run after all registers are restored
-        esp_hal::riscv::register::mepc::write(sys_switch as usize);
+        register::mepc::write(sys_switch as usize);
     }
-
-    true
 }
 
 core::arch::global_asm!(
@@ -181,6 +188,9 @@ sys_switch:
     # t0 => current context
     la t0, {_CURRENT_CTX_PTR}
     lw t0, 0(t0)
+
+    # skip storing context if current task is null (deleted)
+    beqz t0, _restore_context
 
     # store registers to old context - PC needs to be set by the "caller"
     sw ra, 0*4(t0)
@@ -222,6 +232,7 @@ sys_switch:
     addi t1, sp, 16
     sw t1, 30*4(t0)
 
+_restore_context:
     # t0 => next context
     la t1, {_NEXT_CTX_PTR}
     lw t0, 0(t1)
@@ -274,7 +285,38 @@ sys_switch:
     # jump to next task's PC
     mret
 
-    "#, 
+    "#,
     _CURRENT_CTX_PTR = sym _CURRENT_CTX_PTR,
     _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
+
+pub(crate) fn setup_multitasking() {
+    // Register the interrupt handler without nesting to satisfy the requirements of the task
+    // switching code
+    let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint2_handler as *const ()) },
+        esp_hal::interrupt::Priority::Priority1,
+    );
+
+    unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
+}
+
+#[esp_hal::ram]
+extern "C" fn swint2_handler() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.reset();
+
+    SCHEDULER.with(|scheduler| scheduler.switch_task());
+}
+
+#[inline]
+pub(crate) fn yield_task() {
+    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
+    swi.raise();
+
+    // It takes a bit for the software interrupt to be serviced.
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+    esp_hal::riscv::asm::nop();
+}

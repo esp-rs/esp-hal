@@ -73,3 +73,16 @@ pub unsafe extern "C" fn set_isr(
         ));
     }
 }
+
+// For ESP32-C2 < ECO4
+#[unsafe(no_mangle)]
+unsafe extern "C" fn esp32c2_eco4_rom_ptr_init() {
+    // Do not remove, stub to overwrite weak link in Wi-Fi Lib
+    //
+    // Otherwise you will see:
+    //
+    // undefined symbol: s_pm_beacon_offset_ptr
+    // undefined symbol: g_authmode_threshold_failure_ptr
+    // undefined symbol: len_dh_ie_ptr
+    // undefined symbol: s_tbttstart_ptr
+}

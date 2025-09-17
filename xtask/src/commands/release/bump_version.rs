@@ -13,6 +13,7 @@ use toml_edit::{Item, TableLike, Value};
 
 use crate::{Package, Version, cargo::CargoToml, changelog::Changelog, commands::PLACEHOLDER};
 
+/// How to bump the version of a package.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub enum VersionBump {
     PreRelease(String),
@@ -21,6 +22,7 @@ pub enum VersionBump {
     Major,
 }
 
+/// Arguments for bumping the version of packages.
 #[derive(Debug, Args)]
 pub struct BumpVersionArgs {
     /// How much to bump the version by.
@@ -41,6 +43,7 @@ pub struct BumpVersionArgs {
     packages: Vec<Package>,
 }
 
+/// Bump the version of the specified packages by the specified amount.
 pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     // Bump the version by the specified amount for each given package:
     for package in args.packages {
@@ -60,6 +63,7 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
     Ok(())
 }
 
+/// Update the specified package by bumping its version, updating its changelog,
 pub fn update_package(
     package: &mut CargoToml<'_>,
     version: &VersionBump,
@@ -215,6 +219,7 @@ fn bump_crate_version(
     Ok(version)
 }
 
+/// Perform the actual version bump logic.
 pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Result<semver::Version> {
     fn bump_version_number(version: &mut semver::Version, amount: &VersionBump) {
         log::info!("Bumping version number: {version} by {amount:?}");
@@ -345,7 +350,7 @@ fn finalize_placeholders(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use toml_edit::DocumentMut;
 
     use super::*;

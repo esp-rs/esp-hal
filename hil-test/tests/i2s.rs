@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     async fn test_i2s_loopback_async(ctx: Context) {
-        let spawner = embassy_executor::Spawner::for_current_executor().await;
+        let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
             esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
@@ -351,5 +351,49 @@ mod tests {
         delay.delay_millis(300);
 
         assert!(matches!(rx_transfer.pop(&mut buffer), Err(_)));
+    }
+
+    #[test]
+    #[cfg(not(esp32s2))]
+    fn test_i2s_rx_half_sample_bits_regression(ctx: Context) {
+        // Regression test for rx_half_sample_bits configuration bug.
+        // Validates that TX and RX half_sample_bits registers are configured identically.
+        let _i2s = I2s::new(
+            ctx.i2s,
+            ctx.dma_channel,
+            Config::new_tdm_philips()
+                .with_sample_rate(Rate::from_hz(16000))
+                .with_data_format(DataFormat::Data16Channel16)
+                .with_channels(Channels::STEREO),
+        )
+        .unwrap();
+
+        // Access registers directly to read back the configured values
+        let regs = esp_hal::peripherals::I2S0::regs();
+        let tx_conf1 = regs.tx_conf1().read();
+        let rx_conf1 = regs.rx_conf1().read();
+
+        let tx_half_sample_bits = tx_conf1.tx_half_sample_bits().bits();
+        let rx_half_sample_bits = rx_conf1.rx_half_sample_bits().bits();
+
+        // These MUST be identical - if they differ, the rx_half_sample_bits bug is present
+        assert_eq!(
+            tx_half_sample_bits, rx_half_sample_bits,
+            "16-bit Stereo: half_sample_bits mismatch TX={}, RX={} (should be identical for proper timing)",
+            tx_half_sample_bits, rx_half_sample_bits
+        );
+
+        // For Data16Channel16 + STEREO: (16 * 2) / 2 - 1 = 15
+        let expected_value = 15u8;
+        assert_eq!(
+            tx_half_sample_bits, expected_value,
+            "16-bit Stereo: TX half_sample_bits={}, expected {}",
+            tx_half_sample_bits, expected_value
+        );
+        assert_eq!(
+            rx_half_sample_bits, expected_value,
+            "16-bit Stereo: RX half_sample_bits={}, expected {}",
+            rx_half_sample_bits, expected_value
+        );
     }
 }

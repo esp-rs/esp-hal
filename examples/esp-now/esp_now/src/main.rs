@@ -27,12 +27,13 @@ fn main() -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    esp_preempt::start(timg0.timer0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) = esp_radio::wifi::new(&esp_radio_ctrl, wifi).unwrap();
+    let (mut controller, interfaces) =
+        esp_radio::wifi::new(&esp_radio_ctrl, wifi, Default::default()).unwrap();
     controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 

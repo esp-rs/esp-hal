@@ -14,3 +14,9 @@ pub mod master;
 crate::unstable_module! {
     pub mod lp_i2c;
 }
+
+#[cfg(esp32s3)] // Only support ESP32-S3 for now.
+#[cfg(soc_has_rtc_i2c)]
+crate::unstable_module! {
+    pub mod rtc;
+}

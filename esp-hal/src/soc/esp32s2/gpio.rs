@@ -134,6 +134,7 @@ for_each_lp_function! {
 for_each_analog_function! {
     (($_ch:ident, ADCn_CHm, $_n:literal, $_m:literal), $gpio:ident) => {
         impl crate::peripherals::$gpio<'_> {
+            #[cfg(feature = "unstable")]
             pub(crate) fn set_analog_impl(&self) {
                 use crate::gpio::RtcPin;
                 enable_iomux_clk_gate();

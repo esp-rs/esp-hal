@@ -33,7 +33,7 @@ esp-alloc = { version = "0.8.0", path = "../esp-alloc", optional = true }
 esp-config = { version = "0.5.0", path = "../esp-config" }
 esp-metadata-generated = { version = "0.1.0", path = "../esp-metadata-generated" }
 esp-sync = { version = "0.0.0", path = "../esp-sync" }
-esp-wifi-sys = "0.7.1"
+esp-wifi-sys = { version = "0.8.1" }
 num-derive = "0.4.2"
 num-traits = { version = "0.2.19", default-features = false }
 portable_atomic_enum = { version = "0.3.1", features = ["portable-atomic"] }
@@ -112,7 +112,7 @@ esp32s3 = [
 
 ## Use `esp-alloc` with the `compat` feature for dynamic allocations.
 ##
-## If you opt-out you need to provide implementations for the following functions:
+## If you opt-out, you need to provide implementations for the following functions:
 ## - `pub extern "C" fn malloc(size: usize) -> *mut u8`
 ## - `pub extern "C" fn malloc_internal(size: usize) -> *mut u8`
 ## - `pub extern "C" fn free(ptr: *mut u8)`

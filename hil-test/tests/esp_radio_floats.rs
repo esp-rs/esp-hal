@@ -94,7 +94,7 @@ mod tests {
     #[test]
     fn fpu_stays_enabled_with_wifi(peripherals: Peripherals) {
         let timg0 = TimerGroup::new(peripherals.TIMG0);
-        esp_preempt::init(timg0.timer0);
+        esp_preempt::start(timg0.timer0);
         let _init = esp_radio::init().unwrap();
 
         let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
@@ -138,7 +138,7 @@ mod tests {
                     }
 
                     let timg0 = TimerGroup::new(peripherals.TIMG0);
-                    esp_preempt::init(timg0.timer0);
+                    esp_preempt::start(timg0.timer0);
                     let _init = esp_radio::init().unwrap();
 
                     let mut sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);

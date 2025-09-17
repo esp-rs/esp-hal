@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose cache line configuration (#3946)
 - ESP32: Expose `psram_vaddr_mode` via `PsramConfig` (#3990)
 - ESP32-S3: Expose more `Camera` config options (#3996)
+- ESP32-S3: Add RtcI2c driver (#0000)
 - `ShaBackend, Sha<N>Context`: Work-queue based SHA driver (#4013)
 - I2S: `i2s::master::Config` with support for more TDM mode standards (#3985)
+- ESP32: support outputting the main I2S clock signal (#4128)
 
 ### Changed
 
@@ -47,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DmaTxBuffer::from_view` and `DmaRxBuffer::from_view` now return an object with type `DmaTx/RxBuffer::Final`. (#3923)
 - `i2c::master::Config::timeout` has been de-stabilized, and `i2c::master::Config::software_timeout`. (#3926)
 - The default values of `i2c::master::Config` timeouts have been changed to their maximum possible values. (#3926)
+- Adc CHANNEL constant moved to trait function. (#3942)
 - `ShaDigest::finish` has been reimplemented to be properly non-blocking (#3948)
 - Replace Timer's `pub fn enable_interrupt(&mut self, enable: bool)` with `pub fn listen(&mut self)` and `pub fn unlisten(&mut self)` (#3933)
 - ESP32-S3: `PsramConfig::core_clock` is now an `Option` (#3974)
@@ -54,6 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `RtcSlowClock::RtcSlowClockRtc` has been renamed to `RtcSlowClock::RtcSlowClockRcSlow` (#3993)
 - The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
 - ESP32-S2: `i2s::master::DataFormat` now includes 8-bit and 24-bit data widths (#3985)
+- Bump `embassy-embedded-hal` to v0.5.0 (#4075)
+- `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
+- Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
+- The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
 
 ### Fixed
 
@@ -66,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Check serial instead of jtag fifo status in UsbSerialJtag's async flush function (#3957)
 - ESP32: Enable up to 4M of PSRAM (#3990)
 - I2C error recovery logic issues (#4000)
+- I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
 
 ### Removed
 

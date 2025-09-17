@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use clap::Args;
 use esp_metadata::Chip;
 use inquire::Select;
@@ -16,6 +16,7 @@ mod run;
 // ----------------------------------------------------------------------------
 // Subcommand Arguments
 
+/// Arguments common to commands which act on examples.
 #[derive(Debug, Args)]
 pub struct ExamplesArgs {
     /// Example to act on ("all" will execute every example).
@@ -39,6 +40,7 @@ pub struct ExamplesArgs {
     pub timings: bool,
 }
 
+/// Arguments common to commands which act on doctests.
 #[derive(Debug, Args)]
 pub struct DocTestArgs {
     /// Package where we wish to run doc tests.
@@ -49,6 +51,7 @@ pub struct DocTestArgs {
     pub chip: Chip,
 }
 
+/// Arguments common to commands which act on tests.
 #[derive(Debug, Args)]
 pub struct TestsArgs {
     /// Chip to target.
@@ -76,7 +79,13 @@ pub struct TestsArgs {
 // ----------------------------------------------------------------------------
 // Subcommand Actions
 
+/// Execute the given action on the specified examples.
 pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -> Result<()> {
+    log::debug!(
+        "Running examples for '{}' on '{:?}'",
+        args.package,
+        args.chip
+    );
     if args.chip.is_none() {
         let chip_variants = Chip::iter().collect::<Vec<_>>();
 
@@ -88,7 +97,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     let chip = args.chip.unwrap();
 
     // Ensure that the package/chip combination provided are valid:
-    args.package.validate_package_chip(&chip)?;
+    args.package.validate_package_chip(&chip).with_context(|| {
+        format!(
+            "The package '{0}' does not support the chip '{chip:?}'",
+            args.package
+        )
+    })?;
 
     // If the 'esp-hal' package is specified, what we *really* want is the
     // 'examples' package instead:
@@ -110,7 +124,12 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // metadata comments in the source files. As such, it needs to load its metadata differently
     // than other packages.
     let examples = if args.package == Package::Examples {
-        crate::firmware::load_cargo_toml(&package_path)?
+        crate::firmware::load_cargo_toml(&package_path).with_context(|| {
+            format!(
+                "Failed to load specified examples from {}",
+                package_path.display()
+            )
+        })?
     } else {
         let example_path = match args.package {
             Package::QaTest => package_path.join("src").join("bin"),
@@ -135,9 +154,10 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     // Sort all examples by name:
     examples.sort_by_key(|a| a.binary_name());
 
-    let mut filtered = examples.clone();
+    let mut filtered = vec![];
 
     if let Some(example) = args.example.as_deref() {
+        filtered.clone_from(&examples);
         if !example.eq_ignore_ascii_case("all") {
             // Only keep the example the user wants
             filtered.retain(|ex| ex.matches_name(example));
@@ -183,6 +203,7 @@ pub fn examples(workspace: &Path, mut args: ExamplesArgs, action: CargoAction) -
     }
 }
 
+/// Execute the given action on the specified doctests.
 pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<()> {
     let (test_arg, filter) = if let Some(test_arg) = args.test.as_deref() {
         match test_arg.split_once("::") {

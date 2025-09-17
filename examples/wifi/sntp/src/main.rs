@@ -81,11 +81,12 @@ async fn main(spawner: Spawner) -> ! {
     esp_alloc::heap_allocator!(size: 72 * 1024);
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    esp_preempt::start(timg0.timer0);
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
-    let (controller, interfaces) = esp_radio::wifi::new(esp_radio_ctrl, peripherals.WIFI).unwrap();
+    let (controller, interfaces) =
+        esp_radio::wifi::new(esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
 
     let wifi_interface = interfaces.sta;
 

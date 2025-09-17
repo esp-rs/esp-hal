@@ -4,13 +4,20 @@ use crate::chip_specific;
 #[cfg(multi_core)]
 use crate::multi_core::MultiCoreStrategy;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Flash storage error.
 pub enum FlashStorageError {
+    /// I/O error.
     IoError,
+    /// I/O operation timed out.
     IoTimeout,
+    /// Flash could not be unlocked for writing.
     CantUnlock,
+    /// Address or length not aligned to required boundary.
     NotAligned,
+    /// Address or length out of bounds.
     OutOfBounds,
     /// Cannot write to flash as more than one core is running.
     /// Either manually suspend the other core, or use one of the available strategies:
@@ -18,10 +25,12 @@ pub enum FlashStorageError {
     /// * [`FlashStorage::multicore_ignore`]
     #[cfg(multi_core)]
     OtherCoreRunning,
+    /// Other error with the given error code.
     Other(i32),
 }
 
 #[inline(always)]
+/// Check return code from flash operations.
 pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
     match rc {
         0 => Ok(()),
@@ -32,6 +41,8 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+/// Flash storage abstraction.
 pub struct FlashStorage {
     pub(crate) capacity: usize,
     unlocked: bool,
@@ -46,9 +57,12 @@ impl Default for FlashStorage {
 }
 
 impl FlashStorage {
+    /// Flash word size in bytes.
     pub const WORD_SIZE: u32 = 4;
+    /// Flash sector size in bytes.
     pub const SECTOR_SIZE: u32 = 4096;
 
+    /// Create a new flash storage instance.
     pub fn new() -> FlashStorage {
         let mut storage = FlashStorage {
             capacity: 0,

@@ -71,7 +71,7 @@ jobs:
       # Install the Rust toolchain for Xtensa devices:
       - uses: esp-rs/xtensa-toolchain@v1.6
         with:
-          version: 1.88.0.0
+          version: 1.89.0.0
 
       # Install the Rust stable toolchain for RISC-V devices:
       - uses: dtolnay/rust-toolchain@v1
@@ -100,15 +100,25 @@ jobs:
         # always invokes +esp internally
         run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
 
-  extras:
-    runs-on: macos-m1-self-hosted
+  detect-extras-runner:
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
 
+  extras:
+    needs: detect-extras-runner
+    runs-on: ${{ needs.detect-extras-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
 
+      # Install dependencies for building the extra crates on ubuntu
+      - name: Install dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get -y install musl-tools libudev-dev pkg-config
       # Build the extra crates
       - name: Build the bench-server
         run: cd extras/bench-server && cargo build
@@ -150,9 +160,15 @@ jobs:
   # --------------------------------------------------------------------------
   # host tests
 
+  detect-host-tests-runner:
+    uses: ./.github/workflows/check_runner.yml
+    with:
+      primary-runner: macos-m1-self-hosted
+      fallback-runner: ubuntu-latest
+    
   host-tests:
-    runs-on: macos-m1-self-hosted
-
+    needs: detect-host-tests-runner
+    runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
     steps:
       - uses: actions/checkout@v4
       # Some of the configuration items in 'rustfmt.toml' require the 'nightly'
@@ -172,16 +188,27 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
-      # Run tests in esp-config
-      - run: cd esp-config && cargo test --features build,tui
+      # Run host tests for all applicable packages: 
+      - run: cargo xtask host-tests
 
-      # Run tests in esp-bootloader-esp-idf
-      - run: cd esp-bootloader-esp-idf && cargo test --features=std
+  # --------------------------------------------------------------------------
+  # Check links in .rs, .md, and .toml files
 
-      # Run tests in esp-storage
-      - run: cd esp-storage && cargo test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo test --features=emulation,bytewise-read -- --test-threads=1
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: |
+            --verbose
+            --no-progress
+            --format detailed
+            --timeout 7
+            --max-concurrency 6
+            --accept "200,301,302"
+            --exclude-path ".*/target/.*|.*/static\.files/.*|.*/docs/.*"
+            './**/*.rs'
+            './**/*.md'
+            './**/*.toml'
 
-      # Miri tests in esp-storage
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation -- --test-threads=1
-      - run: cd esp-storage && cargo +nightly miri test --features=emulation,bytewise-read -- --test-threads=1

@@ -2,11 +2,11 @@ use std::fs;
 
 use anyhow::{Context, Result};
 use semver::Version;
-use super::execute_plan::make_git_changes;
-use super::PLACEHOLDER;
-use super::Plan;
+
+use super::{PLACEHOLDER, Plan, execute_plan::make_git_changes};
 use crate::commands::comparison_url;
 
+/// Perform post-release tasks such as creating migration guides for packages that have them.
 pub fn post_release(workspace: &std::path::Path) -> Result<()> {
     // Read the release plan
     let plan_path = workspace.join("release_plan.jsonc");
@@ -28,8 +28,16 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         let cargo_toml_path = package_path.join("Cargo.toml");
 
         // Read and parse Cargo.toml
-        let cargo_toml_content = fs::read_to_string(&cargo_toml_path)?;
-        let cargo_toml = cargo_toml_content.parse::<toml_edit::DocumentMut>()?;
+        let cargo_toml_content = fs::read_to_string(&cargo_toml_path)
+            .with_context(|| format!("Failed to read from {:?}", cargo_toml_path))?;
+        let cargo_toml = cargo_toml_content
+            .parse::<toml_edit::DocumentMut>()
+            .with_context(|| {
+                format!(
+                    "Failed to parse Cargo.toml at {}",
+                    cargo_toml_path.display()
+                )
+            })?;
 
         // Extract version from Cargo.toml
         let version_str = cargo_toml["package"]["version"].as_str().ok_or_else(|| {
@@ -40,7 +48,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         })?;
 
         // Parse version using semver and zero out patch version
-        let mut version = Version::parse(version_str)?;
+        let mut version = Version::parse(version_str)
+            .with_context(|| format!("Failed to parse version {version_str:?}"))?;
         version.patch = 0;
 
         // Generate migration guide filename
@@ -51,7 +60,8 @@ pub fn post_release(workspace: &std::path::Path) -> Result<()> {
         if !migration_file_path.exists() {
             // Create the title content
             let title = format!("# Migration Guide from {} to {}\n", version, PLACEHOLDER);
-            fs::write(&migration_file_path, title)?;
+            fs::write(&migration_file_path, title)
+                .with_context(|| format!("Failed to write to {migration_file_path:?}"))?;
             log::info!("Created migration guide: {}", migration_file_path.display());
         } else {
             log::info!(

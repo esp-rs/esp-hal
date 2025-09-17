@@ -941,9 +941,11 @@ pub mod dma {
                     // Write out PSRAM data if needed:
                     #[cfg(psram_dma)]
                     for buffer in self.unaligned_data_buffers.iter_mut() {
-                        if let Some(buffer) = buffer.take() {
+                        // Avoid copying the write_back buffer
+                        if let Some(buffer) = buffer.as_ref() {
                             buffer.write_back();
                         }
+                        *buffer = None;
                     }
                     #[cfg(psram_dma)]
                     if crate::psram::psram_range().contains(&item.buffers.output.addr().get()) {

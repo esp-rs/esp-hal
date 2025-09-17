@@ -124,7 +124,7 @@ unsafe extern "C" fn task_yield() {
 unsafe extern "C" fn task_yield_from_isr() {
     // This is not called because we never set xHigherPriorityTaskWoken = true in the `_from_isr`
     // functions. This should be revisited if a scheduler needs it.
-    todo!();
+    crate::preempt::yield_task_from_isr();
 }
 
 unsafe extern "C" fn mutex_create() -> *const () {
@@ -166,7 +166,13 @@ unsafe extern "C" fn task_create(
             extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
         >(func);
 
-        let task = crate::preempt::task_create(task_func, param, stack_depth as usize);
+        let task = crate::preempt::task_create(
+            task_func,
+            param,
+            prio,
+            if core_id < 2 { Some(core_id) } else { None },
+            stack_depth as usize,
+        );
         *(handle as *mut usize) = task as usize;
     }
 
@@ -306,7 +312,7 @@ pub(crate) fn ble_init() {
         #[allow(static_mut_refs)]
         #[cfg(feature = "sys-logs")]
         {
-            extern "C" {
+            unsafe extern "C" {
                 static mut g_bt_plf_log_level: u32;
             }
 
@@ -320,16 +326,12 @@ pub(crate) fn ble_init() {
         let mut cfg = ble_os_adapter_chip_specific::create_ble_config();
 
         let res = btdm_osi_funcs_register(addr_of!(G_OSI_FUNCS));
-        if res != 0 {
-            panic!("btdm_osi_funcs_register returned {}", res);
-        }
+        assert!(res == 0, "btdm_osi_funcs_register returned {}", res);
 
         #[cfg(coex)]
         {
             let res = crate::wifi::coex_init();
-            if res != 0 {
-                panic!("got error");
-            }
+            assert!(res == 0, "coex_init failed");
         }
 
         let version = btdm_controller_get_compile_version();
@@ -349,9 +351,7 @@ pub(crate) fn ble_init() {
             &mut cfg as *mut esp_bt_controller_config_t,
         ); // see btdm_config_mask_load for mask
 
-        if res != 0 {
-            panic!("btdm_controller_init returned {}", res);
-        }
+        assert!(res == 0, "btdm_controller_init returned {}", res);
 
         debug!("The btdm_controller_init was initialized");
 

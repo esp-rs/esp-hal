@@ -38,13 +38,13 @@ fn main() -> ! {
     let delay = Delay::new();
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    esp_preempt::init(timg0.timer0);
+    esp_preempt::start(timg0.timer0);
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
     // We must initialize some kind of interface and start it.
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();

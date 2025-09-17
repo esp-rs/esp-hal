@@ -4,32 +4,134 @@ use core::ptr::NonNull;
 use esp_hal::time::{Duration, Instant};
 use esp_radio_preempt_driver::{
     register_semaphore_implementation,
-    semaphore::{SemaphoreImplementation, SemaphorePtr},
-    yield_task,
+    semaphore::{SemaphoreImplementation, SemaphoreKind, SemaphorePtr},
 };
 use esp_sync::NonReentrantMutex;
 
-struct SemaphoreInner {
-    current: u32,
-    max: u32,
+use crate::{
+    SCHEDULER,
+    task::{TaskExt, TaskPtr, current_task},
+    wait_queue::WaitQueue,
+};
+
+enum SemaphoreInner {
+    Counting {
+        current: u32,
+        max: u32,
+        waiting: WaitQueue,
+    },
+    Mutex {
+        recursive: bool,
+        owner: Option<TaskPtr>,
+        original_priority: usize,
+        lock_counter: u32,
+        waiting: WaitQueue,
+    },
 }
 
 impl SemaphoreInner {
     fn try_take(&mut self) -> bool {
-        if self.current > 0 {
-            self.current -= 1;
-            true
-        } else {
-            false
+        match self {
+            SemaphoreInner::Counting { current, .. } => {
+                if *current > 0 {
+                    *current -= 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            SemaphoreInner::Mutex {
+                recursive,
+                owner,
+                lock_counter,
+                original_priority,
+                ..
+            } => {
+                let current = current_task();
+                if let Some(owner) = owner {
+                    if *owner == current && *recursive {
+                        *lock_counter += 1;
+                        true
+                    } else {
+                        // We can't lock the mutex. Make sure the mutex holder has a high enough
+                        // priority to avoid priority inversion.
+                        SCHEDULER.with(|scheduler| {
+                            let current_priority = current.priority(&mut scheduler.run_queue);
+                            if owner.priority(&mut scheduler.run_queue) < current_priority {
+                                owner.set_priority(&mut scheduler.run_queue, current_priority);
+                                scheduler.resume_task(*owner);
+                            }
+                            false
+                        })
+                    }
+                } else {
+                    *owner = Some(current);
+                    *lock_counter += 1;
+                    *original_priority =
+                        SCHEDULER.with(|scheduler| current.priority(&mut scheduler.run_queue));
+                    true
+                }
+            }
         }
     }
 
     fn try_give(&mut self) -> bool {
-        if self.current < self.max {
-            self.current += 1;
-            true
-        } else {
-            false
+        match self {
+            SemaphoreInner::Counting { current, max, .. } => {
+                if *current < *max {
+                    *current += 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            SemaphoreInner::Mutex {
+                owner,
+                lock_counter,
+                original_priority,
+                ..
+            } => {
+                let current = current_task();
+
+                if *owner == Some(current) && *lock_counter > 0 {
+                    *lock_counter -= 1;
+                    if *lock_counter == 0 {
+                        if let Some(owner) = owner.take() {
+                            SCHEDULER.with(|scheduler| {
+                                owner.set_priority(&mut scheduler.run_queue, *original_priority);
+                            });
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    fn current_count(&mut self) -> u32 {
+        match self {
+            SemaphoreInner::Counting { current, .. } => *current,
+            SemaphoreInner::Mutex { .. } => {
+                panic!("RecursiveMutex does not support current_count")
+            }
+        }
+    }
+
+    fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
+        trace!("Semaphore wait_with_deadline - {:?}", deadline);
+        match self {
+            SemaphoreInner::Counting { waiting, .. } => waiting.wait_with_deadline(deadline),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.wait_with_deadline(deadline),
+        }
+    }
+
+    fn notify(&mut self) {
+        trace!("Semaphore notify");
+        match self {
+            SemaphoreInner::Counting { waiting, .. } => waiting.notify(),
+            SemaphoreInner::Mutex { waiting, .. } => waiting.notify(),
         }
     }
 }
@@ -39,12 +141,23 @@ pub struct Semaphore {
 }
 
 impl Semaphore {
-    pub fn new(max: u32, initial: u32) -> Self {
-        Semaphore {
-            inner: NonReentrantMutex::new(SemaphoreInner {
+    pub fn new(kind: SemaphoreKind) -> Self {
+        let inner = match kind {
+            SemaphoreKind::Counting { initial, max } => SemaphoreInner::Counting {
                 current: initial,
                 max,
-            }),
+                waiting: WaitQueue::new(),
+            },
+            SemaphoreKind::Mutex | SemaphoreKind::RecursiveMutex => SemaphoreInner::Mutex {
+                recursive: matches!(kind, SemaphoreKind::RecursiveMutex),
+                owner: None,
+                lock_counter: 0,
+                original_priority: 0,
+                waiting: WaitQueue::new(),
+            },
+        };
+        Semaphore {
+            inner: NonReentrantMutex::new(inner),
         }
     }
 
@@ -56,42 +169,59 @@ impl Semaphore {
         self.inner.with(|sem| sem.try_take())
     }
 
-    fn yield_loop_with_timeout(timeout_us: Option<u32>, cb: impl Fn() -> bool) -> bool {
-        let start = if timeout_us.is_some() {
-            Instant::now()
-        } else {
-            Instant::EPOCH
-        };
-
-        let timeout = timeout_us
-            .map(|us| Duration::from_micros(us as u64))
-            .unwrap_or(Duration::MAX);
-
+    pub fn take(&self, timeout_us: Option<u32>) -> bool {
+        let deadline = timeout_us.map(|us| Instant::now() + Duration::from_micros(us as u64));
         loop {
-            if cb() {
+            let taken = self.inner.with(|sem| {
+                if sem.try_take() {
+                    true
+                } else {
+                    // The task will go to sleep when the above critical section is released.
+                    sem.wait_with_deadline(deadline);
+                    false
+                }
+            });
+
+            if taken {
+                debug!("Semaphore - take - success");
                 return true;
             }
 
-            if timeout_us.is_some() && start.elapsed() > timeout {
+            // We are here because we weren't able to take the semaphore previously. We've either
+            // timed out, or the semaphore is ready for taking. However, any higher priority task
+            // can wake up and preempt us still. Let's just check for the timeout, and
+            // try the whole process again.
+
+            if let Some(deadline) = deadline
+                && deadline < Instant::now()
+            {
+                // We have a deadline and we've timed out.
+                trace!("Semaphore - take - timed out");
                 return false;
             }
-
-            yield_task();
+            // We can block more, so let's attempt to take the semaphore again.
         }
     }
 
-    pub fn take(&self, timeout_us: Option<u32>) -> bool {
-        Self::yield_loop_with_timeout(timeout_us, || self.try_take())
+    pub fn current_count(&self) -> u32 {
+        self.inner.with(|sem| sem.current_count())
     }
 
     pub fn give(&self) -> bool {
-        self.inner.with(|sem| sem.try_give())
+        self.inner.with(|sem| {
+            if sem.try_give() {
+                sem.notify();
+                true
+            } else {
+                false
+            }
+        })
     }
 }
 
 impl SemaphoreImplementation for Semaphore {
-    fn create(max: u32, initial: u32) -> SemaphorePtr {
-        let sem = Box::new(Semaphore::new(max, initial));
+    fn create(kind: SemaphoreKind) -> SemaphorePtr {
+        let sem = Box::new(Semaphore::new(kind));
         NonNull::from(Box::leak(sem)).cast()
     }
 
@@ -112,10 +242,24 @@ impl SemaphoreImplementation for Semaphore {
         semaphore.give()
     }
 
+    unsafe fn current_count(semaphore: SemaphorePtr) -> u32 {
+        let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
+
+        semaphore.current_count()
+    }
+
     unsafe fn try_take(semaphore: SemaphorePtr) -> bool {
         let semaphore = unsafe { Semaphore::from_ptr(semaphore) };
 
         semaphore.try_take()
+    }
+
+    unsafe fn try_give_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        unsafe { <Self as SemaphoreImplementation>::give(semaphore) }
+    }
+
+    unsafe fn try_take_from_isr(semaphore: SemaphorePtr, _hptw: Option<&mut bool>) -> bool {
+        unsafe { <Self as SemaphoreImplementation>::try_take(semaphore) }
     }
 }
 

@@ -2,52 +2,290 @@
 #[cfg_attr(xtensa, path = "xtensa.rs")]
 pub(crate) mod arch_specific;
 
-use core::{ffi::c_void, mem::MaybeUninit};
+use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
 use allocator_api2::boxed::Box;
-#[cfg(riscv)]
-use arch_specific::Registers;
 pub(crate) use arch_specific::*;
-#[cfg(xtensa)]
-use esp_hal::trapframe::TrapFrame;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
-use crate::{InternalMemory, SCHEDULER_STATE, task, timer};
+use crate::{
+    InternalMemory,
+    SCHEDULER,
+    run_queue::RunQueue,
+    scheduler::SchedulerState,
+    wait_queue::WaitQueue,
+};
 
-#[repr(C)]
-pub(crate) struct Context {
-    #[cfg(riscv)]
-    pub trap_frame: Registers,
-    #[cfg(xtensa)]
-    pub trap_frame: TrapFrame,
-    pub thread_semaphore: Option<SemaphorePtr>,
-    pub next: *mut Context,
-    pub _allocated_stack: Box<[MaybeUninit<u8>], InternalMemory>,
+#[derive(Clone, Copy, PartialEq, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) enum TaskState {
+    Ready,
+    Sleeping,
 }
 
-impl Context {
-    pub(crate) fn new(
-        task_fn: extern "C" fn(*mut c_void),
-        param: *mut c_void,
-        task_stack_size: usize,
-    ) -> Self {
-        trace!("task_create {:?} {:?} {}", task_fn, param, task_stack_size);
+pub(crate) type TaskPtr = NonNull<Task>;
+pub(crate) type TaskListItem = Option<TaskPtr>;
 
-        let mut stack = Box::<[u8], _>::new_uninit_slice_in(task_stack_size, InternalMemory);
+/// An abstraction that allows the task to contain multiple different queue pointers.
+pub(crate) trait TaskListElement: Default {
+    fn next(task: TaskPtr) -> Option<TaskPtr>;
+    fn set_next(task: TaskPtr, next: Option<TaskPtr>);
+}
 
-        let stack_top = unsafe { stack.as_mut_ptr().add(task_stack_size).cast() };
+macro_rules! task_list_item {
+    ($struct:ident, $field:ident) => {
+        #[derive(Default)]
+        pub(crate) struct $struct;
+        impl TaskListElement for $struct {
+            fn next(task: TaskPtr) -> Option<TaskPtr> {
+                unsafe { task.as_ref().$field }
+            }
 
-        Context {
-            trap_frame: task::new_task_context(task_fn, param, stack_top),
-            thread_semaphore: None,
-            next: core::ptr::null_mut(),
-            _allocated_stack: stack,
+            fn set_next(mut task: TaskPtr, next: Option<TaskPtr>) {
+                unsafe {
+                    task.as_mut().$field = next;
+                }
+            }
+        }
+    };
+}
+
+task_list_item!(TaskAllocListElement, alloc_list_item);
+task_list_item!(TaskReadyQueueElement, ready_queue_item);
+task_list_item!(TaskDeleteListElement, delete_list_item);
+task_list_item!(TaskTimerQueueElement, timer_queue_item);
+
+/// Extension trait for common task operations. These should be inherent methods but we can't
+/// implement stuff for NonNull.
+pub(crate) trait TaskExt {
+    fn resume(self);
+    fn priority(self, _: &mut RunQueue) -> usize;
+    fn set_priority(self, _: &mut RunQueue, new_pro: usize);
+    fn state(self) -> TaskState;
+    fn set_state(self, state: TaskState);
+}
+
+impl TaskExt for TaskPtr {
+    fn resume(self) {
+        SCHEDULER.with(|scheduler| scheduler.resume_task(self))
+    }
+
+    fn priority(self, _: &mut RunQueue) -> usize {
+        unsafe { self.as_ref().priority }
+    }
+
+    fn set_priority(mut self, run_queue: &mut RunQueue, new_priority: usize) {
+        run_queue.remove(self);
+        unsafe { self.as_mut().priority = new_priority };
+    }
+
+    fn state(self) -> TaskState {
+        unsafe { self.as_ref().state }
+    }
+
+    fn set_state(mut self, state: TaskState) {
+        trace!("Task {:?} state changed to {:?}", self, state);
+        unsafe { self.as_mut().state = state };
+    }
+}
+
+/// A singly linked list of tasks.
+///
+/// Use this where you don't care about the order of list elements.
+///
+/// The `E` type parameter is used to access the data in the task object that belongs to this list.
+#[derive(Default)]
+pub(crate) struct TaskList<E> {
+    head: Option<TaskPtr>,
+    _item: PhantomData<E>,
+}
+
+impl<E: TaskListElement> TaskList<E> {
+    pub const fn new() -> Self {
+        Self {
+            head: None,
+            _item: PhantomData,
+        }
+    }
+
+    pub fn push(&mut self, task: TaskPtr) {
+        debug_assert!(E::next(task).is_none());
+        E::set_next(task, self.head);
+        self.head = Some(task);
+    }
+
+    pub fn pop(&mut self) -> Option<TaskPtr> {
+        let popped = self.head.take();
+
+        if let Some(task) = popped {
+            self.head = E::next(task);
+            E::set_next(task, None);
+        }
+
+        popped
+    }
+
+    pub fn remove(&mut self, task: TaskPtr) {
+        // TODO: maybe this (and TaskQueue::remove) may prove too expensive.
+        let mut list = core::mem::take(self);
+        while let Some(popped) = list.pop() {
+            if popped != task {
+                self.push(popped);
+            }
         }
     }
 }
 
-impl Drop for Context {
+/// A singly linked queue of tasks.
+///
+/// Use this where you care about the order of list elements. Elements are popped from the front,
+/// and pushed to the back.
+///
+/// The `E` type parameter is used to access the data in the task object that belongs to this list.
+#[derive(Default)]
+pub(crate) struct TaskQueue<E> {
+    head: Option<TaskPtr>,
+    tail: Option<TaskPtr>,
+    _item: PhantomData<E>,
+}
+
+impl<E: TaskListElement> TaskQueue<E> {
+    pub const fn new() -> Self {
+        Self {
+            head: None,
+            tail: None,
+            _item: PhantomData,
+        }
+    }
+
+    pub fn push(&mut self, task: TaskPtr) {
+        debug_assert!(E::next(task).is_none());
+        if let Some(tail) = self.tail {
+            E::set_next(tail, Some(task));
+        } else {
+            self.head = Some(task);
+        }
+        self.tail = Some(task);
+    }
+
+    pub fn pop(&mut self) -> Option<TaskPtr> {
+        let popped = self.head.take();
+
+        if let Some(task) = popped {
+            self.head = E::next(task);
+            E::set_next(task, None);
+            if self.head.is_none() {
+                self.tail = None;
+            }
+        }
+
+        popped
+    }
+
+    pub fn remove(&mut self, task: TaskPtr) {
+        let mut list = core::mem::take(self);
+        while let Some(popped) = list.pop() {
+            if popped != task {
+                self.push(popped);
+            }
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head.is_none()
+    }
+}
+
+#[repr(C)]
+pub(crate) struct Task {
+    pub cpu_context: CpuContext,
+    pub thread_semaphore: Option<SemaphorePtr>,
+    pub state: TaskState,
+    pub _allocated_stack: *mut [MaybeUninit<u32>],
+    pub priority: usize,
+
+    pub wakeup_at: u64,
+
+    /// The current wait queue this task is in.
+    pub(crate) current_queue: Option<NonNull<WaitQueue>>,
+
+    // Lists a task can be in:
+    /// The list of all allocated tasks
+    pub alloc_list_item: TaskListItem,
+
+    /// Either the RunQueue or the WaitQueue
+    pub ready_queue_item: TaskListItem,
+
+    /// The timer queue
+    pub timer_queue_item: TaskListItem,
+
+    /// The list of tasks scheduled for deletion
+    pub delete_list_item: TaskListItem,
+
+    /// Whether the task was allocated on the heap.
+    pub(crate) heap_allocated: bool,
+}
+
+const STACK_CANARY: u32 = 0xDEEDBAAD;
+
+impl Task {
+    pub(crate) fn new(
+        task_fn: extern "C" fn(*mut c_void),
+        param: *mut c_void,
+        task_stack_size: usize,
+        priority: usize,
+    ) -> Self {
+        trace!(
+            "task_create {:?}({:?}) stack_size = {} priority = {}",
+            task_fn, param, task_stack_size, priority
+        );
+
+        let task_stack_size_words = task_stack_size / 4;
+        let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
+        stack[0] = MaybeUninit::new(STACK_CANARY);
+
+        let stack = Box::leak(stack) as *mut [MaybeUninit<u32>];
+        let stack_top = unsafe { stack.cast::<u32>().add(task_stack_size_words).cast() };
+
+        Task {
+            cpu_context: new_task_context(task_fn, param, stack_top),
+            thread_semaphore: None,
+            state: TaskState::Ready,
+            _allocated_stack: stack,
+            current_queue: None,
+            priority,
+
+            wakeup_at: 0,
+
+            alloc_list_item: TaskListItem::None,
+            ready_queue_item: TaskListItem::None,
+            timer_queue_item: TaskListItem::None,
+            delete_list_item: TaskListItem::None,
+
+            heap_allocated: false,
+        }
+    }
+
+    pub(crate) fn ensure_no_stack_overflow(&self) {
+        // TODO: fix this for main task
+        if self._allocated_stack.is_empty() {
+            return;
+        }
+
+        assert_eq!(
+            // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
+            // during initialization.
+            unsafe { self._allocated_stack.cast::<u32>().read() },
+            STACK_CANARY,
+            "Stack overflow detected in {:?}",
+            self as *const Task
+        );
+    }
+}
+
+impl Drop for Task {
     fn drop(&mut self) {
+        debug!("Dropping task: {:?}", self as *mut Task);
         if let Some(sem) = self.thread_semaphore {
             let sem = unsafe { SemaphoreHandle::from_ptr(sem) };
             core::mem::drop(sem)
@@ -55,94 +293,70 @@ impl Drop for Context {
     }
 }
 
-pub(super) fn allocate_main_task() {
-    // This context will be filled out by the first context switch.
-    let context = Box::new_in(
-        Context {
-            #[cfg(riscv)]
-            trap_frame: Registers::default(),
-            #[cfg(xtensa)]
-            trap_frame: TrapFrame::default(),
-            thread_semaphore: None,
-            next: core::ptr::null_mut(),
-            _allocated_stack: Box::<[u8], _>::new_uninit_slice_in(0, InternalMemory),
-        },
-        InternalMemory,
+// This context will be filled out by the first context switch.
+// We allocate the main task statically, because there is always a main task. If deleted, we simply
+// don't deallocate this.
+pub(crate) static mut MAIN_TASK: Task = Task {
+    cpu_context: CpuContext::new(),
+    thread_semaphore: None,
+    state: TaskState::Ready,
+    _allocated_stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+    current_queue: None,
+    priority: 0,
+
+    wakeup_at: 0,
+
+    alloc_list_item: TaskListItem::None,
+    ready_queue_item: TaskListItem::None,
+    timer_queue_item: TaskListItem::None,
+    delete_list_item: TaskListItem::None,
+
+    heap_allocated: false,
+};
+
+pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
+    let mut main_task_ptr = unwrap!(NonNull::new(&raw mut MAIN_TASK));
+    debug!("Main task created: {:?}", main_task_ptr);
+
+    unsafe {
+        let main_task = main_task_ptr.as_mut();
+
+        // Reset main task properties. The rest should be cleared when the task is deleted.
+        main_task.priority = 0;
+        main_task.state = TaskState::Ready;
+    }
+
+    debug_assert!(
+        scheduler.current_task.is_none(),
+        "Tried to allocate main task multiple times"
     );
 
-    let context_ptr = Box::into_raw(context);
-    unsafe {
-        // The first task loops back to itself.
-        (*context_ptr).next = context_ptr;
-    }
-
-    SCHEDULER_STATE.with(|state| {
-        debug_assert!(
-            state.current_task.is_null(),
-            "Tried to allocate main task multiple times"
-        );
-        state.current_task = context_ptr;
-    })
+    // The main task is already running, no need to add it to the ready queue.
+    scheduler.all_tasks.push(main_task_ptr);
+    scheduler.current_task = Some(main_task_ptr);
+    scheduler.run_queue.mark_task_ready(main_task_ptr);
 }
 
-pub(super) fn delete_all_tasks() {
-    let first_task = SCHEDULER_STATE.with(|state| {
-        // Remove all tasks from the list. We will drop them outside of the critical
-        // section.
-        core::mem::take(&mut state.current_task)
-    });
-
-    if first_task.is_null() {
-        return;
-    }
-
-    let mut task_to_delete = first_task;
-
-    loop {
-        let next_task = unsafe {
-            // SAFETY: Tasks are in a circular linked list. We are guaranteed that the next
-            // task is a valid pointer, or the first task that may already have been
-            // deleted. In the second case, we will not move on to the next
-            // iteration, so the loop will not try to free a task twice.
-            let next_task = (*task_to_delete).next;
-            core::ptr::drop_in_place(task_to_delete);
-            next_task
-        };
-
-        if core::ptr::eq(next_task, first_task) {
-            break;
-        }
-
-        task_to_delete = next_task;
-    }
+pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Task) -> R) -> R {
+    SCHEDULER.with(|state| cb(unsafe { unwrap!(state.current_task).as_mut() }))
 }
 
-pub(super) fn with_current_task<R>(mut cb: impl FnMut(&mut Context) -> R) -> R {
-    SCHEDULER_STATE.with(|state| cb(unsafe { &mut *state.current_task }))
+pub(super) fn current_task() -> TaskPtr {
+    with_current_task(|task| NonNull::from(task))
 }
 
-pub(super) fn current_task() -> *mut Context {
-    with_current_task(|task| task as *mut Context)
-}
-
-pub(super) fn schedule_task_deletion(task: *mut Context) {
-    let deleting_current = SCHEDULER_STATE.with(|state| state.schedule_task_deletion(task));
+pub(super) fn schedule_task_deletion(task: *mut Task) {
+    trace!("schedule_task_deletion {:?}", task);
+    let deleting_current = SCHEDULER.with(|state| state.schedule_task_deletion(task));
 
     // Tasks are deleted during context switches, so we need to yield if we are
     // deleting the current task.
     if deleting_current {
-        loop {
-            timer::yield_task();
-        }
+        SCHEDULER.with(|scheduler| {
+            // We won't be re-scheduled.
+            scheduler.event.set_blocked();
+            yield_task();
+        });
+        unreachable!();
     }
-}
-
-#[cfg(riscv)]
-pub(crate) fn task_switch() {
-    SCHEDULER_STATE.with(|state| state.switch_task());
-}
-
-#[cfg(xtensa)]
-pub(crate) fn task_switch(trap_frame: &mut TrapFrame) {
-    SCHEDULER_STATE.with(|state| state.switch_task(trap_frame));
 }

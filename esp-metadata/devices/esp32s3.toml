@@ -90,6 +90,7 @@ symbols = [
     "psram",
     "psram_dma",
     "octal_psram",
+    "swd",
     "ulp_riscv_core",
 
     # ROM capabilities
@@ -597,6 +598,7 @@ status_registers = 4
 support_status = "partial"
 ram_start = 0x60016800
 channel_ram_size = 48
+channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
 
 [device.rsa]
 support_status = "partial"
