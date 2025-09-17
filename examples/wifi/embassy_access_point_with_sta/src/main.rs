@@ -24,12 +24,12 @@ use core::net::Ipv4Addr;
 use embassy_executor::Spawner;
 use embassy_futures::select::Either;
 use embassy_net::{
-    tcp::TcpSocket,
     IpListenEndpoint,
     Ipv4Cidr,
     Runner,
     StackResources,
     StaticConfigV4,
+    tcp::TcpSocket,
 };
 use embassy_time::{Duration, Timer};
 use esp_alloc as _;
@@ -37,6 +37,7 @@ use esp_backtrace as _;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_println::{print, println};
 use esp_radio::{
+    Controller,
     wifi::{
         AccessPointConfig,
         ClientConfig,
@@ -46,7 +47,6 @@ use esp_radio::{
         WifiDevice,
         WifiEvent,
     },
-    Controller,
 };
 
 esp_bootloader_esp_idf::esp_app_desc!();
