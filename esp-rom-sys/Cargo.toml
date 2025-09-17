@@ -12,6 +12,11 @@ license       = "MIT OR Apache-2.0"
 
 links         = "esp_rom_sys"
 
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]

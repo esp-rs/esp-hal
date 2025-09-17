@@ -13,6 +13,14 @@ links         = "esp-println"
 
 [package.metadata.espressif]
 doc-config = [{ features = ["auto", "defmt-espflash", "critical-section"] }]
+check-configs = [
+    { features = ["auto"] },
+    { features = ["jtag-serial"] },
+    { features = ["uart"] },
+    # { features = ["no-op"] }, # FIXME
+    { features = ["auto", "log-04", "timestamp"] },
+    { features = ["auto", "defmt-espflash", "timestamp"] },
+]
 
 [package.metadata.docs.rs]
 cargo-args     = ["-Z", "build-std=core"]

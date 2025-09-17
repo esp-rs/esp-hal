@@ -12,6 +12,13 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = [{ features = ["esp-hal/unstable", "esp-hal/rt", "defmt", "executors"] }]
+check-configs = [
+    { features = ["esp-hal/unstable", "esp-hal/rt"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "log-04"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "defmt", "executors"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "log-04", "executors"] },
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"

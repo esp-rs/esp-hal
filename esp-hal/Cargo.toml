@@ -16,8 +16,16 @@ semver_checked = true
 doc-config = [
     { features = ["unstable", "rt"] },
     { features = ["psram"], append_if = 'chip_has("psram")' },
-    { features = ["__usb_otg"], append_if = 'chip_has("usb0")' },
+    { features = ["__usb_otg"], append_if = 'chip_has("soc_has_usb0")' },
     { features = ["__bluetooth"], append_if = 'chip_has("bt")' },
+]
+check-configs = [
+    { features = [] },
+    { features = ["rt"] },
+    { features = ["unstable", "rt"] },
+    { features = ["unstable", "rt", "psram"], if = 'chip_has("psram")' },
+    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
 ]
 
 [package.metadata.docs.rs]

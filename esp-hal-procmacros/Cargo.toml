@@ -10,6 +10,10 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = [{ features = ["embassy"] }]
+check-configs = [
+    { features = [] },
+    { features = ["embassy"] }
+]
 
 [package.metadata.docs.rs]
 features = ["embassy", "has-ulp-core", "interrupt", "ram", "is-ulp-core"]

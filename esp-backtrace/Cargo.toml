@@ -12,6 +12,10 @@ license       = "MIT OR Apache-2.0"
 
 [package.metadata.espressif]
 doc-config = [{ features = ["defmt"] }]
+check-configs = [
+    { features = ["println", "esp-println/auto"] },
+    { features = ["defmt"] }
+]
 
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"

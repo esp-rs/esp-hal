@@ -21,6 +21,12 @@ doc-config = [
     { features = ["embedded-hal"] },
     { features = ["embedded-io"], append_if = 'chip_has("lp_core")' },
 ]
+check-configs = [
+    { features = [] },
+    { features = ["embedded-hal"] },
+    { features = ["embedded-io"] },
+    { features = ["embedded-hal", "embedded-io"] },
+]
 
 [lib]
 bench = false

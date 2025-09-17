@@ -19,6 +19,16 @@ doc-config = [
     { features = ["coex"], append_if = 'chip_has("wifi") && chip_has("bt")' },
     { features = ["unstable"], append_if = 'chip_has("wifi") || chip_has("bt") || chip_has("ieee802154")' },
 ]
+check-configs = [
+    { features = ["esp-hal/unstable", "esp-hal/rt"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "defmt"] },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ble"], if = 'chip_has("bt")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "ieee802154"], if = 'chip_has("ieee802154")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "unstable", "defmt", "wifi", "wifi-eap", "esp-now", "sniffer", "smoltcp/proto-ipv4", "smoltcp/proto-ipv6", "ble", "coex"], if = 'chip_has("wifi") && chip_has("bt")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi")' },
+]
 
 [lib]
 bench = false

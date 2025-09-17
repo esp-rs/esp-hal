@@ -10,6 +10,13 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["critical-section"] },
+    { features = ["bytewise-read"] },
+]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
