@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
-use toml_edit::{DocumentMut, Formatted, Item, Value};
+use toml_edit::{DocumentMut, Formatted, Item, Table, Value};
 
 use crate::{Package, windows_safe_path};
 
@@ -484,9 +484,9 @@ impl Drop for CargoCommandBatcher {
 }
 
 /// A representation of a Cargo.toml file for a specific package.
-pub struct CargoToml<'a> {
+pub struct CargoToml {
     /// The workspace path where the Cargo.toml is located.
-    pub workspace: &'a Path,
+    pub workspace: PathBuf,
     /// The package this Cargo.toml belongs to.
     pub package: Package,
     /// The parsed Cargo.toml manifest.
@@ -496,9 +496,9 @@ pub struct CargoToml<'a> {
 const DEPENDENCY_KINDS: [&'static str; 3] =
     ["dependencies", "dev-dependencies", "build-dependencies"];
 
-impl<'a> CargoToml<'a> {
+impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
-    pub fn new(workspace: &'a Path, package: Package) -> Result<Self> {
+    pub fn new(workspace: &Path, package: Package) -> Result<Self> {
         let package_path = workspace.join(package.to_string());
         let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
@@ -514,11 +514,24 @@ impl<'a> CargoToml<'a> {
         Self::from_str(workspace, package, &manifest)
     }
 
+    pub fn espressif_metadata(&self) -> Option<&Table> {
+        let Some(package) = self.manifest.get("package") else {
+            return None;
+        };
+        let Some(metadata) = package.get("metadata") else {
+            return None;
+        };
+        let Some(espressif) = metadata.get("espressif") else {
+            return None;
+        };
+        Some(espressif.as_table()?)
+    }
+
     /// Create a `CargoToml` instance from a manifest string.
-    pub fn from_str(workspace: &'a Path, package: Package, manifest: &str) -> Result<Self> {
+    pub fn from_str(workspace: &Path, package: Package, manifest: &str) -> Result<Self> {
         // Parse the manifest string into a mutable TOML document.
         Ok(Self {
-            workspace,
+            workspace: workspace.to_path_buf(),
             package,
             manifest: manifest
                 .parse::<DocumentMut>()

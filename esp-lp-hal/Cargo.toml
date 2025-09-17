@@ -15,6 +15,9 @@ default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
+[package.metadata.espressif]
+targets_lp_core = true
+
 [lib]
 bench = false
 test  = false

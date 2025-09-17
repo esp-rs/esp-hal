@@ -23,7 +23,7 @@ pub fn publish(workspace: &Path, args: PublishArgs) -> Result<()> {
     let package_path = windows_safe_path(&workspace.join(&package_name));
 
     ensure!(
-        args.package.is_published(workspace),
+        args.package.is_published(),
         "Invalid package '{}' specified, this package should not be published!",
         args.package
     );

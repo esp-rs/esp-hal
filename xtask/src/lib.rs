@@ -7,6 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
+use toml_edit::Item;
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -177,18 +178,13 @@ impl Package {
 
     /// Should documentation be built for the package, and should the package be
     /// published?
-    pub fn is_published(&self, workspace: &Path) -> bool {
+    pub fn is_published(&self) -> bool {
         if *self == Package::Examples {
             // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
             // did nothing in this directory will be published.
             false
         } else {
-            // TODO: we should use some sort of cache instead of parsing the TOML every
-            // time, but for now this should be good enough.
-            let toml =
-                crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
-
-            toml.is_published()
+            self.toml().is_published()
         }
     }
 
@@ -417,8 +413,27 @@ impl Package {
         cases
     }
 
+    fn toml(&self) -> CargoToml {
+        // TODO: we should use some sort of cache instead of parsing the TOML every
+        // time, but for now this should be good enough.
+        CargoToml::new(&std::env::current_dir().unwrap(), *self)
+            .expect("Failed to parse Cargo.toml")
+    }
+
     fn targets_lp_core(&self) -> bool {
-        self == Package::EspLpHal
+        let toml = self.toml();
+
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(targets_lp_core)) = metadata.get("targets_lp_core") else {
+            return false;
+        };
+
+        targets_lp_core
+            .as_bool()
+            .expect("targets_lp_core must be a boolean")
     }
 
     /// Return the target triple for a given package/chip pair.
@@ -432,12 +447,17 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
+        if self.targets_lp_core() && !chip.has_lp_core() {
+            return Err(anyhow!(
+                "Package '{self}' requires an LP core, but '{chip}' does not have one",
+            ));
+        }
+
         let check = match self {
             Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
                 chip.is_xtensa()
             }
             Package::EspRiscvRt => chip.is_riscv(),
-            p if p.targets_lp_core() => chip.has_lp_core(),
             _ => true,
         };
 
@@ -674,8 +694,8 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 }
 
 /// Parse the version from the specified package's Cargo manifest.
-pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
-    CargoToml::new(workspace, package).map(|toml| toml.package_version())
+pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
+    Ok(package.toml().package_version())
 }
 
 /// Make the path "Windows"-safe
