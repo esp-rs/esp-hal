@@ -326,6 +326,7 @@ fn run_cipher_tests(buffer: &mut [u8]) {
     );
 }
 
+#[cfg(aes_dma)]
 fn run_unaligned_dma_tests<const MAX_SHIFT: usize>(memory: &mut [u8]) {
     let zeros = [0; MAX_SHIFT];
 
