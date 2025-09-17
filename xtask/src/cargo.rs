@@ -386,7 +386,14 @@ impl CargoCommandBadger {
             command.extend_from_slice(&key.config);
             for item in group.iter() {
                 // Only build and doc can be batched
-                if item.subcommand != "build" && item.subcommand != "doc" {
+                let batchable = [
+                    "build", "doc",
+                    // "check" // soon(TM)
+                ];
+                if !batchable
+                    .iter()
+                    .any(|&subcommand| subcommand == item.subcommand)
+                {
                     all.push(Self::build_one_for_cargo(item));
                     continue;
                 }

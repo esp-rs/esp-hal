@@ -34,7 +34,7 @@ enum Cli {
     /// Run cargo clean
     Clean(CleanArgs),
     /// Check all packages in the workspace with cargo check
-    CheckPackages(LintPackagesArgs),
+    CheckPackages(CheckPackagesArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Semver Checks
@@ -89,6 +89,21 @@ struct HostTestsArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct CheckPackagesArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+
+    /// Check for a specific chip
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    chips: Vec<Chip>,
+
+    /// The toolchain used to run the checks
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -236,7 +251,7 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
     Ok(())
 }
 
-fn check_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
     log::debug!("Checking packages: {:?}", args.packages);
     let mut packages = args.packages;
     packages.sort();
@@ -260,20 +275,77 @@ fn check_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                     features.push(device.name())
                 }
 
-                lint_package(
+                commands.push(build_check_package_command(
                     workspace,
                     *package,
                     chip,
                     &["--no-default-features"],
                     &features,
-                    args.fix,
                     args.toolchain.as_deref(),
-                )?;
+                )?);
             }
         }
     }
 
+    for c in commands.build(false) {
+        println!(
+            "Command: cargo {}",
+            c.command.join(" ").replace("---", "\n    ---")
+        );
+        c.run(false)?;
+    }
+
     Ok(())
+}
+
+fn build_check_package_command(
+    workspace: &Path,
+    package: Package,
+    chip: &Chip,
+    args: &[&str],
+    features: &[String],
+    mut toolchain: Option<&str>,
+) -> Result<CargoArgsBuilder> {
+    log::info!(
+        "Linting package: {} ({}, features: {:?})",
+        package,
+        chip,
+        features
+    );
+
+    let path = workspace.join(package.to_string());
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("check")
+        .manifest_path(path.join("Cargo.toml"));
+
+    if !package.build_on_host(features) {
+        if chip.is_xtensa() {
+            // In case the user doesn't specify a toolchain, make sure we use +esp
+            toolchain.get_or_insert("esp");
+        }
+        builder = builder.target(package.target_triple(chip)?);
+    }
+
+    if let Some(toolchain) = toolchain {
+        if !package.build_on_host(features) && toolchain.starts_with("esp") {
+            builder = builder.config("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
+    }
+
+    builder = builder.args(&args);
+
+    if !features.is_empty() {
+        builder = builder.arg(format!("--features={}", features.join(",")));
+    }
+
+    // TODO: these should come from the outside
+    builder.add_env_var("CI", "1");
+    builder.add_env_var("DEFMT_LOG", "trace");
+    builder.add_env_var("ESP_LOG", "trace");
+
+    Ok(builder)
 }
 
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
@@ -344,7 +416,7 @@ fn lint_package(
 
     if let Some(toolchain) = toolchain {
         if !package.build_on_host(features) && toolchain.starts_with("esp") {
-            builder = builder.arg("-Zbuild-std=core,alloc");
+            builder = builder.config("-Zbuild-std=core,alloc");
         }
         builder = builder.toolchain(toolchain);
     }
@@ -438,13 +510,25 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
-    runner.run("Check crates", || {
+    // TODO: enable checking all crates once cargo-batch has check support
+    // runner.run("Check crates", || {
+    //     check_packages(
+    //         workspace,
+    //         LintPackagesArgs {
+    //             packages: Package::iter().collect(),
+    //             chips: vec![args.chip],
+    //             fix: false,
+    //             toolchain: args.toolchain.clone(),
+    //         },
+    //     )
+    // });
+
+    runner.run("Check esp-hal", || {
         check_packages(
             workspace,
-            LintPackagesArgs {
-                packages: Package::iter().collect(),
+            CheckPackagesArgs {
+                packages: vec![Package::EspHal],
                 chips: vec![args.chip],
-                fix: false,
                 toolchain: args.toolchain.clone(),
             },
         )
