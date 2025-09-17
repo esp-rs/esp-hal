@@ -11,6 +11,9 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
+[package.metadata.espressif]
+semver_checked = true
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6", "unstable"]

@@ -481,7 +481,17 @@ impl Package {
 
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
-        [Self::EspHal].contains(self)
+        let Some(metadata) = self.toml().espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(semver_checked)) = metadata.get("semver_checked") else {
+            return false;
+        };
+
+        semver_checked
+            .as_bool()
+            .expect("semver_checked must be a boolean")
     }
 }
 
