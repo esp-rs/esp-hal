@@ -5,10 +5,11 @@ ENTRY(Reset)
 INCLUDE memory.x
 
 /* after memory.x to allow override */
-PROVIDE(__pre_init = DefaultPreInit);
+PROVIDE(__pre_init = no_init_hook);
 PROVIDE(__zero_bss = default_mem_hook);
 PROVIDE(__init_data = default_mem_hook);
-PROVIDE(__post_init = default_post_init);
+PROVIDE(__init_persistent = default_mem_hook);
+PROVIDE(__post_init = no_init_hook);
 
 INCLUDE exception.x
 

@@ -429,6 +429,8 @@ pub fn pre_init(args: TokenStream, input: TokenStream) -> TokenStream {
             },
         };
 
+    // TODO: require `unsafe(naked)` as no Rust code should run before statics are initialized
+
     if !valid_signature {
         return parse::Error::new(
             f.span(),
@@ -453,7 +455,7 @@ pub fn pre_init(args: TokenStream, input: TokenStream) -> TokenStream {
     let block = f.block;
 
     quote!(
-        #[export_name = "__pre_init"]
+        #[unsafe(export_name = "__pre_init")]
         #[allow(missing_docs)]  // we make a private fn public, which can trigger this lint
         #(#attrs)*
         pub unsafe fn #ident() #block
