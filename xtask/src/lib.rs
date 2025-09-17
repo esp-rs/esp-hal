@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -6,6 +7,7 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
+use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
 use toml_edit::{Item, Value};
 
@@ -73,24 +75,31 @@ pub enum Package {
 impl Package {
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
-        use Package::*;
+        use strum::IntoEnumIterator;
+        let chips = Chip::iter()
+            .map(|chip| chip.to_string())
+            .collect::<Vec<_>>();
+        let toml = self.toml();
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            return false;
+        };
 
-        matches!(
-            self,
-            EspBacktrace
-                | EspBootloaderEspIdf
-                | EspAlloc
-                | EspHal
-                | EspHalEmbassy
-                | EspMetadataGenerated
-                | EspRomSys
-                | EspLpHal
-                | EspPrintln
-                | EspPreempt
-                | EspStorage
-                | EspSync
-                | EspRadio
-        )
+        // This is intended to opt-out in case there are features that look like chip names, but
+        // aren't supposed to be handled like them.
+        if let Some(metadata) = toml.espressif_metadata() {
+            if let Some(Item::Value(ov)) = metadata.get("has_chip_features") {
+                let Value::Boolean(ov) = ov else {
+                    log::warn!("Invalid value for 'has_chip_features' in metadata");
+                    return false;
+                };
+
+                return *ov.value();
+            }
+        }
+
+        features
+            .iter()
+            .any(|(feature, _)| chips.iter().any(|c| c == feature))
     }
 
     /// Does the package have inline assembly?
@@ -413,11 +422,19 @@ impl Package {
         cases
     }
 
-    fn toml(&self) -> CargoToml {
-        // TODO: we should use some sort of cache instead of parsing the TOML every
-        // time, but for now this should be good enough.
-        CargoToml::new(&std::env::current_dir().unwrap(), *self)
-            .expect("Failed to parse Cargo.toml")
+    fn toml(&self) -> MappedMutexGuard<'_, CargoToml> {
+        static TOML: Mutex<Option<HashMap<Package, CargoToml>>> = Mutex::new(None);
+
+        let tomls = TOML.lock();
+
+        MutexGuard::map(tomls, |tomls| {
+            let tomls = tomls.get_or_insert_default();
+
+            tomls.entry(*self).or_insert_with(|| {
+                CargoToml::new(&std::env::current_dir().unwrap(), *self)
+                    .expect("Failed to parse Cargo.toml")
+            })
+        })
     }
 
     fn targets_lp_core(&self) -> bool {
@@ -461,7 +478,6 @@ impl Package {
         {
             return Err(anyhow!(
                 "Package '{self}' is not compatible with {chip_target} chips",
-                self = self,
                 chip_target = chip.target()
             ));
         }
