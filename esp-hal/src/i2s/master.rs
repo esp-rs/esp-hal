@@ -1432,6 +1432,7 @@ mod private {
     }
 
     pub trait Signals: RegBlock {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal;
         fn bclk_signal(&self) -> OutputSignal;
         fn ws_signal(&self) -> OutputSignal;
@@ -2186,11 +2187,10 @@ mod private {
     impl RegisterAccessPrivate for I2S0<'_> {}
 
     impl Signals for crate::peripherals::I2S0<'_> {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    panic!("MCLK on ESP32 requires special handling");
-                } else if #[cfg(esp32s2)] {
+                if #[cfg(esp32s2)] {
                     OutputSignal::CLK_I2S
                 } else if #[cfg(esp32s3)] {
                     OutputSignal::I2S0_MCLK
@@ -2285,14 +2285,9 @@ mod private {
 
     #[cfg(soc_has_i2s1)]
     impl Signals for crate::peripherals::I2S1<'_> {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    panic!("MCLK on ESP32 requires special handling");
-                } else {
-                    OutputSignal::I2S1_MCLK
-                }
-            }
+            OutputSignal::I2S1_MCLK
         }
 
         fn bclk_signal(&self) -> OutputSignal {
@@ -2385,6 +2380,7 @@ mod private {
                 #[cfg(soc_has_i2s1)]
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
+                #[cfg(not(esp32))]
                 fn mclk_signal(&self) -> OutputSignal;
                 fn bclk_signal(&self) -> OutputSignal;
                 fn ws_signal(&self) -> OutputSignal;
