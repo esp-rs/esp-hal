@@ -28,6 +28,9 @@ esp-rom-sys      = { version = "0.1.1", path = "../esp-rom-sys", optional = true
 # Unstable dependencies that are not (strictly) part of the public API
 document-features = "0.2.11"
 
+# Logging interface
+defmt  = { version = "1.0.1", optional = true }
+
 [features]
 default = ["critical-section"]
 
@@ -36,6 +39,9 @@ critical-section = []
 
 ## Bytewise read emulation
 bytewise-read = []
+
+## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
+defmt = ["dep:defmt"]
 
 #! ### Chip selection
 #! One of the following features must be enabled to select the target chip:

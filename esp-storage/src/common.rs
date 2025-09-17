@@ -4,6 +4,7 @@ use crate::chip_specific;
 
 #[derive(Debug)]
 #[non_exhaustive]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FlashStorageError {
     IoError,
     IoTimeout,
@@ -24,6 +25,7 @@ pub fn check_rc(rc: i32) -> Result<(), FlashStorageError> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FlashStorage {
     pub(crate) capacity: usize,
     unlocked: bool,

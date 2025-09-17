@@ -330,6 +330,9 @@ impl Package {
             Package::EspPreempt => {
                 cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
             }
+            Package::EspStorage => {
+                cases.push(vec!["defmt".to_owned()]);
+            }
             _ => {}
         }
 
