@@ -67,11 +67,7 @@ jobs:
 
       - name: Setup cargo-batch
         run: |
-          # Note the prebuilt is linux-only, the macOS runner should have cargo batch installed, but it needs to build it itself.
           if ! command -v cargo-batch &> /dev/null; then
-              # mkdir -p $HOME/.cargo/bin
-              # curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
-              # chmod +x $HOME/.cargo/bin/cargo-batch
               cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
           fi
 
@@ -175,13 +171,6 @@ jobs:
         run: rustc +${{ env.MSRV }} --version --verbose
       - name: esp toolchain checks
         run: rustc +esp --version --verbose
-
-      # Slow runner, doesn't benefit from cargo-batch
-      # - name: Setup cargo-batch
-      #   run: |
-      #     if ! command -v cargo-batch &> /dev/null; then
-      #       cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked
-      #     fi
 
       # Verify the MSRV for all chips by running a lint session
       - name: msrv RISCV (esp-hal)
