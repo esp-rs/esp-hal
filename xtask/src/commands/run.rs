@@ -184,7 +184,6 @@ pub fn run_examples(
                 &target,
                 &example,
                 CargoAction::Run,
-                1,
                 args.debug,
                 args.toolchain.as_deref(),
                 args.timings,

@@ -408,7 +408,6 @@ pub fn execute_app(
     target: &str,
     app: &Metadata,
     action: CargoAction,
-    repeat: usize,
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
@@ -431,12 +430,7 @@ pub fn execute_app(
 
     let command = CargoCommandBadger::build_one_for_cargo(&builder);
 
-    for i in 0..repeat {
-        if repeat != 1 {
-            log::info!("Run {}/{}", i + 1, repeat);
-        }
-        command.run(false)?;
-    }
+    command.run(false)?;
 
     Ok(())
 }

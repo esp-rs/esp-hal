@@ -285,12 +285,23 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let mut failed = Vec::new();
 
     for c in commands.build(false) {
+        let repeat = if matches!(action, CargoAction::Run) {
+            args.repeat
+        } else {
+            1
+        };
+
         println!(
             "Command: cargo {}",
             c.command.join(" ").replace("---", "\n    ---")
         );
-        if c.run(false).is_err() {
-            failed.push(c.artifact_name);
+        for i in 0..repeat {
+            if repeat != 1 {
+                log::info!("Run {}/{}", i + 1, repeat);
+            }
+            if c.run(false).is_err() {
+                failed.push(c.artifact_name.clone());
+            }
         }
     }
 
