@@ -21,6 +21,7 @@ esp-backtrace = { path = "../esp-backtrace", features = [
     "panic-handler",
     "println",
 ] }
+critical-section   = "1.1.3"
 esp-bootloader-esp-idf = { path = "../esp-bootloader-esp-idf" }
 esp-hal = { path = "../esp-hal", features = ["log-04", "unstable"] }
 esp-hal-embassy = { path = "../esp-hal-embassy" }

@@ -3,7 +3,7 @@
 //! "Disabled" for now - see https://github.com/esp-rs/esp-hal/pull/1635#issuecomment-2137405251
 
 //% CHIPS: esp32c2 esp32c3 esp32c6 esp32h2
-//% FEATURES: unstable
+//% FEATURES: unstable defmt
 
 #![no_std]
 #![no_main]
@@ -30,11 +30,12 @@ struct Context {
     sw0_trigger_addr: u32,
 }
 
+#[unsafe(link_section = ".trap.rust")]
 #[unsafe(no_mangle)]
-fn interrupt20() {
+fn interrupt_handler() {
     unsafe { asm!("csrrwi x0, 0x7e1, 0 #disable timer") }
     critical_section::with(|cs| {
-        SWINT0.borrow_ref(cs).as_ref().unwrap().reset();
+        SWINT0.borrow_ref_mut(cs).as_mut().unwrap().reset();
     });
 
     let mut perf_counter: u32 = 0;
@@ -83,10 +84,12 @@ mod tests {
                 .borrow_ref_mut(cs)
                 .replace(sw_ints.software_interrupt0)
         });
+
         interrupt::enable_direct(
             Interrupt::FROM_CPU_INTR0,
             Priority::Priority3,
             CpuInterrupt::Interrupt20,
+            interrupt_handler,
         )
         .unwrap();
 
@@ -95,29 +98,33 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
-    fn interrupt_latency(_ctx: Context) {
-        // unsafe {
-        //     asm!(
-        //         "
-        // csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
-        // csrrwi x0, 0x7e1, 0 #disable counter
-        // csrrwi x0, 0x7e2, 0 #reset counter
-        // "
-        //     );
-        // }
+    fn interrupt_latency(ctx: Context) {
+        unsafe {
+            asm!(
+                "
+                    csrrwi x0, 0x7e0, 1 #what to count, for cycles write 1 for instructions write 2
+                    csrrwi x0, 0x7e1, 0 #disable counter
+                    csrrwi x0, 0x7e2, 0 #reset counter
+                "
+            );
+        }
 
-        // // interrupt is raised from assembly for max timer granularity.
-        // unsafe {
-        //     asm!(
-        //         "
-        // li {bit}, 1                   # Flip flag (bit 0)
-        // csrrwi x0, 0x7e1, 1           # enable timer
-        // sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
-        // ",
-        //     options(nostack),
-        //     addr = in(reg) ctx.sw0_trigger_addr,
-        //     bit = out(reg) _,
-        //     )
-        // }
+        interrupt::save_int_context();
+        
+        // interrupt is raised from assembly for max timer granularity.
+        unsafe {
+            asm!(
+                "
+                    li {bit}, 1                   # Flip flag (bit 0)
+                    csrrwi x0, 0x7e1, 1           # enable timer
+                    sw {bit}, 0({addr})           # trigger FROM_CPU_INTR0
+                ",
+                options(nostack),
+                addr = in(reg) ctx.sw0_trigger_addr,
+                bit = out(reg) _,
+            )
+        }
+
+        interrupt::restore_int_context();
     }
 }
