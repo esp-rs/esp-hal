@@ -120,7 +120,7 @@ fn panic_handler(info: &core::panic::PanicInfo) -> ! {
         println!("0x{:x}", frame.program_counter());
     }
 
-    abort();
+    abort()
 }
 
 // Ensure that the address is in DRAM.
@@ -186,7 +186,7 @@ fn abort() -> ! {
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "semihosting")] {
-            critical_section::with(|_| {
+            arch::interrupt_free(|| {
                 semihosting::process::abort();
             });
         } else if #[cfg(feature = "halt-cores")] {
@@ -201,5 +201,8 @@ fn abort() -> ! {
     }
 
     #[allow(unreachable_code)]
-    arch::interrupt_free(|| loop {})
+    arch::interrupt_free(|| {
+        #[allow(clippy::empty_loop)]
+        loop {}
+    })
 }

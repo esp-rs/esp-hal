@@ -17,7 +17,7 @@ check-configs = [
     { features = ["auto"] },
     { features = ["jtag-serial"], if = 'chip_has("soc_has_usb_serial_jtag")' },
     { features = ["uart"] },
-    # { features = ["no-op"] }, # FIXME
+    { features = ["no-op"] },
     { features = ["auto", "log-04", "timestamp"] },
     { features = ["auto", "defmt-espflash", "timestamp"] },
 ]
