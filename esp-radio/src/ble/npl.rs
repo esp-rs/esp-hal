@@ -700,8 +700,10 @@ unsafe extern "C" fn ble_npl_callout_is_active(callout: *const ble_npl_callout) 
 
     assert!(unsafe { (*callout).dummy != 0 });
 
-    // we'd need a way to figure out if a timer is active
-    true
+    unsafe {
+        let co = (*callout).dummy as *mut Callout;
+        compat::timer_compat::compat_timer_is_active(&raw mut (*co).timer_handle)
+    }
 }
 
 unsafe extern "C" fn ble_npl_callout_mem_reset(callout: *const ble_npl_callout) {
@@ -1088,9 +1090,7 @@ pub(crate) fn ble_init() {
         }
 
         let res = esp_register_ext_funcs(&G_OSI_FUNCS as *const ExtFuncsT);
-        if res != 0 {
-            panic!("esp_register_ext_funcs returned {}", res);
-        }
+        assert!(res == 0, "esp_register_ext_funcs returned {}", res);
 
         #[cfg(esp32c2)]
         {
@@ -1099,17 +1099,13 @@ pub(crate) fn ble_init() {
                 fn esp_ble_rom_func_ptr_init_all() -> i32;
             }
             let res = esp_ble_rom_func_ptr_init_all();
-            if res != 0 {
-                panic!("esp_ble_rom_func_ptr_init_all returned {}", res);
-            }
+            assert!(res == 0, "esp_ble_rom_func_ptr_init_all returned {}", res);
         }
 
         #[cfg(coex)]
         {
             let res = crate::wifi::coex_init();
-            if res != 0 {
-                panic!("got error");
-            }
+            assert!(res == 0, "coex_init failed");
         }
 
         ble_os_adapter_chip_specific::bt_periph_module_enable();
@@ -1117,9 +1113,7 @@ pub(crate) fn ble_init() {
         ble_os_adapter_chip_specific::disable_sleep_mode();
 
         let res = esp_register_npl_funcs(core::ptr::addr_of!(G_NPL_FUNCS));
-        if res != 0 {
-            panic!("esp_register_npl_funcs returned {}", res);
-        }
+        assert!(res == 0, "esp_register_npl_funcs returned {}", res);
 
         let npl_info = BleNplCountInfoT {
             evt_count: 0,
@@ -1138,18 +1132,15 @@ pub(crate) fn ble_init() {
             &cfg as *const esp_bt_controller_config_t,
             &npl_info as *const BleNplCountInfoT,
         );
-        if res != 0 {
-            panic!("ble_get_npl_element_info returned {}", res);
-        }
+        assert!(res == 0, "ble_get_npl_element_info returned {}", res);
+
         // not really using npl_info here ... remove it?
 
         #[cfg(esp32c2)]
         {
             // Initialize the global memory pool
             let ret = os_msys_buf_alloc();
-            if !ret {
-                panic!("os_msys_buf_alloc failed");
-            }
+            assert!(ret, "os_msys_buf_alloc failed");
 
             os_msys_init();
         }
@@ -1162,9 +1153,7 @@ pub(crate) fn ble_init() {
         #[cfg(coex)]
         {
             let rc = ble_osi_coex_funcs_register(&G_COEX_FUNCS as *const OsiCoexFuncsT);
-            if rc != 0 {
-                panic!("ble_osi_coex_funcs_register returned {}", rc);
-            }
+            assert!(rc == 0, "ble_osi_coex_funcs_register returned {}", rc);
         }
 
         #[cfg(not(esp32c2))]
@@ -1173,9 +1162,7 @@ pub(crate) fn ble_init() {
                 fn esp_ble_register_bb_funcs() -> i32;
             }
             let res = esp_ble_register_bb_funcs();
-            if res != 0 {
-                panic!("esp_ble_register_bb_funcs returned {}", res);
-            }
+            assert!(res == 0, "esp_ble_register_bb_funcs returned {}", res);
         }
 
         #[cfg(esp32c2)]
@@ -1183,9 +1170,8 @@ pub(crate) fn ble_init() {
         #[cfg(not(esp32c2))]
         let res = r_ble_controller_init(&cfg as *const esp_bt_controller_config_t);
 
-        if res != 0 {
-            panic!("ble_controller_init returned {}", res);
-        }
+        assert!(res == 0, "ble_controller_init returned {}", res);
+
         #[cfg(not(esp32c2))]
         {
             unsafe extern "C" {
@@ -1205,19 +1191,13 @@ pub(crate) fn ble_init() {
             }
 
             let res = base_stack_initEnv();
-            if res != 0 {
-                panic!("base_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "base_stack_initEnv returned {}", res);
 
             let res = conn_stack_initEnv();
-            if res != 0 {
-                panic!("conn_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "conn_stack_initEnv returned {}", res);
 
             let res = adv_stack_initEnv();
-            if res != 0 {
-                panic!("adv_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "adv_stack_initEnv returned {}", res);
 
             let res = extAdv_stack_initEnv();
             if res != 0 {
@@ -1225,14 +1205,10 @@ pub(crate) fn ble_init() {
             }
 
             let res = sync_stack_initEnv();
-            if res != 0 {
-                panic!("sync_stack_initEnv returned {}", res);
-            }
+            assert!(res == 0, "sync_stack_initEnv returned {}", res);
 
             let res = r_esp_ble_msys_init(256, 320, 12, 24, 1);
-            if res != 0 {
-                panic!("esp_ble_msys_init returned {}", res);
-            }
+            assert!(res == 0, "esp_ble_msys_init returned {}", res);
         }
 
         #[cfg(coex)]
@@ -1263,9 +1239,7 @@ pub(crate) fn ble_init() {
         let res = ble_controller_enable(1); // 1 = BLE
         #[cfg(not(esp32c2))]
         let res = r_ble_controller_enable(1); // 1 = BLE
-        if res != 0 {
-            panic!("ble_controller_enable returned {}", res);
-        }
+        assert!(res == 0, "ble_controller_enable returned {}", res);
 
         // this is to avoid (ASSERT r_ble_hci_ram_hs_cmd_tx:34 0 0)
         // we wait a bit to make sure the ble task initialized everything
