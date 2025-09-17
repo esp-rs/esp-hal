@@ -36,6 +36,7 @@ use esp_hal::{
 #[allow(unused_imports)]
 use hil_test::{assert, assert_eq};
 
+// RMT channel clock = 500kHz
 cfg_if::cfg_if! {
     if #[cfg(esp32h2)] {
         const FREQ: Rate = Rate::from_mhz(32);
@@ -72,6 +73,7 @@ fn setup<'a, Dm: DriverMode>(
     (tx_channel, rx_channel)
 }
 
+// Pulses of H 100..300 L 50, i.e. 150..350 / 500kHz = 150..350 * 2us = 300..700us
 fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
         PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
