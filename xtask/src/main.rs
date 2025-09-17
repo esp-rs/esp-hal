@@ -266,7 +266,8 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
             log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
-            if package.validate_package_chip(chip).is_err() {
+            if let Err(e) = package.validate_package_chip(chip) {
+                log::warn!("{e}. Skipping");
                 continue;
             }
 
@@ -361,7 +362,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
             log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
-            if package.validate_package_chip(chip).is_err() {
+            if let Err(e) = package.validate_package_chip(chip) {
+                log::warn!("{e}. Skipping");
                 continue;
             }
 

@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
-use toml_edit::Item;
+use toml_edit::{Item, Value};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -453,23 +453,20 @@ impl Package {
             ));
         }
 
-        let check = match self {
-            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
-                chip.is_xtensa()
-            }
-            Package::EspRiscvRt => chip.is_riscv(),
-            _ => true,
-        };
+        let toml = self.toml();
 
-        if check {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ))
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
+            && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
+        {
+            return Err(anyhow!(
+                "Package '{self}' is not compatible with {chip_target} chips",
+                self = self,
+                chip_target = chip.target()
+            ));
         }
+
+        Ok(())
     }
 
     /// Creates a tag string for this [`Package`] combined with a semantic version.
