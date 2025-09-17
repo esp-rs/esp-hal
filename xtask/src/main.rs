@@ -6,7 +6,7 @@ use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
     Package,
-    cargo::{CargoAction, CargoArgsBuilder},
+    cargo::{CargoAction, CargoArgsBuilder, CargoCommandBadger},
     commands::*,
     update_metadata,
 };
@@ -33,6 +33,8 @@ enum Cli {
     FmtPackages(FmtPackagesArgs),
     /// Run cargo clean
     Clean(CleanArgs),
+    /// Check all packages in the workspace with cargo check
+    CheckPackages(LintPackagesArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Semver Checks
@@ -186,6 +188,7 @@ fn main() -> Result<()> {
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::Clean(args) => clean(&workspace, args),
+        Cli::CheckPackages(args) => check_packages(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
@@ -233,6 +236,46 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
     Ok(())
 }
 
+fn check_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
+    log::debug!("Checking packages: {:?}", args.packages);
+    let mut packages = args.packages;
+    packages.sort();
+
+    let mut commands = CargoCommandBadger::new();
+
+    for package in packages.iter().filter(|p| p.is_published(workspace)) {
+        // Unfortunately each package has its own unique requirements for
+        // building, so we need to handle each individually (though there
+        // is *some* overlap)
+        for chip in &args.chips {
+            log::debug!("  for chip: {}", chip);
+            let device = Config::for_chip(chip);
+
+            if package.validate_package_chip(chip).is_err() {
+                continue;
+            }
+
+            for mut features in package.check_feature_rules(device) {
+                if package.has_chip_features() {
+                    features.push(device.name())
+                }
+
+                lint_package(
+                    workspace,
+                    *package,
+                    chip,
+                    &["--no-default-features"],
+                    &features,
+                    args.fix,
+                    args.toolchain.as_deref(),
+                )?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     log::debug!("Linting packages: {:?}", args.packages);
     let mut packages = args.packages;
@@ -250,13 +293,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 continue;
             }
 
-            let feature_sets = [
-                vec![package.feature_rules(device)], // initially test all features
-                package.lint_feature_rules(device),  // add separate test cases
-            ]
-            .concat();
-
-            for mut features in feature_sets {
+            for mut features in package.lint_feature_rules(device) {
                 if package.has_chip_features() {
                     features.push(device.name())
                 }
@@ -401,6 +438,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
+    runner.run("Check crates", || {
+        check_packages(
+            workspace,
+            LintPackagesArgs {
+                packages: Package::iter().collect(),
+                chips: vec![args.chip],
+                fix: false,
+                toolchain: args.toolchain.clone(),
+            },
+        )
+    });
+
     if !args.no_lint {
         runner.run("Lint", || {
             lint_packages(
@@ -537,20 +586,6 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
             });
         }
     }
-
-    // Make sure we're able to build the HAL without the default features enabled
-    runner.run("Build HAL", || {
-        build_package(
-            workspace,
-            BuildPackageArgs {
-                package: Package::EspHal,
-                target: Some(args.chip.target().to_string()),
-                features: vec![args.chip.to_string()],
-                no_default_features: true,
-                toolchain: args.toolchain.clone(),
-            },
-        )
-    });
 
     runner.run("Build examples", || {
         // The `ota_example` expects a file named `examples/target/ota_image` - it

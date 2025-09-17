@@ -296,8 +296,61 @@ impl Package {
     }
 
     /// Additional feature rules to test subsets of features for a package.
+    pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+        let mut cases = Vec::new();
+
+        // For now we run a lot of checks, but that will change.
+        cases.push(self.feature_rules(config));
+
+        match self {
+            Package::EspHal => {
+                // This checks if the `esp-hal` crate compiles with the no features (other than the
+                // chip selection)
+
+                // This tests that disabling the `rt` feature works
+                cases.push(vec![]);
+                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
+                // enabled
+                cases.push(vec!["rt".to_owned()]);
+            }
+            Package::EspRadio => {
+                // Minimal set of features that when enabled _should_ still compile:
+                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
+                if config.contains("wifi") {
+                    // This tests if `wifi` feature works without `esp-radio/unstable`
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi".to_owned(),
+                    ]);
+                    // This tests `wifi-eap` feature
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi-eap".to_owned(),
+                        "unstable".to_owned(),
+                    ]);
+                }
+            }
+            Package::EspMetadataGenerated => {
+                cases.push(vec!["build-script".to_owned()]);
+            }
+            Package::EspPreempt => {
+                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
+            }
+            _ => {}
+        }
+
+        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
+        cases
+    }
+
+    /// Additional feature rules to test subsets of features for a package.
     pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
+
+        // For now we run a lot of clippy checks, but that will change.
+        cases.push(self.feature_rules(config));
 
         match self {
             Package::EspHal => {
