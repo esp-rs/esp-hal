@@ -438,8 +438,6 @@ pub fn execute_app(
 
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if package.starts_with("tests") {
-        Some(format!("--test={}", app.binary_name()))
     } else if !package_path.ends_with("examples") {
         Some(format!("--example={}", app.binary_name()))
     } else {
@@ -452,8 +450,6 @@ pub fn execute_app(
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
-    } else if package.starts_with("tests") {
-        "test"
     } else {
         "run"
     };
@@ -569,8 +565,6 @@ pub fn generate_build_command(
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
-    } else if package.starts_with("tests") {
-        "test"
     } else {
         "run"
     };
@@ -578,8 +572,6 @@ pub fn generate_build_command(
 
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if package.starts_with("tests") {
-        Some(format!("--test={}", app.binary_name()))
     } else if !package_path.ends_with("examples") {
         Some(format!("--example={}", app.binary_name()))
     } else {
