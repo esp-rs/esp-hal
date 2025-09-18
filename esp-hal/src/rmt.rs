@@ -2201,7 +2201,7 @@ mod chip_specific {
     }
 
     impl DynChannelAccess<Tx> {
-        #[cfg(not(esp32))]
+        #[cfg(rmt_has_tx_loop_count)]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, loopcount: Option<LoopCount>) {
             let rmt = crate::peripherals::RMT::regs();
@@ -2215,7 +2215,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_loop_count))]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, _loopcount: Option<LoopCount>) {
             // unsupported
@@ -2329,7 +2329,7 @@ mod chip_specific {
         // Returns whether stopping was immediate, or needs to wait for tx end
         // Due to inlining, the compiler should be able to eliminate code in the caller that
         // depends on this.
-        #[cfg(esp32s2)]
+        #[cfg(rmt_has_tx_immediate_stop)]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
@@ -2338,7 +2338,7 @@ mod chip_specific {
             true
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_immediate_stop))]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let ptr = self.channel_ram_start();

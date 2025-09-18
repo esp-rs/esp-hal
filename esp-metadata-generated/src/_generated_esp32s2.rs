@@ -189,6 +189,33 @@ macro_rules! property {
     ("rmt.channel_ram_size", str) => {
         stringify!(64)
     };
+    ("rmt.has_tx_immediate_stop") => {
+        true
+    };
+    ("rmt.has_tx_loop_count") => {
+        true
+    };
+    ("rmt.has_tx_loop_auto_stop") => {
+        false
+    };
+    ("rmt.has_tx_carrier_data_only") => {
+        true
+    };
+    ("rmt.has_tx_sync") => {
+        true
+    };
+    ("rmt.has_rx_wrap") => {
+        false
+    };
+    ("rmt.has_rx_demodulation") => {
+        true
+    };
+    ("rmt.has_dma") => {
+        false
+    };
+    ("rmt.has_per_channel_clock") => {
+        true
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
