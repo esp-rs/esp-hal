@@ -546,8 +546,7 @@ pub fn generate_build_command(
         .manifest_path(cwd.join("Cargo.toml"))
         .config_path(cwd.join(".cargo").join("config.toml"))
         .target(target)
-        .features(&features)
-        .args(extra_args);
+        .features(&features);
 
     let subcommand = if matches!(action, CargoAction::Build(_)) {
         "build"
@@ -616,6 +615,8 @@ pub fn generate_build_command(
                 .to_string(),
         );
     }
+
+    let builder = builder.args(extra_args);
 
     Ok(builder)
 }
