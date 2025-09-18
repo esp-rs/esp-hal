@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `defmt` feature and `FlashStorage`, `FlashStorageError` now implements `Defmt` (#4127)
-- `FlashSingleton` helper to make `FlashStarage` singleton (#4132)
 
 ### Changed
 
+- `FlashStorage::new()` now panics when it's already being in use (#4132)
 
 ### Fixed
 

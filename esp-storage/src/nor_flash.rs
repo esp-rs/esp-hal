@@ -191,7 +191,6 @@ impl MultiwriteNorFlash for FlashStorage {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FlashSingleton;
 
     const WORD_SIZE: u32 = 4;
     const SECTOR_SIZE: u32 = 4 << 10;
@@ -265,10 +264,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
@@ -288,10 +284,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn not_aligned_read_aligned_buffer() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
         flash.capacity = 4 * 4096;
         let mut data = TestBuffer::default();
 
@@ -303,10 +296,7 @@ mod tests {
     #[test]
     #[cfg(not(feature = "bytewise-read"))]
     fn aligned_read_not_aligned_buffer() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
@@ -328,10 +318,7 @@ mod tests {
     #[test]
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_aligned_buffer() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
 
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
@@ -352,10 +339,7 @@ mod tests {
     #[test]
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_not_aligned_buffer() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
 
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
@@ -377,10 +361,7 @@ mod tests {
 
     #[test]
     fn write_not_aligned_buffer() {
-        FlashSingleton::reset_for_test();
-
-        let flash_token = FlashSingleton::take();
-        let mut flash = FlashStorage::new(flash_token.expect("FlashSingleton already taken"));
+        let mut flash = FlashStorage::new();
         flash.capacity = 4 * 4096;
         let mut read_data = TestBuffer::default();
         let write_data = TestBuffer::seq();

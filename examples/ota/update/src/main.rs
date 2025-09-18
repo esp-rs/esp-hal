@@ -44,6 +44,7 @@ use esp_hal::{
     gpio::{Input, InputConfig, Pull},
     main,
 };
+us esp_storage::{FlashSingleton, FlashStorage};
 use esp_println::println;
 
 esp_bootloader_esp_idf::esp_app_desc!();
@@ -55,7 +56,8 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut storage = esp_storage::FlashStorage::new();
+    let mut storage =
+        FlashStorage::new().expect("FlashStorage already in use!");
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
     let pt = esp_bootloader_esp_idf::partitions::read_partition_table(&mut storage, &mut buffer)
