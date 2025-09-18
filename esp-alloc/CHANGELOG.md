@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added chip-selection features (#4023)
 - New default feature (`compat`) enables implementations for `malloc`, `free`, `calloc`, `realloc` and others (#3890, #4043)
+- `ESP_ALLOC_CONFIG_HEAP_ALGORITHM` to select the global heap algorithm (#4130)
 
 ### Changed
 
 - Make stats structs fields public (#3828)
+- The default heap allocator is now TLSF, implemented by the `rlsf` crate (#3950)
 
 ### Fixed
 

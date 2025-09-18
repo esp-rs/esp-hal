@@ -198,7 +198,6 @@ fn fmt_packages(workspace: &Path, args: FmtPackagesArgs) -> Result<()> {
     packages.sort();
 
     for package in packages {
-        log::info!("Formatting package: {}", package);
         xtask::format_package(workspace, package, args.check)?;
     }
 
