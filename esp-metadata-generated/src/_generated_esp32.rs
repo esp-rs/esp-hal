@@ -213,6 +213,12 @@ macro_rules! property {
     ("rmt.has_per_channel_clock") => {
         true
     };
+    ("rmt.max_idle_threshold") => {
+        32767
+    };
+    ("rmt.max_idle_threshold", str) => {
+        stringify!(32767)
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
