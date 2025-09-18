@@ -29,7 +29,8 @@ use esp_hal::{
     },
     time::Rate,
 };
-use hil_test as _;
+#[allow(unused_imports)]
+use hil_test::{assert, assert_eq};
 
 cfg_if::cfg_if! {
     if #[cfg(esp32h2)] {
@@ -80,10 +81,10 @@ fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; 
     tx_data
 }
 
-// When running this with defmt:
-// - use `DEFMT_RTT_BUFFER_SIZE=32768 xtask run ...` to avoid truncated output
-// - increase embedded_test's default_timeout below to avoid timeouts while printing
-// Note that probe-rs reading the buffer might mess up timing-sensitive tests!
+// When running this with defmt, consider increasing embedded_test's default_timeout below to avoid
+// timeouts while printing. Note that probe-rs reading the buffer might still mess up
+// timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
+// but adding any additional logging to the driver is likely to cause sporadic issues.
 fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize) {
     let mut errors: usize = 0;
 
@@ -232,6 +233,8 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 #[embedded_test::tests(default_timeout = 1, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
+    use hil_test::{assert, assert_eq};
 
     #[init]
     fn init() {}
