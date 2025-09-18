@@ -602,6 +602,7 @@ support_status = "partial"
 ram_start = 0x3ff56800
 channel_ram_size = 64
 channels = ["RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx", "RxTx"]
+has_per_channel_clock = true
 
 [device.rsa]
 support_status = "partial"
