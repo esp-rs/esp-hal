@@ -14,7 +14,7 @@
 #![doc = include_str!(concat!(env!("OUT_DIR"), "/esp_phy_config_table.md"))]
 #![no_std]
 
-// MUST be the first module 
+// MUST be the first module
 mod fmt;
 
 use core::cell::RefCell;
@@ -25,9 +25,7 @@ use esp_hal::time::{Duration, Instant};
 use esp_sync::RawMutex;
 use esp_wifi_sys::include::*;
 
-
 mod common_adapter;
-mod ffi;
 mod phy_init_data;
 
 pub(crate) mod private {

@@ -18,7 +18,7 @@ use esp_hal::ram;
 unsafe extern "C" fn __esp_phy_enter_critical() -> u32 {
     trace!("phy_enter_critical");
 
-    unsafe { crate::ESP_RADIO_LOCK.acquire().inner() }
+    unsafe { crate::ESP_PHY_LOCK.acquire().inner() }
 }
 
 /// **************************************************************************
@@ -41,7 +41,7 @@ unsafe extern "C" fn __esp_phy_exit_critical(level: u32) {
 
     unsafe {
         let token = esp_sync::RestoreState::new(level);
-        crate::ESP_RADIO_LOCK.release(token);
+        crate::ESP_PHY_LOCK.release(token);
     }
 }
 
