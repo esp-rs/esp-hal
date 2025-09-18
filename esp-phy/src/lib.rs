@@ -17,12 +17,10 @@
 // MUST be the first module
 mod fmt;
 
-use core::cell::RefCell;
-
 use esp_hal::clock::{ModemClockController, PhyClockGuard};
 #[cfg(esp32)]
 use esp_hal::time::{Duration, Instant};
-use esp_sync::RawMutex;
+use esp_sync::{NonReentrantMutex, RawMutex};
 use esp_wifi_sys::include::*;
 
 mod common_adapter;
@@ -259,8 +257,7 @@ impl PhyState {
 }
 
 /// Global PHY initialization state
-static PHY_STATE: critical_section::Mutex<RefCell<PhyState>> =
-    critical_section::Mutex::new(RefCell::new(PhyState::new()));
+static PHY_STATE: NonReentrantMutex<PhyState> = NonReentrantMutex::new(PhyState::new());
 
 #[derive(Debug)]
 /// Prevents the PHY from being deinitialized.
@@ -282,7 +279,7 @@ impl PhyInitGuard<'_> {
 
 impl Drop for PhyInitGuard<'_> {
     fn drop(&mut self) {
-        critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
+        PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
     }
 }
 
@@ -293,7 +290,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
         // much of a difference.
         let _phy_clock_guard = self.enable_phy_clock();
 
-        critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).increase_ref_count());
+        PHY_STATE.with(|phy_state| phy_state.increase_ref_count());
 
         PhyInitGuard { _phy_clock_guard }
     }
@@ -306,7 +303,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
     /// lower than the number of alive [PhyInitGuard]s, dropping a guard can
     /// now panic.
     fn decrease_phy_ref_count(&self) {
-        critical_section::with(|cs| PHY_STATE.borrow_ref_mut(cs).decrease_ref_count());
+        PHY_STATE.with(|phy_state| phy_state.decrease_ref_count());
         self.decrease_phy_clock_ref_count();
     }
 }
@@ -330,9 +327,7 @@ pub trait MacTimeExt {
     ///
     /// See [MacTimeUpdateCb] for details.
     fn set_mac_time_update_cb(&self, mac_time_update_cb: MacTimeUpdateCb) {
-        critical_section::with(|cs| {
-            PHY_STATE.borrow_ref_mut(cs).mac_time_update_cb = Some(mac_time_update_cb);
-        })
+        PHY_STATE.with(|phy_state| phy_state.mac_time_update_cb = Some(mac_time_update_cb));
     }
 }
 #[cfg(esp32)]
@@ -352,8 +347,7 @@ pub struct NoCalibrationDataError;
 pub fn set_phy_calibration_data(
     calibration_data: &PhyCalibrationData,
 ) -> Result<(), CalibrationDataAlreadySetError> {
-    critical_section::with(|cs| {
-        let mut phy_state = PHY_STATE.borrow_ref_mut(cs);
+    PHY_STATE.with(|phy_state| {
         if phy_state.calibration_data.is_some() {
             Err(CalibrationDataAlreadySetError)
         } else {
@@ -367,9 +361,8 @@ pub fn set_phy_calibration_data(
 pub fn backup_phy_calibration_data(
     buffer: &mut PhyCalibrationData,
 ) -> Result<(), NoCalibrationDataError> {
-    critical_section::with(|cs| {
-        PHY_STATE
-            .borrow_ref_mut(cs)
+    PHY_STATE.with(|phy_state| {
+        phy_state
             .calibration_data
             .as_mut()
             .ok_or(NoCalibrationDataError)
