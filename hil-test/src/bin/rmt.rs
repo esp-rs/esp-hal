@@ -9,10 +9,14 @@
 use esp_hal::{
     Blocking,
     DriverMode,
+    delay::Delay,
     gpio::{
         Flex,
+        InputConfig,
         Level,
         NoPin,
+        OutputConfig,
+        Pull,
         interconnect::{PeripheralInput, PeripheralOutput},
     },
     rmt::{
@@ -95,7 +99,7 @@ fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool
 // timeouts while printing. Note that probe-rs reading the buffer might still mess up
 // timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
 // but adding any additional logging to the driver is likely to cause sporadic issues.
-fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize) {
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize, tolerance: u16) {
     let mut errors: usize = 0;
 
     for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
@@ -111,7 +115,7 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize) {
             } else {
                 ""
             }
-        } else if !pulse_code_matches(code_tx, code_rx, 1) {
+        } else if !pulse_code_matches(code_tx, code_rx, tolerance) {
             errors += 1;
             "rx/tx code mismatch!"
         } else {
@@ -165,7 +169,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     tx_transaction.wait().unwrap();
     rx_transaction.wait().unwrap();
 
-    check_data_eq(&tx_data, &rcv_data, TX_LEN);
+    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
 }
 
 // Run a test where some data is sent from one channel and looped back to
@@ -213,7 +217,7 @@ async fn do_rmt_loopback_async<const TX_LEN: usize>(tx_memsize: u8, rx_memsize: 
     tx_res.unwrap();
     rx_res.unwrap();
 
-    check_data_eq(&tx_data, &rcv_data, TX_LEN);
+    check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
 }
 
 // Run a test that just sends some data, without trying to recive it.
@@ -435,5 +439,59 @@ mod tests {
             test_channel_pair!(p, pin, channel0, channel2);
             test_channel_pair!(p, pin, channel1, channel3);
         }
+    }
+
+    // Test that the timing is at least roughly correct (i.e. the clock source isn't completely
+    // misconfigured).
+    // This test is almost guaranteed to fail when using defmt!
+    #[test]
+    fn rmt_clock_rate() {
+        let peripherals = esp_hal::init(esp_hal::Config::default());
+
+        let (_, pin) = hil_test::common_test_pins!(peripherals);
+        let mut pin = Flex::new(pin);
+        pin.set_input_enable(true);
+        pin.set_output_enable(true);
+        pin.apply_input_config(&InputConfig::default().with_pull(Pull::None));
+        pin.apply_output_config(&OutputConfig::default());
+        let rx_pin = pin.peripheral_input();
+        let mut tx_pin = pin;
+
+        tx_pin.set_low();
+
+        let rmt = Rmt::new(peripherals.RMT, FREQ).unwrap();
+
+        let tx_config = TxChannelConfig::default();
+        // idle threshold 16383 cycles = ~33ms
+        let rx_config = RxChannelConfig::default().with_idle_threshold(0x3FFF);
+
+        let (_, rx_channel) = setup(rmt, rx_pin, NoPin, tx_config, rx_config);
+
+        let mut rx_data = [PulseCode::default(); 6];
+        let rx_transaction = rx_channel.receive(&mut rx_data).unwrap();
+
+        let mut expected: [_; 5] = core::array::from_fn(|i| {
+            let i = i as u16 + 1;
+            // 1 cycle = 2us
+            PulseCode::new(Level::High, 500 * i, Level::Low, 500 * i)
+        });
+        *expected.last_mut().unwrap() = PulseCode::end_marker();
+
+        let delay = Delay::new();
+        for i in 1..5 {
+            tx_pin.set_high();
+            delay.delay_millis(i);
+            tx_pin.set_low();
+            delay.delay_millis(i);
+        }
+
+        tx_pin.set_high();
+        delay.delay_millis(100);
+        tx_pin.set_low();
+
+        rx_transaction.wait().unwrap();
+
+        // tolerance 25 cycles == 50us
+        check_data_eq(&expected, &rx_data, 6, 25);
     }
 }
