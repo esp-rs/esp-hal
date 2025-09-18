@@ -282,7 +282,6 @@ impl Package {
                     || config.name() == "esp32c3"
                     || config.name() == "esp32s2"
                 {
-                    println!("pizda usho");
                     features.push("portable-atomic/unsafe-assume-single-core".to_owned());
                 }
             }
