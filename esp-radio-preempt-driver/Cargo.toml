@@ -10,4 +10,8 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+check-configs = [{ features = [] }]
+clippy-configs = [{ features = [] }]
+
 [dependencies]

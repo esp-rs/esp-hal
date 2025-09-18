@@ -10,6 +10,16 @@ categories    = ["embedded", "memory-management", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = { features = ["defmt"] }
+check-configs = [
+    { features = [] },
+    { features = ["defmt"] }
+]
+clippy-configs = [
+    { features = ["defmt"] },
+]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["nightly"]

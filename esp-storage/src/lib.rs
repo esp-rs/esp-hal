@@ -25,7 +25,7 @@ fn maybe_with_critical_section<R>(f: impl FnOnce() -> R) -> R {
     {
         static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
-        return LOCK.lock(f);
+        LOCK.lock(f)
     }
 
     #[cfg(not(feature = "critical-section"))]

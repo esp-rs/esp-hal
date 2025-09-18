@@ -11,6 +11,30 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 exclude = [ "api-baseline", "MIGRATING-*", "CHANGELOG.md" ]
 
+[package.metadata.espressif]
+semver_checked = true
+doc-config = { features = ["unstable", "rt"], append = [
+    { if = 'chip_has("psram")', features = ["psram"] },
+    { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
+    { if = 'chip_has("bt")', features = ["__bluetooth"] },
+] }
+check-configs = [
+    { features = [] },
+    { features = ["rt"] },
+    { features = ["unstable", "rt"] },
+    { features = ["unstable", "rt", "psram"], if = 'chip_has("psram")' },
+    { features = ["unstable", "rt", "__usb_otg"], if = 'chip_has("soc_has_usb0")' },
+    { features = ["unstable", "rt", "__bluetooth"], if = 'chip_has("bt")' },
+]
+# Prefer fewer, but more complex clippy rules. A clippy run should cover as much code as possible.
+clippy-configs = [
+    { features = ["unstable", "rt"], append = [
+        { if = 'chip_has("psram")', features = ["psram"] },
+        { if = 'chip_has("soc_has_usb0")', features = ["__usb_otg"] },
+        { if = 'chip_has("bt")', features = ["__bluetooth"] },
+    ] },
+]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6", "unstable"]

@@ -15,6 +15,21 @@ default-target = "riscv32imac-unknown-none-elf"
 features       = ["esp32c6"]
 rustdoc-args   = ["--cfg", "docsrs"]
 
+[package.metadata.espressif]
+targets_lp_core = true
+doc-config = { features = ["embedded-hal"], append = [
+    { features = ["embedded-io"], if = 'chip_has("lp_core")' },
+] }
+check-configs = [
+    { features = [] },
+    { features = ["embedded-hal"] },
+    { features = ["embedded-io"] },
+    { features = ["embedded-hal", "embedded-io"] },
+]
+clippy-configs = [
+    { features = ["embedded-hal", "embedded-io"] },
+]
+
 [lib]
 bench = false
 test  = false

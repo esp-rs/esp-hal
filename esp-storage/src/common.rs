@@ -1,8 +1,15 @@
-use core::mem::MaybeUninit;
+use core::{
+    mem::MaybeUninit,
+    sync::atomic::Ordering::{Acquire, Release},
+};
+
+use portable_atomic::AtomicBool;
 
 use crate::chip_specific;
 #[cfg(multi_core)]
 use crate::multi_core::MultiCoreStrategy;
+
+static IS_TAKEN: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -63,21 +70,30 @@ impl FlashStorage {
     pub const SECTOR_SIZE: u32 = 4096;
 
     /// Create a new flash storage instance.
-    pub fn new() -> FlashStorage {
-        let mut storage = FlashStorage {
-            capacity: 0,
-            unlocked: false,
-            #[cfg(multi_core)]
-            multi_core_strategy: MultiCoreStrategy::Error,
-        };
+    ///
+    /// # Panics
+    ///
+    /// Panics if called more than once.
+    pub fn new() -> Self {
+        if IS_TAKEN.fetch_or(true, Acquire) {
+            panic!("FlashStorage::new() called more than once!");
+        }
 
         #[cfg(not(any(feature = "esp32", feature = "esp32s2")))]
         const ADDR: u32 = 0x0000;
         #[cfg(any(feature = "esp32", feature = "esp32s2"))]
         const ADDR: u32 = 0x1000;
 
+        let mut storage = Self {
+            capacity: 0,
+            unlocked: false,
+            #[cfg(multi_core)]
+            multi_core_strategy: MultiCoreStrategy::Error,
+        };
+
         let mut buffer = crate::buffer::FlashWordBuffer::uninit();
         storage.internal_read(ADDR, buffer.as_bytes_mut()).unwrap();
+
         let buffer = unsafe { buffer.assume_init_bytes() };
         let mb = match buffer[3] & 0xf0 {
             0x00 => 1,
@@ -89,6 +105,7 @@ impl FlashStorage {
             _ => 0,
         };
         storage.capacity = mb * 1024 * 1024;
+
         storage
     }
 
@@ -169,5 +186,41 @@ impl FlashStorage {
         self.multi_core_strategy.post_write(unpark);
 
         Ok(())
+    }
+}
+
+impl Drop for FlashStorage {
+    fn drop(&mut self) {
+        IS_TAKEN.store(false, Release);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::FlashStorage;
+    #[test]
+    fn test_singleton_behavior() {
+        // First call should succeed
+        let flash1 = FlashStorage::new();
+        assert_eq!(flash1.capacity > 0, true); // or check some field
+
+        // Second call should panic
+        let result = std::panic::catch_unwind(|| {
+            FlashStorage::new();
+        });
+        assert!(result.is_err(), "expected panic on second init");
+
+        // Third call should also panic
+        let result = std::panic::catch_unwind(|| {
+            FlashStorage::new();
+        });
+        assert!(result.is_err(), "expected panic on third init");
+    }
+
+    #[test]
+    #[should_panic(expected = "FlashStorage::new() called more than once!")]
+    fn test_expect_panics() {
+        let _flash1 = FlashStorage::new(); // first call is fine
+        let _flash2 = FlashStorage::new(); // this panics
     }
 }

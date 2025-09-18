@@ -319,6 +319,7 @@ mod tests {
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_aligned_buffer() {
         let mut flash = FlashStorage::new();
+
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();
@@ -339,6 +340,7 @@ mod tests {
     #[cfg(feature = "bytewise-read")]
     fn bytewise_read_not_aligned_buffer() {
         let mut flash = FlashStorage::new();
+
         flash.capacity = 4 * 4096;
         let src = TestBuffer::seq();
         let mut data = TestBuffer::default();

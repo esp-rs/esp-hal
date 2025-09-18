@@ -10,6 +10,19 @@ categories    = ["embedded", "hardware-support", "no-std"]
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = { features = ["defmt"] }
+check-configs = [
+    { features = ["println", "esp-println/auto"] },
+    { features = ["defmt"] },
+    { features = ["defmt", "panic-handler", "custom-halt"] },
+    { features = ["defmt", "panic-handler", "halt-cores"] },
+    { features = ["defmt", "panic-handler", "semihosting"] }
+]
+clippy-configs = [
+    { features = ["panic-handler", "halt-cores", "defmt"] },
+]
+
 [package.metadata.docs.rs]
 default-target = "riscv32imc-unknown-none-elf"
 features       = ["esp32c3", "panic-handler", "exception-handler", "println", "esp-println/uart"]
@@ -60,6 +73,7 @@ print-float-registers = [] # TODO support esp32p4
 # additional functionality:
 ## Print messages in red
 colors               = []
+# TODO: these features assume panic-handler is enabled but they don't enforce it.
 ## Invoke the extern function `custom_halt()` instead of doing a loop {} in case of a panic. This feature does not imply the `halt-cores` feature.
 custom-halt          = []
 ## Invoke the extern function `custom_pre_backtrace()` before handling a panic

@@ -8,6 +8,13 @@ documentation = "https://docs.espressif.com/projects/rust/esp-metadata-generated
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["build-script"] },
+]
+clippy-configs = [] # don't waste time on this
+
 [dependencies]
 
 [build-dependencies]

@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .map(|entry| entry.file_name().to_string_lossy().to_string())
                 .collect();
 
-            if files.len() > 0 {
+            if !files.is_empty() {
                 let terminal = tui::init_terminal()?;
                 let mut chooser = tui::ConfigChooser::new(files);
                 config_file = chooser.run(terminal)?;
@@ -134,7 +134,7 @@ fn apply_config(
     previous_cfg: Vec<CrateConfig>,
     config_toml_path: &PathBuf,
 ) -> Result<(), Box<dyn Error>> {
-    let mut config = std::fs::read_to_string(&config_toml_path)?
+    let mut config = std::fs::read_to_string(config_toml_path)?
         .as_str()
         .parse::<DocumentMut>()?;
 
@@ -171,7 +171,7 @@ fn apply_config(
         }
     }
 
-    std::fs::write(&config_toml_path, config.to_string().as_bytes())?;
+    std::fs::write(config_toml_path, config.to_string().as_bytes())?;
 
     Ok(())
 }

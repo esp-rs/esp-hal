@@ -39,7 +39,7 @@ pub fn build_documentation(
 
     for package in packages {
         // Not all packages need documentation built:
-        if !package.is_published(workspace) {
+        if !package.is_published() {
             continue;
         }
 
@@ -205,9 +205,9 @@ fn cargo_doc(workspace: &Path, package: Package, chip: Option<Chip>) -> Result<P
     let mut features = vec![];
     if let Some(chip) = &chip {
         features.push(chip.to_string());
-        features.extend(package.feature_rules(Config::for_chip(chip)));
+        features.extend(package.doc_feature_rules(Config::for_chip(chip)));
     } else {
-        features.extend(package.feature_rules(&Config::empty()));
+        features.extend(package.doc_feature_rules(&Config::empty()));
     }
 
     // Build up an array of command-line arguments to pass to `cargo`:
@@ -326,7 +326,7 @@ pub fn build_documentation_index(workspace: &Path, packages: &mut [Package]) -> 
     for package in packages {
         log::debug!("Building documentation index for package '{package}'");
         // Not all packages have documentation built:
-        if !package.is_published(workspace) {
+        if !package.is_published() {
             continue;
         }
 
@@ -462,7 +462,7 @@ fn generate_documentation_meta_for_index(workspace: &Path) -> Result<Vec<Value>>
 
     for package in Package::iter() {
         // Not all packages have documentation built:
-        if !package.is_published(workspace) {
+        if !package.is_published() {
             continue;
         }
 

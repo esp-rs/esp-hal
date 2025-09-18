@@ -10,6 +10,14 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 exclude       = [ "MIGRATING-*", "CHANGELOG.md" ]
 
+[package.metadata.espressif]
+check-configs = [
+    { features = [] },
+    { features = ["log-04"] },
+    { features = ["defmt"] },
+]
+clippy-configs = [{ features = ["defmt"] }]
+
 [dependencies]
 cfg-if = "1"
 document-features = "0.2"

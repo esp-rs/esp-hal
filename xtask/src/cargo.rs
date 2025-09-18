@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context as _, Result, bail};
 use clap::ValueEnum as _;
 use serde::{Deserialize, Serialize};
-use toml_edit::{DocumentMut, Formatted, Item, Value};
+use toml_edit::{DocumentMut, Formatted, Item, Table, Value};
 
 use crate::{Package, windows_safe_path};
 
@@ -367,29 +367,19 @@ impl CargoCommandBatcher {
             }
 
             let mut command = Vec::new();
-
-            if let Some(tc) = key.toolchain.as_ref() {
-                command.push(format!("+{tc}"));
-            }
-
-            command.push("batch".to_string());
-            if !key.config_file.is_empty()
-                && let Some(config_path) = &group[0].config_path
-            {
-                // All grouped projects have the same config file content, pick one:
-                command.push("--config".to_string());
-                command.push(config_path.display().to_string());
-            }
-
+            let mut batch_len = 0;
             let mut commands_in_batch = 0;
 
-            command.extend_from_slice(&key.config);
+            // Windows be Windows, it has a command length limit.
+            let limit = if cfg!(target_os = "windows") {
+                Some(8191)
+            } else {
+                None
+            };
+
             for item in group.iter() {
-                // Only build and doc can be batched
-                let batchable = [
-                    "build", "doc",
-                    // "check" // soon(TM)
-                ];
+                // Only some commands can be batched
+                let batchable = ["build", "doc", "check"];
                 if !batchable
                     .iter()
                     .any(|&subcommand| subcommand == item.subcommand)
@@ -398,16 +388,56 @@ impl CargoCommandBatcher {
                     continue;
                 }
 
+                // Build the new command
                 let mut c = item.clone();
 
                 c.toolchain = None;
                 c.configs = Vec::new();
                 c.config_path = None;
 
+                let args = c.build();
+
+                let command_chars = 4 + args.iter().map(|arg| arg.len() + 1).sum::<usize>();
+
+                if !command.is_empty()
+                    && let Some(limit) = limit
+                    && batch_len + command_chars > limit
+                {
+                    // Command would be too long, cut here.
+                    all.push(BuiltCommand {
+                        artifact_name: String::from("batch"),
+                        command: std::mem::take(&mut command),
+                        env_vars: key.env_vars.clone(),
+                    });
+                }
+
+                // Set up head part if empty
+                if command.is_empty() {
+                    if let Some(tc) = key.toolchain.as_ref() {
+                        command.push(format!("+{tc}"));
+                    }
+
+                    command.push("batch".to_string());
+                    if !key.config_file.is_empty()
+                        && let Some(config_path) = &group[0].config_path
+                    {
+                        // All grouped projects have the same config file content, pick one:
+                        command.push("--config".to_string());
+                        command.push(config_path.display().to_string());
+                    }
+                    command.extend_from_slice(&key.config);
+
+                    commands_in_batch = 0;
+                    batch_len = command.iter().map(|s| s.len() + 1).sum::<usize>() - 1;
+                }
+
+                // Append the new command
+
                 command.push("---".to_string());
-                command.extend_from_slice(&c.build());
+                command.extend_from_slice(&args);
 
                 commands_in_batch += 1;
+                batch_len += command_chars;
             }
 
             if commands_in_batch > 0 {
@@ -484,9 +514,9 @@ impl Drop for CargoCommandBatcher {
 }
 
 /// A representation of a Cargo.toml file for a specific package.
-pub struct CargoToml<'a> {
+pub struct CargoToml {
     /// The workspace path where the Cargo.toml is located.
-    pub workspace: &'a Path,
+    pub workspace: PathBuf,
     /// The package this Cargo.toml belongs to.
     pub package: Package,
     /// The parsed Cargo.toml manifest.
@@ -496,9 +526,9 @@ pub struct CargoToml<'a> {
 const DEPENDENCY_KINDS: [&'static str; 3] =
     ["dependencies", "dev-dependencies", "build-dependencies"];
 
-impl<'a> CargoToml<'a> {
+impl CargoToml {
     /// Load and parse the Cargo.toml for the specified package in the given workspace.
-    pub fn new(workspace: &'a Path, package: Package) -> Result<Self> {
+    pub fn new(workspace: &Path, package: Package) -> Result<Self> {
         let package_path = workspace.join(package.to_string());
         let manifest_path = package_path.join("Cargo.toml");
         if !manifest_path.exists() {
@@ -514,11 +544,24 @@ impl<'a> CargoToml<'a> {
         Self::from_str(workspace, package, &manifest)
     }
 
+    pub fn espressif_metadata(&self) -> Option<&Table> {
+        let Some(package) = self.manifest.get("package") else {
+            return None;
+        };
+        let Some(metadata) = package.get("metadata") else {
+            return None;
+        };
+        let Some(espressif) = metadata.get("espressif") else {
+            return None;
+        };
+        Some(espressif.as_table()?)
+    }
+
     /// Create a `CargoToml` instance from a manifest string.
-    pub fn from_str(workspace: &'a Path, package: Package, manifest: &str) -> Result<Self> {
+    pub fn from_str(workspace: &Path, package: Package, manifest: &str) -> Result<Self> {
         // Parse the manifest string into a mutable TOML document.
         Ok(Self {
-            workspace,
+            workspace: workspace.to_path_buf(),
             package,
             manifest: manifest
                 .parse::<DocumentMut>()

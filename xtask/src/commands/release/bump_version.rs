@@ -65,7 +65,7 @@ pub fn bump_version(workspace: &Path, args: BumpVersionArgs) -> Result<()> {
 
 /// Update the specified package by bumping its version, updating its changelog,
 pub fn update_package(
-    package: &mut CargoToml<'_>,
+    package: &mut CargoToml,
     version: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
@@ -77,7 +77,7 @@ pub fn update_package(
     Ok(new_version)
 }
 
-fn check_crate_before_bumping(manifest: &mut CargoToml<'_>) -> Result<()> {
+fn check_crate_before_bumping(manifest: &mut CargoToml) -> Result<()> {
     // Collect errors into a vector to preserve order.
     let mut errors = Vec::new();
 
@@ -175,7 +175,7 @@ fn check_dependency_before_bumping(item: &Item) -> Result<()> {
 
 /// Bump the version of the specified package by the specified amount.
 fn bump_crate_version(
-    bumped_package: &mut CargoToml<'_>,
+    bumped_package: &mut CargoToml,
     amount: &VersionBump,
     dry_run: bool,
 ) -> Result<semver::Version> {
@@ -197,7 +197,7 @@ fn bump_crate_version(
 
     let package_name = bumped_package.package.to_string();
     for pkg in Package::iter() {
-        let mut dependent = CargoToml::new(bumped_package.workspace, pkg)
+        let mut dependent = CargoToml::new(&bumped_package.workspace, pkg)
             .with_context(|| format!("Could not load Cargo.toml of {pkg}"))?;
 
         if dependent.change_version_of_dependency(&package_name, &version) {
@@ -268,7 +268,7 @@ pub fn do_version_bump(version: &semver::Version, amount: &VersionBump) -> Resul
 }
 
 fn finalize_changelog(
-    bumped_package: &CargoToml<'_>,
+    bumped_package: &CargoToml,
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
@@ -306,7 +306,7 @@ fn finalize_changelog(
 }
 
 fn finalize_placeholders(
-    bumped_package: &CargoToml<'_>,
+    bumped_package: &CargoToml,
     new_version: &semver::Version,
     dry_run: bool,
 ) -> Result<()> {
@@ -405,7 +405,7 @@ mod tests {
         let mut doc = CargoToml {
             manifest: toml.parse::<DocumentMut>().unwrap(),
             package: Package::EspHal,
-            workspace: Path::new(""),
+            workspace: PathBuf::new(),
         };
         let errors = check_crate_before_bumping(&mut doc);
         pretty_assertions::assert_eq!(

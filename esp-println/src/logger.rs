@@ -52,7 +52,7 @@ impl log::Log for EspEnvLogger {
 
     #[allow(unused)]
     fn log(&self, record: &log::Record) {
-        if self.enabled(&record.metadata()) {
+        if self.enabled(record.metadata()) {
             print_log_record(record);
         }
     }
@@ -61,28 +61,26 @@ impl log::Log for EspEnvLogger {
 }
 
 fn print_log_record(record: &log::Record) {
-    const RESET: &str = "\u{001B}[0m";
-    const RED: &str = "\u{001B}[31m";
-    const GREEN: &str = "\u{001B}[32m";
-    const YELLOW: &str = "\u{001B}[33m";
-    const BLUE: &str = "\u{001B}[34m";
-    const CYAN: &str = "\u{001B}[35m";
+    let (color, reset) = if cfg!(feature = "colors") {
+        const RESET: &str = "\u{001B}[0m";
+        const RED: &str = "\u{001B}[31m";
+        const GREEN: &str = "\u{001B}[32m";
+        const YELLOW: &str = "\u{001B}[33m";
+        const BLUE: &str = "\u{001B}[34m";
+        const CYAN: &str = "\u{001B}[35m";
 
-    #[cfg(feature = "colors")]
-    let color = match record.level() {
-        log::Level::Error => RED,
-        log::Level::Warn => YELLOW,
-        log::Level::Info => GREEN,
-        log::Level::Debug => BLUE,
-        log::Level::Trace => CYAN,
+        let color = match record.level() {
+            log::Level::Error => RED,
+            log::Level::Warn => YELLOW,
+            log::Level::Info => GREEN,
+            log::Level::Debug => BLUE,
+            log::Level::Trace => CYAN,
+        };
+        let reset = RESET;
+        (color, reset)
+    } else {
+        ("", "")
     };
-    #[cfg(feature = "colors")]
-    let reset = RESET;
-
-    #[cfg(not(feature = "colors"))]
-    let color = "";
-    #[cfg(not(feature = "colors"))]
-    let reset = "";
 
     #[cfg(feature = "timestamp")]
     println!(

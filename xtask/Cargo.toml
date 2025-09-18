@@ -16,12 +16,14 @@ kuchikiki    = { version = "0.8.2", optional = true }
 log          = "0.4.22"
 minijinja    = { version = "2.5.0", default-features = false }
 opener       = { version = "0.7.2", optional = true }
+parking_lot  = "0.12.3"
 prettyplease = { version = "0.2.34" }
 regex        = { version = "1.11.1", optional = true }
 rocket       = { version = "0.5.1", optional = true }
 semver       = { version = "1.0.23", features = ["serde"] }
 serde        = { version = "1.0.215", default-features = false, features = ["derive"] }
 serde_json   = "1.0.70"
+somni-expr   = { version = "0.1.0" }
 strum        = { version = "0.27.1", features = ["derive"] }
 syn          = { version = "2", default-features = false, features = ["full", "parsing"] }
 toml_edit    = { version = "0.22.22", features = ["serde"] }
