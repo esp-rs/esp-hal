@@ -9,7 +9,7 @@ use strum::IntoEnumIterator;
 pub use self::{build::*, check_changelog::*, release::*, run::*};
 use crate::{
     Package,
-    cargo::{CargoAction, CargoCommandBadger},
+    cargo::{CargoAction, CargoCommandBatcher},
 };
 mod build;
 mod check_changelog;
@@ -244,7 +244,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         std::fs::create_dir_all(&tmp_dir).unwrap();
     }
 
-    let mut commands = CargoCommandBadger::new();
+    let mut commands = CargoCommandBatcher::new();
     // Execute the specified action:
     if tests.iter().any(|test| test.matches(test_arg.as_deref())) {
         for test in tests

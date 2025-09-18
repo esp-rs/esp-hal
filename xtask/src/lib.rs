@@ -9,7 +9,7 @@ use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    cargo::{CargoArgsBuilder, CargoCommandBadger, CargoToml},
+    cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
     firmware::Metadata,
 };
 
@@ -481,7 +481,7 @@ pub fn execute_app(
         extra_args,
     )?;
 
-    let command = CargoCommandBadger::build_one_for_cargo(&builder);
+    let command = CargoCommandBatcher::build_one_for_cargo(&builder);
 
     command.run(false)?;
 

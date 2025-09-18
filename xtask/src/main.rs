@@ -6,7 +6,7 @@ use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
     Package,
-    cargo::{CargoAction, CargoArgsBuilder, CargoCommandBadger},
+    cargo::{CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::*,
     update_metadata,
 };
@@ -256,7 +256,7 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    let mut commands = CargoCommandBadger::new();
+    let mut commands = CargoCommandBatcher::new();
 
     for package in packages.iter().filter(|p| p.is_published(workspace)) {
         // Unfortunately each package has its own unique requirements for

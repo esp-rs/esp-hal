@@ -8,7 +8,7 @@ use strum::IntoEnumIterator as _;
 use super::{ExamplesArgs, TestsArgs};
 use crate::{
     Package,
-    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBadger},
+    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::move_artifacts,
     firmware::Metadata,
 };
@@ -146,7 +146,7 @@ pub fn build_examples(
     // Attempt to build each supported example, with all required features enabled:
 
     let action = CargoAction::Build(out_path.map(|p| p.to_path_buf()));
-    let mut commands = CargoCommandBadger::new();
+    let mut commands = CargoCommandBatcher::new();
     // Build command list
     for example in examples.iter() {
         let command = crate::generate_build_command(

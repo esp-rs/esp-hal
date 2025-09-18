@@ -325,7 +325,7 @@ impl BatchKey {
 }
 
 #[derive(Debug)]
-pub struct CargoCommandBadger {
+pub struct CargoCommandBatcher {
     commands: HashMap<BatchKey, Vec<CargoArgsBuilder>>,
 }
 
@@ -344,7 +344,7 @@ impl BuiltCommand {
     }
 }
 
-impl CargoCommandBadger {
+impl CargoCommandBatcher {
     pub fn new() -> Self {
         Self {
             commands: HashMap::new(),
@@ -479,7 +479,7 @@ impl CargoCommandBadger {
     }
 }
 
-impl Drop for CargoCommandBadger {
+impl Drop for CargoCommandBatcher {
     fn drop(&mut self) {}
 }
 
