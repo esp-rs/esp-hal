@@ -10,7 +10,7 @@ use esp_backtrace as _;
 use esp_bootloader_esp_idf::partitions;
 use esp_hal::main;
 use esp_println::println;
-use esp_storage::{FlashSingleton, FlashStorage};
+use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -19,7 +19,7 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let _ = esp_hal::init(esp_hal::Config::default());
 
-    let mut storage = FlashStorage::new().expect("FlashStorage already in use!");
+    let mut flash = FlashStorage::new();
     println!("Flash size = {}", flash.capacity());
 
     let mut pt_mem = [0u8; partitions::PARTITION_TABLE_MAX_LEN];

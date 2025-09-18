@@ -70,6 +70,10 @@ impl FlashStorage {
     pub const SECTOR_SIZE: u32 = 4096;
 
     /// Create a new flash storage instance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called more than once.
     pub fn new() -> Self {
         if IS_TAKEN.fetch_or(true, Acquire) {
             panic!("FlashStorage::new() called more than once!");
@@ -197,8 +201,8 @@ mod tests {
     #[test]
     fn test_singleton_behavior() {
         // First call should succeed
-        let token1 = FlashStorage::new();
-        assert_eq!(token1.capacity > 0, true); // or check some field
+        let flash1 = FlashStorage::new();
+        assert_eq!(flash1.capacity > 0, true); // or check some field
 
         // Second call should panic
         let result = std::panic::catch_unwind(|| {
@@ -216,7 +220,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "FlashStorage::new() called more than once!")]
     fn test_expect_panics() {
-        let _token1 = FlashStorage::new(); // first call is fine
-        let _token2 = FlashStorage::new(); // this panics
+        let _flash1 = FlashStorage::new(); // first call is fine
+        let _flash2 = FlashStorage::new(); // this panics
     }
 }

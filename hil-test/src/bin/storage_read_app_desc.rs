@@ -9,7 +9,7 @@
 
 use embedded_storage::ReadStorage;
 use esp_bootloader_esp_idf::EspAppDesc;
-use esp_storage::{FlashSingleton, FlashStorage};
+use esp_storage::FlashStorage;
 use hil_test as _;
 
 #[embedded_test::tests(default_timeout = 3)]
@@ -22,7 +22,7 @@ mod tests {
 
         let mut bytes = [0u8; 256];
 
-        let mut storage = FlashStorage::new().expect("FlashStorage already in use!");
+        let mut flash = FlashStorage::new();
 
         // esp-idf 2nd stage bootloader would expect the app-descriptor at the start of
         // DROM it also expects DROM segment to the the first page of the
