@@ -1,0 +1,14 @@
+crate: esp-alloc
+
+options:
+  - name: heap_algorithm
+    description: "The heap algorithm to use. TLSF offers higher performance
+      and bounded allocation time, but uses more memory."
+    default:
+      - value: '"TLSF"'
+    constraints:
+      - type:
+          validator: enumeration
+          value:
+            - "LLFF"
+            - "TLSF"

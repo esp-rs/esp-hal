@@ -151,10 +151,10 @@ impl<Tm: TouchMode, Dm: DriverMode> Touch<'_, Tm, Dm> {
 
         // Default nr of sleep cycles from IDF
         let mut sleep_cyc = 0x1000;
-        if let Some(config) = config {
-            if let Some(slp) = config.sleep_cycles {
-                sleep_cyc = slp;
-            }
+        if let Some(config) = config
+            && let Some(slp) = config.sleep_cycles
+        {
+            sleep_cyc = slp;
         }
 
         Self::initialize_common(config);
@@ -201,10 +201,10 @@ impl<'d> Touch<'d, OneShot, Blocking> {
 
         // Default nr of sleep cycles from IDF
         let mut sleep_cyc = 0x1000;
-        if let Some(config) = config {
-            if let Some(slp) = config.sleep_cycles {
-                sleep_cyc = slp;
-            }
+        if let Some(config) = config
+            && let Some(slp) = config.sleep_cycles
+        {
+            sleep_cyc = slp;
         }
 
         Self::initialize_common(config);

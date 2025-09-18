@@ -50,6 +50,14 @@ impl RestoreState {
         Self(inner, PhantomData)
     }
 
+    /// Returns an invalid RestoreState.
+    ///
+    /// Note that due to the safety contract of [`RawLock::enter`]/[`RawLock::exit`], you must not
+    /// pass a `RestoreState` obtained from this method to [`RawLock::exit`].
+    pub const fn invalid() -> Self {
+        Self(0, PhantomData)
+    }
+
     fn mark_reentry(&mut self) {
         self.0 |= Self::REENTRY_FLAG;
     }

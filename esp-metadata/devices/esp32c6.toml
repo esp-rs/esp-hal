@@ -110,6 +110,7 @@ symbols = [
     "plic",
     "phy",
     "lp_core",
+    "swd",
 
     # ROM capabilities
     "rom_crc_le",
@@ -461,6 +462,7 @@ status_registers = 3
 support_status = "partial"
 ram_start = 0x60006400
 channel_ram_size = 48
+channels = ["Tx", "Tx", "Rx", "Rx"]
 
 [device.rsa]
 support_status = "partial"

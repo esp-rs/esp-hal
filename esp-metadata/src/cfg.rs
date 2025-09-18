@@ -1,6 +1,7 @@
 pub(crate) mod aes;
 pub(crate) mod gpio;
 pub(crate) mod i2c_master;
+pub(crate) mod rmt;
 pub(crate) mod rsa;
 pub(crate) mod sha;
 pub(crate) mod soc;
@@ -11,6 +12,7 @@ pub(crate) mod uart;
 pub(crate) use aes::*;
 pub(crate) use gpio::*;
 pub(crate) use i2c_master::*;
+pub(crate) use rmt::*;
 pub(crate) use sha::*;
 pub(crate) use spi_master::*;
 pub(crate) use spi_slave::*;
@@ -474,6 +476,7 @@ driver_configs![
         properties: {
             ram_start: u32,
             channel_ram_size: u32,
+            channels: RmtChannelConfig,
         }
     },
     RngProperties {

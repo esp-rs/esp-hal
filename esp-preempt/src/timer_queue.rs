@@ -250,6 +250,10 @@ impl Timer {
         q.enqueue(self);
     }
 
+    fn is_active(&self, q: &mut TimerQueueInner) -> bool {
+        self.properties(q).is_active
+    }
+
     fn disarm(&self, q: &mut TimerQueueInner) {
         self.properties(q).is_active = false;
 
@@ -312,6 +316,12 @@ impl TimerImplementation for Timer {
         );
         let timer = unsafe { Timer::from_ptr(timer) };
         TIMER_QUEUE.inner.with(|q| timer.arm(q, timeout, periodic))
+    }
+
+    unsafe fn is_active(timer: TimerPtr) -> bool {
+        debug!("Checking if timer {:?} is active", timer);
+        let timer = unsafe { Timer::from_ptr(timer) };
+        TIMER_QUEUE.inner.with(|q| timer.is_active(q))
     }
 
     unsafe fn disarm(timer: TimerPtr) {

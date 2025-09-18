@@ -16,7 +16,7 @@ pub(crate) static mut ISR_INTERRUPT_7: (*mut c_void, *mut c_void) =
 // keep them aligned with BT_CONTROLLER_INIT_CONFIG_DEFAULT in ESP-IDF
 // ideally _some_ of these values should be configurable
 pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_config_t {
-    config_version: 0x20231124,
+    config_version: 0x20250310,
     ble_ll_resolv_list_size: 4,
     ble_hci_evt_hi_buf_count: 30,
     ble_hci_evt_lo_buf_count: 8,
@@ -67,6 +67,11 @@ pub(crate) static BLE_CONFIG: esp_bt_controller_config_t = esp_bt_controller_con
     version_num: 0, // chips revision: EFUSE.blk0_rdata5.rd_wafer_version_minor
     ignore_wl_for_direct_adv: 0,
     csa2_select: 0,
+    ble_aa_check: 0,
+    ble_llcp_disc_flag: 0, /* (BT_CTRL_BLE_LLCP_CONN_UPDATE | BT_CTRL_BLE_LLCP_CHAN_MAP_UPDATE |
+                            * BT_CTRL_BLE_LLCP_PHY_UPDATE */
+    scan_backoff_upperlimitmax: 256,
+    vhci_enabled: 0,
     config_magic: 0x5A5AA5A5,
 };
 
@@ -126,4 +131,11 @@ pub(super) unsafe extern "C" fn esp_reset_rpa_moudle() {
     // controller.
     let mut bt = unsafe { BT::steal() };
     bt.reset_rpa();
+}
+
+// Provide the symbol for < eco4 to make the linker happy
+#[unsafe(no_mangle)]
+unsafe fn g_ble_lll_rfmgmt_env_p() -> *mut esp_wifi_sys::c_types::c_void {
+    // prevent "undefined symbol: g_ble_lll_rfmgmt_env_p" for ESP32-C2 < eco4
+    unreachable!()
 }

@@ -16,7 +16,7 @@ esp_bootloader_esp_idf::esp_app_desc!();
 #[embassy_executor::task]
 async fn run() {
     loop {
-        esp_println::println!("Hello world from embassy using esp-hal-async!");
+        esp_println::println!("Hello world from embassy!");
         Timer::after(Duration::from_millis(1_000)).await;
     }
 }

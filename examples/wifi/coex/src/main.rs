@@ -99,7 +99,7 @@ fn main() -> ! {
     println!("started advertising");
 
     let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI).unwrap();
+        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
 
     let mut device = interfaces.sta;
     let iface = create_interface(&mut device);

@@ -78,82 +78,150 @@ fn hal_main(a0: usize, a1: usize, a2: usize) -> ! {
     }
 }
 
-#[cfg(xtensa)]
-#[cfg(feature = "rt")]
-#[unsafe(no_mangle)]
-#[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
-unsafe extern "C" fn ESP32Reset() -> ! {
-    unsafe {
-        configure_cpu_caches();
-    }
+#[cfg(all(xtensa, feature = "rt"))]
+mod xtensa {
+    use core::arch::{global_asm, naked_asm};
 
     /// The ESP32 has a first stage bootloader that handles loading program data
     /// into the right place therefore we skip loading it again. This function
     /// is called by xtensa-lx-rt in Reset.
-    #[doc(hidden)]
-    #[unsafe(no_mangle)]
-    pub extern "Rust" fn __init_data() -> bool {
+    #[unsafe(export_name = "__init_data")]
+    extern "C" fn __init_data() -> bool {
         false
     }
 
-    // These symbols come from `memory.x`
+    extern "C" fn __init_persistent() -> bool {
+        matches!(
+            crate::system::reset_reason(),
+            None | Some(crate::rtc_cntl::SocResetReason::ChipPowerOn)
+        )
+    }
+
     unsafe extern "C" {
-        static mut _rtc_fast_bss_start: u32;
-        static mut _rtc_fast_bss_end: u32;
-        static mut _rtc_fast_persistent_start: u32;
-        static mut _rtc_fast_persistent_end: u32;
+        static _rtc_fast_bss_start: u32;
+        static _rtc_fast_bss_end: u32;
+        static _rtc_fast_persistent_end: u32;
+        static _rtc_fast_persistent_start: u32;
 
-        static mut _rtc_slow_bss_start: u32;
-        static mut _rtc_slow_bss_end: u32;
-        static mut _rtc_slow_persistent_start: u32;
-        static mut _rtc_slow_persistent_end: u32;
+        static _rtc_slow_bss_start: u32;
+        static _rtc_slow_bss_end: u32;
+        static _rtc_slow_persistent_end: u32;
+        static _rtc_slow_persistent_start: u32;
 
-        static mut _stack_start_cpu0: u32;
+        fn _xtensa_lx_rt_zero_fill(s: *mut u32, e: *mut u32);
 
         static mut __stack_chk_guard: u32;
     }
 
-    // set stack pointer to end of memory: no need to retain stack up to this point
-    unsafe {
-        xtensa_lx::set_stack_pointer(core::ptr::addr_of_mut!(_stack_start_cpu0));
+    global_asm!(
+        "
+        .literal sym_init_persistent, {__init_persistent}
+        .literal sym_xtensa_lx_rt_zero_fill, {_xtensa_lx_rt_zero_fill}
+
+        .literal sym_rtc_fast_bss_start, {_rtc_fast_bss_start}
+        .literal sym_rtc_fast_bss_end, {_rtc_fast_bss_end}
+        .literal sym_rtc_fast_persistent_end, {_rtc_fast_persistent_end}
+        .literal sym_rtc_fast_persistent_start, {_rtc_fast_persistent_start}
+
+        .literal sym_rtc_slow_bss_start, {_rtc_slow_bss_start}
+        .literal sym_rtc_slow_bss_end, {_rtc_slow_bss_end}
+        .literal sym_rtc_slow_persistent_end, {_rtc_slow_persistent_end}
+        .literal sym_rtc_slow_persistent_start, {_rtc_slow_persistent_start}
+        ",
+        __init_persistent = sym __init_persistent,
+        _xtensa_lx_rt_zero_fill = sym _xtensa_lx_rt_zero_fill,
+
+        _rtc_fast_bss_end = sym _rtc_fast_bss_end,
+        _rtc_fast_bss_start = sym _rtc_fast_bss_start,
+        _rtc_fast_persistent_end = sym _rtc_fast_persistent_end,
+        _rtc_fast_persistent_start = sym _rtc_fast_persistent_start,
+
+        _rtc_slow_bss_end = sym _rtc_slow_bss_end,
+        _rtc_slow_bss_start = sym _rtc_slow_bss_start,
+        _rtc_slow_persistent_end = sym _rtc_slow_persistent_end,
+        _rtc_slow_persistent_start = sym _rtc_slow_persistent_start,
+    );
+
+    #[unsafe(export_name = "__post_init")]
+    #[unsafe(naked)]
+    #[allow(named_asm_labels)]
+    extern "C" fn post_init() {
+        naked_asm!(
+            "
+            entry a1, 0
+
+            l32r   a6, sym_xtensa_lx_rt_zero_fill      // Pre-load address of zero-fill function
+
+            l32r   a10, sym_rtc_fast_bss_start         // Set input range to .rtc_fast.bss
+            l32r   a11, sym_rtc_fast_bss_end           //
+            callx8 a6                                  // Zero-fill
+
+            l32r   a10, sym_rtc_slow_bss_start         // Set input range to .rtc_slow.bss
+            l32r   a11, sym_rtc_slow_bss_end           //
+            callx8 a6                                  // Zero-fill
+
+            l32r   a5,  sym_init_persistent            // Do we need to initialize persistent data?
+            callx8 a5
+            beqz   a10, .Lpost_init_return             // If not, skip initialization
+
+            l32r   a10, sym_rtc_fast_persistent_start  // Set input range to .rtc_fast.persistent
+            l32r   a11, sym_rtc_fast_persistent_end    //
+            callx8 a6                                  // Zero-fill
+
+            l32r   a10, sym_rtc_slow_persistent_start  // Set input range to .rtc_slow.persistent
+            l32r   a11, sym_rtc_slow_persistent_end    //
+            callx8 a6                                  // Zero-fill
+
+        .Lpost_init_return:
+            retw.n
+        ",
+        )
     }
 
-    // copying data from flash to various data segments is done by the bootloader
-    // initialization to zero needs to be done by the application
+    #[cfg(esp32s3)]
+    global_asm!(".section .rwtext,\"ax\",@progbits");
+    global_asm!(
+        "
+        .literal sym_stack_chk_guard, {__stack_chk_guard}
+        .literal stack_guard_value, {stack_guard_value}
+        ",
+        __stack_chk_guard = sym __stack_chk_guard,
+        stack_guard_value = const esp_config::esp_config_int!(
+            u32,
+            "ESP_HAL_CONFIG_STACK_GUARD_VALUE"
+        )
+    );
 
-    // Initialize RTC RAM
-    unsafe {
-        xtensa_lx_rt::zero_bss(
-            core::ptr::addr_of_mut!(_rtc_fast_bss_start),
-            core::ptr::addr_of_mut!(_rtc_fast_bss_end),
-        );
-        xtensa_lx_rt::zero_bss(
-            core::ptr::addr_of_mut!(_rtc_slow_bss_start),
-            core::ptr::addr_of_mut!(_rtc_slow_bss_end),
-        );
-    }
-    if matches!(
-        crate::system::reset_reason(),
-        None | Some(crate::rtc_cntl::SocResetReason::ChipPowerOn)
-    ) {
-        unsafe {
-            xtensa_lx_rt::zero_bss(
-                core::ptr::addr_of_mut!(_rtc_fast_persistent_start),
-                core::ptr::addr_of_mut!(_rtc_fast_persistent_end),
-            );
-            xtensa_lx_rt::zero_bss(
-                core::ptr::addr_of_mut!(_rtc_slow_persistent_start),
-                core::ptr::addr_of_mut!(_rtc_slow_persistent_end),
-            );
+    #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
+    #[unsafe(export_name = "__pre_init")]
+    #[unsafe(naked)]
+    unsafe extern "C" fn esp32_reset() {
+        // Set up stack protector value before jumping to a rust function
+        naked_asm! {
+            "
+            entry a1, 0x20
+
+            // Set up the stack protector value
+            l32r   a2, sym_stack_chk_guard
+            l32r   a3, stack_guard_value
+            s32i.n a3, a2, 0
+
+            call8 {esp32_init}
+
+            retw.n
+            ",
+            esp32_init = sym esp32_init
         }
     }
 
-    setup_stack_guard();
+    #[cfg_attr(esp32s3, unsafe(link_section = ".rwtext"))]
+    fn esp32_init() {
+        unsafe {
+            super::configure_cpu_caches();
+        }
 
-    crate::interrupt::setup_interrupts();
-
-    // continue with default reset handler
-    unsafe { xtensa_lx_rt::Reset() }
+        crate::interrupt::setup_interrupts();
+    }
 }
 
 #[cfg(feature = "rt")]
@@ -162,7 +230,7 @@ unsafe extern "C" fn stack_chk_fail() {
     panic!("Stack corruption detected");
 }
 
-#[cfg(feature = "rt")]
+#[cfg(all(feature = "rt", riscv))]
 fn setup_stack_guard() {
     unsafe extern "C" {
         static mut __stack_chk_guard: u32;

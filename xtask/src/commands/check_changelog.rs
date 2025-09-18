@@ -4,6 +4,8 @@ use anyhow::{Context, Result, bail};
 
 use crate::{Package, changelog::Changelog};
 
+/// Check the changelogs for the specified packages. If `normalize` is true, rewrite
+/// the changelogs in a normalized format.
 pub fn check_changelog(workspace: &Path, packages: &[Package], normalize: bool) -> Result<()> {
     let mut failed = false;
     for package in packages {
@@ -38,7 +40,12 @@ fn check_changelog_for_package(workspace: &Path, package: Package, normalize: bo
         .with_context(|| format!("Could not parse {}", changelog_path.display()))?;
 
     if normalize {
-        std::fs::write(&changelog_path, changelog.to_string())?;
+        std::fs::write(&changelog_path, changelog.to_string()).with_context(|| {
+            format!(
+                "Failed to write changelog into {}",
+                changelog_path.display()
+            )
+        })?;
     }
 
     Ok(())

@@ -881,11 +881,46 @@ impl<'d> I2s<'d, Blocking> {
     }
 }
 
+#[cfg(esp32)]
+mod esp32 {
+    use super::*;
+    use crate::gpio::OutputSignal;
+
+    /// Pins that can be used as clock outputs.
+    pub trait ClkPin<'d>: PeripheralOutput<'d> {
+        #[doc(hidden)]
+        fn signal(&self) -> OutputSignal;
+    }
+
+    // TODO: implementations should be generated. This is the same problem as SDIO pins -
+    // alternate function without GPIO matrix option. S2 and S3 also have the CLK_OUTn functions,
+    // although they don't seem to need the same mechanism.
+    impl<'d> ClkPin<'d> for crate::peripherals::GPIO0<'d> {
+        fn signal(&self) -> OutputSignal {
+            OutputSignal::CLK_OUT1
+        }
+    }
+    impl<'d> ClkPin<'d> for crate::peripherals::GPIO1<'d> {
+        fn signal(&self) -> OutputSignal {
+            OutputSignal::CLK_OUT3
+        }
+    }
+    impl<'d> ClkPin<'d> for crate::peripherals::GPIO3<'d> {
+        fn signal(&self) -> OutputSignal {
+            OutputSignal::CLK_OUT2
+        }
+    }
+}
+
+#[cfg(esp32)]
+pub use esp32::ClkPin;
+
 impl<'d, Dm> I2s<'d, Dm>
 where
     Dm: DriverMode,
 {
     /// Configures the I2S peripheral to use a master clock (MCLK) output pin.
+    #[cfg(not(esp32))]
     pub fn with_mclk(self, mclk: impl PeripheralOutput<'d>) -> Self {
         let mclk = mclk.into();
 
@@ -893,6 +928,47 @@ where
         mclk.set_output_enable(true);
 
         self.i2s_tx.i2s.mclk_signal().connect_to(&mclk);
+
+        self
+    }
+
+    /// Configures the I2S peripheral to output its clock to a pin.
+    #[cfg(esp32)]
+    pub fn with_mclk(self, mclk: impl ClkPin<'d>) -> Self {
+        use crate::{gpio::OutputSignal, peripherals::IO_MUX};
+
+        let clk_signal = mclk.signal();
+
+        let mclk = mclk.into();
+
+        mclk.apply_output_config(&OutputConfig::default());
+        mclk.set_output_enable(true);
+
+        // We need to do two things:
+        // - Configure the IO_MUX_PIN_CTRL register
+        // - Select the correct pin function
+
+        let selector = match self.i2s_rx.i2s.0 {
+            super::any::Inner::I2s0(_) => 0x0,
+            super::any::Inner::I2s1(_) => 0xF,
+        };
+
+        // Route the appropriate I2S clock output to the selected signal.
+        IO_MUX::regs().pin_ctrl().modify(|_, w| unsafe {
+            match clk_signal {
+                OutputSignal::CLK_OUT1 => w.clk1().bits(selector),
+                OutputSignal::CLK_OUT2 => w.clk2().bits(selector),
+                OutputSignal::CLK_OUT3 => w.clk3().bits(selector),
+                _ => unreachable!(),
+            }
+        });
+
+        // Connect the clock signal to the selected pin.
+        clk_signal.connect_to(&mclk);
+
+        // I think it's okay to leave the configuration untouched when dropping the driver. We'll
+        // gate the clock source, which should also stop the clock output. Reusing the pins will
+        // remove the output signal assignment.
 
         self
     }
@@ -1356,6 +1432,7 @@ mod private {
     }
 
     pub trait Signals: RegBlock {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal;
         fn bclk_signal(&self) -> OutputSignal;
         fn ws_signal(&self) -> OutputSignal;
@@ -2110,11 +2187,10 @@ mod private {
     impl RegisterAccessPrivate for I2S0<'_> {}
 
     impl Signals for crate::peripherals::I2S0<'_> {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal {
             cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    panic!("MCLK currently not supported on ESP32");
-                } else if #[cfg(esp32s2)] {
+                if #[cfg(esp32s2)] {
                     OutputSignal::CLK_I2S
                 } else if #[cfg(esp32s3)] {
                     OutputSignal::I2S0_MCLK
@@ -2209,14 +2285,9 @@ mod private {
 
     #[cfg(soc_has_i2s1)]
     impl Signals for crate::peripherals::I2S1<'_> {
+        #[cfg(not(esp32))] // MCLK on ESP32 requires special handling
         fn mclk_signal(&self) -> OutputSignal {
-            cfg_if::cfg_if! {
-                if #[cfg(esp32)] {
-                    panic!("MCLK currently not supported on ESP32");
-                } else {
-                    OutputSignal::I2S1_MCLK
-                }
-            }
+            OutputSignal::I2S1_MCLK
         }
 
         fn bclk_signal(&self) -> OutputSignal {
@@ -2309,6 +2380,7 @@ mod private {
                 #[cfg(soc_has_i2s1)]
                 AnyI2sInner::I2s1(i2s) => i2s,
             } {
+                #[cfg(not(esp32))]
                 fn mclk_signal(&self) -> OutputSignal;
                 fn bclk_signal(&self) -> OutputSignal;
                 fn ws_signal(&self) -> OutputSignal;
