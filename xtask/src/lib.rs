@@ -211,6 +211,7 @@ impl Package {
         eval_context.add_function("chip_has", |symbol: &str| {
             config.all().iter().any(|sym| sym == symbol)
         });
+        eval_context.add_variable("chip", config.name());
 
         if let Some(condition) = table.get("if") {
             let Some(expr) = condition.as_str() else {
