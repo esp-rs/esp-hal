@@ -5,8 +5,20 @@ rustflags = [
   "-C", "force-frame-pointers",
 ]
 
+[target.'cfg(target_arch = "xtensa")']
+runner    = "espflash flash --monitor"
+rustflags = [
+  # GNU LD
+  "-C", "link-arg=-Wl,-Tlinkall.x",
+  "-C", "link-arg=-nostartfiles",
+
+  # LLD
+  # "-C", "link-arg=-Tlinkall.x",
+  # "-C", "linker=rust-lld",
+]
+
 [env]
 ESP_LOG = "info"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]

@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    time::Instant,
-};
+use std::{path::Path, time::Instant};
 
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser};
@@ -10,7 +6,7 @@ use esp_metadata::{Chip, Config};
 use strum::IntoEnumIterator;
 use xtask::{
     Package,
-    cargo::{CargoAction, CargoArgsBuilder},
+    cargo::{CargoAction, CargoArgsBuilder, CargoCommandBatcher},
     commands::*,
     update_metadata,
 };
@@ -37,6 +33,8 @@ enum Cli {
     FmtPackages(FmtPackagesArgs),
     /// Run cargo clean
     Clean(CleanArgs),
+    /// Check all packages in the workspace with cargo check
+    CheckPackages(CheckPackagesArgs),
     /// Lint all packages in the workspace with clippy
     LintPackages(LintPackagesArgs),
     /// Semver Checks
@@ -58,6 +56,14 @@ struct CiArgs {
     /// The toolchain used to run the lints
     #[arg(long)]
     toolchain: Option<String>,
+
+    /// Whether to skip running lints
+    #[arg(long)]
+    no_lint: bool,
+
+    /// Whether to skip building documentation
+    #[arg(long)]
+    no_docs: bool,
 }
 
 #[derive(Debug, Args)]
@@ -83,6 +89,21 @@ struct HostTestsArgs {
     /// Package(s) to target.
     #[arg(value_enum, default_values_t = Package::iter())]
     packages: Vec<Package>,
+}
+
+#[derive(Debug, Args)]
+struct CheckPackagesArgs {
+    /// Package(s) to target.
+    #[arg(value_enum, default_values_t = Package::iter())]
+    packages: Vec<Package>,
+
+    /// Check for a specific chip
+    #[arg(long, value_enum, value_delimiter = ',', default_values_t = Chip::iter())]
+    chips: Vec<Chip>,
+
+    /// The toolchain used to run the checks
+    #[arg(long)]
+    toolchain: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -133,7 +154,11 @@ fn main() -> Result<()> {
 
     let workspace =
         std::env::current_dir().with_context(|| format!("Failed to get the current dir!"))?;
-    let target_path = Path::new("target");
+    let target_path = workspace.join("target");
+
+    if std::env::var("CARGO_TARGET_DIR").is_err() {
+        unsafe { std::env::set_var("CARGO_TARGET_DIR", target_path.to_str().unwrap()) };
+    }
 
     match Cli::parse() {
         // Build-related subcommands:
@@ -141,11 +166,7 @@ fn main() -> Result<()> {
             Build::Documentation(args) => build_documentation(&workspace, args),
             #[cfg(feature = "deploy-docs")]
             Build::DocumentationIndex => build_documentation_index(&workspace),
-            Build::Examples(args) => examples(
-                &workspace,
-                args,
-                CargoAction::Build(Some(target_path.join("examples"))),
-            ),
+            Build::Examples(args) => examples(&workspace, args, CargoAction::Build(None)),
             Build::Package(args) => build_package(&workspace, args),
             Build::Tests(args) => tests(
                 &workspace,
@@ -182,6 +203,7 @@ fn main() -> Result<()> {
         Cli::Ci(args) => run_ci_checks(&workspace, args),
         Cli::FmtPackages(args) => fmt_packages(&workspace, args),
         Cli::Clean(args) => clean(&workspace, args),
+        Cli::CheckPackages(args) => check_packages(&workspace, args),
         Cli::LintPackages(args) => lint_packages(&workspace, args),
         Cli::SemverCheck(args) => semver_checks(&workspace, args),
         Cli::CheckChangelog(args) => check_changelog(&workspace, &args.packages, args.normalize),
@@ -212,7 +234,11 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
         log::info!("Cleaning package: {}", package);
         let path = workspace.join(package.to_string());
 
-        let cargo_args = CargoArgsBuilder::default().subcommand("clean").build();
+        let cargo_args = CargoArgsBuilder::default()
+            .subcommand("clean")
+            .arg("--target-dir")
+            .arg(path.join("target").display().to_string())
+            .build();
 
         xtask::cargo::run(&cargo_args, &path).with_context(|| {
             format!(
@@ -223,6 +249,103 @@ fn clean(workspace: &Path, args: CleanArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
+    log::debug!("Checking packages: {:?}", args.packages);
+    let mut packages = args.packages;
+    packages.sort();
+
+    let mut commands = CargoCommandBatcher::new();
+
+    for package in packages.iter().filter(|p| p.is_published(workspace)) {
+        // Unfortunately each package has its own unique requirements for
+        // building, so we need to handle each individually (though there
+        // is *some* overlap)
+        for chip in &args.chips {
+            log::debug!("  for chip: {}", chip);
+            let device = Config::for_chip(chip);
+
+            if package.validate_package_chip(chip).is_err() {
+                continue;
+            }
+
+            for mut features in package.check_feature_rules(device) {
+                if package.has_chip_features() {
+                    features.push(device.name())
+                }
+
+                commands.push(build_check_package_command(
+                    workspace,
+                    *package,
+                    chip,
+                    &["--no-default-features"],
+                    &features,
+                    args.toolchain.as_deref(),
+                )?);
+            }
+        }
+    }
+
+    for c in commands.build(false) {
+        println!(
+            "Command: cargo {}",
+            c.command.join(" ").replace("---", "\n    ---")
+        );
+        c.run(false)?;
+    }
+
+    Ok(())
+}
+
+fn build_check_package_command(
+    workspace: &Path,
+    package: Package,
+    chip: &Chip,
+    args: &[&str],
+    features: &[String],
+    mut toolchain: Option<&str>,
+) -> Result<CargoArgsBuilder> {
+    log::info!(
+        "Linting package: {} ({}, features: {:?})",
+        package,
+        chip,
+        features
+    );
+
+    let path = workspace.join(package.to_string());
+
+    let mut builder = CargoArgsBuilder::default()
+        .subcommand("check")
+        .manifest_path(path.join("Cargo.toml"));
+
+    if !package.build_on_host(features) {
+        if chip.is_xtensa() {
+            // In case the user doesn't specify a toolchain, make sure we use +esp
+            toolchain.get_or_insert("esp");
+        }
+        builder = builder.target(package.target_triple(chip)?);
+    }
+
+    if let Some(toolchain) = toolchain {
+        if !package.build_on_host(features) && toolchain.starts_with("esp") {
+            builder = builder.config("-Zbuild-std=core,alloc");
+        }
+        builder = builder.toolchain(toolchain);
+    }
+
+    builder = builder.args(&args);
+
+    if !features.is_empty() {
+        builder = builder.arg(format!("--features={}", features.join(",")));
+    }
+
+    // TODO: these should come from the outside
+    builder.add_env_var("CI", "1");
+    builder.add_env_var("DEFMT_LOG", "trace");
+    builder.add_env_var("ESP_LOG", "trace");
+
+    Ok(builder)
 }
 
 fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
@@ -242,13 +365,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
                 continue;
             }
 
-            let feature_sets = [
-                vec![package.feature_rules(device)], // initially test all features
-                package.lint_feature_rules(device),  // add separate test cases
-            ]
-            .concat();
-
-            for mut features in feature_sets {
+            for mut features in package.lint_feature_rules(device) {
                 if package.has_chip_features() {
                     features.push(device.name())
                 }
@@ -299,7 +416,7 @@ fn lint_package(
 
     if let Some(toolchain) = toolchain {
         if !package.build_on_host(features) && toolchain.starts_with("esp") {
-            builder = builder.arg("-Zbuild-std=core,alloc");
+            builder = builder.config("-Zbuild-std=core,alloc");
         }
         builder = builder.toolchain(toolchain);
     }
@@ -389,17 +506,47 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
 
     let mut runner = Runner::new();
 
-    runner.run("Lint", || {
-        lint_packages(
+    unsafe {
+        std::env::set_var("CI", "true");
+    }
+
+    // TODO: enable checking all crates once cargo-batch has check support
+    // runner.run("Check crates", || {
+    //     check_packages(
+    //         workspace,
+    //         LintPackagesArgs {
+    //             packages: Package::iter().collect(),
+    //             chips: vec![args.chip],
+    //             fix: false,
+    //             toolchain: args.toolchain.clone(),
+    //         },
+    //     )
+    // });
+
+    runner.run("Check esp-hal", || {
+        check_packages(
             workspace,
-            LintPackagesArgs {
-                packages: Package::iter().collect(),
+            CheckPackagesArgs {
+                packages: vec![Package::EspHal],
                 chips: vec![args.chip],
-                fix: false,
                 toolchain: args.toolchain.clone(),
             },
         )
     });
+
+    if !args.no_lint {
+        runner.run("Lint", || {
+            lint_packages(
+                workspace,
+                LintPackagesArgs {
+                    packages: Package::iter().collect(),
+                    chips: vec![args.chip],
+                    fix: false,
+                    toolchain: args.toolchain.clone(),
+                },
+            )
+        });
+    }
 
     runner.run("Run Doc Test", || {
         run_doc_tests(
@@ -411,16 +558,18 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         )
     });
 
-    runner.run("Build Docs", || {
-        build_documentation(
-            workspace,
-            BuildDocumentationArgs {
-                packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
-                chips: vec![args.chip],
-                ..Default::default()
-            },
-        )
-    });
+    if !args.no_docs {
+        runner.run("Build Docs", || {
+            build_documentation(
+                workspace,
+                BuildDocumentationArgs {
+                    packages: vec![Package::EspHal, Package::EspRadio, Package::EspHalEmbassy],
+                    chips: vec![args.chip],
+                    ..Default::default()
+                },
+            )
+        });
+    }
 
     // for chips with esp-lp-hal: Build all supported examples for the low-power
     // core first
@@ -430,6 +579,17 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         // path element then we copy it to the place where the HP core example
         // expects it
         runner.run("Build LP-HAL Examples", || {
+            // The LP examples aren't really that demanding, but they need to be at a certain place.
+            // Instead of trying to figure out where the results are, let's just make sure the
+            // target folder is set up as expected.
+            let original_target_dir = std::env::var("CARGO_TARGET_DIR");
+
+            unsafe {
+                std::env::set_var(
+                    "CARGO_TARGET_DIR",
+                    workspace.join("esp-lp-hal").join("target"),
+                );
+            }
             let result = examples(
                 workspace,
                 ExamplesArgs {
@@ -440,80 +600,76 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
                     toolchain: args.toolchain.clone(),
                     timings: false,
                 },
-                CargoAction::Build(Some(PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples",
-                    args.chip.target()
-                )))),
-            )
-            .and_then(|_| {
-                let from_dir = PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples/{}",
-                    args.chip.target(),
-                    args.chip
-                ));
-                let to_dir = PathBuf::from(format!(
-                    "./esp-lp-hal/target/{}/release/examples",
-                    args.chip.target()
-                ));
-                from_dir
-                    .read_dir()
-                    .with_context(|| format!("Failed to read from {}", from_dir.display()))?
-                    .for_each(|entry| {
-                        let entry = entry.unwrap();
-                        let path = entry.path();
-                        let to = to_dir.join(entry.file_name());
-                        fs::copy(&path, &to).expect(
-                            format!("Failed to copy {} to {}", path.display(), to.display())
-                                .as_str(),
-                        );
-                    });
-                Ok(())
-            });
+                CargoAction::Build(None),
+            );
 
-            // remove the (now) obsolete duplicates
-            log::debug!("Removing obsolete LP-HAL example duplicates");
-            std::fs::remove_dir_all(PathBuf::from(format!(
-                "./esp-lp-hal/target/{}/release/examples/{}",
-                args.chip.target(),
-                args.chip
-            )))
-            .with_context(|| {
-                format!(
-                    "Failed to remove duplicates in ./esp-lp-hal/target/{}/release/examples/{}",
-                    args.chip.target(),
-                    args.chip
-                )
-            })?;
+            // Still need to rename examples to remove the fingerprint off of their names:
+            let dir = workspace
+                .join("esp-lp-hal")
+                .join("target")
+                .join(Package::EspLpHal.target_triple(&args.chip)?)
+                .join("release")
+                .join("examples");
+            let examples = dir
+                .read_dir()
+                .with_context(|| format!("Failed to read examples directory: {}", dir.display()))?;
+            for example in examples {
+                let example = example.context("Failed to read example")?;
+                if example
+                    .file_type()
+                    .with_context(|| {
+                        format!(
+                            "Failed to get file type for example: {}",
+                            example.path().display()
+                        )
+                    })?
+                    .is_file()
+                    && example.path().extension().is_none()
+                {
+                    let example_name = example.file_name().to_string_lossy().to_string();
+                    let without_fingerprint = example_name
+                        .rsplit_once('-')
+                        .map(|(a, _)| a)
+                        .unwrap_or(&example_name);
+                    // Copy so we don't trigger a rebuild unnecessarily by deleting the original
+                    std::fs::copy(example.path(), dir.join(without_fingerprint)).with_context(
+                        || {
+                            format!(
+                                "Failed to copy example: {} to {}",
+                                example.path().display(),
+                                dir.join(without_fingerprint).display()
+                            )
+                        },
+                    )?;
+                }
+            }
+
+            // Restore the original target directory
+            unsafe {
+                if let Ok(target) = original_target_dir {
+                    std::env::set_var("CARGO_TARGET_DIR", target);
+                } else {
+                    std::env::remove_var("CARGO_TARGET_DIR");
+                }
+            }
 
             result
         });
 
-        // Check documentation
-        runner.run("Build LP-HAL docs", || {
-            build_documentation(
-                workspace,
-                BuildDocumentationArgs {
-                    packages: vec![Package::EspLpHal],
-                    chips: vec![args.chip],
-                    ..Default::default()
-                },
-            )
-        });
+        if !args.no_docs {
+            // Check documentation
+            runner.run("Build LP-HAL docs", || {
+                build_documentation(
+                    workspace,
+                    BuildDocumentationArgs {
+                        packages: vec![Package::EspLpHal],
+                        chips: vec![args.chip],
+                        ..Default::default()
+                    },
+                )
+            });
+        }
     }
-
-    // Make sure we're able to build the HAL without the default features enabled
-    runner.run("Build HAL", || {
-        build_package(
-            workspace,
-            BuildPackageArgs {
-                package: Package::EspHal,
-                target: Some(args.chip.target().to_string()),
-                features: vec![args.chip.to_string()],
-                no_default_features: true,
-                toolchain: args.toolchain.clone(),
-            },
-        )
-    });
 
     runner.run("Build examples", || {
         // The `ota_example` expects a file named `examples/target/ota_image` - it

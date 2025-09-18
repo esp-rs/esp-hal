@@ -9,7 +9,7 @@ use esp_metadata::{Chip, Config, TokenStream};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    cargo::{CargoArgsBuilder, CargoToml},
+    cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
     firmware::Metadata,
 };
 
@@ -139,6 +139,9 @@ impl Package {
 
     /// Does the package have any host tests?
     pub fn has_host_tests(&self, workspace: &Path) -> bool {
+        if *self == Package::HilTest {
+            return false;
+        }
         let package_path = workspace.join(self.to_string()).join("src");
 
         walkdir::WalkDir::new(package_path)
@@ -297,8 +300,61 @@ impl Package {
     }
 
     /// Additional feature rules to test subsets of features for a package.
+    pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
+        let mut cases = Vec::new();
+
+        // For now we run a lot of checks, but that will change.
+        cases.push(self.feature_rules(config));
+
+        match self {
+            Package::EspHal => {
+                // This checks if the `esp-hal` crate compiles with the no features (other than the
+                // chip selection)
+
+                // This tests that disabling the `rt` feature works
+                cases.push(vec![]);
+                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
+                // enabled
+                cases.push(vec!["rt".to_owned()]);
+            }
+            Package::EspRadio => {
+                // Minimal set of features that when enabled _should_ still compile:
+                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
+                if config.contains("wifi") {
+                    // This tests if `wifi` feature works without `esp-radio/unstable`
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi".to_owned(),
+                    ]);
+                    // This tests `wifi-eap` feature
+                    cases.push(vec![
+                        "esp-hal/rt".to_owned(),
+                        "esp-hal/unstable".to_owned(),
+                        "wifi-eap".to_owned(),
+                        "unstable".to_owned(),
+                    ]);
+                }
+            }
+            Package::EspMetadataGenerated => {
+                cases.push(vec!["build-script".to_owned()]);
+            }
+            Package::EspPreempt => {
+                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
+            }
+            _ => {}
+        }
+
+        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
+        cases
+    }
+
+    /// Additional feature rules to test subsets of features for a package.
     pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
         let mut cases = Vec::new();
+
+        // For now we run a lot of clippy checks, but that will change.
+        cases.push(self.feature_rules(config));
 
         match self {
             Package::EspHal => {
@@ -409,7 +465,6 @@ pub fn execute_app(
     target: &str,
     app: &Metadata,
     action: CargoAction,
-    repeat: usize,
     debug: bool,
     toolchain: Option<&str>,
     timings: bool,
@@ -418,9 +473,47 @@ pub fn execute_app(
     let package = app.example_path().strip_prefix(package_path)?;
     log::info!("Building example '{}' for '{}'", package.display(), chip);
 
-    if !app.configuration().is_empty() {
-        log::info!("  Configuration: {}", app.configuration());
-    }
+    let builder = generate_build_command(
+        package_path,
+        chip,
+        target,
+        app,
+        action,
+        debug,
+        toolchain,
+        timings,
+        extra_args,
+    )?;
+
+    let command = CargoCommandBatcher::build_one_for_cargo(&builder);
+
+    command.run(false)?;
+
+    Ok(())
+}
+
+pub fn generate_build_command(
+    package_path: &Path,
+    chip: Chip,
+    target: &str,
+    app: &Metadata,
+    action: CargoAction,
+    debug: bool,
+    toolchain: Option<&str>,
+    timings: bool,
+    extra_args: &[&str],
+) -> Result<CargoArgsBuilder> {
+    let package = app.example_path().strip_prefix(package_path)?;
+    log::info!(
+        "Building command: {} '{}' for '{}'",
+        if matches!(action, CargoAction::Build(_)) {
+            "Build"
+        } else {
+            "Run"
+        },
+        package.display(),
+        chip
+    );
 
     let mut features = app.feature_set().to_vec();
     if !features.is_empty() {
@@ -428,19 +521,28 @@ pub fn execute_app(
     }
     features.push(chip.to_string());
 
-    let env_vars = app.env_vars();
-    for (key, value) in env_vars {
-        log::info!("  esp-config:    {} = {}", key, value);
-    }
+    let cwd = if package_path.ends_with("examples") {
+        package_path.join(package).to_path_buf()
+    } else {
+        package_path.to_path_buf()
+    };
 
-    let mut builder = CargoArgsBuilder::default()
+    let mut builder = CargoArgsBuilder::new(app.output_file_name())
+        .manifest_path(cwd.join("Cargo.toml"))
+        .config_path(cwd.join(".cargo").join("config.toml"))
         .target(target)
-        .features(&features);
+        .features(&features)
+        .args(extra_args);
+
+    let subcommand = if matches!(action, CargoAction::Build(_)) {
+        "build"
+    } else {
+        "run"
+    };
+    builder = builder.subcommand(subcommand);
 
     let bin_arg = if package.starts_with("src/bin") {
         Some(format!("--bin={}", app.binary_name()))
-    } else if package.starts_with("tests") {
-        Some(format!("--test={}", app.binary_name()))
     } else if !package_path.ends_with("examples") {
         Some(format!("--example={}", app.binary_name()))
     } else {
@@ -451,21 +553,22 @@ pub fn execute_app(
         builder.add_arg(arg);
     }
 
-    let subcommand = if matches!(action, CargoAction::Build(_)) {
-        "build"
-    } else if package.starts_with("tests") {
-        "test"
-    } else {
-        "run"
-    };
-    builder = builder.subcommand(subcommand);
+    if !app.configuration().is_empty() {
+        log::info!("  Configuration: {}", app.configuration());
+    }
 
     for config in app.cargo_config() {
         log::info!(" Cargo --config: {config}");
-        builder.add_arg("--config").add_arg(config);
+        builder.add_config("--config").add_config(config);
         // Some configuration requires nightly rust, so let's just assume it. May be
         // overwritten by the esp toolchain on xtensa.
         builder = builder.toolchain("nightly");
+    }
+
+    let env_vars = app.env_vars();
+    for (key, value) in env_vars {
+        log::info!("  esp-config:    {} = {}", key, value);
+        builder.add_env_var(key, value);
     }
 
     if !debug {
@@ -482,57 +585,24 @@ pub fn execute_app(
         _ if target.starts_with("xtensa") => Some("esp"),
         _ => None,
     };
-
     if let Some(toolchain) = toolchain {
-        if toolchain.starts_with("esp") {
-            builder = builder.arg("-Zbuild-std=core,alloc");
-        }
         builder = builder.toolchain(toolchain);
     }
 
-    builder = builder.args(extra_args);
-
-    let args = builder.build();
-    log::debug!("{args:#?}");
-
-    let cwd = if package_path.ends_with("examples") {
-        package_path.join(package).to_path_buf()
-    } else {
-        package_path.to_path_buf()
-    };
-
-    if let CargoAction::Build(out_dir) = action {
-        cargo::run_with_env(&args, &cwd, env_vars, false)?;
-
-        if let Some(out_dir) = out_dir {
-            // Now that the build has succeeded and we printed the output, we can
-            // rerun the build again quickly enough to capture JSON. We'll use this to
-            // copy the binary to the output directory.
-            builder.add_arg("--message-format=json");
-            let args = builder.build();
-
-            let output = cargo::run_with_env(&args, &cwd, env_vars, true)?;
-            for line in output.lines() {
-                if let Ok(artifact) = serde_json::from_str::<cargo::Artifact>(line) {
-                    let out_dir = out_dir.join(chip.to_string());
-                    std::fs::create_dir_all(&out_dir)?;
-
-                    let output_file = out_dir.join(app.output_file_name());
-                    std::fs::copy(artifact.executable, &output_file)?;
-                    log::info!("Output ready: {}", output_file.display());
-                }
-            }
-        }
-    } else {
-        for i in 0..repeat {
-            if repeat != 1 {
-                log::info!("Run {}/{}", i + 1, repeat);
-            }
-            cargo::run_with_env(&args, &cwd, env_vars, false)?;
-        }
+    if let CargoAction::Build(Some(out_dir)) = action {
+        // We have to place the binary into a directory named after the app, because
+        // we can't set the binary name.
+        builder.add_arg("--artifact-dir");
+        builder.add_arg(
+            out_dir
+                .join("tmp") // This will be deleted in one go
+                .join(app.output_file_name()) // This sets the name of the binary
+                .display()
+                .to_string(),
+        );
     }
 
-    Ok(())
+    Ok(builder)
 }
 
 // ----------------------------------------------------------------------------
