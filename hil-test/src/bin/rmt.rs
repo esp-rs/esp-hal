@@ -52,14 +52,21 @@ cfg_if::cfg_if! {
 }
 
 // Pulses of H 100..300 L 50, i.e. 150..350 / 500kHz = 150..350 * 2us = 300..700us
-fn generate_tx_data<const TX_LEN: usize>(write_end_marker: bool) -> [PulseCode; TX_LEN] {
+fn generate_tx_data<const TX_LEN: usize>(
+    write_stop_code: bool,
+    write_end_marker: bool,
+) -> [PulseCode; TX_LEN] {
     let mut tx_data: [_; TX_LEN] = core::array::from_fn(|i| {
         PulseCode::new(Level::High, (100 + (i * 10) % 200) as u16, Level::Low, 50)
     });
 
+    let mut pos = TX_LEN - 1;
     if write_end_marker {
-        tx_data[TX_LEN - 2] = PulseCode::new(Level::High, 3000, Level::Low, 500);
-        tx_data[TX_LEN - 1] = PulseCode::end_marker();
+        tx_data[pos] = PulseCode::end_marker();
+        pos -= 1;
+    }
+    if write_stop_code {
+        tx_data[pos] = PulseCode::new(Level::High, 3000, Level::Low, 500);
     }
 
     tx_data
@@ -79,34 +86,50 @@ fn pulse_code_matches(left: PulseCode, right: PulseCode, tolerance: u16) -> bool
 // timeouts while printing. Note that probe-rs reading the buffer might still mess up
 // timing-sensitive tests! This doesn't apply to `check_data_eq` since it is used after the action,
 // but adding any additional logging to the driver is likely to cause sporadic issues.
-fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize, tolerance: u16) {
+fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], idle_threshold: u16, tolerance: u16) {
     let mut errors: usize = 0;
+    let mut count: usize = 0;
 
-    for (idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
-        let _msg = if idx == tx_len - 1 {
-            // The last pulse code is the stop code, which can't be received.
-            ""
-        } else if idx == tx_len - 2 {
-            // The second-to-last pulse-code is the one which exceeds the idle threshold and
-            // should be received as stop code.
-            if !(code_rx.level1() == Level::High && code_rx.length1() == 0) {
+    for (_idx, (&code_tx, &code_rx)) in core::iter::zip(tx, rx).enumerate() {
+        let mut done = false;
+        let mut _msg = "";
+        if code_tx.length1() == 0 {
+            // Sent an end marker
+            break;
+        } else if code_tx.length2() == 0 {
+            // Sent an end marker in the second PulseCode field
+            done = true;
+            if !pulse_code_matches(code_tx, code_rx.with_length2(0).unwrap(), tolerance) {
                 errors += 1;
-                "rx code not a stop code!"
-            } else {
-                ""
+                _msg = "rx/tx code mismatch!";
+            }
+        } else if code_tx.length1() > idle_threshold {
+            // Should receive an end marker in the first PulseCode field
+            done = true;
+            if !code_rx.length1() == 0 && code_tx.level1() == code_rx.level1() {
+                errors += 1;
+                _msg = "rx code not a stop code!";
+            }
+        } else if code_tx.length2() > idle_threshold {
+            // Should receive an end marker in the second PulseCode field
+            done = true;
+            if !pulse_code_matches(code_tx.with_length2(0).unwrap(), code_rx, tolerance) {
+                errors += 1;
+                _msg = "rx code not a stop code!";
             }
         } else if !pulse_code_matches(code_tx, code_rx, tolerance) {
+            // Regular pulse code, should be received exactly
             errors += 1;
-            "rx/tx code mismatch!"
-        } else {
-            ""
+            _msg = "rx/tx code mismatch!";
         };
+
+        count += 1;
 
         #[cfg(feature = "defmt")]
         if _msg.len() > 0 {
             defmt::error!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx): {}",
-                idx,
+                _idx,
                 code_tx,
                 code_rx,
                 _msg
@@ -114,17 +137,22 @@ fn check_data_eq(tx: &[PulseCode], rx: &[PulseCode], tx_len: usize, tolerance: u
         } else {
             defmt::info!(
                 "loopback @ idx {}: {:?} (tx) -> {:?} (rx)",
-                idx,
+                _idx,
                 code_tx,
                 code_rx,
             );
         }
+
+        if done {
+            break;
+        }
     }
 
-    assert_eq!(
-        errors, 0,
+    assert!(
+        errors == 0,
         "rx/tx code mismatch at {}/{} indices",
-        errors, tx_len
+        errors,
+        count
     );
 }
 
@@ -133,7 +161,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
     rx_channel: Channel<Blocking, Rx>,
     abort: bool,
 ) {
-    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     // Start the transactions...
@@ -168,7 +196,7 @@ fn do_rmt_loopback_inner<const TX_LEN: usize>(
         tx_transaction.wait().unwrap();
         rx_transaction.wait().unwrap();
 
-        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        check_data_eq(&tx_data, &rcv_data, 1000, 1);
     }
 }
 
@@ -193,7 +221,7 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
     use embassy_time::Delay;
     use embedded_hal_async::delay::DelayNs;
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(true);
+    let tx_data: [_; TX_LEN] = generate_tx_data(true, true);
     let mut rcv_data: [PulseCode; TX_LEN] = [PulseCode::default(); TX_LEN];
 
     // Start the transactions...
@@ -217,7 +245,7 @@ async fn do_rmt_loopback_async_inner<const TX_LEN: usize>(
         tx_res.unwrap();
         rx_res.unwrap();
 
-        check_data_eq(&tx_data, &rcv_data, TX_LEN, 1);
+        check_data_eq(&tx_data, &rcv_data, 1000, 1);
     }
 }
 
@@ -251,7 +279,7 @@ fn do_rmt_single_shot<const TX_LEN: usize>(
 
     let (tx_channel, _) = ctx.setup_loopback(tx_config, Default::default());
 
-    let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker);
+    let tx_data: [_; TX_LEN] = generate_tx_data(write_end_marker, write_end_marker);
 
     tx_channel.transmit(&tx_data)?.wait().map_err(|(e, _)| e)?;
 
@@ -578,7 +606,7 @@ mod tests {
         rx_transaction.wait().unwrap();
 
         // tolerance 25 cycles == 50us
-        check_data_eq(&expected, &rx_data, 6, 25);
+        check_data_eq(&expected, &rx_data, 0x3FFF, 25);
     }
 
     // Compile-only test to verify that reborrowing channel creators works.
@@ -596,7 +624,7 @@ mod tests {
                 .configure_tx(NoPin, TxChannelConfig::default())
                 .unwrap();
 
-            let tx_data: [_; 10] = generate_tx_data(true);
+            let tx_data: [_; 10] = generate_tx_data(true, true);
 
             ch0.transmit(&tx_data).await.unwrap();
         }
@@ -721,5 +749,90 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[cfg(not(esp32))]
+    fn rmt_loopback_continuous_tx_impl(mut ctx: Context, loopstop: esp_hal::rmt::LoopStop) {
+        use esp_hal::rmt::{LoopCount, LoopStop};
+
+        const TX_COUNT: usize = 10;
+        const MAX_LOOP_COUNT: usize = 3;
+        const MAX_RX_LEN: usize = (MAX_LOOP_COUNT + 1) * TX_COUNT;
+
+        let tx_config = TxChannelConfig::default()
+            .with_idle_output(true)
+            .with_idle_output_level(Level::Low);
+        let rx_config = RxChannelConfig::default()
+            .with_idle_threshold(1000)
+            .with_memsize(2);
+
+        let (mut tx_channel, mut rx_channel) = ctx.setup_loopback(tx_config, rx_config);
+
+        let tx_data: [_; TX_COUNT + 1] = generate_tx_data(false, true);
+        let mut rx_data: [PulseCode; MAX_RX_LEN] = [Default::default(); MAX_RX_LEN];
+        let mut expected_data: [PulseCode; MAX_RX_LEN] = [Default::default(); MAX_RX_LEN];
+
+        for loopcount in 1..MAX_LOOP_COUNT {
+            rx_data.fill(PulseCode::default());
+            let rx_transaction = rx_channel.reborrow().receive(&mut rx_data).unwrap();
+            let tx_transaction = tx_channel
+                .reborrow()
+                .transmit_continuously(
+                    &tx_data,
+                    LoopCount::Finite((loopcount as u16).try_into().unwrap()),
+                    loopstop,
+                )
+                .unwrap();
+
+            // All data is small enough to fit a single hardware buffer, so we don't need to poll
+            // rx/tx concurrently.
+            while !tx_transaction.is_loopcount_interrupt_set() {}
+
+            if loopstop == LoopStop::Manual {
+                tx_transaction.stop_next().unwrap();
+                rx_transaction.wait().unwrap();
+            } else {
+                // tx should stop automatically, so rx should also stop before we explicitly stop
+                // tx
+                rx_transaction.wait().unwrap();
+                tx_transaction.stop_next().unwrap();
+            }
+
+            // FIXME: Somehow verify that tx is really stopped!
+
+            let rx_loopcount = if loopstop == LoopStop::Manual {
+                loopcount + 1
+            } else {
+                loopcount
+            };
+            expected_data.fill(PulseCode::default());
+            for i in 0..rx_loopcount {
+                let i0 = i * TX_COUNT;
+                expected_data[i0..i0 + TX_COUNT].copy_from_slice(&tx_data[..TX_COUNT]);
+            }
+            // We don't transmit an explicit code that will exceed the idle threshold, rather the
+            // final code will simply be extended via the idle output level of the transmitter.
+            expected_data[rx_loopcount * TX_COUNT - 1] = expected_data[rx_loopcount * TX_COUNT - 1]
+                .with_length2(1100)
+                .unwrap();
+
+            check_data_eq(&expected_data, &rx_data, 1000, 1);
+        }
+    }
+
+    // Test that continuous tx with a finite loopcount works as expected when using manual
+    // stopping (on devices that have the required hardware support).
+    #[cfg(not(esp32))]
+    #[test]
+    fn rmt_loopback_continuous_tx_manual_stop(ctx: Context) {
+        rmt_loopback_continuous_tx_impl(ctx, esp_hal::rmt::LoopStop::Manual);
+    }
+
+    // Test that continuous tx with a finite loopcount works as expected when using automatic
+    // stopping (on devices that have the required hardware support).
+    #[cfg(any(esp32c6, esp32h2, esp32s3))]
+    #[test]
+    fn rmt_loopback_continuous_tx_auto_stop(ctx: Context) {
+        rmt_loopback_continuous_tx_impl(ctx, esp_hal::rmt::LoopStop::Auto);
     }
 }
