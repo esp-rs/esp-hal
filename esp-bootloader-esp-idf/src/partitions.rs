@@ -160,8 +160,9 @@ impl defmt::Format for PartitionEntry<'_> {
 /// Errors which can be returned.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[non_exhaustive]
 pub enum Error {
-    /// The partition table is invalid.
+    /// The partition table is invalid or doesn't contain a needed partition.
     Invalid,
     /// An operation tries to access data that is out of bounds.
     OutOfBounds,
@@ -176,11 +177,15 @@ pub enum Error {
     },
     /// Invalid tate
     InvalidState,
+    /// The given argument is invalid.
+    InvalidArgument,
 }
 
 impl core::error::Error for Error {}
 
 /// A partition table.
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PartitionTable<'a> {
     binary: &'a [[u8; RAW_ENTRY_LEN]],
     entries: usize,
@@ -298,6 +303,17 @@ impl<'a> PartitionTable<'a> {
             }
         }
         Ok(None)
+    }
+
+    /// Returns an iterator over the partitions.
+    pub fn iter(&self) -> impl Iterator<Item = PartitionEntry<'a>> {
+        (0..self.entries).filter_map(|i| self.get_partition(i).ok())
+    }
+
+    #[cfg(feature = "std")]
+    /// Get the currently booted partition.
+    pub fn booted_partition(&self) -> Result<Option<PartitionEntry<'a>>, Error> {
+        Err(Error::Invalid)
     }
 
     #[cfg(not(feature = "std"))]
