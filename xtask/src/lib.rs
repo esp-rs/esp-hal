@@ -277,7 +277,15 @@ impl Package {
                 features.push("defmt-espflash".to_owned());
                 features.push("critical-section".to_owned());
             }
-            Package::EspStorage => {}
+            Package::EspStorage => {
+                if config.name() == "esp32c2"
+                    || config.name() == "esp32c3"
+                    || config.name() == "esp32s2"
+                {
+                    println!("pizda usho");
+                    features.push("portable-atomic/unsafe-assume-single-core".to_owned());
+                }
+            }
             Package::EspBootloaderEspIdf => {
                 features.push("defmt".to_owned());
                 features.push("validation".to_owned());
@@ -389,7 +397,19 @@ impl Package {
                 cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
             }
             Package::EspStorage => {
-                cases.push(vec!["defmt".to_owned()]);
+                // TODO: https://github.com/esp-rs/esp-hal/issues/4136
+                if config.name() == "esp32c2"
+                    || config.name() == "esp32c3"
+                    || config.name() == "esp32s2"
+                {
+                    // println!("kokot usho");
+                    cases.push(vec![
+                        "defmt".to_owned(),
+                        "portable-atomic/unsafe-assume-single-core".to_owned(),
+                    ]);
+                } else {
+                    cases.push(vec!["defmt".to_owned()]);
+                }
             }
             _ => {}
         }

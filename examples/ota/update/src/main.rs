@@ -45,6 +45,7 @@ use esp_hal::{
     main,
 };
 use esp_println::println;
+use esp_storage::FlashStorage;
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
@@ -55,11 +56,11 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let mut storage = esp_storage::FlashStorage::new();
+    let mut flash = FlashStorage::new();
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
-    let pt = esp_bootloader_esp_idf::partitions::read_partition_table(&mut storage, &mut buffer)
-        .unwrap();
+    let pt =
+        esp_bootloader_esp_idf::partitions::read_partition_table(&mut flash, &mut buffer).unwrap();
 
     // List all partitions - this is just FYI
     for i in 0..pt.len() {
@@ -75,7 +76,7 @@ fn main() -> ! {
         ))
         .unwrap()
         .unwrap();
-    let mut ota_part = ota_part.as_embedded_storage(&mut storage);
+    let mut ota_part = ota_part.as_embedded_storage(&mut flash);
     println!("Found ota data");
 
     let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut ota_part).unwrap();
@@ -140,7 +141,7 @@ fn main() -> ! {
             }
             .unwrap();
             println!("Found partition: {:?}", next_app_partition);
-            let mut next_app_partition = next_app_partition.as_embedded_storage(&mut storage);
+            let mut next_app_partition = next_app_partition.as_embedded_storage(&mut flash);
 
             // write to the app partition
             for (sector, chunk) in OTA_IMAGE.chunks(4096).enumerate() {
@@ -157,7 +158,7 @@ fn main() -> ! {
                 ))
                 .unwrap()
                 .unwrap();
-            let mut ota_part = ota_part.as_embedded_storage(&mut storage);
+            let mut ota_part = ota_part.as_embedded_storage(&mut flash);
             let mut ota = esp_bootloader_esp_idf::ota::Ota::new(&mut ota_part).unwrap();
             ota.set_current_slot(next_slot).unwrap();
             ota.set_current_ota_state(esp_bootloader_esp_idf::ota::OtaImageState::New)
