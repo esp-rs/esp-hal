@@ -65,6 +65,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
 - `rmt::Channel` and `rmt::ChannelCreator` now carry a lifetime and can be reborrowed. (#4174)
 - RMT transactions and futures are marked as `#[must_use]` and implement `Drop`. (#4174)
+- RMT: `Channel::transmit_continuously` now takes an additional `LoopStop` argument. (#4174)
+- RMT: `LoopCount::Finite` and `ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when the hardware supports it (all except ESP32). (#4174)
 
 ### Fixed
 
@@ -78,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Enable up to 4M of PSRAM (#3990)
 - I2C error recovery logic issues (#4000)
 - I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
+- RMT: `Channel::transmit_continuously` also triggers the loopcount interrupt when only using a single repetition. (#4174)
 
 ### Removed
 

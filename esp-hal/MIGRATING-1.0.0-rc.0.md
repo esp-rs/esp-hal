@@ -188,6 +188,19 @@ are marked as `#[must_use]` to account for the fact that it is in general requir
 Additionally, they now implement `Drop` and stop the ongoing transfer as quickly as possible when dropped,
 ensuring that subsequent transactions start from a well-defined state.
 
+## RMT continuous transmit changes
+
+The behavior of `Channel::transmit_continuously` has been clarified to account
+for the varying hardware support between devices: It now takes an additional
+`LoopStop` argument. Additionally, `LoopCount::Finite` and
+`ContinuousTxTransaction::is_tx_loopcount_interrupt_set` are only defined when
+the hardware supports it (all chips except ESP32).
+
+```diff
+- let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count))?;
++ let transaction = channel.transmit_continuously(&data, LoopCount::Finite(count), LoopStop::Finite)?;
+```
+
 ## DMA changes
 
 DMA buffers now have a `Final` associated type parameter. For the publicly available buffer, this is `Self`,
