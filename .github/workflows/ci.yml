@@ -4,7 +4,7 @@
 # updates which must be made to the CI workflow in order to reflect this; the
 # changes are:
 #
-# 1.) In the 'esp-hal' job, add the name of the chip to the `matrix.soc` array.
+# 1.) In the 'esp-hal' job, add the appropriate build and semver-check command.
 # 1a.) If the device has a low-power core (which is supported in
 #      `esp-lp-hal`), then update the `if` condition to build prerequisites.
 # 2.) In the 'msrv' job, add checks as needed for the new chip.
@@ -40,8 +40,7 @@ jobs:
   # Build Packages
 
   esp-hal:
-    name: esp-hal (${{ matrix.device.soc }})
-    runs-on: ubuntu-latest
+    runs-on: macos-m1-self-hosted
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CI: 1
@@ -51,20 +50,6 @@ jobs:
       GATEWAY_IP: 1.1.1.1
       HOST_IP: 1.1.1.1
 
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [
-            # RISC-V devices:
-            { soc: "esp32c2", toolchain: "stable" },
-            { soc: "esp32c3", toolchain: "stable" },
-            { soc: "esp32c6", toolchain: "stable" },
-            { soc: "esp32h2", toolchain: "stable" },
-            # Xtensa devices:
-            { soc: "esp32", toolchain: "esp" },
-            { soc: "esp32s2", toolchain: "esp" },
-            { soc: "esp32s3", toolchain: "esp" },
-          ]
     steps:
       - uses: actions/checkout@v4
 
@@ -79,26 +64,36 @@ jobs:
           target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
           toolchain: stable
           components: rust-src
-      # Install the Rust nightly toolchain for RISC-V devices, because of `-Zdoctest-xcompile`
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
-          toolchain: nightly
-          components: rust-src
 
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "ci-${{ matrix.device.soc }}"
-          cache-all-crates: true
+      - name: Setup cargo-batch
+        run: |
+          if ! command -v cargo-batch &> /dev/null; then
+              cargo install --git https://github.com/embassy-rs/cargo-batch cargo --bin cargo-batch --locked --force
+          fi
 
       - name: Build and Check
         shell: bash
-        run: cargo xcheck ci ${{ matrix.device.soc }} --toolchain ${{ matrix.device.toolchain }}
+        run: |
+          # lints and docs are checked separately
+          cargo xcheck ci esp32 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s2 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32s3 --toolchain esp --no-lint --no-docs
+          cargo xcheck ci esp32c2 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c3 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32c6 --toolchain stable --no-lint --no-docs
+          cargo xcheck ci esp32h2 --toolchain stable --no-lint --no-docs
 
       - name: Semver-Check
         shell: bash
         # always invokes +esp internally
-        run: cargo xcheck semver-check --chips ${{ matrix.device.soc }} check
+        run: |
+          cargo xcheck semver-check --chips esp32 check
+          cargo xcheck semver-check --chips esp32s2 check
+          cargo xcheck semver-check --chips esp32s3 check
+          cargo xcheck semver-check --chips esp32c2 check
+          cargo xcheck semver-check --chips esp32c3 check
+          cargo xcheck semver-check --chips esp32c6 check
+          cargo xcheck semver-check --chips esp32h2 check
 
   detect-extras-runner:
     uses: ./.github/workflows/check_runner.yml
@@ -127,11 +122,39 @@ jobs:
       - name: Build ieee802154-sniffer
         run: cd extras/ieee802154-sniffer && cargo build
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the Rust toolchain for Xtensa devices:
+      - uses: esp-rs/xtensa-toolchain@v1.6
+        with:
+          version: 1.88.0.0
+
+      # Install the Rust stable toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: stable
+          components: rust-src
+      # Install the Rust nightly toolchain for RISC-V devices:
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          toolchain: nightly
+          components: rust-src
+
+      - name: Build docs
+        shell: bash
+        run: |
+          cargo xtask build documentation
+
   # --------------------------------------------------------------------------
   # MSRV
 
   msrv:
-    runs-on: macos-m1-self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -140,7 +163,7 @@ jobs:
           version: ${{ env.MSRV }}
       - uses: dtolnay/rust-toolchain@v1
         with:
-          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf
+          target: riscv32imc-unknown-none-elf,riscv32imac-unknown-none-elf,x86_64-unknown-linux-gnu
           toolchain: ${{ env.MSRV }}
           components: rust-src,clippy
 
@@ -165,7 +188,7 @@ jobs:
     with:
       primary-runner: macos-m1-self-hosted
       fallback-runner: ubuntu-latest
-    
+
   host-tests:
     needs: detect-host-tests-runner
     runs-on: ${{ needs.detect-host-tests-runner.outputs.selected-runner }}
@@ -188,7 +211,7 @@ jobs:
       # Check metadata generation for all packages:
       - run: cargo xtask update-metadata --check
 
-      # Run host tests for all applicable packages: 
+      # Run host tests for all applicable packages:
       - run: cargo xtask host-tests
 
   # --------------------------------------------------------------------------
@@ -211,4 +234,3 @@ jobs:
             './**/*.rs'
             './**/*.md'
             './**/*.toml'
-

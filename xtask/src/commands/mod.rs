@@ -7,7 +7,10 @@ use inquire::Select;
 use strum::IntoEnumIterator;
 
 pub use self::{build::*, check_changelog::*, release::*, run::*};
-use crate::{Package, cargo::CargoAction};
+use crate::{
+    Package,
+    cargo::{CargoAction, CargoCommandBatcher},
+};
 mod build;
 mod check_changelog;
 mod release;
@@ -221,7 +224,7 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
     let target = Package::HilTest.target_triple(&args.chip)?;
 
     // Load all tests which support the specified chip and parse their metadata:
-    let mut tests = crate::firmware::load(&package_path.join("tests"))?
+    let mut tests = crate::firmware::load(&package_path.join("src").join("bin"))?
         .into_iter()
         .filter(|example| example.supports_chip(args.chip))
         .collect::<Vec<_>>();
@@ -234,53 +237,108 @@ pub fn tests(workspace: &Path, args: TestsArgs, action: CargoAction) -> Result<(
         .flatten()
         .unwrap_or(&[]);
 
+    if let CargoAction::Build(Some(out_dir)) = &action {
+        // Make sure the tmp directory has no garbage for us.
+        let tmp_dir = out_dir.join("tmp");
+        _ = std::fs::remove_dir_all(&tmp_dir);
+        std::fs::create_dir_all(&tmp_dir).unwrap();
+    }
+
+    let mut commands = CargoCommandBatcher::new();
     // Execute the specified action:
     if tests.iter().any(|test| test.matches(test_arg.as_deref())) {
         for test in tests
             .iter()
             .filter(|test| test.matches(test_arg.as_deref()))
         {
-            crate::execute_app(
-                &package_path,
-                args.chip,
-                &target,
-                test,
-                action.clone(),
-                args.repeat,
-                false,
-                args.toolchain.as_deref(),
-                args.timings,
-                run_test_extra_args,
-            )?;
-        }
-        Ok(())
-    } else if test_arg.is_some() {
-        bail!("Test not found or unsupported for the given chip")
-    } else {
-        let mut failed = Vec::new();
-        for test in tests {
-            if crate::execute_app(
+            let command = crate::generate_build_command(
                 &package_path,
                 args.chip,
                 &target,
                 &test,
                 action.clone(),
-                args.repeat,
                 false,
                 args.toolchain.as_deref(),
                 args.timings,
                 run_test_extra_args,
-            )
-            .is_err()
-            {
-                failed.push(test.name_with_configuration());
+            )?;
+            commands.push(command);
+        }
+    } else if test_arg.is_some() {
+        bail!("Test not found or unsupported for the given chip")
+    } else {
+        for test in tests {
+            let command = crate::generate_build_command(
+                &package_path,
+                args.chip,
+                &target,
+                &test,
+                action.clone(),
+                false,
+                args.toolchain.as_deref(),
+                args.timings,
+                run_test_extra_args,
+            )?;
+            commands.push(command);
+        }
+    }
+    let mut failed = Vec::new();
+
+    for c in commands.build(false) {
+        let repeat = if matches!(action, CargoAction::Run) {
+            args.repeat
+        } else {
+            1
+        };
+
+        println!(
+            "Command: cargo {}",
+            c.command.join(" ").replace("---", "\n    ---")
+        );
+        for i in 0..repeat {
+            if repeat != 1 {
+                log::info!("Run {}/{}", i + 1, repeat);
+            }
+            if c.run(false).is_err() {
+                failed.push(c.artifact_name.clone());
             }
         }
+    }
 
-        if !failed.is_empty() {
-            bail!("Failed tests: {:#?}", failed);
+    move_artifacts(args.chip, &action);
+
+    if !failed.is_empty() {
+        bail!("Failed tests: {:#?}", failed);
+    }
+
+    Ok(())
+}
+
+fn move_artifacts(chip: Chip, action: &CargoAction) {
+    if let CargoAction::Build(Some(out_dir)) = action {
+        // Move binaries
+        let from = out_dir.join("tmp");
+        let to = out_dir.join(chip.to_string());
+        std::fs::create_dir_all(&to).unwrap();
+
+        // Binaries are in nested folders. There is one file in each folder. The name of the
+        // final binary should be the name of the source binary's parent folder.
+        for dir_entry in std::fs::read_dir(&from).unwrap() {
+            let dir = dir_entry.unwrap();
+            let mut bin_folder = std::fs::read_dir(dir.path()).unwrap();
+            let file = bin_folder
+                .next()
+                .expect("No binary found")
+                .expect("Failed to read entry");
+            assert!(
+                bin_folder.next().is_none(),
+                "Only one binary should be present in each folder"
+            );
+            let source_file = file.path();
+            let dest = to.join(dir.path().file_name().unwrap().to_string_lossy().as_ref());
+            std::fs::rename(source_file, dest).unwrap();
         }
-
-        Ok(())
+        // Clean up
+        std::fs::remove_dir_all(from).unwrap();
     }
 }

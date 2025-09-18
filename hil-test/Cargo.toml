@@ -7,207 +7,207 @@ publish = false
 [lib]
 name = "hil_test"
 
-[[test]]
+[[bin]]
 name    = "aes"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "alloc_psram"
 harness = false
 required-features = ["psram"]
 
-[[test]]
+[[bin]]
 name    = "clock_monitor"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "critical_section"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "delay_async"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "dma_macros"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "dma_mem2mem"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "ecc"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "flip_link"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "gpio"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "gpio_custom_handler"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "interrupt"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "i2c"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "init"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "i2s"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "i2s_parallel"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "lcd_cam"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "lcd_cam_i8080"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "lcd_cam_i8080_async"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "misc_simple"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "qspi"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "rng"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "spi_full_duplex"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "spi_half_duplex_read"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "spi_half_duplex_write"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "spi_half_duplex_write_psram"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "spi_slave"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "storage_read_app_desc"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "stack_protector"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "parl_io"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "parl_io_tx"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "parl_io_tx_async"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "pcnt"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "rmt"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "rsa"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "sha"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "uart"
 harness = false
 
-[[test]]
+[[bin]]
 name              = "uart_async"
 harness           = false
 required-features = ["embassy"]
 
-[[test]]
+[[bin]]
 name              = "uart_uhci"
 harness           = false
 required-features = ["embassy"]
 
-[[test]]
+[[bin]]
 name    = "uart_regression"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "uart_tx_rx_async"
 harness = false
 
-[[test]]
+[[bin]]
 name              = "embassy_timers_executors"
 harness           = false
 required-features = ["embassy"]
 
-[[test]]
+[[bin]]
 name              = "embassy_interrupt_executor"
 harness           = false
 required-features = ["embassy"]
 
-[[test]]
+[[bin]]
 name    = "embassy_interrupt_spi_dma"
 harness = false
 required-features = ["embassy"]
 
-[[test]]
+[[bin]]
 name    = "systimer"
 harness = false
 
-[[test]]
+[[bin]]
 name    = "twai"
 harness = false
 
-[[test]]
+[[bin]]
 name              = "esp_radio_floats"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
 
-[[test]]
+[[bin]]
 name              = "esp_radio_ble_controller"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
 
-[[test]]
+[[bin]]
 name              = "esp_radio_init"
 harness           = false
 required-features = ["esp-radio", "esp-alloc"]
@@ -241,13 +241,12 @@ portable-atomic    = "1.11.0"
 static_cell        = { version = "2.1.0" }
 semihosting        = { version = "0.1", features= ["stdio", "panic-handler"] }
 
-[dev-dependencies]
 crypto-bigint       = { version = "0.5.5", default-features = false }
 digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
-embassy-executor    = { version = "0.9.0", default-features = false }
 # Add the `embedded-test/defmt` feature for more verbose testing
-embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting"] }
+embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting"], git = "https://github.com/probe-rs/embedded-test", branch = "next" }
+embedded-test-macros       = { version = "0.7.0-alpha.2", default-features = false, git = "https://github.com/probe-rs/embedded-test", branch = "next" }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }

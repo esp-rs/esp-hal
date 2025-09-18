@@ -37,6 +37,15 @@ jobs:
           toolchain: nightly
           components: rust-src, clippy, rustfmt
 
+      - name: Setup cargo-batch
+        run: |
+          # Note this is linux-only, but the macOS runner has cargo batch installed
+          if ! command -v cargo-batch &> /dev/null; then
+              mkdir -p $HOME/.cargo/bin
+              curl -L https://github.com/embassy-rs/cargo-batch/releases/download/batch-0.6.0/cargo-batch > $HOME/.cargo/bin/cargo-batch
+              chmod +x $HOME/.cargo/bin/cargo-batch
+          fi
+
       - name: Build and Check
         shell: bash
         run: cargo xtask ci ${{ matrix.device }} --toolchain nightly

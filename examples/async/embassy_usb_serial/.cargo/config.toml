@@ -21,4 +21,4 @@ rustflags = [
 ESP_LOG = "info"
 
 [unstable]
-build-std = ["core"]
+build-std = ["core", "alloc"]

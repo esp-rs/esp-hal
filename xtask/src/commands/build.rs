@@ -8,7 +8,8 @@ use strum::IntoEnumIterator as _;
 use super::{ExamplesArgs, TestsArgs};
 use crate::{
     Package,
-    cargo::{self, CargoAction, CargoArgsBuilder},
+    cargo::{self, CargoAction, CargoArgsBuilder, CargoCommandBatcher},
+    commands::move_artifacts,
     firmware::Metadata,
 };
 
@@ -143,20 +144,35 @@ pub fn build_examples(
     let target = args.package.target_triple(&chip)?;
 
     // Attempt to build each supported example, with all required features enabled:
-    examples.iter().try_for_each(|example| {
-        crate::execute_app(
-            package_path,
+
+    let action = CargoAction::Build(out_path.map(|p| p.to_path_buf()));
+    let mut commands = CargoCommandBatcher::new();
+    // Build command list
+    for example in examples.iter() {
+        let command = crate::generate_build_command(
+            &package_path,
             chip,
             &target,
             example,
-            CargoAction::Build(out_path.map(|p| p.to_path_buf())),
-            1,
+            action.clone(),
             args.debug,
             args.toolchain.as_deref(),
             args.timings,
             &[],
-        )
-    })
+        )?;
+        commands.push(command);
+    }
+    // Execute the specified action:
+    for c in commands.build(false) {
+        println!(
+            "Command: cargo {}",
+            c.command.join(" ").replace("---", "\n    ---")
+        );
+        c.run(false)?;
+    }
+    move_artifacts(chip, &action);
+
+    Ok(())
 }
 
 /// Build the specified package with the given options.
