@@ -472,6 +472,7 @@ has_rx_wrap = true
 has_rx_demodulation = true
 clock_sources.supported = [ "None", "Pll80MHz", "RcFast", "Xtal" ]
 clock_sources.default = "Pll80MHz"
+max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"

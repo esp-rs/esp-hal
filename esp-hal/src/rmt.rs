@@ -1033,13 +1033,7 @@ where
 
         let _guard = GenericPeripheralGuard::new();
 
-        let threshold = if cfg!(any(esp32, esp32s2)) {
-            0b111_1111_1111_1111
-        } else {
-            0b11_1111_1111_1111
-        };
-
-        if config.idle_threshold > threshold {
+        if config.idle_threshold > property!("rmt.max_idle_threshold") {
             return Err(Error::InvalidArgument);
         }
 
