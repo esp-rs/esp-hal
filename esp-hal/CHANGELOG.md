@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `Raw: RawChannelAccess` of `rmt::Channel` has been erased; channel numbers are always dynamic now. (#3980)
 - ESP32-S2: `i2s::master::DataFormat` now includes 8-bit and 24-bit data widths (#3985)
 - Bump `embassy-embedded-hal` to v0.5.0 (#4075)
+- Make `uart::Uhci` configurable after splitting, improve DMA channel handling (#4039)
 - `RtcClock`, `RtcFastClock`, and `RtcSlowClock` moved to `clock` module (#4089)
 - Resolved enum variant naming violations in `RtcFastClock` and `RtcSlowClock` enums (#4089)
 - The `rmt::Channel::transmit_continuously` and `rmt::Channel::transmit_continuously_with_loopcount` methods have been merged (#4100)
