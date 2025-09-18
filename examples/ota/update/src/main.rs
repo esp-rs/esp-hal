@@ -59,8 +59,8 @@ fn main() -> ! {
     let mut flash = FlashStorage::new();
 
     let mut buffer = [0u8; esp_bootloader_esp_idf::partitions::PARTITION_TABLE_MAX_LEN];
-    let pt = esp_bootloader_esp_idf::partitions::read_partition_table(&mut flash, &mut buffer)
-        .unwrap();
+    let pt =
+        esp_bootloader_esp_idf::partitions::read_partition_table(&mut flash, &mut buffer).unwrap();
 
     // List all partitions - this is just FYI
     for i in 0..pt.len() {
