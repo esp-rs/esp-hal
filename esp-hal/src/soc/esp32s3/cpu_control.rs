@@ -9,6 +9,7 @@
 use core::{
     marker::PhantomData,
     mem::{ManuallyDrop, MaybeUninit},
+    sync::atomic::{AtomicPtr, Ordering},
 };
 
 use crate::{
@@ -75,8 +76,8 @@ impl<const SIZE: usize> Stack<SIZE> {
 
 // Pointer to the closure that will be executed on the second core. The closure
 // is copied to the core's stack.
-static mut START_CORE1_FUNCTION: Option<*mut ()> = None;
-static mut APP_CORE_STACK_TOP: Option<*mut u32> = None;
+static START_CORE1_FUNCTION: AtomicPtr<()> = AtomicPtr::new(core::ptr::null_mut());
+static APP_CORE_STACK_TOP: AtomicPtr<u32> = AtomicPtr::new(core::ptr::null_mut());
 
 /// Will park the APP (second) core when dropped
 #[must_use = "Dropping this guard will park the APP core"]
@@ -222,12 +223,10 @@ impl<'d> CpuControl<'d> {
             static mut _init_start: u32;
         }
 
-        // move vec table
-        let base = core::ptr::addr_of!(_init_start);
+        // set vector table and stack pointer
         unsafe {
-            core::arch::asm!("wsr.vecbase {0}", in(reg) base, options(nostack));
-            // switch to new stack
-            xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
+            core::arch::asm!("wsr.vecbase {0}", in(reg) &raw const _init_start, options(nostack));
+            xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
         }
 
         // Trampoline to run from the new stack.
@@ -243,16 +242,15 @@ impl<'d> CpuControl<'d> {
     where
         F: FnOnce(),
     {
-        #[allow(static_mut_refs)] // FIXME
-        match unsafe { START_CORE1_FUNCTION.take() } {
-            Some(entry) => unsafe {
-                let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
-                entry();
-                loop {
-                    internal_park_core(Cpu::current(), true);
-                }
-            },
-            None => panic!("No start function set"),
+        let entry = START_CORE1_FUNCTION.load(Ordering::Acquire);
+        debug_assert!(!entry.is_null());
+
+        unsafe {
+            let entry = ManuallyDrop::take(&mut *entry.cast::<ManuallyDrop<F>>());
+            entry();
+            loop {
+                internal_park_core(Cpu::current(), true);
+            }
         }
     }
 
@@ -298,8 +296,8 @@ impl<'d> CpuControl<'d> {
             entry_dst.write(entry);
 
             let entry_fn = entry_dst.cast::<()>();
-            START_CORE1_FUNCTION = Some(entry_fn);
-            APP_CORE_STACK_TOP = Some(stack.top());
+            START_CORE1_FUNCTION.store(entry_fn, Ordering::Release);
+            APP_CORE_STACK_TOP.store(stack.top(), Ordering::Release);
         }
 
         crate::rom::ets_set_appcpu_boot_addr(Self::start_core1_init::<F> as *const u32 as u32);
