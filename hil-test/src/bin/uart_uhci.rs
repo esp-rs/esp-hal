@@ -30,7 +30,6 @@ const BAUDRATE: u32 = 921600;
 // const BAUDRATES: &[u32] = &[9600, 19200, 28800, 38400, 57600, 76800, 115200, 230400, 460800,
 // 576000, 921600];
 
-#[cfg(test)]
 #[embedded_test::tests(default_timeout = 5, executor = hil_test::Executor::new())]
 mod tests {
     use super::*;
