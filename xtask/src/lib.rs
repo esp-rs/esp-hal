@@ -582,9 +582,6 @@ pub fn generate_build_command(
         _ => None,
     };
     if let Some(toolchain) = toolchain {
-        // if toolchain.starts_with("esp") {
-        //     builder.add_config("-Zbuild-std=core,alloc");
-        // }
         builder = builder.toolchain(toolchain);
     }
 
