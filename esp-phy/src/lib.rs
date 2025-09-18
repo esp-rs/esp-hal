@@ -294,6 +294,7 @@ pub trait PhyController<'d>: private::Sealed + ModemClockController<'d> {
 
         PhyInitGuard { _phy_clock_guard }
     }
+
     /// Decreases the PHY init reference count for this modem ignoring
     /// currently alive [PhyInitGuard]s.
     ///
@@ -311,8 +312,8 @@ macro_rules! impl_phy_controller {
     ($feature_gate:ident, $peripheral:tt) => {
         #[cfg($feature_gate)]
         impl private::Sealed for esp_hal::peripherals::$peripheral<'_> {}
-        #[cfg($feature_gate)]
 
+        #[cfg($feature_gate)]
         impl<'d> PhyController<'d> for esp_hal::peripherals::$peripheral<'d> {}
     };
 }

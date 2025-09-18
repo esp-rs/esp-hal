@@ -1371,19 +1371,19 @@ pub fn sta_mac() -> [u8; 6] {
 }
 
 #[cfg(esp32)]
-fn set_mac_time_update_cb() {
+fn set_mac_time_update_cb(wifi: crate::hal::peripherals::WIFI<'_>) {
     use esp_phy::MacTimeExt;
     use esp_wifi_sys::include::esp_wifi_internal_update_mac_time;
     unsafe {
-        esp_hal::peripherals::WIFI::steal().set_mac_time_update_cb(|duration| {
+        wifi.set_mac_time_update_cb(|duration| {
             esp_wifi_internal_update_mac_time(duration.as_micros() as u32);
         });
     }
 }
 
-pub(crate) fn wifi_init() -> Result<(), WifiError> {
+pub(crate) fn wifi_init(_wifi: crate::hal::peripherals::WIFI<'_>) -> Result<(), WifiError> {
     #[cfg(esp32)]
-    set_mac_time_update_cb();
+    set_mac_time_update_cb(_wifi);
     unsafe {
         #[cfg(coex)]
         esp_wifi_result!(coex_init())?;
@@ -2958,7 +2958,7 @@ impl WifiConfig {
 /// currently in use.
 pub fn new<'d>(
     _inited: &'d Controller<'d>,
-    _device: crate::hal::peripherals::WIFI<'d>,
+    device: crate::hal::peripherals::WIFI<'d>,
     config: WifiConfig,
 ) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
     if crate::is_interrupts_disabled() {
@@ -3005,7 +3005,7 @@ pub fn new<'d>(
         TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
     };
 
-    crate::wifi::wifi_init()?;
+    crate::wifi::wifi_init(device)?;
 
     unsafe {
         let country = config.country_code.into_blob();
