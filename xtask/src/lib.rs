@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -6,7 +7,9 @@ use std::{
 use anyhow::{Context, Result, anyhow};
 use cargo::CargoAction;
 use esp_metadata::{Chip, Config, TokenStream};
+use parking_lot::{MappedMutexGuard, Mutex, MutexGuard};
 use serde::{Deserialize, Serialize};
+use toml_edit::{InlineTable, Item, Value};
 
 use crate::{
     cargo::{CargoArgsBuilder, CargoCommandBatcher, CargoToml},
@@ -72,24 +75,31 @@ pub enum Package {
 impl Package {
     /// Does the package have chip-specific cargo features?
     pub fn has_chip_features(&self) -> bool {
-        use Package::*;
+        use strum::IntoEnumIterator;
+        let chips = Chip::iter()
+            .map(|chip| chip.to_string())
+            .collect::<Vec<_>>();
+        let toml = self.toml();
+        let Some(Item::Table(features)) = toml.manifest.get("features") else {
+            return false;
+        };
 
-        matches!(
-            self,
-            EspBacktrace
-                | EspBootloaderEspIdf
-                | EspAlloc
-                | EspHal
-                | EspHalEmbassy
-                | EspMetadataGenerated
-                | EspRomSys
-                | EspLpHal
-                | EspPrintln
-                | EspPreempt
-                | EspStorage
-                | EspSync
-                | EspRadio
-        )
+        // This is intended to opt-out in case there are features that look like chip names, but
+        // aren't supposed to be handled like them.
+        if let Some(metadata) = toml.espressif_metadata() {
+            if let Some(Item::Value(ov)) = metadata.get("has_chip_features") {
+                let Value::Boolean(ov) = ov else {
+                    log::warn!("Invalid value for 'has_chip_features' in metadata");
+                    return false;
+                };
+
+                return *ov.value();
+            }
+        }
+
+        features
+            .iter()
+            .any(|(feature, _)| chips.iter().any(|c| c == feature))
     }
 
     /// Does the package have inline assembly?
@@ -177,18 +187,13 @@ impl Package {
 
     /// Should documentation be built for the package, and should the package be
     /// published?
-    pub fn is_published(&self, workspace: &Path) -> bool {
+    pub fn is_published(&self) -> bool {
         if *self == Package::Examples {
             // The `examples/` directory does not contain `Cargo.toml` in its root, and even if it
             // did nothing in this directory will be published.
             false
         } else {
-            // TODO: we should use some sort of cache instead of parsing the TOML every
-            // time, but for now this should be good enough.
-            let toml =
-                crate::cargo::CargoToml::new(workspace, *self).expect("Failed to parse Cargo.toml");
-
-            toml.is_published()
+            self.toml().is_published()
         }
     }
 
@@ -201,225 +206,192 @@ impl Package {
         }
     }
 
-    /// Given a device config, return the features which should be enabled for
-    /// this package.
-    pub fn feature_rules(&self, config: &Config) -> Vec<String> {
-        let mut features = vec![];
-        match self {
-            Package::EspBacktrace => features.push("defmt".to_owned()),
-            Package::EspConfig => features.push("build".to_owned()),
-            Package::EspHal => {
-                features.push("unstable".to_owned());
-                features.push("rt".to_owned());
-                if config.contains("psram") {
-                    // TODO this doesn't test octal psram (since `ESP_HAL_CONFIG_PSRAM_MODE`
-                    // defaults to `quad`) as it would require a separate build
-                    features.push("psram".to_owned())
-                }
-                if config.contains("usb0") {
-                    features.push("__usb_otg".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("__bluetooth".to_owned());
-                }
+    fn parse_conditional_features(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        let mut eval_context = somni_expr::Context::new();
+        eval_context.add_function("chip_has", |symbol: &str| {
+            config.all().iter().any(|sym| sym == symbol)
+        });
+        eval_context.add_variable("chip", config.name());
+
+        if let Some(condition) = table.get("if") {
+            let Some(expr) = condition.as_str() else {
+                panic!("`if` condition must be a string.");
+            };
+
+            if !eval_context
+                .evaluate::<bool>(expr)
+                .expect("Failed to evaluate expression")
+            {
+                return None;
             }
-            Package::EspRadio => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                if config.contains("wifi") {
-                    features.push("wifi".to_owned());
-                    features.push("wifi-eap".to_owned());
-                    features.push("esp-now".to_owned());
-                    features.push("sniffer".to_owned());
-                    features.push("smoltcp/proto-ipv4".to_owned());
-                    features.push("smoltcp/proto-ipv6".to_owned());
-                }
-                if config.contains("bt") {
-                    features.push("ble".to_owned());
-                }
-                if config.contains("ieee802154") {
-                    features.push("ieee802154".to_owned());
-                    // allow wifi + 802.15.4
-                    features.push("__docs_build".to_owned());
-                }
-                if config.contains("wifi") && config.contains("bt") {
-                    features.push("coex".to_owned());
-                }
-                if features.iter().any(|f| {
-                    f == "csi"
-                        || f == "ble"
-                        || f == "esp-now"
-                        || f == "sniffer"
-                        || f == "coex"
-                        || f == "ieee802154"
-                }) {
-                    features.push("unstable".to_owned());
-                }
-            }
-            Package::EspHalProcmacros => {
-                features.push("embassy".to_owned());
-            }
-            Package::EspHalEmbassy => {
-                features.push("esp-hal/unstable".to_owned());
-                features.push("esp-hal/rt".to_owned());
-                features.push("defmt".to_owned());
-                features.push("executors".to_owned());
-            }
-            Package::EspLpHal => {
-                if config.contains("lp_core") {
-                    features.push("embedded-io".to_owned());
-                }
-                features.push("embedded-hal".to_owned());
-            }
-            Package::EspPrintln => {
-                features.push("auto".to_owned());
-                features.push("defmt-espflash".to_owned());
-                features.push("critical-section".to_owned());
-            }
-            Package::EspStorage => {
-                if config.name() == "esp32c2"
-                    || config.name() == "esp32c3"
-                    || config.name() == "esp32s2"
-                {
-                    features.push("portable-atomic/unsafe-assume-single-core".to_owned());
-                }
-            }
-            Package::EspBootloaderEspIdf => {
-                features.push("defmt".to_owned());
-                features.push("validation".to_owned());
-            }
-            Package::EspAlloc => {
-                features.push("defmt".to_owned());
-            }
-            Package::EspMetadataGenerated => {}
-            Package::EspPreempt => features.push("esp-hal/unstable".to_owned()),
-            Package::EspRiscvRt => features.push("rtc-ram".to_owned()),
-            _ => {}
         }
 
-        log::debug!("Features for package '{}': {:?}", self, features);
+        let Some(config_features) = table.get("features") else {
+            panic!("Missing features array.");
+        };
+        let Value::Array(config_features) = config_features else {
+            panic!("features must be an array.");
+        };
+
+        let mut features = Vec::new();
+        for feature in config_features {
+            let feature = feature.as_str().expect("features must be strings.");
+            features.push(feature.to_owned());
+        }
+
+        Some(features)
+    }
+
+    fn parse_feature_set(table: &InlineTable, config: &Config) -> Option<Vec<String>> {
+        // Base features. If their condition is not met, the whole item is ignored.
+        let mut features = Self::parse_conditional_features(table, config)?;
+
+        if let Some(conditionals) = table.get("append") {
+            // Optional features. If their conditions are met, they are appended to the base
+            // features.
+            let Value::Array(conditionals) = conditionals else {
+                panic!("append must be an array.");
+            };
+            for cond in conditionals {
+                let Value::InlineTable(cond_table) = cond else {
+                    panic!("append items must be inline tables.");
+                };
+                if let Some(cond_features) = Self::parse_conditional_features(cond_table, config) {
+                    features.extend(cond_features);
+                }
+            }
+        };
+
+        Some(features)
+    }
+
+    /// Given a device config, return the features which should be enabled for
+    /// this package.
+    ///
+    /// Features are read from Cargo.toml metadata, from the `doc-config` table. Currently only
+    /// one feature set is supported.
+    // TODO: perhaps we should use the docs.rs metadata for doc features for packages that have no
+    // chip-specific features.
+    pub fn doc_feature_rules(&self, config: &Config) -> Vec<String> {
+        let mut features = vec![];
+
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("doc-config")
+        {
+            let Item::Value(Value::InlineTable(table)) = config_meta else {
+                panic!("doc-config must be inline tables.");
+            };
+
+            if let Some(fs) = Self::parse_feature_set(table, config) {
+                features = fs;
+            }
+        } else {
+            // Nothing
+        }
+
+        log::debug!("Doc features for package '{}': {:?}", self, features);
         features
     }
 
     /// Additional feature rules to test subsets of features for a package.
     pub fn check_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = Vec::new();
+        let mut cases = vec![];
 
-        // For now we run a lot of checks, but that will change.
-        cases.push(self.feature_rules(config));
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("check-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "check-configs must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
 
-        match self {
-            Package::EspHal => {
-                // This checks if the `esp-hal` crate compiles with the no features (other than the
-                // chip selection)
-
-                // This tests that disabling the `rt` feature works
-                cases.push(vec![]);
-                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
-                // enabled
-                cases.push(vec!["rt".to_owned()]);
-            }
-            Package::EspRadio => {
-                // Minimal set of features that when enabled _should_ still compile:
-                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                if config.contains("wifi") {
-                    // This tests if `wifi` feature works without `esp-radio/unstable`
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi".to_owned(),
-                    ]);
-                    // This tests `wifi-eap` feature
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi-eap".to_owned(),
-                        "unstable".to_owned(),
-                    ]);
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("check-configs items must be inline tables.");
+                };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
                 }
             }
-            Package::EspMetadataGenerated => {
-                cases.push(vec!["build-script".to_owned()]);
-            }
-            Package::EspPreempt => {
-                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
-            }
-            _ => {}
+        } else {
+            // Nothing specified, just test no features
+            cases.push(vec![]);
         }
 
-        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
+        log::debug!("Check features for package '{}': {:?}", self, cases);
         cases
     }
 
     /// Additional feature rules to test subsets of features for a package.
     pub fn lint_feature_rules(&self, config: &Config) -> Vec<Vec<String>> {
-        let mut cases = Vec::new();
+        let mut cases = vec![];
 
-        // For now we run a lot of clippy checks, but that will change.
-        cases.push(self.feature_rules(config));
+        let toml = self.toml();
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(config_meta) = metadata.get("clippy-configs")
+        {
+            let Item::Value(Value::Array(tables)) = config_meta else {
+                panic!(
+                    "clippy-configs must be an array of tables. {:?}",
+                    config_meta
+                );
+            };
 
-        match self {
-            Package::EspHal => {
-                // This checks if the `esp-hal` crate compiles with the no features (other than the
-                // chip selection)
-
-                // This tests that disabling the `rt` feature works
-                cases.push(vec![]);
-                // This checks if the `esp-hal` crate compiles _without_ the `unstable` feature
-                // enabled
-                cases.push(vec!["rt".to_owned()]);
-            }
-            Package::EspRadio => {
-                // Minimal set of features that when enabled _should_ still compile:
-                cases.push(vec!["esp-hal/rt".to_owned(), "esp-hal/unstable".to_owned()]);
-                if config.contains("wifi") {
-                    // This tests if `wifi` feature works without `esp-radio/unstable`
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi".to_owned(),
-                    ]);
-                    // This tests `wifi-eap` feature
-                    cases.push(vec![
-                        "esp-hal/rt".to_owned(),
-                        "esp-hal/unstable".to_owned(),
-                        "wifi-eap".to_owned(),
-                        "unstable".to_owned(),
-                    ]);
+            for table in tables {
+                let Value::InlineTable(table) = table else {
+                    panic!("clippy-configs items must be inline tables.");
+                };
+                if let Some(features) = Self::parse_feature_set(table, config) {
+                    cases.push(features);
                 }
             }
-            Package::EspMetadataGenerated => {
-                cases.push(vec!["build-script".to_owned()]);
-            }
-            Package::EspPreempt => {
-                cases.push(vec!["esp-alloc".to_owned(), "esp-hal/unstable".to_owned()])
-            }
-            Package::EspStorage => {
-                // TODO: https://github.com/esp-rs/esp-hal/issues/4136
-                if config.name() == "esp32c2"
-                    || config.name() == "esp32c3"
-                    || config.name() == "esp32s2"
-                {
-                    // println!("kokot usho");
-                    cases.push(vec![
-                        "defmt".to_owned(),
-                        "portable-atomic/unsafe-assume-single-core".to_owned(),
-                    ]);
-                } else {
-                    cases.push(vec!["defmt".to_owned()]);
-                }
-            }
-            _ => {}
         }
 
-        log::debug!("Lint feature cases for package '{}': {:?}", self, cases);
+        log::debug!("Check features for package '{}': {:?}", self, cases);
         cases
+    }
+
+    fn toml(&self) -> MappedMutexGuard<'_, CargoToml> {
+        static TOML: Mutex<Option<HashMap<Package, CargoToml>>> = Mutex::new(None);
+
+        let tomls = TOML.lock();
+
+        MutexGuard::map(tomls, |tomls| {
+            let tomls = tomls.get_or_insert_default();
+
+            tomls.entry(*self).or_insert_with(|| {
+                CargoToml::new(&std::env::current_dir().unwrap(), *self)
+                    .expect("Failed to parse Cargo.toml")
+            })
+        })
+    }
+
+    fn targets_lp_core(&self) -> bool {
+        if *self == Package::Examples {
+            return false;
+        }
+
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(targets_lp_core)) = metadata.get("targets_lp_core") else {
+            return false;
+        };
+
+        targets_lp_core
+            .as_bool()
+            .expect("targets_lp_core must be a boolean")
     }
 
     /// Return the target triple for a given package/chip pair.
     pub fn target_triple(&self, chip: &Chip) -> Result<String> {
-        if *self == Package::EspLpHal {
+        if self.targets_lp_core() {
             chip.lp_target().map(ToString::to_string)
         } else {
             Ok(chip.target())
@@ -428,24 +400,29 @@ impl Package {
 
     /// Validate that the specified chip is valid for the specified package.
     pub fn validate_package_chip(&self, chip: &Chip) -> Result<()> {
-        let check = match self {
-            Package::EspLpHal => chip.has_lp_core(),
-            Package::XtensaLx | Package::XtensaLxRt | Package::XtensaLxRtProcMacros => {
-                chip.is_xtensa()
-            }
-            Package::EspRiscvRt => chip.is_riscv(),
-            _ => true,
-        };
-
-        if check {
-            Ok(())
-        } else {
-            Err(anyhow!(
-                "Invalid chip provided for package '{}': '{}'",
-                self,
-                chip
-            ))
+        if *self == Package::Examples {
+            return Ok(());
         }
+
+        if self.targets_lp_core() && !chip.has_lp_core() {
+            return Err(anyhow!(
+                "Package '{self}' requires an LP core, but '{chip}' does not have one",
+            ));
+        }
+
+        let toml = self.toml();
+
+        if let Some(metadata) = toml.espressif_metadata()
+            && let Some(Item::Value(Value::Array(targets))) = metadata.get("requires_target")
+            && !targets.iter().any(|t| t.as_str() == Some(&chip.target()))
+        {
+            return Err(anyhow!(
+                "Package '{self}' is not compatible with {chip_target} chips",
+                chip_target = chip.target()
+            ));
+        }
+
+        Ok(())
     }
 
     /// Creates a tag string for this [`Package`] combined with a semantic version.
@@ -460,7 +437,18 @@ impl Package {
 
     #[cfg(feature = "release")]
     fn is_semver_checked(&self) -> bool {
-        [Self::EspHal].contains(self)
+        let toml = self.toml();
+        let Some(metadata) = toml.espressif_metadata() else {
+            return false;
+        };
+
+        let Some(Item::Value(semver_checked)) = metadata.get("semver_checked") else {
+            return false;
+        };
+
+        semver_checked
+            .as_bool()
+            .expect("semver_checked must be a boolean")
     }
 }
 
@@ -670,8 +658,8 @@ pub fn package_paths(workspace: &Path) -> Result<Vec<PathBuf>> {
 }
 
 /// Parse the version from the specified package's Cargo manifest.
-pub fn package_version(workspace: &Path, package: Package) -> Result<semver::Version> {
-    CargoToml::new(workspace, package).map(|toml| toml.package_version())
+pub fn package_version(_workspace: &Path, package: Package) -> Result<semver::Version> {
+    Ok(package.toml().package_version())
 }
 
 /// Make the path "Windows"-safe

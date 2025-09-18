@@ -258,7 +258,7 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
 
     let mut commands = CargoCommandBatcher::new();
 
-    for package in packages.iter().filter(|p| p.is_published(workspace)) {
+    for package in packages.iter().filter(|p| p.is_published()) {
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
@@ -266,7 +266,8 @@ fn check_packages(workspace: &Path, args: CheckPackagesArgs) -> Result<()> {
             log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
-            if package.validate_package_chip(chip).is_err() {
+            if let Err(e) = package.validate_package_chip(chip) {
+                log::warn!("{e}. Skipping");
                 continue;
             }
 
@@ -353,7 +354,7 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
     let mut packages = args.packages;
     packages.sort();
 
-    for package in packages.iter().filter(|p| p.is_published(workspace)) {
+    for package in packages.iter().filter(|p| p.is_published()) {
         // Unfortunately each package has its own unique requirements for
         // building, so we need to handle each individually (though there
         // is *some* overlap)
@@ -361,7 +362,8 @@ fn lint_packages(workspace: &Path, args: LintPackagesArgs) -> Result<()> {
             log::debug!("  for chip: {}", chip);
             let device = Config::for_chip(chip);
 
-            if package.validate_package_chip(chip).is_err() {
+            if let Err(e) = package.validate_package_chip(chip) {
+                log::warn!("{e}. Skipping");
                 continue;
             }
 
@@ -510,24 +512,11 @@ fn run_ci_checks(workspace: &Path, args: CiArgs) -> Result<()> {
         std::env::set_var("CI", "true");
     }
 
-    // TODO: enable checking all crates once cargo-batch has check support
-    // runner.run("Check crates", || {
-    //     check_packages(
-    //         workspace,
-    //         LintPackagesArgs {
-    //             packages: Package::iter().collect(),
-    //             chips: vec![args.chip],
-    //             fix: false,
-    //             toolchain: args.toolchain.clone(),
-    //         },
-    //     )
-    // });
-
-    runner.run("Check esp-hal", || {
+    runner.run("Check crates", || {
         check_packages(
             workspace,
             CheckPackagesArgs {
-                packages: vec![Package::EspHal],
+                packages: Package::iter().collect(),
                 chips: vec![args.chip],
                 toolchain: args.toolchain.clone(),
             },

@@ -129,6 +129,9 @@ type PrinterImpl = uart_printer::Printer;
 #[cfg(feature = "auto")]
 type PrinterImpl = auto_printer::Printer;
 
+#[cfg(feature = "no-op")]
+type PrinterImpl = noop::Printer;
+
 #[cfg(all(
     feature = "auto",
     any(
@@ -466,6 +469,17 @@ mod uart_printer {
         }
 
         pub fn flush(_token: LockToken<'_>) {}
+    }
+}
+
+#[cfg(feature = "no-op")]
+mod noop {
+    pub struct Printer;
+
+    impl Printer {
+        pub fn write_bytes_in_cs(_bytes: &[u8], _token: super::LockToken<'_>) {}
+
+        pub fn flush(_token: super::LockToken<'_>) {}
     }
 }
 

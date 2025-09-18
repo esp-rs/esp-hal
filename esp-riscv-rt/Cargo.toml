@@ -11,6 +11,17 @@ repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 links         = "esp-riscv-rt"
 
+[package.metadata.espressif]
+doc-config = { features = ["rtc-ram"] }
+requires_target = ["riscv32imc-unknown-none-elf", "riscv32imac-unknown-none-elf"]
+check-configs = [
+    { features = [] },
+    { features = ["rtc-ram"] },
+    { features = ["no-mie-mip"] },
+    { features = ["rtc-ram", "no-mie-mip"] },
+]
+clippy-configs = [{ features = ["rtc-ram"] }]
+
 [lib]
 bench = false
 test  = false

@@ -8,6 +8,16 @@ documentation = "https://docs.espressif.com/projects/rust/esp-hal-procmacros/lat
 repository    = "https://github.com/esp-rs/esp-hal"
 license       = "MIT OR Apache-2.0"
 
+[package.metadata.espressif]
+doc-config = { features = ["embassy"] }
+check-configs = [
+    { features = [] },
+    { features = ["embassy"] }
+]
+clippy-configs = [
+    { features = ["embassy"] },
+]
+
 [package.metadata.docs.rs]
 features = ["embassy", "has-ulp-core", "interrupt", "ram", "is-ulp-core"]
 
