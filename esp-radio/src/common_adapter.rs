@@ -347,15 +347,6 @@ pub(crate) fn enable_wifi_power_domain() {
                 let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
             }
         }
-        cfg_if::cfg_if! {
-            if #[cfg(esp32)] {
-                // The ESP32 doesn't require this.
-            } else if #[cfg(soc_has_apb_ctrl)] {
-                let syscon = esp_hal::peripherals::APB_CTRL::regs();
-            } else {
-                let syscon = esp_hal::peripherals::SYSCON::regs();
-            }
-        }
 
         rtc_cntl
             .dig_pwc()
@@ -363,6 +354,13 @@ pub(crate) fn enable_wifi_power_domain() {
 
         #[cfg(not(esp32))]
         unsafe {
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_apb_ctrl)] {
+                let syscon = esp_hal::peripherals::APB_CTRL::regs();
+            } else {
+                let syscon = esp_hal::peripherals::SYSCON::regs();
+            }
+        }
             const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
             const FE_RST: u32 = 1 << 1; // RF Frontend RST
             const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC 
