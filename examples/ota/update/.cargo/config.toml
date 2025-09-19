@@ -1,12 +1,12 @@
 [target.'cfg(target_arch = "riscv32")']
-runner    = "espflash flash --monitor --partition-table=partitions.csv"
+runner    = "espflash flash --monitor --partition-table=examples/ota/update/partitions.csv"
 rustflags = [
   "-C", "link-arg=-Tlinkall.x",
   "-C", "force-frame-pointers",
 ]
 
 [target.'cfg(target_arch = "xtensa")']
-runner    = "espflash flash --monitor --partition-table=partitions.csv"
+runner    = "espflash flash --monitor --partition-table=examples/ota/update/partitions.csv"
 rustflags = [
   # GNU LD
   "-C", "link-arg=-Wl,-Tlinkall.x",

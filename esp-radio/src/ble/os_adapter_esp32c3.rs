@@ -117,7 +117,7 @@ pub(super) static G_OSI_FUNCS: osi_funcs_s = osi_funcs_s {
     task_create: Some(task_create),
     task_delete: Some(task_delete),
     is_in_isr: Some(is_in_isr),
-    cause_sw_intr_to_core: Some(cause_sw_intr_to_core),
+    cause_sw_intr_to_core: None,
     malloc: Some(crate::ble::malloc),
     malloc_internal: Some(crate::ble::malloc_internal),
     free: Some(crate::ble::free),
