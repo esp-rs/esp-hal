@@ -87,8 +87,7 @@ pub(crate) fn setup_multitasking() {
 #[cfg_attr(not(esp32), unsafe(export_name = "Software0"))]
 #[cfg_attr(esp32, unsafe(export_name = "Software1"))]
 fn task_switch_interrupt(context: &mut CpuContext) {
-    let intr = SW_INTERRUPT;
-    unsafe { core::arch::asm!("wsr.intclear  {0}", in(reg) intr, options(nostack)) };
+    unsafe { xtensa_lx_rt::xtensa_lx::interrupt::clear(SW_INTERRUPT) };
 
     SCHEDULER.with(|scheduler| scheduler.switch_task(context));
 }
