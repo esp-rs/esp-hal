@@ -10,11 +10,11 @@
 //!
 //! ```ignore,bash
 //! cargo xtask build examples gpio --chip=esp32
-//! espflash save-image --chip=esp32 examples/interrupt/gpio/target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/gpio_interrupt examples/target/ota_image
 //! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 examples/ota/update/target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
 //! cargo xtask build examples update --chip=esp32
-//! espflash save-image --chip=esp32 examples/ota/update/target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
+//! espflash save-image --chip=esp32 target/xtensa-esp32-none-elf/release/ota_update examples/target/ota_image
 //! espflash erase-flash
 //! cargo xtask run example update --chip=esp32
 //! ```
