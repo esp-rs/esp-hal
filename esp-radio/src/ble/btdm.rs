@@ -200,8 +200,7 @@ unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
     #[cfg(esp32)]
     {
         trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
-        let intr = 1 << _intr_no;
-        unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
+        unsafe { xtensa_lx_rt::xtensa_lx::interrupt::set(1 << _intr_no) };
         0
     }
 }

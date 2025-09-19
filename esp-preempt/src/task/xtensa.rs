@@ -95,6 +95,5 @@ fn task_switch_interrupt(context: &mut CpuContext) {
 
 #[inline]
 pub(crate) fn yield_task() {
-    let intr = SW_INTERRUPT;
-    unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
+    unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
 }
