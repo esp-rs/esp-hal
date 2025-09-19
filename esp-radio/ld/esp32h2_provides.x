@@ -8,8 +8,8 @@ EXTERN( __esp_radio_strrchr );
 EXTERN( __esp_radio_misc_nvs_deinit );
 EXTERN( __esp_radio_misc_nvs_init );
 EXTERN( __ESP_RADIO_G_LOG_LEVEL );
-EXTERN( __esp_radio_esp_dport_access_reg_read );
-EXTERN( __esp_radio_rtc_get_xtal );
+
+
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_fwrite );
@@ -31,8 +31,8 @@ PROVIDE( strrchr = __esp_radio_strrchr );
 PROVIDE( misc_nvs_deinit = __esp_radio_misc_nvs_deinit );
 PROVIDE( misc_nvs_init = __esp_radio_misc_nvs_init );
 PROVIDE( g_log_level = __ESP_RADIO_G_LOG_LEVEL );
-PROVIDE( esp_dport_access_reg_read = __esp_radio_esp_dport_access_reg_read );
-PROVIDE( rtc_get_xtal = __esp_radio_rtc_get_xtal );
+
+
 PROVIDE( putchar = __esp_radio_putchar );
 PROVIDE( _putchar = __esp_radio_putchar );
 PROVIDE( fwrite = __esp_radio_fwrite );

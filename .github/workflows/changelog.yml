@@ -46,6 +46,8 @@ jobs:
               - 'esp-lp-hal/**'
             esp-metadata:
               - 'esp-metadata/**'
+            esp-phy:
+              - 'esp-phy/**'
             esp-preempt:
               - 'esp-preempt/**'
             esp-println:
@@ -136,6 +138,14 @@ jobs:
           changeLogPath: esp-lp-hal/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-lp-hal/CHANGELOG.md file."
+
+      - name: Check that changelog updated (esp-phy)
+        if: steps.changes.outputs.esp-phy == 'true'
+        uses: dangoslen/changelog-enforcer@v3
+        with:
+          changeLogPath: esp-phy/CHANGELOG.md
+          skipLabels: "skip-changelog"
+          missingUpdateErrorMessage: "Please add a changelog entry in the esp-phy/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-preempt)
         if: steps.changes.outputs.esp-preempt == 'true'

@@ -22,6 +22,7 @@ releases/tag/$
 img\.shields\.io/badge/MSRV-
 
 # TODO: remove once released
+docs\.espressif\.com/projects/rust/esp-phy/latest/
 docs\.espressif\.com/projects/rust/esp-preempt/latest/
 docs\.espressif\.com/projects/rust/esp-radio-preempt-driver/latest/
 docs\.espressif\.com/projects/rust/esp-radio/latest/

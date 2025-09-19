@@ -1,0 +1,19 @@
+crate: esp-phy
+
+options:
+  - name: phy_enable_usb
+    description: "Keeps USB running when using WiFi.
+                 This allows debugging and log messages via USB Serial JTAG.
+                 Turn off for best WiFi performance."
+    default:
+      - value: true
+
+  - name: phy_skip_calibration_after_deep_sleep
+    description: "Use PHY_RF_CAL_NONE after deep sleep."
+    default:
+      - value: false
+
+  - name: phy_full_calibration
+    description: "Use PHY_RF_CAL_FULL instead of PHY_RF_CAL_PARTIAL."
+    default:
+      - value: true

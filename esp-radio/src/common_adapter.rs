@@ -1,17 +1,9 @@
 #![allow(dead_code)]
 
-use esp_sync::NonReentrantMutex;
 use esp_wifi_sys::{
     c_types::c_char,
-    include::{
-        esp_phy_calibration_data_t,
-        esp_phy_calibration_mode_t,
-        get_phy_version_str,
-        register_chipv7_phy,
-        timeval,
-    },
+    include::{esp_phy_calibration_data_t, timeval},
 };
-use portable_atomic::{AtomicU32, Ordering};
 
 use crate::{
     binary::{
@@ -22,49 +14,6 @@ use crate::{
     hal::{self, clock::ModemClockController, ram},
     time::blob_ticks_to_micros,
 };
-
-#[cfg_attr(esp32c3, path = "common_adapter_esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "common_adapter_esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "common_adapter_esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "common_adapter_esp32h2.rs")]
-#[cfg_attr(esp32, path = "common_adapter_esp32.rs")]
-#[cfg_attr(esp32s3, path = "common_adapter_esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "common_adapter_esp32s2.rs")]
-pub(crate) mod chip_specific;
-
-#[cfg_attr(esp32c3, path = "phy_init_data_esp32c3.rs")]
-#[cfg_attr(esp32c2, path = "phy_init_data_esp32c2.rs")]
-#[cfg_attr(esp32c6, path = "phy_init_data_esp32c6.rs")]
-#[cfg_attr(esp32h2, path = "phy_init_data_esp32h2.rs")]
-#[cfg_attr(esp32, path = "phy_init_data_esp32.rs")]
-#[cfg_attr(esp32s3, path = "phy_init_data_esp32s3.rs")]
-#[cfg_attr(esp32s2, path = "phy_init_data_esp32s2.rs")]
-pub(crate) mod phy_init_data;
-
-static PHY_ACCESS_REF: NonReentrantMutex<usize> = NonReentrantMutex::new(0);
-
-pub(crate) unsafe fn phy_enable() {
-    PHY_ACCESS_REF.with(|ref_count| {
-        *ref_count += 1;
-        if *ref_count == 1 {
-            unsafe { chip_specific::phy_enable_inner() };
-        }
-    })
-}
-
-#[allow(unused)]
-pub(crate) unsafe fn phy_disable() {
-    PHY_ACCESS_REF.with(|ref_count| {
-        *ref_count -= 1;
-        if *ref_count == 0 {
-            unsafe { chip_specific::phy_disable_inner() };
-        }
-    })
-}
-
-static CAL_DATA: esp_sync::NonReentrantMutex<
-    [u8; core::mem::size_of::<esp_phy_calibration_data_t>()],
-> = esp_sync::NonReentrantMutex::new([0u8; core::mem::size_of::<esp_phy_calibration_data_t>()]);
 
 /// **************************************************************************
 /// Name: esp_semphr_create
@@ -341,7 +290,33 @@ pub unsafe extern "C" fn __esp_radio_strrchr(_s: *const (), _c: u32) -> *const u
     todo!("strrchr");
 }
 
-static PHY_CLOCK_ENABLE_REF: AtomicU32 = AtomicU32::new(0);
+#[unsafe(no_mangle)]
+static mut __ESP_RADIO_G_LOG_LEVEL: i32 = 0;
+
+#[unsafe(no_mangle)]
+pub static mut __ESP_RADIO_G_MISC_NVS: *mut u32 = &raw mut NVS as *mut u32;
+
+pub static mut NVS: [u32; 15] = [0u32; 15];
+
+// For some reason these are only necessary on Xtensa chips.
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_deinit() {
+    trace!("misc_nvs_deinit")
+}
+
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_init() -> i32 {
+    trace!("misc_nvs_init");
+    0
+}
+
+#[cfg(xtensa)]
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __esp_radio_misc_nvs_restore() -> i32 {
+    todo!("misc_nvs_restore")
+}
 
 // We're use either WIFI or BT here, since esp-radio also supports the ESP32-H2 as the only
 // chip, with BT but without WIFI.
@@ -350,66 +325,73 @@ type ModemClockControllerPeripheral = esp_hal::peripherals::WIFI<'static>;
 #[cfg(esp32h2)]
 type ModemClockControllerPeripheral = esp_hal::peripherals::BT<'static>;
 
+#[allow(unused)]
 pub(crate) unsafe fn phy_enable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_add(1, Ordering::Acquire);
-    if count == 0 {
-        // Stealing the peripheral is safe here, as they must have been passed into the relevant
-        // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
-        let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
-        core::mem::forget(clock_guard);
-
-        trace!("phy_enable_clock done!");
-    }
+    // Stealing the peripheral is safe here, as they must have been passed into the relevant
+    // initialization functions for the Wi-Fi or BLE controller, if this code gets executed.
+    let clock_guard = unsafe { ModemClockControllerPeripheral::steal() }.enable_phy_clock();
+    core::mem::forget(clock_guard);
 }
 
 #[allow(unused)]
 pub(crate) unsafe fn phy_disable_clock() {
-    let count = PHY_CLOCK_ENABLE_REF.fetch_sub(1, Ordering::Release);
-    if count == 1 {
-        unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
-        trace!("phy_disable_clock done!");
-    }
+    unsafe { ModemClockControllerPeripheral::steal() }.decrease_phy_clock_ref_count();
 }
-
-pub(crate) fn phy_calibrate() {
-    let phy_version = unsafe { get_phy_version_str() };
-    trace!("phy_version {}", unsafe { str_from_c(phy_version) });
-
-    let init_data = &phy_init_data::PHY_INIT_DATA_DEFAULT;
-
-    unsafe {
-        chip_specific::bbpll_en_usb();
-    }
-
-    #[cfg(phy_full_calibration)]
-    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_FULL;
-    #[cfg(not(phy_full_calibration))]
-    const CALIBRATION_MODE: esp_phy_calibration_mode_t =
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_PARTIAL;
-
-    #[cfg(phy_skip_calibration_after_deep_sleep)]
-    let calibration_mode = if crate::hal::system::reset_reason()
-        == Some(crate::hal::rtc_cntl::SocResetReason::CoreDeepSleep)
+pub(crate) fn enable_wifi_power_domain() {
+    #[cfg(not(any(soc_has_pmu, esp32c2)))]
     {
-        esp_wifi_sys::include::esp_phy_calibration_mode_t_PHY_RF_CAL_NONE
-    } else {
-        CALIBRATION_MODE
-    };
-    #[cfg(not(phy_skip_calibration_after_deep_sleep))]
-    let calibration_mode = CALIBRATION_MODE;
+        cfg_if::cfg_if! {
+            if #[cfg(soc_has_lpwr)] {
+                let rtc_cntl = esp_hal::peripherals::LPWR::regs();
+            } else {
+                let rtc_cntl = esp_hal::peripherals::RTC_CNTL::regs();
+            }
+        }
 
-    debug!("Using calibration mode {}", calibration_mode);
+        rtc_cntl
+            .dig_pwc()
+            .modify(|_, w| w.wifi_force_pd().clear_bit());
 
-    let res = CAL_DATA.with(|cal_data| unsafe {
-        register_chipv7_phy(
-            init_data,
-            cal_data as *mut _ as *mut crate::binary::include::esp_phy_calibration_data_t,
-            calibration_mode,
-        )
-    });
+        #[cfg(not(esp32))]
+        unsafe {
+            cfg_if::cfg_if! {
+                if #[cfg(soc_has_apb_ctrl)] {
+                    let syscon = esp_hal::peripherals::APB_CTRL::regs();
+                } else {
+                    let syscon = esp_hal::peripherals::SYSCON::regs();
+                }
+            }
+            const WIFIBB_RST: u32 = 1 << 0; // Wi-Fi baseband
+            const FE_RST: u32 = 1 << 1; // RF Frontend RST
+            const WIFIMAC_RST: u32 = 1 << 2; // Wi-Fi MAC 
 
-    debug!("register_chipv7_phy result = {}", res);
+            const BTBB_RST: u32 = 1 << 3; // Bluetooth Baseband
+            const BTMAC_RST: u32 = 1 << 4; // deprecated
+            const RW_BTMAC_RST: u32 = 1 << 9; // Bluetooth MAC
+            const RW_BTMAC_REG_RST: u32 = 1 << 11; // Bluetooth MAC Regsiters
+            const BTBB_REG_RST: u32 = 1 << 13; // Bluetooth Baseband Registers
+
+            const MODEM_RESET_FIELD_WHEN_PU: u32 = WIFIBB_RST
+                | FE_RST
+                | WIFIMAC_RST
+                | if cfg!(soc_has_bt) {
+                    BTBB_RST | BTMAC_RST | RW_BTMAC_RST | RW_BTMAC_REG_RST | BTBB_RST
+                } else {
+                    0
+                };
+
+            syscon
+                .wifi_rst_en()
+                .modify(|r, w| w.bits(r.bits() | MODEM_RESET_FIELD_WHEN_PU));
+            syscon
+                .wifi_rst_en()
+                .modify(|r, w| w.bits(r.bits() & !MODEM_RESET_FIELD_WHEN_PU));
+        }
+
+        rtc_cntl
+            .dig_iso()
+            .modify(|_, w| w.wifi_force_iso().clear_bit());
+    }
 }
 
 /// Get calibration data.
@@ -418,17 +400,19 @@ pub(crate) fn phy_calibrate() {
 ///
 /// If you see the data is different than what was persisted before, consider persisting the new
 /// data.
-pub fn phy_calibration_data() -> [u8; core::mem::size_of::<esp_phy_calibration_data_t>()] {
-    CAL_DATA.with(|cal_data| *cal_data)
+pub fn phy_calibration_data(data: &mut [u8; esp_phy::PHY_CALIBRATION_DATA_LENGTH]) {
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::backup_phy_calibration_data(data);
 }
 
 /// Set calibration data.
 ///
 /// This will be used next time the phy gets initialized.
 pub fn set_phy_calibration_data(data: &[u8; core::mem::size_of::<esp_phy_calibration_data_t>()]) {
-    CAL_DATA.with(|cal_data| {
-        *cal_data = *data;
-    });
+    // Although we're ignoring the result here, this doesn't change the behavior, as this just
+    // doesn't do anything in case an error is returned.
+    let _ = esp_phy::set_phy_calibration_data(data);
 }
 
 /// **************************************************************************

@@ -544,3 +544,5 @@ apb_cycle_wait_num = 16 # TODO
 ## Radio
 [device.bt]
 [device.ieee802154]
+[device.phy]
+combo_module = true

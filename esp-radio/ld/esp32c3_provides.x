@@ -5,8 +5,8 @@ EXTERN( __ESP_RADIO_WIFI_EVENT );
 EXTERN( __esp_radio_gettimeofday );
 EXTERN( __esp_radio_esp_fill_random );
 EXTERN( __esp_radio_strrchr );
-EXTERN( __esp_radio_esp_dport_access_reg_read );
-EXTERN( __esp_radio_rtc_get_xtal );
+
+
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_putchar );
 EXTERN( __esp_radio_fwrite );
@@ -27,8 +27,8 @@ PROVIDE( WIFI_EVENT = __ESP_RADIO_WIFI_EVENT );
 PROVIDE( gettimeofday = __esp_radio_gettimeofday );
 PROVIDE( esp_fill_random = __esp_radio_esp_fill_random );
 PROVIDE( strrchr = __esp_radio_strrchr );
-PROVIDE( esp_dport_access_reg_read = __esp_radio_esp_dport_access_reg_read );
-PROVIDE( rtc_get_xtal = __esp_radio_rtc_get_xtal );
+
+
 PROVIDE( putchar = __esp_radio_putchar );
 PROVIDE( _putchar = __esp_radio_putchar );
 PROVIDE( fwrite = __esp_radio_fwrite );

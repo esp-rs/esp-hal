@@ -55,7 +55,7 @@
 //! Please note that the configuration keys are usually named slightly different and not all configuration keys apply.
 #![cfg_attr(
     feature = "wifi",
-    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_RADIO_PHY_ENABLE_USB` is enabled by default."
+    doc = "By default the power-saving mode is [PowerSaveMode::None](crate::wifi::PowerSaveMode::None) and `ESP_PHY_PHY_ENABLE_USB` is enabled by default."
 )]
 //! In addition pay attention to these configuration keys:
 //! - `ESP_RADIO_RX_QUEUE_SIZE`
@@ -129,7 +129,6 @@ mod fmt;
 
 use core::marker::PhantomData;
 
-use common_adapter::chip_specific::phy_mem_init;
 pub use common_adapter::{phy_calibration_data, set_phy_calibration_data};
 use esp_hal::{self as hal};
 use esp_radio_preempt_driver as preempt;
@@ -295,8 +294,7 @@ pub fn init<'d>() -> Result<Controller<'d>, InitializationError> {
         return Err(InitializationError::WrongClockConfig);
     }
 
-    crate::common_adapter::chip_specific::enable_wifi_power_domain();
-    phy_mem_init();
+    crate::common_adapter::enable_wifi_power_domain();
 
     setup_radio_isr();
 

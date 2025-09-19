@@ -9,6 +9,7 @@ pub(crate) mod os_adapter_chip_specific;
 
 use allocator_api2::boxed::Box;
 use enumset::EnumSet;
+use esp_phy::PhyController;
 use esp_sync::{NonReentrantMutex, RawMutex};
 
 use super::WifiEvent;
@@ -778,8 +779,7 @@ pub unsafe extern "C" fn wifi_apb80m_release() {
 /// *************************************************************************
 pub unsafe extern "C" fn phy_disable() {
     trace!("phy_disable");
-
-    unsafe { crate::common_adapter::phy_disable() }
+    unsafe { WIFI::steal() }.decrease_phy_ref_count();
 }
 
 /// **************************************************************************
@@ -798,8 +798,7 @@ pub unsafe extern "C" fn phy_disable() {
 pub unsafe extern "C" fn phy_enable() {
     // quite some code needed here
     trace!("phy_enable");
-
-    unsafe { crate::common_adapter::phy_enable() }
+    core::mem::forget(unsafe { WIFI::steal() }.enable_phy());
 }
 
 /// **************************************************************************

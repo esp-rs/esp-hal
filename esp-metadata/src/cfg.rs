@@ -619,4 +619,14 @@ driver_configs![
         name: "IEEE 802.15.4",
         properties: {}
     },
+    PhyProperties {
+        driver: phy,
+        name: "PHY",
+        properties: {
+            #[serde(default)]
+            combo_module: bool,
+            #[serde(default)]
+            backed_up_digital_register_count: Option<u32>,
+        }
+    },
 ];
