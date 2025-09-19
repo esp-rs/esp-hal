@@ -192,18 +192,12 @@ unsafe extern "C" fn is_in_isr() -> i32 {
     crate::is_interrupts_disabled() as i32
 }
 
+#[cfg(esp32)]
 #[ram]
 unsafe extern "C" fn cause_sw_intr_to_core(_core: i32, _intr_no: i32) -> i32 {
-    #[cfg(any(esp32c3, esp32s3))]
-    todo!("cause_sw_intr_to_core is not implemented for this target");
-
-    #[cfg(esp32)]
-    {
-        trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
-        let intr = 1 << _intr_no;
-        unsafe { core::arch::asm!("wsr.intset  {0}", in(reg) intr, options(nostack)) };
-        0
-    }
+    trace!("cause_sw_intr_to_core {} {}", _core, _intr_no);
+    unsafe { xtensa_lx_rt::xtensa_lx::interrupt::set(1 << _intr_no) };
+    0
 }
 
 #[allow(unused)]
