@@ -442,7 +442,7 @@ impl AppPartitionSubType {
         if number > 16 {
             return Err(Error::InvalidArgument);
         }
-        Ok(Self::try_from(number + OTA_SUBTYPE_OFFSET)?)
+        Self::try_from(number + OTA_SUBTYPE_OFFSET)
     }
 }
 
