@@ -129,6 +129,9 @@ _xtensa_lx_rt_copy:
 Reset:
     entry  a1, 0
     movi   a0, 0                    // Trash the return address. Debuggers may use this to stop unwinding.
+
+    wsr.intenable a0                // Disable interrupts
+
     l32r   a5, sym_stack_start_cpu0 // a5 is our temporary value register
     mov    sp, a5                   // Set the stack pointer.
 
