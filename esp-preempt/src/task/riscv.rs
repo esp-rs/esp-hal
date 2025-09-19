@@ -1,6 +1,6 @@
 use core::ffi::c_void;
 
-use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register};
+use esp_hal::{interrupt::software::SoftwareInterrupt, riscv::register, system::Cpu};
 
 use crate::SCHEDULER;
 
@@ -290,29 +290,40 @@ _restore_context:
     _NEXT_CTX_PTR = sym _NEXT_CTX_PTR,
 );
 
-pub(crate) fn setup_multitasking() {
+pub(crate) fn setup_multitasking<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>) {
     // Register the interrupt handler without nesting to satisfy the requirements of the task
     // switching code
-    let swint2_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
-        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint2_handler as *const ()) },
+    let swint_handler = esp_hal::interrupt::InterruptHandler::new_not_nested(
+        unsafe { core::mem::transmute::<*const (), extern "C" fn()>(swint_handler as *const ()) },
         esp_hal::interrupt::Priority::Priority1,
     );
 
-    unsafe { SoftwareInterrupt::<2>::steal() }.set_interrupt_handler(swint2_handler);
+    irq.set_interrupt_handler(swint_handler);
+}
+
+#[cfg(multi_core)]
+pub(crate) fn setup_smp<const IRQ: u8>(irq: SoftwareInterrupt<'static, IRQ>) {
+    setup_multitasking(irq);
 }
 
 #[esp_hal::ram]
-extern "C" fn swint2_handler() {
-    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
-    swi.reset();
+extern "C" fn swint_handler() {
+    match Cpu::current() {
+        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),
+    }
 
     SCHEDULER.with(|scheduler| scheduler.switch_task());
 }
 
 #[inline]
 pub(crate) fn yield_task() {
-    let swi = unsafe { SoftwareInterrupt::<2>::steal() };
-    swi.raise();
+    match Cpu::current() {
+        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.raise(),
+        #[cfg(multi_core)]
+        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.raise(),
+    }
 
     // It takes a bit for the software interrupt to be serviced.
     esp_hal::riscv::asm::nop();

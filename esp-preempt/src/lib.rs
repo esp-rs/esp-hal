@@ -3,12 +3,48 @@
 //! This crate requires an esp-hal timer to operate.
 //!
 //! ```rust, no_run
-#![doc = esp_hal::before_snippet!()]
 //! use esp_hal::timer::timg::TimerGroup;
-//!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! esp_preempt::start(timg0.timer0);
-//!
+#![doc = esp_hal::before_snippet!()]
+#![cfg_attr(
+    any(riscv, multi_core),
+    doc = "
+
+use esp_hal::interrupt::software::SoftwareInterrupt;
+let software_interrupt = SoftwareInterrupt::new(peripherals.SYSTIMER);"
+)]
+#![cfg_attr(
+    xtensa,
+    doc = "
+
+esp_preempt::start(timg0.timer0);"
+)]
+#![cfg_attr(
+    riscv,
+    doc = "
+
+esp_preempt::start(timg0.timer0, software_interrupt.software_interrupt0);"
+)]
+#![cfg_attr(
+    all(xtensa, multi_core),
+    doc = "
+// Optionally, start the scheduler on the second core
+esp_preempt::start_second_core(
+    software_interrupt.software_interrupt0,
+    software_interrupt.software_interrupt1,
+);
+"
+)]
+#![cfg_attr(
+    all(riscv, multi_core),
+    doc = "
+// Optionally, start the scheduler on the second core
+esp_preempt::start_second_core(
+    software_interrupt.software_interrupt1,
+);
+"
+)]
+#![doc = ""]
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
 //! # }
@@ -33,8 +69,13 @@ mod timer_queue;
 mod wait_queue;
 
 pub(crate) use esp_alloc::InternalMemory;
+#[cfg(any(multi_core, riscv))]
+use esp_hal::interrupt::software::SoftwareInterrupt;
+#[cfg(multi_core)]
+use esp_hal::peripherals::CPU_CTRL;
 use esp_hal::{
     Blocking,
+    system::Cpu,
     timer::{AnyTimer, OneShotTimer},
 };
 pub(crate) use scheduler::SCHEDULER;
@@ -117,18 +158,70 @@ where
     multi_core,
     doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::start()`."
 )]
-pub fn start(timer: impl TimerSource) {
+pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
+    trace!("Starting scheduler for the first core");
+    assert_eq!(Cpu::current(), Cpu::ProCpu);
+
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()));
 
         // allocate the default tasks
         task::allocate_main_task(scheduler);
 
-        task::setup_multitasking();
+        task::setup_multitasking(
+            #[cfg(riscv)]
+            int0,
+        );
 
         unwrap!(scheduler.time_driver.as_mut()).start();
         task::yield_task();
     })
+}
+
+/// Starts the scheduler on the second CPU core.
+///
+/// Note that the scheduler must be started first, before starting the second core.
+///
+/// The idle task stack size is specified in bytes.
+#[cfg(multi_core)]
+pub fn start_second_core<const STACK_SIZE: usize>(
+    cpu_control: CPU_CTRL,
+    #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
+    int1: SoftwareInterrupt<'static, 1>,
+) {
+    trace!("Starting scheduler for the second core");
+    use allocator_api2::boxed::Box;
+    use esp_hal::{
+        system::{CpuControl, Stack},
+        time::{Duration, Instant},
+    };
+
+    #[cfg(xtensa)]
+    task::setup_smp(int0);
+
+    let stack = Box::new_in(Stack::<STACK_SIZE>::new(), InternalMemory);
+    let stack = Box::leak(stack);
+    let mut cpu_control = CpuControl::new(cpu_control);
+    let guard = cpu_control
+        .start_app_core(stack, move || {
+            trace!("Second core running");
+            task::setup_smp(int1);
+            SCHEDULER.with(move |scheduler| {
+                assert!(
+                    scheduler.time_driver.is_some(),
+                    "The scheduler must be started on the first core first."
+                );
+                task::allocate_main_task(scheduler);
+                task::yield_task();
+                trace!("Second core scheduler initialized");
+            });
+            loop {
+                SCHEDULER.sleep_until(Instant::EPOCH + Duration::MAX);
+            }
+        })
+        .unwrap();
+
+    core::mem::forget(guard);
 }
 
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");

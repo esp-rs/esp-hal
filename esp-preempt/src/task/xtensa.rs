@@ -1,5 +1,7 @@
 use core::ffi::c_void;
 
+#[cfg(multi_core)]
+use esp_hal::interrupt::software::SoftwareInterrupt;
 pub(crate) use esp_hal::trapframe::TrapFrame as CpuContext;
 use esp_hal::{xtensa_lx, xtensa_lx_rt};
 
@@ -72,12 +74,14 @@ const SW_INTERRUPT: u32 = if cfg!(esp32) { 1 << 29 } else { 1 << 7 };
 
 pub(crate) fn setup_multitasking() {
     unsafe {
-        xtensa_lx::interrupt::enable_mask(
-            SW_INTERRUPT
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask(),
-        );
+        xtensa_lx::interrupt::enable_mask(SW_INTERRUPT);
     }
+}
+
+#[cfg(multi_core)]
+pub(crate) fn setup_smp<const IRQ: u8>(mut irq: SoftwareInterrupt<'static, IRQ>) {
+    setup_multitasking();
+    irq.set_interrupt_handler(cross_core_yield_handler);
 }
 
 #[allow(non_snake_case)]
@@ -93,4 +97,17 @@ fn task_switch_interrupt(context: &mut CpuContext) {
 #[inline]
 pub(crate) fn yield_task() {
     unsafe { xtensa_lx::interrupt::set(SW_INTERRUPT) };
+}
+
+#[cfg(multi_core)]
+#[esp_hal::handler]
+fn cross_core_yield_handler() {
+    use esp_hal::system::Cpu;
+
+    match Cpu::current() {
+        Cpu::ProCpu => unsafe { SoftwareInterrupt::<'static, 0>::steal() }.reset(),
+        Cpu::AppCpu => unsafe { SoftwareInterrupt::<'static, 1>::steal() }.reset(),
+    }
+
+    yield_task();
 }

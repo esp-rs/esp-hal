@@ -153,8 +153,10 @@ mod multi_core {
             // If we allow reentrancy, the interrupt handler would technically be a different
             // context with the same `current_thread_id`, so it would be allowed to lock the
             // resource in a theoretically incorrect way.
-            let try_lock = |current_thread_id| {
+            let try_lock = || {
                 let mut tkn = unsafe { lock.enter() };
+
+                let current_thread_id = thread_id();
 
                 let try_lock_result = self
                     .owner
@@ -179,9 +181,8 @@ mod multi_core {
                 }
             };
 
-            let current_thread_id = thread_id();
             loop {
-                if let Some(token) = try_lock(current_thread_id) {
+                if let Some(token) = try_lock() {
                     return token;
                 }
             }
