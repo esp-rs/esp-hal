@@ -1,6 +1,7 @@
 use esp_metadata_generated::Chip;
 
 fn main() -> Result<(), String> {
+    println!("cargo::rustc-check-cfg=cfg(multi_core)");
     if !cfg!(feature = "emulation") {
         // Load the configuration file for the configured device:
         let chip = Chip::from_cargo_feature()?;
