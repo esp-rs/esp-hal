@@ -169,28 +169,43 @@ impl TimeDriver {
 #[esp_hal::ram]
 extern "C" fn timer_tick_handler(#[cfg(xtensa)] _context: &mut esp_hal::trapframe::TrapFrame) {
     SCHEDULER.with(|scheduler| {
-        unwrap!(scheduler.time_driver.as_mut())
-            .timer
-            .clear_interrupt();
+        let time_driver = unwrap!(scheduler.time_driver.as_mut());
 
-        scheduler.event.set_timer_event();
+        time_driver.timer.clear_interrupt();
 
-        // `Scheduler::switch_task` must be called on a single interrupt priority level only.
-        // To ensure this, we call yield_task to pend the software interrupt.
-        //
-        // RISC-V: esp-hal's interrupt handler can process multiple interrupts before handing
-        // control back to the interrupted context. This can result in two task switches
-        // before the first one's context save could run. To prevent this, here we only
-        // trigger the software interrupt which will then run the scheduler.
-        //
-        // ESP32: Because on ESP32 the software interrupt is triggered at priority 3 but
-        // the timer interrupt is triggered at priority 1, we need to trigger the
-        // software interrupt manually.
-        cfg_if::cfg_if! {
-            if #[cfg(any(riscv, esp32))] {
-                crate::task::yield_task();
-            } else {
-                scheduler.switch_task(_context)
+        let mut switch_tasks = false;
+        time_driver.handle_alarm(|ready_task| {
+            debug_assert_eq!(
+                ready_task.state(),
+                crate::task::TaskState::Sleeping,
+                "task: {:?}",
+                ready_task
+            );
+
+            debug!("Task {:?} is ready", ready_task);
+
+            scheduler.run_queue.mark_task_ready(ready_task);
+            switch_tasks = true;
+        });
+
+        if switch_tasks {
+            // `Scheduler::switch_task` must be called on a single interrupt priority level only.
+            // To ensure this, we call yield_task to pend the software interrupt.
+            //
+            // RISC-V: esp-hal's interrupt handler can process multiple interrupts before handing
+            // control back to the interrupted context. This can result in two task switches
+            // before the first one's context save could run. To prevent this, here we only
+            // trigger the software interrupt which will then run the scheduler.
+            //
+            // ESP32: Because on ESP32 the software interrupt is triggered at priority 3 but
+            // the timer interrupt is triggered at priority 1, we need to trigger the
+            // software interrupt manually.
+            cfg_if::cfg_if! {
+                if #[cfg(any(riscv, esp32))] {
+                    crate::task::yield_task();
+                } else {
+                    scheduler.switch_task(_context)
+                }
             }
         }
     });
