@@ -225,8 +225,8 @@ impl<'d> CpuControl<'d> {
 
         // set vector table and stack pointer
         unsafe {
-            core::arch::asm!("wsr.vecbase {0}", in(reg) &raw const _init_start, options(nostack));
-            xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
+            xtensa_lx::set_vecbase(&raw const _init_start);
+            xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
         }
 
         // Trampoline to run from the new stack.
