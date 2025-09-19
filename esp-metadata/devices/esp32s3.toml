@@ -599,6 +599,17 @@ support_status = "partial"
 ram_start = 0x60016800
 channel_ram_size = 48
 channels = ["Tx", "Tx", "Tx", "Tx", "Rx", "Rx", "Rx", "Rx"]
+has_tx_immediate_stop = true
+has_tx_loop_count = true
+has_tx_loop_auto_stop = true
+has_tx_carrier_data_only = true
+has_tx_sync = true
+has_rx_wrap = true
+has_rx_demodulation = true
+has_dma = true
+clock_sources.supported = [ "None", "Apb", "RcFast", "Xtal" ]
+clock_sources.default = "Apb"
+max_idle_threshold = 0x3FFF
 
 [device.rsa]
 support_status = "partial"

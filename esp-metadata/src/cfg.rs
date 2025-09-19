@@ -477,6 +477,26 @@ driver_configs![
             ram_start: u32,
             channel_ram_size: u32,
             channels: RmtChannelConfig,
+            #[serde(default)]
+            has_tx_immediate_stop: bool,
+            #[serde(default)]
+            has_tx_loop_count: bool,
+            #[serde(default)]
+            has_tx_loop_auto_stop: bool,
+            #[serde(default)]
+            has_tx_carrier_data_only: bool,
+            #[serde(default)]
+            has_tx_sync: bool,
+            #[serde(default)]
+            has_rx_wrap: bool,
+            #[serde(default)]
+            has_rx_demodulation: bool,
+            #[serde(default)]
+            has_dma: bool,
+            #[serde(default)]
+            has_per_channel_clock: bool,
+            clock_sources: RmtClockSourcesConfig,
+            max_idle_threshold: u32,
         }
     },
     RngProperties {

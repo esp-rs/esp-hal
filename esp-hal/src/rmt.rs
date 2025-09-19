@@ -213,6 +213,7 @@ use crate::{
     Async,
     Blocking,
     asynch::AtomicWaker,
+    clock::Clocks,
     gpio::{
         self,
         InputConfig,
@@ -788,7 +789,7 @@ impl<'d> Rmt<'d, Blocking> {
     /// Create a new RMT instance
     pub fn new(peripheral: RMT<'d>, frequency: Rate) -> Result<Self, Error> {
         let this = Rmt::create(peripheral);
-        self::chip_specific::configure_clock(frequency)?;
+        self::chip_specific::configure_clock(ClockSource::default(), frequency)?;
         Ok(this)
     }
 
@@ -1032,13 +1033,7 @@ where
 
         let _guard = GenericPeripheralGuard::new();
 
-        let threshold = if cfg!(any(esp32, esp32s2)) {
-            0b111_1111_1111_1111
-        } else {
-            0b11_1111_1111_1111
-        };
-
-        if config.idle_threshold > threshold {
+        if config.idle_threshold > property!("rmt.max_idle_threshold") {
             return Err(Error::InvalidArgument);
         }
 
@@ -1661,6 +1656,62 @@ impl DynChannelAccess<Rx> {
     }
 }
 
+for_each_rmt_clock_source!(
+    (all $(($name:ident, $bits:literal)),+) => {
+        #[derive(Clone, Copy, Debug)]
+        #[repr(u8)]
+        enum ClockSource {
+            $(
+                #[allow(unused)]
+                $name = $bits,
+            )+
+        }
+    };
+
+    (is_boolean) => {
+        impl ClockSource {
+            fn bit(self) -> bool {
+                match (self as u8) {
+                    0 => false,
+                    1 => true,
+                    _ => unreachable!("should be removed by the compiler!"),
+                }
+            }
+        }
+    };
+
+    (default ($name:ident)) => {
+        impl ClockSource {
+            fn default() -> Self {
+                Self::$name
+            }
+
+            fn bits(self) -> u8 {
+                self as u8
+            }
+
+            fn freq(self) -> crate::time::Rate {
+                match self {
+                    #[cfg(rmt_supports_apb_clock)]
+                    ClockSource::Apb => Clocks::get().apb_clock,
+
+                    #[cfg(rmt_supports_rcfast_clock)]
+                    ClockSource::RcFast => todo!(),
+
+                    #[cfg(rmt_supports_xtal_clock)]
+                    ClockSource::Xtal => Clocks::get().xtal_clock,
+
+                    #[cfg(rmt_supports_pll80mhz_clock)]
+                    ClockSource::Pll80MHz => Rate::from_mhz(80),
+
+                    #[cfg(rmt_supports_reftick_clock)]
+                    ClockSource::RefTick => todo!(),
+                }
+            }
+        }
+    };
+);
+
 #[cfg(not(any(esp32, esp32s2)))]
 mod chip_specific {
     use enumset::EnumSet;
@@ -1668,6 +1719,7 @@ mod chip_specific {
     use super::{
         CHANNEL_INDEX_COUNT,
         ChannelIndex,
+        ClockSource,
         Direction,
         DynChannelAccess,
         Error,
@@ -1680,8 +1732,8 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
-        let src_clock = crate::soc::constants::RMT_CLOCK_SRC_FREQ;
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+        let src_clock = source.freq();
 
         if frequency > src_clock {
             return Err(Error::UnreachableTargetFrequency);
@@ -1695,7 +1747,7 @@ mod chip_specific {
         {
             RMT::regs().sys_conf().modify(|_, w| unsafe {
                 w.clk_en().clear_bit();
-                w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC);
+                w.sclk_sel().bits(source.bits());
                 w.sclk_div_num().bits(div);
                 w.sclk_div_a().bits(0);
                 w.sclk_div_b().bits(0);
@@ -1715,11 +1767,11 @@ mod chip_specific {
             #[cfg(esp32c6)]
             PCR::regs()
                 .rmt_sclk_conf()
-                .modify(|_, w| unsafe { w.sclk_sel().bits(crate::soc::constants::RMT_CLOCK_SRC) });
+                .modify(|_, w| unsafe { w.sclk_sel().bits(source.bits()) });
             #[cfg(not(esp32c6))]
             PCR::regs()
                 .rmt_sclk_conf()
-                .modify(|_, w| w.sclk_sel().bit(crate::soc::constants::RMT_CLOCK_SRC));
+                .modify(|_, w| w.sclk_sel().bit(source.bit()));
 
             RMT::regs()
                 .sys_conf()
@@ -2097,6 +2149,7 @@ mod chip_specific {
 
     use super::{
         ChannelIndex,
+        ClockSource,
         Direction,
         DynChannelAccess,
         Error,
@@ -2111,8 +2164,8 @@ mod chip_specific {
     };
     use crate::{peripherals::RMT, time::Rate};
 
-    pub(super) fn configure_clock(frequency: Rate) -> Result<(), Error> {
-        if frequency != Rate::from_mhz(80) {
+    pub(super) fn configure_clock(source: ClockSource, frequency: Rate) -> Result<(), Error> {
+        if frequency != source.freq() {
             return Err(Error::UnreachableTargetFrequency);
         }
 
@@ -2120,7 +2173,7 @@ mod chip_specific {
 
         for ch_num in 0..NUM_CHANNELS {
             rmt.chconf1(ch_num)
-                .modify(|_, w| w.ref_always_on().set_bit());
+                .modify(|_, w| w.ref_always_on().bit(source.bit()));
         }
 
         rmt.apb_conf().modify(|_, w| w.apb_fifo_mask().set_bit());
@@ -2201,7 +2254,7 @@ mod chip_specific {
     }
 
     impl DynChannelAccess<Tx> {
-        #[cfg(not(esp32))]
+        #[cfg(rmt_has_tx_loop_count)]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, loopcount: Option<LoopCount>) {
             let rmt = crate::peripherals::RMT::regs();
@@ -2215,7 +2268,7 @@ mod chip_specific {
                 .modify(|_, w| unsafe { w.tx_loop_num().bits(repeats) });
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_loop_count))]
         #[inline]
         pub fn set_generate_repeat_interrupt(&self, _loopcount: Option<LoopCount>) {
             // unsupported
@@ -2329,7 +2382,7 @@ mod chip_specific {
         // Returns whether stopping was immediate, or needs to wait for tx end
         // Due to inlining, the compiler should be able to eliminate code in the caller that
         // depends on this.
-        #[cfg(esp32s2)]
+        #[cfg(rmt_has_tx_immediate_stop)]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let rmt = crate::peripherals::RMT::regs();
@@ -2338,7 +2391,7 @@ mod chip_specific {
             true
         }
 
-        #[cfg(esp32)]
+        #[cfg(not(rmt_has_tx_immediate_stop))]
         #[inline]
         pub fn stop_tx(&self) -> bool {
             let ptr = self.channel_ram_start();
