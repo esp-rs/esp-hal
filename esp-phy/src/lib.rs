@@ -115,6 +115,7 @@ impl PhyState {
             phy_eco_version_sel(Efuse::major_chip_version());
         }
         // Causes headaches for some reason.
+        // See: https://github.com/esp-rs/esp-hal/issues/4015
         // #[cfg(phy_combo_module)]
         // unsafe {
         // phy_init_param_set(1);
