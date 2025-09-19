@@ -1,6 +1,9 @@
 use core::ptr::NonNull;
 
-use esp_hal::time::{Duration, Instant};
+use esp_hal::{
+    system::Cpu,
+    time::{Duration, Instant},
+};
 
 use crate::{
     SCHEDULER,
@@ -32,7 +35,8 @@ impl WaitQueue {
 
     pub(crate) fn wait_with_deadline(&mut self, deadline: Option<Instant>) {
         SCHEDULER.with(|scheduler| {
-            let mut task = unwrap!(scheduler.current_task);
+            let current_cpu = Cpu::current() as usize;
+            let mut task = unwrap!(scheduler.per_cpu[current_cpu].current_task);
 
             let wake_at = if let Some(deadline) = deadline {
                 deadline

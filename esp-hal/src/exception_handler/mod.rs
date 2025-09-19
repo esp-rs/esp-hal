@@ -7,7 +7,12 @@ unsafe extern "C" fn __user_exception(
     cause: xtensa_lx_rt::exception::ExceptionCause,
     context: &TrapFrame,
 ) {
-    panic!("\n\nException occurred '{:?}'\n{:?}", cause, context);
+    panic!(
+        "\n\nException occurred on {:?} '{:?}'\n{:?}",
+        crate::system::Cpu::current(),
+        cause,
+        context
+    );
 }
 
 #[cfg(riscv)]
