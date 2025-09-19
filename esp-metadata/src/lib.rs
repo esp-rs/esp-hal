@@ -895,12 +895,16 @@ pub fn generate_build_script_utils() -> TokenStream {
 
         impl Config {
             fn define_cfgs(&self) {
-                #(println!(#check_cfgs);)*
-
+                emit_check_cfg_directives();
                 for cfg in self.cfgs {
                     println!("{cfg}");
                 }
             }
+        }
+
+        /// Prints `cargo:rustc-check-cfg` lines.
+        pub fn emit_check_cfg_directives() {
+            #(println!(#check_cfgs);)*
         }
     }
 }
