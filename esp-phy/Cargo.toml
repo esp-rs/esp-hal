@@ -13,7 +13,6 @@ license       = "MIT OR Apache-2.0"
 doc-config = { features = ["esp-hal/unstable", "defmt"] }
 check-configs = [
     { features = ["esp-hal/unstable"] },
-    { features = ["esp-hal/unstable"] },
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "defmt"] },
