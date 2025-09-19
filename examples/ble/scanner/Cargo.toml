@@ -5,7 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
-bt-hci = "0.4.0"
+bt-hci = "0.5.0"
 embassy-executor = "0.9.0"
 embassy-futures = "0.1"
 embassy-time = "0.5.0"
@@ -26,7 +26,7 @@ esp-radio = { path = "../../../esp-radio", features = [
 ] }
 heapless = "0.9.1"
 log = "0.4.27"
-trouble-host = { git = "https://github.com/embassy-rs/trouble", rev = "39c5c99", features = [
+trouble-host = { version = "0.3.0", features = [
     "default-packet-pool-mtu-255",
     "derive",
     "scan",

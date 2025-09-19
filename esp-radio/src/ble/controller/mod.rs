@@ -99,6 +99,7 @@ pub(crate) mod asynch {
     use bt_hci::{
         ControllerToHostPacket,
         FromHciBytes,
+        FromHciBytesError,
         HostToControllerPacket,
         WriteHci,
         transport::{Transport, WithIndicator},
@@ -146,6 +147,12 @@ pub(crate) mod asynch {
         async fn flush(&mut self) -> Result<(), BleConnectorError> {
             // nothing to do
             Ok(())
+        }
+    }
+
+    impl From<FromHciBytesError> for BleConnectorError {
+        fn from(_e: FromHciBytesError) -> Self {
+            BleConnectorError::Unknown
         }
     }
 

@@ -30,8 +30,9 @@ check-configs = [
 ]
 clippy-configs = [
     { features = ["esp-hal/unstable", "esp-hal/rt"] },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi"], if = 'chip_has("wifi")' },
-    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi-eap", "unstable"], if = 'chip_has("wifi")' },
+    { features = ["esp-hal/unstable", "esp-hal/rt", "wifi", "wifi-eap", "unstable"], if = 'chip_has("wifi")', append = [
+        { features = ["ble"], if = 'chip_has("bt")' },
+    ] },
 ]
 
 [lib]
@@ -75,7 +76,7 @@ smoltcp = { version = "0.12.0", default-features = false, features = [
   "socket-raw",
 ], optional = true }
 embassy-net-driver = { version = "0.2.0", optional = true }
-bt-hci = { version = "0.4.0", optional = true }
+bt-hci = { version = "0.5.0", optional = true }
 
 # Logging interfaces, they are mutually exclusive so they need to be behind separate features.
 defmt = { version = "1.0.1", optional = true }
