@@ -250,13 +250,23 @@ where
             return Err(Error::InvalidArgument);
         }
 
-        let idx = app as u8 - OTA_SUBTYPE_OFFSET;
-        if idx >= self.ota_partition_count as u8 {
+        let ota_app_index = app as u8 - OTA_SUBTYPE_OFFSET;
+        if ota_app_index >= self.ota_partition_count as u8 {
             return Err(Error::InvalidArgument);
         }
 
         let current = self.current_app_partition()?;
+
+        // no need to update any sequence if the partition isn't changed
         if current != app {
+            // the bootloader will look at the two slots in ota-data and get the highest sequence
+            // number
+            //
+            // the booted ota-app-partition is the sequence-nr modulo the number of
+            // ota-app-partitions
+
+            // calculate the needed increment of the sequence-number to select the requested OTA-app
+            // partition
             let inc = if current == AppPartitionSubType::Factory {
                 (((app as u8 - OTA_SUBTYPE_OFFSET) as i32 + 1) + (self.ota_partition_count as i32))
                     as u32
@@ -268,15 +278,19 @@ where
                     % self.ota_partition_count as u32
             };
 
+            // the slot we need to write the new sequence number to
             let slot = self.current_slot()?.next();
 
             let (seq0, seq1) = self.get_slot_seq()?;
             let new_seq = {
                 if seq0 == UNINITALIZED_SEQUENCE && seq1 == UNINITALIZED_SEQUENCE {
+                    // no ota-app partition is selected
                     inc
                 } else if seq0 == UNINITALIZED_SEQUENCE {
+                    // seq1 is the sequence number to increment
                     seq1 + inc
                 } else if seq1 == UNINITALIZED_SEQUENCE {
+                    // seq0 is the sequence number to increment
                     seq0 + inc
                 } else {
                     u32::max(seq0, seq1) + inc
@@ -296,6 +310,7 @@ where
         Ok(())
     }
 
+    // determine the current ota-data slot by checking the sequence numbers
     fn current_slot(&mut self) -> Result<OtaDataSlot, Error> {
         let (seq0, seq1) = self.get_slot_seq()?;
 
