@@ -150,7 +150,7 @@ pub(crate) mod asynch {
     }
 
     impl From<FromHciBytesError> for BleConnectorError {
-        fn from(e: FromHciBytesError) -> Self {
+        fn from(_e: FromHciBytesError) -> Self {
             BleConnectorError::Unknown
         }
     }
