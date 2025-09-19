@@ -154,7 +154,7 @@ where
     let r = f();
 
     // enable previously disabled interrupts
-    unsafe { enable_mask(old_mask) };
+    unsafe { set_mask(old_mask) };
 
     r
 }
