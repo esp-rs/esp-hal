@@ -167,7 +167,7 @@ where
         flash: &'a mut FlashRegion<'a, F>,
         ota_partition_count: usize,
     ) -> Result<Ota<'a, F>, Error> {
-        if ota_partition_count == 0 || ota_partition_count >= 16 {
+        if ota_partition_count == 0 || ota_partition_count > 16 {
             return Err(Error::InvalidArgument);
         }
 
