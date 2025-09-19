@@ -287,7 +287,7 @@ impl<'d> CpuControl<'d> {
         // set vector table and stack pointer
         unsafe {
             xtensa_lx::set_vecbase(&raw const _init_start);
-            xtensa_lx::set_stack_pointer(unwrap!(APP_CORE_STACK_TOP));
+            xtensa_lx::set_stack_pointer(APP_CORE_STACK_TOP.load(Ordering::Acquire));
         }
 
         // Trampoline to run from the new stack.
