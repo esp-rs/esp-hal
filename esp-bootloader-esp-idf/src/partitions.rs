@@ -17,6 +17,8 @@ const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
+pub(crate) const OTA_SUBTYPE_OFFSET: u8 = 0x10;
+
 /// Represents a single partition entry.
 pub struct PartitionEntry<'a> {
     pub(crate) binary: &'a [u8; RAW_ENTRY_LEN],

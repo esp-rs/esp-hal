@@ -31,11 +31,14 @@ use crate::partitions::{
     DataPartitionSubType,
     Error,
     FlashRegion,
+    OTA_SUBTYPE_OFFSET,
     PartitionType,
 };
 
 const SLOT0_DATA_OFFSET: u32 = 0x0000;
 const SLOT1_DATA_OFFSET: u32 = 0x1000;
+
+const UNINITALIZED_SEQUENCE: u32 = 0xffffffff;
 
 /// Representation of the current OTA-data slot.
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::FromRepr)]
@@ -196,20 +199,20 @@ where
     pub fn current_app_partition(&mut self) -> Result<AppPartitionSubType, Error> {
         let (seq0, seq1) = self.get_slot_seq()?;
 
-        let slot = if seq0 == 0xffffffff && seq1 == 0xffffffff {
+        let slot = if seq0 == UNINITALIZED_SEQUENCE && seq1 == UNINITALIZED_SEQUENCE {
             AppPartitionSubType::Factory
-        } else if seq0 == 0xffffffff {
+        } else if seq0 == UNINITALIZED_SEQUENCE {
             AppPartitionSubType::try_from(
-                (((seq1 - 1) % self.ota_partition_count as u32) + 0x10) as u8,
+                (((seq1 - 1) % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
             )?
-        } else if seq1 == 0xffffffff || seq0 > seq1 {
+        } else if seq1 == UNINITALIZED_SEQUENCE || seq0 > seq1 {
             AppPartitionSubType::try_from(
-                (((seq0 - 1) % self.ota_partition_count as u32) + 0x10) as u8,
+                (((seq0 - 1) % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
             )?
         } else {
             let counter = u32::max(seq0, seq1) - 1;
             AppPartitionSubType::try_from(
-                ((counter % self.ota_partition_count as u32) + 0x10) as u8,
+                ((counter % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
             )?
         };
 
@@ -247,7 +250,7 @@ where
             return Err(Error::InvalidArgument);
         }
 
-        let idx = app as u8 - 0x10;
+        let idx = app as u8 - OTA_SUBTYPE_OFFSET;
         if idx >= self.ota_partition_count as u8 {
             return Err(Error::InvalidArgument);
         }
@@ -255,10 +258,12 @@ where
         let current = self.current_app_partition()?;
         if current != app {
             let inc = if current == AppPartitionSubType::Factory {
-                (((app as u8 - 0x10) as i32 + 1) + (self.ota_partition_count as i32)) as u32
+                (((app as u8 - OTA_SUBTYPE_OFFSET) as i32 + 1) + (self.ota_partition_count as i32))
+                    as u32
                     % self.ota_partition_count as u32
             } else {
-                ((((app as u8 - 0x10) as i32) - ((current as u8 - 0x10) as i32))
+                ((((app as u8 - OTA_SUBTYPE_OFFSET) as i32)
+                    - ((current as u8 - OTA_SUBTYPE_OFFSET) as i32))
                     + (self.ota_partition_count as i32)) as u32
                     % self.ota_partition_count as u32
             };
@@ -267,11 +272,11 @@ where
 
             let (seq0, seq1) = self.get_slot_seq()?;
             let new_seq = {
-                if seq0 == 0xffffffff && seq1 == 0xffffffff {
+                if seq0 == UNINITALIZED_SEQUENCE && seq1 == UNINITALIZED_SEQUENCE {
                     inc
-                } else if seq0 == 0xffffffff {
+                } else if seq0 == UNINITALIZED_SEQUENCE {
                     seq1 + inc
-                } else if seq1 == 0xffffffff {
+                } else if seq1 == UNINITALIZED_SEQUENCE {
                     seq0 + inc
                 } else {
                     u32::max(seq0, seq1) + inc
@@ -294,11 +299,11 @@ where
     fn current_slot(&mut self) -> Result<OtaDataSlot, Error> {
         let (seq0, seq1) = self.get_slot_seq()?;
 
-        let slot = if seq0 == 0xffffffff && seq1 == 0xffffffff {
+        let slot = if seq0 == UNINITALIZED_SEQUENCE && seq1 == UNINITALIZED_SEQUENCE {
             OtaDataSlot::None
-        } else if seq0 == 0xffffffff {
+        } else if seq0 == UNINITALIZED_SEQUENCE {
             OtaDataSlot::Slot1
-        } else if seq1 == 0xffffffff || seq0 > seq1 {
+        } else if seq1 == UNINITALIZED_SEQUENCE || seq0 > seq1 {
             OtaDataSlot::Slot0
         } else {
             OtaDataSlot::Slot1
@@ -311,7 +316,7 @@ where
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
     pub fn set_current_ota_state(&mut self, state: OtaImageState) -> Result<(), Error> {
-        if let (0xffffffff, 0xffffffff) = self.get_slot_seq()? {
+        if let (UNINITALIZED_SEQUENCE, UNINITALIZED_SEQUENCE) = self.get_slot_seq()? {
             Err(Error::InvalidState)
         } else {
             let offset = self.current_slot()?.offset();
@@ -328,7 +333,7 @@ where
     /// # Errors
     /// A [Error::InvalidState] if no partition is currently selected.
     pub fn current_ota_state(&mut self) -> Result<OtaImageState, Error> {
-        if let (0xffffffff, 0xffffffff) = self.get_slot_seq()? {
+        if let (UNINITALIZED_SEQUENCE, UNINITALIZED_SEQUENCE) = self.get_slot_seq()? {
             Err(Error::InvalidState)
         } else {
             let offset = self.current_slot()?.offset();
