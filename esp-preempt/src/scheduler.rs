@@ -35,9 +35,6 @@ impl SchedulerEvent {
     // If this is NOT set, the event is a cooperative yield of some sort (time slicing, self-yield).
     const TASK_BLOCKED: usize = 1 << 0;
 
-    // If this is set, the timer queue should be processed.
-    const TIMER_EVENT: usize = 1 << 1;
-
     fn contains(self, bit: usize) -> bool {
         self.0 & bit != 0
     }
@@ -49,16 +46,8 @@ impl SchedulerEvent {
         self.set(Self::TASK_BLOCKED)
     }
 
-    pub(crate) fn set_timer_event(&mut self) {
-        self.set(Self::TIMER_EVENT)
-    }
-
     pub(crate) fn is_cooperative_yield(self) -> bool {
         !self.contains(Self::TASK_BLOCKED)
-    }
-
-    pub(crate) fn is_timer_event(self) -> bool {
-        self.contains(Self::TIMER_EVENT)
     }
 }
 
@@ -154,22 +143,6 @@ impl SchedulerState {
         self.delete_marked_tasks();
 
         let event = core::mem::take(&mut self.event);
-        let time_driver = unwrap!(self.time_driver.as_mut());
-
-        if event.is_timer_event() {
-            time_driver.handle_alarm(|ready_task| {
-                debug_assert_eq!(
-                    ready_task.state(),
-                    task::TaskState::Sleeping,
-                    "task: {:?}",
-                    ready_task
-                );
-
-                debug!("Task {:?} is ready", ready_task);
-
-                self.run_queue.mark_task_ready(ready_task);
-            });
-        }
 
         if event.is_cooperative_yield()
             && let Some(current_task) = self.current_task
@@ -232,6 +205,7 @@ impl SchedulerState {
         let arm_next_timeslice_tick = priority
             .map(|p| !self.run_queue.is_level_empty(p))
             .unwrap_or(false);
+        let time_driver = unwrap!(self.time_driver.as_mut());
         time_driver.arm_next_wakeup(arm_next_timeslice_tick);
     }
 
