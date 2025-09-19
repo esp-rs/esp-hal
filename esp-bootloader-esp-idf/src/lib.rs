@@ -105,6 +105,8 @@ pub mod partitions;
 
 pub mod ota;
 
+pub mod ota_updater;
+
 // We run tests on the host which happens to be MacOS machines and mach-o
 // doesn't like `link-sections` this way
 #[cfg(not(target_os = "macos"))]
@@ -339,7 +341,7 @@ pub const MMU_PAGE_SIZE: u32 = {
 
 /// The (pretended) ESP-IDF version
 pub const ESP_IDF_COMPATIBLE_VERSION: &str =
-    esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_MMU_PAGE_SIZE");
+    esp_config::esp_config_str!("ESP_BOOTLOADER_ESP_IDF_CONFIG_ESP_IDF_VERSION");
 
 /// This macro populates the application descriptor (see [EspAppDesc]) which is
 /// available as a static named `ESP_APP_DESC`
