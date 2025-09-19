@@ -31,7 +31,6 @@ use crate::partitions::{
     DataPartitionSubType,
     Error,
     FlashRegion,
-    OTA_SUBTYPE_OFFSET,
     PartitionType,
 };
 
@@ -202,17 +201,17 @@ where
         let slot = if seq0 == UNINITALIZED_SEQUENCE && seq1 == UNINITALIZED_SEQUENCE {
             AppPartitionSubType::Factory
         } else if seq0 == UNINITALIZED_SEQUENCE {
-            AppPartitionSubType::try_from(
-                (((seq1 - 1) % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
+            AppPartitionSubType::from_ota_app_number(
+                ((seq1 - 1) % self.ota_partition_count as u32) as u8,
             )?
         } else if seq1 == UNINITALIZED_SEQUENCE || seq0 > seq1 {
-            AppPartitionSubType::try_from(
-                (((seq0 - 1) % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
+            AppPartitionSubType::from_ota_app_number(
+                ((seq0 - 1) % self.ota_partition_count as u32) as u8,
             )?
         } else {
             let counter = u32::max(seq0, seq1) - 1;
-            AppPartitionSubType::try_from(
-                ((counter % self.ota_partition_count as u32) + OTA_SUBTYPE_OFFSET as u32) as u8,
+            AppPartitionSubType::from_ota_app_number(
+                (counter % self.ota_partition_count as u32) as u8,
             )?
         };
 
@@ -250,7 +249,7 @@ where
             return Err(Error::InvalidArgument);
         }
 
-        let ota_app_index = app as u8 - OTA_SUBTYPE_OFFSET;
+        let ota_app_index = app.ota_app_number();
         if ota_app_index >= self.ota_partition_count as u8 {
             return Err(Error::InvalidArgument);
         }
@@ -268,12 +267,10 @@ where
             // calculate the needed increment of the sequence-number to select the requested OTA-app
             // partition
             let inc = if current == AppPartitionSubType::Factory {
-                (((app as u8 - OTA_SUBTYPE_OFFSET) as i32 + 1) + (self.ota_partition_count as i32))
-                    as u32
+                (((app.ota_app_number()) as i32 + 1) + (self.ota_partition_count as i32)) as u32
                     % self.ota_partition_count as u32
             } else {
-                ((((app as u8 - OTA_SUBTYPE_OFFSET) as i32)
-                    - ((current as u8 - OTA_SUBTYPE_OFFSET) as i32))
+                ((((app.ota_app_number()) as i32) - ((current.ota_app_number()) as i32))
                     + (self.ota_partition_count as i32)) as u32
                     % self.ota_partition_count as u32
             };

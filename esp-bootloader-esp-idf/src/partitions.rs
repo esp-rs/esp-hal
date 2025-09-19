@@ -17,7 +17,7 @@ const RAW_ENTRY_LEN: usize = 32;
 const ENTRY_MAGIC: u16 = 0x50aa;
 const MD5_MAGIC: u16 = 0xebeb;
 
-pub(crate) const OTA_SUBTYPE_OFFSET: u8 = 0x10;
+const OTA_SUBTYPE_OFFSET: u8 = 0x10;
 
 /// Represents a single partition entry.
 pub struct PartitionEntry<'a> {
@@ -398,7 +398,7 @@ pub enum AppPartitionSubType {
     /// Factory image
     Factory = 0,
     /// OTA slot 0
-    Ota0    = 0x10,
+    Ota0    = OTA_SUBTYPE_OFFSET,
     /// OTA slot 1
     Ota1,
     /// OTA slot 2
@@ -431,6 +431,19 @@ pub enum AppPartitionSubType {
     Ota15,
     /// Test image
     Test,
+}
+
+impl AppPartitionSubType {
+    pub(crate) fn ota_app_number(&self) -> u8 {
+        *self as u8 - OTA_SUBTYPE_OFFSET
+    }
+
+    pub(crate) fn from_ota_app_number(number: u8) -> Result<Self, Error> {
+        if number > 16 {
+            return Err(Error::InvalidArgument);
+        }
+        Ok(Self::try_from(number + OTA_SUBTYPE_OFFSET)?)
+    }
 }
 
 impl TryFrom<u8> for AppPartitionSubType {

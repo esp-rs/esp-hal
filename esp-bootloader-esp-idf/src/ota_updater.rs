@@ -2,7 +2,7 @@
 
 use crate::{
     ota::OtaImageState,
-    partitions::{AppPartitionSubType, Error, FlashRegion, OTA_SUBTYPE_OFFSET, PartitionTable},
+    partitions::{AppPartitionSubType, Error, FlashRegion, PartitionTable},
 };
 
 /// This can be used as more convenient - yet less flexible, way to do OTA updates.
@@ -90,9 +90,8 @@ where
         let current = self.selected_partition()?;
         let next = match current {
             AppPartitionSubType::Factory => AppPartitionSubType::Ota0,
-            _ => AppPartitionSubType::try_from(
-                (((current as u8 - OTA_SUBTYPE_OFFSET) + 1) % self.ota_count as u8)
-                    + OTA_SUBTYPE_OFFSET,
+            _ => AppPartitionSubType::from_ota_app_number(
+                (current.ota_app_number() + 1) % self.ota_count as u8,
             )?,
         };
 
@@ -100,9 +99,8 @@ where
         let booted = self.pt.booted_partition()?;
         let next = if let Some(booted) = booted {
             if booted.partition_type() == crate::partitions::PartitionType::App(next) {
-                AppPartitionSubType::try_from(
-                    (((current as u8 - OTA_SUBTYPE_OFFSET) + 2) % self.ota_count as u8)
-                        + OTA_SUBTYPE_OFFSET,
+                AppPartitionSubType::from_ota_app_number(
+                    (current.ota_app_number() + 2) % self.ota_count as u8,
                 )?
             } else {
                 next
