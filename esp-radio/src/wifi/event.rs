@@ -281,6 +281,22 @@ impl StaDisconnected<'_> {
     }
 }
 
+/// All AP credentials received from WPS handshake.
+#[repr(transparent)]
+pub struct ApCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
+
+impl ApCredential {
+    /// Get the SSID of an AP.
+    pub fn ssid(&self) -> &[u8] {
+        &self.0.ssid
+    }
+
+    /// Get passphrase for the AP.
+    pub fn passphrase(&self) -> &[u8] {
+        &self.0.passphrase
+    }
+}
+
 impl StaAuthmodeChange<'_> {
     /// Get the old authentication mode.
     pub fn old_mode(&self) -> u32 {
@@ -300,8 +316,12 @@ impl StaWpsErSuccess<'_> {
     }
 
     /// Get all AP credentials received.
-    pub fn ap_cred(&self) -> &[wifi_event_sta_wps_er_success_t__bindgen_ty_1] {
-        &self.0.ap_cred
+    pub fn ap_cred(&self) -> &[ApCredential] {
+        let array_ref: &[ApCredential; 3] =
+            // cast reference of fixed-size array to wrapper type
+            unsafe { &*(&self.0.ap_cred as *const _ as *const [ApCredential; 3]) };
+
+        &array_ref[..]
     }
 }
 
@@ -309,6 +329,21 @@ impl StaWpsErPin<'_> {
     /// Get the PIN code received from the WPS.
     pub fn pin(&self) -> &[u8] {
         &self.0.pin_code
+    }
+}
+
+/// Safe wrapper around a raw pointer to a `wifi_ftm_report_entry_t`.
+///
+/// # Safety
+///
+/// The pointer originates from the C code. The caller is responsible
+/// for ensuring that it is valid for the lifetime of `FtmReportData`.
+#[repr(transparent)]
+pub struct FtmReportData(*mut wifi_ftm_report_entry_t);
+
+impl FtmReportData {
+    pub(crate) const unsafe fn new(ptr: *mut wifi_ftm_report_entry_t) -> Self {
+        Self(ptr)
     }
 }
 
@@ -339,8 +374,8 @@ impl FtmReport<'_> {
     }
 
     /// Get Pointer to FTM Report, should be freed after use.
-    pub fn report_data(&self) -> *mut wifi_ftm_report_entry_t {
-        self.0.ftm_report_data
+    pub fn report_data(&self) -> FtmReportData {
+        unsafe { FtmReportData::new(self.0.ftm_report_data) }
     }
 
     /// Get the number of entries in the FTM report data.
