@@ -37,6 +37,7 @@ impl<'d> BleConnector<'d> {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// Error type for the BLE connector.
 #[instability::unstable]
 pub enum BleConnectorError {
