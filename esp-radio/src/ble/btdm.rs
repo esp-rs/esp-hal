@@ -149,20 +149,18 @@ unsafe extern "C" fn mutex_unlock(_mutex: *const ()) -> i32 {
 
 unsafe extern "C" fn task_create(
     func: *mut crate::binary::c_types::c_void,
-    name: *const c_char,
+    name_ptr: *const c_char,
     stack_depth: u32,
     param: *mut crate::binary::c_types::c_void,
     prio: u32,
     handle: *mut crate::binary::c_types::c_void,
     core_id: u32,
 ) -> i32 {
-    unsafe {
-        let n = str_from_c(name);
-        trace!(
-            "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
-            func, name, n, stack_depth, param, prio, handle, core_id
-        );
-    }
+    let name = unsafe { str_from_c(name_ptr) };
+    trace!(
+        "task_create {:?} {:?} {} {} {:?} {} {:?} {}",
+        func, name_ptr, name, stack_depth, param, prio, handle, core_id
+    );
 
     unsafe {
         let task_func = core::mem::transmute::<
@@ -171,6 +169,7 @@ unsafe extern "C" fn task_create(
         >(func);
 
         let task = crate::preempt::task_create(
+            name,
             task_func,
             param,
             prio,
