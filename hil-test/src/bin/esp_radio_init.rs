@@ -120,13 +120,21 @@ mod tests {
             &*mk_static!(esp_radio::Controller<'static>, esp_radio::init().unwrap());
 
         // Initialize, then de-initialize wifi
-        let wifi =
-            esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow(), Default::default()).unwrap();
+        let wifi = esp_radio::wifi::WifiController::new(
+            &esp_radio_ctrl,
+            p.WIFI.reborrow(),
+            Default::default(),
+        )
+        .unwrap();
         drop(wifi);
 
         // Now, can we do it again?
-        let _wifi =
-            esp_radio::wifi::new(&esp_radio_ctrl, p.WIFI.reborrow(), Default::default()).unwrap();
+        let _wifi = esp_radio::wifi::WifiController::new(
+            &esp_radio_ctrl,
+            p.WIFI.reborrow(),
+            Default::default(),
+        )
+        .unwrap();
     }
 
     #[test]
