@@ -33,6 +33,7 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
+    dma::DmaTxStreamBuf,
     dma_buffers,
     i2s::master::{Channels, Config, DataFormat, I2s},
     time::Rate,
@@ -84,7 +85,7 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_dout(peripherals.GPIO5)
-        .build(tx_descriptors);
+        .build();
 
     let data =
         unsafe { core::slice::from_raw_parts(&SINE as *const _ as *const u8, SINE.len() * 2) };
@@ -105,14 +106,17 @@ async fn main(_spawner: Spawner) {
     let mut idx = 32000 % data.len();
 
     println!("Start");
-    let mut transaction = i2s_tx.write_dma_circular_async(buffer).unwrap();
+    let mut transaction = i2s_tx
+        .write(DmaTxStreamBuf::new(tx_descriptors, buffer).unwrap())
+        .unwrap();
     loop {
         for i in 0..filler.len() {
             filler[i] = data[(idx + i) % data.len()];
         }
         println!("Next");
 
-        let written = transaction.push(&filler).await.unwrap();
+        transaction.wait_for_available().await.unwrap();
+        let written = transaction.push(&filler);
         idx = (idx + written) % data.len();
         println!("written {}", written);
     }

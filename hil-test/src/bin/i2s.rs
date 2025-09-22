@@ -13,7 +13,7 @@
 use esp_hal::{
     Async,
     delay::Delay,
-    dma_buffers,
+    dma::{DmaDescriptor, DmaTxStreamBuf},
     gpio::{AnyPin, NoPin, Pin},
     i2s::master::{Channels, Config, DataFormat, I2s, I2sTx},
     peripherals::I2S0,
@@ -57,24 +57,30 @@ impl Iterator for SampleSource {
 }
 
 #[embassy_executor::task]
-async fn writer(tx_buffer: &'static mut [u8], i2s_tx: I2sTx<'static, Async>) {
+async fn writer(
+    tx_buffer: &'static mut [u8],
+    tx_descriptors: &'static mut [DmaDescriptor],
+    i2s_tx: I2sTx<'static, Async>,
+) {
     let mut samples = SampleSource::new();
     for b in tx_buffer.iter_mut() {
         *b = samples.next().unwrap();
     }
 
-    let mut tx_transfer = i2s_tx.write_dma_circular_async(tx_buffer).unwrap();
+    let mut tx_transfer = i2s_tx
+        .write(DmaTxStreamBuf::new(tx_descriptors, tx_buffer).unwrap())
+        .unwrap();
 
     loop {
-        tx_transfer
-            .push_with(|buffer| {
-                for b in buffer.iter_mut() {
-                    *b = samples.next().unwrap();
-                }
-                buffer.len()
-            })
-            .await
-            .unwrap();
+        while tx_transfer.available_bytes() == 0 {
+            tx_transfer.wait_for_available().await.unwrap();
+        }
+        tx_transfer.push_with(|buffer| {
+            for b in buffer.iter_mut() {
+                *b = samples.next().unwrap();
+            }
+            buffer.len()
+        });
     }
 }
 
@@ -96,6 +102,8 @@ fn enable_loopback() {
 
 #[embedded_test::tests(default_timeout = 3, executor = hil_test::Executor::new())]
 mod tests {
+    use esp_hal::{dma::DmaRxStreamBuf, dma_buffers_chunk_size};
+
     use super::*;
 
     struct Context {
@@ -131,8 +139,9 @@ mod tests {
     async fn test_i2s_loopback_async(ctx: Context) {
         let spawner = unsafe { embassy_executor::Spawner::for_current_executor().await };
 
+        // We need more than 3 descriptors for continuous transfer to work
         let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
-            esp_hal::dma_circular_buffers!(BUFFER_SIZE, BUFFER_SIZE);
+            esp_hal::dma_buffers_chunk_size!(BUFFER_SIZE, BUFFER_SIZE, BUFFER_SIZE / 3);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -152,26 +161,34 @@ mod tests {
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_dout(dout)
-            .build(tx_descriptors);
+            .build();
 
         let i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_din(din)
-            .build(rx_descriptors);
+            .build();
 
         enable_loopback();
 
-        let mut rx_transfer = i2s_rx.read_dma_circular_async(rx_buffer).unwrap();
-        spawner.must_spawn(writer(tx_buffer, i2s_tx));
+        let mut rx_transfer = i2s_rx
+            .read(
+                DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
+                BUFFER_SIZE,
+            )
+            .unwrap();
+        spawner.must_spawn(writer(tx_buffer, tx_descriptors, i2s_tx));
 
-        let mut rcv = [0u8; BUFFER_SIZE];
         let mut sample_idx = 0;
         let mut samples = SampleSource::new();
         for _ in 0..30 {
-            let len = rx_transfer.pop(&mut rcv).await.unwrap();
-            for &b in &rcv[..len] {
+            while rx_transfer.available_bytes() == 0 {
+                rx_transfer.wait_for_available().await.unwrap();
+            }
+            let data = rx_transfer.peek();
+            let len = data.len();
+            for &b in data {
                 let expected = samples.next().unwrap();
                 assert_eq!(
                     b, expected,
@@ -180,12 +197,17 @@ mod tests {
                 );
                 sample_idx += 1;
             }
+            rx_transfer.consume(len);
         }
     }
 
     #[test]
     fn test_i2s_loopback(ctx: Context) {
-        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) = dma_buffers!(16000, 16000);
+        // NOTE: 32000 bits of buffer maybe too large, but for some reason it fails with buffer
+        // size 16000 as it seems DMA can be quick enough to run out of descriptors in that
+        // case.
+        let (rx_buffer, rx_descriptors, tx_buffer, tx_descriptors) =
+            dma_buffers_chunk_size!(32000, 32000, 4000);
 
         let i2s = I2s::new(
             ctx.i2s,
@@ -199,19 +221,19 @@ mod tests {
 
         let (din, dout) = unsafe { ctx.dout.split() };
 
-        let mut i2s_tx = i2s
+        let i2s_tx = i2s
             .i2s_tx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_dout(dout)
-            .build(tx_descriptors);
+            .build();
 
-        let mut i2s_rx = i2s
+        let i2s_rx = i2s
             .i2s_rx
             .with_bclk(NoPin)
             .with_ws(NoPin)
             .with_din(din)
-            .build(rx_descriptors);
+            .build();
 
         enable_loopback();
 
@@ -223,51 +245,53 @@ mod tests {
         let mut rcv = [0u8; 11000];
         let mut filler = [0x1u8; 12000];
 
-        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
-        // trying to pop data before calling `available` should just do nothing
-        assert_eq!(0, rx_transfer.pop(&mut rcv[..100]).unwrap());
+        let mut rx_transfer = i2s_rx
+            .read(
+                DmaRxStreamBuf::new(rx_descriptors, rx_buffer).unwrap(),
+                4000,
+            )
+            .unwrap();
+        // trying to peek data before calling `available` should just do nothing
+        assert_eq!(0, rx_transfer.peek().len());
 
         // no data available yet
-        assert_eq!(0, rx_transfer.available().unwrap());
+        assert_eq!(0, rx_transfer.available_bytes());
 
-        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
+        let mut tx_transfer = i2s_tx
+            .write(DmaTxStreamBuf::new(tx_descriptors, tx_buffer).unwrap())
+            .unwrap();
 
         let mut iteration = 0;
         let mut sample_idx = 0;
         let mut check_samples = SampleSource::new();
         loop {
-            let tx_avail = tx_transfer.available().unwrap();
+            let tx_avail = tx_transfer.available_bytes();
 
             // make sure there are more than one descriptor buffers ready to push
             if tx_avail > 5000 {
                 for b in &mut filler[0..tx_avail].iter_mut() {
                     *b = samples.next().unwrap();
                 }
-                tx_transfer.push(&filler[0..tx_avail]).unwrap();
+                tx_transfer.push(&filler[0..tx_avail]);
             }
 
             // test calling available multiple times doesn't break anything
-            rx_transfer.available().unwrap();
-            rx_transfer.available().unwrap();
-            rx_transfer.available().unwrap();
-            rx_transfer.available().unwrap();
-            rx_transfer.available().unwrap();
-            rx_transfer.available().unwrap();
-            let rx_avail = rx_transfer.available().unwrap();
+            rx_transfer.available_bytes();
+            rx_transfer.available_bytes();
+            rx_transfer.available_bytes();
+            rx_transfer.available_bytes();
+            rx_transfer.available_bytes();
+            rx_transfer.available_bytes();
+            let rx_avail = rx_transfer.available_bytes();
 
             // make sure there are more than one descriptor buffers ready to pop
             if rx_avail > 0 {
-                // trying to pop less data than available is an error
-                assert_eq!(
-                    Err(esp_hal::dma::DmaError::BufferTooSmall),
-                    rx_transfer.pop(&mut rcv[..rx_avail / 2])
-                );
-
                 rcv.fill(0xff);
-                let len = rx_transfer.pop(&mut rcv).unwrap();
+                let data = rx_transfer.peek();
+                let len = data.len();
                 assert!(len > 0);
 
-                for &b in &rcv[..len] {
+                for &b in data {
                     let expected = check_samples.next().unwrap();
                     assert_eq!(
                         b, expected,
@@ -276,6 +300,8 @@ mod tests {
                     );
                     sample_idx += 1;
                 }
+
+                rx_transfer.consume(len);
 
                 iteration += 1;
 

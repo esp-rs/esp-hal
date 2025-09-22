@@ -19,8 +19,10 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
+    dma::DmaRxStreamBuf,
     dma_buffers,
-    i2s::master::{Channels, Config, DataFormat, I2s},
+    dma_buffers_chunk_size,
+    i2s::master::{Channels, Config, DataFormat, I2s, Standard},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -44,7 +46,7 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(4092 * 4, 0);
+    let (rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_size!(4092 * 4, 0, 4092);
 
     let i2s = I2s::new(
         peripherals.I2S0,
@@ -63,18 +65,21 @@ async fn main(_spawner: Spawner) {
         .with_bclk(peripherals.GPIO2)
         .with_ws(peripherals.GPIO4)
         .with_din(peripherals.GPIO5)
-        .build(rx_descriptors);
+        .build();
 
     let buffer = rx_buffer;
     println!("Start");
 
     let mut data = [0u8; 5000];
-    let mut transaction = i2s_rx.read_dma_circular_async(buffer).unwrap();
+    let mut transaction = i2s_rx
+        .read(DmaRxStreamBuf::new(rx_descriptors, buffer).unwrap(), 4092)
+        .unwrap();
     loop {
-        let avail = transaction.available().await.unwrap();
+        transaction.wait_for_available().await.unwrap();
+        let avail = transaction.available_bytes();
         println!("available {}", avail);
 
-        let count = transaction.pop(&mut data).await.unwrap();
+        let count = transaction.pop(&mut data);
 
         #[cfg(not(feature = "esp32s2"))]
         println!(
