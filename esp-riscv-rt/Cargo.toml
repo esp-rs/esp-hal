@@ -41,3 +41,6 @@ rtc-ram = []
 
 ## Implement `defmt::Format`
 defmt = ["dep:defmt", "riscv-rt/defmt"]
+
+[package.metadata.cargo-machete]
+ignored = ["defmt"]
