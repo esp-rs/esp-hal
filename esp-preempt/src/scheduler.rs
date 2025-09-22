@@ -98,13 +98,14 @@ impl SchedulerState {
 
     pub(crate) fn create_task(
         &mut self,
+        name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
         priority: usize,
     ) -> TaskPtr {
         let mut task = Box::new_in(
-            Task::new(task, param, task_stack_size, priority),
+            Task::new(name, task, param, task_stack_size, priority),
             InternalMemory,
         );
         task.heap_allocated = true;
@@ -115,7 +116,7 @@ impl SchedulerState {
             task::yield_task();
         }
 
-        debug!("Task created: {:?}", task_ptr);
+        debug!("Task '{}' created: {:?}", name, task_ptr);
 
         task_ptr
     }
@@ -295,12 +296,13 @@ impl Scheduler {
 
     pub(crate) fn create_task(
         &self,
+        name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
         priority: u32,
     ) -> TaskPtr {
-        self.with(|state| state.create_task(task, param, task_stack_size, priority as usize))
+        self.with(|state| state.create_task(name, task, param, task_stack_size, priority as usize))
     }
 
     pub(crate) fn sleep_until(&self, wake_at: Instant) -> bool {
@@ -347,6 +349,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
 
     fn task_create(
         &self,
+        name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         priority: u32,
@@ -354,6 +357,7 @@ impl esp_radio_preempt_driver::Scheduler for Scheduler {
         task_stack_size: usize,
     ) -> *mut c_void {
         self.create_task(
+            name,
             task,
             param,
             task_stack_size,

@@ -231,14 +231,15 @@ const STACK_CANARY: u32 =
 
 impl Task {
     pub(crate) fn new(
+        name: &str,
         task_fn: extern "C" fn(*mut c_void),
         param: *mut c_void,
         task_stack_size: usize,
         priority: usize,
     ) -> Self {
         trace!(
-            "task_create {:?}({:?}) stack_size = {} priority = {}",
-            task_fn, param, task_stack_size, priority
+            "task_create {} {:?}({:?}) stack_size = {} priority = {}",
+            name, task_fn, param, task_stack_size, priority
         );
 
         // Make sure the stack guard doesn't eat into the stack size.

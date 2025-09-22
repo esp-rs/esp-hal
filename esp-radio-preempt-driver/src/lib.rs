@@ -39,6 +39,7 @@ unsafe extern "Rust" {
     fn esp_preempt_current_task() -> *mut c_void;
     fn esp_preempt_max_task_priority() -> u32;
     fn esp_preempt_task_create(
+        name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         priority: u32,
@@ -57,42 +58,43 @@ unsafe extern "Rust" {
 /// See the [module documentation][crate] for an example.
 #[macro_export]
 macro_rules! scheduler_impl {
-    ($vis:vis static $name:ident: $t: ty = $val:expr) => {
-        $vis static $name: $t = $val;
+    ($vis:vis static $driver:ident: $t: ty = $val:expr) => {
+        $vis static $driver: $t = $val;
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_initialized() -> bool {
-            <$t as $crate::Scheduler>::initialized(&$name)
+            <$t as $crate::Scheduler>::initialized(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_yield_task() {
-            <$t as $crate::Scheduler>::yield_task(&$name)
+            <$t as $crate::Scheduler>::yield_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_yield_task_from_isr() {
-            <$t as $crate::Scheduler>::yield_task_from_isr(&$name)
+            <$t as $crate::Scheduler>::yield_task_from_isr(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_current_task() -> *mut c_void {
-            <$t as $crate::Scheduler>::current_task(&$name)
+            <$t as $crate::Scheduler>::current_task(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_max_task_priority() -> u32 {
-            <$t as $crate::Scheduler>::max_task_priority(&$name)
+            <$t as $crate::Scheduler>::max_task_priority(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_task_create(
+            name: &str,
             task: extern "C" fn(*mut c_void),
             param: *mut c_void,
             priority: u32,
@@ -100,7 +102,8 @@ macro_rules! scheduler_impl {
             task_stack_size: usize,
         ) -> *mut c_void {
             <$t as $crate::Scheduler>::task_create(
-                &$name,
+                &$driver,
+                name,
                 task,
                 param,
                 priority,
@@ -112,25 +115,25 @@ macro_rules! scheduler_impl {
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_schedule_task_deletion(task_handle: *mut c_void) {
-            <$t as $crate::Scheduler>::schedule_task_deletion(&$name, task_handle)
+            <$t as $crate::Scheduler>::schedule_task_deletion(&$driver, task_handle)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_current_task_thread_semaphore() -> SemaphorePtr {
-            <$t as $crate::Scheduler>::current_task_thread_semaphore(&$name)
+            <$t as $crate::Scheduler>::current_task_thread_semaphore(&$driver)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_usleep(us: u32) {
-            <$t as $crate::Scheduler>::usleep(&$name, us)
+            <$t as $crate::Scheduler>::usleep(&$driver, us)
         }
 
         #[unsafe(no_mangle)]
         #[inline]
         fn esp_preempt_now() -> u64 {
-            <$t as $crate::Scheduler>::now(&$name)
+            <$t as $crate::Scheduler>::now(&$driver)
         }
     };
 }
@@ -166,6 +169,7 @@ macro_rules! scheduler_impl {
 ///
 ///     fn task_create(
 ///        &self,
+///        name: &str,
 ///        task: extern "C" fn(*mut c_void),
 ///        param: *mut c_void,
 ///        priority: u32,
@@ -220,6 +224,7 @@ pub trait Scheduler: Send + Sync + 'static {
     /// It should allocate the stack.
     fn task_create(
         &self,
+        name: &str,
         task: extern "C" fn(*mut c_void),
         param: *mut c_void,
         priority: u32,
@@ -293,13 +298,14 @@ pub fn max_task_priority() -> u32 {
 /// pointed to by `param` needs to be `Send` and the task takes ownership over it.
 #[inline]
 pub unsafe fn task_create(
+    name: &str,
     task: extern "C" fn(*mut c_void),
     param: *mut c_void,
     priority: u32,
     pin_to_core: Option<u32>,
     task_stack_size: usize,
 ) -> *mut c_void {
-    unsafe { esp_preempt_task_create(task, param, priority, pin_to_core, task_stack_size) }
+    unsafe { esp_preempt_task_create(name, task, param, priority, pin_to_core, task_stack_size) }
 }
 
 /// Schedules the given task for deletion.

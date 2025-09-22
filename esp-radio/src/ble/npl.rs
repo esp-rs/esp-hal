@@ -385,14 +385,11 @@ unsafe extern "C" fn task_create(
     task_handle: *const c_void,
     core_id: u32,
 ) -> i32 {
-    unsafe {
-        let name_str = str_from_c(name);
-
-        trace!(
-            "task_create {:?} {} {} {:?} {} {:?} {}",
-            task_func, name_str, stack_depth, param, prio, task_handle, core_id,
-        );
-    };
+    let name_str = unsafe { str_from_c(name) };
+    trace!(
+        "task_create {:?} {} {} {:?} {} {:?} {}",
+        task_func, name_str, stack_depth, param, prio, task_handle, core_id,
+    );
 
     unsafe {
         *(task_handle as *mut usize) = 0;
@@ -402,6 +399,7 @@ unsafe extern "C" fn task_create(
         let task_func = transmute::<*mut c_void, extern "C" fn(*mut c_void)>(task_func);
 
         let task = crate::preempt::task_create(
+            name_str,
             task_func,
             param,
             prio,
