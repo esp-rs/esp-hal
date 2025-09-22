@@ -38,11 +38,19 @@ log_format!("serial");
 #[cfg(not(feature = "no-op"))]
 #[macro_export]
 macro_rules! println {
+    () => {{
+        $crate::Printer::write_bytes(&[b'\n']);
+    }};
     ($($arg:tt)*) => {{
-        {
-            use core::fmt::Write;
-            writeln!($crate::Printer, $($arg)*).ok();
+        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
+            $crate::with(|_| {
+                use ::core::fmt::Write;
+                ($crate::Printer).write_fmt(args)?;
+                $crate::Printer::write_bytes(&[b'\n']);
+                Ok(())
+            })
         }
+        _do_print(::core::format_args!($($arg)*)).ok();
     }};
 }
 
@@ -51,10 +59,13 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        {
-            use core::fmt::Write;
-            write!($crate::Printer, $($arg)*).ok();
+        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
+            $crate::with(|_| {
+                use ::core::fmt::Write;
+                ($crate::Printer).write_fmt(args)
+            })
         }
+        _do_print(::core::format_args!($($arg)*)).ok();
     }};
 }
 
@@ -486,7 +497,8 @@ mod noop {
 use core::marker::PhantomData;
 
 #[derive(Clone, Copy)]
-struct LockToken<'a>(PhantomData<&'a ()>);
+#[doc(hidden)]
+pub struct LockToken<'a>(PhantomData<&'a ()>);
 
 impl LockToken<'_> {
     #[allow(unused)]
@@ -499,8 +511,9 @@ impl LockToken<'_> {
 static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 /// Runs the callback in a critical section, if enabled.
+#[doc(hidden)]
 #[inline]
-fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
+pub fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
     #[cfg(feature = "critical-section")]
     return LOCK.lock(|| f(unsafe { LockToken::conjure() }));
 
