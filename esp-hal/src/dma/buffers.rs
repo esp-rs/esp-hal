@@ -1508,6 +1508,7 @@ impl DmaTxStreamBuf {
 
 unsafe impl DmaTxBuffer for DmaTxStreamBuf {
     type View = DmaTxStreamBufView;
+    type Final = Self;
 
     fn prepare(&mut self) -> Preparation {
         // Link up all the descriptors (but not in a circle).
