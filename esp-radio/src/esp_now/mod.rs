@@ -18,7 +18,7 @@ use core::{
 
 use esp_hal::asynch::AtomicWaker;
 use esp_sync::NonReentrantMutex;
-use portable_atomic::{AtomicBool, AtomicU8, Ordering};
+use portable_atomic::{AtomicBool, Ordering};
 
 use super::*;
 #[cfg(feature = "csi")]
@@ -382,11 +382,10 @@ impl EspNowWifiInterface {
 
 /// Manages the `EspNow` instance lifecycle while ensuring it remains active.
 #[instability::unstable]
-pub struct EspNowManager<'d> {
-    _rc: EspNowRc<'d>,
-}
+#[non_exhaustive]
+pub struct EspNowManager {}
 
-impl EspNowManager<'_> {
+impl EspNowManager {
     /// Set primary Wi-Fi channel.
     /// Should only be used when using ESP-NOW without AP or STA.
     #[instability::unstable]
@@ -566,11 +565,10 @@ impl EspNowManager<'_> {
 /// completion of a sending requires waiting for a callback invoked in an
 /// interrupt.
 #[instability::unstable]
-pub struct EspNowSender<'d> {
-    _rc: EspNowRc<'d>,
-}
+#[non_exhaustive]
+pub struct EspNowSender {}
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Send data to peer
     ///
     /// The peer needs to be added to the peer list first.
@@ -600,7 +598,7 @@ impl EspNowSender<'_> {
 /// invoked.
 #[must_use]
 #[instability::unstable]
-pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender<'s>>);
+pub struct SendWaiter<'s>(PhantomData<&'s mut EspNowSender>);
 
 impl SendWaiter<'_> {
     /// Wait for the previous sending to complete, i.e. the send callback is
@@ -631,11 +629,10 @@ impl Drop for SendWaiter<'_> {
 /// This is the receiver part of ESP-NOW. You can get this receiver by splitting
 /// an `EspNow` instance.
 #[instability::unstable]
-pub struct EspNowReceiver<'d> {
-    _rc: EspNowRc<'d>,
-}
+#[non_exhaustive]
+pub struct EspNowReceiver {}
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// Receives data from the ESP-NOW queue.
     #[instability::unstable]
     pub fn receive(&self) -> Option<ReceivedData> {
@@ -643,44 +640,36 @@ impl EspNowReceiver<'_> {
     }
 }
 
-/// The reference counter for properly deinit espnow after all parts are
-/// dropped.
-struct EspNowRc<'d> {
-    rc: &'static AtomicU8,
-    inner: PhantomData<EspNow<'d>>,
-}
-
-impl EspNowRc<'_> {
-    fn new() -> Self {
-        static ESP_NOW_RC: AtomicU8 = AtomicU8::new(0);
-        assert!(ESP_NOW_RC.fetch_add(1, Ordering::AcqRel) == 0);
-
-        Self {
-            rc: &ESP_NOW_RC,
-            inner: PhantomData,
-        }
+pub(crate) fn deinit_internal() {
+    unsafe {
+        esp_now_unregister_recv_cb();
+        esp_now_deinit();
     }
 }
 
-impl Clone for EspNowRc<'_> {
-    fn clone(&self) -> Self {
-        self.rc.fetch_add(1, Ordering::Release);
-        Self {
-            rc: self.rc,
-            inner: PhantomData,
-        }
-    }
-}
+pub(crate) fn init_internal() {
+    check_error_expect!({ esp_now_init() }, "esp-now-init failed");
+    check_error_expect!(
+        { esp_now_register_recv_cb(Some(rcv_cb)) },
+        "receiving callback failed"
+    );
+    check_error_expect!(
+        { esp_now_register_send_cb(Some(send_cb)) },
+        "sending callback failed"
+    );
 
-impl Drop for EspNowRc<'_> {
-    fn drop(&mut self) {
-        if self.rc.fetch_sub(1, Ordering::AcqRel) == 1 {
-            unsafe {
-                esp_now_unregister_recv_cb();
-                esp_now_deinit();
-            }
-        }
-    }
+    let raw_peer = esp_now_peer_info_t {
+        peer_addr: BROADCAST_ADDRESS,
+        lmk: [0u8; 16],
+        channel: 0,
+        ifidx: EspNowWifiInterface::Sta.as_wifi_interface(),
+        encrypt: false,
+        priv_: core::ptr::null_mut(),
+    };
+    check_error_expect!(
+        { esp_now_add_peer(&raw_peer as *const _) },
+        "adding peer failed"
+    );
 }
 
 #[allow(unknown_lints)]
@@ -695,54 +684,25 @@ impl Drop for EspNowRc<'_> {
 /// For convenience, by default there will be a broadcast peer added on the STA
 /// interface.
 #[instability::unstable]
-pub struct EspNow<'d> {
-    manager: EspNowManager<'d>,
-    sender: EspNowSender<'d>,
-    receiver: EspNowReceiver<'d>,
-    _phantom: PhantomData<&'d ()>,
+pub struct EspNow {
+    manager: EspNowManager,
+    sender: EspNowSender,
+    receiver: EspNowReceiver,
 }
 
-impl<'d> EspNow<'d> {
-    pub(crate) fn new_internal() -> EspNow<'d> {
-        let espnow_rc = EspNowRc::new();
-        let esp_now = EspNow {
-            manager: EspNowManager {
-                _rc: espnow_rc.clone(),
-            },
-            sender: EspNowSender {
-                _rc: espnow_rc.clone(),
-            },
-            receiver: EspNowReceiver { _rc: espnow_rc },
-            _phantom: PhantomData,
-        };
-
-        check_error_expect!({ esp_now_init() }, "esp-now-init failed");
-        check_error_expect!(
-            { esp_now_register_recv_cb(Some(rcv_cb)) },
-            "receiving callback failed"
-        );
-        check_error_expect!(
-            { esp_now_register_send_cb(Some(send_cb)) },
-            "sending callback failed"
-        );
-
-        esp_now
-            .add_peer(PeerInfo {
-                interface: EspNowWifiInterface::Sta,
-                peer_address: BROADCAST_ADDRESS,
-                lmk: None,
-                channel: None,
-                encrypt: false,
-            })
-            .expect("adding peer failed");
-
-        esp_now
+impl EspNow {
+    pub(crate) fn new_internal() -> EspNow {
+        EspNow {
+            manager: EspNowManager {},
+            sender: EspNowSender {},
+            receiver: EspNowReceiver {},
+        }
     }
 
     /// Splits the `EspNow` instance into its manager, sender, and receiver
     /// components.
     #[instability::unstable]
-    pub fn split(self) -> (EspNowManager<'d>, EspNowSender<'d>, EspNowReceiver<'d>) {
+    pub fn split(self) -> (EspNowManager, EspNowSender, EspNowReceiver) {
         (self.manager, self.sender, self.receiver)
     }
 
@@ -903,7 +863,7 @@ unsafe extern "C" fn rcv_cb(
     });
 }
 
-impl EspNowReceiver<'_> {
+impl EspNowReceiver {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -913,7 +873,7 @@ impl EspNowReceiver<'_> {
     }
 }
 
-impl EspNowSender<'_> {
+impl EspNowSender {
     /// Sends data asynchronously to a peer (using its MAC) using ESP-NOW.
     #[instability::unstable]
     pub fn send_async<'s, 'r>(
@@ -930,7 +890,7 @@ impl EspNowSender<'_> {
     }
 }
 
-impl EspNow<'_> {
+impl EspNow {
     /// This function takes mutable reference to self because the
     /// implementation of `ReceiveFuture` is not logically thread
     /// safe.
@@ -956,7 +916,7 @@ impl EspNow<'_> {
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
 pub struct SendFuture<'s, 'r> {
-    _sender: PhantomData<&'s mut EspNowSender<'s>>,
+    _sender: PhantomData<&'s mut EspNowSender>,
     addr: &'r [u8; 6],
     data: &'r [u8],
     sent: bool,
@@ -994,7 +954,7 @@ impl core::future::Future for SendFuture<'_, '_> {
 /// the rest of them unwakable.
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 #[instability::unstable]
-pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver<'r>>);
+pub struct ReceiveFuture<'r>(PhantomData<&'r mut EspNowReceiver>);
 
 impl core::future::Future for ReceiveFuture<'_> {
     type Output = ReceivedData;

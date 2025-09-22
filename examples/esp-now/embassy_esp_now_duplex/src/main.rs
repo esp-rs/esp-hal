@@ -46,8 +46,9 @@ async fn main(spawner: Spawner) -> ! {
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
     let wifi = peripherals.WIFI;
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, wifi, Default::default()).unwrap();
+    let interfaces = esp_radio::wifi::interfaces();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, wifi, Default::default()).unwrap();
     controller.set_mode(esp_radio::wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();
 
@@ -68,9 +69,9 @@ async fn main(spawner: Spawner) -> ! {
     }
 
     let (manager, sender, receiver) = esp_now.split();
-    let manager = mk_static!(EspNowManager<'static>, manager);
+    let manager = mk_static!(EspNowManager, manager);
     let sender = mk_static!(
-        Mutex::<NoopRawMutex, EspNowSender<'static>>,
+        Mutex::<NoopRawMutex, EspNowSender>,
         Mutex::<NoopRawMutex, _>::new(sender)
     );
 
@@ -99,7 +100,7 @@ async fn main(spawner: Spawner) -> ! {
 }
 
 #[embassy_executor::task]
-async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>) {
+async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender>) {
     let mut ticker = Ticker::every(Duration::from_secs(1));
     loop {
         ticker.next().await;
@@ -112,7 +113,7 @@ async fn broadcaster(sender: &'static Mutex<NoopRawMutex, EspNowSender<'static>>
 }
 
 #[embassy_executor::task]
-async fn listener(manager: &'static EspNowManager<'static>, mut receiver: EspNowReceiver<'static>) {
+async fn listener(manager: &'static EspNowManager, mut receiver: EspNowReceiver) {
     loop {
         let r = receiver.receive_async().await;
         println!("Received {:?}", r.data());

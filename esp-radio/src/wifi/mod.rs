@@ -4,6 +4,7 @@
 
 pub mod event;
 mod internal;
+pub mod net;
 pub(crate) mod os_adapter;
 pub(crate) mod state;
 use alloc::{collections::vec_deque::VecDeque, string::String};
@@ -64,6 +65,7 @@ use esp_wifi_sys::include::{
     wifi_promiscuous_pkt_t,
     wifi_promiscuous_pkt_type_t,
 };
+use net::*;
 use num_derive::FromPrimitive;
 #[doc(hidden)]
 pub(crate) use os_adapter::*;
@@ -71,9 +73,6 @@ use portable_atomic::{AtomicUsize, Ordering};
 use procmacros::BuilderLite;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
 pub use state::*;
 
 use crate::{
@@ -1776,35 +1775,6 @@ impl WifiDeviceMode {
         WIFI_TX_INFLIGHT.fetch_add(1, Ordering::SeqCst);
     }
 
-    fn tx_token(&self) -> Option<WifiTxToken> {
-        if !self.can_send() {
-            // TODO: perhaps we can use a counting semaphore with a short blocking timeout
-            crate::preempt::yield_task();
-        }
-
-        if self.can_send() {
-            Some(WifiTxToken { mode: *self })
-        } else {
-            None
-        }
-    }
-
-    fn rx_token(&self) -> Option<(WifiRxToken, WifiTxToken)> {
-        let is_empty = self.data_queue_rx().with(|q| q.is_empty());
-        if is_empty || !self.can_send() {
-            // TODO: use an OS queue with a short timeout
-            crate::preempt::yield_task();
-        }
-
-        let is_empty = is_empty && self.data_queue_rx().with(|q| q.is_empty());
-
-        if !is_empty {
-            self.tx_token().map(|tx| (WifiRxToken { mode: *self }, tx))
-        } else {
-            None
-        }
-    }
-
     fn interface(&self) -> wifi_interface_t {
         match self {
             WifiDeviceMode::Sta => wifi_interface_t_WIFI_IF_STA,
@@ -1850,30 +1820,15 @@ impl WifiDeviceMode {
     }
 }
 
-/// A wifi device implementing smoltcp's Device trait.
-pub struct WifiDevice<'d> {
-    _phantom: PhantomData<&'d ()>,
+/// A wifi interface.
+pub struct WifiDevice {
     mode: WifiDeviceMode,
 }
 
-impl WifiDevice<'_> {
+impl WifiDevice {
     /// Retrieves the MAC address of the Wi-Fi device.
     pub fn mac_address(&self) -> [u8; 6] {
         self.mode.mac_address()
-    }
-
-    /// Receives data from the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
-    pub fn receive(&mut self) -> Option<(WifiRxToken, WifiTxToken)> {
-        self.mode.rx_token()
-    }
-
-    /// Transmits data through the Wi-Fi device (only when `smoltcp` feature is
-    /// disabled).
-    #[cfg(not(feature = "smoltcp"))]
-    pub fn transmit(&mut self) -> Option<WifiTxToken> {
-        self.mode.tx_token()
     }
 }
 
@@ -2126,28 +2081,21 @@ unsafe extern "C" fn promiscuous_rx_cb(buf: *mut core::ffi::c_void, frame_type: 
 #[instability::unstable]
 /// A Wi-Fi sniffer.
 #[non_exhaustive]
-pub struct Sniffer<'d> {
-    _phantom: PhantomData<&'d ()>,
-}
+pub struct Sniffer {}
 
 #[cfg(all(feature = "sniffer", feature = "unstable"))]
-impl Sniffer<'_> {
+impl Sniffer {
     pub(crate) fn new() -> Self {
-        // This shouldn't fail, since the way this is created, means that wifi will
-        // always be initialized.
-        unwrap!(esp_wifi_result!(unsafe {
-            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
-        }));
-        Self {
-            _phantom: PhantomData,
-        }
+        Self {}
     }
+
     /// Set promiscuous mode enabled or disabled.
     #[instability::unstable]
     pub fn set_promiscuous_mode(&self, enabled: bool) -> Result<(), WifiError> {
         esp_wifi_result!(unsafe { esp_wifi_set_promiscuous(enabled) })?;
         Ok(())
     }
+
     /// Transmit a raw frame.
     #[instability::unstable]
     pub fn send_raw_frame(
@@ -2169,135 +2117,11 @@ impl Sniffer<'_> {
             )
         })
     }
+
     /// Set the callback for receiving a packet.
     #[instability::unstable]
     pub fn set_receive_cb(&mut self, cb: fn(PromiscuousPkt<'_>)) {
         SNIFFER_CB.with(|callback| *callback = Some(cb));
-    }
-}
-
-// see https://docs.rs/smoltcp/0.7.1/smoltcp/phy/index.html
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl Device for WifiDevice<'_> {
-    type RxToken<'a>
-        = WifiRxToken
-    where
-        Self: 'a;
-    type TxToken<'a>
-        = WifiTxToken
-    where
-        Self: 'a;
-
-    fn receive(
-        &mut self,
-        _instant: smoltcp::time::Instant,
-    ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-        self.mode.rx_token()
-    }
-
-    fn transmit(&mut self, _instant: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
-        self.mode.tx_token()
-    }
-
-    fn capabilities(&self) -> smoltcp::phy::DeviceCapabilities {
-        let mut caps = DeviceCapabilities::default();
-        caps.max_transmission_unit = MTU;
-        caps.max_burst_size = if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0
-        {
-            None
-        } else {
-            Some(esp_config_int!(
-                usize,
-                "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
-            ))
-        };
-        caps
-    }
-}
-
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct WifiRxToken {
-    mode: WifiDeviceMode,
-}
-
-impl WifiRxToken {
-    /// Consumes the RX token and applies the callback function to the received
-    /// data buffer.
-    pub fn consume_token<R, F>(self, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        let mut data = self.mode.data_queue_rx().with(|queue| {
-            unwrap!(
-                queue.pop_front(),
-                "unreachable: transmit()/receive() ensures there is a packet to process"
-            )
-        });
-
-        // We handle the received data outside of the lock because
-        // PacketBuffer::drop must not be called in a critical section.
-        // Dropping an PacketBuffer will call `esp_wifi_internal_free_rx_buffer`
-        // which will try to lock an internal mutex. If the mutex is already
-        // taken, the function will try to trigger a context switch, which will
-        // fail if we are in an interrupt-free context.
-        let buffer = data.as_slice_mut();
-        dump_packet_info(buffer);
-
-        f(buffer)
-    }
-}
-
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl RxToken for WifiRxToken {
-    fn consume<R, F>(self, f: F) -> R
-    where
-        F: FnOnce(&[u8]) -> R,
-    {
-        self.consume_token(|t| f(t))
-    }
-}
-
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct WifiTxToken {
-    mode: WifiDeviceMode,
-}
-
-impl WifiTxToken {
-    /// Consumes the TX token and applies the callback function to the received
-    /// data buffer.
-    pub fn consume_token<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        self.mode.increase_in_flight_counter();
-
-        // (safety): creation of multiple Wi-Fi devices with the same mode is impossible
-        // in safe Rust, therefore only smoltcp _or_ embassy-net can be used at
-        // one time
-        static mut BUFFER: [u8; MTU] = [0u8; MTU];
-
-        let buffer = unsafe { &mut BUFFER[..len] };
-
-        let res = f(buffer);
-
-        esp_wifi_send_data(self.mode.interface(), buffer);
-
-        res
-    }
-}
-
-#[cfg(all(feature = "smoltcp", feature = "unstable"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-impl TxToken for WifiTxToken {
-    fn consume<R, F>(self, len: usize, f: F) -> R
-    where
-        F: FnOnce(&mut [u8]) -> R,
-    {
-        self.consume_token(len, f)
     }
 }
 
@@ -2568,93 +2392,6 @@ macro_rules! esp_wifi_result {
     }};
 }
 
-pub(crate) mod embassy {
-    use embassy_net_driver::{Capabilities, Driver, HardwareAddress, RxToken, TxToken};
-    use esp_hal::asynch::AtomicWaker;
-
-    use super::*;
-
-    // We can get away with a single tx waker because the transmit queue is shared
-    // between interfaces.
-    pub(crate) static TRANSMIT_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static AP_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(crate) static AP_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
-
-    pub(crate) static STA_RECEIVE_WAKER: AtomicWaker = AtomicWaker::new();
-    pub(crate) static STA_LINK_STATE_WAKER: AtomicWaker = AtomicWaker::new();
-
-    impl RxToken for WifiRxToken {
-        fn consume<R, F>(self, f: F) -> R
-        where
-            F: FnOnce(&mut [u8]) -> R,
-        {
-            self.consume_token(f)
-        }
-    }
-
-    impl TxToken for WifiTxToken {
-        fn consume<R, F>(self, len: usize, f: F) -> R
-        where
-            F: FnOnce(&mut [u8]) -> R,
-        {
-            self.consume_token(len, f)
-        }
-    }
-
-    impl Driver for WifiDevice<'_> {
-        type RxToken<'a>
-            = WifiRxToken
-        where
-            Self: 'a;
-        type TxToken<'a>
-            = WifiTxToken
-        where
-            Self: 'a;
-
-        fn receive(
-            &mut self,
-            cx: &mut core::task::Context<'_>,
-        ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
-            self.mode.register_receive_waker(cx);
-            self.mode.register_transmit_waker(cx);
-            self.mode.rx_token()
-        }
-
-        fn transmit(&mut self, cx: &mut core::task::Context<'_>) -> Option<Self::TxToken<'_>> {
-            self.mode.register_transmit_waker(cx);
-            self.mode.tx_token()
-        }
-
-        fn link_state(
-            &mut self,
-            cx: &mut core::task::Context<'_>,
-        ) -> embassy_net_driver::LinkState {
-            self.mode.register_link_state_waker(cx);
-            self.mode.link_state()
-        }
-
-        fn capabilities(&self) -> Capabilities {
-            let mut caps = Capabilities::default();
-            caps.max_transmission_unit = MTU;
-            caps.max_burst_size =
-                if esp_config_int!(usize, "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE") == 0 {
-                    None
-                } else {
-                    Some(esp_config_int!(
-                        usize,
-                        "ESP_RADIO_CONFIG_WIFI_MAX_BURST_SIZE"
-                    ))
-                };
-            caps
-        }
-
-        fn hardware_address(&self) -> HardwareAddress {
-            HardwareAddress::Ethernet(self.mac_address())
-        }
-    }
-}
-
 /// Power saving mode settings for the modem.
 #[non_exhaustive]
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
@@ -2699,19 +2436,19 @@ impl Drop for FreeApListOnDrop {
 
 /// Represents the Wi-Fi controller and its associated interfaces.
 #[non_exhaustive]
-pub struct Interfaces<'d> {
+pub struct Interfaces {
     /// Station mode Wi-Fi device.
-    pub sta: WifiDevice<'d>,
+    pub sta: WifiDevice,
     /// Access Point mode Wi-Fi device.
-    pub ap: WifiDevice<'d>,
+    pub ap: WifiDevice,
     /// ESP-NOW interface.
     #[cfg(all(feature = "esp-now", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub esp_now: crate::esp_now::EspNow<'d>,
+    pub esp_now: crate::esp_now::EspNow,
     /// Wi-Fi sniffer interface.
     #[cfg(all(feature = "sniffer", feature = "unstable"))]
     #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
-    pub sniffer: Sniffer<'d>,
+    pub sniffer: Sniffer,
 }
 
 /// Wi-Fi operating class.
@@ -2950,96 +2687,30 @@ impl WifiConfig {
     }
 }
 
-/// Create a Wi-Fi controller and it's associated interfaces.
+/// Gets the Wi-Fi interfaces.
 ///
-/// Dropping the controller will deinitialize / stop Wi-Fi.
+/// # Panics
 ///
-/// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
-/// currently in use.
-pub fn new<'d>(
-    _inited: &'d Controller<'d>,
-    device: crate::hal::peripherals::WIFI<'d>,
-    config: WifiConfig,
-) -> Result<(WifiController<'d>, Interfaces<'d>), WifiError> {
-    if crate::is_interrupts_disabled() {
-        return Err(WifiError::Unsupported);
+/// Panics if called more than once.
+pub fn interfaces() -> Interfaces {
+    static INTERFACES_TAKEN: portable_atomic::AtomicBool = portable_atomic::AtomicBool::new(false);
+
+    if INTERFACES_TAKEN.fetch_or(true, portable_atomic::Ordering::Acquire) {
+        panic!("`interfaces` called more than once!");
     }
 
-    config.validate();
-
-    unsafe {
-        internal::G_CONFIG = wifi_init_config_t {
-            osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
-
-            wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
-            static_rx_buf_num: config.static_rx_buf_num as _,
-            dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
-            tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
-            static_tx_buf_num: config.static_tx_buf_num as _,
-            dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
-            rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
-            rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
-            cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
-            csi_enable: cfg!(feature = "csi") as i32,
-            ampdu_rx_enable: config.ampdu_rx_enable as _,
-            ampdu_tx_enable: config.ampdu_tx_enable as _,
-            amsdu_tx_enable: config.amsdu_tx_enable as _,
-            nvs_enable: 0,
-            nano_enable: 0,
-            rx_ba_win: config.rx_ba_win as _,
-            wifi_task_core_id: Cpu::current() as _,
-            beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
-            mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
-            feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
-            sta_disconnected_pm: false,
-            espnow_max_encrypt_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM
-                as i32,
-
-            tx_hetb_queue_num: 3,
-            dump_hesigb_enable: false,
-
-            magic: WIFI_INIT_CONFIG_MAGIC as i32,
-        };
-
-        RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
-        TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
-    };
-
-    crate::wifi::wifi_init(device)?;
-
-    unsafe {
-        let country = config.country_code.into_blob();
-        esp_wifi_result!(esp_wifi_set_country(&country))?;
-    }
-
-    // At some point the "High-speed ADC" entropy source became available.
-    unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
-
-    // Only create WifiController after we've enabled TRNG - otherwise returning an error from this
-    // function will cause panic because WifiController::drop tries to disable the TRNG.
-    let mut controller = WifiController {
-        _phantom: Default::default(),
-    };
-
-    controller.set_power_saving(config.power_save_mode)?;
-
-    Ok((
-        controller,
-        Interfaces {
-            sta: WifiDevice {
-                _phantom: Default::default(),
-                mode: WifiDeviceMode::Sta,
-            },
-            ap: WifiDevice {
-                _phantom: Default::default(),
-                mode: WifiDeviceMode::Ap,
-            },
-            #[cfg(all(feature = "esp-now", feature = "unstable"))]
-            esp_now: crate::esp_now::EspNow::new_internal(),
-            #[cfg(all(feature = "sniffer", feature = "unstable"))]
-            sniffer: Sniffer::new(),
+    Interfaces {
+        sta: WifiDevice {
+            mode: WifiDeviceMode::Sta,
         },
-    ))
+        ap: WifiDevice {
+            mode: WifiDeviceMode::Ap,
+        },
+        #[cfg(all(feature = "esp-now", feature = "unstable"))]
+        esp_now: crate::esp_now::EspNow::new_internal(),
+        #[cfg(all(feature = "sniffer", feature = "unstable"))]
+        sniffer: Sniffer::new(),
+    }
 }
 
 /// Wi-Fi controller.
@@ -3050,6 +2721,9 @@ pub struct WifiController<'d> {
 
 impl Drop for WifiController<'_> {
     fn drop(&mut self) {
+        #[cfg(feature = "esp-now")]
+        crate::esp_now::deinit_internal();
+
         if let Err(e) = crate::wifi::wifi_deinit() {
             warn!("Failed to cleanly deinit wifi: {:?}", e);
         }
@@ -3074,6 +2748,91 @@ impl WifiController<'_> {
         csi.set_csi(true)?;
 
         Ok(())
+    }
+
+    /// Create a Wi-Fi controller and it's associated interfaces.
+    ///
+    /// Dropping the controller will deinitialize / stop Wi-Fi.
+    ///
+    /// Make sure to **not** call this function while interrupts are disabled, or IEEE 802.15.4 is
+    /// currently in use.
+    pub fn new<'d>(
+        _inited: &'d Controller<'d>,
+        device: crate::hal::peripherals::WIFI<'d>,
+        config: WifiConfig,
+    ) -> Result<WifiController<'d>, WifiError> {
+        if crate::is_interrupts_disabled() {
+            return Err(WifiError::Unsupported);
+        }
+
+        config.validate();
+
+        unsafe {
+            internal::G_CONFIG = wifi_init_config_t {
+                osi_funcs: (&raw const internal::__ESP_RADIO_G_WIFI_OSI_FUNCS).cast_mut(),
+
+                wpa_crypto_funcs: g_wifi_default_wpa_crypto_funcs,
+                static_rx_buf_num: config.static_rx_buf_num as _,
+                dynamic_rx_buf_num: config.dynamic_rx_buf_num as _,
+                tx_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_TX_BUFFER_TYPE as i32,
+                static_tx_buf_num: config.static_tx_buf_num as _,
+                dynamic_tx_buf_num: config.dynamic_tx_buf_num as _,
+                rx_mgmt_buf_type: esp_wifi_sys::include::CONFIG_ESP_WIFI_DYNAMIC_RX_MGMT_BUF as i32,
+                rx_mgmt_buf_num: esp_wifi_sys::include::CONFIG_ESP_WIFI_RX_MGMT_BUF_NUM_DEF as i32,
+                cache_tx_buf_num: esp_wifi_sys::include::WIFI_CACHE_TX_BUFFER_NUM as i32,
+                csi_enable: cfg!(feature = "csi") as i32,
+                ampdu_rx_enable: config.ampdu_rx_enable as _,
+                ampdu_tx_enable: config.ampdu_tx_enable as _,
+                amsdu_tx_enable: config.amsdu_tx_enable as _,
+                nvs_enable: 0,
+                nano_enable: 0,
+                rx_ba_win: config.rx_ba_win as _,
+                wifi_task_core_id: Cpu::current() as _,
+                beacon_max_len: esp_wifi_sys::include::WIFI_SOFTAP_BEACON_MAX_LEN as i32,
+                mgmt_sbuf_num: esp_wifi_sys::include::WIFI_MGMT_SBUF_NUM as i32,
+                feature_caps: internal::__ESP_RADIO_G_WIFI_FEATURE_CAPS,
+                sta_disconnected_pm: false,
+                espnow_max_encrypt_num:
+                    esp_wifi_sys::include::CONFIG_ESP_WIFI_ESPNOW_MAX_ENCRYPT_NUM as i32,
+
+                tx_hetb_queue_num: 3,
+                dump_hesigb_enable: false,
+
+                magic: WIFI_INIT_CONFIG_MAGIC as i32,
+            };
+
+            RX_QUEUE_SIZE.store(config.rx_queue_size, Ordering::Relaxed);
+            TX_QUEUE_SIZE.store(config.tx_queue_size, Ordering::Relaxed);
+        };
+
+        crate::wifi::wifi_init(device)?;
+
+        unsafe {
+            let country = config.country_code.into_blob();
+            esp_wifi_result!(esp_wifi_set_country(&country))?;
+        }
+
+        // At some point the "High-speed ADC" entropy source became available.
+        unsafe { esp_hal::rng::TrngSource::increase_entropy_source_counter() };
+
+        // Only create WifiController after we've enabled TRNG - otherwise returning an error from
+        // this function will cause panic because WifiController::drop tries to disable the
+        // TRNG.
+        let mut controller = WifiController {
+            _phantom: Default::default(),
+        };
+
+        controller.set_power_saving(config.power_save_mode)?;
+
+        #[cfg(feature = "sniffer")]
+        unwrap!(esp_wifi_result!(unsafe {
+            esp_wifi_set_promiscuous_rx_cb(Some(promiscuous_rx_cb))
+        }));
+
+        #[cfg(feature = "esp-now")]
+        crate::esp_now::init_internal();
+
+        Ok(controller)
     }
 
     /// Set the Wi-Fi protocol.

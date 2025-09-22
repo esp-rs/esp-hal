@@ -52,13 +52,18 @@ fn main() -> ! {
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+    let interfaces = esp_radio::wifi::interfaces();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, peripherals.WIFI, Default::default())
+            .unwrap();
 
     let mut ap_device = interfaces.ap;
+    let mut ap_device = esp_radio::wifi::net::smoltcp_adapter::SmoltcpAdapter::new(&mut ap_device);
     let ap_interface = create_interface(&mut ap_device);
 
     let mut sta_device = interfaces.sta;
+    let mut sta_device =
+        esp_radio::wifi::net::smoltcp_adapter::SmoltcpAdapter::new(&mut sta_device);
     let sta_interface = create_interface(&mut sta_device);
 
     let rng = Rng::new();
@@ -232,7 +237,9 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(
+    device: &mut esp_radio::wifi::net::smoltcp_adapter::SmoltcpAdapter<'_>,
+) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

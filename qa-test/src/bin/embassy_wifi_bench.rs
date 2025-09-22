@@ -80,10 +80,14 @@ async fn main(spawner: Spawner) -> ! {
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+    let interfaces = esp_radio::wifi::interfaces();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, peripherals.WIFI, Default::default())
+            .unwrap();
 
     let wifi_interface = interfaces.sta;
+    let wifi_interface = &mut *mk_static!(WifiDevice, wifi_interface);
+    let wifi_interface = esp_radio::wifi::net::embassy::EmbassyNetAdapter::new(wifi_interface);
 
     controller
         .set_power_saving(esp_radio::wifi::PowerSaveMode::None)
@@ -184,7 +188,9 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(
+    mut runner: Runner<'static, esp_radio::wifi::net::embassy::EmbassyNetAdapter<'static>>,
+) {
     runner.run().await
 }
 

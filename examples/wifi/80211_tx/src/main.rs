@@ -43,9 +43,11 @@ fn main() -> ! {
 
     let esp_radio_ctrl = esp_radio::init().unwrap();
 
+    let interfaces = esp_radio::wifi::interfaces();
     // We must initialize some kind of interface and start it.
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, peripherals.WIFI, Default::default())
+            .unwrap();
 
     controller.set_mode(wifi::WifiMode::Sta).unwrap();
     controller.start().unwrap();

@@ -98,10 +98,13 @@ fn main() -> ! {
 
     println!("started advertising");
 
-    let (mut controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+    let interfaces = esp_radio::wifi::interfaces();
+    let mut controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, peripherals.WIFI, Default::default())
+            .unwrap();
 
     let mut device = interfaces.sta;
+    let mut device = esp_radio::wifi::net::smoltcp_adapter::SmoltcpAdapter::new(&mut device);
     let iface = create_interface(&mut device);
 
     controller
@@ -210,7 +213,9 @@ fn timestamp() -> smoltcp::time::Instant {
     )
 }
 
-pub fn create_interface(device: &mut esp_radio::wifi::WifiDevice) -> smoltcp::iface::Interface {
+pub fn create_interface(
+    device: &mut esp_radio::wifi::net::smoltcp_adapter::SmoltcpAdapter<'_>,
+) -> smoltcp::iface::Interface {
     // users could create multiple instances but since they only have one WifiDevice
     // they probably can't do anything bad with that
     smoltcp::iface::Interface::new(

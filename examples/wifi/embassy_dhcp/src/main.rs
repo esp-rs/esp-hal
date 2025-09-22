@@ -46,6 +46,8 @@ async fn main(spawner: Spawner) -> ! {
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
 
+    let interfaces = esp_radio::wifi::interfaces();
+
     esp_alloc::heap_allocator!(#[unsafe(link_section = ".dram2_uninit")] size: 64 * 1024);
     esp_alloc::heap_allocator!(size: 36 * 1024);
 
@@ -54,10 +56,13 @@ async fn main(spawner: Spawner) -> ! {
 
     let esp_radio_ctrl = &*mk_static!(Controller<'static>, esp_radio::init().unwrap());
 
-    let (controller, interfaces) =
-        esp_radio::wifi::new(&esp_radio_ctrl, peripherals.WIFI, Default::default()).unwrap();
+    let controller =
+        esp_radio::wifi::WifiController::new(&esp_radio_ctrl, peripherals.WIFI, Default::default())
+            .unwrap();
 
     let wifi_interface = interfaces.sta;
+    let wifi_interface = &mut *mk_static!(WifiDevice, wifi_interface);
+    let wifi_interface = esp_radio::wifi::net::embassy::EmbassyNetAdapter::new(wifi_interface);
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "esp32")] {
@@ -194,6 +199,8 @@ async fn connection(mut controller: WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(mut runner: Runner<'static, WifiDevice<'static>>) {
+async fn net_task(
+    mut runner: Runner<'static, esp_radio::wifi::net::embassy::EmbassyNetAdapter<'static>>,
+) {
     runner.run().await
 }
