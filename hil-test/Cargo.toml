@@ -246,7 +246,6 @@ digest              = { version = "0.10.7", default-features = false }
 elliptic-curve      = { version = "0.13.8", default-features = false, features = ["sec1"] }
 # Add the `embedded-test/defmt` feature for more verbose testing
 embedded-test       = { version = "0.7.0-alpha.3", default-features = false, features = ["embassy", "external-executor", "semihosting"], git = "https://github.com/probe-rs/embedded-test", branch = "next" }
-embedded-test-macros       = { version = "0.7.0-alpha.2", default-features = false, git = "https://github.com/probe-rs/embedded-test", branch = "next" }
 hex-literal         = "1.0.0"
 nb                  = "1.1.0"
 p192                = { version = "0.13.0", default-features = false, features = ["arithmetic"] }
