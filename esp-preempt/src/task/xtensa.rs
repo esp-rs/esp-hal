@@ -72,12 +72,10 @@ const SW_INTERRUPT: u32 = if cfg!(esp32) { 1 << 29 } else { 1 << 7 };
 
 pub(crate) fn setup_multitasking() {
     unsafe {
-        let enabled = xtensa_lx::interrupt::disable();
         xtensa_lx::interrupt::enable_mask(
             SW_INTERRUPT
                 | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level2.mask()
-                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask()
-                | enabled,
+                | xtensa_lx_rt::interrupt::CpuInterruptLevel::Level6.mask(),
         );
     }
 }
