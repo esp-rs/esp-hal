@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- `critical-section` now wraps the entirety of the `print!` macros (#4154)
 
 ### Removed
 

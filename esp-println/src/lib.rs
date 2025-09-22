@@ -40,10 +40,8 @@ log_format!("serial");
 macro_rules! println {
     ($($arg:tt)*) => {{
         {
-            $crate::with(|_| {
-                use core::fmt::Write;
-                writeln!($crate::Printer, $($arg)*).ok();
-            });
+            use core::fmt::Write;
+            writeln!($crate::Printer, $($arg)*).ok();
         }
     }};
 }
@@ -54,10 +52,8 @@ macro_rules! println {
 macro_rules! print {
     ($($arg:tt)*) => {{
         {
-            $crate::with(|_| {
-                use core::fmt::Write;
-                write!($crate::Printer, $($arg)*).ok();
-            });
+            use core::fmt::Write;
+            write!($crate::Printer, $($arg)*).ok();
         }
     }};
 }
@@ -490,8 +486,7 @@ mod noop {
 use core::marker::PhantomData;
 
 #[derive(Clone, Copy)]
-#[doc(hidden)]
-pub struct LockToken<'a>(PhantomData<&'a ()>);
+struct LockToken<'a>(PhantomData<&'a ()>);
 
 impl LockToken<'_> {
     #[allow(unused)]
@@ -504,9 +499,8 @@ impl LockToken<'_> {
 static LOCK: esp_sync::RawMutex = esp_sync::RawMutex::new();
 
 /// Runs the callback in a critical section, if enabled.
-#[doc(hidden)]
 #[inline]
-pub fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
+fn with<R>(f: impl FnOnce(LockToken) -> R) -> R {
     #[cfg(feature = "critical-section")]
     return LOCK.lock(|| f(unsafe { LockToken::conjure() }));
 
