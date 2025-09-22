@@ -201,7 +201,7 @@ pub(crate) struct Task {
     pub cpu_context: CpuContext,
     pub thread_semaphore: Option<SemaphorePtr>,
     pub state: TaskState,
-    pub _allocated_stack: *mut [MaybeUninit<u32>],
+    pub stack: *mut [MaybeUninit<u32>],
     pub priority: usize,
 
     pub wakeup_at: u64,
@@ -226,7 +226,8 @@ pub(crate) struct Task {
     pub(crate) heap_allocated: bool,
 }
 
-const STACK_CANARY: u32 = 0xDEEDBAAD;
+const STACK_CANARY: u32 =
+    const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
 impl Task {
     pub(crate) fn new(
@@ -251,7 +252,7 @@ impl Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             state: TaskState::Ready,
-            _allocated_stack: stack,
+            stack,
             current_queue: None,
             priority,
 
@@ -267,15 +268,10 @@ impl Task {
     }
 
     pub(crate) fn ensure_no_stack_overflow(&self) {
-        // TODO: fix this for main task
-        if self._allocated_stack.is_empty() {
-            return;
-        }
-
         assert_eq!(
             // This cast is safe to do from MaybeUninit<u32> because this is the word we've written
             // during initialization.
-            unsafe { self._allocated_stack.cast::<u32>().read() },
+            unsafe { self.stack.cast::<u32>().read() },
             STACK_CANARY,
             "Stack overflow detected in {:?}",
             self as *const Task
@@ -300,7 +296,7 @@ pub(crate) static mut MAIN_TASK: Task = Task {
     cpu_context: CpuContext::new(),
     thread_semaphore: None,
     state: TaskState::Ready,
-    _allocated_stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
+    stack: core::ptr::slice_from_raw_parts_mut(core::ptr::null_mut(), 0),
     current_queue: None,
     priority: 0,
 
@@ -314,16 +310,21 @@ pub(crate) static mut MAIN_TASK: Task = Task {
     heap_allocated: false,
 };
 
-pub(super) fn allocate_main_task(scheduler: &mut SchedulerState) {
+pub(super) fn allocate_main_task(scheduler: &mut SchedulerState, stack: *mut [MaybeUninit<u32>]) {
     let mut main_task_ptr = unwrap!(NonNull::new(&raw mut MAIN_TASK));
     debug!("Main task created: {:?}", main_task_ptr);
 
     unsafe {
+        stack
+            .cast::<MaybeUninit<u32>>()
+            .write(MaybeUninit::new(STACK_CANARY));
+
         let main_task = main_task_ptr.as_mut();
 
         // Reset main task properties. The rest should be cleared when the task is deleted.
         main_task.priority = 0;
         main_task.state = TaskState::Ready;
+        main_task.stack = stack;
     }
 
     debug_assert!(
