@@ -4,7 +4,7 @@ pub(crate) mod arch_specific;
 
 use core::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr::NonNull};
 
-use allocator_api2::boxed::Box;
+use allocator_api2::alloc::Allocator;
 pub(crate) use arch_specific::*;
 use esp_radio_preempt_driver::semaphore::{SemaphoreHandle, SemaphorePtr};
 
@@ -241,18 +241,36 @@ impl Task {
             task_fn, param, task_stack_size, priority
         );
 
-        let task_stack_size_words = task_stack_size / 4;
-        let mut stack = Box::<[u32], _>::new_uninit_slice_in(task_stack_size_words, InternalMemory);
-        stack[0] = MaybeUninit::new(STACK_CANARY);
+        // Make sure the stack guard doesn't eat into the stack size.
+        let task_stack_size = task_stack_size + 4;
 
-        let stack = Box::leak(stack) as *mut [MaybeUninit<u32>];
-        let stack_top = unsafe { stack.cast::<u32>().add(task_stack_size_words).cast() };
+        // Make sure stack size is also aligned to 16 bytes.
+        let task_stack_size = (task_stack_size & !0xF) + 16;
+
+        let layout = unwrap!(
+            allocator_api2::alloc::Layout::from_size_align(task_stack_size, 16).ok(),
+            "Cannot compute Layout for stack"
+        );
+
+        let stack = unwrap!(
+            InternalMemory.allocate(layout).ok(),
+            "Failed to allocate stack of {} bytes",
+            layout.size()
+        )
+        .as_ptr();
+
+        let stack_bottom = stack.cast::<MaybeUninit<u32>>();
+        let stack_len_bytes = layout.size();
+        unsafe { stack_bottom.write(MaybeUninit::new(STACK_CANARY)) };
+
+        let stack_words = core::ptr::slice_from_raw_parts_mut(stack_bottom, stack_len_bytes / 4);
+        let stack_top = unsafe { stack_bottom.add(stack_words.len()).cast() };
 
         Task {
             cpu_context: new_task_context(task_fn, param, stack_top),
             thread_semaphore: None,
             state: TaskState::Ready,
-            stack,
+            stack: stack_words,
             current_queue: None,
             priority,
 
