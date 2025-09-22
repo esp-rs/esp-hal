@@ -227,7 +227,7 @@ pub(crate) struct Task {
 }
 
 const STACK_CANARY: u32 =
-    const { esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_STACK_GUARD_VALUE") };
+    const { esp_config::esp_config_int!(u32, "ESP_HAL_CONFIG_STACK_GUARD_VALUE") };
 
 impl Task {
     pub(crate) fn new(
