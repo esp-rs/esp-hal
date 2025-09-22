@@ -3,12 +3,50 @@
 //! This crate requires an esp-hal timer to operate.
 //!
 //! ```rust, no_run
-#![doc = esp_hal::before_snippet!()]
 //! use esp_hal::timer::timg::TimerGroup;
-//!
 //! let timg0 = TimerGroup::new(peripherals.TIMG0);
-//! esp_preempt::start(timg0.timer0);
-//!
+#![doc = esp_hal::before_snippet!()]
+#![cfg_attr(
+    any(riscv, multi_core),
+    doc = "
+
+use esp_hal::interrupt::software::SoftwareInterruptControl;
+let software_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);"
+)]
+#![cfg_attr(
+    xtensa,
+    doc = "
+
+esp_preempt::start(timg0.timer0);"
+)]
+#![cfg_attr(
+    riscv,
+    doc = "
+
+esp_preempt::start(timg0.timer0, software_interrupt.software_interrupt0);"
+)]
+#![cfg_attr(
+    all(xtensa, multi_core),
+    doc = "
+// Optionally, start the scheduler on the second core
+esp_preempt::start_second_core(
+    software_interrupt.software_interrupt0,
+    software_interrupt.software_interrupt1,
+    || {}, // Second core's main function.
+);
+"
+)]
+#![cfg_attr(
+    all(riscv, multi_core),
+    doc = "
+// Optionally, start the scheduler on the second core
+esp_preempt::start_second_core(
+    software_interrupt.software_interrupt1,
+    || {}, // Second core's main function.
+);
+"
+)]
+#![doc = ""]
 //! // You can now start esp-radio:
 //! // let esp_radio_controller = esp_radio::init().unwrap();
 //! # }
@@ -35,9 +73,18 @@ mod wait_queue;
 use core::mem::MaybeUninit;
 
 pub(crate) use esp_alloc::InternalMemory;
+#[cfg(any(multi_core, riscv))]
+use esp_hal::interrupt::software::SoftwareInterrupt;
 use esp_hal::{
     Blocking,
+    system::Cpu,
     timer::{AnyTimer, OneShotTimer},
+};
+#[cfg(multi_core)]
+use esp_hal::{
+    peripherals::CPU_CTRL,
+    system::{CpuControl, Stack},
+    time::{Duration, Instant},
 };
 pub(crate) use scheduler::SCHEDULER;
 
@@ -105,6 +152,8 @@ where
 
 /// Starts the scheduler.
 ///
+/// The current context will be converted into the main task, and will be pinned to the first core.
+///
 /// # The `timer` argument
 ///
 /// The `timer` argument is a timer source that is used by the scheduler to
@@ -119,7 +168,10 @@ where
     multi_core,
     doc = " \nNote that `esp_radio::init()` must be called on the same core as `esp_preempt::start()`."
 )]
-pub fn start(timer: impl TimerSource) {
+pub fn start(timer: impl TimerSource, #[cfg(riscv)] int0: SoftwareInterrupt<'static, 0>) {
+    trace!("Starting scheduler for the first core");
+    assert_eq!(Cpu::current(), Cpu::ProCpu);
+
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()));
 
@@ -138,11 +190,71 @@ pub fn start(timer: impl TimerSource) {
         );
         task::allocate_main_task(scheduler, stack_slice);
 
-        task::setup_multitasking();
+        task::setup_multitasking(
+            #[cfg(riscv)]
+            int0,
+        );
 
-        unwrap!(scheduler.time_driver.as_mut()).start();
         task::yield_task();
     })
+}
+
+/// Starts the scheduler on the second CPU core.
+///
+/// Note that the scheduler must be started first, before starting the second core.
+///
+/// The supplied stack and function will be used as the main thread of the second core. The thread
+/// will be pinned to the second core.
+#[cfg(multi_core)]
+pub fn start_second_core<const STACK_SIZE: usize>(
+    cpu_control: CPU_CTRL,
+    #[cfg(xtensa)] int0: SoftwareInterrupt<'static, 0>,
+    int1: SoftwareInterrupt<'static, 1>,
+    stack: &'static mut Stack<STACK_SIZE>,
+    func: impl FnOnce() + Send + 'static,
+) {
+    trace!("Starting scheduler for the second core");
+
+    #[cfg(xtensa)]
+    task::setup_smp(int0);
+
+    struct SecondCoreStack {
+        stack: *mut [MaybeUninit<u32>],
+    }
+    unsafe impl Send for SecondCoreStack {}
+    let stack_ptrs = SecondCoreStack {
+        stack: core::ptr::slice_from_raw_parts_mut(
+            stack.bottom().cast::<MaybeUninit<u32>>(),
+            STACK_SIZE,
+        ),
+    };
+
+    let mut cpu_control = CpuControl::new(cpu_control);
+    let guard = cpu_control
+        .start_app_core(stack, move || {
+            trace!("Second core running");
+            task::setup_smp(int1);
+            SCHEDULER.with(move |scheduler| {
+                // Make sure the whole struct is captured, not just a !Send field.
+                let ptrs = stack_ptrs;
+                assert!(
+                    scheduler.time_driver.is_some(),
+                    "The scheduler must be started on the first core first."
+                );
+                task::allocate_main_task(scheduler, ptrs.stack);
+                task::yield_task();
+                trace!("Second core scheduler initialized");
+            });
+
+            func();
+
+            loop {
+                SCHEDULER.sleep_until(Instant::EPOCH + Duration::MAX);
+            }
+        })
+        .unwrap();
+
+    core::mem::forget(guard);
 }
 
 const TICK_RATE: u32 = esp_config::esp_config_int!(u32, "ESP_PREEMPT_CONFIG_TICK_RATE_HZ");

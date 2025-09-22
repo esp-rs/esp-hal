@@ -75,15 +75,12 @@ impl TimeDriver {
         };
 
         timer.set_interrupt_handler(handler);
+        timer.listen();
 
         Self {
             timer,
             timer_queue: TimerQueue::new(),
         }
-    }
-
-    pub(crate) fn start(&mut self) {
-        self.timer.listen();
     }
 
     pub(crate) fn handle_alarm(&mut self, mut on_task_ready: impl FnMut(TaskPtr)) {
