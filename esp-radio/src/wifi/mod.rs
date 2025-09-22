@@ -909,6 +909,7 @@ impl TryFrom<&Config> for WifiMode {
     }
 }
 
+#[doc(hidden)]
 impl TryFrom<wifi_mode_t> for WifiMode {
     type Error = WifiError;
 
@@ -924,6 +925,7 @@ impl TryFrom<wifi_mode_t> for WifiMode {
     }
 }
 
+#[doc(hidden)]
 impl From<WifiMode> for wifi_mode_t {
     fn from(val: WifiMode) -> Self {
         #[allow(non_upper_case_globals)]
@@ -1048,6 +1050,7 @@ impl Default for CsiConfig {
     }
 }
 
+#[doc(hidden)]
 #[cfg(feature = "csi")]
 impl From<CsiConfig> for wifi_csi_config_t {
     fn from(config: CsiConfig) -> Self {

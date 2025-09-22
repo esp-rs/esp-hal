@@ -281,6 +281,22 @@ impl StaDisconnected<'_> {
     }
 }
 
+/// All AP credentials received from WPS handshake.
+#[repr(transparent)]
+pub struct ApCredential(wifi_event_sta_wps_er_success_t__bindgen_ty_1);
+
+impl ApCredential {
+    /// Get the SSID of an AP.
+    pub fn ssid(&self) -> &[u8] {
+        &self.0.ssid
+    }
+
+    /// Get passphrase for the AP.
+    pub fn passphrase(&self) -> &[u8] {
+        &self.0.passphrase
+    }
+}
+
 impl StaAuthmodeChange<'_> {
     /// Get the old authentication mode.
     pub fn old_mode(&self) -> u32 {
@@ -300,8 +316,12 @@ impl StaWpsErSuccess<'_> {
     }
 
     /// Get all AP credentials received.
-    pub fn ap_cred(&self) -> &[wifi_event_sta_wps_er_success_t__bindgen_ty_1] {
-        &self.0.ap_cred
+    pub fn ap_cred(&self) -> &[ApCredential] {
+        let array_ref: &[ApCredential; 3] =
+            // cast reference of fixed-size array to wrapper type
+            unsafe { &*(&self.0.ap_cred as *const _ as *const [ApCredential; 3]) };
+
+        &array_ref[..]
     }
 }
 
@@ -309,6 +329,47 @@ impl StaWpsErPin<'_> {
     /// Get the PIN code received from the WPS.
     pub fn pin(&self) -> &[u8] {
         &self.0.pin_code
+    }
+}
+
+/// A safe, read-only wrapper for a single FTM report entry.
+#[repr(transparent)]
+pub struct FtmReportEntry<'a>(&'a wifi_ftm_report_entry_t);
+
+impl FtmReportEntry<'_> {
+    /// Gets the Dialog Token of the FTM frame.
+    pub fn dialog_token(&self) -> u8 {
+        self.0.dlog_token
+    }
+
+    /// Gets the Received Signal Strength Indicator (RSSI) of the FTM frame.
+    pub fn rssi(&self) -> i8 {
+        self.0.rssi
+    }
+
+    /// Gets the Round Trip Time (RTT) in picoseconds.
+    pub fn rtt(&self) -> u32 {
+        self.0.rtt
+    }
+
+    /// Gets T1: Time of departure of the FTM frame from the Responder (in picoseconds).
+    pub fn t1(&self) -> u64 {
+        self.0.t1
+    }
+
+    /// Gets T2: Time of arrival of the FTM frame at the Initiator (in picoseconds).
+    pub fn t2(&self) -> u64 {
+        self.0.t2
+    }
+
+    /// Gets T3: Time of departure of the ACK from the Initiator (in picoseconds).
+    pub fn t3(&self) -> u64 {
+        self.0.t3
+    }
+
+    /// Gets T4: Time of arrival of the ACK at the Responder (in picoseconds).
+    pub fn t4(&self) -> u64 {
+        self.0.t4
     }
 }
 
@@ -338,14 +399,26 @@ impl FtmReport<'_> {
         self.0.dist_est
     }
 
-    /// Get Pointer to FTM Report, should be freed after use.
-    pub fn report_data(&self) -> *mut wifi_ftm_report_entry_t {
-        self.0.ftm_report_data
-    }
-
     /// Get the number of entries in the FTM report data.
     pub fn report_num_entries(&self) -> u8 {
         self.0.ftm_report_num_entries
+    }
+
+    /// Returns an iterator over the detailed FTM report entries.
+    pub fn entries(&self) -> impl Iterator<Item = FtmReportEntry<'_>> + '_ {
+        let ptr = self.0.ftm_report_data;
+        let len = self.0.ftm_report_num_entries as usize;
+
+        // Return an empty slice when there are no entries.
+        let entries_slice = if ptr.is_null() || len == 0 {
+            &[]
+        } else {
+            // Otherwise, it's the slice from the data.
+            // Can we trust the C API to provide a valid pointer and length?
+            unsafe { core::slice::from_raw_parts(ptr, len) }
+        };
+
+        entries_slice.iter().map(FtmReportEntry)
     }
 }
 
