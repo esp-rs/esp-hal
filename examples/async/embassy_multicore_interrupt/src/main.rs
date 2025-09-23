@@ -19,9 +19,9 @@ use esp_hal::{
     interrupt::{Priority, software::SoftwareInterruptControl},
     main,
     system::{Cpu, CpuControl, Stack},
-    timer::{AnyTimer, timg::TimerGroup},
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::InterruptExecutor;
+use esp_preempt::embassy::InterruptExecutor;
 use esp_println::println;
 use static_cell::StaticCell;
 
@@ -72,12 +72,13 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
-    let sw_ints = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
-
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer1: AnyTimer = timg0.timer1.into();
-    esp_hal_embassy::init([timer0, timer1]);
+    esp_preempt::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 
@@ -87,7 +88,7 @@ fn main() -> ! {
     let led = Output::new(peripherals.GPIO0, Level::Low, OutputConfig::default());
 
     static EXECUTOR_CORE_1: StaticCell<InterruptExecutor<1>> = StaticCell::new();
-    let executor_core1 = InterruptExecutor::new(sw_ints.software_interrupt1);
+    let executor_core1 = InterruptExecutor::new(sw_int.software_interrupt1);
     let executor_core1 = EXECUTOR_CORE_1.init(executor_core1);
 
     let _guard = cpu_control
@@ -101,8 +102,8 @@ fn main() -> ! {
         })
         .unwrap();
 
-    static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<0>> = StaticCell::new();
-    let executor_core0 = InterruptExecutor::new(sw_ints.software_interrupt0);
+    static EXECUTOR_CORE_0: StaticCell<InterruptExecutor<2>> = StaticCell::new();
+    let executor_core0 = InterruptExecutor::new(sw_int.software_interrupt2);
     let executor_core0 = EXECUTOR_CORE_0.init(executor_core0);
 
     let spawner = executor_core0.start(Priority::Priority1);

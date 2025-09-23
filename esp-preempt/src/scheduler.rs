@@ -1,12 +1,14 @@
 #[cfg(feature = "esp-radio")]
 use core::{ffi::c_void, ptr::NonNull};
 
+#[cfg(feature = "alloc")]
 use allocator_api2::boxed::Box;
 use esp_hal::{system::Cpu, time::Instant};
 use esp_sync::NonReentrantMutex;
 
+#[cfg(feature = "alloc")]
+use crate::InternalMemory;
 use crate::{
-    InternalMemory,
     run_queue::RunQueue,
     task::{
         self,
@@ -105,6 +107,7 @@ impl CpuSchedulerState {
                 timer_queue_item: TaskListItem::None,
                 delete_list_item: TaskListItem::None,
 
+                #[cfg(feature = "alloc")]
                 heap_allocated: false,
             },
         }
@@ -403,12 +406,14 @@ impl SchedulerState {
         self.remove_from_all_queues(to_delete);
 
         unsafe {
+            #[cfg(feature = "alloc")]
             if to_delete.as_ref().heap_allocated {
                 let task = Box::from_raw_in(to_delete.as_ptr(), InternalMemory);
                 core::mem::drop(task);
-            } else {
-                core::ptr::drop_in_place(to_delete.as_mut());
+                return;
             }
+
+            core::ptr::drop_in_place(to_delete.as_mut());
         }
     }
 

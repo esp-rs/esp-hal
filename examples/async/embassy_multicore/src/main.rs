@@ -15,12 +15,14 @@ use embassy_executor::Spawner;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
 use esp_backtrace as _;
+#[cfg(target_arch = "riscv32")]
+use esp_hal::interrupt::software::SoftwareInterruptControl;
 use esp_hal::{
     gpio::{Level, Output, OutputConfig},
     system::{Cpu, CpuControl, Stack},
-    timer::{AnyTimer, timg::TimerGroup},
+    timer::timg::TimerGroup,
 };
-use esp_hal_embassy::Executor;
+use esp_preempt::embassy::Executor;
 use esp_println::println;
 use static_cell::StaticCell;
 
@@ -47,15 +49,19 @@ async fn control_led(
     }
 }
 
-#[esp_hal_embassy::main]
+#[esp_preempt::main]
 async fn main(_spawner: Spawner) {
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
 
+    #[cfg(target_arch = "riscv32")]
+    let sw_int = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let timer0: AnyTimer = timg0.timer0.into();
-    let timer1: AnyTimer = timg0.timer1.into();
-    esp_hal_embassy::init([timer0, timer1]);
+    esp_preempt::start(
+        timg0.timer0,
+        #[cfg(target_arch = "riscv32")]
+        sw_int.software_interrupt0,
+    );
 
     let mut cpu_control = CpuControl::new(peripherals.CPU_CTRL);
 

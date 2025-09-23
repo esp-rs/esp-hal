@@ -57,7 +57,7 @@ impl RunQueue {
         self.ready_tasks[priority].push(ready_task);
 
         self.ready_priority.mark_ready(priority);
-        if priority > current_prio {
+        if priority > current_prio || current_prio == 0 {
             debug!(
                 "mark_task_ready - New prio level: {}",
                 self.ready_priority.ready()

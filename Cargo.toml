@@ -7,7 +7,6 @@ exclude  = [
     "esp-bootloader-esp-idf",
     "esp-config",
     "esp-hal",
-    "esp-hal-embassy",
     "esp-hal-procmacros",
     "esp-rom-sys",
     "esp-lp-hal",

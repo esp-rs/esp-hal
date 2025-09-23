@@ -38,8 +38,6 @@ jobs:
               - 'esp-config/**'
             esp-hal:
               - 'esp-hal/**'
-            esp-hal-embassy:
-              - 'esp-hal-embassy/**'
             esp-hal-procmacros:
               - 'esp-hal-procmacros/**'
             esp-lp-hal:
@@ -114,14 +112,6 @@ jobs:
           changeLogPath: esp-hal/CHANGELOG.md
           skipLabels: "skip-changelog"
           missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal/CHANGELOG.md file."
-
-      - name: Check that changelog updated (esp-hal-embassy)
-        if: steps.changes.outputs.esp-hal-embassy == 'true'
-        uses: dangoslen/changelog-enforcer@v3
-        with:
-          changeLogPath: esp-hal-embassy/CHANGELOG.md
-          skipLabels: "skip-changelog"
-          missingUpdateErrorMessage: "Please add a changelog entry in the esp-hal-embassy/CHANGELOG.md file."
 
       - name: Check that changelog updated (esp-hal-procmacros)
         if: steps.changes.outputs.esp-hal-procmacros == 'true'

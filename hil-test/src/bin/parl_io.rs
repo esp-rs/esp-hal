@@ -6,8 +6,6 @@
 #![no_std]
 #![no_main]
 
-#[cfg(not(esp32h2))]
-use esp_hal::parl_io::{RxSixteenBits, TxSixteenBits};
 use esp_hal::{
     dma::{DmaRxBuf, DmaTxBuf},
     dma_buffers,
@@ -43,8 +41,6 @@ struct Context {
     clock_pin: AnyPin<'static>,
     valid_pin: AnyPin<'static>,
     data_pins: [AnyPin<'static>; 8],
-    #[cfg(esp32c6)]
-    extra_data_pins: [AnyPin<'static>; 7],
 }
 
 #[embedded_test::tests(default_timeout = 3)]
@@ -79,16 +75,6 @@ mod tests {
                 peripherals.GPIO23.degrade(),
                 peripherals.GPIO0.degrade(),
                 peripherals.GPIO1.degrade(),
-            ],
-            #[cfg(esp32c6)]
-            extra_data_pins: [
-                peripherals.GPIO18.degrade(),
-                peripherals.GPIO19.degrade(),
-                peripherals.GPIO20.degrade(),
-                peripherals.GPIO22.degrade(),
-                peripherals.GPIO8.degrade(),
-                peripherals.GPIO9.degrade(),
-                peripherals.GPIO15.degrade(),
             ],
         }
     }
