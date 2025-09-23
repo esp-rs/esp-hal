@@ -1454,6 +1454,7 @@ pub struct DmaTxStreamBuf {
     descriptors: &'static mut [DmaDescriptor],
     buffer: &'static mut [u8],
     burst: BurstConfig,
+    pre_filled: Option<usize>,
 }
 
 impl DmaTxStreamBuf {
@@ -1478,7 +1479,6 @@ impl DmaTxStreamBuf {
         let mut chunks = buffer.chunks_exact_mut(chunk_size);
         for (desc, chunk) in descriptors.iter_mut().zip(chunks.by_ref()) {
             desc.buffer = chunk.as_mut_ptr();
-            desc.set_owner(Owner::Dma);
             desc.set_size(chunk.len());
         }
         let remainder = chunks.into_remainder();
@@ -1497,12 +1497,24 @@ impl DmaTxStreamBuf {
             descriptors,
             buffer,
             burst: Default::default(),
+            pre_filled: None,
         })
     }
 
     /// Consume the buf, returning the descriptors and buffer.
     pub fn split(self) -> (&'static mut [DmaDescriptor], &'static mut [u8]) {
         (self.descriptors, self.buffer)
+    }
+
+    /// Fill the buffer with the given data before DMA transfer starts.
+    ///
+    /// Otherwise the streaming buffer will transfer garbage data to
+    /// DMA so that CPU has enough time to fill the buffer after transfer starts.
+    pub fn fill(&mut self, data: &[u8]) -> usize {
+        let n = self.buffer.len().min(data.len());
+        self.buffer[..n].copy_from_slice(&data[..n]);
+        self.pre_filled = Some(n);
+        n
     }
 }
 
@@ -1517,8 +1529,7 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
             desc.next = next;
             next = desc;
 
-            desc.reset_for_tx(false);
-            desc.set_length(desc.size());
+            desc.set_suc_eof(false);
         }
         Preparation {
             start: self.descriptors.as_mut_ptr(),
@@ -1537,11 +1548,15 @@ unsafe impl DmaTxBuffer for DmaTxStreamBuf {
     }
 
     fn into_view(self) -> Self::View {
-        DmaTxStreamBufView {
+        // If the buffer is not pre-filled, treat it as fully filled
+        let pre_filled = self.pre_filled.unwrap_or(self.buffer.len());
+        let mut view = DmaTxStreamBufView {
             buf: self,
             descriptor_idx: 0,
             descriptor_offset: 0,
-        }
+        };
+        view.update_state(pre_filled);
+        view
     }
 
     fn from_view(view: Self::View) -> Self {
@@ -1576,6 +1591,12 @@ impl DmaTxStreamBufView {
         let dma_end = (dma_start + self.available_bytes()).min(self.buf.buffer.len());
         let bytes_pushed = f(&mut self.buf.buffer[dma_start..dma_end]);
 
+        self.update_state(bytes_pushed);
+        bytes_pushed
+    }
+
+    /// Updates the view state on pushed with `bytes_pushed` many bytes.
+    fn update_state(&mut self, bytes_pushed: usize) {
         let mut bytes_filled = 0;
         for d in (self.descriptor_idx..self.buf.descriptors.len()).chain(core::iter::once(0)) {
             let desc = &mut self.buf.descriptors[d];
@@ -1601,8 +1622,6 @@ impl DmaTxStreamBufView {
                 prev.set_suc_eof(false);
             }
         }
-
-        bytes_pushed
     }
 
     /// Pushes a buffer into the stream buffer.

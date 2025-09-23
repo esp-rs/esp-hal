@@ -1017,9 +1017,10 @@ where
         // configure DMA outlink
         unsafe {
             self.tx_channel
-                .prepare_transfer(self.i2s.dma_peripheral(), &mut buf)
-                .and_then(|_| self.tx_channel.start_transfer())?;
+                .prepare_transfer(self.i2s.dma_peripheral(), &mut buf)?;
         }
+        let view = buf.into_view();
+        self.tx_channel.start_transfer()?;
 
         // set I2S_TX_STOP_EN if needed
 
@@ -1028,7 +1029,7 @@ where
 
         Ok(I2sTxDmaTransfer {
             i2s_tx: ManuallyDrop::new(self),
-            buffer_view: ManuallyDrop::new(buf.into_view()),
+            buffer_view: ManuallyDrop::new(view),
         })
     }
 
