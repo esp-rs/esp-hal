@@ -37,10 +37,6 @@ pub enum Error {
     InvalidInterruptPriority,
     /// The CPU interrupt is a reserved interrupt
     CpuInterruptReserved,
-    /// The enabled trap mode is not correct
-    InvalidTrapMode,
-    /// The resulting offset is out of bounds
-    InvalidOffset,
 }
 
 /// Interrupt kind
@@ -212,11 +208,17 @@ impl TryFrom<u8> for Priority {
 #[cfg_attr(place_switch_tables_in_ram, unsafe(link_section = ".rwtext"))]
 pub static RESERVED_INTERRUPTS: &[u32] = PRIORITY_TO_INTERRUPT;
 
+/// Enable an interrupt by directly binding it to a available CPU interrupt
+///
+/// Unless you are sure, you most likely want to use [`enable`] instead.
+///
+/// Trying using a reserved interrupt from [`RESERVED_INTERRUPTS`] will return
+/// an error.
 pub fn enable_direct(
     interrupt: Interrupt,
     level: Priority,
     cpu_interrupt: CpuInterrupt,
-    handler: unsafe fn(),
+    handler: unsafe extern "C" fn(),
 ) -> Result<(), Error> {
     if RESERVED_INTERRUPTS.contains(&(cpu_interrupt as _)) {
         return Err(Error::CpuInterruptReserved);
@@ -230,9 +232,10 @@ pub fn enable_direct(
 
         let mt = mtvec::read();
 
-        if mt.trap_mode() != mtvec::TrapMode::Vectored {
-            return Err(Error::InvalidTrapMode);
-        }
+        assert_eq!(
+            mt.trap_mode().into_usize(),
+            mtvec::TrapMode::Vectored.into_usize()
+        );
 
         let base_addr = mt.address() as usize;
 
@@ -248,64 +251,6 @@ pub fn enable_direct(
     Ok(())
 }
 
-/// Save caller-saved registers. **Should** be called before the interrupt handler will act,
-/// otherwise, the Rust function (user's potential interrupt handler) will clear the registers and
-/// return to an unpredictable place, since it is using `ret` and not `mret`.
-pub fn save_int_context() {
-    unsafe {
-        core::arch::asm!(
-            "
-                addi sp, sp, -16*4
-                sw ra, 0(sp)
-                sw t0, 1*4(sp)
-                sw t1, 2*4(sp)
-                sw t2, 3*4(sp)
-                sw t3, 4*4(sp)
-                sw t4, 5*4(sp)
-                sw t5, 6*4(sp)
-                sw t6, 7*4(sp)
-                sw a0, 8*4(sp)
-                sw a1, 9*4(sp)
-                sw a2, 10*4(sp)
-                sw a3, 11*4(sp)
-                sw a4, 12*4(sp)
-                sw a5, 13*4(sp)
-                sw a6, 14*4(sp)
-                sw a7, 15*4(sp)
-            "
-        )
-    }
-}
-
-/// Restores caller-saved registers, after being saved with the [`save_context`]. **Should** be
-/// called after the interrupt handler has been executed.
-pub fn restore_int_context() {
-    unsafe {
-        core::arch::asm!(
-            "
-                lw ra, 0*4(sp)
-                lw t0, 1*4(sp)
-                lw t1, 2*4(sp)
-                lw t2, 3*4(sp)
-                lw t3, 4*4(sp)
-                lw t4, 5*4(sp)
-                lw t5, 6*4(sp)
-                lw t6, 7*4(sp)
-                lw a0, 8*4(sp)
-                lw a1, 9*4(sp)
-                lw a2, 10*4(sp)
-                lw a3, 11*4(sp)
-                lw a4, 12*4(sp)
-                lw a5, 13*4(sp)
-                lw a6, 14*4(sp)
-                lw a7, 15*4(sp)
-
-                addi sp, sp, 16*4
-            "
-        )
-    }
-}
-
 // helper: returns correctly encoded RISC-V `jal` instruction
 fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let offset = (target as isize) - (pc as isize);
@@ -313,9 +258,7 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     const MIN: isize = -(1isize << 20);
     const MAX: isize = (1isize << 20) - 1;
 
-    if offset % 2 != 0 || offset < MIN || offset > MAX {
-        return Err(Error::InvalidOffset);
-    }
+    assert!(offset % 2 == 0 && (MIN..=MAX).contains(&offset));
 
     let imm = offset as u32;
     let imm20 = (imm >> 20) & 0x1;
@@ -327,7 +270,6 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
         | (imm19_12 << 12)
         | (imm11 << 20)
         | (imm10_1 << 21)
-        | (0u32 << 7)
         // https://lhtin.github.io/01world/app/riscv-isa/?xlen=32&insn_name=jal
         | 0b1101111u32;
 

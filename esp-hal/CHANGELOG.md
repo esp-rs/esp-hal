@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ESP32: Enable up to 4M of PSRAM (#3990)
 - I2C error recovery logic issues (#4000)
 - I2S: Fixed RX half-sample bits configuration bug causing microphone noise (#4109)
+- RISC-V: Direct interrupt vectoring (#4171)
 
 ### Removed
 
