@@ -19,10 +19,8 @@
 use embassy_executor::Spawner;
 use esp_backtrace as _;
 use esp_hal::{
-    dma::DmaRxStreamBuf,
-    dma_buffers,
-    dma_buffers_chunk_size,
-    i2s::master::{Channels, Config, DataFormat, I2s, Standard},
+    dma_rx_stream_buffer,
+    i2s::master::{Channels, Config, DataFormat, I2s},
     time::Rate,
     timer::timg::TimerGroup,
 };
@@ -46,8 +44,6 @@ async fn main(_spawner: Spawner) {
         }
     }
 
-    let (rx_buffer, rx_descriptors, _, _) = dma_buffers_chunk_size!(4092 * 4, 0, 4092);
-
     let i2s = I2s::new(
         peripherals.I2S0,
         dma_channel,
@@ -67,12 +63,11 @@ async fn main(_spawner: Spawner) {
         .with_din(peripherals.GPIO5)
         .build();
 
-    let buffer = rx_buffer;
     println!("Start");
 
     let mut data = [0u8; 5000];
     let mut transaction = i2s_rx
-        .read(DmaRxStreamBuf::new(rx_descriptors, buffer).unwrap(), 4092)
+        .read(dma_rx_stream_buffer!(4092 * 4, 4092), 4092)
         .unwrap();
     loop {
         transaction.wait_for_available().await.unwrap();
