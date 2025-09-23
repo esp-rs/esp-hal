@@ -235,13 +235,11 @@ pub fn enable_direct(
         }
 
         let base_addr = mt.address() as usize;
-        // where should handler act
+
         let int_slot = base_addr.wrapping_add((cpu_interrupt as usize) * 4);
 
-        // Encode a `jal x0, handler`
         let instr = encode_jal_x0(handler as usize, int_slot as usize)?;
 
-        // Patch the slot
         core::ptr::write_volatile(int_slot as *mut u32, instr);
         core::arch::asm!("fence.i");
 
@@ -308,12 +306,10 @@ pub fn restore_int_context() {
     }
 }
 
-/// jal x0 _handler
+// helper: returns correctly encoded RISC-V `jal` instruction
 fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let offset = (target as isize) - (pc as isize);
 
-    // Range: signed 21-bit immediate encoded as imm<<1 => offsets in
-    // [-(1<<20) .. (1<<20)-1], and must be 2-byte aligned.
     const MIN: isize = -(1isize << 20);
     const MAX: isize = (1isize << 20) - 1;
 
@@ -327,11 +323,13 @@ fn encode_jal_x0(target: usize, pc: usize) -> Result<u32, Error> {
     let imm11 = (imm >> 11) & 0x1;
     let imm19_12 = (imm >> 12) & 0xff;
 
-    let rd = 0u32;
-    let opcode = 0b1101111u32;
-
-    let instr =
-        (imm20 << 31) | (imm19_12 << 12) | (imm11 << 20) | (imm10_1 << 21) | (rd << 7) | opcode;
+    let instr = (imm20 << 31)
+        | (imm19_12 << 12)
+        | (imm11 << 20)
+        | (imm10_1 << 21)
+        | (0u32 << 7)
+        // https://lhtin.github.io/01world/app/riscv-isa/?xlen=32&insn_name=jal
+        | 0b1101111u32;
 
     Ok(instr)
 }
