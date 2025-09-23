@@ -7,6 +7,8 @@
 #![no_std]
 #![no_main]
 
+use core::ffi::c_void;
+
 use defmt::info;
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, signal::Signal};
 #[cfg(target_arch = "riscv32")]
@@ -22,7 +24,12 @@ use esp_hal::{
 };
 use esp_hal_embassy::InterruptExecutor;
 use esp_radio::InitializationError;
+use esp_radio_preempt_driver::{
+    self as preempt,
+    semaphore::{SemaphoreHandle, SemaphoreKind},
+};
 use hil_test::mk_static;
+use portable_atomic::{AtomicUsize, Ordering};
 use static_cell::StaticCell;
 
 #[allow(unused)] // compile test
@@ -143,6 +150,78 @@ mod tests {
     }
 
     #[test]
+    #[timeout(2)]
+    fn test_esp_preempt_time_sliicng(p: Peripherals) {
+        let timg0 = TimerGroup::new(p.TIMG0);
+        esp_preempt::start(timg0.timer0);
+
+        struct TestContext {
+            time_slice_observed: SemaphoreHandle,
+            counter: AtomicUsize,
+        }
+        let mut test_context = TestContext {
+            // This semaphore signals the end of the test
+            time_slice_observed: SemaphoreHandle::new(SemaphoreKind::Counting {
+                max: 2,
+                initial: 0,
+            }),
+            counter: AtomicUsize::new(0),
+        };
+
+        // Spawn tasks
+        extern "C" fn task_fn(context: *mut c_void) {
+            let context = unsafe { &*(context as *const TestContext) };
+
+            let mut expected_value = None;
+
+            loop {
+                let was = context.counter.fetch_add(1, Ordering::SeqCst);
+
+                if let Some(expected) = expected_value {
+                    // Not the first iteration. Check that the counter matches the expected value.
+                    if was == expected {
+                        expected_value = Some(was + 1);
+                    } else {
+                        break;
+                    }
+                } else {
+                    // First iteration, just grab the initial value.
+                    expected_value = Some(was + 1);
+                }
+            }
+
+            context.time_slice_observed.give();
+
+            // TODO: support one-shot tasks in esp-preempt
+            unsafe {
+                preempt::schedule_task_deletion(core::ptr::null_mut());
+            }
+        }
+
+        unsafe {
+            preempt::task_create(
+                "task",
+                task_fn,
+                (&raw mut test_context).cast::<c_void>(),
+                0,
+                None,
+                2048,
+            );
+            preempt::task_create(
+                "task",
+                task_fn,
+                (&raw mut test_context).cast::<c_void>(),
+                0,
+                None,
+                2048,
+            );
+        }
+
+        test_context.time_slice_observed.take(None);
+        test_context.time_slice_observed.take(None);
+    }
+
+    #[test]
     fn test_esp_preempt_priority_inheritance(p: Peripherals) {
         use core::ffi::c_void;
 
@@ -176,7 +255,7 @@ mod tests {
             mutex: SemaphoreHandle,
             high_priority_task_finished: AtomicBool,
         }
-        let test_context = TestContext {
+        let mut test_context = TestContext {
             // This semaphore signals the end of the test
             ready_semaphore: SemaphoreHandle::new(SemaphoreKind::Counting { max: 1, initial: 0 }),
             // We'll use this mutex to test priority inheritance
@@ -228,7 +307,7 @@ mod tests {
             preempt::task_create(
                 "high_priority_task",
                 high_priority_task,
-                (&raw const test_context).cast::<c_void>().cast_mut(),
+                (&raw mut test_context).cast::<c_void>(),
                 3,
                 None,
                 4096,
@@ -237,7 +316,7 @@ mod tests {
             preempt::task_create(
                 "medium_priority_task",
                 medium_priority_task,
-                (&raw const test_context).cast::<c_void>().cast_mut(),
+                (&raw mut test_context).cast::<c_void>(),
                 2,
                 None,
                 4096,

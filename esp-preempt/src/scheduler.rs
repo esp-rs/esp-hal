@@ -200,9 +200,9 @@ impl SchedulerState {
         }
 
         // TODO maybe we don't need to do this every time?
-        // The current task is not in the run queue. If the run queue on the current priority level
-        // is empty, the current task is the only one running at its priority level. In this
-        // case, we don't need time slicing.
+        // The current task is not in the run queue. If the run queue on the current priority
+        // level is empty, the current task is the only one running at its priority
+        // level. In this case, we don't need time slicing.
         let arm_next_timeslice_tick = priority
             .map(|p| !self.run_queue.is_level_empty(p))
             .unwrap_or(false);
