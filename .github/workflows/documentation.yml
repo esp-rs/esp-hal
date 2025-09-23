@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: esp-rs/xtensa-toolchain@v1.6
+      - uses: SergioGasquez/xtensa-toolchain@feat/test-espup
         with:
           default: true
           version: 1.89.0.0
