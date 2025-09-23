@@ -659,6 +659,36 @@ macro_rules! dma_rx_stream_buffer {
 }
 
 #[procmacros::doc_replace]
+/// Convenience macro to create a [DmaTxStreamBuf] from buffer size and
+/// optional chunk size (uses max if unspecified).
+/// The buffer and descriptors are statically allocated and
+/// used to create the [DmaTxStreamBuf].
+///
+/// Smaller chunk sizes are recommended for lower latency.
+///
+/// ## Usage
+/// ```rust,no_run
+/// # {before_snippet}
+/// use esp_hal::dma_tx_stream_buffer;
+///
+/// let buf = dma_tx_stream_buffer!(32000);
+/// let buf = dma_tx_stream_buffer!(32000, 1000);
+/// # {after_snippet}
+/// ```
+#[macro_export]
+macro_rules! dma_tx_stream_buffer {
+    ($tx_size:expr) => {
+        $crate::dma_tx_stream_buffer!($tx_size, 4095)
+    };
+    ($tx_size:expr, $chunk_size:expr) => {{
+        let (buffer, descriptors) =
+            $crate::dma_buffers_impl!($tx_size, $chunk_size, is_circular = false);
+
+        $crate::dma::DmaTxStreamBuf::new(descriptors, buffer).unwrap()
+    }};
+}
+
+#[procmacros::doc_replace]
 /// Convenience macro to create a [DmaLoopBuf] from a buffer size.
 ///
 /// ## Usage
