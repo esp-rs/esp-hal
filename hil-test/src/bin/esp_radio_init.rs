@@ -226,6 +226,7 @@ mod tests {
         unsafe {
             info!("Low: spawning high priority task");
             preempt::task_create(
+                "high_priority_task",
                 high_priority_task,
                 (&raw const test_context).cast::<c_void>().cast_mut(),
                 3,
@@ -234,6 +235,7 @@ mod tests {
             );
             info!("Low: spawning medium priority task");
             preempt::task_create(
+                "medium_priority_task",
                 medium_priority_task,
                 (&raw const test_context).cast::<c_void>().cast_mut(),
                 2,

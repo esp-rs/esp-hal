@@ -183,6 +183,39 @@ macro_rules! property {
     ("rmt.channel_ram_size", str) => {
         stringify!(48)
     };
+    ("rmt.has_tx_immediate_stop") => {
+        true
+    };
+    ("rmt.has_tx_loop_count") => {
+        true
+    };
+    ("rmt.has_tx_loop_auto_stop") => {
+        false
+    };
+    ("rmt.has_tx_carrier_data_only") => {
+        true
+    };
+    ("rmt.has_tx_sync") => {
+        true
+    };
+    ("rmt.has_rx_wrap") => {
+        true
+    };
+    ("rmt.has_rx_demodulation") => {
+        true
+    };
+    ("rmt.has_dma") => {
+        false
+    };
+    ("rmt.has_per_channel_clock") => {
+        false
+    };
+    ("rmt.max_idle_threshold") => {
+        16383
+    };
+    ("rmt.max_idle_threshold", str) => {
+        stringify!(16383)
+    };
     ("rng.apb_cycle_wait_num") => {
         16
     };
@@ -301,6 +334,16 @@ macro_rules! for_each_rmt_channel {
         _for_each_inner!((2, 0)); _for_each_inner!((3, 1)); _for_each_inner!((all(0),
         (1), (2), (3))); _for_each_inner!((tx(0, 0), (1, 1))); _for_each_inner!((rx(2,
         0), (3, 1)));
+    };
+}
+#[macro_export]
+#[cfg_attr(docsrs, doc(cfg(feature = "_device-selected")))]
+macro_rules! for_each_rmt_clock_source {
+    ($($pattern:tt => $code:tt;)*) => {
+        macro_rules! _for_each_inner { $(($pattern) => $code;)* ($other : tt) => {} }
+        _for_each_inner!((Apb, 1)); _for_each_inner!((RcFast, 2));
+        _for_each_inner!((Xtal, 3)); _for_each_inner!((Apb)); _for_each_inner!((all(Apb,
+        1), (RcFast, 2), (Xtal, 3))); _for_each_inner!((default(Apb)));
     };
 }
 #[macro_export]

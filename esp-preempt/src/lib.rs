@@ -32,6 +32,8 @@ mod timer;
 mod timer_queue;
 mod wait_queue;
 
+use core::mem::MaybeUninit;
+
 pub(crate) use esp_alloc::InternalMemory;
 use esp_hal::{
     Blocking,
@@ -121,8 +123,20 @@ pub fn start(timer: impl TimerSource) {
     SCHEDULER.with(move |scheduler| {
         scheduler.setup(TimeDriver::new(timer.timer()));
 
-        // allocate the default tasks
-        task::allocate_main_task(scheduler);
+        // Allocate the default task. The stack bottom is set to the stack guard's address as the
+        // rest of the stack is unusable anyway.
+
+        unsafe extern "C" {
+            static _stack_start_cpu0: u32;
+            static __stack_chk_guard: u32;
+        }
+        let stack_top = &raw const _stack_start_cpu0;
+        let stack_bottom = (&raw const __stack_chk_guard).cast::<MaybeUninit<u32>>();
+        let stack_slice = core::ptr::slice_from_raw_parts_mut(
+            stack_bottom.cast_mut(),
+            stack_top as usize - stack_bottom as usize,
+        );
+        task::allocate_main_task(scheduler, stack_slice);
 
         task::setup_multitasking();
 

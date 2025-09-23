@@ -61,3 +61,6 @@ log-04 = ["dep:log-04"]
 
 ## Enable logging output using `defmt` and implement `defmt::Format` on certain types.
 defmt = ["dep:defmt"]
+
+[package.metadata.cargo-machete]
+ignored = ["esp-metadata-generated"]

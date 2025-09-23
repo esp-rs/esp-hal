@@ -38,13 +38,19 @@ log_format!("serial");
 #[cfg(not(feature = "no-op"))]
 #[macro_export]
 macro_rules! println {
+    () => {{
+        $crate::Printer::write_bytes(&[b'\n']);
+    }};
     ($($arg:tt)*) => {{
-        {
+        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
             $crate::with(|_| {
-                use core::fmt::Write;
-                writeln!($crate::Printer, $($arg)*).ok();
-            });
+                use ::core::fmt::Write;
+                ($crate::Printer).write_fmt(args)?;
+                $crate::Printer::write_bytes(&[b'\n']);
+                Ok(())
+            })
         }
+        _do_print(::core::format_args!($($arg)*)).ok();
     }};
 }
 
@@ -53,12 +59,13 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {{
-        {
+        fn _do_print(args: core::fmt::Arguments<'_>) -> Result<(), core::fmt::Error> {
             $crate::with(|_| {
-                use core::fmt::Write;
-                write!($crate::Printer, $($arg)*).ok();
-            });
+                use ::core::fmt::Write;
+                ($crate::Printer).write_fmt(args)
+            })
         }
+        _do_print(::core::format_args!($($arg)*)).ok();
     }};
 }
 

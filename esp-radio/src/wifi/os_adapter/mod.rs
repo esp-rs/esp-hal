@@ -410,6 +410,41 @@ pub unsafe extern "C" fn event_group_wait_bits(
     todo!("event_group_wait_bits")
 }
 
+fn common_task_create(
+    task_func: *mut c_void,
+    name: *const c_char,
+    stack_depth: u32,
+    param: *mut c_void,
+    prio: u32,
+    task_handle: *mut c_void,
+    core_id: Option<u32>,
+) -> i32 {
+    let task_name = unsafe { str_from_c(name as _) };
+    trace!(
+        "task_create task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {:?}",
+        task_func, task_name, stack_depth, param, prio, task_handle, core_id
+    );
+
+    unsafe {
+        let task_func = core::mem::transmute::<
+            *mut c_void,
+            extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
+        >(task_func);
+
+        let task = crate::preempt::task_create(
+            task_name,
+            task_func,
+            param,
+            prio,
+            core_id,
+            stack_depth as usize,
+        );
+        *(task_handle as *mut usize) = task as usize;
+
+        1
+    }
+}
+
 /// **************************************************************************
 /// Name: esp_task_create_pinned_to_core
 ///
@@ -440,34 +475,15 @@ pub unsafe extern "C" fn task_create_pinned_to_core(
     task_handle: *mut c_void,
     core_id: u32,
 ) -> i32 {
-    trace!(
-        "task_create_pinned_to_core task_func {:?} name {} stack_depth {} param {:?} prio {}, task_handle {:?} core_id {}",
+    common_task_create(
         task_func,
-        unsafe { str_from_c(name as _) },
+        name,
         stack_depth,
         param,
         prio,
         task_handle,
-        core_id
-    );
-
-    unsafe {
-        let task_func = core::mem::transmute::<
-            *mut c_void,
-            extern "C" fn(*mut esp_wifi_sys::c_types::c_void),
-        >(task_func);
-
-        let task = crate::preempt::task_create(
-            task_func,
-            param,
-            prio,
-            if core_id < 2 { Some(core_id) } else { None },
-            stack_depth as usize,
-        );
-        *(task_handle as *mut usize) = task as usize;
-
-        1
-    }
+        if core_id < 2 { Some(core_id) } else { None },
+    )
 }
 
 /// **************************************************************************
@@ -497,7 +513,7 @@ pub unsafe extern "C" fn task_create(
     prio: u32,
     task_handle: *mut c_void,
 ) -> i32 {
-    unsafe { task_create_pinned_to_core(task_func, name, stack_depth, param, prio, task_handle, 0) }
+    common_task_create(task_func, name, stack_depth, param, prio, task_handle, None)
 }
 
 /// **************************************************************************
