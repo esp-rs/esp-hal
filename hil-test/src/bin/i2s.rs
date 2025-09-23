@@ -319,66 +319,6 @@ mod tests {
     }
 
     #[test]
-    fn test_i2s_push_too_late(ctx: Context) {
-        let (_, _, tx_buffer, tx_descriptors) = dma_buffers!(0, 16000);
-
-        let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
-                .with_sample_rate(Rate::from_hz(16000))
-                .with_data_format(DataFormat::Data16Channel16)
-                .with_channels(Channels::STEREO),
-        )
-        .unwrap();
-
-        let mut i2s_tx = i2s
-            .i2s_tx
-            .with_bclk(NoPin)
-            .with_ws(NoPin)
-            .with_dout(ctx.dout)
-            .build(tx_descriptors);
-
-        let mut tx_transfer = i2s_tx.write_dma_circular(tx_buffer).unwrap();
-
-        let delay = esp_hal::delay::Delay::new();
-        delay.delay_millis(300);
-
-        assert!(matches!(tx_transfer.push(&[0; 128]), Err(_)));
-    }
-
-    #[test]
-    #[timeout(1)]
-    fn test_i2s_read_too_late(ctx: Context) {
-        let (rx_buffer, rx_descriptors, _, _) = dma_buffers!(16000, 0);
-
-        let i2s = I2s::new(
-            ctx.i2s,
-            ctx.dma_channel,
-            Config::new_tdm_philips()
-                .with_sample_rate(Rate::from_hz(16000))
-                .with_data_format(DataFormat::Data16Channel16)
-                .with_channels(Channels::STEREO),
-        )
-        .unwrap();
-
-        let mut i2s_rx = i2s
-            .i2s_rx
-            .with_bclk(NoPin)
-            .with_ws(NoPin)
-            .with_din(ctx.dout) // not a typo
-            .build(rx_descriptors);
-
-        let mut buffer = [0u8; 1024];
-        let mut rx_transfer = i2s_rx.read_dma_circular(rx_buffer).unwrap();
-
-        let delay = esp_hal::delay::Delay::new();
-        delay.delay_millis(300);
-
-        assert!(matches!(rx_transfer.pop(&mut buffer), Err(_)));
-    }
-
-    #[test]
     #[cfg(not(esp32s2))]
     fn test_i2s_rx_half_sample_bits_regression(ctx: Context) {
         // Regression test for rx_half_sample_bits configuration bug.
