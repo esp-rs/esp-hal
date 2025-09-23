@@ -1003,7 +1003,7 @@ where
     Dm: DriverMode,
 {
     /// Starts a DMA transfer to write data to the I2S transmitter.
-    pub fn write<TXBUF: DmaTxBuffer<Final = TXBUF>>(
+    pub fn write<TXBUF: DmaTxBuffer>(
         mut self,
         mut buf: TXBUF,
     ) -> Result<I2sTxDmaTransfer<'d, Dm, TXBUF>, Error> {
@@ -1071,14 +1071,11 @@ where
 {
     /// Start reading from the I2S RX unit. Notice because of the DMA transfer,
     /// the buffer must be aligned to 32-bit.
-    pub fn read<RXBUF>(
+    pub fn read<RXBUF: DmaRxBuffer>(
         mut self,
         mut buf: RXBUF,
         chunk_size: usize,
-    ) -> Result<I2sRxDmaTransfer<'d, Dm, RXBUF>, Error>
-    where
-        RXBUF: DmaRxBuffer<Final = RXBUF>,
-    {
+    ) -> Result<I2sRxDmaTransfer<'d, Dm, RXBUF>, Error> {
         // Reset RX unit and RX FIFO
         self.i2s.reset_rx();
 
@@ -1115,14 +1112,12 @@ where
 }
 
 /// An in-progress DMA write transfer.
-pub struct I2sTxDmaTransfer<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> {
+pub struct I2sTxDmaTransfer<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> {
     i2s_tx: ManuallyDrop<I2sTx<'d, Dm>>,
     buffer_view: ManuallyDrop<BUFFER::View>,
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> Deref
-    for I2sTxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> Deref for I2sTxDmaTransfer<'d, Dm, BUFFER> {
     type Target = BUFFER::View;
 
     fn deref(&self) -> &Self::Target {
@@ -1130,17 +1125,13 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> Deref
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> DerefMut
-    for I2sTxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> DerefMut for I2sTxDmaTransfer<'d, Dm, BUFFER> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> Drop
-    for I2sTxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> Drop for I2sTxDmaTransfer<'d, Dm, BUFFER> {
     fn drop(&mut self) {
         self.stop_peripheral();
         // SAFETY: This is Drop, we know that self.i2s_tx and self.buffer_view
@@ -1152,9 +1143,9 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> Drop
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> I2sTxDmaTransfer<'d, Dm, BUFFER> {
+impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer> I2sTxDmaTransfer<'d, Dm, BUFFER> {
     /// Stops the DMA transfer and returns the I2S transmitter and buffer.
-    pub fn stop(mut self) -> (I2sTx<'d, Dm>, BUFFER) {
+    pub fn stop(mut self) -> (I2sTx<'d, Dm>, BUFFER::Final) {
         self.stop_peripheral();
         let (i2s_tx, view) = self.release();
         (i2s_tx, BUFFER::from_view(view))
@@ -1167,7 +1158,10 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> I2sTxDmaTransfer<'
     }
 
     /// Stops and restarts the DMA transfer.
-    pub fn restart(self) -> Result<Self, Error> {
+    pub fn restart(self) -> Result<Self, Error>
+    where
+        BUFFER: DmaTxBuffer<Final = BUFFER>,
+    {
         let (i2s, buf) = self.stop();
         i2s.write(buf)
     }
@@ -1197,15 +1191,13 @@ impl<'d, Dm: DriverMode, BUFFER: DmaTxBuffer<Final = BUFFER>> I2sTxDmaTransfer<'
 }
 
 /// An in-progress async circular DMA read transfer.
-pub struct I2sRxDmaTransfer<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> {
+pub struct I2sRxDmaTransfer<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> {
     i2s_rx: ManuallyDrop<I2sRx<'d, Dm>>,
     chunk_size: usize,
     buffer_view: ManuallyDrop<BUFFER::View>,
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> Deref
-    for I2sRxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> Deref for I2sRxDmaTransfer<'d, Dm, BUFFER> {
     type Target = BUFFER::View;
 
     fn deref(&self) -> &Self::Target {
@@ -1213,17 +1205,13 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> Deref
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> DerefMut
-    for I2sRxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> DerefMut for I2sRxDmaTransfer<'d, Dm, BUFFER> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer_view
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> Drop
-    for I2sRxDmaTransfer<'d, Dm, BUFFER>
-{
+impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> Drop for I2sRxDmaTransfer<'d, Dm, BUFFER> {
     fn drop(&mut self) {
         self.stop_peripheral();
         // SAFETY: This is Drop, we know that self.i2s_rx and self.buffer_view
@@ -1235,9 +1223,9 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> Drop
     }
 }
 
-impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> I2sRxDmaTransfer<'d, Dm, BUFFER> {
+impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer> I2sRxDmaTransfer<'d, Dm, BUFFER> {
     /// Stops the transfer and returns the I2S receiver and the buffer.
-    pub fn stop(mut self) -> (I2sRx<'d, Dm>, BUFFER) {
+    pub fn stop(mut self) -> (I2sRx<'d, Dm>, BUFFER::Final) {
         self.stop_peripheral();
         let (i2s_rx, view) = self.release();
         (i2s_rx, BUFFER::from_view(view))
@@ -1250,7 +1238,10 @@ impl<'d, Dm: DriverMode, BUFFER: DmaRxBuffer<Final = BUFFER>> I2sRxDmaTransfer<'
     }
 
     /// Stops and restarts the DMA transfer.
-    pub fn restart(self) -> Result<Self, Error> {
+    pub fn restart(self) -> Result<Self, Error>
+    where
+        BUFFER: DmaRxBuffer<Final = BUFFER>,
+    {
         let chunk_size = self.chunk_size;
         let (i2s, buf) = self.stop();
         i2s.read(buf, chunk_size)
@@ -2535,7 +2526,7 @@ pub mod asynch {
         i2s::master::I2sRxDmaTransfer,
     };
 
-    impl<BUFFER: DmaTxBuffer<Final = BUFFER>> I2sTxDmaTransfer<'_, Async, BUFFER> {
+    impl<BUFFER: DmaTxBuffer> I2sTxDmaTransfer<'_, Async, BUFFER> {
         /// Waits for DMA process to be made and additional room to be
         /// available.
         ///
@@ -2552,7 +2543,7 @@ pub mod asynch {
         }
     }
 
-    impl<BUFFER: DmaRxBuffer<Final = BUFFER>> I2sRxDmaTransfer<'_, Async, BUFFER> {
+    impl<BUFFER: DmaRxBuffer> I2sRxDmaTransfer<'_, Async, BUFFER> {
         /// Waits for DMA process to be made and additional room to be
         /// available.
         ///
